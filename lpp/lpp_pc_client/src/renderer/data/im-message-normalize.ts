@@ -164,7 +164,9 @@ export function resolveMediaUrl(
   ...keys: string[]
 ) {
   const record = media as Record<string, unknown> | undefined;
-  const raw = keys.map((key) => stringValue(record?.[key])).find(Boolean);
+  const raw = keys
+    .map((key) => stringValue(record?.[key]))
+    .find((value): value is string => Boolean(value && !isBareMediaFileName(value)));
   if (!raw) return undefined;
   if (/^(data:|blob:|https?:|file:)/i.test(raw)) return raw;
   if (raw.startsWith("//")) return `https:${raw}`;
@@ -174,6 +176,14 @@ export function resolveMediaUrl(
   } catch {
     return raw;
   }
+}
+
+function isBareMediaFileName(value: string) {
+  return (
+    !/[\\/?#]/.test(value) &&
+    /\.[a-z0-9]{2,8}$/i.test(value) &&
+    !/^[a-z][a-z0-9+.-]*:/i.test(value)
+  );
 }
 
 export function isBrowserNativeUrl(value: string) {

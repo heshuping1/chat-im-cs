@@ -419,10 +419,6 @@ function FilePart({
           <strong>{fileName}</strong>
           <em>{statusText || formatSize(media?.sizeBytes)}</em>
         </span>
-        <span className="message-file-source" aria-hidden="true">
-          <span className="message-file-source-mark">●</span>
-          微信电脑版
-        </span>
       </button>
       {openError && <span className="message-file-error">{openError}</span>}
       <UploadControls uploadState={uploadState} onUploadAction={onUploadAction} />
@@ -704,9 +700,23 @@ function VideoPart({
     Boolean(displaySrc && readyVideoSourceCache.has(displaySrc)),
   );
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
     setFrameReady(Boolean(displaySrc && readyVideoSourceCache.has(displaySrc)));
   }, [displaySrc]);
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [previewOpen]);
   useEffect(() => {
     if (explicitPoster || registeredPoster) {
       setGeneratedPoster(undefined);
@@ -742,7 +752,12 @@ function VideoPart({
     if (nextPoster) videoPosterCache.set(displaySrc, nextPoster);
   };
   const openPreview = () => {
+    videoRef.current?.pause();
     setPreviewOpen(true);
+  };
+  const closePreview = () => {
+    previewVideoRef.current?.pause();
+    setPreviewOpen(false);
   };
   const saveVideoAs = async () => {
     if (!displaySrc) return;
@@ -831,18 +846,19 @@ function VideoPart({
       {previewOpen && displaySrc && !failed && (
         <div
           className="wechat-video-preview"
+          onClick={closePreview}
           role="dialog"
           aria-modal="true"
           aria-label="视频预览"
         >
-          <div className="wechat-video-preview-window">
+          <div className="wechat-video-preview-window" onClick={(event) => event.stopPropagation()}>
             <header className="wechat-video-preview-toolbar">
               <div className="wechat-video-preview-dots" aria-hidden="true">
                 <button
                   className="close"
                   type="button"
                   aria-label="关闭视频预览"
-                  onClick={() => setPreviewOpen(false)}
+                  onClick={closePreview}
                 />
                 <span className="minimize" />
                 <span className="maximize" />
@@ -866,6 +882,7 @@ function VideoPart({
             </header>
             <div className="wechat-video-preview-stage">
               <video
+                ref={previewVideoRef}
                 className="wechat-video-preview-player"
                 src={displaySrc}
                 poster={posterSrc}

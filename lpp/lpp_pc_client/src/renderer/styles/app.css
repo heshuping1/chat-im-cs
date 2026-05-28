@@ -2731,14 +2731,15 @@ button.message-image-frame {
   z-index: 120;
   display: grid;
   place-items: center;
-  padding: 36px;
-  background: rgba(0, 0, 0, 0.88);
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
 }
 
 .wechat-video-preview-window {
   display: grid;
-  width: min(94vw, 1280px);
-  height: min(92vh, 860px);
+  width: min(92vw, 1280px);
+  height: min(90vh, 860px);
+  min-width: min(760px, 92vw);
   grid-template-rows: 56px minmax(0, 1fr);
   overflow: hidden;
   border-radius: 14px;
@@ -2826,8 +2827,12 @@ button.message-image-frame {
 }
 
 .wechat-video-preview-player {
+  display: block;
+  width: auto;
+  height: auto;
   max-width: 100%;
   max-height: 100%;
+  object-fit: contain;
   background: #000;
   outline: none;
 }
@@ -8510,10 +8515,15 @@ body.is-composer-resizing * {
 }
 
 .pc-chat-message.mine .pc-chat-bubble:has(.wechat-video-card),
+.pc-chat-message.mine .pc-chat-bubble:has(.message-file-card),
+.pc-chat-message.mine .pc-chat-bubble:has(.message-audio-card),
+.pc-chat-message.mine .pc-chat-bubble:has(.message-contact-card),
 .pc-chat-message.other .pc-chat-bubble:has(.wechat-video-card),
 .pc-chat-message.mine .pc-chat-bubble:has(.message-media),
 .pc-chat-message.other .pc-chat-bubble:has(.message-media) {
+  padding: 0 !important;
   border: 0 !important;
+  border-radius: 8px !important;
   background: transparent !important;
   box-shadow: none !important;
 }
@@ -9000,17 +9010,51 @@ body.is-composer-resizing * {
 }
 
 .pc-chat-bubble .message-file-card {
-  width: min(318px, 46vw);
-  min-width: min(300px, 46vw);
-  max-width: min(318px, 46vw);
-  padding: 14px 14px 9px;
-  background: #ffffff;
+  width: min(246px, 42vw);
+  min-width: min(246px, 42vw);
+  min-height: 84px;
+  max-width: min(246px, 42vw);
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 8px 14px;
+  padding: 12px 12px;
+  border-radius: 5px;
+  background: #f0f1f3;
   box-shadow: none;
 }
 
 .pc-chat-bubble .message-file-wrap,
 .pc-chat-bubble .message-upload-meta {
-  max-width: min(318px, 46vw);
+  max-width: min(246px, 42vw);
+}
+
+.pc-chat-bubble .message-file-card .message-file-copy {
+  gap: 5px;
+}
+
+.pc-chat-bubble .message-file-card strong {
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.pc-chat-bubble .message-file-card em,
+.pc-chat-bubble .message-file-source {
+  font-size: 11px;
+}
+
+.pc-chat-bubble .message-file-icon {
+  width: 36px;
+  height: 44px;
+}
+
+.pc-chat-bubble .message-file-icon::after {
+  width: 13px;
+  height: 13px;
+}
+
+.pc-chat-bubble .message-file-icon.sheet .file-type-glyph,
+.pc-chat-bubble .message-file-icon.video .file-type-glyph {
+  font-size: 17px;
 }
 
 .pc-chat-message.mine .message-media-empty,
@@ -9136,21 +9180,22 @@ body.is-composer-resizing .composer-resize-handle {
   flex-wrap: nowrap !important;
   align-items: flex-start !important;
   justify-content: flex-start !important;
-  gap: 10px !important;
-  min-height: 48px !important;
+  gap: 12px !important;
+  min-height: 58px !important;
   padding: 8px 12px 0 !important;
   overflow: hidden !important;
 }
 
 .e-composer .h-tool-row button {
   display: inline-grid !important;
-  width: 42px !important;
-  min-width: 42px !important;
-  height: 40px !important;
-  min-height: 40px !important;
-  grid-template-rows: 20px 16px !important;
+  width: 45px !important;
+  min-width: 45px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  grid-template-rows: 22px 22px !important;
   place-items: center !important;
-  gap: 1px !important;
+  align-content: center !important;
+  gap: 2px !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 8px !important;
@@ -9162,7 +9207,7 @@ body.is-composer-resizing .composer-resize-handle {
 
 .e-composer .h-tool-row button:hover:not(:disabled),
 .e-composer .h-tool-row button.active {
-  background: rgba(231, 234, 238, 0.78) !important;
+  background: #e8edf3 !important;
   color: #111827 !important;
 }
 
@@ -9173,8 +9218,8 @@ body.is-composer-resizing .composer-resize-handle {
 }
 
 .e-composer .h-tool-row button svg {
-  width: 19px !important;
-  height: 19px !important;
+  width: 20px !important;
+  height: 20px !important;
   stroke-width: 1.9 !important;
 }
 
@@ -9190,6 +9235,13 @@ body.is-composer-resizing .composer-resize-handle {
   font-weight: 500 !important;
   line-height: 1.1 !important;
   white-space: nowrap !important;
+}
+
+.e-composer .h-tool-row .tool-shortcut {
+  margin-top: 0 !important;
+  color: #667085 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
 }
 
 .e-composer .h-tool-row button.composer-advanced-tool {
@@ -13093,6 +13145,47 @@ body.is-pane-resizing .app-shell.messages-layout > .profile-resizer {
 *.is-scrolling {
   scrollbar-width: thin !important;
   scrollbar-color: rgba(113, 131, 155, 0.34) transparent !important;
+}
+
+/* WeChat-style chat panes: reserve the rail so messages never shift horizontally. */
+.app-shell .e-message-stage,
+.app-shell .h-message-stage {
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(156, 163, 175, 0.42) transparent !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar,
+.app-shell .h-message-stage::-webkit-scrollbar,
+.app-shell .e-message-stage:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .h-message-stage:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .e-message-stage.is-scrolling::-webkit-scrollbar,
+.app-shell .h-message-stage.is-scrolling::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar-thumb,
+.app-shell .h-message-stage::-webkit-scrollbar-thumb,
+.app-shell .e-message-stage:not(.is-scrolling)::-webkit-scrollbar-thumb,
+.app-shell .h-message-stage:not(.is-scrolling)::-webkit-scrollbar-thumb,
+.app-shell .e-message-stage.is-scrolling::-webkit-scrollbar-thumb,
+.app-shell .h-message-stage.is-scrolling::-webkit-scrollbar-thumb {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(156, 163, 175, 0.42) !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar-thumb:hover,
+.app-shell .h-message-stage::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.58) !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar-track,
+.app-shell .h-message-stage::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
 /* Theme system bridge: keeps legacy page classes aligned with theme tokens. */

@@ -32,6 +32,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const allowedExternalProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+const appIconPath = app.isPackaged
+  ? join(process.resourcesPath, 'app-icon.ico')
+  : join(__dirname, '../../assets/app-icon-green-bubble.ico');
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -45,6 +48,7 @@ function createWindow() {
     minWidth: 1180,
     minHeight: 760,
     title: 'LPP 客服客户端',
+    icon: appIconPath,
     backgroundColor: '#f5f7fb',
     webPreferences: {
       preload: join(__dirname, '../preload/preload.cjs'),
@@ -80,7 +84,7 @@ function createWindow() {
 
 function ensureTray() {
   if (tray) return;
-  const emptyIcon = process.platform === 'win32' ? join(__dirname, '../../build/icon.ico') : undefined;
+  const emptyIcon = process.platform === 'win32' ? appIconPath : undefined;
   if (!emptyIcon) return;
   try {
     tray = new Tray(emptyIcon);
@@ -240,9 +244,10 @@ async function copyFileToClipboard(filePath: string) {
   }
   if (process.platform === 'win32') {
     await execFileAsync('powershell.exe', [
+      '-STA',
       '-NoProfile',
       '-Command',
-      'Set-Clipboard -LiteralPath $args[0]',
+      '& { param($path) Add-Type -AssemblyName System.Windows.Forms; $files = New-Object System.Collections.Specialized.StringCollection; [void] $files.Add($path); [System.Windows.Forms.Clipboard]::SetFileDropList($files) }',
       filePath,
     ]);
     return;
@@ -342,31 +347,47 @@ function screenshotSelectorHtml(channel: string) {
 <head>
   <meta charset="utf-8" />
   <style>
+    :root { color-scheme: dark; }
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; cursor: crosshair; user-select: none; }
     body { background: #000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     #shot { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: fill; }
-    #shade { position: fixed; inset: 0; background: rgba(0, 0, 0, .36); }
-    #box { position: fixed; display: none; border: 1px solid #07c160; box-shadow: 0 0 0 9999px rgba(0,0,0,.36); background: transparent; }
-    #size { position: fixed; display: none; padding: 3px 6px; border-radius: 4px; background: rgba(15,23,42,.82); color: #fff; font-size: 12px; }
-    #bar { position: fixed; display: none; gap: 8px; padding: 7px; border-radius: 8px; background: rgba(31,41,55,.92); box-shadow: 0 12px 36px rgba(0,0,0,.26); }
-    button { height: 28px; padding: 0 12px; border: 0; border-radius: 5px; background: rgba(255,255,255,.14); color: #fff; font-size: 13px; cursor: pointer; }
+    #shade { position: fixed; inset: 0; background: rgba(0, 0, 0, .42); }
+    #box { position: fixed; display: none; box-sizing: border-box; border: 1px solid #07c160; box-shadow: 0 0 0 9999px rgba(0,0,0,.42), 0 0 0 1px rgba(255,255,255,.78) inset; background: transparent; cursor: move; }
+    #size { position: fixed; display: none; z-index: 2; padding: 4px 7px; border-radius: 4px; background: rgba(15,23,42,.9); color: #fff; font-size: 12px; line-height: 1; }
+    #bar { position: fixed; display: none; z-index: 2; align-items: center; gap: 4px; padding: 6px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; background: rgba(31,41,55,.96); box-shadow: 0 12px 36px rgba(0,0,0,.35); }
+    #hint { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 7px 10px; border-radius: 999px; background: rgba(15,23,42,.72); color: rgba(255,255,255,.78); font-size: 12px; pointer-events: none; }
+    .handle { position: absolute; width: 9px; height: 9px; border: 1px solid rgba(255,255,255,.95); border-radius: 999px; background: #07c160; transform: translate(-50%, -50%); }
+    .nw { left: 0; top: 0; cursor: nwse-resize; } .n { left: 50%; top: 0; cursor: ns-resize; } .ne { left: 100%; top: 0; cursor: nesw-resize; }
+    .e { left: 100%; top: 50%; cursor: ew-resize; } .se { left: 100%; top: 100%; cursor: nwse-resize; } .s { left: 50%; top: 100%; cursor: ns-resize; }
+    .sw { left: 0; top: 100%; cursor: nesw-resize; } .w { left: 0; top: 50%; cursor: ew-resize; }
+    button { display: grid; width: 32px; height: 30px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: #f8fafc; cursor: pointer; font-size: 17px; }
+    button:hover { background: rgba(255,255,255,.13); }
     button.primary { background: #07c160; color: #fff; }
+    button.primary:hover { background: #06ad56; }
+    .divider { width: 1px; height: 22px; margin: 0 3px; background: rgba(255,255,255,.18); }
   </style>
 </head>
 <body>
   <img id="shot" />
   <div id="shade"></div>
-  <div id="box"></div>
+  <div id="box">
+    <i class="handle nw" data-handle="nw"></i><i class="handle n" data-handle="n"></i><i class="handle ne" data-handle="ne"></i>
+    <i class="handle e" data-handle="e"></i><i class="handle se" data-handle="se"></i><i class="handle s" data-handle="s"></i>
+    <i class="handle sw" data-handle="sw"></i><i class="handle w" data-handle="w"></i>
+  </div>
   <div id="size"></div>
   <div id="bar"><button id="cancel">取消</button><button id="ok" class="primary">完成</button></div>
+  <div id="hint">拖动鼠标选择截图区域，Enter 完成，Esc 取消</div>
   <script>
     const { ipcRenderer } = require('electron');
     const shot = document.getElementById('shot');
     const box = document.getElementById('box');
     const size = document.getElementById('size');
     const bar = document.getElementById('bar');
-    let dragging = false;
+    const hint = document.getElementById('hint');
+    let mode = null;
     let start = null;
+    let base = null;
     let rect = null;
     ipcRenderer.once('desktop:screenshot-source', (_event, dataUrl) => { shot.src = dataUrl; });
     function send(value) { ipcRenderer.send(${JSON.stringify(channel)}, value); }
@@ -375,33 +396,71 @@ function screenshotSelectorHtml(channel: string) {
       const top = Math.min(a.y, b.y);
       return { left, top, width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) };
     }
+    function clampRect(next) {
+      const left = Math.max(0, Math.min(window.innerWidth - 1, next.left));
+      const top = Math.max(0, Math.min(window.innerHeight - 1, next.top));
+      const width = Math.max(1, Math.min(window.innerWidth - left, next.width));
+      const height = Math.max(1, Math.min(window.innerHeight - top, next.height));
+      return { left, top, width, height };
+    }
+    function resizeRect(handle, origin, delta) {
+      let left = origin.left;
+      let top = origin.top;
+      let right = origin.left + origin.width;
+      let bottom = origin.top + origin.height;
+      if (handle.includes('w')) left += delta.x;
+      if (handle.includes('e')) right += delta.x;
+      if (handle.includes('n')) top += delta.y;
+      if (handle.includes('s')) bottom += delta.y;
+      return normalized({ x: left, y: top }, { x: right, y: bottom });
+    }
     function showRect(next) {
-      rect = next;
-      box.style.display = next.width > 2 && next.height > 2 ? 'block' : 'none';
-      box.style.left = next.left + 'px';
-      box.style.top = next.top + 'px';
-      box.style.width = next.width + 'px';
-      box.style.height = next.height + 'px';
+      rect = clampRect(next);
+      box.style.display = rect.width > 2 && rect.height > 2 ? 'block' : 'none';
+      hint.style.display = box.style.display === 'block' ? 'none' : 'block';
+      box.style.left = rect.left + 'px';
+      box.style.top = rect.top + 'px';
+      box.style.width = rect.width + 'px';
+      box.style.height = rect.height + 'px';
       size.style.display = box.style.display;
-      size.textContent = Math.round(next.width) + ' x ' + Math.round(next.height);
-      size.style.left = next.left + 'px';
-      size.style.top = Math.max(4, next.top - 26) + 'px';
+      size.textContent = Math.round(rect.width) + ' × ' + Math.round(rect.height);
+      size.style.left = rect.left + 'px';
+      size.style.top = Math.max(6, rect.top - 24) + 'px';
       bar.style.display = box.style.display;
-      const barTop = next.top + next.height + 10;
-      bar.style.left = Math.min(window.innerWidth - 132, Math.max(8, next.left + next.width - 132)) + 'px';
-      bar.style.top = (barTop + 46 > window.innerHeight ? next.top - 46 : barTop) + 'px';
+      const barWidth = 118;
+      const barTop = rect.top + rect.height + 10;
+      bar.style.left = Math.min(window.innerWidth - barWidth - 8, Math.max(8, rect.left + rect.width - barWidth)) + 'px';
+      bar.style.top = (barTop + 44 > window.innerHeight ? rect.top - 44 : barTop) + 'px';
     }
     window.addEventListener('mousedown', (event) => {
       if (event.target.closest('#bar')) return;
-      dragging = true;
       start = { x: event.clientX, y: event.clientY };
+      base = rect ? { ...rect } : null;
+      const handle = event.target.dataset && event.target.dataset.handle;
+      if (handle && rect) {
+        mode = 'resize:' + handle;
+        return;
+      }
+      if (event.target === box && rect) {
+        mode = 'move';
+        return;
+      }
+      mode = 'draw';
       showRect({ left: start.x, top: start.y, width: 0, height: 0 });
     });
     window.addEventListener('mousemove', (event) => {
-      if (!dragging || !start) return;
-      showRect(normalized(start, { x: event.clientX, y: event.clientY }));
+      if (!mode || !start) return;
+      const current = { x: event.clientX, y: event.clientY };
+      const delta = { x: current.x - start.x, y: current.y - start.y };
+      if (mode === 'draw') {
+        showRect(normalized(start, current));
+      } else if (mode === 'move' && base) {
+        showRect({ ...base, left: base.left + delta.x, top: base.top + delta.y });
+      } else if (mode.startsWith('resize:') && base) {
+        showRect(resizeRect(mode.slice(7), base, delta));
+      }
     });
-    window.addEventListener('mouseup', () => { dragging = false; });
+    window.addEventListener('mouseup', () => { mode = null; });
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') send({ canceled: true });
       if (event.key === 'Enter') finish();

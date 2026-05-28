@@ -49,6 +49,7 @@
   "build": {
     "appId": "com.lpp.pcclient",
     "productName": "LPP 客服客户端",
+    "icon": "assets/app-icon-green-bubble.ico",
     "directories": {
       "output": "release"
     },
@@ -56,11 +57,20 @@
       "dist/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "assets/app-icon-green-bubble.ico",
+        "to": "app-icon.ico"
+      }
+    ],
     "win": {
+      "icon": "assets/app-icon-green-bubble.ico",
       "target": "nsis",
       "artifactName": "LPP-CustomerService-${version}.${ext}"
     },
     "nsis": {
+      "installerIcon": "assets/app-icon-green-bubble.ico",
+      "uninstallerIcon": "assets/app-icon-green-bubble.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

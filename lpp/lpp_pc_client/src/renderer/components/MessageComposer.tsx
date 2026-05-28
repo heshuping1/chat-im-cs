@@ -1,6 +1,7 @@
 import {
   FileImage,
   Folder,
+  MessageSquareQuote,
   Mic,
   Paperclip,
   Plus,
@@ -539,7 +540,6 @@ export function MessageComposer({
         >
           <Scissors size={16} />
           <span className={dense ? "tool-label" : ""}>
-            截图
             {enableScreenshot && screenshotShortcut !== "None" && (
               <em className="tool-shortcut">{screenshotShortcut}</em>
             )}
@@ -547,6 +547,15 @@ export function MessageComposer({
         </button>
         <span className="composer-tool-separator" aria-hidden="true" />
         {leadingTools}
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="话术"
+          title="话术"
+        >
+          <MessageSquareQuote size={16} />
+          <span className={dense ? "tool-label" : ""}>话术</span>
+        </button>
         {renderComposerExtraTools({
           extraTools,
           disabled: disabled || translatingDraft || !draft.trim(),
