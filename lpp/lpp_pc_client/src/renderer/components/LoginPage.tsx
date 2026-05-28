@@ -53,6 +53,7 @@ export function LoginPage() {
       const login = await client.platformLogin({
         identifier: identifier.trim(),
         password,
+        loginType: inferLoginType(identifier.trim()),
         captchaToken: captchaInput?.captchaToken,
         captchaAnswer: captchaInput?.captchaAnswer,
       });
@@ -295,4 +296,12 @@ function selectTenantId(login: PlatformLoginResult, preferredTenantId: string) {
     return login.spaceContext.tenantId;
   }
   return login.tenants?.[0]?.tenantId ?? null;
+}
+
+function inferLoginType(identifier: string) {
+  const value = identifier.trim();
+  if (/^lpp_/i.test(value)) return 'lpp_id';
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'email';
+  if (/^\+?\d[\d\s-]{5,}$/.test(value)) return 'mobile';
+  return 'auto';
 }
