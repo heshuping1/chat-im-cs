@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PC 通讯录高保真视觉方案</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter, "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --ink: #111827;
+        --muted: #64748b;
+        --line: #e3eaf2;
+        --line-soft: #edf2f7;
+        --green: #10b981;
+        --green-dark: #058f71;
+        --blue: #2563eb;
+        --amber: #f59e0b;
+        --bg: #f5f8fb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 12% 6%, rgba(16, 185, 129, 0.08), transparent 24%),
+          linear-gradient(180deg, #fbfdff 0%, var(--bg) 100%);
+        color: var(--ink);
+      }
+
+      .board {
+        width: 1920px;
+        min-height: 1360px;
+        padding: 48px;
+      }
+
+      .board-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        margin-bottom: 28px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 34px;
+        letter-spacing: 0;
+      }
+
+      .board-head p {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 17px;
+        font-weight: 600;
+      }
+
+      .badge {
+        padding: 9px 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.78);
+        color: #475569;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .scheme-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 26px;
+      }
+
+      .scheme {
+        overflow: hidden;
+        border: 1px solid #dde7f1;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.09);
+      }
+
+      .scheme-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--line-soft);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .scheme-title h2 {
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .scheme-title span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .mock {
+        display: grid;
+        height: 412px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .mock.a {
+        grid-template-columns: 176px 260px 1fr;
+        --accent: #10b981;
+      }
+
+      .mock.b {
+        grid-template-columns: 72px 292px 1fr;
+        --accent: #2563eb;
+      }
+
+      .mock.c {
+        grid-template-columns: 220px 282px 1fr;
+        --accent: #0f766e;
+      }
+
+      .mock.d {
+        grid-template-columns: 156px 330px 1fr;
+        --accent: #7c3aed;
+      }
+
+      .side {
+        padding: 18px;
+        border-right: 1px solid var(--line-soft);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 250, 0.96));
+      }
+
+      .mock.b .side {
+        padding: 14px 10px;
+        background: #132238;
+        color: #fff;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .avatar {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #ff5f47, #ffb33f);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 950;
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .brand small {
+        color: #7a8da4;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 38px;
+        margin-bottom: 8px;
+        padding: 0 11px;
+        border-radius: 10px;
+        color: #52657a;
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .nav-item.active {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--accent);
+      }
+
+      .mock.b .nav-item {
+        justify-content: center;
+        width: 48px;
+        height: 50px;
+        margin: 0 auto 10px;
+        padding: 0;
+        color: rgba(255, 255, 255, 0.72);
+      }
+
+      .mock.b .nav-item.active {
+        background: rgba(255, 255, 255, 0.14);
+        color: #fff;
+      }
+
+      .iconbox {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 9px;
+        background: rgba(226, 232, 240, 0.7);
+      }
+
+      .list {
+        min-width: 0;
+        padding: 20px;
+        border-right: 1px solid var(--line-soft);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .list h3 {
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 38px;
+        margin: 14px 0;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .tabs span {
+        height: 30px;
+        padding: 0 11px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        color: #60758d;
+        font-size: 12px;
+        font-weight: 850;
+        line-height: 29px;
+      }
+
+      .tabs span.active {
+        border-color: rgba(16, 185, 129, 0.35);
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--accent);
+      }
+
+      .contact {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        min-height: 58px;
+        padding: 9px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+      }
+
+      .contact.active {
+        border-color: rgba(16, 185, 129, 0.42);
+        background: rgba(16, 185, 129, 0.08);
+      }
+
+      .mini-avatar {
+        display: grid;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border-radius: 10px;
+        background: #dbeafe;
+        color: #2563eb;
+        font-size: 15px;
+        font-weight: 950;
+      }
+
+      .contact strong {
+        display: block;
+        overflow: hidden;
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .contact small {
+        display: block;
+        overflow: hidden;
+        margin-top: 3px;
+        color: #7a8da4;
+        font-size: 11px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .pill {
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 22px;
+      }
+
+      .detail {
+        min-width: 0;
+        padding: 22px 24px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 252, 255, 0.92));
+      }
+
+      .detail-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .detail-head .avatar {
+        width: 54px;
+        height: 54px;
+        border-radius: 15px;
+        font-size: 22px;
+      }
+
+      .detail-head h3 {
+        font-size: 22px;
+      }
+
+      .detail-head p {
+        margin-top: 5px;
+        color: #6f8197;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .detail-actions {
+        display: flex;
+        gap: 8px;
+        margin: 18px 0;
+      }
+
+      .detail-actions button {
+        height: 34px;
+        padding: 0 13px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: #40536a;
+        font-weight: 850;
+      }
+
+      .detail-actions button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .info-card {
+        min-height: 72px;
+        padding: 12px;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      .info-card span {
+        color: #71839a;
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .info-card strong {
+        display: block;
+        margin-top: 7px;
+        font-size: 15px;
+      }
+
+      .org-tree {
+        margin-top: 12px;
+        padding: 12px;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      .org-line {
+        display: flex;
+        justify-content: space-between;
+        padding: 7px 0;
+        color: #52657a;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .params {
+        display: grid;
+        grid-template-columns: 1.15fr 1fr;
+        gap: 14px;
+        padding: 16px 20px 20px;
+      }
+
+      .param-box {
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: rgba(248, 251, 255, 0.78);
+        padding: 12px;
+      }
+
+      .param-box h3 {
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .param-box p {
+        color: #52657a;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.65;
+      }
+
+      .mono {
+        color: #0f766e;
+        font-family: "SF Mono", Consolas, monospace;
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="board">
+      <header class="board-head">
+        <div>
+          <h1>PC 客户端通讯录高保真视觉方案</h1>
+          <p>每套方案均含可落地参数：布局、组件、色彩、字体、间距、头像、列表和 lucide 图标名。</p>
+        </div>
+        <div class="badge">目标：选定后按参数实现，不靠参考图猜</div>
+      </header>
+
+      <section class="scheme-grid">
+        <article class="scheme">
+          <div class="scheme-title">
+            <h2>A · 白瓷组织台</h2>
+            <span>最贴近当前 E 方案，低风险落地</span>
+          </div>
+          <div class="mock a">
+            <aside class="side">
+              <div class="brand"><span class="avatar">T</span><div><strong>tree</strong><small>mouse-corp</small></div></div>
+              <div class="nav-item"><span class="iconbox">💬</span>消息</div>
+              <div class="nav-item active"><span class="iconbox">👥</span>通讯录</div>
+              <div class="nav-item"><span class="iconbox">🎧</span>在线客服</div>
+              <div class="nav-item"><span class="iconbox">⚙</span>设置</div>
+            </aside>
+            <section class="list">
+              <h3>通讯录</h3>
+              <div class="search">⌕ 搜索成员、客户、群聊</div>
+              <div class="tabs"><span class="active">组织</span><span>好友</span><span>客户</span><span>群聊</span></div>
+              <div class="contact active"><span class="mini-avatar">A</span><div><strong>Ahmed Hassan</strong><small>客户 · VIP · 网站聊天</small></div><span class="pill">客户</span></div>
+              <div class="contact"><span class="mini-avatar">M</span><div><strong>Mina Chen</strong><small>运营部 · 产品运营</small></div><span class="pill">员工</span></div>
+              <div class="contact"><span class="mini-avatar">I</span><div><strong>IT 支撑群</strong><small>群聊 · 18 人</small></div><span class="pill">群</span></div>
+            </section>
+            <section class="detail">
+              <div class="detail-head"><span class="avatar">A</span><div><h3>Ahmed Hassan</h3><p>VIP 客户 · UAE · 已认证</p></div></div>
+              <div class="detail-actions"><button class="primary">发消息</button><button>客户资料</button><button>备注</button></div>
+              <div class="info-grid"><div class="info-card"><span>手机号</span><strong>+971 50 123 4567</strong></div><div class="info-card"><span>邮箱</span><strong>ahmed@uae.ae</strong></div><div class="info-card"><span>来源</span><strong>网站聊天</strong></div><div class="info-card"><span>归属客服</span><strong>mouse客服</strong></div></div>
+            </section>
+          </div>
+          <div class="params">
+            <div class="param-box"><h3>设计原则 / 页面布局</h3><p>三栏：<span class="mono">176 / 260 / auto</span>。左导航常驻，通讯录二级列表承载组织/好友/客户/群，右侧详情用于快速沟通和资料摘要。</p></div>
+            <div class="param-box"><h3>参数</h3><p>主色 <span class="mono">#10B981</span>；背景 <span class="mono">#F5F8FB</span>；字号 <span class="mono">20/14/12</span>；列表行 <span class="mono">58px</span>；头像 <span class="mono">40/54px r10/r15</span>；图标：ContactRound, Building2, UsersRound。</p></div>
+          </div>
+        </article>
+
+        <article class="scheme">
+          <div class="scheme-title">
+            <h2>B · 极简深侧栏</h2>
+            <span>身份强、像桌面客户端，空间更省</span>
+          </div>
+          <div class="mock b">
+            <aside class="side">
+              <div class="brand" style="justify-content:center;margin-bottom:18px"><span class="avatar">T</span></div>
+              <div class="nav-item">💬</div><div class="nav-item active">👥</div><div class="nav-item">🎧</div><div class="nav-item">⚙</div>
+            </aside>
+            <section class="list">
+              <h3>通讯录</h3>
+              <div class="search">⌕ 搜索</div>
+              <div class="tabs"><span class="active">全部</span><span>组织</span><span>客户</span></div>
+              <div class="contact active"><span class="mini-avatar">M</span><div><strong>Mina Chen</strong><small>员工 · 在线</small></div><span class="pill">员工</span></div>
+              <div class="contact"><span class="mini-avatar">A</span><div><strong>Ahmed Hassan</strong><small>客户 · VIP</small></div><span class="pill">客户</span></div>
+              <div class="contact"><span class="mini-avatar">G</span><div><strong>运营群</strong><small>群聊 · 42 人</small></div><span class="pill">群</span></div>
+            </section>
+            <section class="detail">
+              <div class="detail-head"><span class="avatar">M</span><div><h3>Mina Chen</h3><p>运营部 · 产品运营 · 在线</p></div></div>
+              <div class="detail-actions"><button class="primary">发消息</button><button>视频</button><button>资料</button></div>
+              <div class="org-tree"><div class="org-line"><span>部门</span><strong>运营部 / 增长组</strong></div><div class="org-line"><span>岗位</span><strong>产品运营</strong></div><div class="org-line"><span>LPP号</span><strong>lpp_mina</strong></div></div>
+            </section>
+          </div>
+          <div class="params">
+            <div class="param-box"><h3>设计原则 / 页面布局</h3><p>深色 72px 一级导航，内容区更宽。适合 PC 专业客户端，但与 E 轻奢白瓷差异较大，落地需统一全局侧栏。</p></div>
+            <div class="param-box"><h3>参数</h3><p>导航 <span class="mono">72px #132238</span>；列表 <span class="mono">292px</span>；主色 <span class="mono">#2563EB</span>；行高 <span class="mono">58px</span>；头像 <span class="mono">40px r10</span>；图标：MessageSquare, ContactRound, Headphones, Settings。</p></div>
+          </div>
+        </article>
+
+        <article class="scheme">
+          <div class="scheme-title">
+            <h2>C · 组织树优先</h2>
+            <span>适合企业成员多、部门层级深</span>
+          </div>
+          <div class="mock c">
+            <aside class="side">
+              <div class="brand"><span class="avatar">L</span><div><strong>LPP 企业</strong><small>组织通讯录</small></div></div>
+              <div class="nav-item active"><span class="iconbox">🏢</span>总公司</div>
+              <div class="nav-item"><span class="iconbox">▸</span>运营部</div>
+              <div class="nav-item"><span class="iconbox">▸</span>客服部</div>
+              <div class="nav-item"><span class="iconbox">▸</span>技术部</div>
+            </aside>
+            <section class="list">
+              <h3>客服部</h3>
+              <div class="search">⌕ 搜索成员</div>
+              <div class="tabs"><span class="active">成员 28</span><span>客户 12</span></div>
+              <div class="contact active"><span class="mini-avatar">王</span><div><strong>王客服</strong><small>在线客服 · 可接待</small></div><span class="pill">客服</span></div>
+              <div class="contact"><span class="mini-avatar">M</span><div><strong>mouse客服</strong><small>客服主管 · 忙碌</small></div><span class="pill">主管</span></div>
+              <div class="contact"><span class="mini-avatar">J</span><div><strong>Jason</strong><small>普通成员</small></div><span class="pill">员工</span></div>
+            </section>
+            <section class="detail">
+              <div class="detail-head"><span class="avatar">王</span><div><h3>王客服</h3><p>客服部 · 在线客服 · 可接待</p></div></div>
+              <div class="detail-actions"><button class="primary">发消息</button><button>查看排班</button><button>成员资料</button></div>
+              <div class="info-grid"><div class="info-card"><span>今日接待</span><strong>18</strong></div><div class="info-card"><span>满意度</span><strong>4.8</strong></div><div class="info-card"><span>状态</span><strong>可接待</strong></div><div class="info-card"><span>部门</span><strong>客服部</strong></div></div>
+            </section>
+          </div>
+          <div class="params">
+            <div class="param-box"><h3>设计原则 / 页面布局</h3><p>把组织树作为第一列：<span class="mono">220 / 282 / auto</span>。适合组织架构入口，但好友/客户/群入口会被弱化。</p></div>
+            <div class="param-box"><h3>参数</h3><p>主色 <span class="mono">#0F766E</span>；组织行 <span class="mono">38px</span>；列表行 <span class="mono">58px</span>；详情卡 <span class="mono">12px r12</span>；图标：Building2, Network, UserRound, UsersRound。</p></div>
+          </div>
+        </article>
+
+        <article class="scheme">
+          <div class="scheme-title">
+            <h2>D · 客户/员工双域</h2>
+            <span>适合客服场景，客户与员工心智清楚</span>
+          </div>
+          <div class="mock d">
+            <aside class="side">
+              <div class="brand"><span class="avatar">T</span><div><strong>tree</strong><small>vvv</small></div></div>
+              <div class="nav-item"><span class="iconbox">💬</span>消息</div>
+              <div class="nav-item active"><span class="iconbox">👥</span>通讯录</div>
+              <div class="nav-item"><span class="iconbox">🎧</span>在线客服</div>
+            </aside>
+            <section class="list">
+              <h3>通讯录</h3>
+              <div class="search">⌕ 搜索客户、员工、群</div>
+              <div class="tabs"><span class="active">客户</span><span>员工</span><span>群聊</span><span>申请</span></div>
+              <div class="contact active"><span class="mini-avatar">A</span><div><strong>Ahmed Hassan</strong><small>我的客户 · VIP · UAE</small></div><span class="pill">客户</span></div>
+              <div class="contact"><span class="mini-avatar">B</span><div><strong>Bob</strong><small>未分配客户 · WhatsApp</small></div><span class="pill">客户</span></div>
+              <div class="contact"><span class="mini-avatar">IT</span><div><strong>IT 支撑群</strong><small>官方群 · 18 人</small></div><span class="pill">群</span></div>
+            </section>
+            <section class="detail">
+              <div class="detail-head"><span class="avatar">A</span><div><h3>Ahmed Hassan</h3><p>客户 · VIP · 网站聊天 · 已认证</p></div></div>
+              <div class="detail-actions"><button class="primary">发消息</button><button>客户画像</button><button>分配</button></div>
+              <div class="info-grid"><div class="info-card"><span>账户余额</span><strong>$18,900</strong></div><div class="info-card"><span>风险</span><strong>低</strong></div><div class="info-card"><span>最近交易</span><strong>2026-05-17</strong></div><div class="info-card"><span>归属</span><strong>mouse客服</strong></div></div>
+            </section>
+          </div>
+          <div class="params">
+            <div class="param-box"><h3>设计原则 / 页面布局</h3><p>通讯录默认按对象域筛选：客户、员工、群聊、申请。对客服最清晰，也不把在线客服临时会话混进通讯录。</p></div>
+            <div class="param-box"><h3>参数</h3><p>列宽 <span class="mono">156 / 330 / auto</span>；主色 <span class="mono">#7C3AED + #10B981</span>；列表行 <span class="mono">62px</span>；头像 <span class="mono">42px r12</span>；图标：ContactRound, UserRound, UsersRound, UserPlus。</p></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

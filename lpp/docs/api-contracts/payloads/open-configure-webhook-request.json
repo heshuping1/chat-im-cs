@@ -1,0 +1,6 @@
+{
+  "callbackUrl": "http://TEDDYSUN:35913/",
+  "callbackSecret": "webhook-secret",
+  "timeoutSeconds": 5,
+  "maxAttempts": 3
+}

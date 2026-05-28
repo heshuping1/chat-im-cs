@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Flutter/Dart generated files
+**/.dart_tool/
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/build/
+**/coverage/
+
+# Local test data and scripts
+**/test_data/
+**/scripts/**/dev/*.sh
+**/scripts/**/test-data/*.sh
+**/scripts/**/test-data/test_accounts.md
+**/scripts/**/e2e/*.py
+
+# Release/signing secrets
+**/android/key.properties
+**/*.jks
+**/*.keystore

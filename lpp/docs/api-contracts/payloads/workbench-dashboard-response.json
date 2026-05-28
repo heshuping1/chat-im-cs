@@ -1,0 +1,16 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNKU8AB12C3D",
+  "data": {
+    "queuedTempCount": 3,
+    "queuedDirectCount": 1,
+    "queuedTotalCount": 4,
+    "activeTempCount": 5,
+    "assignedDirectCount": 2,
+    "totalActiveCount": 7,
+    "onlineStaffCount": 8,
+    "busyStaffCount": 2,
+    "directUnreadCount": 4
+  }
+}

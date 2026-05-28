@@ -1,0 +1,1719 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:dio/dio.dart' show Options, ResponseType;
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:lpp_mobile/core/di/injector.dart';
+import 'package:lpp_mobile/core/network/http_client.dart';
+import 'package:lpp_mobile/core/platform/local_file.dart';
+import 'package:lpp_mobile/core/platform/platform_capabilities.dart';
+import 'package:lpp_mobile/core/widgets/app_network_image.dart';
+import 'package:lpp_mobile/core/widgets/identity_badge.dart';
+import 'package:lpp_mobile/core/widgets/person_avatar_with_badge.dart';
+import 'package:lpp_mobile/core/widgets/user_avatar.dart';
+import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/services/audio_player_service.dart';
+import 'package:lpp_mobile/features/chat/presentation/pages/image_viewer_page.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
+import 'package:lpp_mobile/l10n/app_localizations.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
+
+class _C {
+  static const selfBgLight = Color(0xFFDCF8C6); // 微信风格浅绿（亮色）
+  static const selfBgDark = Color(0xFF3D7A4F); // 微信暗色深绿
+  static const otherBgLight = Color(0xFFFFFFFF);
+  static const otherBgDark = Color(0xFF2C2C2C); // 微信暗色对方气泡
+  static const green = Color(0xFF07C160);
+  static const textSecondary = Color(0xFF666666);
+
+  static Color selfBg(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? selfBgDark : selfBgLight;
+  }
+
+  static Color otherBg(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return isDark ? otherBgDark : otherBgLight;
+  }
+}
+
+class MessageBubble extends ConsumerWidget {
+  final Message message;
+  final bool isSelf;
+  final String? senderName;
+  final String? senderAvatarUrl;
+  final String? senderIdentityLabel;
+  final IdentityBadgeTone? senderIdentityTone;
+  final String? senderAvatarBadgeLabel;
+  final IdentityBadgeTone? senderAvatarBadgeTone;
+  final bool showSenderInfo;
+  final VoidCallback? onAvatarTap;
+  final VoidCallback? onConvertVoiceToText;
+  final VoidCallback? onCallLogTap;
+
+  /// 被引用的消息（用于显示引用块内容）
+  final Message? replyMessage;
+
+  /// 被引用消息的发送者名字
+  final String? replySenderName;
+
+  /// 群聊 ID（非空时不显示私聊阅读勾）
+  final String? groupId;
+
+  /// 发送失败时点击感叹号的回调
+  final VoidCallback? onFailedTap;
+
+  /// 是否显示时间戳（相邻消息时间差 < 5 分钟时隐藏）
+  final bool showTimestamp;
+
+  const MessageBubble({
+    super.key,
+    required this.message,
+    required this.isSelf,
+    this.senderName,
+    this.senderAvatarUrl,
+    this.senderIdentityLabel,
+    this.senderIdentityTone,
+    this.senderAvatarBadgeLabel,
+    this.senderAvatarBadgeTone,
+    this.showSenderInfo = false,
+    this.onAvatarTap,
+    this.onConvertVoiceToText,
+    this.onCallLogTap,
+    this.replyMessage,
+    this.replySenderName,
+    this.groupId,
+    this.onFailedTap,
+    this.showTimestamp = true,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tzOffset = ref.watch(timezoneOffsetProvider);
+    if (message.isRecalled) {
+      return _RecalledBubble(isSelf: isSelf, senderName: senderName);
+    }
+
+    // 系统事件消息：居中灰色文字，无头像无气泡；text 为空时不渲染
+    if (message.type == MessageType.event) {
+      if (message.body.text == null || message.body.text!.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      return _EventBubble(message: message);
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: isSelf ? 56 : 6,
+        right: isSelf ? 6 : 56,
+        top: 4,
+        bottom: 4,
+      ),
+      child: Row(
+        mainAxisAlignment:
+            isSelf ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 对方头像（左侧，顶部对齐）
+          if (!isSelf) ...[
+            GestureDetector(
+              onTap: onAvatarTap,
+              child: _Avatar(
+                url: senderAvatarUrl,
+                name: senderName,
+                badgeLabel: senderAvatarBadgeLabel,
+                badgeTone: senderAvatarBadgeTone,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          // 消息内容区
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isSelf ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                // 对方名字（群聊或单聊都显示，在气泡上方）
+                if (!isSelf && senderName != null && senderName!.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 3, left: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            senderName!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.5),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (senderIdentityLabel != null &&
+                            senderIdentityTone != null) ...[
+                          const SizedBox(width: 4),
+                          IdentityBadge(
+                            label: senderIdentityLabel!,
+                            tone: senderIdentityTone!,
+                            compact: true,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                // 气泡 + 极简投递/阅读状态
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (isSelf) ...[
+                      _StatusIndicator(
+                        status: message.status,
+                        isReadByPeer: message.isReadByPeer,
+                        showReadReceipt: groupId == null,
+                        onFailedTap: onFailedTap,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Flexible(
+                      child: _BubbleContent(
+                        message: message,
+                        isSelf: isSelf,
+                        onConvertVoiceToText: onConvertVoiceToText,
+                        onCallLogTap: onCallLogTap,
+                        replyMessage: replyMessage,
+                        replySenderName: replySenderName,
+                      ),
+                    ),
+                  ],
+                ),
+                // 时间戳（相邻消息时间差 < 5 分钟时隐藏）
+                if (showTimestamp)
+                  Padding(
+                    padding: EdgeInsets.only(top: 3, left: 2, right: 2),
+                    child: Text(
+                      formatTimeWithTimezone(message.sentAt, tzOffset),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // 自己头像（右侧）
+          if (isSelf) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onAvatarTap,
+              child: _Avatar(
+                url: senderAvatarUrl,
+                name: senderName,
+                isMyAvatar: true,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Avatar — 圆角矩形（微信风格），轻阴影，40×40dp
+// ---------------------------------------------------------------------------
+
+class _Avatar extends StatelessWidget {
+  final String? url;
+  final String? name;
+  final bool isMyAvatar;
+  final String? badgeLabel;
+  final IdentityBadgeTone? badgeTone;
+
+  const _Avatar({
+    this.url,
+    this.name,
+    this.isMyAvatar = false,
+    this.badgeLabel,
+    this.badgeTone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 2.0,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: PersonAvatarWithBadge(
+        avatarUrl: url,
+        name: name ?? '',
+        size: 40,
+        borderRadius: 8,
+        isMyAvatar: isMyAvatar,
+        showIdentity: badgeLabel != null && badgeTone != null,
+        badgeLabel: badgeLabel,
+        badgeTone: badgeTone,
+        badgeSize: 16,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Status Indicator — 私聊用单/双勾表达阅读状态
+// ---------------------------------------------------------------------------
+
+class _StatusIndicator extends StatelessWidget {
+  final MessageStatus status;
+  final bool isReadByPeer;
+  final bool showReadReceipt;
+  final VoidCallback? onFailedTap;
+  _StatusIndicator({
+    required this.status,
+    this.isReadByPeer = false,
+    required this.showReadReceipt,
+    this.onFailedTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    switch (status) {
+      case MessageStatus.sending:
+        return SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+        );
+      case MessageStatus.sent:
+      case MessageStatus.delivered:
+        if (!showReadReceipt) return const SizedBox.shrink();
+        return Icon(
+          isReadByPeer ? Icons.done_all : Icons.done,
+          size: 16,
+          color: isReadByPeer
+              ? const Color(0xFF4FC3F7)
+              : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+        );
+      case MessageStatus.read:
+        if (!showReadReceipt) return const SizedBox.shrink();
+        return const Icon(Icons.done_all, size: 16, color: Color(0xFF4FC3F7));
+      case MessageStatus.failed:
+      case MessageStatus.rejected:
+        return GestureDetector(
+          onTap: onFailedTap,
+          child: const Icon(Icons.error_outline, size: 20, color: Colors.red),
+        );
+      case MessageStatus.recalled:
+      case MessageStatus.deletedLocal:
+        return const SizedBox.shrink();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Recalled Bubble
+// ---------------------------------------------------------------------------
+
+class _RecalledBubble extends StatelessWidget {
+  final bool isSelf;
+  final String? senderName;
+  _RecalledBubble({required this.isSelf, this.senderName});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text = isSelf
+        ? l10n.chatRecalledSelf
+        : l10n.chatRecalledPeer(senderName ?? l10n.chatPeer);
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: Text(text,
+            style: TextStyle(
+                fontSize: 12,
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bubble Content dispatcher
+// ---------------------------------------------------------------------------
+
+class _BubbleContent extends StatelessWidget {
+  final Message message;
+  final bool isSelf;
+  final VoidCallback? onConvertVoiceToText;
+  final VoidCallback? onCallLogTap;
+  final Message? replyMessage;
+  final String? replySenderName;
+  const _BubbleContent(
+      {required this.message,
+      required this.isSelf,
+      this.onConvertVoiceToText,
+      this.onCallLogTap,
+      this.replyMessage,
+      this.replySenderName});
+
+  Color _bg(BuildContext context) =>
+      isSelf ? _C.selfBg(context) : _C.otherBg(context);
+
+  BorderRadius get _br => BorderRadius.only(
+        topLeft: const Radius.circular(12),
+        topRight: const Radius.circular(12),
+        bottomLeft: Radius.circular(isSelf ? 12 : 4),
+        bottomRight: Radius.circular(isSelf ? 4 : 12),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = _bg(context);
+    switch (message.type) {
+      case MessageType.text:
+      case MessageType.markdown:
+        return _TextBubble(
+            message: message,
+            bg: bg,
+            br: _br,
+            replyMessage: replyMessage,
+            replySenderName: replySenderName);
+      case MessageType.image:
+        return _ImageBubble(message: message);
+      case MessageType.voice:
+        return _VoiceBubble(
+          message: message,
+          bg: bg,
+          br: _br,
+          isSelf: isSelf,
+          onConvertVoiceToText: onConvertVoiceToText,
+        );
+      case MessageType.video:
+        return _VideoBubble(message: message);
+      case MessageType.file:
+        return _FileBubble(message: message, bg: bg, br: _br);
+      case MessageType.event:
+        return _EventBubble(message: message);
+      case MessageType.contactCard:
+        return _ContactCardBubble(card: message.body.contactCard);
+      case MessageType.callLog:
+        return _CallLogBubble(
+          log: message.body.callLog,
+          bg: bg,
+          br: _br,
+          onTap: onCallLogTap,
+        );
+      case MessageType.location:
+        return _LocationBubble(loc: message.body.location, bg: bg, br: _br);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Text Bubble — 支持回复引用 + 翻译显示
+// ---------------------------------------------------------------------------
+
+class _TextBubble extends StatelessWidget {
+  final Message message;
+  final Color bg;
+  final BorderRadius br;
+  final Message? replyMessage;
+  final String? replySenderName;
+  const _TextBubble(
+      {required this.message,
+      required this.bg,
+      required this.br,
+      this.replyMessage,
+      this.replySenderName});
+
+  /// 从消息中提取预览文字
+  static String _previewOf(BuildContext context, Message msg) {
+    if (msg.body.text != null && msg.body.text!.isNotEmpty)
+      return msg.body.text!;
+    final l10n = AppLocalizations.of(context);
+    switch (msg.type) {
+      case MessageType.image:
+        return l10n.chatImageMessage;
+      case MessageType.video:
+        return l10n.chatVideoMessage;
+      case MessageType.voice:
+        return l10n.chatVoiceMessage;
+      case MessageType.file:
+        return l10n.chatFileMessage;
+      default:
+        return l10n.chatGenericMessage;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = message.body.text ?? '';
+
+    // 微信风格：正文气泡 + 下方引用块（分离显示）
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 正文气泡
+        Container(
+          constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.70),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: message.replyToMessageId != null
+                ? BorderRadius.only(
+                    topLeft: br.topLeft,
+                    topRight: br.topRight,
+                    // 有引用时底部直角，与引用块无缝连接
+                    bottomLeft: Radius.zero,
+                    bottomRight: Radius.zero,
+                  )
+                : br,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 4,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 正文
+              Text(text,
+                  style: TextStyle(
+                      fontSize: 15,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      height: 1.4)),
+              // 翻译
+              if (message.isTranslating)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
+                    border: Border(
+                        top: BorderSide(color: Colors.black.withOpacity(0.1))),
+                  ),
+                  child: const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 1.5),
+                  ),
+                )
+              else if (message.translation != null &&
+                  message.translation!.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
+                    border: Border(
+                        top: BorderSide(color: Colors.black.withOpacity(0.1))),
+                  ),
+                  child: Text(
+                    AppLocalizations.of(context)
+                        .chatTranslationPrefix(message.translation!),
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.7)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // 微信风格引用块：在气泡下方，灰色背景
+        if (message.replyToMessageId != null)
+          Container(
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.70),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.only(
+                bottomLeft: br.bottomLeft,
+                bottomRight: br.bottomRight,
+              ),
+            ),
+            child: _buildReplyBlock(context),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildReplyBlock(BuildContext context) {
+    if (replyMessage == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(AppLocalizations.of(context).chatMessageDeleted,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF999999))),
+      );
+    }
+
+    final sender = replySenderName ?? AppLocalizations.of(context).chatPeer;
+    final isImage = replyMessage!.type == MessageType.image;
+    final imageUrl = replyMessage!.body.image?.url;
+
+    if (isImage && imageUrl != null) {
+      // 图片引用：显示缩略图，可点击查看
+      return GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ImageViewerPage(imageUrls: [imageUrl]),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$sender：',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.5))),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: AppNetworkImage(
+                  url: imageUrl,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Text(
+        '$sender：${_previewOf(context, replyMessage!)}',
+        style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Image Bubble
+// ---------------------------------------------------------------------------
+
+class _ImageBubble extends ConsumerWidget {
+  final Message message;
+  const _ImageBubble({required this.message});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rawUrl = message.body.image?.url;
+    // 本地文件：以 / 开头但不是 /media/ 这类服务端相对路径，或者是绝对本地路径
+    final isLocalFile = rawUrl != null &&
+        !rawUrl.startsWith('http') &&
+        !rawUrl.startsWith('/media') &&
+        !rawUrl.startsWith('/api');
+    final url = rawUrl;
+
+    return GestureDetector(
+      onTap: url != null && !isLocalFile
+          ? () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ImageViewerPage(imageUrls: [url]),
+                ),
+              )
+          : null,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: url != null
+            ? isLocalFile
+                // 发送中：本地文件路径，由平台适配层选择可用的渲染方式
+                ? localImageWidget(url,
+                    width: 200, height: 200, fit: BoxFit.cover)
+                : AppNetworkImage(
+                    url: url,
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    placeholderBuilder: _placeholder,
+                    errorBuilder: _placeholder,
+                  )
+            : _placeholder(context),
+      ),
+    );
+  }
+
+  Widget _placeholder(BuildContext ctx) => Container(
+        width: 200,
+        height: 200,
+        color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+        child: Icon(Icons.image,
+            size: 48,
+            color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4)),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Voice Bubble — AudioPlayerService 互斥播放 + 未听红点 + 转文字按钮
+// ---------------------------------------------------------------------------
+
+class _VoiceBubble extends ConsumerStatefulWidget {
+  final Message message;
+  final Color bg;
+  final BorderRadius br;
+  final bool isSelf;
+  final VoidCallback? onConvertVoiceToText;
+
+  const _VoiceBubble({
+    required this.message,
+    required this.bg,
+    required this.br,
+    required this.isSelf,
+    this.onConvertVoiceToText,
+  });
+
+  @override
+  ConsumerState<_VoiceBubble> createState() => _VoiceBubbleState();
+}
+
+class _VoiceBubbleState extends ConsumerState<_VoiceBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  StreamSubscription<PlayerState>? _playerSub;
+  bool _listened = false;
+  bool _showText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    final svc = ref.read(audioPlayerServiceProvider);
+    _playerSub = svc.playerStateStream.listen((state) {
+      if (!mounted || svc.currentlyPlayingId != widget.message.messageId) {
+        return;
+      }
+      if (!state.playing &&
+          state.processingState == ProcessingState.completed) {
+        _ctrl.stop();
+      }
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _playerSub?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  bool get _isPlaying {
+    final svc = ref.read(audioPlayerServiceProvider);
+    return svc.currentlyPlayingId == widget.message.messageId && svc.isPlaying;
+  }
+
+  Future<void> _togglePlay() async {
+    final svc = ref.read(audioPlayerServiceProvider);
+    final url = widget.message.body.voice?.url.trim();
+    if (url == null || url.isEmpty) return;
+
+    if (svc.currentlyPlayingId == widget.message.messageId && svc.isPlaying) {
+      await svc.pause();
+      _ctrl.stop();
+    } else {
+      try {
+        final token = ref.read(currentSpaceProvider)?.accessToken;
+        await svc.play(widget.message.messageId, url, token: token);
+        _ctrl.repeat(reverse: true);
+        setState(() => _listened = true);
+      } catch (error) {
+        debugPrint('[VoiceBubble] playback failed: $error');
+        _ctrl.stop();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(AppLocalizations.of(context).commonOperationFailed),
+          ));
+        }
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Listen to player state to update UI
+    ref.listen(audioPlayerServiceProvider, (_, __) {
+      if (mounted) setState(() {});
+    });
+
+    final duration = widget.message.body.voice?.durationSeconds ?? 0;
+    final isPlaying = _isPlaying;
+    final hasVoiceText = widget.message.translation?.isNotEmpty == true;
+    final showVoiceText = _showText && hasVoiceText;
+
+    // 气泡宽度随时长变化（最小 80，最大 200）
+    final bubbleWidth = (80.0 + duration * 6.0).clamp(80.0, 200.0);
+
+    return Column(
+      crossAxisAlignment:
+          widget.isSelf ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: _togglePlay,
+          child: Container(
+            width: bubbleWidth,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: widget.bg,
+              borderRadius: widget.br,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: widget.isSelf
+                  ? [
+                      // 自己发的：时长 + 波形 + 播放图标
+                      Text(
+                        '$duration"',
+                        style: TextStyle(
+                            fontSize: 15,
+                            color: Theme.of(context).colorScheme.onSurface),
+                      ),
+                      const Spacer(),
+                      _buildAnimatedSpeaker(isPlaying),
+                    ]
+                  : [
+                      // 对方发的：播放图标 + 波形 + 时长 + 未听红点
+                      _buildAnimatedSpeaker(isPlaying),
+                      Spacer(),
+                      Text(
+                        '$duration"',
+                        style: TextStyle(
+                            fontSize: 15,
+                            color: Theme.of(context).colorScheme.onSurface),
+                      ),
+                      if (!_listened) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
+            ),
+          ),
+        ),
+        // 转文字按钮（微信风格：灰色胶囊）
+        if (!widget.isSelf) ...[
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: () {
+              if (showVoiceText) {
+                setState(() => _showText = false);
+              } else if (hasVoiceText) {
+                setState(() => _showText = true);
+              } else {
+                widget.onConvertVoiceToText?.call();
+                setState(() => _showText = true);
+              }
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: widget.message.isTranslating
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    )
+                  : Text(
+                      showVoiceText
+                          ? AppLocalizations.of(context).chatVoiceHideText
+                          : AppLocalizations.of(context).chatVoiceShowText,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.5)),
+                    ),
+            ),
+          ),
+        ],
+        // 转文字内容
+        if (showVoiceText)
+          Container(
+            margin: EdgeInsets.only(top: 4),
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: widget.bg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              widget.message.translation!,
+              style: TextStyle(
+                  fontSize: 13,
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 微信风格的声波动画图标（三条弧线）
+  Widget _buildAnimatedSpeaker(bool isPlaying) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) {
+        return SizedBox(
+          width: 22,
+          height: 22,
+          child: CustomPaint(
+            painter: _SpeakerPainter(
+              progress: isPlaying ? _ctrl.value : 1.0,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        );
+      },
+    );
+  }
+} // end _VoiceBubbleState
+
+// ---------------------------------------------------------------------------
+// Speaker Painter — 微信风格声波图标（三条弧线，播放时动画）
+// ---------------------------------------------------------------------------
+
+class _SpeakerPainter extends CustomPainter {
+  final double progress; // 0~1，播放时动画进度
+  final Color color;
+
+  const _SpeakerPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+
+    final cx = size.width * 0.35;
+    final cy = size.height * 0.5;
+
+    // 喇叭主体（梯形）
+    final bodyPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(cx - 3, cy - 4)
+      ..lineTo(cx + 2, cy - 7)
+      ..lineTo(cx + 2, cy + 7)
+      ..lineTo(cx - 3, cy + 4)
+      ..close();
+    canvas.drawPath(path, bodyPaint);
+
+    // 三条弧线（从小到大）
+    final arcs = [
+      (size.width * 0.55, size.height * 0.25),
+      (size.width * 0.68, size.height * 0.38),
+      (size.width * 0.82, size.height * 0.50),
+    ];
+
+    for (int i = 0; i < arcs.length; i++) {
+      final (rx, ry) = arcs[i];
+      // 播放时，弧线依次点亮（动画效果）
+      final threshold = (i + 1) / arcs.length;
+      final arcColor = progress >= threshold ? color : color.withOpacity(0.25);
+      paint.color = arcColor;
+      canvas.drawArc(
+        Rect.fromCenter(
+            center: Offset(cx + 2, cy), width: rx * 2, height: ry * 2),
+        -math.pi * 0.4,
+        math.pi * 0.8,
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SpeakerPainter old) =>
+      old.progress != progress || old.color != color;
+}
+
+// ---------------------------------------------------------------------------
+// Video Bubble
+// ---------------------------------------------------------------------------
+
+class _VideoBubble extends ConsumerWidget {
+  final Message message;
+  const _VideoBubble({required this.message});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailUrl = message.body.video?.thumbnailUrl;
+    final duration = message.body.video?.durationSeconds;
+
+    return GestureDetector(
+      onTap: () => _openMediaResource(
+        context,
+        ref,
+        message.body.video,
+        fallbackName: 'video.mp4',
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            thumbnailUrl != null
+                ? AppNetworkImage(
+                    url: thumbnailUrl,
+                    width: 220,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    placeholderBuilder: _placeholder,
+                    errorBuilder: _placeholder)
+                : _placeholder(context),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
+              child: Icon(Icons.play_arrow,
+                  color: Theme.of(context).colorScheme.surface, size: 28),
+            ),
+            if (duration != null)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(4)),
+                  child: Text(_fmt(duration),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.surface,
+                          fontSize: 11)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder(context) => Container(
+        width: 220,
+        height: 160,
+        color: const Color(0xFF2C3E50),
+        child: const Icon(Icons.videocam, size: 48, color: Colors.white54),
+      );
+
+  String _fmt(int s) =>
+      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+}
+
+// ---------------------------------------------------------------------------
+// File Bubble
+// ---------------------------------------------------------------------------
+
+class _FileBubble extends ConsumerWidget {
+  final Message message;
+  final Color bg;
+  final BorderRadius br;
+  const _FileBubble(
+      {required this.message, required this.bg, required this.br});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final file = message.body.file;
+    final name =
+        file?.fileName ?? AppLocalizations.of(context).chatFileDefaultName;
+    final size = file?.sizeBytes;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openMediaResource(
+          context,
+          ref,
+          file,
+          fallbackName: name,
+        ),
+        borderRadius: br,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 240),
+          child: Ink(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: bg, borderRadius: br),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A90E2).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.insert_drive_file,
+                      color: Color(0xFF4A90E2), size: 24),
+                ),
+                SizedBox(width: 10),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w500)),
+                      if (size != null) ...[
+                        SizedBox(height: 2),
+                        Text(_fmtSize(size),
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.5))),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _fmtSize(int b) {
+    if (b < 1024) return '$b B';
+    if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
+    return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+Future<void> _openMediaResource(
+  BuildContext context,
+  WidgetRef ref,
+  MediaResource? resource, {
+  required String fallbackName,
+}) async {
+  final media = resource;
+  if (media == null) return;
+  final rawUrl = media.url.trim();
+  if (rawUrl.isEmpty) return;
+
+  try {
+    final path = await _mediaOpenPath(ref, media, fallbackName);
+    final result = await OpenFilex.open(path, type: media.mimeType);
+    if (result.type != ResultType.done && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppLocalizations.of(context).commonOperationFailed),
+      ));
+    }
+  } catch (error) {
+    debugPrint('[MessageBubble] open media failed: $error');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppLocalizations.of(context).commonOperationFailed),
+      ));
+    }
+  }
+}
+
+Future<String> _mediaOpenPath(
+  WidgetRef ref,
+  MediaResource resource,
+  String fallbackName,
+) async {
+  final rawUrl = resource.url.trim();
+  if (_isLocalMediaPath(rawUrl)) {
+    return localPathFromUriOrPath(rawUrl);
+  }
+
+  final url = _resolveMediaUrl(rawUrl);
+  final fileName = _safeMediaFileName(resource, fallbackName);
+  final response = await ref.read(dioProvider).get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+  final bytes = response.data;
+  if (bytes == null || bytes.isEmpty) {
+    throw StateError('Media response is empty');
+  }
+  return cacheBytesToLocalFile(
+    bytes: bytes,
+    directoryName: 'lpp_media',
+    fileName: '${url.hashCode}_$fileName',
+  );
+}
+
+bool _isLocalMediaPath(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri != null && uri.scheme == 'file') return true;
+  if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+    return false;
+  }
+  return !url.startsWith('/media') &&
+      !url.startsWith('/api') &&
+      !url.startsWith('/uploads') &&
+      !url.startsWith('/files');
+}
+
+String _resolveMediaUrl(String url) {
+  final parsed = Uri.tryParse(url);
+  if (parsed != null && parsed.hasScheme) return url;
+  return Uri.parse(HttpClient.baseUrl).resolve(url).toString();
+}
+
+String _safeMediaFileName(MediaResource resource, String fallbackName) {
+  final rawName = resource.fileName?.trim().isNotEmpty == true
+      ? resource.fileName!
+      : fallbackName;
+  final safeName = rawName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+  if (p.extension(safeName).isNotEmpty) return safeName;
+
+  final extension = _extensionForMime(resource.mimeType);
+  return extension == null ? safeName : '$safeName$extension';
+}
+
+String? _extensionForMime(String? mimeType) {
+  switch (mimeType?.toLowerCase()) {
+    case 'video/mp4':
+      return '.mp4';
+    case 'video/quicktime':
+      return '.mov';
+    case 'audio/mpeg':
+      return '.mp3';
+    case 'audio/mp4':
+    case 'audio/m4a':
+      return '.m4a';
+    case 'application/pdf':
+      return '.pdf';
+    case 'text/plain':
+      return '.txt';
+    default:
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Event Bubble
+// ---------------------------------------------------------------------------
+
+class _EventBubble extends StatelessWidget {
+  final Message message;
+  const _EventBubble({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(message.body.text ?? '',
+            style: TextStyle(
+                fontSize: 12,
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Contact Card Bubble — 对照 API ContactCardDto
+// ---------------------------------------------------------------------------
+
+class _ContactCardBubble extends StatelessWidget {
+  final ContactCardDto? card;
+  const _ContactCardBubble({required this.card});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = card?.displayName ??
+        AppLocalizations.of(context).chatContactDefaultName;
+    final avatarUrl = card?.avatarUrl;
+    final userId = card?.userId ?? '';
+
+    return GestureDetector(
+      onTap: userId.isNotEmpty ? () => context.push('/profile/$userId') : null,
+      child: Container(
+        width: 200,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: avatarUrl != null && avatarUrl.isNotEmpty
+                        ? AuthNetworkImage(
+                            url: avatarUrl,
+                            width: 36,
+                            height: 36,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _avatarFallback(name, 36),
+                          )
+                        : _avatarFallback(name, 36),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(Icons.chevron_right,
+                      size: 16,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.5)),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: Color(0xFFE5E6EB)),
+            Padding(
+              padding: EdgeInsets.fromLTRB(10, 4, 10, 6),
+              child: Text(AppLocalizations.of(context).chatContactCardTitle,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.5))),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarFallback(String name, double size) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: const Color(0xFF4A90E2),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Center(
+          child: Text(
+            name.isNotEmpty ? name[0] : '?',
+            style: TextStyle(color: Colors.white, fontSize: size * 0.4),
+          ),
+        ),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Call Log Bubble — 对照 API CallLogDto
+// ---------------------------------------------------------------------------
+
+class _CallLogBubble extends StatelessWidget {
+  final CallLogDto? log;
+  final Color bg;
+  final BorderRadius br;
+  final VoidCallback? onTap;
+  const _CallLogBubble({
+    required this.log,
+    required this.bg,
+    required this.br,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isVideo = CallDisplay.isVideoMediaMode(log?.mediaMode ?? 'audio');
+    final endReason = CallDisplay.normalizeReason(log?.endReason);
+    final duration = log?.durationSeconds ?? 0;
+    final isCaller = log?.isCaller ?? false;
+    final display = CallDisplay.ended(
+      isVideo: isVideo,
+      isCaller: isCaller,
+      durationSeconds: duration,
+      endReason: endReason,
+    );
+
+    IconData icon;
+    Color iconColor;
+
+    switch (endReason) {
+      case 'missed':
+      case 'timeout':
+        icon = Icons.phone_missed;
+        iconColor = Colors.red;
+      case 'cancelled':
+        icon = Icons.phone_disabled;
+        iconColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
+      case 'rejected':
+        icon = Icons.phone_disabled;
+        iconColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
+      case 'connection_lost':
+        icon = Icons.signal_wifi_connected_no_internet_4;
+        iconColor = Colors.orange;
+      case 'admin_force_end':
+        icon = Icons.phone_disabled;
+        iconColor = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
+      case 'failed':
+      case 'busy':
+      case 'node_offline':
+        icon = Icons.phone_disabled;
+        iconColor = Colors.red;
+      default:
+        icon = isVideo ? Icons.videocam : Icons.phone;
+        iconColor = _C.green;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: br,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 180),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(color: bg, borderRadius: br),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 22),
+                ),
+                SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      CallDisplay.mediaTitle(isVideo: isVideo),
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                        duration > 0
+                            ? '${display.status} · ${display.detail}'
+                            : display.status,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                endReason == 'missed' || endReason == 'timeout'
+                                    ? Colors.red
+                                    : _C.textSecondary)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Location Bubble — 对照 API LocationDto
+// ---------------------------------------------------------------------------
+
+class _LocationBubble extends StatelessWidget {
+  final LocationDto? loc;
+  final Color bg;
+  final BorderRadius br;
+  const _LocationBubble(
+      {required this.loc, required this.bg, required this.br});
+
+  @override
+  Widget build(BuildContext context) {
+    final title =
+        loc?.title ?? AppLocalizations.of(context).chatLocationDefaultTitle;
+    final address = loc?.address ?? '';
+    final point = loc == null ? null : LatLng(loc!.latitude, loc!.longitude);
+
+    return InkWell(
+      borderRadius: br,
+      onTap: loc == null ? null : () => _openSystemMap(context, loc!, title),
+      child: Container(
+        width: 240,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: br,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x14000000),
+              blurRadius: 4,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: _C.green.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: _C.green,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text(
+                          address.isNotEmpty
+                              ? address
+                              : point == null
+                                  ? ''
+                                  : '${point.latitude.toStringAsFixed(6)}, ${point.longitude.toStringAsFixed(6)}',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.55)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 96,
+              width: double.infinity,
+              child: point == null
+                  ? Container(
+                      color: const Color(0xFFEAF3EF),
+                      child: const Center(
+                        child: Icon(
+                          Icons.map_outlined,
+                          size: 30,
+                          color: _C.green,
+                        ),
+                      ),
+                    )
+                  : Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        IgnorePointer(
+                          child: FlutterMap(
+                            options: MapOptions(
+                              initialCenter: point,
+                              initialZoom: (loc?.zoomLevel ?? 16).toDouble(),
+                              interactionOptions: const InteractionOptions(
+                                flags: InteractiveFlag.none,
+                              ),
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.lpp.mobile',
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.location_pin,
+                          size: 34,
+                          color: Color(0xFFE53935),
+                          shadows: [
+                            Shadow(
+                              color: Color(0x66000000),
+                              blurRadius: 6,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        Positioned(
+                          right: 8,
+                          bottom: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.92),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              '地图',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF4E5969),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              alignment: Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withOpacity(0.5),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.near_me, size: 13, color: _C.green),
+                  const SizedBox(width: 4),
+                  Text(
+                    AppLocalizations.of(context).chatLocationMessage,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.55),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSystemMap(
+    BuildContext context,
+    LocationDto location,
+    String title,
+  ) async {
+    final encodedTitle = Uri.encodeComponent(title);
+    final lat = location.latitude;
+    final lng = location.longitude;
+    final candidates = PlatformCapabilities.isIOS
+        ? <Uri>[
+            Uri.parse('https://maps.apple.com/?ll=$lat,$lng&q=$encodedTitle'),
+            Uri.parse(
+                'https://www.google.com/maps/search/?api=1&query=$lat,$lng'),
+          ]
+        : <Uri>[
+            Uri.parse('geo:$lat,$lng?q=$lat,$lng($encodedTitle)'),
+            Uri.parse(
+                'https://www.google.com/maps/search/?api=1&query=$lat,$lng'),
+          ];
+
+    for (final uri in candidates) {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(AppLocalizations.of(context).commonOperationFailed),
+    ));
+  }
+}

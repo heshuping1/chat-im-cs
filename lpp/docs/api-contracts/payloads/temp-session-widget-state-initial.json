@@ -1,0 +1,22 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V133",
+  "data": {
+    "sessionId": "019e5a6f-e374-71ac-b91e-ae8d413398e1",
+    "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+    "status": "active",
+    "locale": "zh-CN",
+    "queuePosition": null,
+    "estimatedWaitSeconds": null,
+    "visitorId": "019e5a6f-e374-7882-b396-442802f0894e",
+    "visitorUserId": "019e5a6f-e374-7b1b-befe-8cf2350653ac",
+    "currentOwnerStaffUserId": "019e5a6f-e2a6-797c-94d4-c665722efca6",
+    "currentOwnerStaffDisplayName": "Temp Staff",
+    "currentResponderType": "staff",
+    "currentResponderDisplayName": "Temp Staff",
+    "ai": null,
+    "createdAt": "2026-05-24T14:42:22.7077696\u002B00:00",
+    "lastMessageAt": "2026-05-24T14:42:22.7288209\u002B00:00"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNKU8AB12C3F",
+  "data": {
+    "threadType": "direct_customer",
+    "threadId": "019daa03-abcd-7d00-b003-aabb11223344",
+    "conversationId": "019daa03-abcd-7d00-b003-aabb11223345",
+    "status": "active",
+    "title": "赵六",
+    "avatarUrl": "https://cdn.example.com/avatars/zhao6.png",
+    "customerUserId": "019daa03-abcd-7d00-b003-aabb11223346",
+    "visitorId": null,
+    "peerUserId": "019daa03-abcd-7d00-b003-aabb11223346",
+    "assignedStaffUserId": "019daa00-0001-7c00-a001-ffeeddccbbaa",
+    "assignedStaffDisplayName": "客服张三",
+    "assignedAt": "2026-04-20T08:50:00.000+00:00",
+    "tempSession": null,
+    "directChat": {
+      "chatId": "019daa03-abcd-7d00-b003-aabb11223345",
+      "customerUserId": "019daa03-abcd-7d00-b003-aabb11223346",
+      "customerDisplayName": "赵六",
+      "customerAvatarUrl": "https://cdn.example.com/avatars/zhao6.png",
+      "isPinned": false,
+      "isMuted": false,
+      "lastReadSeq": 5,
+      "lastMessageSeq": 7,
+      "unreadCount": 2,
+      "assignedAt": "2026-04-20T08:50:00.000+00:00",
+      "messages": [
+        {
+          "messageId": "019daa04-1111-7e00-c001-aabbccddeef0",
+          "conversationId": "019daa03-abcd-7d00-b003-aabb11223345",
+          "conversationSeq": 6,
+          "senderUserId": "019daa03-abcd-7d00-b003-aabb11223346",
+          "messageType": "text",
+          "body": {
+            "text": "我的订单什么时候能发货？",
+            "image": null,
+            "video": null,
+            "voice": null,
+            "file": null,
+            "contactCard": null,
+            "callLog": null,
+            "location": null,
+            "event": null
+          },
+          "isRecalled": false,
+          "sentAt": "2026-04-20T09:08:30.000+00:00",
+          "replyToMessageId": null,
+          "forwardFromMessageId": null,
+          "mentions": null,
+          "clientMsgId": null,
+          "appId": null
+        },
+        {
+          "messageId": "019daa04-2222-7e00-c002-aabbccddeef1",
+          "conversationId": "019daa03-abcd-7d00-b003-aabb11223345",
+          "conversationSeq": 7,
+          "senderUserId": "019daa00-0001-7c00-a001-ffeeddccbbaa",
+          "messageType": "text",
+          "body": {
+            "text": "您好，订单预计明天发货，请耐心等待。",
+            "image": null,
+            "video": null,
+            "voice": null,
+            "file": null,
+            "contactCard": null,
+            "callLog": null,
+            "location": null,
+            "event": null
+          },
+          "isRecalled": false,
+          "sentAt": "2026-04-20T09:10:15.000+00:00",
+          "replyToMessageId": null,
+          "forwardFromMessageId": null,
+          "mentions": null,
+          "clientMsgId": "workbench-direct-msg-001",
+          "appId": null
+        }
+      ]
+    }
+  }
+}

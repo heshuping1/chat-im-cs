@@ -1,0 +1,18 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V1FM",
+  "data": {
+    "userId": "019e5a70-9bb8-7750-9ac5-c9e0f55721ff",
+    "isOnline": true,
+    "customStatus": null,
+    "devices": [
+      {
+        "deviceId": "019e5a70-9bbf-7bef-a733-e9b35e519e63",
+        "nodeId": "4Z2woRV9MW7z6cyOUX2FQw",
+        "platform": "signalr",
+        "lastSeenAt": "2026-05-24T14:43:10.1080661\u002B00:00"
+      }
+    ]
+  }
+}

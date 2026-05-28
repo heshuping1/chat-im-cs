@@ -1,0 +1,220 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V13F",
+  "data": {
+    "session": {
+      "sessionId": "019e5a6f-e374-71ac-b91e-ae8d413398e1",
+      "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+      "status": "active",
+      "visitorId": "019e5a6f-e374-7882-b396-442802f0894e",
+      "visitorName": "Widget Visitor",
+      "customerId": null,
+      "locale": "zh-CN",
+      "category": "\u552E\u524D\u54A8\u8BE2",
+      "sourceChannel": "website",
+      "currentOwnerStaffUserId": "019e5a6f-e2a6-797c-94d4-c665722efca6",
+      "currentOwnerStaffDisplayName": "Temp Staff",
+      "currentResponderType": "staff",
+      "currentResponderDisplayName": "Temp Staff",
+      "ai": {
+        "botUserId": null,
+        "botDisplayName": null,
+        "serviceStatus": "human_serving",
+        "enabled": false,
+        "isActive": false,
+        "humanRequested": false,
+        "firstResponseAt": null,
+        "lastResponseAt": null,
+        "messageCount": 0,
+        "humanRequestedAt": null,
+        "humanHandoffAt": "2026-05-24T14:42:22.7077696\u002B00:00",
+        "handoffReasonCode": null,
+        "handoffReasonText": null,
+        "handoffSummary": null,
+        "lastReplySource": null,
+        "lastProvider": null,
+        "lastModel": null,
+        "lastLatencyMs": null,
+        "lastInputTokens": null,
+        "lastOutputTokens": null,
+        "lastTotalTokens": null,
+        "lastEstimatedCostUsd": null,
+        "lastReplyPreview": null,
+        "lastError": null,
+        "lastJobStatus": null,
+        "lastJobUpdatedAt": null,
+        "lastKnowledgeHits": []
+      },
+      "queuePosition": null,
+      "estimatedWaitSeconds": null,
+      "priority": "normal",
+      "visitorMessageCount": 2,
+      "staffMessageCount": 1,
+      "createdAt": "2026-05-24T14:42:22.7077696\u002B00:00",
+      "lastMessageAt": "2026-05-24T14:42:24.4301165\u002B00:00",
+      "visitorIpAddress": null,
+      "visitorUserAgent": ""
+    },
+    "visitor": {
+      "visitorId": "019e5a6f-e374-7882-b396-442802f0894e",
+      "visitorUserId": "019e5a6f-e374-7b1b-befe-8cf2350653ac",
+      "visitorName": "Widget Visitor",
+      "mobileMasked": "",
+      "emailMasked": "wi***@example.com",
+      "customerId": null,
+      "customerName": null,
+      "linkedUserId": null,
+      "locale": "zh-CN",
+      "from": null,
+      "ref": null,
+      "sourceUrl": "https://example.test/pricing",
+      "ipAddress": null,
+      "userAgent": "",
+      "totalSessions": 1,
+      "metadata": null
+    },
+    "participants": [
+      {
+        "userId": "019e5a6f-e374-7b1b-befe-8cf2350653ac",
+        "displayName": "Widget Visitor",
+        "role": "visitor"
+      },
+      {
+        "userId": "019e5a6f-e2a6-797c-94d4-c665722efca6",
+        "displayName": "Temp Staff",
+        "role": "primary_staff"
+      }
+    ],
+    "messages": [
+      {
+        "messageId": "019e5a6f-e387-7bbe-85f2-c179d4386f6f",
+        "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+        "conversationSeq": 1,
+        "senderUserId": "019e5a6f-e383-71d2-8877-c9918156a90a",
+        "senderDisplayName": "\u5BA2\u670D\u7CFB\u7EDF",
+        "senderType": "system",
+        "messageType": "text",
+        "body": {
+          "text": "\u60A8\u597D\uFF0C\u6B22\u8FCE\u54A8\u8BE2\u5728\u7EBF\u5BA2\u670D\u3002"
+        },
+        "sentAt": "2026-05-24T14:42:22.7270956\u002B00:00",
+        "replyToMessageId": null,
+        "senderRole": null
+      },
+      {
+        "messageId": "019e5a6f-e388-7a21-97ee-4bfe8f497617",
+        "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+        "conversationSeq": 2,
+        "senderUserId": "019e5a6f-e374-7b1b-befe-8cf2350653ac",
+        "senderDisplayName": "Widget Visitor",
+        "senderType": "visitor",
+        "messageType": "text",
+        "body": {
+          "text": "\u4F60\u597D\uFF0C\u6211\u60F3\u4E86\u89E3\u4F01\u4E1A\u7248\u63A5\u5165\u3002"
+        },
+        "sentAt": "2026-05-24T14:42:22.7280894\u002B00:00",
+        "replyToMessageId": null,
+        "senderRole": null
+      },
+      {
+        "messageId": "019e5a6f-e916-70a8-97ee-c09064ff7adb",
+        "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+        "conversationSeq": 3,
+        "senderUserId": "019e5a6f-e374-7b1b-befe-8cf2350653ac",
+        "senderDisplayName": "Widget Visitor",
+        "senderType": "visitor",
+        "messageType": "text",
+        "body": {
+          "text": "\u6211\u4E5F\u60F3\u786E\u8BA4\u4E00\u4E0B\u79C1\u6709\u90E8\u7F72\u4EF7\u683C\u3002"
+        },
+        "sentAt": "2026-05-24T14:42:24.1509818\u002B00:00",
+        "replyToMessageId": null,
+        "senderRole": null
+      },
+      {
+        "messageId": "019e5a6f-ea2e-73f3-bfe2-ed79f916226b",
+        "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+        "conversationSeq": 4,
+        "senderUserId": "019e5a6f-e2a6-797c-94d4-c665722efca6",
+        "senderDisplayName": "Temp Staff",
+        "senderType": "staff",
+        "messageType": "text",
+        "body": {
+          "text": "\u53EF\u4EE5\u7684\uFF0C\u6211\u4EEC\u652F\u6301\u79C1\u6709\u90E8\u7F72\u548C\u7F51\u5173\u5185\u7F51\u63A5\u5165\u3002"
+        },
+        "sentAt": "2026-05-24T14:42:24.4301165\u002B00:00",
+        "replyToMessageId": null,
+        "senderRole": null
+      }
+    ],
+    "events": [
+      {
+        "eventId": "019e5a6f-ea2e-793c-b7d0-9cfaa061eb88",
+        "eventType": "message_sent",
+        "actorDisplayName": "Temp Staff",
+        "detail": {
+          "preview": "\u53EF\u4EE5\u7684\uFF0C\u6211\u4EEC\u652F\u6301\u79C1\u6709\u90E8\u7F72\u548C\u7F51\u5173\u5185\u7F51\u63A5\u5165\u3002"
+        },
+        "createdAt": "2026-05-24T14:42:24.4301165\u002B00:00"
+      },
+      {
+        "eventId": "019e5a6f-e917-798e-b789-8195b09cec02",
+        "eventType": "message_received",
+        "actorDisplayName": "Widget Visitor",
+        "detail": {
+          "preview": "\u6211\u4E5F\u60F3\u786E\u8BA4\u4E00\u4E0B\u79C1\u6709\u90E8\u7F72\u4EF7\u683C\u3002"
+        },
+        "createdAt": "2026-05-24T14:42:24.1509818\u002B00:00"
+      },
+      {
+        "eventId": "019e5a6f-e388-73a7-9952-605d2c8c0ebf",
+        "eventType": "message_received",
+        "actorDisplayName": "Widget Visitor",
+        "detail": {
+          "preview": "\u4F60\u597D\uFF0C\u6211\u60F3\u4E86\u89E3\u4F01\u4E1A\u7248\u63A5\u5165\u3002"
+        },
+        "createdAt": "2026-05-24T14:42:22.7280894\u002B00:00"
+      },
+      {
+        "eventId": "019e5a6f-e387-7930-a788-3fd6aade94da",
+        "eventType": "message_sent",
+        "actorDisplayName": null,
+        "detail": {
+          "preview": "\u60A8\u597D\uFF0C\u6B22\u8FCE\u54A8\u8BE2\u5728\u7EBF\u5BA2\u670D\u3002"
+        },
+        "createdAt": "2026-05-24T14:42:22.7270956\u002B00:00"
+      },
+      {
+        "eventId": "019e5a6f-e37b-7c0f-963d-56ec3a30162a",
+        "eventType": "created",
+        "actorDisplayName": "Widget Visitor",
+        "detail": {
+          "locale": "zh-CN",
+          "category": "\u552E\u524D\u54A8\u8BE2",
+          "sourceUrl": "https://example.test/pricing"
+        },
+        "createdAt": "2026-05-24T14:42:22.7077696\u002B00:00"
+      },
+      {
+        "eventId": "019e5a6f-e37c-7e91-b353-ba1ba830edf6",
+        "eventType": "assigned",
+        "actorDisplayName": "Temp Staff",
+        "detail": {
+          "assignedStaff": "Temp Staff"
+        },
+        "createdAt": "2026-05-24T14:42:22.7077696\u002B00:00"
+      }
+    ],
+    "notes": [],
+    "rating": null,
+    "quality": {
+      "score": "",
+      "tags": [],
+      "comment": null,
+      "checkedBy": null,
+      "checkedAt": null
+    },
+    "ai": null
+  }
+}

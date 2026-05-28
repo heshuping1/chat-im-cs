@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PC 通讯录 E 体系高保真方案</title>
+    <style>
+      :root {
+        font-family:
+          Inter, "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --bg: #f4f8fb;
+        --panel: rgba(255, 255, 255, 0.94);
+        --panel-strong: #ffffff;
+        --ink: #111827;
+        --muted: #6b7f98;
+        --soft: #94a3b8;
+        --line: #dde8f2;
+        --line-soft: #edf3f8;
+        --green: #10b981;
+        --green-dark: #059669;
+        --blue: #2563eb;
+        --orange: #ff6b3d;
+        --shadow: 0 22px 58px rgba(15, 23, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 8% 0%, rgba(16, 185, 129, 0.1), transparent 24%),
+          linear-gradient(180deg, #fbfdff 0%, var(--bg) 100%);
+        color: var(--ink);
+      }
+
+      .board {
+        width: 1920px;
+        padding: 38px 42px 56px;
+      }
+
+      .board-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        margin-bottom: 24px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 32px;
+        font-weight: 950;
+        letter-spacing: 0;
+      }
+
+      .board-head p {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 16px;
+        font-weight: 650;
+      }
+
+      .rule {
+        padding: 9px 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.78);
+        color: #475569;
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .scheme {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 18px;
+        margin-bottom: 26px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.72);
+        box-shadow: var(--shadow);
+      }
+
+      .app {
+        display: grid;
+        height: 520px;
+        grid-template-columns: 156px var(--list-width) minmax(0, 1fr) var(--right-width);
+        overflow: hidden;
+        background: var(--panel-strong);
+      }
+
+      .scheme.a .app {
+        --list-width: 330px;
+        --right-width: 360px;
+      }
+
+      .scheme.b .app {
+        --list-width: 360px;
+        --right-width: 340px;
+      }
+
+      .scheme.c .app {
+        --list-width: 292px;
+        --right-width: 382px;
+      }
+
+      .sidebar {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        padding: 16px 14px 14px;
+        border-right: 1px solid var(--line);
+        background: linear-gradient(180deg, #fbfefd 0%, #f7fbf9 100%);
+      }
+
+      .account {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        height: 68px;
+        margin-bottom: 14px;
+      }
+
+      .avatar {
+        position: relative;
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #ff594f, #ff9f43);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 950;
+      }
+
+      .avatar::after {
+        position: absolute;
+        right: -1px;
+        bottom: -1px;
+        width: 10px;
+        height: 10px;
+        border: 2px solid #fff;
+        border-radius: 999px;
+        background: var(--green);
+        content: "";
+      }
+
+      .account strong {
+        display: block;
+        overflow: hidden;
+        color: #142033;
+        font-size: 13px;
+        font-weight: 900;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .account small {
+        display: block;
+        overflow: hidden;
+        margin-top: 3px;
+        color: #6b7f98;
+        font-size: 11px;
+        font-weight: 750;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .nav {
+        display: grid;
+        gap: 7px;
+      }
+
+      .nav-item {
+        display: grid;
+        grid-template-columns: 32px minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        height: 42px;
+        padding: 0 8px;
+        color: #53677f;
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .nav-icon {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 9px;
+        background: rgba(226, 235, 244, 0.72);
+        color: #64748b;
+        font-size: 16px;
+      }
+
+      .nav-item.active {
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        border-radius: 12px;
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--green-dark);
+      }
+
+      .nav-item.active .nav-icon {
+        background: #fff;
+        color: var(--green-dark);
+      }
+
+      .side-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: auto;
+        padding-top: 14px;
+        border-top: 1px solid var(--line-soft);
+        color: #53677f;
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        margin-right: 8px;
+        border-radius: 999px;
+        background: var(--green);
+      }
+
+      .column {
+        min-width: 0;
+        border-right: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .list-col {
+        padding: 18px 16px;
+      }
+
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .eyebrow {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--green-dark);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+      }
+
+      .head h2 {
+        font-size: 22px;
+        font-weight: 950;
+      }
+
+      .icon-btn {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        color: #52657a;
+        font-size: 17px;
+      }
+
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 38px;
+        margin-bottom: 12px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 750;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .tabs span {
+        height: 30px;
+        padding: 0 11px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: #60758d;
+        font-size: 12px;
+        font-weight: 850;
+        line-height: 29px;
+      }
+
+      .tabs span.active {
+        border-color: rgba(16, 185, 129, 0.36);
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--green-dark);
+      }
+
+      .contact-row {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        min-height: 64px;
+        margin-bottom: 8px;
+        padding: 10px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+      }
+
+      .contact-row.active {
+        border-color: rgba(16, 185, 129, 0.42);
+        background: rgba(16, 185, 129, 0.08);
+      }
+
+      .mini-avatar {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border-radius: 11px;
+        background: #dbeafe;
+        color: #2563eb;
+        font-size: 15px;
+        font-weight: 950;
+      }
+
+      .mini-avatar.green {
+        background: linear-gradient(135deg, #10b981, #34d399);
+        color: #fff;
+      }
+
+      .mini-avatar.purple {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #fff;
+      }
+
+      .contact-row strong {
+        display: block;
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 900;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .contact-row small {
+        display: block;
+        overflow: hidden;
+        margin-top: 4px;
+        color: #71839a;
+        font-size: 11px;
+        font-weight: 720;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .pill {
+        height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 22px;
+      }
+
+      .tree-box {
+        margin-bottom: 12px;
+        padding: 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: rgba(248, 251, 255, 0.86);
+      }
+
+      .tree-line {
+        display: flex;
+        justify-content: space-between;
+        height: 28px;
+        color: #53677f;
+        font-size: 12px;
+        font-weight: 820;
+      }
+
+      .detail {
+        min-width: 0;
+        padding: 22px 24px;
+        background:
+          radial-gradient(circle at 60% 0%, rgba(16, 185, 129, 0.08), transparent 28%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 251, 254, 0.92));
+      }
+
+      .detail-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .detail-title .avatar {
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
+        font-size: 22px;
+      }
+
+      .detail-title h3 {
+        font-size: 24px;
+        font-weight: 950;
+      }
+
+      .detail-title p {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 720;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin: 16px 0;
+      }
+
+      .actions button {
+        height: 34px;
+        padding: 0 13px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: #40536a;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .actions .primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: #fff;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .info-card {
+        min-height: 72px;
+        padding: 12px;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      .info-card span {
+        color: #71839a;
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .info-card strong {
+        display: block;
+        margin-top: 7px;
+        font-size: 15px;
+      }
+
+      .right {
+        min-width: 0;
+        padding: 18px 16px;
+        background: rgba(255, 255, 255, 0.96);
+      }
+
+      .right h3 {
+        font-size: 16px;
+        font-weight: 950;
+      }
+
+      .right-block {
+        margin-top: 12px;
+        padding: 12px;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      .right-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--line-soft);
+        color: #71839a;
+        font-size: 12px;
+        font-weight: 740;
+      }
+
+      .right-row:last-child {
+        border-bottom: 0;
+      }
+
+      .right-row strong {
+        color: var(--ink);
+        text-align: right;
+      }
+
+      .params {
+        padding: 18px;
+        border-left: 1px solid var(--line);
+        background: rgba(248, 251, 255, 0.84);
+      }
+
+      .params h2 {
+        margin-bottom: 8px;
+        font-size: 19px;
+        font-weight: 950;
+      }
+
+      .params p {
+        margin-bottom: 12px;
+        color: #52657a;
+        font-size: 13px;
+        font-weight: 720;
+        line-height: 1.7;
+      }
+
+      .token {
+        display: grid;
+        gap: 7px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      .token div {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .token code {
+        color: #0f766e;
+        font-family: "SF Mono", Consolas, monospace;
+        font-weight: 850;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="board">
+      <header class="board-head">
+        <div>
+          <h1>PC 通讯录视觉方案：固定 E 轻奢白瓷体系</h1>
+          <p>这版不再换整体风格。左侧导航、头像、底部状态、白瓷背景、绿色点缀全部固定，只比较通讯录内容结构。</p>
+        </div>
+        <div class="rule">选中后按 token 实现，不靠截图猜</div>
+      </header>
+
+      <section class="scheme a">
+        <div class="app">
+          <aside class="sidebar">
+            <div class="account"><span class="avatar">T</span><div><strong>tree</strong><small>mouse-corp</small></div></div>
+            <nav class="nav">
+              <div class="nav-item"><span class="nav-icon">□</span>消息</div>
+              <div class="nav-item active"><span class="nav-icon">▣</span>通讯录</div>
+              <div class="nav-item"><span class="nav-icon">◉</span>在线客服</div>
+              <div class="nav-item"><span class="nav-icon">▤</span>工单中心</div>
+              <div class="nav-item"><span class="nav-icon">↗</span>数据中心</div>
+              <div class="nav-item"><span class="nav-icon">☷</span>工作台</div>
+              <div class="nav-item"><span class="nav-icon">⚙</span>设置</div>
+            </nav>
+            <div class="side-bottom"><span><i class="dot"></i>在线</span><span>☰</span></div>
+          </aside>
+          <section class="column list-col">
+            <div class="head"><div><span class="eyebrow">DIRECTORY</span><h2>通讯录</h2></div><span class="icon-btn">＋</span></div>
+            <div class="search">⌕ 搜索成员、客户、群聊</div>
+            <div class="tabs"><span class="active">组织</span><span>好友</span><span>客户</span><span>群聊</span></div>
+            <div class="tree-box">
+              <div class="tree-line"><span>▾ LPP 企业</span><strong>128</strong></div>
+              <div class="tree-line"><span>　▾ 客服部</span><strong>28</strong></div>
+              <div class="tree-line"><span>　▸ 运营部</span><strong>36</strong></div>
+              <div class="tree-line"><span>　▸ 技术部</span><strong>42</strong></div>
+            </div>
+            <div class="contact-row active"><span class="mini-avatar green">A</span><div><strong>Ahmed Hassan</strong><small>客户 · VIP · 网站聊天</small></div><span class="pill">客户</span></div>
+            <div class="contact-row"><span class="mini-avatar">M</span><div><strong>Mina Chen</strong><small>运营部 · 产品运营 · 在线</small></div><span class="pill">员工</span></div>
+            <div class="contact-row"><span class="mini-avatar purple">群</span><div><strong>运营-科技沟通群</strong><small>群聊 · 19 人</small></div><span class="pill">群</span></div>
+          </section>
+          <section class="detail">
+            <div class="detail-title"><span class="avatar">A</span><div><h3>Ahmed Hassan</h3><p>客户 · VIP · UAE · 已认证 · 网站聊天</p></div></div>
+            <div class="actions"><button class="primary">发消息</button><button>客户资料</button><button>备注</button><button>加入触达</button></div>
+            <div class="info-grid">
+              <div class="info-card"><span>手机</span><strong>+971 50 123 4567</strong></div>
+              <div class="info-card"><span>邮箱</span><strong>ahmed@uae.ae</strong></div>
+              <div class="info-card"><span>归属客服</span><strong>mouse客服</strong></div>
+              <div class="info-card"><span>最近联系</span><strong>18 分钟前</strong></div>
+            </div>
+          </section>
+          <aside class="right">
+            <h3>关系与上下文</h3>
+            <div class="right-block">
+              <div class="right-row"><span>客户等级</span><strong>VIP</strong></div>
+              <div class="right-row"><span>风险等级</span><strong>低</strong></div>
+              <div class="right-row"><span>账户余额</span><strong>$18,900</strong></div>
+              <div class="right-row"><span>累计入金</span><strong>$42,340</strong></div>
+            </div>
+          </aside>
+        </div>
+        <aside class="params">
+          <h2>A · 组织树 + 混合对象</h2>
+          <p>最适合“企业通讯录”心智：组织树、成员、客户、群都能放，但不会把在线客服临时会话混进来。</p>
+          <div class="token">
+            <div><span>布局</span><code>156 / 330 / 1fr / 360</code></div>
+            <div><span>列表行</span><code>64px, padding 10</code></div>
+            <div><span>头像</span><code>42px r11, detail 58px r16</code></div>
+            <div><span>主色</span><code>#10B981 / #059669</code></div>
+            <div><span>字体</span><code>22 / 14 / 12</code></div>
+            <div><span>lucide</span><code>ContactRound, Building2, UsersRound</code></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="scheme b">
+        <div class="app">
+          <aside class="sidebar">
+            <div class="account"><span class="avatar">T</span><div><strong>tree</strong><small>mouse-corp</small></div></div>
+            <nav class="nav">
+              <div class="nav-item"><span class="nav-icon">□</span>消息</div>
+              <div class="nav-item active"><span class="nav-icon">▣</span>通讯录</div>
+              <div class="nav-item"><span class="nav-icon">◉</span>在线客服</div>
+              <div class="nav-item"><span class="nav-icon">▤</span>工单中心</div>
+              <div class="nav-item"><span class="nav-icon">↗</span>数据中心</div>
+              <div class="nav-item"><span class="nav-icon">☷</span>工作台</div>
+              <div class="nav-item"><span class="nav-icon">⚙</span>设置</div>
+            </nav>
+            <div class="side-bottom"><span><i class="dot"></i>在线</span><span>☰</span></div>
+          </aside>
+          <section class="column list-col">
+            <div class="head"><div><span class="eyebrow">CONTACTS</span><h2>通讯录</h2></div><span class="icon-btn">＋</span></div>
+            <div class="search">⌕ 搜索客户、员工、群聊</div>
+            <div class="tabs"><span class="active">客户</span><span>员工</span><span>群聊</span><span>申请</span></div>
+            <div class="contact-row active"><span class="mini-avatar green">A</span><div><strong>Ahmed Hassan</strong><small>我的客户 · VIP · UAE</small></div><span class="pill">客户</span></div>
+            <div class="contact-row"><span class="mini-avatar green">B</span><div><strong>Bob</strong><small>未分配客户 · WhatsApp</small></div><span class="pill">客户</span></div>
+            <div class="contact-row"><span class="mini-avatar">M</span><div><strong>Mina Chen</strong><small>员工 · 运营部</small></div><span class="pill">员工</span></div>
+            <div class="contact-row"><span class="mini-avatar purple">IT</span><div><strong>IT 支撑群</strong><small>官方群 · 18 人</small></div><span class="pill">群</span></div>
+          </section>
+          <section class="detail">
+            <div class="detail-title"><span class="avatar">A</span><div><h3>Ahmed Hassan</h3><p>客户 · VIP · 网站聊天 · 归属 mouse客服</p></div></div>
+            <div class="actions"><button class="primary">发消息</button><button>客户画像</button><button>分配</button><button>历史会话</button></div>
+            <div class="info-grid">
+              <div class="info-card"><span>账户余额</span><strong>$18,900</strong></div>
+              <div class="info-card"><span>风险</span><strong>低</strong></div>
+              <div class="info-card"><span>最近交易</span><strong>2026-05-17</strong></div>
+              <div class="info-card"><span>标签</span><strong>高净值</strong></div>
+            </div>
+          </section>
+          <aside class="right">
+            <h3>客户摘要</h3>
+            <div class="right-block">
+              <div class="right-row"><span>KYC</span><strong>已认证</strong></div>
+              <div class="right-row"><span>语言</span><strong>العربية</strong></div>
+              <div class="right-row"><span>来源</span><strong>网站聊天</strong></div>
+              <div class="right-row"><span>IB</span><strong>IB-005</strong></div>
+            </div>
+          </aside>
+        </div>
+        <aside class="params">
+          <h2>B · 客户/员工双域</h2>
+          <p>更适合客服产品：客户、员工、群聊、申请分得很清楚。普通通讯录和客户管理入口不会混乱。</p>
+          <div class="token">
+            <div><span>布局</span><code>156 / 360 / 1fr / 340</code></div>
+            <div><span>列表行</span><code>64px, gap 8</code></div>
+            <div><span>筛选</span><code>客户/员工/群聊/申请</code></div>
+            <div><span>详情</span><code>动作按钮 34px r9</code></div>
+            <div><span>字体</span><code>22 / 14 / 12</code></div>
+            <div><span>lucide</span><code>UserRound, UserPlus, UsersRound</code></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="scheme c">
+        <div class="app">
+          <aside class="sidebar">
+            <div class="account"><span class="avatar">T</span><div><strong>tree</strong><small>mouse-corp</small></div></div>
+            <nav class="nav">
+              <div class="nav-item"><span class="nav-icon">□</span>消息</div>
+              <div class="nav-item active"><span class="nav-icon">▣</span>通讯录</div>
+              <div class="nav-item"><span class="nav-icon">◉</span>在线客服</div>
+              <div class="nav-item"><span class="nav-icon">▤</span>工单中心</div>
+              <div class="nav-item"><span class="nav-icon">↗</span>数据中心</div>
+              <div class="nav-item"><span class="nav-icon">☷</span>工作台</div>
+              <div class="nav-item"><span class="nav-icon">⚙</span>设置</div>
+            </nav>
+            <div class="side-bottom"><span><i class="dot"></i>在线</span><span>☰</span></div>
+          </aside>
+          <section class="column list-col">
+            <div class="head"><div><span class="eyebrow">ORG</span><h2>组织</h2></div><span class="icon-btn">☷</span></div>
+            <div class="search">⌕ 搜索部门/成员</div>
+            <div class="tree-box">
+              <div class="tree-line"><span>▾ LPP 企业</span><strong>128</strong></div>
+              <div class="tree-line"><span>　▾ 客服部</span><strong>28</strong></div>
+              <div class="tree-line"><span>　　在线客服组</span><strong>12</strong></div>
+              <div class="tree-line"><span>　　质检组</span><strong>6</strong></div>
+              <div class="tree-line"><span>　▸ 运营部</span><strong>36</strong></div>
+            </div>
+            <div class="tabs"><span class="active">成员 28</span><span>客户 12</span></div>
+            <div class="contact-row active"><span class="mini-avatar">王</span><div><strong>王客服</strong><small>在线客服组 · 可接待</small></div><span class="pill">客服</span></div>
+            <div class="contact-row"><span class="mini-avatar">M</span><div><strong>mouse客服</strong><small>客服主管 · 忙碌</small></div><span class="pill">主管</span></div>
+          </section>
+          <section class="detail">
+            <div class="detail-title"><span class="avatar">王</span><div><h3>王客服</h3><p>客服部 · 在线客服组 · 可接待</p></div></div>
+            <div class="actions"><button class="primary">发消息</button><button>查看资料</button><button>排班</button><button>接待统计</button></div>
+            <div class="info-grid">
+              <div class="info-card"><span>今日接待</span><strong>18</strong></div>
+              <div class="info-card"><span>满意度</span><strong>4.8</strong></div>
+              <div class="info-card"><span>在线状态</span><strong>在线</strong></div>
+              <div class="info-card"><span>接待状态</span><strong>可接待</strong></div>
+            </div>
+          </section>
+          <aside class="right">
+            <h3>部门信息</h3>
+            <div class="right-block">
+              <div class="right-row"><span>部门人数</span><strong>28</strong></div>
+              <div class="right-row"><span>在线客服</span><strong>12</strong></div>
+              <div class="right-row"><span>今日排班</span><strong>8 人</strong></div>
+              <div class="right-row"><span>SLA</span><strong>92%</strong></div>
+            </div>
+          </aside>
+        </div>
+        <aside class="params">
+          <h2>C · 组织架构优先</h2>
+          <p>如果通讯录主目标是找企业成员、找部门，这套最稳。但客户入口会弱一些，客服产品可能不如 B 直观。</p>
+          <div class="token">
+            <div><span>布局</span><code>156 / 292 / 1fr / 382</code></div>
+            <div><span>组织树</span><code>28px row, 12px card</code></div>
+            <div><span>列表行</span><code>64px</code></div>
+            <div><span>右栏</span><code>部门信息/成员统计</code></div>
+            <div><span>字体</span><code>22 / 14 / 12</code></div>
+            <div><span>lucide</span><code>Building2, Network, ContactRound</code></div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

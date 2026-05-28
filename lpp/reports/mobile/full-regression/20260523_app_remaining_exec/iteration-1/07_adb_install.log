@@ -1,0 +1,4 @@
++ adb_cmd install -r build/app/outputs/flutter-apk/app-debug.apk
+Performing Streamed Install
+Success
+PASS adb install debug apk (10s)

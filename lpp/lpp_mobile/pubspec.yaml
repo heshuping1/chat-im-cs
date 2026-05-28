@@ -1,0 +1,90 @@
+name: lpp_mobile
+description: LPP Flutter 三端应用（iOS/Android/Windows）
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Navigation
+  go_router: ^13.2.0
+
+  # Networking
+  dio: ^5.4.3
+  retrofit: ^4.1.0
+  http: ^1.2.0
+
+  # Serialization
+  json_annotation: ^4.9.0
+  freezed_annotation: ^2.4.1
+
+  # Local storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  flutter_secure_storage: ^9.0.0
+  sqflite: ^2.3.0
+  path: ^1.9.0
+
+  # Real-time communication
+  signalr_netcore: ^1.3.5
+  flutter_webrtc: ^1.4.1
+
+  # Media
+  record: ^5.2.0
+  just_audio: ^0.9.40
+  file_picker: ^8.1.2
+  image_picker: ^1.0.7
+  audioplayers: ^6.0.0
+  speech_to_text: ^7.0.0
+
+  # Utilities
+  path_provider: ^2.1.2
+  connectivity_plus: ^6.0.3
+  uuid: ^4.3.3
+  intl: ^0.20.2
+  cached_network_image: ^3.3.1
+  flutter_cache_manager: ^3.3.1
+  flutter_svg: ^2.0.10+1
+  crypto: ^3.0.3
+  characters: ^1.3.0
+  qr_flutter: ^4.1.0
+  flutter_map: ^8.3.0
+  geolocator: ^14.0.2
+  latlong2: ^0.9.1
+  url_launcher: ^6.3.2
+  flutter_local_notifications: ^21.0.0
+  package_info_plus: ^9.0.1
+  open_filex: ^4.7.0
+  mobile_scanner: ^7.2.0
+
+dependency_overrides:
+  record_linux: ^1.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Code generation
+  build_runner: ^2.4.9
+  riverpod_generator: ^2.4.0
+  retrofit_generator: ^8.1.0
+  json_serializable: ^6.8.0
+  freezed: ^2.5.2
+  hive_generator: ^2.0.1
+
+  # Linting
+  flutter_lints: ^3.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true

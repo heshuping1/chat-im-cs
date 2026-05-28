@@ -1,0 +1,20 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V134",
+  "data": {
+    "messageId": "019e5a6f-e916-70a8-97ee-c09064ff7adb",
+    "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+    "conversationSeq": 3,
+    "senderUserId": "019e5a6f-e374-7b1b-befe-8cf2350653ac",
+    "senderDisplayName": "Widget Visitor",
+    "senderType": "visitor",
+    "messageType": "text",
+    "body": {
+      "text": "\u6211\u4E5F\u60F3\u786E\u8BA4\u4E00\u4E0B\u79C1\u6709\u90E8\u7F72\u4EF7\u683C\u3002"
+    },
+    "sentAt": "2026-05-24T14:42:24.1509818\u002B00:00",
+    "replyToMessageId": null,
+    "senderRole": null
+  }
+}

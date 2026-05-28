@@ -1,0 +1,4 @@
+iteration	step	status	seconds	log
+1	docs check	PASS	0	iteration-1/01_docs.log
+1	flutter pub get	PASS	2	iteration-1/02_pub_get.log
+1	flutter analyze	FAIL(1)	6	iteration-1/03_analyze.log

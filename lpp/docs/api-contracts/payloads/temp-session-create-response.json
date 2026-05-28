@@ -1,0 +1,23 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V11S",
+  "data": {
+    "sessionId": "019e5a6f-e374-71ac-b91e-ae8d413398e1",
+    "conversationId": "019e5a6f-e374-7db8-8646-128739250e56",
+    "visitorId": "019e5a6f-e374-7882-b396-442802f0894e",
+    "visitorUserId": "019e5a6f-e374-7b1b-befe-8cf2350653ac",
+    "visitorToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjAxOWU1YTZmLWUzNzQtN2IxYi1iZWZlLThjZjIzNTA2NTNhYyIsInRlbmFudF9pZCI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsInRva2VuX3R5cGUiOiJ2aXNpdG9yX3Nlc3Npb24iLCJ2aXNpdG9yX2lkIjoiMDE5ZTVhNmYtZTM3NC03ODgyLWIzOTYtNDQyODAyZjA4OTRlIiwidmlzaXRvcl91c2VyX2lkIjoiMDE5ZTVhNmYtZTM3NC03YjFiLWJlZmUtOGNmMjM1MDY1M2FjIiwidmlzaXRvcl9zZXNzaW9uX2lkIjoiMDE5ZTVhNmYtZTM3NC03MWFjLWI5MWUtYWU4ZDQxMzM5OGUxIiwidmlzaXRvcl90b2tlbl92ZXJzaW9uIjoiMSIsIm5iZiI6MTc3OTYzMzc0MiwiZXhwIjoxNzc5NjU1MzQyLCJpc3MiOiJ6dGNoYXQiLCJhdWQiOiJ6dGNoYXQifQ.aD3MBOehKbmdAE2uHXePWkxXJi5TDuvbjPoxrQY_i4g",
+    "status": "active",
+    "queuePosition": null,
+    "estimatedWaitSeconds": null,
+    "locale": "zh-CN",
+    "ai": null,
+    "welcomeMessages": [
+      {
+        "type": "text",
+        "content": "\u60A8\u597D\uFF0C\u6B22\u8FCE\u54A8\u8BE2\u5728\u7EBF\u5BA2\u670D\u3002"
+      }
+    ]
+  }
+}

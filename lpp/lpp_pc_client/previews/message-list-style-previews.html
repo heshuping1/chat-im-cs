@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>消息列表样式预览</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #eef2f6;
+        color: #111827;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      }
+
+      .page {
+        display: grid;
+        grid-template-columns: repeat(4, 270px);
+        gap: 22px;
+        min-height: 100vh;
+        align-items: start;
+        justify-content: center;
+        padding: 28px;
+      }
+
+      .preview {
+        overflow: hidden;
+        border: 1px solid #d8e2ed;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 24px 55px rgba(18, 35, 54, 0.14);
+      }
+
+      .caption {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e4ebf3;
+        background: #fff;
+      }
+
+      .caption strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .caption small {
+        display: block;
+        margin-top: 3px;
+        color: #718096;
+        font-size: 11px;
+      }
+
+      .panel {
+        width: 220px;
+        min-height: 720px;
+        margin: 0 auto;
+        padding: 14px 10px;
+      }
+
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .head h1 {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .new {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 11px;
+        background: #06b879;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 800;
+      }
+
+      .search {
+        height: 32px;
+        margin-bottom: 10px;
+        padding: 0 10px;
+        border: 1px solid #d4dee9;
+        border-radius: 999px;
+        color: #9aa8b8;
+        font-size: 12px;
+        line-height: 30px;
+      }
+
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        height: 30px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        border: 1px solid #d8e2ed;
+        border-radius: 999px;
+        background: #eaf1f7;
+        color: #60738a;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tabs span {
+        display: grid;
+        place-items: center;
+      }
+
+      .tabs .on {
+        background: #fff;
+        color: #07895f;
+      }
+
+      .list {
+        display: grid;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .avatar {
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        overflow: hidden;
+        background: linear-gradient(135deg, #04b978, #08d292);
+        color: white;
+        font-size: 20px;
+        font-weight: 800;
+      }
+
+      .avatar.gray {
+        background: #dedede;
+        color: #73777d;
+      }
+
+      .avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .copy {
+        min-width: 0;
+      }
+
+      .copy strong,
+      .copy small {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .copy strong {
+        color: #111827;
+        font-size: 14px;
+        line-height: 1.25;
+      }
+
+      .copy small {
+        margin-top: 5px;
+        color: #6f8095;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .time {
+        color: #9aabba;
+        font-size: 12px;
+      }
+
+      .wechat .panel {
+        background: #f6f7f8;
+      }
+
+      .wechat .list {
+        gap: 0;
+      }
+
+      .wechat .row {
+        min-height: 66px;
+        padding: 8px 8px;
+        border-radius: 0;
+        background: transparent;
+      }
+
+      .wechat .row.active {
+        background: #dff0e8;
+      }
+
+      .wechat .row:not(.active):hover {
+        background: #ebeef2;
+      }
+
+      .wechat .avatar {
+        border-radius: 8px;
+      }
+
+      .soft-card .panel {
+        background: #f7f9fb;
+      }
+
+      .soft-card .list {
+        gap: 7px;
+      }
+
+      .soft-card .row {
+        min-height: 68px;
+        padding: 9px 9px;
+        border: 1px solid #e1e9f1;
+        border-radius: 12px;
+        background: #fff;
+      }
+
+      .soft-card .row.active {
+        border-color: #7be1b7;
+        background: #effcf7;
+      }
+
+      .soft-card .avatar {
+        border-radius: 11px;
+      }
+
+      .compact .panel {
+        background: #fbfcfd;
+      }
+
+      .compact .list {
+        gap: 2px;
+      }
+
+      .compact .row {
+        grid-template-columns: 36px minmax(0, 1fr) auto;
+        min-height: 58px;
+        padding: 7px 7px;
+        border-radius: 8px;
+      }
+
+      .compact .row.active {
+        background: #e7f6ef;
+      }
+
+      .compact .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        font-size: 16px;
+      }
+
+      .compact .copy strong {
+        font-size: 13px;
+      }
+
+      .compact .copy small,
+      .compact .time {
+        font-size: 11px;
+      }
+
+      .lark .panel {
+        background: #fff;
+      }
+
+      .lark .list {
+        gap: 0;
+      }
+
+      .lark .row {
+        min-height: 64px;
+        padding: 8px 8px;
+        border-left: 3px solid transparent;
+        border-radius: 0;
+      }
+
+      .lark .row.active {
+        border-left-color: #00b578;
+        background: #f0fbf6;
+      }
+
+      .lark .row:not(.active):hover {
+        background: #f5f7fa;
+      }
+
+      .lark .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 9px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="preview wechat">
+        <div class="caption">
+          <strong>A 微信图片效果</strong>
+          <small>扁平列表，选中浅绿，不做卡片</small>
+        </div>
+        <Panel></Panel>
+      </section>
+      <section class="preview soft-card">
+        <div class="caption">
+          <strong>B 微信轻卡片</strong>
+          <small>保留圆角，但弱化边框和阴影</small>
+        </div>
+        <Panel></Panel>
+      </section>
+      <section class="preview compact">
+        <div class="caption">
+          <strong>C 企业紧凑版</strong>
+          <small>更适合 220px，信息密度最高</small>
+        </div>
+        <Panel></Panel>
+      </section>
+      <section class="preview lark">
+        <div class="caption">
+          <strong>D 飞书干净版</strong>
+          <small>白底列表，选中左侧绿线</small>
+        </div>
+        <Panel></Panel>
+      </section>
+    </main>
+    <template id="panel-template">
+      <div class="panel">
+        <div class="head">
+          <h1>消息</h1>
+          <span class="new">+</span>
+        </div>
+        <div class="search">搜索会话、联系人、群聊</div>
+        <div class="tabs">
+          <span class="on">全部</span>
+          <span>未读 0</span>
+          <span>好友</span>
+        </div>
+        <div class="list">
+          <article class="row active">
+            <span class="avatar">M</span>
+            <span class="copy"><strong>mouse所有者</strong><small>123</small></span>
+            <span class="time">01:09</span>
+          </article>
+          <article class="row">
+            <span class="avatar">测</span>
+            <span class="copy"><strong>测试客户A</strong><small>2</small></span>
+            <span class="time">01:09</span>
+          </article>
+          <article class="row">
+            <span class="avatar">M</span>
+            <span class="copy"><strong>mouse管理员</strong><small>tiff</small></span>
+            <span class="time">5/27</span>
+          </article>
+          <article class="row">
+            <span class="avatar"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Crect width='84' height='84' fill='%23d7c5b2'/%3E%3Crect x='23' y='12' width='38' height='60' rx='5' fill='%23f6b5d0'/%3E%3Crect x='28' y='17' width='28' height='50' rx='2' fill='%23f7d6e4'/%3E%3Cpath d='M31 28h20M31 35h17M31 42h20M31 49h15' stroke='%23374151' stroke-width='2'/%3E%3C/svg%3E" alt="" /></span>
+            <span class="copy"><strong>mouse客服1</strong><small>还比比吧不不不你</small></span>
+            <span class="time">5/27</span>
+          </article>
+          <article class="row">
+            <span class="avatar gray">群</span>
+            <span class="copy"><strong>VIP群</strong><small>jjbb</small></span>
+            <span class="time">5/26</span>
+          </article>
+          <article class="row">
+            <span class="avatar">L</span>
+            <span class="copy"><strong>LPP客户1</strong><small>1232</small></span>
+            <span class="time">5/26</span>
+          </article>
+          <article class="row">
+            <span class="avatar gray">群</span>
+            <span class="copy"><strong>验证</strong><small>[图片]</small></span>
+            <span class="time">5/25</span>
+          </article>
+          <article class="row">
+            <span class="avatar gray">群</span>
+            <span class="copy"><strong>111</strong><small>家家户户</small></span>
+            <span class="time">5/21</span>
+          </article>
+          <article class="row">
+            <span class="avatar">B</span>
+            <span class="copy"><strong>bob</strong><small>您好，我已收到您的消息</small></span>
+            <span class="time">5/16</span>
+          </article>
+          <article class="row">
+            <span class="avatar">测</span>
+            <span class="copy"><strong>测试客户B</strong><small>[通话记录]</small></span>
+            <span class="time">5/14</span>
+          </article>
+        </div>
+      </div>
+    </template>
+    <script>
+      const template = document.querySelector("#panel-template");
+      document.querySelectorAll("Panel").forEach((node) => {
+        node.replaceWith(template.content.cloneNode(true));
+      });
+    </script>
+  </body>
+</html>

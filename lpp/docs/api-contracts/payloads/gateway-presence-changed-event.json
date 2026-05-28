@@ -1,0 +1,10 @@
+{
+  "event": "presence.changed",
+  "traceId": "019d6ce4616a77d5ab7c1d0dd0eb8735",
+  "sentAt": "2026-04-08T11:40:00.0000000+00:00",
+  "data": {
+    "userId": "019d6ce4-5f64-7def-be6d-5c2087d4e314",
+    "isOnline": true,
+    "customStatus": null
+  }
+}

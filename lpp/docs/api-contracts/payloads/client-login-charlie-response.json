@@ -1,0 +1,12 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V1EH",
+  "data": {
+    "userId": "019e5a70-9bf8-7b74-ac2e-a1fc9df4c2dd",
+    "userType": 1,
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjAxOWU1YTcwLTliZjgtN2I3NC1hYzJlLWExZmM5ZGY0YzJkZCIsInRlbmFudF9pZCI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiJDaGFybGllIiwiZGV2aWNlX2lkIjoiMDE5ZTVhNzAtOWJmYy03OGQ3LWIzYzItMDk3MDBjZGQ4ZDkzIiwidG9rZW5fdHlwZSI6InRlbmFudCIsInNwYWNlX3R5cGUiOiIyIiwianRpIjoiMDE5ZTVhNzA5YzBjNzhmZTkyMGUwYzJlZTdhOTVmM2UiLCJzZXNzaW9uX2lkIjoiMDE5ZTVhNzAtOWMwYi03ZjAyLTkxZGQtNGZjYmZmZWJkMTJiIiwicGxhdGZvcm1fdXNlcl9pZCI6IjAxOWU1YTcwLTliZjgtNzkyNS1hZWZmLThhODliZDA1ZjFjMiIsInRnZW4iOiIxIiwibmJmIjoxNzc5NjMzNzg5LCJleHAiOjE3Nzk2NTUzODksImlzcyI6Inp0Y2hhdCIsImF1ZCI6Inp0Y2hhdCJ9.RVNB_WxheBm5sep4-U2-npZIfVzwm3y4o7DxpwxIyIY",
+    "refreshToken": "Z2J3lIsr9JY1vDEEoVTAIKACB1A0wY5V9m6sSzN5faA=",
+    "expiresIn": 21600
+  }
+}

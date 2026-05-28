@@ -1,0 +1,33 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V1FG",
+  "data": {
+    "items": [
+      {
+        "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+        "conversationType": "group",
+        "title": "\u9879\u76EE\u8054\u8C03\u7FA4",
+        "avatarUrl": null,
+        "lastMessage": {
+          "messageId": "019e5a70-9ef7-70e5-9b74-1e2fc051f780",
+          "messageType": "video",
+          "preview": "[\u89C6\u9891]",
+          "sentAt": "2026-05-24T14:43:10.7118166\u002B00:00"
+        },
+        "draft": null,
+        "unreadCount": 5,
+        "lastReadSeq": 0,
+        "lastMessageSeq": 5,
+        "isPinned": false,
+        "isMuted": false,
+        "peerUserId": null,
+        "memberCount": 3,
+        "ownerUserId": "019e5a70-965b-721f-b4a5-674270c426c8",
+        "peerUserType": null,
+        "tempSession": null
+      }
+    ],
+    "nextCursor": "2026-05-24T14:43:10.7118166\u002B00:00"
+  }
+}

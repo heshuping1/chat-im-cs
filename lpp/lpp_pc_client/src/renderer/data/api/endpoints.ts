@@ -1,0 +1,78 @@
+export const endpointPlan = {
+  platformLogin: "/api/platform/v1/auth/login",
+  selectTenant: "/api/platform/v1/auth/select-tenant",
+  selectPersonalSpace: "/api/platform/v1/auth/select-personal-space",
+  platformTenants: "/api/platform/v1/my/tenants",
+  tenantSearch: "/api/platform/v1/tenants/search",
+  tenantJoinByCode: "/api/platform/v1/tenants/join-by-code",
+  tenantJoinRequest: "/api/platform/v1/tenants/{tenantId}/join-request",
+  accountDeactivate: "/api/platform/v1/account/deactivate",
+  captchaGenerate: "/api/client/v1/auth/captcha/generate",
+  conversations: "/api/client/v1/conversations",
+  profileMe: "/api/client/v1/profile/me",
+  profilePrivacy: "/api/client/v1/profile/me/privacy",
+  tenantInfo: "/api/client/v1/tenant/info",
+  changePassword: "/api/client/v1/auth/change-password",
+  blocklist: "/api/client/v1/blocklist",
+  blocklistItem: "/api/client/v1/blocklist/{blockedUserId}",
+  friendInviteQr: "/api/client/v1/friends/invite-qr",
+  favoritesSummary: "/api/client/v1/favorites/summary",
+  favoritesList: "/api/client/v1/favorites/list",
+  enterpriseAnnouncements: "/api/client/v1/announcements",
+  enterpriseAnnouncementRead:
+    "/api/client/v1/enterprise/announcements/{announcementId}/read",
+  friends: "/api/client/v1/friends",
+  friendRequests: "/api/client/v1/friends/requests",
+  friendRequestHandle: "/api/client/v1/friends/requests/{requestId}/handle",
+  tenantMembers: "/api/client/v1/tenant/members",
+  departments: "/api/client/v1/departments/",
+  departmentMembers: "/api/client/v1/departments/{departmentId}/members",
+  directChats: "/api/client/v1/direct-chats/",
+  directMessages: "/api/client/v1/direct-chats/{conversationId}/messages",
+  directRead: "/api/client/v1/direct-chats/{conversationId}/read",
+  directReadStatus: "/api/client/v1/direct-chats/{conversationId}/read-status",
+  groupMessages: "/api/client/v1/groups/{conversationId}/messages",
+  groupMembers: "/api/client/v1/groups/{conversationId}/members",
+  groupRead: "/api/client/v1/groups/{conversationId}/read",
+  mediaUpload: "/api/client/v1/media/upload",
+  messageRecall: "/api/client/v1/messages/{messageId}/recall",
+  messageDelete: "/api/client/v1/messages/{messageId}/delete",
+  messageForward: "/api/client/v1/messages/forward",
+  messageVoiceToText: "/api/client/v1/messages/voice-to-text",
+  messageTranslate: "/api/client/v1/translate/message",
+  textTranslate: "/api/client/v1/translate/text",
+  favorites: "/api/client/v1/favorites",
+  customerServiceThreads: "/api/client/v1/customer-service/workbench/threads",
+  staffServiceHistory: "/api/client/v1/customer-service/staff/service-history",
+  customerServiceReceptionStatus:
+    "/api/client/v1/customer-service/reception/status",
+  customerServiceThreadDetail:
+    "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}",
+  customerServiceThreadMessages:
+    "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/messages",
+  customerServiceThreadAction:
+    "/api/client/v1/customer-service/workbench/threads/{threadActionType}/{threadId}/{action}",
+  threadProfileCard:
+    "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/profile-card",
+  clientErrors: "/api/client/v1/client-errors",
+  scheduledMessages: "/api/client/v1/scheduled-messages",
+  knowledgeSearch: "/api/client/v1/customer-service/knowledge/search",
+  knowledgeBases: "/api/client/v1/customer-service/knowledge/bases",
+  knowledgeDocuments:
+    "/api/client/v1/customer-service/knowledge/bases/{knowledgeBaseId}/documents",
+  aiSuggestion:
+    "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/ai-suggestion",
+  aiSuggestions:
+    "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/ai-suggestions",
+  aiSuggestionAdopt:
+    "/api/client/v1/customer-service/workbench/ai-suggestions/{suggestionId}/adopt",
+  enterpriseBroadcasts: "/api/admin/v1/enterprise-broadcasts",
+  enterpriseBroadcastPreview: "/api/admin/v1/enterprise-broadcasts/preview",
+  customerManagementSummary: "/api/admin/v1/customer-management/summary",
+  customerManagementCustomers: "/api/admin/v1/customer-management/customers",
+  conversationManagementSummary:
+    "/api/admin/v1/conversation-management/summary",
+  conversationManagementConversations:
+    "/api/admin/v1/conversation-management/conversations",
+  gateway: "/ws/client",
+};

@@ -1,0 +1,175 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V1FH",
+  "data": [
+    {
+      "messageId": "019e5a70-9d09-7fc4-98c6-7e6ec51f5af1",
+      "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+      "conversationSeq": 1,
+      "senderUserId": "00000000-0000-0000-0000-000000000000",
+      "messageType": "event",
+      "body": {
+        "text": "\u6210\u5458\u5DF2\u52A0\u5165\u7FA4\u804A",
+        "image": null,
+        "video": null,
+        "voice": null,
+        "file": null,
+        "contactCard": null,
+        "callLog": null,
+        "location": null,
+        "event": {
+          "eventType": "members_added",
+          "operatorUserId": "019e5a70-9b73-7070-b4ca-73a42d2a5489",
+          "addedUserIds": [
+            "019e5a70-9bb8-7750-9ac5-c9e0f55721ff"
+          ],
+          "removedUserId": null,
+          "userId": null,
+          "fromUserId": null,
+          "toUserId": null
+        },
+        "kind": null
+      },
+      "isRecalled": false,
+      "sentAt": "2026-05-24T14:43:10.2175855\u002B00:00",
+      "replyToMessageId": null,
+      "forwardFromMessageId": null,
+      "mentions": null,
+      "clientMsgId": "sys_019e5a709d097fc498c67e6ec51f5af1",
+      "appId": null
+    },
+    {
+      "messageId": "019e5a70-9d1b-7fa2-b9e0-9c6783855432",
+      "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+      "conversationSeq": 2,
+      "senderUserId": "019e5a70-9b73-7070-b4ca-73a42d2a5489",
+      "messageType": "text",
+      "body": {
+        "text": "hello from alice",
+        "image": null,
+        "video": null,
+        "voice": null,
+        "file": null,
+        "contactCard": null,
+        "callLog": null,
+        "location": null,
+        "event": null,
+        "kind": null
+      },
+      "isRecalled": false,
+      "sentAt": "2026-05-24T14:43:10.235936\u002B00:00",
+      "replyToMessageId": null,
+      "forwardFromMessageId": null,
+      "mentions": null,
+      "clientMsgId": "alice-text-001",
+      "appId": null
+    },
+    {
+      "messageId": "019e5a70-9dff-7b38-9eb0-07f6ffc53d6f",
+      "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+      "conversationSeq": 3,
+      "senderUserId": "019e5a70-9b73-7070-b4ca-73a42d2a5489",
+      "messageType": "text",
+      "body": {
+        "text": "@Bob \u6536\u5230\uFF0C\u7EE7\u7EED\u8054\u8C03",
+        "image": null,
+        "video": null,
+        "voice": null,
+        "file": null,
+        "contactCard": null,
+        "callLog": null,
+        "location": null,
+        "event": null,
+        "kind": null
+      },
+      "isRecalled": false,
+      "sentAt": "2026-05-24T14:43:10.4634627\u002B00:00",
+      "replyToMessageId": "019e5a70-9d1b-7fa2-b9e0-9c6783855432",
+      "forwardFromMessageId": null,
+      "mentions": [
+        {
+          "userId": "019e5a70-9bb8-7750-9ac5-c9e0f55721ff",
+          "offset": 0,
+          "length": 4
+        }
+      ],
+      "clientMsgId": "alice-reply-001",
+      "appId": null
+    },
+    {
+      "messageId": "019e5a70-9ee9-7967-a43e-74e47372f829",
+      "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+      "conversationSeq": 4,
+      "senderUserId": "019e5a70-9b73-7070-b4ca-73a42d2a5489",
+      "messageType": "image",
+      "body": {
+        "text": null,
+        "image": {
+          "url": "/media/019e5a70-9d0f-79ae-941f-d52a68e2d84e",
+          "fileName": "diagram.png",
+          "mimeType": "image/png",
+          "sizeBytes": 12,
+          "width": null,
+          "height": null,
+          "durationSeconds": null,
+          "thumbnailUrl": null,
+          "signedUrl": "/media/019e5a70-9d0f-79ae-941f-d52a68e2d84e?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637390\u0026sig=T1847UPsJM00jeyJzXRpFEkQBNpg4f7r5qYWuG2WSys",
+          "downloadUrl": "/media/019e5a70-9d0f-79ae-941f-d52a68e2d84e?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637390\u0026sig=T1847UPsJM00jeyJzXRpFEkQBNpg4f7r5qYWuG2WSys\u0026download=1"
+        },
+        "video": null,
+        "voice": null,
+        "file": null,
+        "contactCard": null,
+        "callLog": null,
+        "location": null,
+        "event": null,
+        "kind": null
+      },
+      "isRecalled": false,
+      "sentAt": "2026-05-24T14:43:10.6970375\u002B00:00",
+      "replyToMessageId": null,
+      "forwardFromMessageId": null,
+      "mentions": null,
+      "clientMsgId": "alice-image-001",
+      "appId": null
+    },
+    {
+      "messageId": "019e5a70-9ef7-70e5-9b74-1e2fc051f780",
+      "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+      "conversationSeq": 5,
+      "senderUserId": "019e5a70-9b73-7070-b4ca-73a42d2a5489",
+      "messageType": "video",
+      "body": {
+        "text": null,
+        "image": null,
+        "video": {
+          "url": "/media/019e5a70-9d13-717d-9c84-6b6abe5f1419",
+          "fileName": "walkthrough.mp4",
+          "mimeType": "video/mp4",
+          "sizeBytes": 16,
+          "width": null,
+          "height": null,
+          "durationSeconds": 12,
+          "thumbnailUrl": null,
+          "signedUrl": "/media/019e5a70-9d13-717d-9c84-6b6abe5f1419?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637390\u0026sig=6XG34QidBI2RZhtQt369Y7dGrmJ3Cie7_ALMXiut_bs",
+          "downloadUrl": "/media/019e5a70-9d13-717d-9c84-6b6abe5f1419?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637390\u0026sig=6XG34QidBI2RZhtQt369Y7dGrmJ3Cie7_ALMXiut_bs\u0026download=1"
+        },
+        "voice": null,
+        "file": null,
+        "contactCard": null,
+        "callLog": null,
+        "location": null,
+        "event": null,
+        "kind": null
+      },
+      "isRecalled": false,
+      "sentAt": "2026-05-24T14:43:10.7118166\u002B00:00",
+      "replyToMessageId": null,
+      "forwardFromMessageId": null,
+      "mentions": null,
+      "clientMsgId": "alice-video-001",
+      "appId": null
+    }
+  ]
+}

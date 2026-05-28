@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>加好友二维码 · 接口文档</title>
+<style>
+  :root {
+    --fg: #1f2328;
+    --muted: #57606a;
+    --bg: #ffffff;
+    --soft: #f6f8fa;
+    --line: #d0d7de;
+    --accent: #0969da;
+    --code-bg: #f6f8fa;
+    --code-fg: #1f2328;
+    --tag-bg: #ddf4ff;
+    --tag-fg: #0969da;
+    --get: #1f883d;
+    --post: #bf8700;
+    --delete: #cf222e;
+    --warn-bg: #fff8c5;
+    --warn-line: #d4a72c;
+    --tip-bg: #ddf4ff;
+    --tip-line: #54aeff;
+    --bad-bg: #ffebe9;
+    --bad-line: #ff8182;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.65;
+    font-size: 15px;
+  }
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+  }
+  header.cover {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 28px;
+    margin-bottom: 36px;
+  }
+  header.cover h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+  }
+  header.cover .sub {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  h2 {
+    font-size: 22px;
+    margin: 48px 0 14px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 {
+    font-size: 17px;
+    margin: 32px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  h4 {
+    font-size: 14px;
+    margin: 20px 0 8px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.4px;
+  }
+  p { margin: 10px 0; }
+  ul, ol { padding-left: 22px; margin: 10px 0; }
+  li { margin: 4px 0; }
+  code, pre {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+    font-size: 13px;
+  }
+  code {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 10px 0;
+  }
+  pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    white-space: pre;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0 18px;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--soft); font-weight: 600; }
+  tr:nth-child(even) td { background: #fbfcfd; }
+  .method {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #fff;
+    letter-spacing: 0.6px;
+    font-weight: 600;
+    min-width: 56px;
+    text-align: center;
+  }
+  .method.get { background: var(--get); }
+  .method.post { background: var(--post); }
+  .method.delete { background: var(--delete); }
+  .pathbox {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 2px 8px;
+  }
+  .tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--tag-fg);
+    font-size: 12px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    border: 1px solid #b6e3ff;
+  }
+  .callout {
+    margin: 16px 0;
+    padding: 12px 16px;
+    border-left: 4px solid;
+    border-radius: 6px;
+    background: var(--soft);
+  }
+  .callout.tip {
+    background: var(--tip-bg);
+    border-color: var(--tip-line);
+  }
+  .callout.warn {
+    background: var(--warn-bg);
+    border-color: var(--warn-line);
+  }
+  .callout.bad {
+    background: var(--bad-bg);
+    border-color: var(--bad-line);
+  }
+  .callout strong { display: block; margin-bottom: 4px; }
+  .toc {
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px 24px;
+    margin-bottom: 36px;
+  }
+  .toc ol { margin: 6px 0 0; }
+  .toc a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .toc a:hover { text-decoration: underline; }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 6px 18px;
+    font-size: 14px;
+    margin: 6px 0 16px;
+  }
+  .meta-grid .k { color: var(--muted); }
+  hr.soft {
+    border: 0;
+    border-top: 1px dashed var(--line);
+    margin: 28px 0;
+  }
+  .small { font-size: 13px; color: var(--muted); }
+  .nowrap { white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="cover">
+  <h1>加好友二维码 · 接口文档</h1>
+  <div class="sub">面向客户端 / Web 接入方 · 共 5 个接口</div>
+</header>
+
+<section class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#overview">功能概述</a></li>
+    <li><a href="#flow">使用流程</a></li>
+    <li><a href="#common">通用约定</a></li>
+    <li><a href="#api-1">① 生成二维码</a></li>
+    <li><a href="#api-2">② 列出我发的二维码</a></li>
+    <li><a href="#api-3">③ 撤销二维码</a></li>
+    <li><a href="#api-4">④ 扫码后预览</a></li>
+    <li><a href="#api-5">⑤ 扫码加好友</a></li>
+    <li><a href="#errors">错误码总表</a></li>
+    <li><a href="#scenarios">常见使用场景</a></li>
+    <li><a href="#qa">常见问题</a></li>
+  </ol>
+</section>
+
+<h2 id="overview">功能概述</h2>
+<p>用户可以让系统给自己生成一个「加我为好友」的二维码，分享出去后别人扫码即可向自己发起好友申请。</p>
+<ul>
+  <li>服务端只发放一个 <strong>token 字符串</strong>，并不负责生成二维码图片。客户端拿到返回里的 <code>qrPayload</code>，用本地任意二维码库（qrcode、jsQR 等）渲染成图片即可。</li>
+  <li>扫码人扫到码之后，是<strong>以自己的身份向发码人发起一条好友申请</strong>，发码人仍需要在好友申请列表里点「同意」。也就是说，二维码不会绕过任何隐私设置或黑名单——它只相当于一张「让对方知道我是谁」的电子名片。</li>
+  <li>一张二维码可以设置有效期和使用次数。可以做成长期有效的个人名片码，也可以做成一次性的当面加码。</li>
+</ul>
+
+<h2 id="flow">使用流程</h2>
+<ol>
+  <li>用户 A 调用 <code>POST /friends/invite-qr</code> 生码，拿到 <code>qrPayload</code>。</li>
+  <li>客户端把 <code>qrPayload</code> 渲染成二维码图片展示出来。</li>
+  <li>用户 B 扫码后，客户端从二维码里提取 token（即 <code>?token=</code> 后面那一串）。</li>
+  <li>客户端调用 <code>GET /friends/invite-qr/{token}/preview</code> 展示一下「这是 Alice，你确定要加吗」的确认页。</li>
+  <li>用户 B 点确认 → 客户端调 <code>POST /friends/invite-qr/{token}/accept</code> → 向 A 发起好友申请。</li>
+  <li>用户 A 在好友申请列表里同意 → 双方成为好友。</li>
+</ol>
+
+<h2 id="common">通用约定</h2>
+
+<h4>请求基础</h4>
+<div class="meta-grid">
+  <div class="k">路径前缀</div><div><code>/api/client/v1</code></div>
+  <div class="k">认证</div><div>所有接口都需要登录态（请求头携带访问令牌）</div>
+  <div class="k">请求体</div><div><code>application/json</code></div>
+</div>
+
+<h4>响应基础</h4>
+<p>统一响应信封：</p>
+<pre><code>{
+  "code":      "OK",       // OK 表示成功；其他为错误码
+  "message":   "success",
+  "requestId": "...",       // 排查用
+  "data":      { /* 各接口的业务数据，见下文 */ }
+}</code></pre>
+
+<h4>限流</h4>
+<p><strong>生码</strong>和<strong>扫码加好友</strong>这两个写操作做了节流，按已登录用户算：<strong>5 分钟内最多 20 次</strong>。超出会返回 <code>429</code>。</p>
+
+<h2 id="api-1">① 生成二维码</h2>
+<h3>
+  <span class="method post">POST</span>
+  <span class="pathbox">/friends/invite-qr</span>
+  <span class="tag">限流</span>
+</h3>
+<p>给当前用户发放一张「加我为好友」的二维码。可重复调用，生成多张码。</p>
+
+<h4>请求体（字段全部可选，整个 body 也可以不传）</h4>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>默认</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>ttlHours</code></td><td>整数</td><td><code>168</code>（7 天）</td><td>有效期，单位小时。取值范围 <code>1 ~ 720</code>（最长 30 天）。超出会被自动截到边界。</td></tr>
+<tr><td><code>maxUses</code></td><td>整数</td><td><code>0</code>（不限）</td><td>最多可被多少人扫码加成功。<code>0</code> 表示不限次数；取值范围 <code>0 ~ 1000</code>。</td></tr>
+<tr><td><code>message</code></td><td>字符串</td><td>null</td><td>对方扫码后默认带上的附言，最长 500 字符。扫码人可以覆盖。</td></tr>
+</tbody>
+</table>
+
+<h4>响应 data（FriendInviteQrDto）</h4>
+<pre><code>{
+  "tokenId":   "019e1fff-764f-7a21-a0a8-50fa837eb26e",
+  "token":     "A1B2C3D4E5F6A7B8",
+  "qrPayload": "ztchat://friend-invite?token=A1B2C3D4E5F6A7B8",
+  "maxUses":   0,
+  "usedCount": 0,
+  "message":   "扫码加我",
+  "status":    "active",
+  "expiresAt": "2026-05-20T06:00:00+00:00",
+  "createdAt": "2026-05-13T06:00:00+00:00"
+}</code></pre>
+
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>tokenId</code></td><td>GUID</td><td>这张码的内部 ID，<strong>撤销时使用</strong>。</td></tr>
+<tr><td><code>token</code></td><td>字符串</td><td>真正的二维码内容（16 位十六进制）。一般客户端不直接展示，而是用下面的 <code>qrPayload</code>。</td></tr>
+<tr><td><code>qrPayload</code></td><td>字符串</td><td><strong>直接喂给二维码库渲染图片</strong>。格式形如 <code>ztchat://friend-invite?token=XXXX</code>。</td></tr>
+<tr><td><code>maxUses</code></td><td>整数</td><td>最大可被接受的扫码次数。<code>0</code> 表示不限。</td></tr>
+<tr><td><code>usedCount</code></td><td>整数</td><td>已经被成功扫码加好友的次数。</td></tr>
+<tr><td><code>message</code></td><td>字符串/null</td><td>默认附言。</td></tr>
+<tr><td><code>status</code></td><td>字符串</td><td><code>active</code>=可用 / <code>revoked</code>=已撤销 / <code>exhausted</code>=用尽。</td></tr>
+<tr><td><code>expiresAt</code></td><td>时间戳</td><td>过期时间。</td></tr>
+<tr><td><code>createdAt</code></td><td>时间戳</td><td>创建时间。</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip">
+  <strong>提示</strong>
+  <code>qrPayload</code> 是一个<strong>自定义 scheme 的链接</strong>。客户端只需要把这个字符串完整编码进二维码即可。手机端扫码 App 不会直接识别 <code>ztchat://</code>，但 ZTChat 自己的客户端会拦截并跳转加好友页。
+</div>
+
+<h2 id="api-2">② 列出我发的二维码</h2>
+<h3>
+  <span class="method get">GET</span>
+  <span class="pathbox">/friends/invite-qr</span>
+</h3>
+<p>列出当前用户名下<strong>仍然有效</strong>的二维码——已撤销 / 已用尽 / 已过期的不会出现在列表里，避免界面里堆死码。按创建时间倒序。</p>
+
+<h4>请求参数</h4>
+<p>无。</p>
+
+<h4>响应 data</h4>
+<p>数组，每个元素就是 ① 里的 <code>FriendInviteQrDto</code>。</p>
+<pre><code>[
+  {
+    "tokenId":   "019e1fff-...",
+    "token":     "A1B2C3D4E5F6A7B8",
+    "qrPayload": "ztchat://friend-invite?token=A1B2C3D4E5F6A7B8",
+    "maxUses":   0,
+    "usedCount": 3,
+    "message":   "扫码加我",
+    "status":    "active",
+    "expiresAt": "...",
+    "createdAt": "..."
+  }
+]</code></pre>
+
+<h2 id="api-3">③ 撤销二维码</h2>
+<h3>
+  <span class="method delete">DELETE</span>
+  <span class="pathbox">/friends/invite-qr/{tokenId}</span>
+</h3>
+<p>把自己发出去的某一张码作废。撤销后再有人扫这张码，会被告知「二维码已失效」。</p>
+
+<h4>路径参数</h4>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>tokenId</code></td><td>GUID</td><td>① 里返回的 <code>tokenId</code>。<strong>不是 <code>token</code></strong>——故意不在 URL 上暴露真正的码值。</td></tr>
+</tbody>
+</table>
+
+<h4>响应 data</h4>
+<pre><code>{ "tokenId": "019e1fff-..." }</code></pre>
+
+<h4>行为说明</h4>
+<ul>
+  <li><strong>幂等</strong>：重复撤销同一张码，第二次仍然返回 200。</li>
+  <li>撤销别人的码会返回 <code>403 FRIEND_QR_FORBIDDEN</code>。</li>
+  <li>找不到这张码返回 <code>404 FRIEND_QR_NOT_FOUND</code>。</li>
+</ul>
+
+<h2 id="api-4">④ 扫码后预览</h2>
+<h3>
+  <span class="method get">GET</span>
+  <span class="pathbox">/friends/invite-qr/{token}/preview</span>
+</h3>
+<p>扫到码之后，先调一次预览拿到发码人的公开资料，让用户在客户端上确认「我要加的是这个人吗」。<strong>这一步不会真的发起好友申请。</strong></p>
+
+<h4>路径参数</h4>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>token</code></td><td>字符串</td><td>从扫到的 <code>qrPayload</code> 里提取的 <code>token</code> 值。</td></tr>
+</tbody>
+</table>
+
+<h4>响应 data（FriendInviteQrPreviewDto）</h4>
+<pre><code>{
+  "inviterUserId":      "019d7c8b-...",
+  "inviterDisplayName": "Alice",
+  "inviterAvatarUrl":   "https://.../avatar.png",
+  "message":            "扫码加我",
+  "expiresAt":          "2026-05-20T06:00:00+00:00",
+  "expired":            false,
+  "alreadyFriends":     false
+}</code></pre>
+
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>inviterUserId</code></td><td>GUID</td><td>发码人的用户 ID。</td></tr>
+<tr><td><code>inviterDisplayName</code></td><td>字符串</td><td>发码人昵称。</td></tr>
+<tr><td><code>inviterAvatarUrl</code></td><td>字符串/null</td><td>发码人头像。</td></tr>
+<tr><td><code>message</code></td><td>字符串/null</td><td>发码人设置的默认附言。</td></tr>
+<tr><td><code>expiresAt</code></td><td>时间戳</td><td>过期时间。</td></tr>
+<tr><td><code>expired</code></td><td>布尔</td><td><strong>关键字段</strong>。<code>true</code> 表示二维码已不可用（已过期 / 已撤销 / 已用尽）。<strong>注意这种情况不会返回错误码</strong>，只是 <code>expired=true</code>——客户端据此提示「二维码已失效，请向对方索取新码」。</td></tr>
+<tr><td><code>alreadyFriends</code></td><td>布尔</td><td><code>true</code> 表示扫码人和发码人<strong>已经是好友</strong>。客户端可以直接提示「你们已经是好友啦」并跳过申请步骤。</td></tr>
+</tbody>
+</table>
+
+<div class="callout warn">
+  <strong>注意</strong>
+  二维码失效不会以 HTTP 错误形式返回——状态码仍然是 <code>200</code>，但 <code>expired</code> 为 <code>true</code>。请前端务必判断这个布尔位，否则会把失效码当作正常码进入下一步。<br>
+  真正的错误（404 token 不存在 / 发码人账号已注销）才会以错误码形式返回。
+</div>
+
+<h2 id="api-5">⑤ 扫码加好友</h2>
+<h3>
+  <span class="method post">POST</span>
+  <span class="pathbox">/friends/invite-qr/{token}/accept</span>
+  <span class="tag">限流</span>
+</h3>
+<p>正式向发码人发起好友申请。<strong>发码人仍然需要在自己的好友申请列表里点同意</strong>，才会真正成为好友。</p>
+
+<h4>路径参数</h4>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>token</code></td><td>字符串</td><td>从扫到的 <code>qrPayload</code> 里提取的 <code>token</code>。</td></tr>
+</tbody>
+</table>
+
+<h4>请求体（可空，整个 body 也可以不传）</h4>
+<pre><code>{ "message": "你好，我是从你的二维码扫过来的" }</code></pre>
+<table>
+<thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>message</code></td><td>字符串/null</td><td>本次申请的附言。<strong>不传或为 null 时，自动使用发码人在生码时设置的默认附言。</strong>最长 500 字符。</td></tr>
+</tbody>
+</table>
+
+<h4>响应 data</h4>
+<pre><code>{ "requestId": "019e2000-..." }</code></pre>
+<p>新建（或反向命中自动接受）的好友申请 ID。后续在好友申请相关接口里可以用到。</p>
+
+<h4>行为说明</h4>
+<ul>
+  <li>本接口走的是完整的「发好友申请」流程，因此会受所有标准规则约束：
+    <ul>
+      <li>对方设置了「不接受任何好友申请」→ 返回 <code>FRIEND_PRIVACY_DENIED</code></li>
+      <li>对方设置了「只接受共同好友的申请」且没有共同好友 → 返回 <code>FRIEND_PRIVACY_NO_MUTUAL</code></li>
+      <li>对方拉黑了你 → 返回 <code>FRIEND_BLOCKED</code></li>
+      <li>你们已经是好友 → 返回 <code>FRIEND_ALREADY_EXISTS</code></li>
+      <li>你已经发过一条待处理的申请 → 返回 <code>FRIEND_REQUEST_PENDING</code></li>
+    </ul>
+  </li>
+  <li><strong>双向扫码自动互加</strong>：如果对方此前也扫过你的码、或主动向你发过申请，本次扫码会被识别为「互相同意」，<strong>跳过申请直接成为好友</strong>。</li>
+  <li>扫自己的码会被拒绝（<code>FRIEND_QR_SELF</code>）。</li>
+</ul>
+
+<h2 id="errors">错误码总表</h2>
+<p>本功能特有：</p>
+<table>
+<thead><tr><th>错误码</th><th>HTTP</th><th>含义</th><th>建议提示文案</th></tr></thead>
+<tbody>
+<tr><td><code>FRIEND_QR_NOT_FOUND</code></td><td>404</td><td>二维码不存在（token 错误或从未生成过）</td><td>"二维码无效"</td></tr>
+<tr><td><code>FRIEND_QR_REVOKED</code></td><td>410</td><td>已被发码人撤销</td><td>"二维码已失效，请向对方索取新码"</td></tr>
+<tr><td><code>FRIEND_QR_EXPIRED</code></td><td>410</td><td>已过期</td><td>"二维码已过期"</td></tr>
+<tr><td><code>FRIEND_QR_EXHAUSTED</code></td><td>409</td><td>已达使用次数上限</td><td>"二维码已被使用完，请向对方索取新码"</td></tr>
+<tr><td><code>FRIEND_QR_SELF</code></td><td>400</td><td>不能扫自己的码</td><td>"这是你自己的二维码"</td></tr>
+<tr><td><code>FRIEND_QR_INVITER_NOT_FOUND</code></td><td>404</td><td>发码人账号已不存在</td><td>"该用户账号已注销"</td></tr>
+<tr><td><code>FRIEND_QR_FORBIDDEN</code></td><td>403</td><td>撤销了不属于自己的码</td><td>—（不该发生）</td></tr>
+<tr><td><code>FRIEND_QR_INVALID</code></td><td>400</td><td>token 字段为空</td><td>—（不该发生）</td></tr>
+</tbody>
+</table>
+
+<p>沿用「发好友申请」的通用错误码：</p>
+<table>
+<thead><tr><th>错误码</th><th>HTTP</th><th>含义</th></tr></thead>
+<tbody>
+<tr><td><code>FRIEND_ALREADY_EXISTS</code></td><td>409</td><td>你们已经是好友</td></tr>
+<tr><td><code>FRIEND_REQUEST_PENDING</code></td><td>409</td><td>已有一条待处理的申请</td></tr>
+<tr><td><code>FRIEND_BLOCKED</code></td><td>403</td><td>对方已将你拉黑</td></tr>
+<tr><td><code>FRIEND_PRIVACY_DENIED</code></td><td>403</td><td>对方设置为「不接受好友申请」</td></tr>
+<tr><td><code>FRIEND_PRIVACY_NO_MUTUAL</code></td><td>403</td><td>对方设置为「需共同好友」且无共同好友</td></tr>
+<tr><td><code>FRIEND_ISOLATION_MODE</code></td><td>403</td><td>当前组织开启了客户隔离模式，禁止客户之间互加</td></tr>
+<tr><td><code>FRIEND_GROUP_DISABLED</code></td><td>403</td><td>双方所在群禁止通过群内互加好友</td></tr>
+</tbody>
+</table>
+
+<h2 id="scenarios">常见使用场景</h2>
+
+<h4>场景 1 · 永久个人名片码</h4>
+<p>放在个人资料页常驻展示，谁都可以扫，长期有效。</p>
+<pre><code>POST /friends/invite-qr
+{
+  "ttlHours": 720,
+  "maxUses":  0,
+  "message":  "你好，我是 Alice"
+}</code></pre>
+<p>有效期 30 天（系统最长）。前端需要做一件事：<strong>到期前自动调一次本接口生成新码并替换</strong>，否则旧码失效后用户无法被加。</p>
+
+<h4>场景 2 · 一次性面对面加</h4>
+<p>线下见面时临时生成、对方扫一次后自动作废。</p>
+<pre><code>POST /friends/invite-qr
+{
+  "ttlHours": 1,
+  "maxUses":  1
+}</code></pre>
+
+<h4>场景 3 · 小群拉新（限量）</h4>
+<p>同事/活动里有限名额的加好友码。</p>
+<pre><code>POST /friends/invite-qr
+{
+  "ttlHours": 24,
+  "maxUses":  20,
+  "message":  "ZTChat 用户群欢迎你"
+}</code></pre>
+<p>用满 20 次后状态自动变为 <code>exhausted</code>。</p>
+
+<h2 id="qa">常见问题</h2>
+
+<h4>Q：二维码图片是后端给吗？</h4>
+<p>不是。后端只返回 <code>qrPayload</code> 字符串，前端自己用任意二维码库（Web 端 <code>qrcode</code> / 小程序原生组件 / 移动端原生）渲染成图片即可。这样可以自由控制尺寸、颜色、Logo、纠错等级。</p>
+
+<h4>Q：扫码就成好友吗？</h4>
+<p>不是。扫码 = 发起一条普通的好友申请，发码人需要主动同意。<strong>例外</strong>：如果对方此前也扫过你的码（或向你发过申请），系统会判定为「互相同意」，跳过申请直接成为好友。</p>
+
+<h4>Q：能扫别的租户/企业的码吗？</h4>
+<p>可以。如果发码人和扫码人在同一个 ZTChat 平台账号体系下，跨租户/跨组织也能加为好友（前提是发码人的隐私设置允许）。</p>
+
+<h4>Q：二维码会泄露什么信息？</h4>
+<p>只有一个 16 位随机字符串。在被扫码人调用 <code>preview</code> 之前，外人拿到这个串什么也做不了；调用 preview 也只能看到发码人的公开资料（昵称、头像、默认附言）。</p>
+
+<h4>Q：可以同时存在多少张码？</h4>
+<p>没有硬性数量上限。<code>GET /friends/invite-qr</code> 返回的是所有「未失效」的码，建议前端在用户管理界面里展示这个列表。</p>
+
+<h4>Q：限流被触发了怎么办？</h4>
+<p>会收到 HTTP <code>429</code>。每用户 5 分钟内最多 20 次生码/扫码。正常使用绝不会触发，触发了一般说明被脚本反复调用。</p>
+
+<h4>Q：客户端怎么把二维码里的 token 提取出来？</h4>
+<p>扫码后得到字符串形如 <code>ztchat://friend-invite?token=A1B2C3D4E5F6A7B8</code>。用任意 URL 解析方式取 <code>token</code> query 参数即可。若不是 <code>ztchat://friend-invite</code> 开头，按「不是 ZTChat 加好友码」处理。</p>
+
+<hr class="soft">
+<p class="small">文档版本：2026-05-13 · 适用于 ZTChat 客户端 API v1</p>
+
+</div>
+</body>
+</html>

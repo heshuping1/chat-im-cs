@@ -1,0 +1,201 @@
+:root {
+  color-scheme: light;
+  --pc-bg: #eef4f8;
+  --pc-surface: #ffffff;
+  --pc-surface-soft: #f7fafc;
+  --pc-surface-muted: #edf3f8;
+  --pc-rail: #081524;
+  --pc-rail-elevated: #10243a;
+  --pc-rail-border: rgba(202, 214, 230, 0.14);
+  --pc-primary: #08b47a;
+  --pc-primary-strong: #05845c;
+  --pc-primary-soft: #e6f8f0;
+  --pc-accent: #ff7a2f;
+  --pc-danger: #ee3f50;
+  --pc-warning: #f5a524;
+  --pc-text: #101827;
+  --pc-text-secondary: #53657c;
+  --pc-text-muted: #7b8ca3;
+  --pc-border: #d9e3ee;
+  --pc-border-soft: #e8eef5;
+  --pc-focus: rgba(0, 168, 112, 0.24);
+  --pc-shadow-sm: 0 6px 18px rgba(14, 27, 47, 0.06);
+  --pc-shadow-md: 0 18px 46px rgba(14, 27, 47, 0.14);
+  --pc-shadow-popover: 0 24px 70px rgba(14, 27, 47, 0.22);
+  --pc-radius-xs: 6px;
+  --pc-radius-sm: 8px;
+  --pc-radius-md: 12px;
+  --pc-radius-lg: 16px;
+  --pc-space-1: 4px;
+  --pc-space-2: 8px;
+  --pc-space-3: 12px;
+  --pc-space-4: 16px;
+  --pc-space-5: 20px;
+  --pc-space-6: 24px;
+  --pc-font-scale: 1;
+  --pc-density-scale: 1;
+  --pc-boundary-alpha: 1;
+  --pc-font-family:
+    Inter,
+    "PingFang SC",
+    "Microsoft YaHei",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+
+:root[data-theme="business"] {
+  --pc-bg: #f2f5f8;
+  --pc-surface-soft: #f8fafc;
+  --pc-surface-muted: #e9eff6;
+  --pc-rail: #0f172a;
+  --pc-rail-elevated: #18233a;
+  --pc-primary: #1677ff;
+  --pc-primary-strong: #0f5ec8;
+  --pc-primary-soft: #e9f2ff;
+  --pc-accent: #13a8a8;
+  --pc-focus: rgba(22, 119, 255, 0.24);
+}
+
+:root[data-theme="classic-wechat"] {
+  --pc-bg: #ededed;
+  --pc-surface-soft: #f7f7f7;
+  --pc-surface-muted: #e6e6e6;
+  --pc-rail: #2e2e2e;
+  --pc-rail-elevated: #363636;
+  --pc-primary: #07c160;
+  --pc-primary-strong: #06a754;
+  --pc-primary-soft: #e8f7ee;
+  --pc-text-secondary: #5f6670;
+  --pc-border: #d8d8d8;
+  --pc-border-soft: #e8e8e8;
+  --pc-focus: rgba(7, 193, 96, 0.22);
+  --pc-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.05);
+  --pc-shadow-md: 0 14px 36px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --pc-bg: #111827;
+  --pc-surface: #182231;
+  --pc-surface-soft: #202b3c;
+  --pc-surface-muted: #263449;
+  --pc-rail: #070b12;
+  --pc-rail-elevated: #101827;
+  --pc-rail-border: rgba(148, 163, 184, 0.18);
+  --pc-primary: #20d99a;
+  --pc-primary-strong: #12b981;
+  --pc-primary-soft: rgba(32, 217, 154, 0.14);
+  --pc-text: #f7fafc;
+  --pc-text-secondary: #c5d0df;
+  --pc-text-muted: #93a4b8;
+  --pc-border: #34445a;
+  --pc-border-soft: #2a374b;
+  --pc-focus: rgba(32, 217, 154, 0.28);
+  --pc-shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.22);
+  --pc-shadow-md: 0 18px 48px rgba(0, 0, 0, 0.34);
+  --pc-shadow-popover: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+:root[data-theme="high-contrast"] {
+  --pc-bg: #f8fafc;
+  --pc-surface: #ffffff;
+  --pc-surface-soft: #ffffff;
+  --pc-surface-muted: #eef2f7;
+  --pc-primary: #00845c;
+  --pc-primary-strong: #006747;
+  --pc-primary-soft: #dff8ec;
+  --pc-text: #050b18;
+  --pc-text-secondary: #27364a;
+  --pc-text-muted: #52627a;
+  --pc-border: #9fb0c4;
+  --pc-border-soft: #c6d2df;
+  --pc-boundary-alpha: 1.22;
+}
+
+:root[data-skin="jade"] {
+  --pc-primary: #00a870;
+  --pc-primary-strong: #007f59;
+  --pc-primary-soft: #e4f8ef;
+  --pc-focus: rgba(0, 168, 112, 0.24);
+}
+
+:root[data-skin="blue"] {
+  --pc-primary: #1677ff;
+  --pc-primary-strong: #0f5ec8;
+  --pc-primary-soft: #e9f2ff;
+  --pc-focus: rgba(22, 119, 255, 0.24);
+}
+
+:root[data-skin="graphite"] {
+  --pc-primary: #475569;
+  --pc-primary-strong: #334155;
+  --pc-primary-soft: #eef2f7;
+  --pc-focus: rgba(71, 85, 105, 0.22);
+}
+
+:root[data-font-size="small"] {
+  --pc-font-scale: 0.94;
+}
+
+:root[data-font-size="large"] {
+  --pc-font-scale: 1.06;
+}
+
+:root[data-font-size="extra-large"] {
+  --pc-font-scale: 1.12;
+}
+
+:root[data-density="compact"] {
+  --pc-density-scale: 0.9;
+}
+
+:root[data-boundary="strong"] {
+  --pc-boundary-alpha: 1.18;
+}
+
+.pc-button,
+.pc-icon-button,
+.pc-input,
+.pc-card,
+.pc-menu,
+.pc-badge,
+.pc-tabs {
+  font: inherit;
+}
+
+.pc-button,
+.pc-icon-button {
+  border: 1px solid var(--pc-border);
+  background: var(--pc-surface);
+  color: var(--pc-text-secondary);
+}
+
+.pc-button:hover,
+.pc-icon-button:hover {
+  border-color: var(--pc-primary);
+  color: var(--pc-primary-strong);
+}
+
+.pc-input {
+  border: 1px solid var(--pc-border);
+  background: var(--pc-surface);
+  color: var(--pc-text);
+}
+
+.pc-card,
+.pc-menu {
+  border: 1px solid var(--pc-border-soft);
+  background: var(--pc-surface);
+  box-shadow: var(--pc-shadow-sm);
+}
+
+.pc-badge {
+  background: var(--pc-primary-soft);
+  color: var(--pc-primary-strong);
+}
+
+.pc-tabs {
+  color: var(--pc-text-secondary);
+}

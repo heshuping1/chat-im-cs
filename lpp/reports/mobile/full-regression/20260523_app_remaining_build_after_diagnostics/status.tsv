@@ -1,0 +1,6 @@
+iteration	step	status	seconds	log
+1	flutter analyze	PASS	5	iteration-1/03_analyze.log
+1	flutter build apk debug	PASS	15	iteration-1/05_build_debug_apk.log
+1	adb install debug apk	PASS	9	iteration-1/07_adb_install.log
+1	adb launch smoke	PASS	1	iteration-1/08_adb_launch.log
+1	adb process check	PASS	0	iteration-1/09_adb_pid_check.log

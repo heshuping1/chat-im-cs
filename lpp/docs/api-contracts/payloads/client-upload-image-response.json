@@ -1,0 +1,17 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V1EV",
+  "data": {
+    "mediaId": "019e5a70-9d0f-79ae-941f-d52a68e2d84e",
+    "mediaKind": "image",
+    "url": "/media/019e5a70-9d0f-79ae-941f-d52a68e2d84e",
+    "relativePath": "11111111111111111111111111111111/2026/05/24/image/019e5a709d0f79ae941fd52a68e2d84e.png",
+    "fileName": "diagram.png",
+    "mimeType": "image/png",
+    "sizeBytes": 12,
+    "thumbnailUrl": null,
+    "signedUrl": "/media/019e5a70-9d0f-79ae-941f-d52a68e2d84e?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637390\u0026sig=T1847UPsJM00jeyJzXRpFEkQBNpg4f7r5qYWuG2WSys",
+    "downloadUrl": "/media/019e5a70-9d0f-79ae-941f-d52a68e2d84e?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637390\u0026sig=T1847UPsJM00jeyJzXRpFEkQBNpg4f7r5qYWuG2WSys\u0026download=1"
+  }
+}

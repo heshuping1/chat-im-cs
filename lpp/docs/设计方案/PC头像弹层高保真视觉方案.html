@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PC 头像弹层高保真视觉方案</title>
+  <style>
+    :root {
+      --bg: #eef4f7;
+      --panel: #ffffff;
+      --line: #dbe6ef;
+      --line-strong: #cbd9e5;
+      --text: #101827;
+      --sub: #607189;
+      --muted: #8aa0b6;
+      --green: #10b981;
+      --green-deep: #07966f;
+      --green-soft: #e8fbf3;
+      --blue: #3578f6;
+      --red: #ef4056;
+      --shadow: 0 22px 70px rgba(31, 45, 61, .14);
+      --shadow-soft: 0 12px 36px rgba(31, 45, 61, .08);
+      font-family: Inter, "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 15% 4%, rgba(16, 185, 129, .12), transparent 30%),
+        radial-gradient(circle at 84% 0%, rgba(53, 120, 246, .11), transparent 31%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    .page {
+      width: 1680px;
+      margin: 0 auto;
+      padding: 48px;
+    }
+
+    .page-title {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .page-title h1 {
+      margin: 0;
+      font-size: 36px;
+      letter-spacing: 0;
+    }
+
+    .page-title p {
+      max-width: 760px;
+      margin: 10px 0 0;
+      color: var(--sub);
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .principle {
+      min-height: 112px;
+      padding: 18px;
+      border: 1px solid rgba(203, 217, 229, .78);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .78);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .principle strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    .principle span {
+      color: var(--sub);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .scheme-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+    }
+
+    .scheme {
+      overflow: hidden;
+      border: 1px solid rgba(203, 217, 229, .82);
+      border-radius: 26px;
+      background: rgba(255, 255, 255, .82);
+      box-shadow: var(--shadow);
+    }
+
+    .scheme-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid rgba(219, 230, 239, .82);
+      background: rgba(255, 255, 255, .72);
+    }
+
+    .scheme-head h2 {
+      margin: 0;
+      font-size: 21px;
+    }
+
+    .scheme-head em {
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: var(--green-soft);
+      color: var(--green-deep);
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 900;
+    }
+
+    .stage {
+      position: relative;
+      min-height: 560px;
+      padding: 34px;
+      background:
+        linear-gradient(135deg, rgba(247, 251, 253, .92), rgba(255, 255, 255, .98)),
+        #fff;
+    }
+
+    .sidebar-demo {
+      width: 150px;
+      height: 500px;
+      border-right: 1px solid var(--line);
+      background: linear-gradient(180deg, #f7fbfa, #fff);
+      padding: 22px 18px;
+    }
+
+    .avatar-trigger {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 116px;
+      padding: 8px;
+      border-radius: 16px;
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 10px 30px rgba(31, 45, 61, .08);
+    }
+
+    .avatar {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 auto;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #ff4d42, #ff8a34);
+      color: #fff;
+      font-size: 22px;
+      font-weight: 900;
+      box-shadow: 0 12px 28px rgba(255, 96, 58, .24);
+    }
+
+    .avatar.round {
+      border-radius: 50%;
+    }
+
+    .status-dot {
+      position: absolute;
+      right: -1px;
+      bottom: -1px;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .identity strong,
+    .identity span {
+      display: block;
+      overflow: hidden;
+      max-width: 48px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .identity strong { font-size: 15px; }
+    .identity span { color: var(--sub); font-size: 12px; }
+
+    .popover {
+      position: absolute;
+      left: 146px;
+      top: 46px;
+      width: 404px;
+      border: 1px solid rgba(203, 217, 229, .9);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .97);
+      box-shadow: var(--shadow);
+    }
+
+    .popover.glass {
+      width: 430px;
+      border-color: rgba(255, 255, 255, .72);
+      background: rgba(255, 255, 255, .76);
+      backdrop-filter: blur(24px);
+    }
+
+    .popover.compact {
+      width: 352px;
+      border-radius: 16px;
+    }
+
+    .popover.command {
+      width: 454px;
+      background: #101827;
+      color: #fff;
+      border-color: rgba(255, 255, 255, .08);
+      box-shadow: 0 26px 80px rgba(16, 24, 39, .36);
+    }
+
+    .pop-section {
+      padding: 16px;
+      border-bottom: 1px solid rgba(219, 230, 239, .86);
+    }
+
+    .command .pop-section {
+      border-bottom-color: rgba(255, 255, 255, .08);
+    }
+
+    .pop-section:last-child {
+      border-bottom: 0;
+    }
+
+    .profile-line {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 72px;
+      padding: 12px;
+      border: 1px solid rgba(219, 230, 239, .9);
+      border-radius: 14px;
+      background: #fff;
+    }
+
+    .glass .profile-line {
+      background: rgba(255, 255, 255, .72);
+    }
+
+    .command .profile-line {
+      border-color: rgba(255, 255, 255, .1);
+      background: rgba(255, 255, 255, .07);
+    }
+
+    .profile-line .avatar { width: 52px; height: 52px; }
+
+    .profile-copy strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1.15;
+    }
+
+    .profile-copy span {
+      display: block;
+      margin-top: 6px;
+      color: var(--sub);
+      font-size: 14px;
+    }
+
+    .command .profile-copy span,
+    .command .section-title,
+    .command .row span {
+      color: rgba(255, 255, 255, .62);
+    }
+
+    .outline-btn {
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid rgba(53, 120, 246, .42);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .command .outline-btn {
+      border-color: rgba(16, 185, 129, .55);
+      background: rgba(16, 185, 129, .12);
+      color: #5ee0b0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 10px;
+      color: #607189;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .section-title button {
+      border: 0;
+      background: transparent;
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    .space-row,
+    .row {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 58px;
+      padding: 10px 12px;
+      border: 1px solid rgba(219, 230, 239, .86);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .space-row + .space-row,
+    .row + .row {
+      margin-top: 8px;
+    }
+
+    .command .space-row,
+    .command .row {
+      border-color: rgba(255, 255, 255, .08);
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .logo {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #00a86b, #14c889);
+      color: #fff;
+      font-weight: 950;
+    }
+
+    .row-icon {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #eef6f2;
+      color: var(--green-deep);
+      font-weight: 900;
+    }
+
+    .space-copy strong,
+    .row strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .space-copy span,
+    .row span {
+      display: block;
+      margin-top: 3px;
+      color: var(--sub);
+      font-size: 12px;
+    }
+
+    .switch {
+      width: 42px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--blue);
+      padding: 3px;
+    }
+
+    .switch::after {
+      content: "";
+      display: block;
+      width: 18px;
+      height: 18px;
+      margin-left: 18px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .quick-grid button {
+      min-height: 54px;
+      border: 1px solid rgba(219, 230, 239, .86);
+      border-radius: 12px;
+      background: #fff;
+      color: #44566e;
+      font-weight: 850;
+    }
+
+    .command .quick-grid button {
+      border-color: rgba(255, 255, 255, .08);
+      background: rgba(255, 255, 255, .06);
+      color: rgba(255, 255, 255, .88);
+    }
+
+    .logout {
+      display: flex;
+      width: 100%;
+      height: 42px;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(239, 64, 86, .18);
+      border-radius: 12px;
+      background: rgba(239, 64, 86, .06);
+      color: #dc354d;
+      font-weight: 900;
+    }
+
+    .param {
+      padding: 18px 22px 22px;
+      background: rgba(247, 251, 253, .72);
+    }
+
+    .param h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    .param-grid {
+      display: grid;
+      grid-template-columns: 108px minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid rgba(219, 230, 239, .9);
+      border-radius: 14px;
+      background: #fff;
+      font-size: 13px;
+    }
+
+    .param-grid span,
+    .param-grid code {
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(219, 230, 239, .74);
+    }
+
+    .param-grid span {
+      color: var(--sub);
+      font-weight: 850;
+    }
+
+    .param-grid code {
+      color: #233044;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      white-space: normal;
+    }
+
+    .param-grid span:nth-last-child(-n+2),
+    .param-grid code:nth-last-child(-n+1) {
+      border-bottom: 0;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 6px 9px;
+      background: #eef4fb;
+      color: #52677f;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .scheme-a .popover { top: 72px; }
+    .scheme-b .popover { top: 54px; }
+    .scheme-c .popover { top: 64px; }
+    .scheme-d .popover { top: 48px; }
+
+    .scheme-c .stage {
+      background: linear-gradient(135deg, #111827, #172033 52%, #eff8f4 52%);
+    }
+
+    .scheme-c .sidebar-demo {
+      background: transparent;
+      border-right-color: rgba(255, 255, 255, .1);
+    }
+
+    .scheme-c .avatar-trigger {
+      background: rgba(255, 255, 255, .08);
+      color: #fff;
+      box-shadow: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-title">
+      <div>
+        <h1>PC 客户端头像弹层高保真视觉方案</h1>
+        <p>弹层定位：头像入口下的轻量个人中心。它承载个人身份、IM 在线状态、企业空间、企业切换、少量个人快捷入口；系统通知、桌面能力、诊断仍放系统设置。</p>
+      </div>
+    </header>
+
+    <section class="principles">
+      <article class="principle">
+        <strong>头像代表个人，不代表企业</strong>
+        <span>触发点展示真人客服身份；企业 Logo 只在企业空间卡和企业信息里出现。</span>
+      </article>
+      <article class="principle">
+        <strong>弹层只做轻操作</strong>
+        <span>个人资料、状态、切换企业、二维码、收藏；复杂设置不塞进这里。</span>
+      </article>
+      <article class="principle">
+        <strong>状态模型清晰</strong>
+        <span>这里只控制 IM 在线状态；在线客服接待状态仍在在线客服页。</span>
+      </article>
+      <article class="principle">
+        <strong>参数化落地</strong>
+        <span>每套方案都给出宽度、圆角、间距、字号、阴影和组件尺寸，避免靠感觉复刻。</span>
+      </article>
+    </section>
+
+    <section class="scheme-grid">
+      <article class="scheme scheme-a">
+        <header class="scheme-head">
+          <h2>A 轻量飞书式</h2>
+          <em>信息最清楚</em>
+        </header>
+        <div class="stage">
+          <aside class="sidebar-demo">
+            <div class="avatar-trigger">
+              <span class="avatar round">T<span class="status-dot"></span></span>
+              <span class="identity"><strong>tree</strong><span>vvv</span></span>
+            </div>
+          </aside>
+          <section class="popover compact">
+            <div class="pop-section">
+              <div class="profile-line">
+                <span class="avatar round">T<span class="status-dot"></span></span>
+                <span class="profile-copy"><strong>tree</strong><span>lpp_gs9fn2c7</span></span>
+                <button class="outline-btn">个人头像</button>
+              </div>
+            </div>
+            <div class="pop-section">
+              <p class="section-title">企业空间 <button>切换</button></p>
+              <div class="space-row">
+                <span class="logo">L</span>
+                <span class="space-copy"><strong>LPP</strong><span>vvv</span></span>
+                <span class="switch"></span>
+              </div>
+            </div>
+            <div class="pop-section">
+              <div class="row"><span class="row-icon">I</span><span><strong>IM 状态</strong><span>在线</span></span><b>›</b></div>
+              <div class="row"><span class="row-icon">Q</span><span><strong>我的二维码</strong><span>用于加好友</span></span><b>›</b></div>
+              <div class="row"><span class="row-icon">S</span><span><strong>账号安全</strong><span>密码 / 登录设备</span></span><b>›</b></div>
+            </div>
+            <div class="pop-section"><button class="logout">退出登录</button></div>
+          </section>
+        </div>
+        <div class="param">
+          <h3>参数</h3>
+          <div class="param-grid">
+            <span>弹层</span><code>width 352; radius 16; padding 16; shadow 0 22 70 rgba(31,45,61,.14)</code>
+            <span>头像</span><code>trigger 42 circle; profile 52 circle; gradient #ff4d42 → #ff8a34</code>
+            <span>字号</span><code>name 20/900; section 13/900; row title 15/850; desc 12/650</code>
+            <span>间距</span><code>section 16; row gap 8; row height 58; inner gap 12</code>
+            <span>图标</span><code>lucide: UserRound, QrCode, ShieldCheck, ChevronRight, LogOut</code>
+          </div>
+          <div class="pill-row"><span class="pill">适合普通 IM 工具</span><span class="pill">最接近飞书</span><span class="pill">弹层较小</span></div>
+        </div>
+      </article>
+
+      <article class="scheme scheme-b">
+        <header class="scheme-head">
+          <h2>B 白瓷分组卡片</h2>
+          <em>推荐</em>
+        </header>
+        <div class="stage">
+          <aside class="sidebar-demo">
+            <div class="avatar-trigger">
+              <span class="avatar">M<span class="status-dot"></span></span>
+              <span class="identity"><strong>mouse</strong><span>star</span></span>
+            </div>
+          </aside>
+          <section class="popover">
+            <div class="pop-section">
+              <div class="profile-line">
+                <span class="avatar">M<span class="status-dot"></span></span>
+                <span class="profile-copy"><strong>mouse客服</strong><span>lpp_gs9fn2c7 · 在线</span></span>
+                <button class="outline-btn">个人资料</button>
+              </div>
+            </div>
+            <div class="pop-section">
+              <p class="section-title">企业空间 <button>切换企业</button></p>
+              <div class="space-row">
+                <span class="logo">L</span>
+                <span class="space-copy"><strong>LPP</strong><span>star · 当前企业</span></span>
+                <span class="switch"></span>
+              </div>
+              <div class="space-row">
+                <span class="logo">S</span>
+                <span class="space-copy"><strong>星创 AI</strong><span>企业信息</span></span>
+                <b>›</b>
+              </div>
+            </div>
+            <div class="pop-section">
+              <p class="section-title">快捷入口</p>
+              <div class="quick-grid">
+                <button>二维码</button>
+                <button>收藏</button>
+                <button>线路</button>
+                <button>隐私</button>
+                <button>设备</button>
+                <button>语言</button>
+              </div>
+            </div>
+            <div class="pop-section"><button class="logout">退出登录</button></div>
+          </section>
+        </div>
+        <div class="param">
+          <h3>参数</h3>
+          <div class="param-grid">
+            <span>弹层</span><code>width 404; radius 18; section padding 16; card radius 14; border #dbe6ef</code>
+            <span>头像</span><code>trigger 42 rounded-14; profile 52 rounded-16; status dot 12</code>
+            <span>字号</span><code>name 20/900; subtitle 14/650; section 13/900; quick 13/850</code>
+            <span>间距</span><code>outer 16; card padding 12; row height 58; quick grid 3 cols gap 8</code>
+            <span>色彩</span><code>bg #fff/#f7fbfd; primary #10b981; accent #3578f6; red #ef4056</code>
+            <span>图标</span><code>lucide: UserRound, Building2, Repeat2, QrCode, Star, Route, Languages, MonitorSmartphone</code>
+          </div>
+          <div class="pill-row"><span class="pill">高级白瓷风</span><span class="pill">最适配 E 方案</span><span class="pill">入口完整</span></div>
+        </div>
+      </article>
+
+      <article class="scheme scheme-c">
+        <header class="scheme-head">
+          <h2>C 深色指挥台</h2>
+          <em>强品牌感</em>
+        </header>
+        <div class="stage">
+          <aside class="sidebar-demo">
+            <div class="avatar-trigger">
+              <span class="avatar">M<span class="status-dot"></span></span>
+              <span class="identity"><strong>mouse</strong><span>star</span></span>
+            </div>
+          </aside>
+          <section class="popover command">
+            <div class="pop-section">
+              <div class="profile-line">
+                <span class="avatar">M<span class="status-dot"></span></span>
+                <span class="profile-copy"><strong>mouse客服</strong><span>在线 · 客服角色 · star</span></span>
+                <button class="outline-btn">资料</button>
+              </div>
+            </div>
+            <div class="pop-section">
+              <p class="section-title">当前企业 <button>切换</button></p>
+              <div class="space-row">
+                <span class="logo">L</span>
+                <span class="space-copy"><strong>LPP</strong><span>当前空间 · vvv</span></span>
+                <span class="switch"></span>
+              </div>
+            </div>
+            <div class="pop-section">
+              <p class="section-title">工作快捷入口</p>
+              <div class="quick-grid">
+                <button>状态</button>
+                <button>二维码</button>
+                <button>设备</button>
+                <button>收藏</button>
+                <button>安全</button>
+                <button>线路</button>
+              </div>
+            </div>
+            <div class="pop-section"><button class="logout">退出登录</button></div>
+          </section>
+        </div>
+        <div class="param">
+          <h3>参数</h3>
+          <div class="param-grid">
+            <span>弹层</span><code>width 454; radius 18; bg #101827; panel rgba(255,255,255,.06)</code>
+            <span>头像</span><code>52 rounded-16; high contrast orange gradient; status dot #10b981</code>
+            <span>字号</span><code>name 20/900; secondary 14/650; section 13/900</code>
+            <span>间距</span><code>section 16; row height 58; quick button height 54</code>
+            <span>图标</span><code>lucide: Command, Bot, ShieldCheck, MonitorSmartphone, Route, LogOut</code>
+          </div>
+          <div class="pill-row"><span class="pill">视觉最强</span><span class="pill">偏专业工具</span><span class="pill">和白瓷主界面对比强</span></div>
+        </div>
+      </article>
+
+      <article class="scheme scheme-d">
+        <header class="scheme-head">
+          <h2>D 毛玻璃浮层</h2>
+          <em>最轻盈</em>
+        </header>
+        <div class="stage">
+          <aside class="sidebar-demo">
+            <div class="avatar-trigger">
+              <span class="avatar round">T<span class="status-dot"></span></span>
+              <span class="identity"><strong>tree</strong><span>vvv</span></span>
+            </div>
+          </aside>
+          <section class="popover glass">
+            <div class="pop-section">
+              <div class="profile-line">
+                <span class="avatar round">T<span class="status-dot"></span></span>
+                <span class="profile-copy"><strong>tree</strong><span>vvv · 在线</span></span>
+                <button class="outline-btn">个人头像</button>
+              </div>
+            </div>
+            <div class="pop-section">
+              <p class="section-title">企业空间 <button>切换企业</button></p>
+              <div class="space-row">
+                <span class="logo">L</span>
+                <span class="space-copy"><strong>LPP</strong><span>当前企业</span></span>
+                <span class="switch"></span>
+              </div>
+            </div>
+            <div class="pop-section">
+              <div class="row"><span class="row-icon">P</span><span><strong>个人资料</strong><span>头像、昵称、LPP 号</span></span><b>›</b></div>
+              <div class="row"><span class="row-icon">L</span><span><strong>语言与线路</strong><span>时区、自动翻译、线路</span></span><b>›</b></div>
+              <div class="row"><span class="row-icon">B</span><span><strong>隐私与黑名单</strong><span>联系人权限</span></span><b>›</b></div>
+            </div>
+            <div class="pop-section"><button class="logout">退出登录</button></div>
+          </section>
+        </div>
+        <div class="param">
+          <h3>参数</h3>
+          <div class="param-grid">
+            <span>弹层</span><code>width 430; radius 20; bg rgba(255,255,255,.76); blur 24px</code>
+            <span>头像</span><code>circle 52; trigger circle 42; status dot 12</code>
+            <span>字号</span><code>name 20/900; row title 15/850; desc 12/650</code>
+            <span>间距</span><code>section 16; row height 58; gap 12</code>
+            <span>图标</span><code>lucide: UserRound, Languages, Shield, Building2, LogOut</code>
+          </div>
+          <div class="pill-row"><span class="pill">轻盈现代</span><span class="pill">适合 macOS 感</span><span class="pill">Windows 下需控制透明度</span></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

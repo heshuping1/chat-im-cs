@@ -1,0 +1,37 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNKU8AB12C3G",
+  "data": [
+    {
+      "deviceId": "019daa10-aaaa-7f00-d001-112233445566",
+      "tenantId": "019daa10-bbbb-7f00-d002-112233445567",
+      "tenantName": "示例科技有限公司",
+      "deviceName": "iPhone 15 Pro",
+      "deviceType": "ios",
+      "lastActiveAt": "2026-04-20T09:30:00.000+00:00",
+      "isCurrent": true,
+      "activeSessionCount": 1
+    },
+    {
+      "deviceId": "019daa10-cccc-7f00-d003-112233445568",
+      "tenantId": "019daa10-bbbb-7f00-d002-112233445567",
+      "tenantName": "示例科技有限公司",
+      "deviceName": "Chrome on Windows",
+      "deviceType": "web",
+      "lastActiveAt": "2026-04-19T18:45:00.000+00:00",
+      "isCurrent": false,
+      "activeSessionCount": 1
+    },
+    {
+      "deviceId": "019daa10-dddd-7f00-d004-112233445569",
+      "tenantId": "019daa10-eeee-7f00-d005-11223344556a",
+      "tenantName": null,
+      "deviceName": "Android Tablet",
+      "deviceType": "android",
+      "lastActiveAt": "2026-04-18T14:20:00.000+00:00",
+      "isCurrent": false,
+      "activeSessionCount": 0
+    }
+  ]
+}

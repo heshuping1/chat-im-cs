@@ -1,0 +1,11 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V1FB",
+  "data": {
+    "messageId": "019e5a70-9ef7-70e5-9b74-1e2fc051f780",
+    "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+    "conversationSeq": 5,
+    "serverTime": "2026-05-24T14:43:10.7118166\u002B00:00"
+  }
+}

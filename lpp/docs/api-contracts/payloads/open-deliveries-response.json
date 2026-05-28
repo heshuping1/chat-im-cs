@@ -1,0 +1,23 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLPKAG7V1DM",
+  "data": [
+    {
+      "deliveryId": "019e5a70-8a35-7edf-802a-294f3e632863",
+      "topic": "message.read",
+      "status": 1,
+      "retryCount": 0,
+      "createdAt": "2026-05-24T14:43:05.3978581\u002B00:00",
+      "deliveredAt": "2026-05-24T14:43:05.4097065\u002B00:00"
+    },
+    {
+      "deliveryId": "019e5a70-89cc-71af-a986-3293d4427410",
+      "topic": "message.created",
+      "status": 1,
+      "retryCount": 0,
+      "createdAt": "2026-05-24T14:43:05.2912612\u002B00:00",
+      "deliveredAt": "2026-05-24T14:43:05.3651418\u002B00:00"
+    }
+  ]
+}

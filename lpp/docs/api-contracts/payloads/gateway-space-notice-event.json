@@ -1,0 +1,16 @@
+{
+  "event": "space.notice",
+  "traceId": "019e5a7079ea7234af96bb35c6ce76db",
+  "sentAt": "2026-05-24T14:43:01.2265783\u002B00:00",
+  "data": {
+    "noticeType": "message",
+    "spaceType": 2,
+    "tenantId": "019e5a70-7869-76d5-b2b0-75a6d64b00d4",
+    "requiresSwitch": true,
+    "targetUnreadConversationCount": 1,
+    "targetUnreadMessageCount": 1,
+    "unreadSpaceCount": 1,
+    "totalUnreadConversationCount": 1,
+    "totalUnreadMessageCount": 1
+  }
+}

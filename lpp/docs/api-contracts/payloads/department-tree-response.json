@@ -1,0 +1,52 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNKU8AB12C3H",
+  "data": [
+    {
+      "departmentId": "019daa20-1111-7a00-e001-aabbccddeef0",
+      "parentId": null,
+      "departmentName": "技术研发部",
+      "departmentCode": "TECH",
+      "sortOrder": 1,
+      "leaderUserId": "019daa20-2222-7a00-e002-aabbccddeef1",
+      "memberCount": 15
+    },
+    {
+      "departmentId": "019daa20-3333-7a00-e003-aabbccddeef2",
+      "parentId": "019daa20-1111-7a00-e001-aabbccddeef0",
+      "departmentName": "后端开发组",
+      "departmentCode": "TECH-BE",
+      "sortOrder": 1,
+      "leaderUserId": "019daa20-4444-7a00-e004-aabbccddeef3",
+      "memberCount": 8
+    },
+    {
+      "departmentId": "019daa20-5555-7a00-e005-aabbccddeef4",
+      "parentId": "019daa20-1111-7a00-e001-aabbccddeef0",
+      "departmentName": "前端开发组",
+      "departmentCode": "TECH-FE",
+      "sortOrder": 2,
+      "leaderUserId": null,
+      "memberCount": 5
+    },
+    {
+      "departmentId": "019daa20-6666-7a00-e006-aabbccddeef5",
+      "parentId": null,
+      "departmentName": "市场营销部",
+      "departmentCode": "MKT",
+      "sortOrder": 2,
+      "leaderUserId": "019daa20-7777-7a00-e007-aabbccddeef6",
+      "memberCount": 10
+    },
+    {
+      "departmentId": "019daa20-8888-7a00-e008-aabbccddeef7",
+      "parentId": null,
+      "departmentName": "客户服务部",
+      "departmentCode": "CS",
+      "sortOrder": 3,
+      "leaderUserId": "019daa20-9999-7a00-e009-aabbccddeef8",
+      "memberCount": 12
+    }
+  ]
+}

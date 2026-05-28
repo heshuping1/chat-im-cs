@@ -1,0 +1,561 @@
++ flutter test --concurrency=1 ../scripts/mobile/test/flutter
+00:00 +0: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/logged_devices_model_test.dart
+00:00 +0: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/logged_devices_model_test.dart: LoggedDevice parses platform account devices response
+00:00 +1: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart
+00:00 +1: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart: profile contracts parses current user profile response
+00:00 +2: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart: profile contracts serializes profile update request with only changed fields
+00:00 +3: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart: profile contracts parses and serializes privacy settings
+00:00 +4: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart: profile contracts serializes feedback request and parses result
+00:00 +5: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart: settings contracts parses and serializes notification settings
+00:00 +6: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart: settings contracts copyWith can clear dnd times explicitly
+00:00 +7: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/profile_settings_contract_test.dart: notice contracts parses announcement list/detail response
+00:00 +8: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/chat_input_settings_test.dart
+00:00 +8: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/chat_input_settings_test.dart: chatEnterToSendProvider defaults to disabled
+00:00 +9: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/settings/chat_input_settings_test.dart: chatEnterToSendProvider persists enabled value locally for repeat launches
+00:00 +10: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_provider_permission_test.dart
+00:01 +10: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_provider_permission_test.dart: Customer service provider permissions admin and owner do not call customer-service workbench providers
+00:01 +11: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_provider_permission_test.dart: Customer service provider permissions non-admin roles cannot call admin workbench providers
+00:01 +12: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart
+00:02 +12: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads direct customer threads from documented admin endpoint
+00:02 +13: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads all center threads without thread type filter
+00:02 +14: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads temp session center threads with documented thread type
+00:02 +15: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads direct customer center threads with documented thread type
+00:02 +16: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads audit logs from documented admin endpoint
+00:02 +17: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads customers from documented admin users endpoint
+00:02 +18: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads customers with enterprise tag filters
+00:02 +19: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads customer detail with assignable staff
+00:02 +20: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource assigns customer service from documented endpoint
+00:02 +21: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource updates enterprise customer tags from documented endpoint
+00:02 +22: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Admin customer service datasource loads admin customer profile card from profile-card endpoint
+00:02 +23: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/admin_customer_service_datasource_test.dart: Customer service datasource loads workbench customer profile card from client endpoint
+00:02 +24: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/workbench_time_range_test.dart
+00:02 +24: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/workbench_time_range_test.dart: formatWorkbenchDateRange shows explicit custom dates
+00:02 +25: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart
+00:03 +25: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses quick replies from documented client API payload
+00:03 +26: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract keeps dashboard online count as server-maintained status summary
+00:03 +27: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses admin customer service dashboard type breakdown
+00:03 +28: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract keeps admin dashboard optional today stats when present
+00:03 +29: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses reception status from documented client API payload
+00:03 +30: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract keeps thread reception state when detail refreshes
+00:03 +31: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract maps outbound direct customer response for broadcast send flow
+00:03 +32: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses customer service broadcast preview response
+00:03 +33: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses customer service broadcast task progress
+00:03 +34: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract distinguishes broadcast admin permission and group membership errors
+00:03 +35: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract maps admin im-direct thread item for customer management
+00:03 +36: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract maps admin im-direct staff aliases for customer assignment status
+00:03 +37: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses admin customer list item from admin users payload
+00:03 +38: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses admin customer tag aliases from admin users payload
+00:03 +39: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses admin customer detail service assignment context
+00:03 +40: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses registered customer profile card with tickets
+00:03 +41: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses visitor-only profile card when customer is not registered
+00:03 +42: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract maps owner staff aliases from unified thread item
+00:03 +43: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses admin center dashboard aliases from admin API payload
+00:03 +44: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses admin staff status payload
+00:03 +45: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/customer_service_contract_test.dart: Customer service API contract parses admin audit log payload flexibly
+00:03 +46: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart
+00:04 +46: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart: customer has no workbench permission
+00:04 +47: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart: normal employee only sees the basic enterprise workbench
+00:04 +48: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart: customer service role sees customer-service tabs
+00:04 +49: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart: admin workbench shows management entries
+00:04 +50: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart: owner workbench uses effective role and shows management entries
+00:05 +51: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart: thread management shows online service summary
+00:05 +52: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/customer_service/management_workbench_role_test.dart: thread management opens customer conversation as read-only
+00:05 +53: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart
+00:05 +53: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract parses temp session type and draft object
+00:05 +54: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract keeps emoji preview as the latest conversation text
+00:05 +55: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract parses and caps group member avatar previews at 9 users
+00:05 +56: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract parses nested user member previews from loose map payloads
+00:05 +57: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract serializes conversation type using server values
+00:05 +58: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract defaults unknown conversation type to direct for compatibility
+00:05 +59: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract uses top-level lastActivityAt when lastMessage is absent
+00:05 +60: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract keeps lastMessage as the source of last activity when present
+00:05 +61: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract supports legacy string draft and writes current object draft shape
+00:05 +62: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract filters blank avatar urls while preserving member name previews
+00:05 +63: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_model_contract_test.dart: ConversationModel API contract serializes last message summary for local conversation cache
+00:05 +64: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/group_member_payload_mapper_test.dart
+00:06 +64: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/group_member_payload_mapper_test.dart: Group member payload mapper extracts list from documented and wrapped payloads
+00:06 +65: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/group_member_payload_mapper_test.dart: Group member payload mapper parses nested user avatar, role and mute fields consistently
+00:06 +66: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/gateway_event_handler_test.dart
+00:07 +66: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/gateway_event_handler_test.dart: GatewayEventHandler emits message and conversation update with conversation sequence
+00:07 +67: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/gateway_event_handler_test.dart: GatewayEventHandler ignores events without conversation id
+00:07 +68: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/gateway_event_handler_test.dart: GatewayEventHandler reads nested conversation type fallback from gateway payload
+00:07 +69: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/gateway_event_handler_test.dart: GatewayEventHandler temp session gateway summaries are excluded from home list
+00:07 +70: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/gateway_event_handler_test.dart: GatewayEventHandler converts every message type to documented API string
+00:07 +71: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/send_message_lifecycle_test.dart
+00:07 +71: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/send_message_lifecycle_test.dart: successful text send emits sending then sent state
+[info] chat.send.lifecycle: queued {conversationId: chat-1, conversationType: direct, clientMsgId: a86d5770-54cb-4e68-b00e-b4ca19ebefff, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: a86d5770-54cb-4e68-b00e-b4ca19ebefff, messageType: text, status: sending, attempt: 1}
+[info] chat.send.lifecycle: sent {conversationId: chat-1, conversationType: direct, clientMsgId: a86d5770-54cb-4e68-b00e-b4ca19ebefff, messageType: text, status: sent, messageId: server-a86d5770-54cb-4e68-b00e-b4ca19ebefff, conversationSeq: 7}
+00:07 +72: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/send_message_lifecycle_test.dart: server business error fails once without offline retry
+[info] chat.send.lifecycle: queued {conversationId: group-1, conversationType: group, clientMsgId: 5e4d9ea8-176d-4fd9-beb0-12b28177b9cf, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: group-1, conversationType: group, clientMsgId: 5e4d9ea8-176d-4fd9-beb0-12b28177b9cf, messageType: text, status: sending, attempt: 1}
+[error] chat.send.lifecycle: failed {conversationId: group-1, conversationType: group, clientMsgId: 5e4d9ea8-176d-4fd9-beb0-12b28177b9cf, messageType: text, status: rejected, stage: send, attempt: 1, errorType: server, code: MSG_GROUP_MUTED, message: group muted, statusCode: 403, requestId: req-1}
+00:07 +73: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/send_message_lifecycle_test.dart: network failures retry and enqueue pending message for recovery
+[info] chat.send.lifecycle: queued {conversationId: chat-1, conversationType: direct, clientMsgId: 1e354a88-8a7a-43c8-baf6-06dadacc540a, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 1e354a88-8a7a-43c8-baf6-06dadacc540a, messageType: text, status: sending, attempt: 1}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 1e354a88-8a7a-43c8-baf6-06dadacc540a, messageType: text, status: sending, attempt: 2}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 1e354a88-8a7a-43c8-baf6-06dadacc540a, messageType: text, status: sending, attempt: 3}
+[error] chat.send.lifecycle: failed {conversationId: chat-1, conversationType: direct, clientMsgId: 1e354a88-8a7a-43c8-baf6-06dadacc540a, messageType: text, status: failed, stage: send, errorType: network, message: offline}
+00:09 +74: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/send_message_lifecycle_test.dart: duplicate client message id is treated as idempotent success
+[info] chat.send.lifecycle: queued {conversationId: chat-1, conversationType: direct, clientMsgId: 52862d38-efe2-4ac9-85ba-318ec47987f8, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 52862d38-efe2-4ac9-85ba-318ec47987f8, messageType: text, status: sending, attempt: 1}
+[info] chat.send.lifecycle: sent {conversationId: chat-1, conversationType: direct, clientMsgId: 52862d38-efe2-4ac9-85ba-318ec47987f8, messageType: text, status: sent, messageId: 52862d38-efe2-4ac9-85ba-318ec47987f8, conversationSeq: 0, idempotent: true}
+00:09 +75: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart
+00:09 +75: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: sortConversations keeps pinned conversations first and sorts by last activity desc
+00:09 +76: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: sortConversations puts conversations without activity time after dated items
+00:09 +77: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: sortConversations keeps input list unchanged after sorting
+00:09 +78: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: sortConversations keeps original relative order when pin and activity are identical
+00:09 +79: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: filterConversations matches title case-insensitively and trims keyword
+00:09 +80: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: filterConversations matches last message preview including emoji text
+00:09 +81: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: filterConversations returns original list when keyword is blank
+00:09 +82: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: filterConversations matches Chinese title and preview text
+00:09 +83: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: filterConversations returns empty list when nothing matches
+00:09 +84: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: filterConversations keeps customer service temp sessions out of home conversations
+00:09 +85: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: filterConversations keeps known customer service conversation ids out even if type is direct
+00:09 +86: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/conversation_usecases_test.dart: ConversationActionsController treats group and temp session as group-like API targets
+00:09 +87: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart
+00:10 +87: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract parses snake_case message types from server payloads
+00:10 +88: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract serializes outgoing text body without null media fields
+00:10 +89: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract serializes rich message bodies with client API field names
+00:10 +90: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract builds sent message from send response while preserving local body
+00:10 +91: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract maps local-only message statuses without losing wire names
+00:10 +92: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract round-trips every supported message status wire value
+00:10 +93: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract marks recalled server messages as recalled status
+00:10 +94: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract parses server-provided read and rejected statuses when present
+00:10 +95: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract parses camelCase body aliases kept by old local caches
+00:10 +96: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract parses structured event preview text for system messages
+00:10 +97: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/chat/message_model_contract_test.dart: MessageModel API contract serializes location payload with only supported API fields
+00:10 +98: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/login_methods_contract_test.dart
+00:11 +98: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/login_methods_contract_test.dart: login method contract email password login sends platform login request
+00:11 +99: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/login_methods_contract_test.dart: login method contract mobile password login sends platform login request
+00:11 +100: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/login_methods_contract_test.dart: login method contract email code login sends login-by-code request
+00:11 +101: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/login_methods_contract_test.dart: login method contract mobile code login sends login-by-code request
+00:11 +102: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/login_methods_contract_test.dart: login method contract verification code request carries target channel and purpose
+00:11 +103: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/lpp_id_login_platform_test.dart
+00:11 +103: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/lpp_id_login_platform_test.dart: lpp_id platform login uses platform login and select-tenant without tenant code
+[TokenRefresh] started, interval=45min
+[TokenRefresh] stopped
+00:11 +104: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/lpp_id_login_platform_test.dart: lpp_id platform login enters the single owner tenant even when server suggests personal
+[TokenRefresh] started, interval=45min
+[TokenRefresh] stopped
+00:11 +105: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/lpp_id_login_platform_test.dart: lpp_id platform login does not fall back to tenant login when platform login fails
+[TokenRefresh] stopped
+00:11 +106: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/tenant_login_datasource_test.dart
+00:12 +106: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/auth/tenant_login_datasource_test.dart: tenant login sends tenantCode in body when only enterprise code is known
+00:12 +107: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/contact_identity_contract_test.dart
+00:12 +107: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/contact_identity_contract_test.dart: contact identity contract remark wins over original name for display name
+00:12 +108: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/contact_identity_contract_test.dart: contact identity contract empty remark falls back to original name
+00:12 +109: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/contact_identity_contract_test.dart: contact identity contract contact userType separates customers from employees
+00:12 +110: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/contact_identity_contract_test.dart: contact identity contract department member treats userType or customer tag as customer
+00:12 +111: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/contact_identity_contract_test.dart: contact identity contract friend request keeps pending status and creation time
+00:12 +112: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/owner_customer_visibility_test.dart
+00:13 +112: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/owner_customer_visibility_test.dart: owner cold-start restore keeps all-customer visibility and customer filtering
+[TokenRefresh] started, interval=45min
+00:13 +113: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/customer_overview_admin_credentials_test.dart
+00:13 +113: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/customer_overview_admin_credentials_test.dart: owner customer management does not spin forever when admin credential is unavailable
+00:14 +114: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/customer_overview_admin_credentials_test.dart: owner customer management filters customers by enterprise tags
+00:14 +115: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/friend_requests_datasource_test.dart
+00:15 +115: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/friend_requests_datasource_test.dart: Friend requests datasource parses incoming and outgoing identities from documented fields
+00:15 +116: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/friend_requests_datasource_test.dart: Friend requests datasource handles friend request with documented action body
+00:15 +117: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/friend_details_gender_test.dart
+00:15 +117: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/friend_details_gender_test.dart: 朋友资料展示性别字段
+00:16 +118: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/contacts/friend_details_gender_test.dart: 朋友资料中的关系信息为只读展示
+00:16 +119: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart
+00:17 +119: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix enterprise roles expose the expected customer visibility
+00:17 +120: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix contact directory role modules follow the latest IM spec
+00:17 +121: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix create group and join-space actions are limited by role and space
+00:17 +122: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix profile direct-message and friend-request decisions stay explicit
+00:17 +123: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix all-muted group blocks ordinary members but allows managers and CS
+00:17 +124: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix group role parser accepts server and UI role spellings
+00:17 +125: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix owner can dismiss group while admin can manage but not dismiss
+00:17 +126: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix member capabilities follow group management settings exactly
+00:17 +127: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix workbench tab is tenant-gated while customer-service page is CS-only
+00:17 +128: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix customer assignment candidates are exact customer-service role only
+00:17 +129: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix personal and customer spaces cannot see tenant customer pools
+00:17 +130: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/permissions/role_access_matrix_test.dart: role access matrix group manage decision returns explicit denial copy for members
+00:17 +131: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/workbench/workbench_badge_count_test.dart
+00:18 +131: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/workbench/workbench_badge_count_test.dart: customer service workbench badge includes unread and queued sessions
+00:18 +132: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/workbench/workbench_badge_count_test.dart: owner workbench badge uses pending enterprise join requests
+00:18 +133: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/workbench/workbench_badge_count_test.dart: roles without workbench do not show badge
+00:18 +134: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/space/space_switch_personal_test.dart
+00:19 +134: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/space/space_switch_personal_test.dart: switching to personal space uses cached personal token when available
+00:19 +135: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/space/space_switch_personal_test.dart: switching to personal space reports missing credential clearly
+00:19 +136: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/space/space_switch_personal_test.dart: switching to personal space can use in-memory platform token
+00:19 +137: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/space/space_switch_personal_test.dart: switching to personal space rejects cached platform token as access
+00:20 +138: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/chat_input_toolbar_test.dart
+00:20 +138: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/chat_input_toolbar_test.dart: muted group disables text, voice, emoji and more actions
+00:21 +139: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/chat_input_toolbar_test.dart: unmuted text input sends typed content
+00:21 +140: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/chat_input_toolbar_test.dart: scheduled message picker schedules typed content
+00:21 +141: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/swipe_action_item_test.dart
+00:22 +141: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/swipe_action_item_test.dart: swipe actions reflect unread, pinned and muted state
+00:22 +142: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/swipe_action_item_test.dart: swipe actions reflect read, unpinned and notification-on state
+00:22 +143: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/swipe_action_item_test.dart: swipe action callbacks receive next desired states
+00:23 +144: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/group_avatar_test.dart
+00:23 +144: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/group_avatar_test.dart: GroupAvatar renders local fallback initials for members without avatars
+00:23 +145: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/group_avatar_test.dart: GroupAvatar caps visible members at 9 like WeChat grid avatars
+00:23 +146: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/group_avatar_test.dart: GroupAvatar renders empty placeholder when no member preview exists
+00:23 +147: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/automated/widgets/group_avatar_test.dart: GroupAvatar uses member names when avatar url list is shorter
+00:24 +148: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/site_line_manager_test.dart
+00:24 +148: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/site_line_manager_test.dart: SiteLineManager uses only S3 configfile when current primary has no cached lines
+00:24 +149: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/site_line_manager_test.dart: SiteLineManager uses cached lines then S3 when current site is primary
+00:24 +150: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/site_line_manager_test.dart: SiteLineManager moves current cached line to the front before S3
+00:24 +151: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/site_line_manager_test.dart: SiteLineManager parses configfile and removes primary/fallback concepts
+00:24 +152: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/site_line_manager_test.dart: SiteLineManager selects the first available site from the overall list order
+00:24 +153: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/connectivity_provider_test.dart
+00:25 +153: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/connectivity_provider_test.dart: connectivityStatusFromResults returns offline when there is no connectivity result
+00:25 +154: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/connectivity_provider_test.dart: connectivityStatusFromResults returns offline when connectivity reports none
+00:25 +155: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/connectivity_provider_test.dart: connectivityStatusFromResults returns online when any network transport is available
+00:25 +156: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_preservation_test.dart
+00:25 +156: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_preservation_test.dart: Preservation Checking: 非 Bug 条件路径行为不变 4.1 refreshToken 有效 → /auth/refresh 成功，不触发 selectTenant 降级
+  Validates: Requirements 3.1
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer refreshed_acc...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+00:25 +157: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_preservation_test.dart: Preservation Checking: 非 Bug 条件路径行为不变 4.2 网络超时（非 401/403）→ 抛普通 Exception，不调用 onAuthFailed
+  Validates: Requirements 3.3
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[error] http.error: ┌─── HTTP Error ─────────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 401
+│ Error: This exception was thrown because the response has a status code of 401 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 401 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+
+│ Response Body:
+│   {code: UNAUTHORIZED}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 401, requestId: null}
+00:25 +158: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_preservation_test.dart: Preservation Checking: 非 Bug 条件路径行为不变 4.3 _isRetry == true 的请求返回 401 → 直接 _clearTokensAndFail，不进入 _refreshToken()
+  Validates: Requirements 3.5
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer some_access_t...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[error] http.error: ┌─── HTTP Error ─────────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 401
+│ Error: null
+│ Response Body:
+│   {code: UNAUTHORIZED}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 401, requestId: null}
+00:25 +159: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_preservation_test.dart: Preservation Checking: 非 Bug 条件路径行为不变 4.4 平台级 API（/api/platform/v1/）401 → 走 _refreshPlatformToken()，不进入 _refreshToken()，不调用 selectTenant
+  Validates: Requirements 3.2
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/platform/v1/spaces
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer valid_platfor...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/platform/v1/spaces}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/platform/v1/spaces
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_platform_...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/platform/v1/spaces}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/platform/v1/spaces
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/platform/v1/spaces, statusCode: 200, requestId: null}
+00:25 +160: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_preservation_test.dart: Preservation Checking: 并发 401 请求只触发一次降级 4.5 并发多个 401 请求 → _fallbackWithPlatformToken 只被调用一次，其余请求通过 _pendingQueue 等待后重放
+  Validates: Requirements 3.4
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_access_to...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_access_to...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_access_to...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+00:25 +161: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_bug_condition_test.dart
+00:26 +161: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_bug_condition_test.dart: Bug Condition 探索性测试: refreshToken 过期时不应直接登出 1.1 refreshToken 过期（401）且 platformToken 有效 → onAuthFailed 不应被调用（期望行为），selectTenant 应被调用
+  预期: FAIL（未修复代码会调用 onAuthFailed，证明 bug 存在）
+  Validates: Requirements 2.1, 2.2
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_access_to...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+00:26 +162: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_bug_condition_test.dart: Bug Condition 探索性测试: refreshToken 过期时不应直接登出 1.2 refreshToken 过期（403）且 platformToken 有效 → onAuthFailed 不应被调用（期望行为），selectTenant 应被调用
+  预期: FAIL（未修复代码会调用 onAuthFailed，证明 bug 存在）
+  Validates: Requirements 2.1, 2.2
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_access_to...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+00:26 +163: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_fix_checking_test.dart
+00:26 +163: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_fix_checking_test.dart: Fix Checking: refreshToken 过期时降级到 selectTenant 3.1 refreshToken 过期（401）+ platformToken 有效 → selectTenant 被调用，onAuthFailed 未被调用，GlobalTokenHolder 更新
+  Validates: Requirements 2.1, 2.2
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_access_to...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+00:26 +164: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_fix_checking_test.dart: Fix Checking: refreshToken 过期时降级到 selectTenant 3.2 refreshToken 过期（403）+ platformToken 有效 → selectTenant 被调用，onAuthFailed 未被调用，GlobalTokenHolder 更新
+  Validates: Requirements 2.1, 2.2
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│   Authorization: Bearer new_access_to...
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[debug] http.response: ┌─── HTTP Response ──────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 200
+│ Response Body:
+│   {data: {}}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 200, requestId: null}
+00:26 +165: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_fix_checking_test.dart: Fix Checking: refreshToken 过期时降级到 selectTenant 3.3 refreshToken 过期 + platformToken 为 null → onAuthFailed 被调用（兜底登出）
+  Validates: Requirements 2.3
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[error] http.error: ┌─── HTTP Error ─────────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 401
+│ Error: null
+│ Response Body:
+│   {code: UNAUTHORIZED, message: token expired}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 401, requestId: null}
+00:26 +166: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/network/token_interceptor_fix_checking_test.dart: Fix Checking: refreshToken 过期时降级到 selectTenant 3.4 refreshToken 过期 + platformToken 有效 + selectTenant 也失败 → onAuthFailed 被调用
+  Validates: Requirements 2.3
+[debug] http.request: ┌─── HTTP Request ───────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Headers:
+│   Content-Type: application/json
+│ Request Body: (empty)
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations}
+[error] http.error: ┌─── HTTP Error ─────────────────────────────────────
+│ GET https://chat.hearteasechat.com/api/client/v1/conversations
+│ Status: 401
+│ Error: null
+│ Response Body:
+│   {code: UNAUTHORIZED, message: token expired}
+└────────────────────────────────────────────────────
+ {method: GET, uri: https://chat.hearteasechat.com/api/client/v1/conversations, statusCode: 401, requestId: null}
+00:26 +167: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/admin/admin_http_client_test.dart
+00:27 +167: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/admin/admin_http_client_test.dart: AdminHttpClient uses platform token to issue admin token from platform API
+00:27 +168: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/admin/admin_http_client_test.dart: AdminHttpClient does not issue admin token for non-admin roles
+00:27 +169: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart
+00:28 +169: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions group rules owner and admin can manage, member cannot
+00:28 +170: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions group rules all-muted group blocks ordinary member input with reason
+00:28 +171: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions group rules customer service can speak when group is all muted
+00:28 +172: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions space and profile rules create group is admin-only in employee space, allowed in personal
+00:28 +173: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions space and profile rules admin customer view blocks direct message
+00:28 +174: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions space and profile rules owner and admin can see all tenant customers
+00:28 +175: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions space and profile rules customer identity is based on userType, not only display tag
+00:28 +176: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/permissions/app_permissions_test.dart: AppPermissions space and profile rules friend request denial reports the first applicable reason
+00:28 +177: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/diagnostics/app_diagnostics_test.dart
+00:28 +177: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/core/diagnostics/app_diagnostics_test.dart: AppDiagnostics records events and masks token fields
+[error] chat.send: message send failed {conversationId: c1, accessToken: abcdef...yz}
+00:28 +178: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/usecases/send_message_usecase_test.dart
+00:29 +178: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/usecases/send_message_usecase_test.dart: records send lifecycle for successful text message
+[info] chat.send.lifecycle: queued {conversationId: chat-1, conversationType: direct, clientMsgId: 025358d6-848a-4c6f-be52-7cd762e52750, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 025358d6-848a-4c6f-be52-7cd762e52750, messageType: text, status: sending, attempt: 1}
+[info] chat.send.lifecycle: sent {conversationId: chat-1, conversationType: direct, clientMsgId: 025358d6-848a-4c6f-be52-7cd762e52750, messageType: text, status: sent, messageId: server-025358d6-848a-4c6f-be52-7cd762e52750, conversationSeq: 7}
+00:29 +179: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/usecases/send_message_usecase_test.dart: does not retry server business errors and records failure context
+[info] chat.send.lifecycle: queued {conversationId: group-1, conversationType: group, clientMsgId: 8f9c39fe-8b32-4538-950c-754afde0073c, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: group-1, conversationType: group, clientMsgId: 8f9c39fe-8b32-4538-950c-754afde0073c, messageType: text, status: sending, attempt: 1}
+[error] chat.send.lifecycle: failed {conversationId: group-1, conversationType: group, clientMsgId: 8f9c39fe-8b32-4538-950c-754afde0073c, messageType: text, status: rejected, stage: send, attempt: 1, errorType: server, code: MSG_GROUP_MUTED, message: group muted, statusCode: 403, requestId: req-1}
+00:29 +180: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/usecases/send_message_usecase_test.dart: persists failure reason and enqueues network failures for retry
+[info] chat.send.lifecycle: queued {conversationId: chat-1, conversationType: direct, clientMsgId: 7279c6b6-7773-41ef-979b-755649b02fc7, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 7279c6b6-7773-41ef-979b-755649b02fc7, messageType: text, status: sending, attempt: 1}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 7279c6b6-7773-41ef-979b-755649b02fc7, messageType: text, status: sending, attempt: 2}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 7279c6b6-7773-41ef-979b-755649b02fc7, messageType: text, status: sending, attempt: 3}
+[error] chat.send.lifecycle: failed {conversationId: chat-1, conversationType: direct, clientMsgId: 7279c6b6-7773-41ef-979b-755649b02fc7, messageType: text, status: failed, stage: send, errorType: network, message: offline}
+00:30 +181: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/usecases/send_message_usecase_test.dart: treats duplicate client message id as idempotent success
+[info] chat.send.lifecycle: queued {conversationId: chat-1, conversationType: direct, clientMsgId: 758add8e-4448-4a5d-bc4c-f4e9e99688ba, messageType: text, status: sending}
+[info] chat.send.lifecycle: sending {conversationId: chat-1, conversationType: direct, clientMsgId: 758add8e-4448-4a5d-bc4c-f4e9e99688ba, messageType: text, status: sending, attempt: 1}
+[info] chat.send.lifecycle: sent {conversationId: chat-1, conversationType: direct, clientMsgId: 758add8e-4448-4a5d-bc4c-f4e9e99688ba, messageType: text, status: sent, messageId: 758add8e-4448-4a5d-bc4c-f4e9e99688ba, conversationSeq: 0, idempotent: true}
+00:30 +182: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/entities/message_test.dart
+00:31 +182: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/entities/message_test.dart: MessageBody event parsing uses explicit event text when present
+00:31 +183: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/entities/message_test.dart: MessageBody event parsing formats tap tap event when text preview is missing
+00:31 +184: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/entities/message_test.dart: MessageBody event parsing uses custom tap tap text from profile settings
+00:31 +185: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/entities/message_test.dart: MessageBody location serialization serializes location body with API contract fields
+00:31 +186: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/chat/domain/entities/message_test.dart: MessageBody location serialization parses zoomLevel from numeric json values
+00:31 +187: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/auth/presentation/providers/auth_provider_bug_condition_test.dart
+00:31 +187: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/auth/presentation/providers/auth_provider_bug_condition_test.dart: Bug Condition: _restoreUserId 竞态覆盖空间上下文 Property 1 (Bug Condition): _restoreUserId 完成后不应覆盖用户已切换的空间
+  场景: startupSpaceId=personal, 用户切换到 tenant_abc, _restoreUserId 完成后 currentSpaceProvider 应保持 tenant_abc
+  预期: FAIL（未修复代码会将 currentSpaceProvider 覆盖回 personal）
+  Validates: Requirements 2.3, 2.1
+[TokenRefresh] started, interval=45min
+00:32 +188: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/auth/presentation/providers/auth_provider_preservation_test.dart
+00:32 +188: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/auth/presentation/providers/auth_provider_preservation_test.dart: Preservation: 无竞态时 userId 补全行为不变 Property 2 (Preservation) 场景 1: currentSpaceId == startupSpaceId == personal 时，_restoreUserId 完成后 currentSpaceProvider.state.userId 等于 fetched userId
+  预期: PASS（确认基线行为）
+  Validates: Requirements 3.4, 3.5
+[TokenRefresh] started, interval=45min
+00:33 +189: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/auth/presentation/providers/auth_provider_preservation_test.dart: Preservation: 无竞态时 userId 补全行为不变 Property 2 (Preservation) 场景 2: /profile/me 返回空 userId 时，setSpace 不被调用，currentSpaceProvider.state 不变
+  预期: PASS（确认基线行为）
+  Validates: Requirements 3.4, 3.5
+[TokenRefresh] started, interval=45min
+00:33 +190: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/features/auth/presentation/providers/auth_provider_preservation_test.dart: Preservation: 无竞态时 userId 补全行为不变 Property 2 (Preservation) 场景 3: /profile/me 抛出异常时，catch 后不调用 setSpace，currentSpaceProvider.state 不变
+  预期: PASS（确认基线行为）
+  Validates: Requirements 3.4, 3.5
+[TokenRefresh] started, interval=45min
+00:33 +191: loading /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/widget_test.dart
+00:34 +191: /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/mobile/test/flutter/widget_test.dart: App starts smoke test
+00:34 +192: All tests passed!
+PASS flutter test (38s)

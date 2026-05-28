@@ -1,0 +1,1549 @@
+import 'dart:async';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:lpp_mobile/app/theme/theme.dart';
+import 'package:lpp_mobile/core/utils/debouncer.dart';
+import 'package:lpp_mobile/core/widgets/app_toast.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/widgets/emoji_picker_panel.dart';
+import 'package:lpp_mobile/features/chat/presentation/widgets/voice_recorder.dart';
+import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
+import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/chat_input_settings_provider.dart';
+import 'package:lpp_mobile/l10n/app_localizations.dart';
+
+enum _InputMode { text, voice, emoji, tools }
+
+class ChatInputToolbar extends ConsumerStatefulWidget {
+  final String conversationId;
+  final bool isGroup;
+  final String? initialDraft; // 进入会话时恢复的草稿
+
+  /// 群全员禁言时为 true
+  final bool isMuted;
+
+  /// 当前用户是否可以发言（管理员/群主不受禁言限制）
+  final bool canSpeak;
+
+  /// 当前不可发言时展示在输入框里的原因。
+  final String? muteReason;
+
+  final FutureOr<bool> Function(String text) onSendText;
+  final FutureOr<bool> Function(String text, DateTime scheduledAt)?
+      onScheduleText;
+  final Function(String filePath, int duration) onSendVoice;
+  final Function(List<String> imagePaths) onSendImages;
+  final Function(
+          String filePath, String fileName, String mimeType, int sizeBytes)?
+      onSendFile;
+  final VoidCallback? onVoiceCall;
+  final VoidCallback? onVideoCall;
+  final VoidCallback? onLocation;
+  final VoidCallback? onFavorite;
+  final VoidCallback? onSendContactCard;
+  final String? quickReplyScope;
+  final String? aiReplyContextText;
+  final String? externalInsertText;
+  final int externalInsertToken;
+
+  const ChatInputToolbar({
+    super.key,
+    required this.conversationId,
+    required this.isGroup,
+    this.initialDraft,
+    this.isMuted = false,
+    this.canSpeak = true,
+    this.muteReason,
+    required this.onSendText,
+    this.onScheduleText,
+    required this.onSendVoice,
+    required this.onSendImages,
+    this.onSendFile,
+    this.onVoiceCall,
+    this.onVideoCall,
+    this.onLocation,
+    this.onFavorite,
+    this.onSendContactCard,
+    this.quickReplyScope,
+    this.aiReplyContextText,
+    this.externalInsertText,
+    this.externalInsertToken = 0,
+  });
+
+  @override
+  ConsumerState<ChatInputToolbar> createState() => _ChatInputToolbarState();
+}
+
+class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
+  _InputMode _mode = _InputMode.text;
+  final _textController = TextEditingController();
+  final _focusNode = FocusNode();
+  final _imagePicker = ImagePicker();
+  Timer? _draftTimer;
+  bool _sendingText = false;
+  DateTime? _scheduledSendAt;
+
+  bool get _isMutedForUser => widget.isMuted && !widget.canSpeak;
+
+  @override
+  void initState() {
+    super.initState();
+    // 恢复草稿
+    if (widget.initialDraft != null && widget.initialDraft!.isNotEmpty) {
+      _textController.text = widget.initialDraft!;
+      _textController.selection = TextSelection.fromPosition(
+        TextPosition(offset: widget.initialDraft!.length),
+      );
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatInputToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.externalInsertToken == oldWidget.externalInsertToken) return;
+    final text = widget.externalInsertText?.trim();
+    if (text == null || text.isEmpty || _isMutedForUser) return;
+    _insertTextAtCursor(text);
+    _setMode(_InputMode.text);
+    _focusNode.requestFocus();
+  }
+
+  @override
+  void dispose() {
+    _draftTimer?.cancel();
+    _textController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  /// 防抖保存草稿：输入停止 500ms 后调用 API
+  void _scheduleDraftSave(String text) {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 500), () {
+      _saveDraft(text);
+    });
+  }
+
+  Future<void> _saveDraft(String text) async {
+    await ref.read(conversationActionsControllerProvider).saveDraft(
+          widget.conversationId,
+          isGroup: widget.isGroup,
+          text: text,
+        );
+  }
+
+  void _setMode(_InputMode mode) {
+    if (_isMutedForUser) {
+      _focusNode.unfocus();
+      if (_mode != _InputMode.text) {
+        setState(() => _mode = _InputMode.text);
+      }
+      return;
+    }
+    setState(() => _mode = mode);
+    if (mode == _InputMode.text) {
+      _focusNode.requestFocus();
+    } else {
+      _focusNode.unfocus();
+    }
+  }
+
+  Future<void> _sendText() async {
+    if (_isMutedForUser) return;
+    if (_sendingText) return;
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+    final scheduledAt = _scheduledSendAt;
+    setState(() => _sendingText = true);
+    _textController.clear();
+    _draftTimer?.cancel();
+    try {
+      final sent = scheduledAt == null
+          ? await Future.sync(() => widget.onSendText(text))
+              .then((value) => value)
+              .catchError((_) => false)
+          : await Future.sync(
+              () => widget.onScheduleText?.call(text, scheduledAt) ?? false,
+            ).then((value) => value).catchError((_) => false);
+      if (sent) {
+        if (scheduledAt != null && mounted) {
+          setState(() => _scheduledSendAt = null);
+        }
+        await _saveDraft('');
+      } else {
+        await _saveDraft(text);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sendingText = false);
+      }
+    }
+  }
+
+  Future<void> _openSchedulePicker() async {
+    if (_isMutedForUser) return;
+    final selected = await showModalBottomSheet<DateTime>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => const _ScheduledMessageTimeSheet(),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _scheduledSendAt = selected);
+    _setMode(_InputMode.text);
+    _focusNode.requestFocus();
+  }
+
+  void _clearScheduledSendAt() {
+    setState(() => _scheduledSendAt = null);
+  }
+
+  bool _isPlainEnter(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final key = event.logicalKey;
+    if (key != LogicalKeyboardKey.enter &&
+        key != LogicalKeyboardKey.numpadEnter) {
+      return false;
+    }
+    final pressed = HardwareKeyboard.instance.logicalKeysPressed;
+    return !pressed.contains(LogicalKeyboardKey.shiftLeft) &&
+        !pressed.contains(LogicalKeyboardKey.shiftRight) &&
+        !pressed.contains(LogicalKeyboardKey.controlLeft) &&
+        !pressed.contains(LogicalKeyboardKey.controlRight) &&
+        !pressed.contains(LogicalKeyboardKey.altLeft) &&
+        !pressed.contains(LogicalKeyboardKey.altRight) &&
+        !pressed.contains(LogicalKeyboardKey.metaLeft) &&
+        !pressed.contains(LogicalKeyboardKey.metaRight);
+  }
+
+  Future<void> _pickImages() async {
+    if (_isMutedForUser) return;
+    try {
+      final files = await _imagePicker.pickMultiImage(imageQuality: 85);
+      if (files.isNotEmpty) {
+        widget.onSendImages(files.map((f) => f.path).toList());
+      }
+    } catch (e) {
+      // pickMultiImage 不可用时降级为单张选图
+      try {
+        final file = await _imagePicker.pickImage(
+            source: ImageSource.gallery, imageQuality: 85);
+        if (file != null) {
+          widget.onSendImages([file.path]);
+        }
+      } catch (_) {
+        // 静默失败
+      }
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    if (_isMutedForUser) return;
+    final file = await _imagePicker.pickImage(
+        source: ImageSource.camera, imageQuality: 85);
+    if (file != null) {
+      widget.onSendImages([file.path]);
+    }
+  }
+
+  Future<void> _pickFile() async {
+    if (_isMutedForUser) return;
+    final result = await FilePicker.platform.pickFiles(allowMultiple: false);
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    if (file.size > 100 * 1024 * 1024) {
+      if (mounted) {
+        AppToast.error(context, AppLocalizations.of(context).chatFileTooLarge);
+      }
+      return;
+    }
+    if (file.path == null) return;
+    final mimeType = _mimeTypeFromExtension(file.extension ?? '');
+    widget.onSendFile?.call(file.path!, file.name, mimeType, file.size);
+  }
+
+  String _mimeTypeFromExtension(String ext) {
+    switch (ext.toLowerCase()) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+        return 'application/vnd.ms-excel';
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'ppt':
+        return 'application/vnd.ms-powerpoint';
+      case 'pptx':
+        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case 'zip':
+        return 'application/zip';
+      case 'txt':
+        return 'text/plain';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mp3':
+        return 'audio/mpeg';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  void _insertEmoji(String emoji) {
+    if (_isMutedForUser) return;
+    _insertTextAtCursor(emoji);
+  }
+
+  void _insertTextAtCursor(String insertedText) {
+    final text = _textController.text;
+    final sel = _textController.selection;
+    final start = sel.start < 0 ? text.length : sel.start;
+    final end = sel.end < 0 ? text.length : sel.end;
+    final newText = text.replaceRange(start, end, insertedText);
+    _textController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + insertedText.length),
+    );
+    _scheduleDraftSave(newText);
+    setState(() {}); // 触发重建，更新发送按钮状态
+  }
+
+  Future<void> _openQuickReplies() async {
+    if (_isMutedForUser || widget.quickReplyScope == null) return;
+    final selected = await showModalBottomSheet<CsQuickReply>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => _QuickReplyPickerSheet(scope: widget.quickReplyScope),
+    );
+    if (selected == null || !mounted) return;
+    _insertTextAtCursor(selected.content);
+    _setMode(_InputMode.text);
+    _focusNode.requestFocus();
+  }
+
+  Future<void> _openAiReplySuggestions() async {
+    if (_isMutedForUser) return;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => _AiReplySuggestionSheet(
+        contextText: widget.aiReplyContextText,
+      ),
+    );
+    if (selected == null || !mounted) return;
+    _insertTextAtCursor(selected);
+    _setMode(_InputMode.text);
+    _focusNode.requestFocus();
+  }
+
+  void _deleteLastChar() {
+    final text = _textController.text;
+    if (text.isEmpty) return;
+    final sel = _textController.selection;
+    final pos = sel.start < 0 ? text.length : sel.start;
+    if (pos == 0) return;
+    // 用 Characters 正确处理 emoji（多字节字符）
+    final chars = text.substring(0, pos).characters;
+    if (chars.isEmpty) return;
+    final newPrefix = chars.skipLast(1).string;
+    final newText = newPrefix + text.substring(pos);
+    _textController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newPrefix.length),
+    );
+    setState(() {}); // 更新发送按钮状态
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Divider(
+              height: 0.5,
+              thickness: 0.5,
+              color: Theme.of(context).dividerColor),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 左：麦克风 / 键盘
+                _CircleIconButton(
+                  icon: _mode == _InputMode.voice
+                      ? Icons.keyboard_alt_outlined
+                      : Icons.mic_none_rounded,
+                  onTap: _isMutedForUser
+                      ? null
+                      : () => _setMode(
+                            _mode == _InputMode.voice
+                                ? _InputMode.text
+                                : _InputMode.voice,
+                          ),
+                ),
+                const SizedBox(width: 8),
+                // 中：输入框 / 按住说话（同一个容器样式）
+                Expanded(child: _buildInputArea()),
+                const SizedBox(width: 8),
+                // 右：表情
+                _CircleIconButton(
+                  icon: _mode == _InputMode.emoji
+                      ? Icons.keyboard_alt_outlined
+                      : Icons.mood,
+                  showBorder: false,
+                  onTap: _isMutedForUser
+                      ? null
+                      : () => _setMode(
+                            _mode == _InputMode.emoji
+                                ? _InputMode.text
+                                : _InputMode.emoji,
+                          ),
+                ),
+                const SizedBox(width: 8),
+                // 右：+，发送交给键盘右下角的 send action
+                _buildMoreButton(),
+              ],
+            ),
+          ),
+          if (_scheduledSendAt != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              child: _ScheduledSendBanner(
+                scheduledAt: _scheduledSendAt!,
+                onClear: _clearScheduledSendAt,
+              ),
+            ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            child: _buildExpandedPanel(bottomPadding),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputArea() {
+    final inputColor = Theme.of(context).colorScheme.surfaceContainerHighest;
+    final enterToSend = ref.watch(chatEnterToSendProvider);
+    if (_isMutedForUser) {
+      final textColor = Theme.of(context).colorScheme.onSurfaceVariant;
+      return Container(
+        height: 40,
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: inputColor,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            widget.muteReason ??
+                AppLocalizations.of(context).chatInputMutedAdminOnly,
+            maxLines: 1,
+            style: TextStyle(fontSize: 14, color: textColor),
+          ),
+        ),
+      );
+    }
+
+    if (_mode == _InputMode.voice) {
+      // 语音模式：VoiceRecorder 内部已有 height:36 的按住说话按钮
+      return VoiceRecorder(
+        onSendVoice: widget.onSendVoice,
+        onSendText: widget.onSendText,
+        onCancel: () => setState(() => _mode = _InputMode.voice),
+      );
+    }
+
+    // 文字模式：和"按住说话"完全相同的 Container 结构
+    return Container(
+      width: double.infinity,
+      height: 36,
+      decoration: BoxDecoration(
+        color: inputColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      alignment: Alignment.center,
+      child: Focus(
+        onKeyEvent: (node, event) {
+          if (!enterToSend) return KeyEventResult.ignored;
+          if (!_isPlainEnter(event)) return KeyEventResult.ignored;
+          unawaited(_sendText());
+          return KeyEventResult.handled;
+        },
+        child: TextField(
+          controller: _textController,
+          focusNode: _focusNode,
+          maxLines: 1,
+          textInputAction: TextInputAction.send,
+          onEditingComplete: () {},
+          onSubmitted: (_) => _sendText(),
+          onChanged: _scheduleDraftSave,
+          onTap: () {
+            if (_mode != _InputMode.text) {
+              setState(() => _mode = _InputMode.text);
+            }
+          },
+          textAlignVertical: TextAlignVertical.center,
+          cursorColor: Theme.of(context).colorScheme.onSurface,
+          decoration: InputDecoration(
+            hintText: AppLocalizations.of(context).chatInputHint,
+            hintStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 15,
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            isCollapsed: true,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+          ),
+          style: TextStyle(
+            fontSize: 15,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMoreButton() {
+    return _CircleIconButton(
+      icon: _mode == _InputMode.tools
+          ? Icons.close_rounded
+          : Icons.add_circle_outline_rounded,
+      showBorder: false,
+      onTap: _isMutedForUser
+          ? null
+          : () => _setMode(
+                _mode == _InputMode.tools ? _InputMode.text : _InputMode.tools,
+              ),
+    );
+  }
+
+  Widget _buildExpandedPanel(double bottomPadding) {
+    if (_mode == _InputMode.emoji && !_isMutedForUser) {
+      return EmojiPickerPanel(
+        onEmojiSelected: _insertEmoji,
+        onDelete: _deleteLastChar,
+        onSend: _sendText,
+        hasSendContent: _textController.text.trim().isNotEmpty,
+      );
+    }
+
+    if (_mode == _InputMode.tools && !_isMutedForUser) {
+      return _ToolsPanel(
+        isGroup: widget.isGroup,
+        bottomPadding: bottomPadding,
+        onPickImages: _pickImages,
+        onTakePhoto: _takePhoto,
+        onPickFile: _pickFile,
+        onVoiceCall: widget.onVoiceCall ?? () {},
+        onVideoCall: widget.onVideoCall ?? () {},
+        onLocation: widget.onLocation ?? () {},
+        onFavorite: widget.onFavorite ?? () {},
+        onSendContactCard: widget.onSendContactCard,
+        onScheduleMessage: _openSchedulePicker,
+        onQuickReply: widget.quickReplyScope == null ? null : _openQuickReplies,
+        onAiReply:
+            widget.quickReplyScope == null ? null : _openAiReplySuggestions,
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 圆圈图标按钮（对照微信：白底圆形 + 细边框）
+// ---------------------------------------------------------------------------
+
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool showBorder;
+
+  const _CircleIconButton({
+    required this.icon,
+    required this.onTap,
+    this.showBorder = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: disabled ? 0.38 : 1,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: showBorder
+              ? BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: Theme.of(context).dividerColor, width: 0.8),
+                )
+              : null,
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: 26,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduledSendBanner extends StatelessWidget {
+  final DateTime scheduledAt;
+  final VoidCallback onClear;
+
+  const _ScheduledSendBanner({
+    required this.scheduledAt,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.only(left: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '发送时间：',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onSurface.withValues(alpha: 0.62),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              _formatScheduledSendAt(scheduledAt),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF2F6FED),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: onClear,
+            icon: Icon(
+              Icons.close_rounded,
+              color: colorScheme.onSurface.withValues(alpha: 0.42),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduledMessageTimeSheet extends StatefulWidget {
+  const _ScheduledMessageTimeSheet();
+
+  @override
+  State<_ScheduledMessageTimeSheet> createState() =>
+      _ScheduledMessageTimeSheetState();
+}
+
+class _ScheduledMessageTimeSheetState
+    extends State<_ScheduledMessageTimeSheet> {
+  late final List<DateTime> _dates;
+  late int _selectedDateIndex;
+  late int _selectedHour;
+  late int _selectedMinute;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final nextHour = now.add(const Duration(hours: 1));
+    final defaultTime =
+        DateTime(nextHour.year, nextHour.month, nextHour.day, nextHour.hour);
+    _dates = List.generate(
+      14,
+      (index) =>
+          DateTime(now.year, now.month, now.day).add(Duration(days: index)),
+    );
+    _selectedDateIndex = defaultTime.difference(_dates.first).inDays;
+    _selectedHour = defaultTime.hour;
+    _selectedMinute = defaultTime.minute;
+  }
+
+  DateTime get _selectedAt {
+    final date = _dates[_selectedDateIndex];
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      _selectedHour,
+      _selectedMinute,
+    );
+  }
+
+  bool get _isValid => _selectedAt.isAfter(
+        DateTime.now().add(const Duration(minutes: 1)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 378,
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 8, bottom: 10),
+            decoration: BoxDecoration(
+              color: colorScheme.onSurface.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                const SizedBox(width: 48),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      '选择时间',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: CupertinoPicker(
+                    scrollController: FixedExtentScrollController(
+                      initialItem: _selectedDateIndex,
+                    ),
+                    itemExtent: 46,
+                    magnification: 1.06,
+                    useMagnifier: true,
+                    onSelectedItemChanged: (index) {
+                      setState(() => _selectedDateIndex = index);
+                    },
+                    children: _dates
+                        .map(
+                          (date) => Center(
+                            child: Text(
+                              _formatSchedulePickerDate(date),
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: CupertinoPicker(
+                    scrollController: FixedExtentScrollController(
+                      initialItem: _selectedHour,
+                    ),
+                    itemExtent: 46,
+                    magnification: 1.06,
+                    useMagnifier: true,
+                    onSelectedItemChanged: (index) {
+                      setState(() => _selectedHour = index);
+                    },
+                    children: List.generate(
+                      24,
+                      (hour) => Center(
+                        child: Text(
+                          hour.toString().padLeft(2, '0'),
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: CupertinoPicker(
+                    scrollController: FixedExtentScrollController(
+                      initialItem: _selectedMinute,
+                    ),
+                    itemExtent: 46,
+                    magnification: 1.06,
+                    useMagnifier: true,
+                    onSelectedItemChanged: (index) {
+                      setState(() => _selectedMinute = index);
+                    },
+                    children: List.generate(
+                      60,
+                      (minute) => Center(
+                        child: Text(
+                          minute.toString().padLeft(2, '0'),
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: _isValid
+                    ? () => Navigator.of(context).pop(_selectedAt)
+                    : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF2F6FED),
+                  disabledBackgroundColor:
+                      colorScheme.onSurface.withValues(alpha: 0.12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  '保存',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatScheduledSendAt(DateTime dateTime) {
+  final minute = dateTime.minute.toString().padLeft(2, '0');
+  return '${dateTime.month}月${dateTime.day}日（${_weekdayText(dateTime)}） '
+      '${dateTime.hour.toString().padLeft(2, '0')}:$minute';
+}
+
+String _formatSchedulePickerDate(DateTime date) {
+  return '${date.month}月${date.day}日 ${_weekdayText(date)}';
+}
+
+String _weekdayText(DateTime date) {
+  const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  return weekdays[date.weekday - 1];
+}
+
+// ---------------------------------------------------------------------------
+// 更多工具面板
+// ---------------------------------------------------------------------------
+
+class _ToolsPanel extends StatelessWidget {
+  final bool isGroup;
+  final double bottomPadding;
+  final VoidCallback onPickImages;
+  final VoidCallback onTakePhoto;
+  final VoidCallback onPickFile;
+  final VoidCallback onVoiceCall;
+  final VoidCallback onVideoCall;
+  final VoidCallback onLocation;
+  final VoidCallback onFavorite;
+  final VoidCallback? onSendContactCard;
+  final VoidCallback onScheduleMessage;
+  final VoidCallback? onQuickReply;
+  final VoidCallback? onAiReply;
+
+  const _ToolsPanel({
+    required this.isGroup,
+    required this.bottomPadding,
+    required this.onPickImages,
+    required this.onTakePhoto,
+    required this.onPickFile,
+    required this.onVoiceCall,
+    required this.onVideoCall,
+    required this.onLocation,
+    required this.onFavorite,
+    this.onSendContactCard,
+    required this.onScheduleMessage,
+    this.onQuickReply,
+    this.onAiReply,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final tools = [
+      _ToolItem(
+          icon: Icons.photo_library_outlined,
+          label: l10n.chatToolPhotos,
+          onTap: onPickImages),
+      _ToolItem(
+          icon: Icons.camera_alt_outlined,
+          label: l10n.chatToolCamera,
+          onTap: onTakePhoto),
+      _ToolItem(
+          icon: Icons.insert_drive_file_outlined,
+          label: l10n.chatToolFile,
+          onTap: onPickFile),
+      _ToolItem(
+        icon: Icons.schedule_send_outlined,
+        label: '定时消息',
+        onTap: onScheduleMessage,
+      ),
+      _ToolItem(
+          icon: Icons.location_on_outlined,
+          label: l10n.chatToolLocation,
+          onTap: onLocation),
+      _ToolItem(
+          icon: Icons.contact_page_outlined,
+          label: l10n.chatToolContactCard,
+          onTap: () {
+            onSendContactCard?.call();
+          }),
+      if (onQuickReply != null)
+        _ToolItem(
+          icon: Icons.quickreply_outlined,
+          label: '话术',
+          onTap: onQuickReply!,
+        ),
+      if (onAiReply != null)
+        _ToolItem(
+          icon: Icons.auto_awesome_outlined,
+          label: 'AI回复',
+          onTap: onAiReply!,
+        ),
+      if (!isGroup) ...[
+        _ToolItem(
+            icon: Icons.phone_outlined,
+            label: l10n.chatToolVoiceCall,
+            onTap: onVoiceCall),
+        _ToolItem(
+            icon: Icons.videocam_outlined,
+            label: l10n.chatToolVideoCall,
+            onTap: onVideoCall),
+      ],
+      _ToolItem(
+          icon: Icons.star_border_rounded,
+          label: l10n.chatToolFavorites,
+          onTap: onFavorite),
+    ];
+
+    final pages = <List<_ToolItem>>[];
+    for (var i = 0; i < tools.length; i += 8) {
+      pages.add(tools.skip(i).take(8).toList(growable: false));
+    }
+
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomPadding),
+      child: SizedBox(
+        height: 178,
+        child: PageView.builder(
+          itemCount: pages.length,
+          physics: pages.length > 1
+              ? const PageScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, pageIndex) {
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 6,
+                crossAxisSpacing: 10,
+                mainAxisExtent: 82,
+              ),
+              itemCount: pages[pageIndex].length,
+              itemBuilder: (context, index) =>
+                  _ToolCell(item: pages[pageIndex][index]),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _AiReplySuggestionSheet extends StatelessWidget {
+  final String? contextText;
+
+  const _AiReplySuggestionSheet({required this.contextText});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final suggestions = _buildSuggestions(contextText);
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.56,
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 8, bottom: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.onSurface.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.auto_awesome_outlined,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'AI回复',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          if (contextText?.trim().isNotEmpty == true)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '参考客户消息：${contextText!.trim()}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: colorScheme.onSurface.withValues(alpha: 0.56),
+                ),
+              ),
+            ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+              itemCount: suggestions.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, index) {
+                final suggestion = suggestions[index];
+                return _AiReplySuggestionTile(text: suggestion);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _buildSuggestions(String? rawContext) {
+    final context = rawContext?.trim() ?? '';
+    final lower = context.toLowerCase();
+    final suggestions = <String>[];
+
+    if (context.contains('退款') || context.contains('退货')) {
+      suggestions.add('您好，关于退款/退货问题我先帮您核实订单状态。麻烦您提供一下订单号，我确认后给您处理方案。');
+    } else if (context.contains('订单') || context.contains('物流')) {
+      suggestions.add('您好，我先帮您查询订单和物流状态。麻烦您发一下订单号，我确认后马上回复您。');
+    } else if (context.contains('价格') ||
+        context.contains('多少钱') ||
+        context.contains('报价')) {
+      suggestions.add('您好，价格会根据具体方案和数量有所不同。我先了解一下您的需求，再给您准确报价。');
+    } else if (context.contains('投诉') || context.contains('不满意')) {
+      suggestions.add('您好，非常抱歉给您带来不好的体验。我先记录并核实情况，会尽快给您一个明确处理结果。');
+    } else if (lower.contains('hello') || lower.contains('hi')) {
+      suggestions.add('您好，我在的。请问有什么可以帮您处理？');
+    }
+
+    suggestions.addAll([
+      '您好，我已收到您的消息。我先帮您核实一下具体情况，稍后给您回复。',
+      '收到，为了更快帮您处理，麻烦您补充一下订单号或相关截图。',
+      '理解您的情况，我会尽快帮您跟进处理，处理进展会在这里同步给您。',
+    ]);
+
+    final seen = <String>{};
+    return suggestions.where(seen.add).take(4).toList();
+  }
+}
+
+class _AiReplySuggestionTile extends StatelessWidget {
+  final String text;
+
+  const _AiReplySuggestionTile({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.of(context).pop(text),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.auto_awesome_outlined,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.38,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.add_rounded,
+                size: 18,
+                color: colorScheme.onSurface.withValues(alpha: 0.38),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickReplyPickerSheet extends ConsumerStatefulWidget {
+  final String? scope;
+
+  const _QuickReplyPickerSheet({required this.scope});
+
+  @override
+  ConsumerState<_QuickReplyPickerSheet> createState() =>
+      _QuickReplyPickerSheetState();
+}
+
+class _QuickReplyPickerSheetState
+    extends ConsumerState<_QuickReplyPickerSheet> {
+  final _searchController = TextEditingController();
+  final _searchDebouncer = Debouncer();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchDebouncer.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebouncer.run(() {
+      if (mounted) setState(() => _query = value.trim());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final repliesAsync =
+        ref.watch(customerServiceQuickRepliesProvider(widget.scope));
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.62,
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 8, bottom: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.onSurface.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Row(
+              children: [
+                Text(
+                  '常用话术',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: _QuickReplySheetSearchField(
+              controller: _searchController,
+              query: _query,
+              onChanged: _onSearchChanged,
+              onClear: () => setState(() {
+                _searchDebouncer.cancel();
+                _searchController.clear();
+                _query = '';
+              }),
+            ),
+          ),
+          Expanded(
+            child: repliesAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+              error: (_, __) => _QuickReplyStateView(
+                icon: Icons.cloud_off_outlined,
+                title: '话术加载失败',
+                subtitle: '请稍后重试',
+                onRetry: () => ref
+                    .read(customerServiceQuickRepliesProvider(widget.scope)
+                        .notifier)
+                    .refresh(),
+              ),
+              data: (replies) {
+                final filtered = _filterQuickReplyPickerItems(replies, _query);
+                if (replies.isEmpty) {
+                  return const _QuickReplyStateView(
+                    icon: Icons.quickreply_outlined,
+                    title: '暂无话术',
+                    subtitle: '话术库启用后会显示在这里',
+                  );
+                }
+                if (filtered.isEmpty) {
+                  return const _QuickReplyStateView(
+                    icon: Icons.search_off_outlined,
+                    title: '没有匹配的话术',
+                    subtitle: '换个关键词试试',
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, index) {
+                    final reply = filtered[index];
+                    return _QuickReplyPickerTile(reply: reply);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickReplySheetSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _QuickReplySheetSearchField({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: '搜索话术',
+        prefixIcon: Icon(
+          Icons.search,
+          color: colorScheme.onSurface.withValues(alpha: 0.42),
+        ),
+        suffixIcon: query.trim().isEmpty
+            ? null
+            : IconButton(
+                visualDensity: VisualDensity.compact,
+                onPressed: onClear,
+                icon: Icon(
+                  Icons.cancel,
+                  size: 18,
+                  color: colorScheme.onSurface.withValues(alpha: 0.38),
+                ),
+              ),
+        filled: true,
+        fillColor: Theme.of(context).scaffoldBackgroundColor,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+}
+
+List<CsQuickReply> _filterQuickReplyPickerItems(
+  List<CsQuickReply> replies,
+  String query,
+) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return replies;
+  return replies.where((reply) {
+    final searchable = [
+      reply.title,
+      reply.content,
+      reply.category,
+      reply.scopeLabel,
+      ...reply.tags,
+    ].join(' ').toLowerCase();
+    return searchable.contains(q);
+  }).toList(growable: false);
+}
+
+class _QuickReplyPickerTile extends StatelessWidget {
+  final CsQuickReply reply;
+
+  const _QuickReplyPickerTile({required this.reply});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.of(context).pop(reply),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      reply.title.isNotEmpty ? reply.title : '未命名话术',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    reply.category,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withValues(alpha: 0.46),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                reply.content,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.35,
+                  color: colorScheme.onSurface.withValues(alpha: 0.78),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickReplyStateView extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onRetry;
+
+  const _QuickReplyStateView({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 44,
+              color: colorScheme.onSurface.withValues(alpha: 0.28),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(height: 12),
+              TextButton(onPressed: onRetry, child: const Text('重试')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolItem {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ToolItem(
+      {required this.icon, required this.label, required this.onTap});
+}
+
+class _ToolCell extends StatelessWidget {
+  final _ToolItem item;
+  const _ToolCell({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: item.onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Icon(item.icon,
+                size: 28, color: Theme.of(context).colorScheme.onSurface),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            item.label,
+            style: const TextStyle(
+              fontSize: 11,
+              height: 1.15,
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}

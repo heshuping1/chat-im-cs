@@ -1,0 +1,233 @@
++ /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/docs/check-docs.sh
+== LPP docs files ==
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/.DS_Store
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/00-ECC工作流.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/01-需求规格说明书.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/02-功能矩阵和实现情况.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/03-技术方案.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/04-测试验收方案.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/05-接口与服务端依赖.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/06-发布风险与检查清单.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/07-UI与交互设计说明.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/08-代码现状与证据索引.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/09-安全权限与数据治理.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/12-版本交付报告.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/13-自动化执行脚本说明.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/14-功能接口映射表.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/15-新电脑安装与运行指南.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/16-客服工作台App-PC功能拆分.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/17-PC端准备与复用方案.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/README.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/.DS_Store
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/AGENTS.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/CHANGES-2026-05.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/README.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/admin-api-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/admin-api.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/admin-console-login-flow.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/audit-report.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/auth-v2-and-realtime-events.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/client-api-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/client-api.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/cs-broadcast-notice.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/field-enum-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/followme.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/friend-invite-qr.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/open-platform-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/open-platform.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/account-devices-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/admin-cs-center-dashboard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/admin-cs-center-threads-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-add-members-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-change-password-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-conversations-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-create-conversation-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-history-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-alice-refresh-tenant-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-alice-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-alice-tenant-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-bob-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-charlie-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-member-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-member-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-open-guard-user-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-owner-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-owner-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-presence-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-read-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-recall-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-refresh-alice-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-alice-refresh-tenant-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-alice-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-alice-tenant-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-bob-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-charlie-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-member-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-member-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-open-guard-user-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-owner-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-owner-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-image-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-reply-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-text-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-video-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-sync-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-upload-image-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-upload-video-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/department-tree-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/gateway-msg-new-event.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/gateway-presence-changed-event.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/gateway-space-notice-event.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-configure-webhook-request.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-configure-webhook-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-create-app-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-deliveries-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-rotate-credentials-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-send-message-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-subscriptions-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-upload-image-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/production-platform-join-approval-e2e-2026-04-14.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-admin-detail-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-admin-force-close-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-create-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-staff-mine-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-staff-send-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-visitor-send-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-widget-state-final.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-widget-state-initial.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/webhook-message-created-request.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/webhook-message-read-request.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/workbench-dashboard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/workbench-thread-detail-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/workbench-threads-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/production-platform-join-approval-e2e-2026-04-14.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/screen-share.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/voice-video-call-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/voice-video-call.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/templates/功能矩阵模板.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/templates/技术方案模板.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/templates/需求条目模板.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md
+
+== Markdown local link check ==
+missing_count=0
+
+== Unresolved markers ==
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/README.md:108:rg "待填写|待确认|未执行|待细化|需确认|TBD|TODO" lpp/docs
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/00-ECC工作流.md:86:涉及以下内容时，必须先给方案并等待确认：
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/00-ECC工作流.md:114:rg "待填写|待确认|未执行|待细化|需确认|TBD|TODO" lpp/docs
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/01-需求规格说明书.md:5:最后核对方式：基于当前 Flutter 代码目录、路由、接口调用和测试文件静态盘点。本文档不把未执行真机验收的能力写成已验收。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/01-需求规格说明书.md:103:| 发布治理 | 查看缺口、风险、测试状态。 | 把未执行验收写成已通过。 | 与版本交付报告一致。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:7:注意：本文不是“全部不支持”清单。问题类型为“业务口径待确认”“字段/接口语义待确认”“配置/环境待确认”的条目，通常表示接口或客户端链路已经存在，但仍需要服务端确认真实触发条件、稳定字段、权限、副作用、错误码或联调环境。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:20:| 权限/业务口径待确认 | 接口存在，但角色权限、状态流转、错误码或业务副作用需要服务端明确。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:21:| 配置/环境待确认 | 需要服务端提供配置地址、健康检查、推送配置或三方服务配置。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:25:| AUTH-SERVER-001 | 邮箱验证码登录 | 配置/业务口径待确认 | App 已能发送邮箱验证码并按验证码登录 | 确认邮件送达、验证码有效期、频控、重发、错误码和模板配置 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:26:| AUTH-SERVER-002 | 短信验证码登录 | 配置/业务口径待确认 | App 已能发送短信验证码并按验证码登录 | 确认 SMS 供应商、签名模板、国家区号、频控、过期码、错误码和到达率 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:28:| AUTH-SERVER-004 | 登录错误码统一 | 业务口径待确认 | App 可把错误码映射为中文提示 | 统一返回冻结账号、停用租户、无权限租户、错误密码、账号不存在、频控等错误码 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:29:| AUTH-SERVER-005 | token 长稳和撤销 | 业务口径待确认 | App 已有 access/platform/admin token 刷新和并发 401 处理 | 提供 token 过期、撤销、跨空间失败、后台恢复时的稳定错误码和刷新规则 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:30:| CS-SERVER-006 | 普通消息列表排除临时会话 | 字段/口径待确认 | 客户端已过滤 `temp_session` | `/conversations` 默认不返回客服临时会话，或稳定返回 `conversationType=temp_session` 供过滤 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:45:| ENTERPRISE-BROADCAST-002 | 企业群发官方账号发送身份 | 缺失接口/业务口径待确认 | App 不能本地伪造官方账号消息；必须由服务端按企业默认官方账号发出 | 企业群发消息必须以企业默认官方账号或指定官方账号作为消息发送人，接收端消息、会话摘要、推送标题、审计记录都要体现官方账号身份，并记录实际操作人 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:46:| ENTERPRISE-BROADCAST-003 | 企业群发目标和权限口径 | 缺失接口/业务口径待确认 | App 需要服务端统一计算目标范围，不能在端侧拼全员名单 | 用一个企业群发权限控制是否可发；目标支持全体人员、企业员工、企业客户、官方群，其中全体人员=企业员工+企业客户；客服角色默认无企业群发权限 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:52:| NOTICE-SERVER-001 | 企业公告发布/撤回/已读统计 | 缺失接口/产品归属待确认 | App 当前主要是公告读取侧 | 确认 App 是否承载发布；如承载，补发布、撤回、已读统计接口合同 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:53:| CS-FREEZE-001 | 客服会话冻结/解冻 | 接口语义待确认/可能缺失接口 | 客户端只看到群冻结路径，未接正式客服会话冻结接口 | 明确是否需要客服会话冻结；如需要，提供会话冻结/解冻、审计和客户侧表现约定 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:55:| SITE-LINE-001 | 线路 configfile | 配置/健康检查待确认 | 客户端已实现当前站点、缓存站点、S3 顺序拉取 | 提供 S3 configfile URL、稳定返回格式和轻量健康检查路径 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:56:| ACCOUNT-SERVER-001 | 绿泡泡号修改规则 | 业务口径待确认 | App 已调用 `PUT /profile/me/lpp-id` | 明确重复校验、修改次数、冷却时间、修改后搜索/登录名同步规则和错误码 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:57:| ACCOUNT-SERVER-002 | 登录设备踢出 | 业务口径待确认 | App 已有设备列表和删除设备接口 | 删除其他设备后需服务端使目标设备 token 失效，并通过 Gateway/Push 触发下线提示 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:58:| ACCOUNT-SERVER-003 | 账号注销/取消注销 | 业务口径待确认 | App 已有注销和冷静期取消注销接口入口 | 明确冷静期、重新登录撤销、数据保留/清除、企业关系清理和错误码 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:59:| PROFILE-SERVER-001 | 隐私设置真实副作用 | 业务口径待确认 | App 已能保存隐私设置 | 服务端需按设置影响手机号/LPP 搜索、好友申请、资料可见性，并返回稳定权限错误 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:61:| ENTERPRISE-SERVER-001 | 企业信息/功能开关 | 业务口径待确认 | App 已有 tenant info/features 读取和保存 | 明确所有者/管理员权限、字段保存后刷新、好友模式/加入审批/客服模式对业务的实时影响 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:62:| ENTERPRISE-SERVER-002 | 企业成员角色和移除 | 业务口径待确认 | App 已有成员列表、改角色、移除接口入口 | 明确角色修改后权限刷新、被移除账号 token/空间处理、错误码和审计记录 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:63:| ENTERPRISE-SERVER-003 | 企业邀请和加入审批 | 业务口径待确认 | App 已有邀请、预览、接受和申请链路 | 明确邀请有效期、次数限制、拒绝后再申请、审批通知和状态枚举 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:64:| GROUP-SERVER-001 | 群创建和默认权限 | 业务口径待确认 | App 已按企业群默认严格权限提交设置 | 服务端需确认默认权限是否落库并实际限制邀请、改名、二维码、成员列表、@所有人等行为 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:65:| GROUP-SERVER-002 | 群管理操作权限 | 业务口径待确认 | App 已有加人、改名、公告、审批、禁言、管理员、转让、退出/解散接口入口 | 服务端需稳定返回群主/管理员/普通成员/客户成员的权限拒绝码和多端同步事件 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:66:| GROUP-SERVER-003 | 群已读回执 | 字段/接口语义待确认 | App 已有已读回执页面入口 | 明确哪些群支持已读回执、成员分页、权限范围、超大群性能和字段格式 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:68:| GROUP-SERVER-007 | 管理端复杂群治理接口接入 | 接口待接入/业务口径待确认 | App 暂只执行冻结/解冻；全员禁言、成员管理、强制解散只提示接口待接入 | 服务端明确复杂群治理接口、权限、审计和 PC/App 承载边界 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:70:| PRESENCE-SERVER-002 | 客服在线/忙碌状态 | 业务口径待确认 | App 已有 reception status 接口和状态模型 | 明确在线/忙碌/离线对分配、排队、自动接入、人工接管的影响和事件刷新 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:71:| PUSH-SERVER-001 | 推送通知和点击跳转 | 配置/环境待确认 | App 已有通知模块和 JPush/FCM 初始化代码 | 服务端需提供前台/后台/杀进程推送 payload、deep link、会话/公告/通话跳转字段和厂商配置 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:74:| TRANSLATE-SERVER-001 | 快捷翻译 | 业务口径待确认 | App 已有翻译入口和接口调用 | 明确语言识别、支持语种、失败错误码、敏感内容处理、计费/权限规则 | 低 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:491:App 当前已有企业公告列表和详情读取能力，但完整公告管理闭环尚未明确是否由 App 承载。功能矩阵中该能力标为 `需服务端`，问题类型为“缺失接口/产品归属待确认”。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:497:| NOTICE-SERVER-001 | App 是否允许发布公告 | 产品归属待确认 | 明确公告发布、编辑、撤回、已读统计是否仅 PC/管理端承载，还是 App 也需要承载 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:511:当前代码和文档中只看到类似 `/api/admin/v1/groups/{id}/freeze` 的群冻结路径，无法确认它是否适用于客服会话、客户会话或普通群聊。功能矩阵中“会话冻结/解冻”标为 `需服务端`，问题类型为“接口语义待确认/可能缺失接口”。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:517:| CS-FREEZE-001 | 冻结对象定义 | 接口语义待确认 | 明确冻结对象是群、普通会话、客服线程、客户账号，还是多种对象分别处理 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:520:| CS-FREEZE-004 | 客户侧表现 | 产品/接口语义待确认 | 明确冻结后客户能否发送、客服能否发送、历史消息是否可读、是否提示原因 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:559:| AUTH-SERVER-001 | 邮箱验证码登录闭环 | 配置/业务口径待确认 | 邮件验证码可真实送达；明确有效期、重发间隔、每日/每小时频控、错误码、模板和多语言文案 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:560:| AUTH-SERVER-002 | 短信验证码登录闭环 | 配置/业务口径待确认 | SMS 可真实送达；明确国家区号、签名模板、频控、过期码、运营商失败错误码和重发策略 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:562:| AUTH-SERVER-004 | 登录/空间错误码统一 | 业务口径待确认 | 统一冻结账号、停用租户、无权限租户、账号不存在、密码错误、频控、验证码错误、验证码过期等错误码 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:563:| AUTH-SERVER-005 | token 生命周期和撤销 | 业务口径待确认 | 明确 access token、platform token、admin token 过期/撤销/并发刷新规则；跨空间失败时返回稳定错误码 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:581:| ACCOUNT-SERVER-001 | 绿泡泡号修改规则 | 业务口径待确认 | 明确重复校验、修改次数、冷却时间、修改后搜索/登录名同步规则和错误码 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:582:| ACCOUNT-SERVER-002 | 删除登录设备后的踢出 | 业务口径待确认 | 删除设备后目标设备 token 失效；最好通过 Gateway/Push 通知目标端下线，并返回可展示的原因 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:583:| ACCOUNT-SERVER-003 | 账号注销和取消注销 | 业务口径待确认 | 明确冷静期、重新登录撤销、数据保留/删除、企业关系清理、再次注册/登录规则和错误码 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:584:| PROFILE-SERVER-001 | 隐私设置副作用 | 业务口径待确认 | `searchableByMobile/searchableByLppId/allowFriendRequest/profileVisibility` 需要真实影响搜索、好友申请、资料可见性 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:586:| ENTERPRISE-SERVER-001 | 企业信息和功能开关 | 业务口径待确认 | 明确所有者/管理员权限、保存后刷新方式、好友模式/加入审批/客服模式对业务的实时影响 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:587:| ENTERPRISE-SERVER-002 | 企业成员角色和移除 | 业务口径待确认 | 角色修改后权限即时刷新；被移除账号 token/空间状态处理；写入审计记录并返回稳定错误码 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:588:| ENTERPRISE-SERVER-003 | 企业邀请和加入审批 | 业务口径待确认 | 明确邀请有效期、次数限制、撤销/过期、申请中、拒绝后再申请、审批通知和状态枚举 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:606:| GROUP-SERVER-001 | 企业群默认严格权限落库 | 业务口径待确认 | 创建企业群后默认关闭成员邀请、改名、二维码加入、加好友、查看成员列表、@所有人，并开启加入审批；服务端需实际执行限制 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:607:| GROUP-SERVER-002 | 群操作权限拒绝码 | 业务口径待确认 | 群主/管理员/普通成员/客户成员对加人、改名、公告、审批、禁言、设管理员、转让、解散等操作返回稳定错误码 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:609:| GROUP-SERVER-004 | 群已读回执范围 | 接口语义待确认 | 明确哪些群支持已读回执、谁可查看、成员分页字段、超大群性能策略 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:612:| GROUP-SERVER-007 | 管理端复杂群治理接口接入 | 接口待接入/业务口径待确认 | App 暂只执行冻结/解冻；全员禁言、成员禁言、移除成员、强制解散等复杂治理后续按 PC/服务端接口成熟度逐步接入 | 中 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:631:| PRESENCE-SERVER-002 | 客服在线/忙碌/离线状态 | 业务口径待确认 | 明确客服状态对排队分配、自动接入、人工接管、忙碌暂停接待的影响，并提供事件刷新 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:632:| PUSH-SERVER-001 | 推送 payload 和跳转 | 配置/环境待确认 | 提供消息、公告、客服会话、通话的 JPush/FCM payload 字段、deep link、点击跳转参数和厂商配置 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:633:| PUSH-SERVER-002 | 后台/杀进程通知到达 | 配置/环境待确认 | 明确 Android 厂商通道、通知分类、权限引导、离线消息补偿和失败排查字段 | 高 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md:636:| TRANSLATE-SERVER-001 | 快捷翻译口径 | 业务口径待确认 | 明确语言识别、支持语种、失败错误码、敏感内容处理、权限/计费规则 | 低 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/06-发布风险与检查清单.md:34:| RISK-S0-001 | S0 | Android 真机 P0 业务验收未完成；当前已安装 release 模式包并完成部分单机验证，但完整主链路未跑完。 | 未关闭，对应 `APP-TODO-001` |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/06-发布风险与检查清单.md:35:| RISK-S0-002 | S0 | admin API token 域未完成真实账号专项。自动化已覆盖签发/拒签，真接口专项未完成。 | 未关闭，对应 `APP-TODO-003` |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/12-版本交付报告.md:19:| 当前结论 | 不建议直接交付，需完成 `APP-TODO-001` 到 `APP-TODO-012` 中的 P0/P1 关键项 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/12-版本交付报告.md:66:| 接口联调 | 未执行 |  | GAP-S1-001 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/12-版本交付报告.md:68:| 性能基线 | 部分执行 | release 冷启动、热启动、基础内存、断网/恢复提示已有记录；大数据和长稳未执行。 | GAP-S1-006 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/12-版本交付报告.md:74:| GAP-S0-001 | S0 | Android P0 真机业务验收未完成，当前已安装 release 模式包并完成部分单机验证 | 无法判断真机业务可交付 | 执行 `APP-TODO-001` 和在线客服专项 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/12-版本交付报告.md:107:- 功能矩阵中服务端缺失项已单独整理到 `服务端支持.md`，App 侧剩余事项见 `APP-TODO-*`。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/04-测试验收方案.md:27:| 接口联调 | 验证 endpoint、字段、权限、错误码、requestId。 | 真接口 + 日志 | 未执行 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/04-测试验收方案.md:29:| 发布验收 | 验证 P0 路径和 S0/S1 风险。 | 检查清单 + 报告 | 未执行 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/04-测试验收方案.md:110:| 执行结果 | 通过、失败、部分失败、未执行。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/AGENTS.md:67:### 2.5 内部待办、TODO、未决事项
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:31:| APP-TODO-001 | P0 | Android P0 主链路回归 | release 模式包已安装；客服账号已验证消息、通讯录、工作台、个人页、弱网提示。 | 用正式测试账号跑登录、空间切换、消息发送、会话列表、个人页、退出登录，形成截图和日志记录。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:32:| APP-TODO-002 | P0 | 多角色界面真机抽查 | 角色入口自动化已覆盖客户、普通员工、客服、管理员、所有者；客服账号已真机验证。 | 分别登录客户、普通员工、管理员、所有者，确认底部导航、工作台入口、只读会话和敏感数据可见性。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:33:| APP-TODO-003 | P0 | admin token 和 tenant token 防混用专项 | 自动化已覆盖 admin credential 签发和拒签。 | 用管理员/所有者真实账号抽查客户管理、客服中心、群组监管接口，确认不会用普通 tenant token 调 admin API。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:34:| APP-TODO-004 | P0 | 管理员/所有者只读会话真机确认 | 管理工作台路由和只读入口代码已实现。 | 从管理工作台进入客户会话，确认输入区不可发言，只能查看。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:35:| APP-TODO-005 | P0 | 普通 IM 弱网发送回归 | 文本待发队列、Gateway 重连、`/sync` 和网络状态条有代码和部分真机证据。 | 断网发送文本、恢复网络，确认消息自动重发、状态更新、不重复。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:36:| APP-TODO-006 | P0 | 在线客服端到端验收 | 临时会话过滤、工作台入口、接入/接管/关闭代码已验证；空态已真机验证。 | 用临时会话脚本创建访客会话，验证只在工作台出现、接入、继续沟通、关闭、画像入口。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:37:| APP-TODO-007 | P1 | 好友双账号闭环 | 搜索、申请、同意、拒绝和 409 处理代码存在。 | 两个账号验证加好友、通过/拒绝、双方通讯录和会话出现。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:38:| APP-TODO-008 | P1 | 群聊多角色闭环 | 创建群、加人、群设置、禁言、公告、审批等代码存在。 | 群主、管理员、普通成员分别验证创建、加人、禁言、改名、公告、退出/解散。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:39:| APP-TODO-009 | P1 | 推送和后台专项 | 通知初始化、通话模块和点击处理代码存在。 | 验证前台、后台、杀进程通知到达，点击进入正确空间和会话；补 Android 厂商权限引导。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:40:| APP-TODO-010 | P1 | 通话专项补测 | 用户已确认音视频可用。 | 补双真机、弱网、锁屏、后台、小窗、扬声器/听筒/蓝牙音频路由。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:41:| APP-TODO-011 | P1 | 大数据长列表和低端机性能 | 当前已有冷启动和基础内存记录，列表已做懒加载和头像优化。 | 用 500/1000 条会话、消息、客户、群成员压测滚动帧率、内存、首屏耗时。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:42:| APP-TODO-012 | P1 | 错误诊断增强 | 已实现全局错误上报、脱敏、限流和失败静默。 | 增加 breadcrumbs、traceId 串联、本地诊断包导出和用户反馈自动附带日志。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:43:| APP-TODO-013 | P2 | 媒体失败态和权限体验 | 图片、文件已人工确认可用；媒体链路代码存在。 | 补相册/相机/录音权限拒绝、大文件失败重试、上传进度和弱网提示。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:44:| APP-TODO-014 | P2 | UI 细节和无数据状态回归 | 客户管理、客服中心、群组监管已具备空态页面壳。 | 按页面检查 loading、空态、错误态、按钮禁用、防重复点击和长文本换行。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:45:| APP-TODO-015 | P2 | 自动化报告常态化 | `scripts/mobile/test/run_full_regression.sh` 已支持重复跑和报告。 | 每次交付前跑完整脚本，把报告路径和失败项回填版本交付报告。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:53:| 业务口径待确认 | 冻结对象、企业公告发布是否放 App、账号注销数据规则、隐私设置真实副作用。 | 产品/服务端确认后再进入 App 实施。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:60:| GAP-S0-001 | S0 | 未形成 Android P0 真机业务验收报告；设备已识别且已安装 release 模式包，但完整场景未跑完 | 无法判断是否可交付 | 对应 APP-TODO-001 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:61:| GAP-S0-002 | S0 | admin API token 域未完成真实账号专项 | 存在管理越权风险 | 对应 APP-TODO-003 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:62:| GAP-S0-003 | S0 | 管理端只读会话未完成真机确认 | 可能误发客户会话消息 | 对应 APP-TODO-004 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:64:| GAP-S1-002 | S1 | 好友申请双方闭环未记录真机结果 | 申请状态可能不一致 | 对应 APP-TODO-007 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:65:| GAP-S1-003 | S1 | 群禁言和群治理未完成多角色多端验收 | 权限可能错误 | 对应 APP-TODO-008 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:66:| GAP-S1-004 | S1 | 客服并发接管和真实排队未验收 | 客服业务可用性未知 | 对应 APP-TODO-006 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:67:| GAP-S1-005 | S1 | 通话、推送、后台未形成完整专项报告 | 真实设备可用性未知 | 对应 APP-TODO-009、APP-TODO-010 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:68:| GAP-S1-006 | S1 | 性能基线只有启动、基础内存和弱网提示，缺大数据量和长稳 | 无法判断大数据量体验 | 对应 APP-TODO-011 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:76:| `02-功能矩阵和实现情况.md` | 已按模块和二级功能拆分；仍需随真机/API 结果回填。 | 每完成一个 APP-TODO 就更新状态和证据。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:82:| `10-性能稳定性基线.md` | 已有基础数据，缺大数据和长稳。 | 按 APP-TODO-011 补测。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:87:1. 跑 Android P0 主链路回归，完成 APP-TODO-001。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:88:2. 跑 admin token 和管理只读会话专项，完成 APP-TODO-003、APP-TODO-004。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:89:3. 跑在线客服端到端验收，完成 APP-TODO-006。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:90:4. 跑多角色界面真机抽查，完成 APP-TODO-002。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:91:5. 跑普通 IM 弱网发送回归，完成 APP-TODO-005。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:92:6. 跑好友和群聊双账号/多角色专项，完成 APP-TODO-007、APP-TODO-008。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:93:7. 跑推送、后台、通话专项，完成 APP-TODO-009、APP-TODO-010。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:94:8. 建立大数据长列表和低端机性能基线，完成 APP-TODO-011。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md:95:9. 增强错误诊断 breadcrumbs、traceId 和本地诊断包，完成 APP-TODO-012。
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/02-功能矩阵和实现情况.md:16:| 需服务端 | 客户端无法单独完成，需要服务端接口、字段、事件、权限或审计支持；当前说明必须明确属于“缺失接口”“接口不可用/待修复”“字段/事件缺失”还是“接口语义待确认”。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/02-功能矩阵和实现情况.md:135:| 企业公告 | 公告发布/撤回/已读统计 | 需服务端 | 缺失接口/产品归属待确认：App 当前主要是读取侧，缺少面向 App 的公告发布、撤回、已读统计接口合同；也未明确这些能力是否只放 PC/管理端。 | 服务端/产品确认 App 是否承载；如承载，补发布、撤回、已读统计接口。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/02-功能矩阵和实现情况.md:186:| REQ-AUTH-001 | 租户内 login_name 兼容登录 | 代码已验证 | `auth_provider.dart` 支持 `loginType == 'login_name'`；`tenantLogin()`；`tenant_login_datasource_test.dart` | 主登录页当前不单独暴露 `login_name` 入口，主要作为兼容路径；需确认产品是否保留 | 代码审查 + API |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/02-功能矩阵和实现情况.md:303:| REQ-ENTERPRISE-001 | 企业群发消息 | 需服务端 | 服务端支持计划已整理到 `docs/服务端支持.md` 的 `ENTERPRISE-BROADCAST-*`；客户端普通“群发”不依赖服务端新增接口 | 缺失接口/业务口径待确认：企业群发需服务端异步任务、官方账号发送身份、统一企业群发权限、目标范围、失败明细、审计和频控；客服角色默认不具备企业群发权限 | 产品 + 服务端 API |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/02-功能矩阵和实现情况.md:309:| REQ-CS-002 | 会话冻结/解冻 | 需服务端 | `/api/admin/v1/groups/{id}/freeze` | 接口语义待确认/可能缺失接口：当前仅看到群冻结路径，未确认是否适用于客服会话；缺少客服会话冻结/解冻的正式接口、审计字段和客户侧表现约定 | 产品 + API |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md:32:| 弱网 | 登录、消息发送、图片上传、客服接管、审批操作。 | 部分执行：系统断网提示和恢复隐藏已验证；限速、蜂窝、弱网发送耗时未执行。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md:33:| 断网恢复 | Gateway 重连、增量同步、失败消息重试。 | 部分执行：恢复网络后消息首页继续显示；离线消息补齐和待发消息自动重发未执行。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md:34:| 多端并发 | 好友申请、群禁言、客服接管、会话关闭。 | 未执行 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md:35:| 长列表 | 会话列表、聊天消息、客户列表、群成员列表。 | 代码已做懒加载、缓存和防抖优化；真实大数据压测未执行。 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md:36:| 后台前台切换 | 会话刷新、通话、推送、权限恢复。 | 未执行 |
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md:37:| Android 厂商差异 | Vivo、OPPO、小米、华为、Pixel。 | 未执行 |
+
+Docs check completed.
+PASS docs check (0s)
