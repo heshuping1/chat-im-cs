@@ -28,6 +28,7 @@ export const endpointPlan = {
   departments: "/api/client/v1/departments/",
   departmentMembers: "/api/client/v1/departments/{departmentId}/members",
   directChats: "/api/client/v1/direct-chats/",
+  groups: "/api/client/v1/groups",
   directMessages: "/api/client/v1/direct-chats/{conversationId}/messages",
   directRead: "/api/client/v1/direct-chats/{conversationId}/read",
   directReadStatus: "/api/client/v1/direct-chats/{conversationId}/read-status",

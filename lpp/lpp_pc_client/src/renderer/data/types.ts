@@ -28,6 +28,7 @@ export interface ContactItem {
   remark: string;
   tags: string[];
   userId?: string;
+  lppId?: string;
   conversationId?: string;
   avatarUrl?: string | null;
   online?: boolean;

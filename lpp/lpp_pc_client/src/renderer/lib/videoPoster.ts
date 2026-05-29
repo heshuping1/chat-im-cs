@@ -82,9 +82,7 @@ function capturePosterFromUrl(src: string, fileName: string) {
     video.addEventListener(
       "loadedmetadata",
       () => {
-        const targetTime = Number.isFinite(video.duration)
-          ? Math.min(Math.max(video.duration * 0.02, 0.12), 0.5)
-          : 0.18;
+        const targetTime = posterCaptureTime(video.duration);
         try {
           video.currentTime = targetTime;
         } catch {
@@ -112,6 +110,14 @@ function capturePosterFromUrl(src: string, fileName: string) {
     video.src = src;
     video.load();
   });
+}
+
+function posterCaptureTime(duration: number) {
+  if (!Number.isFinite(duration) || duration <= 0) return 0.18;
+  const latestSafeTime = Math.max(0.08, duration - 0.08);
+  if (duration <= 0.8) return Math.min(Math.max(duration * 0.18, 0.08), latestSafeTime);
+  if (duration <= 3) return Math.min(Math.max(duration * 0.08, 0.12), latestSafeTime, 0.32);
+  return Math.min(Math.max(duration * 0.025, 0.16), latestSafeTime, 0.65);
 }
 
 async function finishFromFrame(video: HTMLVideoElement, fileName: string) {

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const bottomThreshold = 80;
+const conversationBottomLockMs = 2400;
+const userScrollIntentMs = 450;
 
 export function useWechatBottomFollow<TMessage>({
   conversationKey,
@@ -16,15 +18,27 @@ export function useWechatBottomFollow<TMessage>({
   const stageRef = useRef<HTMLElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef(true);
+  const bottomLockUntilRef = useRef(0);
+  const userScrollIntentUntilRef = useRef(0);
   const previousConversationKeyRef = useRef<string | undefined>(undefined);
   const previousMessageKeysRef = useRef<Set<string>>(new Set());
   const [pendingNewMessageCount, setPendingNewMessageCount] = useState(0);
 
-  const isNearBottom = useCallback((threshold = bottomThreshold) => {
+  const isBottomLocked = useCallback(
+    () => Date.now() < bottomLockUntilRef.current,
+    [],
+  );
+
+  const rawIsNearBottom = useCallback((threshold = bottomThreshold) => {
     const stage = stageRef.current;
     if (!stage) return true;
     return stage.scrollHeight - stage.scrollTop - stage.clientHeight <= threshold;
   }, []);
+
+  const isNearBottom = useCallback(
+    (threshold = bottomThreshold) => isBottomLocked() || rawIsNearBottom(threshold),
+    [isBottomLocked, rawIsNearBottom],
+  );
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const scroll = () => {
@@ -40,11 +54,26 @@ export function useWechatBottomFollow<TMessage>({
     window.setTimeout(scroll, 260);
   }, []);
 
+  const beginBottomLock = useCallback(() => {
+    bottomLockUntilRef.current = Date.now() + conversationBottomLockMs;
+  }, []);
+
   const handleScroll = useCallback(() => {
-    const atBottom = isNearBottom();
+    const atBottom = rawIsNearBottom();
+    if (
+      !atBottom &&
+      isBottomLocked() &&
+      Date.now() <= userScrollIntentUntilRef.current
+    ) {
+      bottomLockUntilRef.current = 0;
+    }
+    if (!atBottom && isBottomLocked()) {
+      scrollToBottom("auto");
+      return;
+    }
     isAtBottomRef.current = atBottom;
     if (atBottom) setPendingNewMessageCount(0);
-  }, [isNearBottom]);
+  }, [isBottomLocked, rawIsNearBottom, scrollToBottom]);
 
   const jumpToLatest = useCallback(() => {
     scrollToBottom("smooth");
@@ -58,10 +87,12 @@ export function useWechatBottomFollow<TMessage>({
     previousMessageKeysRef.current = currentKeys;
 
     if (!conversationKey) {
+      bottomLockUntilRef.current = 0;
       setPendingNewMessageCount(0);
       return;
     }
     if (conversationChanged) {
+      beginBottomLock();
       isAtBottomRef.current = true;
       setPendingNewMessageCount(0);
       scrollToBottom("auto");
@@ -80,7 +111,50 @@ export function useWechatBottomFollow<TMessage>({
     if (addedMessages.some(isMineMessage)) {
       scrollToBottom("smooth");
     }
-  }, [conversationKey, isMineMessage, messageKey, messages, scrollToBottom]);
+  }, [beginBottomLock, conversationKey, isMineMessage, messageKey, messages, scrollToBottom]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const markUserScrollIntent = () => {
+      userScrollIntentUntilRef.current = Date.now() + userScrollIntentMs;
+    };
+    stage.addEventListener("wheel", markUserScrollIntent, { passive: true });
+    stage.addEventListener("pointerdown", markUserScrollIntent, { passive: true });
+    stage.addEventListener("touchstart", markUserScrollIntent, { passive: true });
+    stage.addEventListener("keydown", markUserScrollIntent);
+    return () => {
+      stage.removeEventListener("wheel", markUserScrollIntent);
+      stage.removeEventListener("pointerdown", markUserScrollIntent);
+      stage.removeEventListener("touchstart", markUserScrollIntent);
+      stage.removeEventListener("keydown", markUserScrollIntent);
+    };
+  }, [conversationKey]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || typeof ResizeObserver === "undefined") return undefined;
+    const followBottomIfNeeded = () => {
+      if (isBottomLocked() || isAtBottomRef.current) {
+        scrollToBottom("auto");
+      }
+    };
+    const resizeObserver = new ResizeObserver(followBottomIfNeeded);
+    const observeCurrentLayout = () => {
+      resizeObserver.observe(stage);
+      Array.from(stage.children).forEach((child) => resizeObserver.observe(child));
+    };
+    observeCurrentLayout();
+    const mutationObserver = new MutationObserver(() => {
+      observeCurrentLayout();
+      followBottomIfNeeded();
+    });
+    mutationObserver.observe(stage, { childList: true, subtree: false });
+    return () => {
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
+    };
+  }, [conversationKey, isBottomLocked, messages.length, scrollToBottom]);
 
   return {
     bottomRef,

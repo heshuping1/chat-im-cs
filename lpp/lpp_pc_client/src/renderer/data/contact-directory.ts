@@ -30,6 +30,7 @@ export function filterContacts(contacts: ContactItem[], keyword: string) {
       item.name,
       item.subtitle,
       item.remark,
+      item.lppId,
       item.departmentName,
       item.position,
       item.tags.join(" "),
@@ -107,9 +108,11 @@ export function mapContacts({
 
   const friendContacts: ContactItem[] = friends.map((friend) => {
     const kind: ContactKind = friend.userType === 1 ? "customer" : "friend";
+    const lppId = friend.lppId || friend.lppNo || friend.lppNumber;
     return {
       id: `friend-${friend.friendUserId}`,
       userId: friend.friendUserId,
+      lppId,
       conversationId: directByPeer.get(friend.friendUserId),
       kind,
       name: friend.remarkName || friend.displayName || "好友",

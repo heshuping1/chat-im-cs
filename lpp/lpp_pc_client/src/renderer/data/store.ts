@@ -51,6 +51,7 @@ export interface LocalImPeerReadReceipt {
 }
 
 export type StoredImReadState = Record<string, ConversationReadState>;
+export type MessageLayoutMode = 'full' | 'no-profile' | 'chat-focus' | 'rail-focus';
 
 const authStorageKey = 'lpp.pc.authSession';
 const localImReadsStoragePrefix = 'lpp.pc.im.localReads';
@@ -89,6 +90,7 @@ interface WorkspaceState {
   serviceListPaneWidth: number;
   serviceProfilePaneWidth: number;
   messageProfileVisible: boolean;
+  messageLayoutMode: MessageLayoutMode;
   filter: 'all' | 'queued' | 'serving' | 'vip';
   messageFilter: 'all' | 'friends' | 'groups' | 'unread';
   contactFilter: ContactFilter;
@@ -117,6 +119,7 @@ interface WorkspaceState {
   setServiceListPaneWidth: (width: number) => void;
   setServiceProfilePaneWidth: (width: number) => void;
   setMessageProfileVisible: (visible: boolean) => void;
+  setMessageLayoutMode: (mode: MessageLayoutMode) => void;
   setFilter: (filter: WorkspaceState['filter']) => void;
   setMessageFilter: (filter: WorkspaceState['messageFilter']) => void;
   setContactFilter: (filter: WorkspaceState['contactFilter']) => void;
@@ -400,6 +403,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   serviceListPaneWidth: 340,
   serviceProfilePaneWidth: 330,
   messageProfileVisible: true,
+  messageLayoutMode: 'full',
   filter: 'all',
   messageFilter: 'all',
   contactFilter: 'customer',
@@ -535,6 +539,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setServiceProfilePaneWidth: (width) =>
     set({ serviceProfilePaneWidth: Math.min(440, Math.max(300, Math.round(width))) }),
   setMessageProfileVisible: (messageProfileVisible) => set({ messageProfileVisible }),
+  setMessageLayoutMode: (messageLayoutMode) =>
+    set((state) =>
+      state.messageLayoutMode === messageLayoutMode ? state : { messageLayoutMode },
+    ),
   setFilter: (filter) => set({ filter }),
   setMessageFilter: (messageFilter) => set({ messageFilter }),
   setContactFilter: (contactFilter) => set({ contactFilter }),

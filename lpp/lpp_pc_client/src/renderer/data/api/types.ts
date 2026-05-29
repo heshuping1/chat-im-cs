@@ -229,6 +229,24 @@ export interface ConversationListItem {
   conversationType: "direct" | "group" | "temp_session" | string;
   title: string;
   avatarUrl?: string | null;
+  groupAvatarUrl?: string | null;
+  groupIconUrl?: string | null;
+  iconUrl?: string | null;
+  memberAvatarUrls?: string[];
+  memberAvatars?: string[];
+  avatarVisible?: boolean | null;
+  memberAvatarVisible?: boolean | null;
+  canViewMemberAvatars?: boolean | null;
+  memberListVisible?: boolean | null;
+  canViewMemberList?: boolean | null;
+  membersVisible?: boolean | null;
+  members?: Array<{
+    avatarUrl?: string | null;
+    displayName?: string | null;
+    role?: string | null;
+    memberRole?: string | null;
+    joinedAt?: string | null;
+  }>;
   lastMessage?: {
     messageId?: string;
     messageType?: string;
@@ -256,6 +274,10 @@ export interface ConversationListItem {
   isMuted?: boolean;
   peerUserId?: string | null;
   peerLppId?: string | null;
+  peerLppNo?: string | null;
+  peerLppNumber?: string | null;
+  peerUserNo?: string | number | null;
+  peerDisplayName?: string | null;
   peerPhoneMasked?: string | null;
   peerEmailMasked?: string | null;
   peerUserType?: number | null;
@@ -282,6 +304,9 @@ export interface FriendDto {
   groupName?: string | null;
   createdAt?: string;
   userType?: number;
+  lppId?: string;
+  lppNo?: string;
+  lppNumber?: string;
 }
 
 export interface FriendRequestDto {
@@ -338,11 +363,23 @@ export interface DepartmentMemberDto {
 }
 
 export interface DirectChatCreatedDto {
+  conversationId?: string;
   chatId: string;
+  id?: string;
   peerUserId: string;
   peerDisplayName: string;
   peerAvatarUrl?: string | null;
   isNew?: boolean;
+}
+
+export interface GroupChatCreatedDto {
+  conversationId?: string;
+  chatId?: string;
+  groupId?: string;
+  id?: string;
+  title?: string;
+  name?: string;
+  memberCount?: number;
 }
 
 export interface MediaResourceDto {
@@ -595,12 +632,34 @@ export interface StaffReceptionStatusDto {
 
 export interface CustomerProfileCard {
   customerUserId?: string;
+  customerId?: string;
+  userId?: string;
+  platformUserId?: string;
+  lppId?: string;
+  lppNo?: string;
+  lppNumber?: string;
+  userNo?: string | number;
+  customerLppId?: string;
+  customerLppNo?: string;
+  greenBubbleId?: string;
+  greenBubbleNo?: string;
   displayName?: string;
+  customerName?: string;
+  customerDisplayName?: string;
+  nickname?: string;
   avatarUrl?: string;
   isVip?: boolean;
   customerLevel?: string;
+  level?: string;
+  grade?: string;
+  rank?: string;
   kycStatus?: string;
+  kyc?: string;
+  kycLevel?: string;
+  complianceStatus?: string;
   riskLevel?: string;
+  risk?: string;
+  riskStatus?: string;
   accountBalance?: string | number;
   totalDeposit?: string | number;
   netDeposit?: string | number;
@@ -614,7 +673,11 @@ export interface CustomerProfileCard {
   provider?: string;
   tags?: string[];
   phoneMasked?: string;
+  mobileMasked?: string;
+  mobile?: string;
+  phone?: string;
   emailMasked?: string;
+  email?: string;
   country?: string;
   lastActiveAt?: string;
   assignedAgentName?: string;

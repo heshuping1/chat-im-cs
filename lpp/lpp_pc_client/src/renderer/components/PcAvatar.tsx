@@ -24,7 +24,7 @@ export function PcAvatar({
 }) {
   return (
     <span {...spanProps} className={`pc-avatar ${kind} ${className}`.trim()}>
-      {kind === "group" ? (
+      {kind === "group" && !avatarUrl ? (
         <UsersRound size={iconSize} />
       ) : (
         <PcAvatarImage avatarUrl={avatarUrl} name={name} />
@@ -66,6 +66,15 @@ function PcAvatarImage({
     setSrc("");
     setFailed(!avatarUrl);
     if (!avatarUrl) {
+      return () => {
+        active = false;
+        objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+      };
+    }
+
+    if (/^(blob:|data:)/i.test(avatarUrl)) {
+      setSrc(avatarUrl);
+      setFailed(false);
       return () => {
         active = false;
         objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));

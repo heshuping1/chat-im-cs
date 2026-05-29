@@ -11,7 +11,6 @@ import {
   X,
 } from "lucide-react";
 import type {
-  KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   MutableRefObject,
   PointerEvent as ReactPointerEvent,
@@ -29,9 +28,24 @@ import {
   type LexicalChatInputHandle,
   type LexicalPendingAttachment,
 } from "./LexicalChatInput";
+import {
+  detectComposerMediaKind,
+  type ComposerMediaKind,
+} from "../composer/domain/detectComposerMediaKind";
+import {
+  composerFileAttachmentVisual,
+  composerMediaKindLabel,
+  formatComposerFileSize,
+} from "../composer/presentation/composerAttachmentPresentation";
+import {
+  isScreenshotCancelError,
+  matchesScreenshotShortcut,
+  screenshotDataUrlToFile,
+  type ScreenshotShortcut,
+} from "../composer/runtime/composerScreenshot";
+import { sendComposerPartsInOrder } from "../media/runtime/sendQueue";
 
-export type ComposerMediaKind = "image" | "video" | "file";
-export type ScreenshotShortcut = "Alt+A" | "Ctrl+Alt+A" | "Ctrl+Shift+A" | "None";
+export type { ScreenshotShortcut };
 
 interface PendingAttachment {
   id: string;
@@ -41,10 +55,6 @@ interface PendingAttachment {
   status?: "ready" | "failed";
   error?: string;
 }
-
-type ComposerPart =
-  | { id: string; type: "text"; text: string }
-  | { id: string; type: "attachment"; attachmentId: string };
 
 export function MessageComposer({
   placeholder,
@@ -97,12 +107,10 @@ export function MessageComposer({
   const [lexicalAttachmentsByScope, setLexicalAttachmentsByScope] = useState<
     Record<string, LexicalPendingAttachment[]>
   >({});
-  const [partsByScope, setPartsByScope] = useState<Record<string, ComposerPart[]>>({});
   const [richHasText, setRichHasText] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<PendingAttachment | null>(
     null,
   );
-  const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [recentEmojis, setRecentEmojis] = useState<WechatEmojiItem[]>([]);
@@ -115,20 +123,15 @@ export function MessageComposer({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const richEditorRef = useRef<HTMLDivElement | null>(null);
   const lexicalInputRef = useRef<LexicalChatInputHandle | null>(null);
   const composerRef = useRef<HTMLElement | null>(null);
   const previewUrlsRef = useRef<string[]>([]);
-  const activeTextPartIdRef = useRef<string | null>(null);
 
   const draft = draftValue ?? internalDraft;
   const attachmentScope = attachmentScopeKey || "__default__";
   const attachments = attachmentsByScope[attachmentScope] ?? [];
   const lexicalAttachments = lexicalAttachmentsByScope[attachmentScope] ?? [];
   const compactComposer = attachmentUi === "compact";
-  const richParts = partsByScope[attachmentScope] ?? [
-    { id: `${attachmentScope}-text-root`, type: "text", text: draft },
-  ];
   const mentionMatch = /(?:^|\s)@([^\s@]*)$/.exec(
     draft.slice(0, textareaRef.current?.selectionStart ?? draft.length),
   );
@@ -159,32 +162,6 @@ export function MessageComposer({
     setLexicalAttachmentsByScope((current) => ({
       ...current,
       [attachmentScope]: updater(current[attachmentScope] ?? []),
-    }));
-  };
-
-  const getSyncedRichParts = () =>
-    compactComposer
-      ? readRichPartsFromEditor(richEditorRef.current, richParts)
-      : richParts;
-
-  const syncRichDraftState = () => {
-    const nextParts = getSyncedRichParts();
-    const text = richTextFromParts(nextParts);
-    const preview = richPreviewFromParts(nextParts, attachments);
-    setPartsByScope((current) => ({
-      ...current,
-      [attachmentScope]: nextParts,
-    }));
-    setRichHasText(text.trim().length > 0);
-    updateDraft(text);
-    onDraftPreviewChange?.(preview);
-    return { nextParts, text, preview };
-  };
-
-  const updateRichParts = (updater: (current: ComposerPart[]) => ComposerPart[]) => {
-    setPartsByScope((current) => ({
-      ...current,
-      [attachmentScope]: ensureTrailingTextPart(updater(getSyncedRichParts())),
     }));
   };
 
@@ -219,12 +196,7 @@ export function MessageComposer({
 
   useEffect(() => {
     setPreviewAttachment(null);
-    setSelectedAttachmentId(null);
-    setRichHasText(
-      compactComposer
-        ? draft.trim().length > 0
-        : richTextFromParts(richParts).trim().length > 0,
-    );
+    setRichHasText(draft.trim().length > 0);
   }, [attachmentScope]);
 
   useEffect(() => {
@@ -254,16 +226,15 @@ export function MessageComposer({
     });
     updateAttachments(() => []);
     focusComposerInput(textareaRef);
-    try {
-      if (content) {
-        void Promise.resolve(onSendText(content)).catch((err) => setError(formatError(err)));
-      }
-      for (const item of queued) {
-        void Promise.resolve(onSendMedia(item.file, item.kind)).catch((err) => setError(formatError(err)));
-      }
-    } catch (err) {
-      setError(formatError(err));
-    }
+    await sendComposerPartsInOrder<PendingAttachment>({
+      parts: [
+        ...(content ? [{ type: "text" as const, text: content }] : []),
+        ...queued.map((attachment) => ({ type: "attachment" as const, attachment })),
+      ],
+      sendText: onSendText,
+      sendAttachment: (item) => onSendMedia(item.file, item.kind),
+      onFailure: ({ error: err }) => setError(formatError(err)),
+    });
   };
 
   const sendRichDraft = async () => {
@@ -280,30 +251,25 @@ export function MessageComposer({
     onDraftEditorStateChange?.("");
     onDraftPreviewChange?.("");
     setRichHasText(false);
-    setSelectedAttachmentId(null);
-    focusComposerInput(textareaRef, richEditorRef, compactComposer, lexicalInputRef);
+    focusComposerInput(textareaRef, compactComposer, lexicalInputRef);
     try {
-      for (const part of sendableParts) {
-        if (part.type === "text") {
-          void Promise.resolve(onSendText(part.text)).catch((err) => setError(formatError(err)));
-          continue;
-        }
-        const item = part.attachment;
-        void Promise.resolve(onSendMedia(item.file, item.kind)).catch((err) => setError(formatError(err)));
-      }
-    } catch (err) {
-      setError(formatError(err));
+      await sendComposerPartsInOrder<LexicalPendingAttachment>({
+        parts: sendableParts,
+        sendText: onSendText,
+        sendAttachment: (item) => onSendMedia(item.file, item.kind),
+        onFailure: ({ error: err }) => setError(formatError(err)),
+      });
     } finally {
       attachmentPreviewUrls.forEach((previewUrl) => revokePreviewUrl(previewUrl, previewUrlsRef));
-      focusComposerInput(textareaRef, richEditorRef, compactComposer, lexicalInputRef);
+      focusComposerInput(textareaRef, compactComposer, lexicalInputRef);
     }
   };
 
-  const addFiles = (fileList: FileList | File[]) => {
+  const addFiles = async (fileList: FileList | File[]) => {
     if (disabled) return;
     setError(null);
-    const nextItems = Array.from(fileList).map((file) => {
-      const kind = composerMediaKindFromFile(file);
+    const nextItems = await Promise.all(Array.from(fileList).map(async (file) => {
+      const kind = await detectComposerMediaKind(file);
       const previewUrl =
         kind === "image" || kind === "video" ? URL.createObjectURL(file) : undefined;
       if (previewUrl) previewUrlsRef.current.push(previewUrl);
@@ -314,16 +280,14 @@ export function MessageComposer({
         previewUrl,
         status: "ready" as const,
       };
-    });
+    }));
     if (compactComposer) {
       updateLexicalAttachments((current) => [...current, ...nextItems]);
       lexicalInputRef.current?.insertAttachments(nextItems);
-      setSelectedAttachmentId(nextItems.at(-1)?.id ?? null);
       setMoreOpen(false);
       return;
     }
     updateAttachments((current) => [...current, ...nextItems]);
-    setSelectedAttachmentId(nextItems.at(-1)?.id ?? null);
     setMoreOpen(false);
   };
 
@@ -336,10 +300,10 @@ export function MessageComposer({
         return;
       }
       const result = await window.desktopApi.captureScreenshot();
-      addFiles([dataUrlToFile(result.dataUrl, result.fileName || "截图.png")]);
+      addFiles([screenshotDataUrlToFile(result.dataUrl, result.fileName || "截图.png")]);
     } catch (err) {
       const message = formatError(err);
-      if (message.includes("已取消截图")) return;
+      if (isScreenshotCancelError(message)) return;
       setError(message);
     }
   };
@@ -348,26 +312,8 @@ export function MessageComposer({
     updateAttachments((current) =>
       current.filter((attachment) => attachment.id !== item.id),
     );
-    if (compactComposer) {
-      const nextParts = ensureTrailingTextPart(
-        getSyncedRichParts().filter(
-          (part) => part.type !== "attachment" || part.attachmentId !== item.id,
-        ),
-      );
-      setPartsByScope((current) => ({
-        ...current,
-        [attachmentScope]: nextParts,
-      }));
-      setRichHasText(richTextFromParts(nextParts).trim().length > 0);
-      updateDraft(richTextFromParts(nextParts));
-      onDraftPreviewChange?.(richPreviewFromParts(
-        nextParts,
-        attachments.filter((attachment) => attachment.id !== item.id),
-      ));
-    }
     if (item.previewUrl) revokePreviewUrl(item.previewUrl, previewUrlsRef);
     if (previewAttachment?.id === item.id) setPreviewAttachment(null);
-    if (selectedAttachmentId === item.id) setSelectedAttachmentId(null);
   };
 
   const removeLexicalAttachment = (attachmentId: string) => {
@@ -377,25 +323,6 @@ export function MessageComposer({
       return current.filter((item) => item.id !== attachmentId);
     });
     if (previewAttachment?.id === attachmentId) setPreviewAttachment(null);
-    if (selectedAttachmentId === attachmentId) setSelectedAttachmentId(null);
-  };
-
-  const removeSelectedOrLastAttachment = () => {
-    const target =
-      attachments.find((item) => item.id === selectedAttachmentId) ??
-      attachments.at(-1);
-    if (!target) return false;
-    removeAttachment(target);
-    return true;
-  };
-
-  const handleAttachmentKeyDown = (
-    event: ReactKeyboardEvent<HTMLElement>,
-    item: PendingAttachment,
-  ) => {
-    if (event.key !== "Delete" && event.key !== "Backspace") return;
-    event.preventDefault();
-    removeAttachment(item);
   };
 
   const insertEmoji = (item: WechatEmojiItem) => {
@@ -661,17 +588,17 @@ export function MessageComposer({
                 <img src={item.previewUrl} alt={item.file.name || "待发送图片"} />
               ) : (
                 <span
-                  className={`composer-attachment-icon ${fileAttachmentVisual(item.file.name).kind}`}
+                  className={`composer-attachment-icon ${composerFileAttachmentVisual(item.file.name).kind}`}
                   aria-hidden="true"
                 >
                   <span className="file-type-glyph">
-                    {fileAttachmentVisual(item.file.name).label}
+                    {composerFileAttachmentVisual(item.file.name).label}
                   </span>
                 </span>
               )}
               <span>
                 <strong>{item.file.name || composerMediaKindLabel(item.kind)}</strong>
-                <small>{formatFileSize(item.file.size)}</small>
+                <small>{formatComposerFileSize(item.file.size)}</small>
               </span>
               <button
                 type="button"
@@ -706,56 +633,7 @@ export function MessageComposer({
           </button>
         </div>
       )}
-      {compactComposer && lexicalAttachments.length > 0 && (
-        <div className="composer-top-attachments" aria-label="待发送附件">
-          {lexicalAttachments.map((item) => (
-            <article className={`composer-top-attachment ${item.kind}`} key={item.id}>
-              {item.kind === "image" && item.previewUrl ? (
-                <button
-                  className="composer-top-attachment-thumb"
-                  type="button"
-                  aria-label={`预览待发送图片 ${item.file.name}`}
-                  onClick={() => setPreviewAttachment(item)}
-                >
-                  <img src={item.previewUrl} alt={item.file.name || "待发送图片"} />
-                </button>
-              ) : (
-                <>
-                  <span className="composer-top-attachment-copy">
-                    <strong>{item.file.name || "文件"}</strong>
-                    <small>{item.error || formatFileSize(item.file.size)}</small>
-                  </span>
-                  <span
-                    className={`composer-top-attachment-icon ${
-                      fileAttachmentVisual(item.file.name).kind
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <span className="file-type-glyph">
-                      {fileAttachmentVisual(item.file.name).label}
-                    </span>
-                  </span>
-                </>
-              )}
-              <button
-                className="composer-top-attachment-remove"
-                type="button"
-                aria-label={`移除 ${item.file.name || "附件"}`}
-                onClick={() => removeLexicalAttachment(item.id)}
-              >
-                <X size={12} />
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
-      <div
-        className={`${dense ? "h-input-row" : "composer-input"} ${
-          compactComposer && lexicalAttachments.length > 0
-            ? "has-rich-attachments"
-            : ""
-        }`}
-      >
+      <div className={dense ? "h-input-row" : "composer-input"}>
         {compactComposer ? (
           <LexicalChatInput
             key={attachmentScope}
@@ -812,15 +690,6 @@ export function MessageComposer({
               }
             }}
             onKeyDown={(event) => {
-              if (
-                (event.key === "Delete" || event.key === "Backspace") &&
-                !draft &&
-                attachments.length > 0
-              ) {
-                event.preventDefault();
-                removeSelectedOrLastAttachment();
-                return;
-              }
               if (event.key !== "Enter" || event.shiftKey) return;
               if (!event.ctrlKey && !event.metaKey && !event.altKey) {
                 event.preventDefault();
@@ -857,18 +726,6 @@ export function MessageComposer({
   );
 }
 
-function composerMediaKindFromFile(file: File): ComposerMediaKind {
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type.startsWith("video/")) return "video";
-  return "file";
-}
-
-function composerMediaKindLabel(kind: ComposerMediaKind) {
-  if (kind === "image") return "图片";
-  if (kind === "video") return "视频";
-  return "文件";
-}
-
 function renderComposerExtraTools({
   extraTools,
   disabled,
@@ -897,58 +754,6 @@ function renderComposerExtraTools({
   });
 }
 
-function formatFileSize(size: number) {
-  if (!Number.isFinite(size) || size <= 0) return "";
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function fileAttachmentVisual(fileName: string) {
-  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (["mp4", "mov", "m4v", "webm", "avi", "mkv"].includes(extension)) {
-    return { kind: "video", label: "▶" };
-  }
-  if (["zip", "rar", "7z", "tar", "gz"].includes(extension)) {
-    return { kind: "archive", label: "ZIP" };
-  }
-  if (["xls", "xlsx", "csv"].includes(extension)) return { kind: "sheet", label: "X" };
-  if (extension === "pdf") return { kind: "pdf", label: "PDF" };
-  if (["doc", "docx"].includes(extension)) return { kind: "word", label: "W" };
-  if (["ppt", "pptx"].includes(extension)) return { kind: "slide", label: "P" };
-  if (["txt", "log", "md"].includes(extension)) return { kind: "document", label: "TXT" };
-  return { kind: "document", label: extension ? extension.slice(0, 3).toUpperCase() : "DOC" };
-}
-
-function dataUrlToFile(dataUrl: string, fileName: string) {
-  const [meta = "", data = ""] = dataUrl.split(",");
-  const mime = /data:([^;]+);base64/i.exec(meta)?.[1] ?? "image/png";
-  const binary = atob(data);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new File([bytes], fileName, { type: mime });
-}
-
-function matchesScreenshotShortcut(
-  event: KeyboardEvent,
-  shortcut: ScreenshotShortcut,
-) {
-  const key = event.key.toLowerCase();
-  const ctrl = event.ctrlKey || event.metaKey;
-  if (shortcut === "Alt+A") {
-    return key === "a" && event.altKey && !ctrl && !event.shiftKey;
-  }
-  if (shortcut === "Ctrl+Alt+A") {
-    return key === "a" && ctrl && event.altKey && !event.shiftKey;
-  }
-  if (shortcut === "Ctrl+Shift+A") {
-    return key === "a" && ctrl && event.shiftKey && !event.altKey;
-  }
-  return false;
-}
-
 function revokePreviewUrl(
   url: string,
   ref: MutableRefObject<string[]>,
@@ -957,221 +762,8 @@ function revokePreviewUrl(
   ref.current = ref.current.filter((item) => item !== url);
 }
 
-function ensureTrailingTextPart(parts: ComposerPart[]) {
-  const normalized: ComposerPart[] = [];
-  for (const part of parts) {
-    if (part.type === "text") {
-      const previous = normalized.at(-1);
-      if (previous?.type === "text") {
-        previous.text += part.text;
-      } else {
-        normalized.push(part);
-      }
-      continue;
-    }
-    normalized.push(part);
-  }
-  if (normalized.length === 0 || normalized.at(-1)?.type !== "text") {
-    normalized.push({
-      id: `composer-text-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      type: "text",
-      text: "",
-    });
-  }
-  return normalized;
-}
-
-function richTextFromParts(parts: ComposerPart[]) {
-  return parts
-    .filter((part): part is Extract<ComposerPart, { type: "text" }> => part.type === "text")
-    .map((part) => part.text)
-    .join("");
-}
-
-function richPreviewFromParts(parts: ComposerPart[], attachments: PendingAttachment[]) {
-  return parts
-    .map((part) => {
-      if (part.type === "text") return part.text;
-      const attachment = attachments.find((item) => item.id === part.attachmentId);
-      return attachment?.kind === "file" ? "[文件]" : "[图片]";
-    })
-    .join("")
-    .trim();
-}
-
-function readRichPartsFromEditor(
-  editor: HTMLDivElement | null,
-  fallback: ComposerPart[],
-) {
-  if (!editor) return ensureTrailingTextPart(fallback);
-  const childNodes = Array.from(editor.childNodes);
-  const markedNodes = Array.from(
-    editor.querySelectorAll<HTMLElement>("[data-composer-part]"),
-  );
-  if (childNodes.length === 0 || markedNodes.length === 0) {
-    const fallbackTextPart = fallback.find(
-      (part): part is Extract<ComposerPart, { type: "text" }> => part.type === "text",
-    );
-    return ensureTrailingTextPart([
-      {
-        id: fallbackTextPart?.id ?? `composer-text-${Date.now()}`,
-        type: "text",
-        text: editor.textContent ?? "",
-      },
-    ]);
-  }
-  const fallbackTextIds = fallback
-    .filter((part): part is Extract<ComposerPart, { type: "text" }> => part.type === "text")
-    .map((part) => part.id);
-  let textIndex = 0;
-  const parts = childNodes.flatMap((node): ComposerPart[] => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent ?? "";
-      return text
-        ? [
-            {
-              id:
-                fallbackTextIds[textIndex++] ??
-                `composer-text-${Date.now()}-${textIndex}`,
-              type: "text",
-              text,
-            },
-          ]
-        : [];
-    }
-    if (!(node instanceof HTMLElement)) return [];
-    if (node.dataset.composerPart === "attachment") {
-      const attachmentId = node.dataset.attachmentId;
-      return attachmentId
-        ? [{ id: `part-${attachmentId}`, type: "attachment", attachmentId }]
-        : [];
-    }
-    if (node.dataset.composerPart !== "text") {
-      const text = node.textContent ?? "";
-      return text
-        ? [
-            {
-              id:
-                fallbackTextIds[textIndex++] ??
-                `composer-text-${Date.now()}-${textIndex}`,
-              type: "text",
-              text,
-            },
-          ]
-        : [];
-    }
-    const fallbackPart = fallback.find(
-      (part) => part.type === "text" && part.id === node.dataset.textPartId,
-    );
-    textIndex += 1;
-    return [
-      {
-        id:
-          node.dataset.textPartId ||
-          fallbackPart?.id ||
-          `composer-text-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        type: "text",
-        text: node.textContent ?? "",
-      },
-    ];
-  });
-  return ensureTrailingTextPart(parts);
-}
-
-function getCaretOffsetInTextPart(
-  editor: HTMLDivElement | null,
-  partId: string,
-  options: { coerceZeroToEnd?: boolean } = { coerceZeroToEnd: true },
-) {
-  const textNode = queryTextPart(editor, partId);
-  if (!textNode) return editor?.textContent?.length ?? 0;
-  const textLength = textNode.textContent?.length ?? 0;
-  const activeElement = document.activeElement;
-  if (activeElement !== textNode && !textNode.contains(activeElement)) {
-    return textLength;
-  }
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return textLength;
-  const range = selection.getRangeAt(0);
-  if (!textNode.contains(range.startContainer)) return textLength;
-  const before = range.cloneRange();
-  before.selectNodeContents(textNode);
-  before.setEnd(range.startContainer, range.startOffset);
-  const offset = before.toString().length;
-  return options.coerceZeroToEnd && offset === 0 && textLength > 0 ? textLength : offset;
-}
-
-function findAdjacentAttachmentAtCaret(
-  editor: HTMLDivElement | null,
-  parts: ComposerPart[],
-  key: "Backspace" | "Delete",
-) {
-  if (!editor) return undefined;
-  const activeText = parts.find(
-    (part): part is Extract<ComposerPart, { type: "text" }> =>
-      part.type === "text" &&
-      document.activeElement === queryTextPart(editor, part.id),
-  );
-  if (!activeText) return undefined;
-  const offset = getCaretOffsetInTextPart(editor, activeText.id, {
-    coerceZeroToEnd: false,
-  });
-  const partIndex = parts.findIndex((part) => part.id === activeText.id);
-  if (key === "Backspace" && offset === 0) {
-    const previous = parts[partIndex - 1];
-    return previous?.type === "attachment" ? previous : undefined;
-  }
-  if (key === "Delete" && offset >= activeText.text.length) {
-    const next = parts[partIndex + 1];
-    return next?.type === "attachment" ? next : undefined;
-  }
-  return undefined;
-}
-
-function focusTextPart(editor: HTMLDivElement | null, partId?: string) {
-  if (!editor) return;
-  const target =
-    (partId ? queryTextPart(editor, partId) : null) ??
-    editor.querySelector<HTMLElement>("[data-composer-part='text']");
-  if (!target) return;
-  target.focus();
-  const range = document.createRange();
-  range.selectNodeContents(target);
-  range.collapse(false);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function insertTextIntoRichEditor(editor: HTMLDivElement | null, text: string) {
-  if (!editor) return;
-  editor.focus();
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) {
-    focusTextPart(editor);
-  }
-  const activeSelection = window.getSelection();
-  if (!activeSelection || activeSelection.rangeCount === 0) return;
-  activeSelection.deleteFromDocument();
-  activeSelection.getRangeAt(0).insertNode(document.createTextNode(text));
-  activeSelection.collapseToEnd();
-  editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
-}
-
-function queryTextPart(editor: HTMLDivElement | null, partId: string) {
-  if (!editor) return null;
-  return editor.querySelector<HTMLElement>(
-    `[data-text-part-id="${cssEscape(partId)}"]`,
-  );
-}
-
-function cssEscape(value: string) {
-  return globalThis.CSS?.escape ? globalThis.CSS.escape(value) : value.replace(/"/g, '\\"');
-}
-
 function focusComposerInput(
   ref: MutableRefObject<HTMLTextAreaElement | null>,
-  richRef?: MutableRefObject<HTMLDivElement | null>,
   compact = false,
   lexicalRef?: MutableRefObject<LexicalChatInputHandle | null>,
 ) {
@@ -1179,11 +771,6 @@ function focusComposerInput(
     if (compact && lexicalRef?.current) {
       lexicalRef.current.focus();
       window.setTimeout(() => lexicalRef.current?.focus(), 0);
-      return;
-    }
-    if (compact && richRef?.current) {
-      focusTextPart(richRef.current);
-      window.setTimeout(() => focusTextPart(richRef.current), 0);
       return;
     }
     ref.current?.focus();

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { ConversationListItem, CustomerProfileCard } from "../data/api-client";
 import type { ContactItem } from "../data/types";
 import { formatChatTime } from "../lib/format";
@@ -100,7 +101,12 @@ export function CustomerProfileWorkspace({
       </section>
 
       {loading && <PanelState text="正在加载客户资料..." />}
-      {Boolean(error) && <PanelState tone="error" text="客户资料暂不可用" />}
+      {Boolean(error) && (
+        <PanelState
+          tone="error"
+          text="客户资料暂不可用，已展示会话和通讯录中的基础信息。"
+        />
+      )}
 
       <section className="customer-profile-scorebar">
         <Metric label="账户余额" value={model.accountBalance} />
@@ -148,9 +154,7 @@ export function CustomerProfileWorkspace({
         </nav>
       </section>
 
-      <section className="customer-profile-content">
-        {renderTab(activeTab, model)}
-      </section>
+      <section className="customer-profile-content">{renderTab(activeTab, model)}</section>
     </aside>
   );
 }
@@ -163,7 +167,7 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
           <InfoGrid
             rows={[
               ["客户 ID", model.customerId],
-              ["LPP 号", model.lppId],
+              ["绿泡泡号", model.lppId],
               ["姓名", model.name],
               ["客户等级", model.level],
               ["来源", model.source],
@@ -202,7 +206,7 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
             ]}
           />
         </PanelBlock>
-        <PanelBlock title="语言桥" icon={<Languages size={16} />}>
+        <PanelBlock title="语言" icon={<Languages size={16} />}>
           <InfoGrid
             rows={[
               ["客户接收", model.customerLanguage],
@@ -234,10 +238,7 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
             ]}
           />
         </PanelBlock>
-        <ExternalSectionList
-          empty="暂无交易明细"
-          sections={model.sections.trading}
-        />
+        <ExternalSectionList empty="暂无交易明细" sections={model.sections.trading} />
         <PanelBlock title="临时订单" icon={<ReceiptText size={16} />}>
           <ItemList
             empty="暂无临时订单"
@@ -361,8 +362,8 @@ function PanelBlock({
   icon,
   title,
 }: {
-  children: React.ReactNode;
-  icon: React.ReactNode;
+  children: ReactNode;
+  icon: ReactNode;
   title: string;
 }) {
   return (
@@ -515,6 +516,32 @@ function buildCustomerModel({
   const categorizedExternal = categorizeSections(external);
   const profileSource = sourceLabel(profile);
   const source = isKnown(profileSource) ? profileSource : contact?.source || "--";
+  const lppId = firstKnownValue(
+    profileValue(profile, [
+      "lppId",
+      "lppNo",
+      "lppNumber",
+      "customerLppId",
+      "customerLppNo",
+      "greenBubbleId",
+      "greenBubbleNo",
+      "userNo",
+    ]),
+    conversation?.peerLppId,
+    conversation?.peerLppNo,
+    conversation?.peerLppNumber,
+    conversation?.peerUserNo,
+    contact?.lppId,
+    valueAt(external, ["identity", "profile", "customer", "客户", "核心身份"], [
+      "绿泡泡号",
+      "lppId",
+      "lppNo",
+      "lppNumber",
+      "customerLppId",
+      "greenBubbleId",
+      "userNo",
+    ]),
+  );
   return {
     accountBalance: textValue(profile?.accountBalance),
     accountStatus: textValue(profile?.accountStatus ?? tradingSummary.accountStatus),
@@ -531,12 +558,12 @@ function buildCustomerModel({
     commissionRate: textValue(valueAt(external, ["ib", "agent", "代理"], ["佣金比例", "commissionRate"])),
     complianceNote: textValue(valueAt(external, ["kyc", "compliance", "合规"], ["备注", "note"])),
     country: textValue(profile?.country),
-    customerId: textValue(profile?.customerUserId ?? conversation?.peerUserId ?? contact?.userId ?? contact?.id),
-    customerLanguage: textValue(profileValue(profile, ["customerLanguage", "receiveLanguage"]) ?? profile?.language),
-    emailMasked: textValue(profile?.emailMasked ?? conversation?.peerEmailMasked),
-    id: profile?.customerUserId || conversation?.peerUserId || contact?.userId || contact?.id || conversation?.conversationId || "customer",
-    kyc: textValue(profile?.kycStatus),
-    language: textValue(profile?.language),
+    customerId: textValue(firstKnownValue(profile?.customerUserId, profile?.customerId, profile?.userId, conversation?.peerUserId, contact?.userId, contact?.id)),
+    customerLanguage: textValue(profileValue(profile, ["customerLanguage", "receiveLanguage", "preferredLanguage"]) ?? profile?.language),
+    emailMasked: textValue(firstKnownValue(profile?.emailMasked, profile?.email, conversation?.peerEmailMasked)),
+    id: String(firstKnownValue(profile?.customerUserId, profile?.customerId, profile?.userId, conversation?.peerUserId, contact?.userId, contact?.id, conversation?.conversationId) ?? "customer"),
+    kyc: textValue(firstKnownValue(profile?.kycStatus, profile?.kyc, profile?.kycLevel, profile?.complianceStatus, valueAt(external, ["kyc", "compliance", "合规"], ["状态", "status", "kycStatus", "kyc"]))),
+    language: textValue(profileValue(profile, ["language", "customerLanguage", "preferredLanguage"])),
     lastActive: shortDate(profile?.lastActiveAt ?? contact?.lastMessageAt),
     lastDevice: textValue(valueAt(external, ["device", "设备"], ["设备", "device", "name"])),
     lastIp: textValue(valueAt(external, ["device", "设备"], ["IP", "ip", "lastIp"])),
@@ -544,18 +571,18 @@ function buildCustomerModel({
     lastMessageTime: formatChatTime(conversation?.lastMessage?.sentAt),
     latestFundTime: shortDate(valueAt(external, ["fund", "资金", "cash"], ["最近时间", "updatedAt", "createdAt"])),
     latestTouchChannel: textValue(valueAt(external, ["touch", "触达", "marketing"], ["渠道", "channel"])),
-    level: textValue(profile?.customerLevel || (profile?.isVip ? "VIP" : undefined)),
+    level: textValue(firstKnownValue(profile?.customerLevel, profile?.level, profile?.grade, profile?.rank, profile?.isVip ? "VIP" : undefined)),
     marketingConsent: textValue(valueAt(external, ["marketing", "consent", "营销"], ["同意", "consent"])),
-    name: profile?.displayName || contact?.name || conversation?.title || "--",
+    name: textValue(firstKnownValue(profile?.displayName, profile?.customerDisplayName, profile?.customerName, profile?.nickname, contact?.name, conversation?.peerDisplayName, conversation?.title)),
     netDeposit: textValue(profile?.netDeposit),
     nextFollowUp: textValue(valueAt(external, ["touch", "触达", "marketing"], ["下次跟进", "nextFollowUp"])),
-    lppId: textValue(conversation?.peerLppId ?? profileValue(profile, ["lppId", "lppNo", "lppNumber"])),
-    phoneMasked: textValue(profile?.phoneMasked ?? conversation?.peerPhoneMasked),
+    lppId: textValue(lppId),
+    phoneMasked: textValue(firstKnownValue(profile?.phoneMasked, profile?.mobileMasked, profile?.mobile, profile?.phone, conversation?.peerPhoneMasked)),
     profileVisibility: textValue(profileValue(profile, ["profileVisibility"])),
     recentTradeTime: shortDate(tradingSummary.recentTradeTime ?? tradingSummary.lastTradeAt),
     registeredAt: shortDate(profile?.registeredAt ?? tradingSummary.registeredAt),
     remoteLoginAlert: textValue(valueAt(external, ["device", "security", "设备"], ["异地登录提醒", "remoteLoginAlert"])),
-    risk: textValue(profile?.riskLevel),
+    risk: textValue(firstKnownValue(profile?.riskLevel, profile?.risk, profile?.riskStatus, valueAt(external, ["risk", "kyc", "compliance", "风险", "合规"], ["风险", "risk", "riskLevel", "riskStatus"]))),
     sections: {
       trading: categorizedExternal.trading,
       funds: categorizedExternal.funds,
@@ -568,7 +595,7 @@ function buildCustomerModel({
     sessionCount: textValue(profile?.tabCounts?.sessions ?? profile?.tabCounts?.conversations),
     source,
     staffLanguage: textValue(profileValue(profile, ["staffLanguage", "viewLanguage"])),
-    tags: Array.from(new Set(tags)),
+    tags: Array.from(new Set(tags.map(textValue).filter(isKnown))),
     temporaryOrders: profile?.temporaryOrders ?? [],
     tickets: profile?.tickets ?? [],
     totalDeposit: textValue(profile?.totalDeposit),
@@ -656,9 +683,7 @@ function sectionToItems(section: ExternalSection) {
 
 function normalizeRecord(value: unknown): Array<[string, string]> {
   if (!value || typeof value !== "object") return [];
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => normalizeRecord(item));
-  }
+  if (Array.isArray(value)) return value.flatMap((item) => normalizeRecord(item));
   return Object.entries(value as Record<string, unknown>)
     .filter(([key]) => !["items", "fields", "type", "sectionType", "title"].includes(key))
     .map(([key, val]) => [fieldLabel(key), textValue(val)] as [string, string])
@@ -689,11 +714,13 @@ function profileValue(profile: CustomerProfileCard | undefined, keys: string[]) 
   if (!profile) return undefined;
   const record = profile as Record<string, unknown>;
   for (const key of keys) {
-    if (record[key] !== undefined && record[key] !== null && record[key] !== "") {
-      return record[key];
-    }
+    if (record[key] !== undefined && record[key] !== null && record[key] !== "") return record[key];
   }
   return undefined;
+}
+
+function firstKnownValue(...values: unknown[]) {
+  return values.find((value) => isKnown(textValue(value)));
 }
 
 function sourceLabel(profile?: CustomerProfileCard) {
@@ -724,11 +751,49 @@ function textValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "是" : "否";
   if (Array.isArray(value)) return value.map(textValue).filter(isKnown).join(" / ") || "--";
   if (typeof value === "object") return "--";
-  return String(value);
+  return enumLabel(String(value));
 }
 
 function isKnown(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "" && value !== "--";
+}
+
+function enumLabel(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const map: Record<string, string> = {
+    accepted: "已通过",
+    active: "活跃",
+    app: "自有 App",
+    blocked: "已拉黑",
+    busy: "忙碌",
+    closed: "已关闭",
+    disabled: "已禁用",
+    enabled: "已启用",
+    everyone: "所有人",
+    failed: "失败",
+    friends: "仅好友",
+    high: "高",
+    low: "低",
+    medium: "中",
+    mobile_app: "移动 App",
+    native: "自有 App",
+    no: "否",
+    nobody: "不允许",
+    offline: "离线",
+    online: "在线",
+    own_app: "自有 App",
+    pending: "待处理",
+    rejected: "已拒绝",
+    reviewed: "已审核",
+    success: "成功",
+    unknown: "未知",
+    unverified: "未认证",
+    verified: "已认证",
+    web: "网页",
+    website: "网页",
+    yes: "是",
+  };
+  return map[normalized] ?? value;
 }
 
 function fieldLabel(key: string) {
@@ -741,6 +806,7 @@ function fieldLabel(key: string) {
     status: "状态",
     symbol: "品种",
     totalDeposit: "累计入金",
+    type: "类型",
     updatedAt: "更新时间",
   };
   return map[key] ?? key;

@@ -26,20 +26,22 @@ export async function getCachedMedia(key: string) {
 }
 
 export async function refreshCachedMedia({
+  force = false,
   key,
   token,
   url,
 }: {
+  force?: boolean;
   key: string;
   token?: string | null;
   url: string;
 }) {
   const entry = await getMediaEntry(key);
   const now = Date.now();
-  if (entry?.updatedAt && now - entry.updatedAt < mediaRefreshIntervalMs) {
+  if (!force && entry?.updatedAt && now - entry.updatedAt < mediaRefreshIntervalMs) {
     return entry.blob;
   }
-  if (entry?.failedAt && now - entry.failedAt < mediaRetryIntervalMs) {
+  if (!force && entry?.failedAt && now - entry.failedAt < mediaRetryIntervalMs) {
     return entry.blob?.size ? entry.blob : null;
   }
 
@@ -77,7 +79,14 @@ export async function refreshCachedMedia({
 }
 
 async function fetchMediaBlob(url: string, token?: string | null) {
-  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+  const headers = token
+    ? {
+        Accept: "application/octet-stream,*/*",
+        Authorization: `Bearer ${token}`,
+        "X-Access-Token": token,
+        "X-Tenant-Token": token,
+      }
+    : undefined;
   const response = await fetch(url, { cache: "no-store", headers });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const blob = await response.blob();

@@ -14,6 +14,8 @@ import { ApiError } from './data/api-client';
 import { useWorkspaceStore } from './data/store';
 import './styles/theme.css';
 import './styles/app.css';
+import './styles/messages/context-menu.css';
+import './styles/messages/toast.css';
 
 const AiAssistantPage = lazy(() =>
   import('./components/AiAssistantPage').then((module) => ({
@@ -106,6 +108,7 @@ export default function App() {
   const messageProfileVisible = useWorkspaceStore(
     (state) => state.messageProfileVisible,
   );
+  const messageLayoutMode = useWorkspaceStore((state) => state.messageLayoutMode);
 
   useTransientScrollbars();
   useAppearanceSettings(pcSettings);
@@ -118,7 +121,7 @@ export default function App() {
         <div
           className={`app-shell ${
             activeModule === 'messages'
-                ? `messages-layout ${messageProfileVisible ? '' : 'profile-collapsed'}`
+                ? `messages-layout layout-${messageLayoutMode} ${messageProfileVisible ? '' : 'profile-collapsed'}`
               : 'page-layout'
           } ${pcSettings.highDensityContext ? 'is-density-compact' : ''} ${
             pcSettings.highContrastBoundary ? 'is-boundary-strong' : ''

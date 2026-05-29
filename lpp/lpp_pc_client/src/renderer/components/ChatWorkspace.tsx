@@ -15,8 +15,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { ChannelBadge, channelLabel as formatChannelLabel } from "./ChannelBadge";
 import { ChatMessageBubble } from "./ChatMessageBubble";
-import { MessageComposer, type ComposerMediaKind } from "./MessageComposer";
+import { MessageComposer } from "./MessageComposer";
 import { PcAvatar, avatarInitial } from "./PcAvatar";
+import type { ComposerMediaKind } from "../composer/domain/detectComposerMediaKind";
 import {
   isTerminalCustomerServiceThreadStatus,
   isTerminalCustomerServiceWriteError,
@@ -32,13 +33,29 @@ import {
   firstMessageMedia,
   mediaFileName,
   normalizeMessageType as normalizeImMessageType,
-  resolveMediaUrl as resolveNormalizedMediaUrl,
 } from "../data/im-message-normalize";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { useWorkspaceStore } from "../data/store";
 import { customerServiceHistoryStatusLabel } from "../data/customer-service-display";
-import { formatClockTime, formatError } from "../lib/format";
+import { formatChatMessageTime, formatError } from "../lib/format";
+import { prefetchImageMessages } from "../media/runtime/imagePrecache";
+import {
+  hasOpenableMessageMedia,
+  messageMediaActionPayload,
+  messageMediaFileName,
+  resolveMessageMediaUrl,
+} from "../media/domain/mediaMessage";
+import { withVideoPosterMedia } from "../media/runtime/videoPosterMedia";
+import {
+  copyDesktopImage,
+  copyDesktopMediaFile,
+  editDesktopMediaFile,
+  openDesktopMediaFile,
+  revealDesktopMediaInFolder,
+  revealInFolderLabel as desktopRevealInFolderLabel,
+  saveDesktopMediaAs,
+} from "../media/runtime/desktopMediaActions";
 import { startVerticalPaneResize } from "../lib/paneResize";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
 import {
@@ -63,6 +80,7 @@ type LocalServiceUploadTask = {
   body: Record<string, unknown>;
   localPreviewUrl?: string;
   videoPoster?: VideoPosterResult;
+  videoPosterPromise?: Promise<VideoPosterResult | undefined>;
   controller?: AbortController;
   controlState?: "paused" | "canceled";
 };
@@ -178,6 +196,20 @@ export function ChatWorkspace() {
   const replyGate = customerServiceReplyGate(status || selectedThread?.status);
   const canReply = !readOnly && replyGate === "open";
   const messages = detail?.messages ?? [];
+  useEffect(() => {
+    if (!session || !selectedThread || messages.length === 0) return;
+    prefetchImageMessages({
+      accountId:
+        session.userId ||
+        session.platformUserId ||
+        session.lppId ||
+        session.tenantId,
+      assetBaseUrl: session.apiBaseUrl,
+      authToken: session.tenantToken,
+      conversationId: selectedThread.threadId || selectedThread.conversationId,
+      messages,
+    });
+  }, [messages, selectedThread, session]);
   const {
     handleScroll: handleMessageStageScroll,
     jumpToLatest,
@@ -302,7 +334,7 @@ export function ChatWorkspace() {
             await copyMessageImage(url, session?.tenantToken, {
               accountId,
               conversationId,
-              fileName: mediaCacheFileName(message),
+              fileName: messageMediaFileName(message),
             });
             setNotice("图片已复制。");
           } else {
@@ -455,15 +487,21 @@ export function ChatWorkspace() {
             }),
             task.file,
           );
+          const videoPoster =
+            task.videoPoster ??
+            (task.kind === "video" && task.videoPosterPromise
+              ? await settleVideoPosterForSend(task.videoPosterPromise)
+              : undefined);
+          task.videoPoster = videoPoster;
           const uploadedPoster =
-            task.kind === "video" && task.videoPoster
+            task.kind === "video" && videoPoster
               ? await client
-                  .uploadMedia(task.videoPoster.file, "image", { signal: controller.signal })
-                  .then((posterMedia) => normalizeUploadedMedia(posterMedia, task.videoPoster!.file))
+                  .uploadMedia(videoPoster.file, "image", { signal: controller.signal })
+                  .then((posterMedia) => normalizeUploadedMedia(posterMedia, videoPoster.file))
                   .catch(() => undefined)
               : undefined;
-          const media = withVideoPosterMedia(uploadedMedia, task.videoPoster, uploadedPoster);
-          registerVideoPosterForMedia(media as Record<string, unknown>, task.videoPoster?.url);
+          const media = withVideoPosterMedia(uploadedMedia, videoPoster, uploadedPoster);
+          registerVideoPosterForMedia(media as Record<string, unknown>, videoPoster?.url);
           const result = await client.sendWorkbenchMediaMessage(
             task.thread.threadType,
             task.thread.threadId,
@@ -481,7 +519,7 @@ export function ChatWorkspace() {
                   ? {
                       ...media,
                       localPreviewUrl: task.localPreviewUrl,
-                      ...(task.videoPoster?.url ? { localPosterUrl: task.videoPoster.url } : {}),
+                      ...(videoPoster?.url ? { localPosterUrl: videoPoster.url } : {}),
                     }
                   : media,
             },
@@ -514,25 +552,19 @@ export function ChatWorkspace() {
       const localTaskId = `pc-cs-upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       const localPreviewUrl =
         kind === "image" || kind === "video" ? URL.createObjectURL(file) : undefined;
-      const videoPoster = kind === "video" ? await createVideoPoster(file) : undefined;
+      const videoPosterPromise = kind === "video" ? createVideoPoster(file) : undefined;
       const localMedia: MediaResourceDto & {
         localPreviewUrl?: string;
         localPosterUrl?: string;
         posterUrl?: string;
       } = {
         url: localPreviewUrl || "",
-        thumbnailUrl: videoPoster?.url || (kind === "image" ? localPreviewUrl : undefined),
-        posterUrl: videoPoster?.url,
-        localPosterUrl: videoPoster?.url,
+        thumbnailUrl: kind === "image" ? localPreviewUrl : undefined,
         fileName: file.name,
         mimeType: file.type,
         sizeBytes: file.size,
-        durationSeconds: videoPoster?.durationSeconds,
-        width: videoPoster?.width,
-        height: videoPoster?.height,
         localPreviewUrl,
       };
-      registerVideoPosterForMedia(localMedia as Record<string, unknown>, videoPoster?.url);
       const body = { [kind]: localMedia };
       const message = customerServiceMessageFromSendResult({
         thread: selectedThread,
@@ -556,7 +588,7 @@ export function ChatWorkspace() {
         thread: selectedThread,
         body,
         localPreviewUrl,
-        videoPoster,
+        videoPosterPromise,
       });
       scrollMessagesToBottom("smooth");
       startServiceMediaUpload(localTaskId);
@@ -858,7 +890,7 @@ function ServiceMessage({
       onUploadAction={onUploadAction}
       senderFallback={senderFallback || "访客"}
       statusText={mine ? "已发送" : undefined}
-      timeText={formatClockTime(message.sentAt)}
+      timeText={formatChatMessageTime(message.sentAt)}
     />
   );
 }
@@ -914,6 +946,9 @@ function ServiceMessageContextMenu({
       icon: <FolderOpen size={15} />,
     },
   ];
+  const visibleItems = items.filter(
+    (item) => !isVideo || (item.action !== "copy_media" && item.action !== "save_media_as"),
+  );
   return (
     <div
       className="message-context-menu"
@@ -921,7 +956,7 @@ function ServiceMessageContextMenu({
       style={{ left: position.x, top: position.y }}
       onClick={(event) => event.stopPropagation()}
     >
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <button key={item.action} type="button" role="menuitem" onClick={() => onAction(item.action)}>
           {item.icon}
           <span>{item.label}</span>
@@ -1213,42 +1248,8 @@ function mediaName(message: MessageItemDto) {
   return mediaFileName(media) || message.preview;
 }
 
-function mediaCacheFileName(message: MessageItemDto) {
-  const media = firstMessageMedia(message);
-  return mediaFileName(media) || mediaFallbackName(message);
-}
-
-function mediaFallbackName(message: MessageItemDto) {
-  const type = normalizeImMessageType(message);
-  if (type.includes("image")) return "lpp-image.jpg";
-  if (type.includes("video")) return "lpp-video.mp4";
-  if (type.includes("voice") || type.includes("audio")) return "lpp-voice.m4a";
-  return "lpp-file";
-}
-
 function hasOpenableMedia(message: MessageItemDto) {
-  return Boolean(resolveMessageMediaUrl(message));
-}
-
-function resolveMessageMediaUrl(message: MessageItemDto, assetBaseUrl?: string) {
-  const media = firstMessageMedia(message);
-  const raw = resolveNormalizedMediaUrl(
-    media,
-    assetBaseUrl || window.location.origin,
-    "url",
-    "downloadUrl",
-    "signedUrl",
-    "fileUrl",
-    "uri",
-    "path",
-    "thumbnailUrl",
-  );
-  if (!raw) return undefined;
-  try {
-    return new URL(raw, assetBaseUrl || window.location.origin).toString();
-  } catch {
-    return raw;
-  }
+  return hasOpenableMessageMedia(message);
 }
 
 async function saveMessageMediaAs(
@@ -1260,22 +1261,9 @@ async function saveMessageMediaAs(
     conversationId?: string;
   },
 ) {
-  const fileName = safeMediaFileName(mediaCacheFileName(message));
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持另存为，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.saveMediaAs) {
-    return window.desktopApi.saveMediaAs({
-      url,
-      fileName,
-      kind: mediaCacheKind(message),
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-    });
-  }
-  await downloadAuthenticatedMediaBlob(url, fileName, authToken);
-  return fileName;
+  return saveDesktopMediaAs(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function revealMessageMediaInFolder(
@@ -1287,34 +1275,9 @@ async function revealMessageMediaInFolder(
     conversationId?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持显示位置，请先发送完成后再操作");
-  }
-  const fileName = safeMediaFileName(mediaCacheFileName(message));
-  const kind = mediaCacheKind(message);
-  if (window.desktopApi?.revealMediaInFolder) {
-    return window.desktopApi.revealMediaInFolder({
-      url,
-      fileName,
-      kind,
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-    });
-  }
-  if (window.desktopApi?.cacheMediaFile && window.desktopApi?.openFile) {
-    const cached = await window.desktopApi.cacheMediaFile({
-      url,
-      fileName,
-      kind,
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-    });
-    await window.desktopApi.openFile(parentDirectory(cached.filePath));
-    return cached.filePath;
-  }
-  throw new Error("当前环境不支持显示文件位置");
+  return revealDesktopMediaInFolder(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function copyMessageMediaFile(
@@ -1326,24 +1289,9 @@ async function copyMessageMediaFile(
     conversationId?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持复制，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.copyMediaFile) {
-    return window.desktopApi.copyMediaFile(mediaDesktopPayload(message, url, authToken, cacheContext));
-  }
-  if (window.desktopApi?.cacheMediaFile) {
-    const cached = await window.desktopApi.cacheMediaFile(
-      mediaDesktopPayload(message, url, authToken, cacheContext),
-    );
-    if (window.desktopApi?.copyFilePath) {
-      await window.desktopApi.copyFilePath(cached.filePath);
-    } else {
-      await navigator.clipboard.writeText(cached.filePath);
-    }
-    return cached.filePath;
-  }
-  throw new Error("PC 桌面能力未就绪，请重启 PC 客户端后再试");
+  return copyDesktopMediaFile(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function copyMessageImage(
@@ -1355,49 +1303,12 @@ async function copyMessageImage(
     fileName?: string;
   },
 ) {
-  if (!/^(blob:|data:)/i.test(url) && window.desktopApi?.copyImageFromUrl) {
-    await window.desktopApi.copyImageFromUrl({
-      url,
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-      fileName: cacheContext?.fileName,
-    });
-    return;
-  }
-  const pngBlob = await imageUrlToPngBlob(url, authToken);
-  const ClipboardItemCtor = window.ClipboardItem;
-  if (!navigator.clipboard?.write || !ClipboardItemCtor) {
-    throw new Error("当前环境不支持复制图片");
-  }
-  await navigator.clipboard.write([
-    new ClipboardItemCtor({ "image/png": pngBlob }),
-  ]);
-}
-
-async function imageUrlToPngBlob(url: string, authToken?: string) {
-  const response = await fetch(url, {
-    headers:
-      authToken && !/^(blob:|data:)/i.test(url)
-        ? { Authorization: `Bearer ${authToken}` }
-        : undefined,
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const sourceBlob = await response.blob();
-  if (sourceBlob.type === "image/png") return sourceBlob;
-  const bitmap = await createImageBitmap(sourceBlob);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("无法创建图片画布");
-  context.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("图片转换失败"));
-    }, "image/png");
+  await copyDesktopImage({
+    url,
+    authToken,
+    accountId: cacheContext?.accountId,
+    conversationId: cacheContext?.conversationId,
+    fileName: cacheContext?.fileName || "image.png",
   });
 }
 
@@ -1410,20 +1321,9 @@ async function openMessageMediaFile(
     conversationId?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持打开，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.openMediaFile) {
-    return window.desktopApi.openMediaFile(mediaDesktopPayload(message, url, authToken, cacheContext));
-  }
-  if (window.desktopApi?.cacheMediaFile && window.desktopApi?.openFile) {
-    const cached = await window.desktopApi.cacheMediaFile(
-      mediaDesktopPayload(message, url, authToken, cacheContext),
-    );
-    await window.desktopApi.openFile(cached.filePath);
-    return cached.filePath;
-  }
-  throw new Error("当前环境不支持打开文件");
+  return openDesktopMediaFile(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function editMessageMediaFile(
@@ -1435,105 +1335,17 @@ async function editMessageMediaFile(
     conversationId?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持编辑，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.editMediaFile) {
-    return window.desktopApi.editMediaFile(mediaDesktopPayload(message, url, authToken, cacheContext));
-  }
-  return openMessageMediaFile(message, url, authToken, cacheContext);
-}
-
-function mediaDesktopPayload(
-  message: MessageItemDto,
-  url: string,
-  authToken?: string,
-  cacheContext?: {
-    accountId?: string;
-    conversationId?: string;
-  },
-) {
-  return {
-    url,
-    fileName: safeMediaFileName(mediaCacheFileName(message)),
-    kind: mediaCacheKind(message),
-    authToken,
-    accountId: cacheContext?.accountId,
-    conversationId: cacheContext?.conversationId,
-  };
-}
-
-function mediaCacheKind(message: MessageItemDto): "image" | "video" | "file" {
-  const type = normalizeImMessageType(message);
-  if (type.includes("image") || message.body?.image) return "image";
-  if (type.includes("video") || message.body?.video) return "video";
-  return "file";
+  return editDesktopMediaFile(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 function revealInFolderLabel() {
-  return isMacPlatform() ? "在 Finder 中显示" : "在文件夹中显示";
+  return desktopRevealInFolderLabel();
 }
 
 function isMacPlatform() {
   return /mac/i.test(navigator.platform);
-}
-
-function parentDirectory(filePath: string) {
-  const normalized = filePath.trim();
-  const parent = normalized.replace(/[\\/][^\\/]*$/, "");
-  return parent || normalized;
-}
-
-async function downloadAuthenticatedMediaBlob(
-  url: string,
-  fileName: string,
-  authToken?: string,
-) {
-  const response = await fetch(url, {
-    headers: authToken
-      ? {
-          Accept: "application/octet-stream,*/*",
-          Authorization: `Bearer ${authToken}`,
-          "X-Access-Token": authToken,
-          "X-Tenant-Token": authToken,
-        }
-      : undefined,
-  });
-  const blob = await response.blob();
-  if (!response.ok || blob.type.includes("json")) {
-    const text = await blob.text().catch(() => "");
-    const message = jsonErrorMessage(text) || `文件下载失败：HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  const objectUrl = URL.createObjectURL(blob);
-  triggerDownload(objectUrl, fileName);
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5_000);
-}
-
-function triggerDownload(url: string, fileName: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.rel = "noreferrer";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
-
-function jsonErrorMessage(text: string) {
-  if (!text.trim()) return undefined;
-  try {
-    const payload = JSON.parse(text) as { code?: string; message?: string };
-    if (payload.code === "AUTH_REQUIRED") return "文件下载需要登录认证，请重新登录后再试";
-    return payload.message || payload.code;
-  } catch {
-    return undefined;
-  }
-}
-
-function safeMediaFileName(value: string) {
-  const sanitized = value.trim().replace(/[\\/:*?"<>|]/g, "_");
-  return sanitized || "lpp-media";
 }
 
 function updateThreadPreview(
@@ -1788,28 +1600,28 @@ function normalizeUploadedMedia(
     thumbnailUrl:
       media.thumbnailUrl ||
       stringField(record, "thumbUrl", "previewUrl", "previewPath", "coverUrl", "cover", "thumbnail"),
-    fileName: media.fileName || file.name,
-    mimeType: media.mimeType || file.type,
-    sizeBytes: media.sizeBytes || file.size,
-  };
+    fileName: file.name || media.fileName,
+    originalFileName: file.name,
+    mimeType: file.type || media.mimeType,
+    sizeBytes: file.size || media.sizeBytes,
+  } as MediaResourceDto;
 }
 
-function withVideoPosterMedia(
-  media: MediaResourceDto,
-  poster?: VideoPosterResult,
-  uploadedPoster?: MediaResourceDto,
-): MediaResourceDto {
-  if (!poster && !uploadedPoster) return media;
-  const posterUrl = uploadedPoster?.url || uploadedPoster?.thumbnailUrl || poster?.url;
-  return {
-    ...media,
-    thumbnailUrl: media.thumbnailUrl || posterUrl,
-    posterUrl,
-    localPosterUrl: poster?.url,
-    durationSeconds: media.durationSeconds || poster?.durationSeconds,
-    width: media.width || poster?.width,
-    height: media.height || poster?.height,
-  } as MediaResourceDto;
+async function settleVideoPosterForSend(
+  promise: Promise<VideoPosterResult | undefined>,
+  timeoutMs = 700,
+) {
+  let timer: number | undefined;
+  try {
+    return await Promise.race([
+      promise.catch(() => undefined),
+      new Promise<undefined>((resolve) => {
+        timer = window.setTimeout(() => resolve(undefined), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) window.clearTimeout(timer);
+  }
 }
 
 function stringField(record: Record<string, unknown>, ...keys: string[]) {

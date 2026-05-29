@@ -34,22 +34,18 @@ export function channelLabel(source?: string | null) {
   if (value.includes("抖音")) return "抖音";
   if (value.includes("微信")) return "微信";
   if (value.includes("网页") || value.includes("网站")) return "网页";
-  if (normalized.includes("douyin") || normalized.includes("tiktok")) {
-    return "抖音";
-  }
-  if (normalized.includes("whatsapp") || normalized.includes("wathsup")) {
-    return "WhatsApp";
-  }
-  if (normalized.includes("telegram") || normalized === "tg") {
-    return "Telegram";
-  }
+  if (normalized.includes("douyin") || normalized.includes("tiktok")) return "抖音";
+  if (normalized.includes("wechat") || normalized.includes("weixin")) return "微信";
+  if (normalized.includes("whatsapp") || normalized.includes("wathsup")) return "WhatsApp";
+  if (normalized.includes("telegram") || normalized === "tg") return "Telegram";
   if (
     normalized === "app" ||
     normalized.includes("own_app") ||
     normalized.includes("native") ||
-    value.includes("自有") ||
+    normalized.includes("mobile_app") ||
     value === "APP" ||
-    value === "App"
+    value === "App" ||
+    value.includes("自有")
   ) {
     return "自有 App";
   }
@@ -72,14 +68,13 @@ export function channelTone(source?: string | null) {
   if (raw.includes("微信")) return "web";
   if (raw.includes("自有")) return "own-app";
   if (normalized.includes("douyin") || normalized.includes("tiktok")) return "douyin";
-  if (normalized.includes("whatsapp") || normalized.includes("wathsup")) {
-    return "whatsapp";
-  }
+  if (normalized.includes("whatsapp") || normalized.includes("wathsup")) return "whatsapp";
   if (normalized.includes("telegram") || normalized === "tg") return "telegram";
   if (
     normalized === "app" ||
     normalized.includes("own_app") ||
-    normalized.includes("native")
+    normalized.includes("native") ||
+    normalized.includes("mobile_app")
   ) {
     return "own-app";
   }
@@ -102,12 +97,14 @@ function channelIcon(source?: string | null): LucideIcon {
   if (raw.includes("网页") || raw.includes("网站")) return Globe2;
   if (raw.includes("自有")) return AppWindow;
   if (normalized.includes("douyin") || normalized.includes("tiktok")) return Music2;
+  if (normalized.includes("wechat") || normalized.includes("weixin")) return MessageCircle;
   if (normalized.includes("whatsapp") || normalized.includes("wathsup")) return MessageCircle;
   if (normalized.includes("telegram") || normalized === "tg") return Send;
   if (
     normalized === "app" ||
     normalized.includes("own_app") ||
-    normalized.includes("native")
+    normalized.includes("native") ||
+    normalized.includes("mobile_app")
   ) {
     return AppWindow;
   }
@@ -123,5 +120,5 @@ function channelIcon(source?: string | null): LucideIcon {
 }
 
 function normalizeChannelSource(source?: string | null) {
-  return source?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_") ?? "";
+  return source?.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "_") ?? "";
 }

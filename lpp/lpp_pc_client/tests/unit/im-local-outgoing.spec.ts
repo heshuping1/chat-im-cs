@@ -13,6 +13,21 @@ function message(id: string, status = "sent", sentAt = "2026-05-28T10:00:00.000Z
   };
 }
 
+function textMessage(id: string, status = "sent", text = "from owner to agent"): MessageItemDto {
+  return {
+    messageId: id,
+    conversationId: "c1",
+    sentAt: "2026-05-28T10:00:00.000Z",
+    status,
+    direction: "out",
+    isMine: true,
+    isSelf: true,
+    messageType: "text",
+    body: { text },
+    preview: text,
+  };
+}
+
 describe("mergeLocalOutgoingMessages", () => {
   it("keeps a local uploading file visible when a server refresh does not include it yet", () => {
     const server = [message("server-1", "sent", "2026-05-28T09:59:00.000Z")];
@@ -27,6 +42,13 @@ describe("mergeLocalOutgoingMessages", () => {
   it("uses the server copy once the same outgoing file arrives from the server", () => {
     const server = [message("server-1", "sent", "2026-05-28T10:00:00.000Z")];
     const local = [message("server-1", "sending", "2026-05-28T10:00:00.000Z")];
+
+    expect(mergeLocalOutgoingMessages(server, local)).toEqual(server);
+  });
+
+  it("deduplicates a pending local text echo when the server copy arrives with a new id first", () => {
+    const server = [textMessage("server-23", "sent")];
+    const local = [textMessage("pc-local-text-1", "sending")];
 
     expect(mergeLocalOutgoingMessages(server, local)).toEqual(server);
   });

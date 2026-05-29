@@ -1,39 +1,37 @@
 import {
-  BellOff,
   Check,
-  CheckSquare,
+  ChevronLeft,
   ChevronsUp,
   ClipboardList,
   Clock3,
-  Copy,
-  Download,
-  Edit3,
   FileImage,
   FileText,
-  FolderOpen,
   Forward,
   Languages,
   MessageSquarePlus,
   MessageSquareQuote,
   PanelRight,
+  Plus,
+  QrCode,
   Reply,
   Search,
   Sparkles,
   Star,
   TextCursorInput,
   Trash2,
-  Undo2,
   X,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, Dispatch, MouseEvent, ReactNode, SetStateAction } from "react";
+import type { CSSProperties, Dispatch, MouseEvent, SetStateAction } from "react";
+import type { CachedMediaStatus } from "../../shared/desktop-api";
 import { ChatMessageBubble } from "./ChatMessageBubble";
-import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
-import { MessageComposer, type ComposerMediaKind } from "./MessageComposer";
+import { MessageComposer } from "./MessageComposer";
 import { PcAvatar, avatarInitial } from "./PcAvatar";
+import type { ComposerMediaKind } from "../composer/domain/detectComposerMediaKind";
 import type {
   ConversationListItem,
+  FriendDto,
   GroupMemberDto,
   MediaResourceDto,
   MessageItemDto,
@@ -44,7 +42,6 @@ import {
   messagePreviewFromBody,
   normalizeMessageItem,
   normalizeMessageType,
-  resolveMediaUrl as resolveNormalizedMediaUrl,
 } from "../data/im-message-normalize";
 import { mergeLocalOutgoingMessages } from "../data/im-local-outgoing";
 import {
@@ -65,7 +62,27 @@ import { pcQueryKeys } from "../data/query-keys";
 import { applyDirectReadReceiptToMessages } from "../data/read-receipts";
 import { requireApiClient } from "../data/runtime";
 import { type AuthSession, useWorkspaceStore } from "../data/store";
-import { formatChatTime, formatError } from "../lib/format";
+import type { ContactItem } from "../data/types";
+import { formatChatMessageTime, formatChatTime, formatError } from "../lib/format";
+import { prefetchImageMessages } from "../media/runtime/imagePrecache";
+import {
+  hasOpenableMessageMedia,
+  messageMediaActionPayload,
+  messageMediaFileName,
+  messageVideoPlayerPayload,
+  resolveMessageMediaUrl,
+} from "../media/domain/mediaMessage";
+import { withVideoPosterMedia } from "../media/runtime/videoPosterMedia";
+import {
+  copyDesktopImage,
+  copyDesktopMediaFile,
+  downloadDesktopMedia,
+  editDesktopMediaFile,
+  openDesktopMediaFile,
+  revealDesktopMediaInFolder,
+  revealInFolderLabel as desktopRevealInFolderLabel,
+  saveDesktopMediaAs,
+} from "../media/runtime/desktopMediaActions";
 import { startHorizontalPaneResize, startVerticalPaneResize } from "../lib/paneResize";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
 import {
@@ -74,6 +91,36 @@ import {
   type VideoPosterResult,
 } from "../lib/videoPoster";
 import { renderWechatEmojiText } from "../lib/wechatEmoji";
+import {
+  ConversationContextMenu,
+  MessageContextMenu,
+  type MessageContextAction,
+} from "../messages/components/ChatContextMenus";
+import {
+  ConversationAvatar,
+  ConversationRow,
+  type GroupAvatarCell,
+  type GroupConversationAvatar,
+} from "../messages/components/ConversationListParts";
+import { ConversationInfoPanel } from "../messages/components/ConversationInfoPanel";
+import { ForwardDialog } from "../messages/components/ForwardDialog";
+import { ChatToastNotice, isNoticeErrorText } from "../messages/components/ChatToastNotice";
+import {
+  DirectChatDialog,
+  GroupChatDialog,
+  MessagePlusMenu,
+  type ContactPickerItem,
+} from "../messages/components/MessageStartDialogs";
+import { InviteQrDialog } from "../messages/components/InviteQrDialog";
+import { useActiveImConversationQueries } from "../messages/hooks/useActiveImConversationQueries";
+import { useGroupAvatarSnapshots } from "../messages/hooks/useGroupAvatarSnapshots";
+import {
+  useMediaUploadTaskRegistry,
+  type LocalMediaUploadTask,
+} from "../messages/hooks/useMediaUploadTaskRegistry";
+import { useMessageContactPickerData } from "../messages/hooks/useMessageContactPickerData";
+import { useMessageResponsiveLayout } from "../messages/hooks/useMessageResponsiveLayout";
+import { useSerialTaskQueue } from "../messages/hooks/useSerialTaskQueue";
 
 type ImConversationType = "direct" | "group";
 
@@ -116,21 +163,6 @@ type ReplyTarget = {
 
 type LocalUploadStatus = "queued" | "uploading" | "paused" | "failed" | "sent" | "canceled";
 
-type LocalMediaUploadTask = {
-  localTaskId: string;
-  localMessageId: string;
-  file: File;
-  kind: ComposerMediaKind;
-  conversation: ConversationListItem;
-  conversationType: ImConversationType;
-  body: Record<string, unknown>;
-  reply: ReplyTarget;
-  localPreviewUrl?: string;
-  videoPoster?: VideoPosterResult;
-  controller?: AbortController;
-  controlState?: "paused" | "canceled";
-};
-
 type UnreadJumpState = {
   conversationId: string;
   count: number;
@@ -152,14 +184,14 @@ const historyFilterTabs: Array<{
   label: string;
   icon: typeof Clock3;
 }> = [
-  { key: "all", label: "全部", icon: Clock3 },
-  { key: "text", label: "文字", icon: TextCursorInput },
-  { key: "image", label: "图片", icon: FileImage },
-  { key: "file", label: "文件", icon: FileText },
-  { key: "voice", label: "语音", icon: MessageSquarePlus },
-  { key: "video", label: "视频", icon: PanelRight },
-  { key: "link", label: "链接", icon: Search },
-  { key: "favorite", label: "收藏", icon: Star },
+  { key: "all", label: "\u5168\u90e8", icon: Clock3 },
+  { key: "text", label: "\u6587\u5b57", icon: TextCursorInput },
+  { key: "image", label: "\u56fe\u7247", icon: FileImage },
+  { key: "file", label: "\u6587\u4ef6", icon: FileText },
+  { key: "voice", label: "\u8bed\u97f3", icon: MessageSquarePlus },
+  { key: "video", label: "\u89c6\u9891", icon: PanelRight },
+  { key: "link", label: "\u94fe\u63a5", icon: Search },
+  { key: "favorite", label: "\u6536\u85cf", icon: Star },
 ];
 
 const composerHeightBounds = {
@@ -227,7 +259,10 @@ export function MessageCenter() {
   const setMessageProfileVisible = useWorkspaceStore(
     (state) => state.setMessageProfileVisible,
   );
+  const messageLayoutMode = useWorkspaceStore((state) => state.messageLayoutMode);
+  const setMessageLayoutMode = useWorkspaceStore((state) => state.setMessageLayoutMode);
   const setActiveModule = useWorkspaceStore((state) => state.setActiveModule);
+  const setContactFilter = useWorkspaceStore((state) => state.setContactFilter);
   const queryClient = useQueryClient();
   const [keyword, setKeyword] = useState("");
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
@@ -236,6 +271,8 @@ export function MessageCenter() {
   const [historyFilter, setHistoryFilter] = useState<HistoryFilterKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<MessageMenuState>(null);
+  const [messageMenuMediaStatus, setMessageMenuMediaStatus] =
+    useState<CachedMediaStatus>("not_cached");
   const [conversationMenu, setConversationMenu] = useState<ConversationMenuState>(null);
   const [avatarProfilePopover, setAvatarProfilePopover] =
     useState<AvatarProfilePopoverState | null>(null);
@@ -246,6 +283,10 @@ export function MessageCenter() {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget>(null);
   const [composerHeight, setComposerHeight] = useState(220);
   const [forwardTargetMessages, setForwardTargetMessages] = useState<MessageItemDto[]>([]);
+  const [conversationDrawerOpen, setConversationDrawerOpen] = useState(false);
+  const [profileStandaloneOpen, setProfileStandaloneOpen] = useState(false);
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+  const [composerDialog, setComposerDialog] = useState<"direct" | "group" | "qr" | null>(null);
   const [unreadJump, setUnreadJump] = useState<UnreadJumpState | null>(null);
   const [messageAnnotations, setMessageAnnotations] = useState<
     Record<string, string>
@@ -256,6 +297,8 @@ export function MessageCenter() {
     useState<Record<string, string>>({});
   const [localOutgoingMessagesByConversation, setLocalOutgoingMessagesByConversation] =
     useState<Record<string, MessageItemDto[]>>({});
+  const [groupMembersByConversation, setGroupMembersByConversation] =
+    useState<Record<string, GroupMemberDto[]>>({});
   const [localHiddenConversationIds, setLocalHiddenConversationIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -266,12 +309,21 @@ export function MessageCenter() {
   const messageElementRefs = useRef(new Map<string, HTMLDivElement>());
   const localImagePreviewByMessageIdRef = useRef(new Map<string, string>());
   const autoSelectedConversationIdsRef = useRef(new Set<string>());
-  const outgoingSendQueueRef = useRef(Promise.resolve());
-  const mediaUploadTasksRef = useRef(new Map<string, LocalMediaUploadTask>());
+  const mediaUploadTasks = useMediaUploadTaskRegistry();
+  const enqueueOutgoingTask = useSerialTaskQueue();
   const getChatPanelHeight = useCallback(
     () => chatPanelRef.current?.getBoundingClientRect().height ?? null,
     [],
   );
+  useMessageResponsiveLayout({
+    chatPanelRef,
+    listPaneWidth,
+    messageLayoutMode,
+    profilePaneWidth,
+    setConversationDrawerOpen,
+    setMessageLayoutMode,
+    setProfileStandaloneOpen,
+  });
   useEffect(() => {
     const panel = chatPanelRef.current;
     if (!panel) return undefined;
@@ -436,7 +488,7 @@ export function MessageCenter() {
             return queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
           })
           .catch((error) => {
-            setNotice(`已在本地标记已读，服务端同步失败：${formatError(error)}`);
+            setNotice(`已在本机标记已读；服务端同步失败：${formatError(error)}`);
           });
       });
     },
@@ -513,65 +565,76 @@ export function MessageCenter() {
     setAvatarProfilePopover(null);
     setConversationMenu(null);
     setForwardTargetMessages([]);
+    setConversationDrawerOpen(false);
+    setProfileStandaloneOpen(false);
     setUnreadJump((current) =>
       current?.conversationId === activeConversation?.conversationId ? current : null,
     );
   }, [activeConversation?.conversationId]);
 
-  const messagesQuery = useQuery({
-    queryKey: pcQueryKeys.imMessages(
-      session?.apiBaseUrl,
-      session?.tenantToken,
-      activeConversationType,
-      activeConversation?.conversationId,
-    ),
-    enabled: Boolean(session && activeConversation && activeConversationType),
-    queryFn: async () =>
-      requireApiClient(session).getConversationMessages(
-        activeConversationType!,
-        activeConversation!.conversationId,
-      ),
-    gcTime: 30 * 60_000,
-    refetchInterval: 2_500,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60_000,
-  });
-  const directReadStatusQuery = useQuery({
-    queryKey: pcQueryKeys.imDirectReadStatus(
-      session?.apiBaseUrl,
-      session?.tenantToken,
-      activeConversation?.conversationId,
-    ),
-    enabled: Boolean(
-      session &&
-        activeConversation &&
-        activeConversationType === "direct",
-    ),
-    queryFn: async () =>
-      requireApiClient(session).getDirectReadStatus(
-        activeConversation!.conversationId,
-      ),
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
-    staleTime: 2_000,
-  });
-  const groupMembersQuery = useQuery({
-    queryKey: [
-      "pc-group-members",
-      session?.apiBaseUrl ?? "",
-      session?.tenantToken ?? "",
-      activeConversation?.conversationId ?? "",
-    ],
-    enabled: Boolean(session && activeConversationType === "group" && activeConversation),
-    queryFn: async () =>
-      requireApiClient(session).getGroupMembers(activeConversation!.conversationId),
-    staleTime: 60_000,
+  const {
+    directReadStatusQuery,
+    groupMembersQuery,
+    messagesQuery,
+  } = useActiveImConversationQueries({
+    activeConversation,
+    activeConversationType,
+    session,
   });
   const groupMemberMap = useMemo(
     () => buildGroupMemberMap(groupMembersQuery.data ?? []),
     [groupMembersQuery.data],
+  );
+  useEffect(() => {
+    if (
+      !activeConversation?.conversationId ||
+      activeConversationType !== "group" ||
+      !groupMembersQuery.data
+    ) {
+      return;
+    }
+    setGroupMembersByConversation((current) => {
+      const previous = current[activeConversation.conversationId];
+      if (previous === groupMembersQuery.data) return current;
+      return {
+        ...current,
+        [activeConversation.conversationId]: groupMembersQuery.data,
+      };
+    });
+  }, [activeConversation?.conversationId, activeConversationType, groupMembersQuery.data]);
+  const { groupAvatarSnapshotFor } = useGroupAvatarSnapshots({
+    activeConversation,
+    activeConversationType,
+    activeGroupMembers: groupMembersQuery.data,
+    getConversationType: getImConversationType,
+    groupCompositeAvatarAllowed,
+    groupCompositeAvatarCells,
+    session,
+    visibleConversations,
+  });
+  const {
+    contactPickerItems,
+    friendsQuery,
+    inviteQrsQuery,
+  } = useMessageContactPickerData(session, composerDialog);
+  const activeConversationHeaderTitle = useMemo(() => {
+    if (!activeConversation) return "";
+    if (activeConversationType !== "group") return activeConversation.title;
+    const memberCount =
+      typeof activeConversation.memberCount === "number" && activeConversation.memberCount > 0
+        ? activeConversation.memberCount
+        : groupMembersQuery.data?.length;
+    return memberCount && memberCount > 0
+      ? `${activeConversation.title}(${memberCount})`
+      : activeConversation.title;
+  }, [
+    activeConversation,
+    activeConversationType,
+      groupMembersQuery.data?.length,
+  ]);
+  const activeConversationContact = useMemo(
+    () => buildDirectConversationContact(activeConversation, friendsQuery.data ?? []),
+    [activeConversation, friendsQuery.data],
   );
 
   const sendTextMutation = useMutation({
@@ -605,6 +668,47 @@ export function MessageCenter() {
       void invalidateMessages(queryClient);
       scrollMessagesToBottom("smooth");
     },
+  });
+
+  const createDirectChatMutation = useMutation({
+    mutationFn: async (peerUserId: string) =>
+      requireApiClient(session).createDirectChat(peerUserId),
+    onSuccess: async (chat) => {
+      const conversationId = createdConversationId(chat);
+      if (!conversationId) {
+        setNotice("发起聊天失败：服务端未返回会话 ID");
+        return;
+      }
+      setComposerDialog(null);
+      await queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+      setActiveConversation(conversationId);
+    },
+    onError: (error) => setNotice(`发起聊天失败：${formatError(error)}`),
+  });
+
+  const createGroupChatMutation = useMutation({
+    mutationFn: async (payload: { name: string; memberUserIds: string[] }) =>
+      requireApiClient(session).createGroupChat(payload),
+    onSuccess: async (group) => {
+      const conversationId =
+        createdConversationId(group);
+      if (!conversationId) {
+        setNotice("建群失败：服务端未返回群聊会话 ID");
+        return;
+      }
+      setComposerDialog(null);
+      await queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+      setActiveConversation(conversationId);
+    },
+    onError: (error) => setNotice(`建群失败：${formatError(error)}`),
+  });
+
+  const createInviteQrMutation = useMutation({
+    mutationFn: async () => requireApiClient(session).createFriendInviteQr(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["pc-account-invite-qrs"] });
+    },
+    onError: (error) => setNotice(`生成二维码失败：${formatError(error)}`),
   });
 
   const sendMediaMutation = useMutation({
@@ -672,8 +776,8 @@ export function MessageCenter() {
       if (context?.conversation) {
         const serverMessageId = result.sent.messageId || context.localMessageId;
         const localPreviewUrl = context.localPreviewUrl;
-        if (variables.kind === "image" && localPreviewUrl) {
-          localImagePreviewKeys(serverMessageId, result.media).forEach((key) => {
+        if ((variables.kind === "image" || variables.kind === "video") && localPreviewUrl) {
+          localMediaPreviewKeys(serverMessageId, result.media).forEach((key) => {
             localImagePreviewByMessageIdRef.current.set(key, localPreviewUrl);
           });
         }
@@ -710,12 +814,6 @@ export function MessageCenter() {
       }
     },
   });
-
-  const enqueueOutgoingTask = (task: () => Promise<void>) => {
-    outgoingSendQueueRef.current = outgoingSendQueueRef.current
-      .catch(() => undefined)
-      .then(task);
-  };
 
   const sendTextOptimistically = (content: string) => {
     if (!session || !activeConversation || !activeConversationType) {
@@ -798,7 +896,7 @@ export function MessageCenter() {
 
   const startMediaUpload = useCallback(
     (localTaskId: string) => {
-      const task = mediaUploadTasksRef.current.get(localTaskId);
+      const task = mediaUploadTasks.getTask(localTaskId);
       if (!task || !session) return;
       const controller = new AbortController();
       task.controller = controller;
@@ -830,21 +928,27 @@ export function MessageCenter() {
               );
             },
           });
+          const videoPoster =
+            task.videoPoster ??
+            (task.kind === "video" && task.videoPosterPromise
+              ? await settleVideoPosterForSend(task.videoPosterPromise)
+              : undefined);
+          task.videoPoster = videoPoster;
           const uploadedPoster =
-            task.kind === "video" && task.videoPoster
+            task.kind === "video" && videoPoster
               ? await client
-                  .uploadMedia(task.videoPoster.file, "image", { signal: controller.signal })
-                  .then((posterMedia) => normalizeUploadedMedia(posterMedia, task.videoPoster!.file))
+                  .uploadMedia(videoPoster.file, "image", { signal: controller.signal })
+                  .then((posterMedia) => normalizeUploadedMedia(posterMedia, videoPoster.file))
                   .catch(() => undefined)
               : undefined;
           const normalizedMedia = withVideoPosterMedia(
             normalizeUploadedMedia(media, task.file),
-            task.videoPoster,
+            videoPoster,
             uploadedPoster,
           );
           registerVideoPosterForMedia(
             normalizedMedia as Record<string, unknown>,
-            task.videoPoster?.url,
+            videoPoster?.url,
           );
           const sent = await client.sendConversationMediaMessage(
             task.conversationType,
@@ -854,8 +958,8 @@ export function MessageCenter() {
             task.reply?.messageId,
           );
           const serverMessageId = sent.messageId || task.localMessageId;
-          if (task.kind === "image" && task.localPreviewUrl) {
-            localImagePreviewKeys(serverMessageId, normalizedMedia).forEach((key) => {
+          if ((task.kind === "image" || task.kind === "video") && task.localPreviewUrl) {
+            localMediaPreviewKeys(serverMessageId, normalizedMedia).forEach((key) => {
               localImagePreviewByMessageIdRef.current.set(key, task.localPreviewUrl!);
             });
           }
@@ -872,7 +976,7 @@ export function MessageCenter() {
                     ? {
                         ...normalizedMedia,
                         localPreviewUrl: task.localPreviewUrl,
-                        ...(task.videoPoster?.url ? { localPosterUrl: task.videoPoster.url } : {}),
+                        ...(videoPoster?.url ? { localPosterUrl: videoPoster.url } : {}),
                       }
                     : normalizedMedia,
               },
@@ -889,7 +993,7 @@ export function MessageCenter() {
               sentMessage,
             ),
           );
-          mediaUploadTasksRef.current.delete(localTaskId);
+          mediaUploadTasks.deleteTask(localTaskId);
           void invalidateMessages(queryClient);
           scrollMessagesToBottom("smooth");
         } catch (error) {
@@ -907,7 +1011,7 @@ export function MessageCenter() {
         }
       })();
     },
-    [queryClient, session],
+    [mediaUploadTasks, queryClient, session],
   );
 
   const sendMediaOptimistically = async (file: File, kind: ComposerMediaKind) => {
@@ -921,25 +1025,19 @@ export function MessageCenter() {
     const localTaskId = `pc-upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const localPreviewUrl =
       kind === "image" || kind === "video" ? URL.createObjectURL(file) : undefined;
-    const videoPoster = kind === "video" ? await createVideoPoster(file) : undefined;
+    const videoPosterPromise = kind === "video" ? createVideoPoster(file) : undefined;
     const localMedia: MediaResourceDto & {
       localPreviewUrl?: string;
       localPosterUrl?: string;
       posterUrl?: string;
     } = {
       url: localPreviewUrl || "",
-      thumbnailUrl: videoPoster?.url || (kind === "image" ? localPreviewUrl : undefined),
-      posterUrl: videoPoster?.url,
-      localPosterUrl: videoPoster?.url,
+      thumbnailUrl: kind === "image" ? localPreviewUrl : undefined,
       fileName: file.name,
       mimeType: file.type,
       sizeBytes: file.size,
-      durationSeconds: videoPoster?.durationSeconds,
-      width: videoPoster?.width,
-      height: videoPoster?.height,
       localPreviewUrl,
     };
-    registerVideoPosterForMedia(localMedia as Record<string, unknown>, videoPoster?.url);
     const body = withReplyBody({ [kind]: localMedia }, reply);
     const localMessage = appendLocalMessage(
       queryClient,
@@ -957,7 +1055,7 @@ export function MessageCenter() {
     setLocalOutgoingMessagesByConversation((current) =>
       upsertLocalOutgoingMessage(current, conversationType, conversation.conversationId, localMessage),
     );
-    mediaUploadTasksRef.current.set(localTaskId, {
+    mediaUploadTasks.setTask({
       localTaskId,
       localMessageId,
       file,
@@ -967,7 +1065,7 @@ export function MessageCenter() {
       body,
       reply,
       localPreviewUrl,
-      videoPoster,
+      videoPosterPromise,
     });
     setReplyTarget(null);
     scrollMessagesToBottom("smooth");
@@ -976,7 +1074,7 @@ export function MessageCenter() {
 
   const handleUploadAction = useCallback(
     (localTaskId: string, action: "pause" | "resume" | "cancel" | "retry") => {
-      const task = mediaUploadTasksRef.current.get(localTaskId);
+      const task = mediaUploadTasks.getTask(localTaskId);
       if (!task || !session) return;
       if (action === "pause") {
         task.controlState = "paused";
@@ -1008,7 +1106,7 @@ export function MessageCenter() {
       }
       startMediaUpload(localTaskId);
     },
-    [queryClient, session, startMediaUpload],
+    [mediaUploadTasks, queryClient, session, startMediaUpload],
   );
 
   const recallMutation = useMutation({
@@ -1018,7 +1116,7 @@ export function MessageCenter() {
     },
     onSuccess: async (_result, messageId) => {
       markMessageRecalledInCache(queryClient, messageId);
-      setNotice("消息已撤回。");
+      setNotice("消息已撤回");
       await invalidateMessages(queryClient);
     },
     onError: (error) => setNotice(`撤回失败：${formatError(error)}`),
@@ -1031,7 +1129,7 @@ export function MessageCenter() {
     },
     onSuccess: async (_result, messageId) => {
       removeMessageFromCache(queryClient, messageId);
-      setNotice("消息已删除。");
+      setNotice("消息已删除");
       await invalidateMessages(queryClient);
     },
     onError: (error) => setNotice(`删除失败：${formatError(error)}`),
@@ -1051,7 +1149,7 @@ export function MessageCenter() {
         message.messageId,
         (result as { favoriteId?: string }).favoriteId,
       );
-      setNotice("已收藏。");
+      setNotice("已收藏");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["pc-im-messages"] }),
         queryClient.invalidateQueries({ queryKey: ["pc-account-favorites"] }),
@@ -1064,7 +1162,7 @@ export function MessageCenter() {
   const translateMutation = useMutation({
     mutationFn: async (message: MessageItemDto) => {
       if (!session) throw new Error("请先登录");
-      if (!message.messageId) throw new Error("这条消息缺少 messageId，无法翻译");
+      if (!message.messageId) throw new Error("当前消息缺少 messageId，无法翻译");
       const apiClient = requireApiClient(session);
       const messageText = extractMessageText(message);
       let text: string | undefined;
@@ -1090,14 +1188,14 @@ export function MessageCenter() {
           delete next[messageId];
           return next;
         });
-        setNotice("翻译服务没有返回内容。");
+        setNotice("翻译服务未返回内容");
         return;
       }
       setMessageAnnotations((current) => ({
         ...current,
         [messageId]: `译文：${text}`,
       }));
-      setNotice("已翻译。");
+      setNotice("已翻译");
     },
     onError: (error, message) => {
       setMessageAnnotations((current) => {
@@ -1121,14 +1219,14 @@ export function MessageCenter() {
     },
     onSuccess: ({ messageId, text }) => {
       if (!text) {
-        setNotice("语音转文字没有返回内容。");
+        setNotice("语音转文字未返回内容");
         return;
       }
       setMessageAnnotations((current) => ({
         ...current,
         [messageId]: `转文字：${text}`,
       }));
-      setNotice("已转文字。");
+      setNotice("已转为文字");
     },
     onError: (error) => setNotice(`语音转文字失败：${formatError(error)}`),
   });
@@ -1180,10 +1278,10 @@ export function MessageCenter() {
       setSelectedMessageIds(new Set());
       setNotice(
         failedCount > 0
-          ? `已转发 ${succeededMessages.length} 条，${failedCount} 条失败，请稍后重试。`
+          ? `已转发 ${succeededMessages.length} 条，${failedCount} 条失败，请稍后重试`
           : succeededMessages.length > 1
-            ? `已转发 ${succeededMessages.length} 条消息。`
-            : "已转发。",
+            ? `已转发 ${succeededMessages.length} 条消息`
+            : "已转发",
       );
       await invalidateMessages(queryClient);
     },
@@ -1200,7 +1298,7 @@ export function MessageCenter() {
           ? (localOutgoingMessagesByConversation[activeConversationKey] ?? [])
           : [],
       );
-      const messagesWithPreviews = withLocalImagePreviews(
+      const messagesWithPreviews = withLocalMediaPreviews(
         mergedOutgoingMessages,
         localImagePreviewByMessageIdRef.current,
       );
@@ -1234,6 +1332,24 @@ export function MessageCenter() {
       ),
     [historyFilter, historyOpen, messageSearchKeyword, messageSearchOpen, messages],
   );
+  useEffect(() => {
+    if (!session || !activeConversation?.conversationId || messages.length === 0) return;
+    prefetchImageMessages({
+      accountId:
+        session.userId ||
+        session.platformUserId ||
+        session.lppId ||
+        session.tenantId,
+      assetBaseUrl: session.apiBaseUrl,
+      authToken: session.tenantToken,
+      conversationId: activeConversation.conversationId,
+      messages,
+    });
+  }, [
+    activeConversation?.conversationId,
+    messages,
+    session,
+  ]);
   const {
     bottomRef: messagesBottomRef,
     handleScroll: handleMessageStageScroll,
@@ -1346,7 +1462,7 @@ export function MessageCenter() {
   ]);
   const loading = conversationsQuery.isLoading;
   const errorText = conversationsQuery.error
-    ? `会话列表加载失败：${formatError(conversationsQuery.error)}`
+    ? `Conversation list failed: ${formatError(conversationsQuery.error)}`
     : messagesQuery.error
       ? `消息加载失败：${formatError(messagesQuery.error)}`
       : null;
@@ -1361,6 +1477,69 @@ export function MessageCenter() {
       window.removeEventListener("keydown", close);
     };
   }, [messageMenu]);
+
+  useEffect(() => {
+    if (!plusMenuOpen) return undefined;
+    const close = () => setPlusMenuOpen(false);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPlusMenuOpen(false);
+    };
+    window.addEventListener("click", close);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [plusMenuOpen]);
+
+  useEffect(() => {
+    let canceled = false;
+    setMessageMenuMediaStatus("not_cached");
+    if (!messageMenu || !isVideoMessage(messageMenu.message)) return undefined;
+    const url = resolveMessageMediaUrl(messageMenu.message, session?.apiBaseUrl);
+    if (!url) return undefined;
+    if (/^(blob:|data:|file:)/i.test(url)) {
+      setMessageMenuMediaStatus("cached");
+      return undefined;
+    }
+    const context = {
+      accountId:
+        session?.userId ||
+        session?.platformUserId ||
+        session?.lppId ||
+        session?.tenantId,
+      conversationId: activeConversation?.conversationId,
+      fileName: messageMediaFileName(messageMenu.message),
+    };
+    const statusPromise = window.desktopApi?.getCachedMediaStatus?.(
+      messageMediaActionPayload({
+        message: messageMenu.message,
+        url,
+        authToken: session?.tenantToken,
+        cacheContext: context,
+      }),
+    );
+    if (!statusPromise) return undefined;
+    void statusPromise
+      .then((status) => {
+        if (!canceled) setMessageMenuMediaStatus(status);
+      })
+      .catch(() => {
+        if (!canceled) setMessageMenuMediaStatus("not_cached");
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [
+    activeConversation?.conversationId,
+    messageMenu,
+    session?.apiBaseUrl,
+    session?.lppId,
+    session?.platformUserId,
+    session?.tenantId,
+    session?.tenantToken,
+    session?.userId,
+  ]);
 
   useEffect(() => {
     if (!conversationMenu) return undefined;
@@ -1418,10 +1597,10 @@ export function MessageCenter() {
           const next = new Set(current);
           if (conversation.isMuted || next.has(conversation.conversationId)) {
             next.delete(conversation.conversationId);
-            setNotice("已在本地取消免打扰。服务端持久化需要接口支持。");
+            setNotice("已在本机取消免打扰；服务端同步需要接口支持");
           } else {
             next.add(conversation.conversationId);
-            setNotice("已在本地开启免打扰。服务端持久化需要接口支持。");
+            setNotice("已在本机开启免打扰；服务端同步需要接口支持");
           }
           return next;
         });
@@ -1442,7 +1621,7 @@ export function MessageCenter() {
         if (activeConversationId === conversation.conversationId) {
           setActiveConversation("");
         }
-        setNotice(action === "delete" ? "已从本地隐藏会话。服务端删除需要接口支持。" : "已在本地隐藏会话。");
+        setNotice(action === "delete" ? "会话已在本机隐藏；服务端删除需要接口支持" : "会话已在本机隐藏");
       }
     },
     [activeConversationId, setActiveConversation],
@@ -1498,23 +1677,23 @@ export function MessageCenter() {
       if (action === "multi_select") {
         setMultiSelectMode(true);
         setSelectedMessageIds(new Set([message.messageId]));
-        setNotice("已进入多选模式。");
+        setNotice("已进入多选模式");
         return;
       }
       if (action === "copy") {
         const text = extractMessageText(message);
         if (!text) {
-          setNotice("这条消息没有可复制的文本。");
+          setNotice("当前消息没有可复制的文本");
           return;
         }
         await navigator.clipboard.writeText(text);
-        setNotice("已复制。");
+        setNotice("已复制");
         return;
       }
       if (action === "copy_image" || action === "copy_media") {
         const url = resolveMessageMediaUrl(message, session?.apiBaseUrl);
         if (!url) {
-          setNotice("这条媒体消息没有可复制的地址。");
+          setNotice("当前媒体消息没有可复制的文件地址");
           return;
         }
         try {
@@ -1525,14 +1704,14 @@ export function MessageCenter() {
               session?.lppId ||
               session?.tenantId,
             conversationId: activeConversation?.conversationId,
-            fileName: mediaCacheFileName(message),
+            fileName: messageMediaFileName(message),
           };
           if (action === "copy_image") {
             await copyMessageImage(url, session?.tenantToken, context);
-            setNotice("图片已复制。");
+            setNotice("图片已复制");
           } else {
             await copyMessageMediaFile(message, url, session?.tenantToken, context);
-            setNotice("文件已复制。");
+            setNotice("文件已复制");
           }
         } catch (error) {
           setNotice(`复制失败：${formatError(error)}`);
@@ -1551,7 +1730,7 @@ export function MessageCenter() {
       }
       if (action === "ai_reply") {
         setActiveModule("aiAssistant");
-        setNotice("已打开 AI 助手，可基于当前消息起草回复。");
+        setNotice("AI 助手已打开，可以基于当前消息起草回复。");
         return;
       }
       if (action === "translate") {
@@ -1574,7 +1753,7 @@ export function MessageCenter() {
       ) {
         const url = resolveMessageMediaUrl(message, session?.apiBaseUrl);
         if (!url) {
-          setNotice("这条媒体消息没有可处理的地址。");
+          setNotice("当前媒体消息没有可用地址");
           return;
         }
         try {
@@ -1588,23 +1767,34 @@ export function MessageCenter() {
           };
           if (action === "save_media_as") {
             const savedPath = await saveMessageMediaAs(message, url, session?.tenantToken, context);
-            if (savedPath) setNotice("已另存为。");
+            if (savedPath) setNotice("已另存为");
           } else if (action === "reveal_in_folder") {
             await revealMessageMediaInFolder(message, url, session?.tenantToken, context);
-            setNotice(isMacPlatform() ? "已在 Finder 中显示。" : "已在文件夹中显示。");
+            setNotice(isMacPlatform() ? "已在 Finder 中显示" : "已在文件夹中显示");
           } else if (action === "open_media") {
-            await openMessageMediaFile(message, url, session?.tenantToken, context);
-            setNotice("已打开。");
+            if (isVideoMessage(message) && window.desktopApi?.openVideoPlayer) {
+              await window.desktopApi.openVideoPlayer(
+                messageVideoPlayerPayload({
+                  message,
+                  url,
+                  authToken: session?.tenantToken,
+                  cacheContext: context,
+                }),
+              );
+            } else {
+              await openMessageMediaFile(message, url, session?.tenantToken, context);
+            }
+            setNotice("已打开");
           } else {
             await editMessageMediaFile(message, url, session?.tenantToken, context);
-            setNotice("已打开编辑。");
+            setNotice("已打开编辑器");
           }
         } catch (error) {
           const prefix =
             action === "save_media_as"
               ? "另存为失败"
               : action === "reveal_in_folder"
-                ? "显示文件位置失败"
+                ? "在文件夹中显示失败"
                 : action === "open_media"
                   ? "打开失败"
                   : "编辑失败";
@@ -1626,7 +1816,7 @@ export function MessageCenter() {
         return;
       }
       if (action === "delete") {
-        if (!window.confirm("确定删除这条消息吗？删除后将从当前会话移除。")) return;
+        if (!window.confirm("Delete this message? It will be removed from the current conversation.")) return;
         deleteMutation.mutate(message.messageId);
       }
     },
@@ -1645,6 +1835,7 @@ export function MessageCenter() {
   const openConversationFromUserClick = useCallback(
     (conversation: ConversationListItem) => {
       autoSelectedConversationIdsRef.current.delete(conversation.conversationId);
+      setConversationDrawerOpen(false);
       setActiveConversation(conversation.conversationId);
 
       const conversationType = getImConversationType(conversation);
@@ -1727,13 +1918,13 @@ export function MessageCenter() {
       session,
     );
     if (!target) {
-      setNotice("第一条未读不在当前已加载记录里，请向上加载更多历史消息后再查看。");
+      setNotice("第一条未读消息尚未加载，请加载更多历史后重试");
       return;
     }
     const scrollToTarget = () => {
       const element = messageElementRefs.current.get(target.messageId);
       if (!element) {
-        setNotice("第一条未读不在当前筛选结果中，请清空搜索后查看。");
+        setNotice("第一条未读消息不在当前筛选结果中，请清空搜索后重试");
         return;
       }
       element.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -1749,7 +1940,7 @@ export function MessageCenter() {
     const scroll = () => {
       const element = messageElementRefs.current.get(messageId);
       if (!element) {
-        setNotice("这条消息不在当前已加载记录里，请调整筛选或加载更多历史消息。");
+        setNotice("该消息尚未加载，请调整筛选或加载更多历史");
         return;
       }
       element.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -1763,7 +1954,7 @@ export function MessageCenter() {
   const handleBatchDeleteSelected = useCallback(async () => {
     const messageIds = Array.from(selectedMessageIds);
     if (messageIds.length === 0) return;
-    if (!window.confirm(`确定删除已选择的 ${messageIds.length} 条消息吗？`)) return;
+    if (!window.confirm(`确定删除已选的 ${messageIds.length} 条消息吗？`)) return;
     const results = await Promise.allSettled(
       messageIds.map((messageId) => deleteMutation.mutateAsync(messageId)),
     );
@@ -1771,40 +1962,55 @@ export function MessageCenter() {
     setMultiSelectMode(false);
     setSelectedMessageIds(new Set());
     if (failedCount > 0) {
-      setNotice(`已删除 ${messageIds.length - failedCount} 条，${failedCount} 条失败，请稍后重试。`);
+      setNotice(`已删除 ${messageIds.length - failedCount} 条，${failedCount} 条失败，请稍后重试`);
     } else {
-      setNotice(`已删除 ${messageIds.length} 条消息。`);
+      setNotice(`已删除 ${messageIds.length} 条消息`);
     }
   }, [deleteMutation, selectedMessageIds]);
 
+  const dockProfile = messageProfileVisible && messageLayoutMode === "full";
+
   return (
     <>
-      <section className="e-panel e-conversation-panel">
-        <header className="e-panel-header">
-          <div>
-            <h1>消息</h1>
+      <section className={`e-panel e-conversation-panel ${conversationDrawerOpen ? "drawer-open" : ""}`}>
+        <header className="e-message-list-top">
+          <label className="e-search">
+            <Search size={16} />
+            <input
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="搜索"
+            />
+          </label>
+          <div className="message-plus-wrap" onClick={(event) => event.stopPropagation()}>
+            <button
+              className="e-icon-button message-plus-button"
+              type="button"
+              aria-label="打开消息操作菜单"
+              title="发起聊天"
+              aria-haspopup="menu"
+              aria-expanded={plusMenuOpen}
+              onClick={() => setPlusMenuOpen((value) => !value)}
+            >
+              <Plus size={18} />
+            </button>
+            {plusMenuOpen && (
+              <MessagePlusMenu
+                onAction={(action) => {
+                  setPlusMenuOpen(false);
+                  if (action === "requests") {
+                    setContactFilter("requests");
+                    setActiveModule("contacts");
+                    return;
+                  }
+                  setComposerDialog(action);
+                }}
+              />
+            )}
           </div>
-          <button
-            className="e-icon-button primary"
-            type="button"
-            aria-label="发起聊天"
-            title="发起聊天需接入联系人选择"
-            disabled
-          >
-            <MessageSquarePlus size={18} />
-          </button>
         </header>
 
-        <label className="e-search">
-          <Search size={17} />
-          <input
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索会话、联系人、群聊"
-          />
-        </label>
-
-        <nav className="e-filter-row" aria-label="消息筛选">
+        <nav className="e-filter-row" aria-label="Message filters">
           {filterTabs.map((tab) => (
             <button
               className={messageFilter === tab.key ? "selected" : ""}
@@ -1834,11 +2040,21 @@ export function MessageCenter() {
                 key={item.conversationId}
                 onClick={() => openConversationFromUserClick(item)}
                 onContextMenu={(event) => openConversationMenu(event, item)}
-                userIdentity={unreadIdentity}
+                groupAvatar={resolveGroupConversationAvatar(
+                  item,
+                  groupMembersByConversation[item.conversationId] ??
+                    (item.conversationId === activeConversation?.conversationId &&
+                    getImConversationType(item) === "group"
+                      ? groupMembersQuery.data
+                      : undefined),
+                  groupAvatarSnapshotFor(item),
+                )}
+                isGroup={getImConversationType(item) === "group"}
+                unread={effectiveConversationUnreadCount(item, unreadIdentity)}
               />
             ))}
           {!loading && visibleConversations.length === 0 && (
-            <PanelState text={keyword ? "没有匹配的普通 IM 会话" : "暂无普通 IM 会话"} />
+            <PanelState text={keyword ? "没有匹配的会话" : "暂无会话"} />
           )}
         </div>
       </section>
@@ -1864,14 +2080,26 @@ export function MessageCenter() {
           <>
             <header className="e-chat-header">
               <div className={`e-chat-title ${activeConversationIsGroup ? "group-title" : ""}`}>
+                <button
+                  className="e-chat-back-button"
+                  type="button"
+                  aria-label="显示会话列表"
+                  title="显示会话列表"
+                  onClick={() => setConversationDrawerOpen(true)}
+                >
+                  <ChevronLeft size={20} />
+                </button>
                 {!activeConversationIsGroup && (
                   <ConversationAvatar
-                    conversation={activeConversation}
-                    userIdentity={unreadIdentity}
+                    avatarUrl={activeConversation.avatarUrl}
+                    groupAvatar={undefined}
+                    isGroup={false}
+                    title={activeConversation.title}
+                    unread={effectiveConversationUnreadCount(activeConversation, unreadIdentity)}
                   />
                 )}
                 <div>
-                  <h2>{activeConversation.title}</h2>
+                  <h2>{activeConversationHeaderTitle}</h2>
                   {!activeConversationIsGroup && (
                     <p>
                       {conversationMetaText(
@@ -1910,12 +2138,26 @@ export function MessageCenter() {
                   </button>
                 )}
                 <button
-                  className={`e-icon-button ${messageProfileVisible ? "active" : ""}`}
+                  className={`e-icon-button ${
+                    messageLayoutMode === "full"
+                      ? messageProfileVisible
+                        ? "active"
+                        : ""
+                      : profileStandaloneOpen
+                        ? "active"
+                        : ""
+                  }`}
                   type="button"
-                  aria-label={activeConversationIsGroup ? "群资料" : "资料"}
-                  title={activeConversationIsGroup ? "群资料" : "资料"}
-                  aria-pressed={messageProfileVisible}
-                  onClick={() => setMessageProfileVisible(!messageProfileVisible)}
+                  aria-label={activeConversationIsGroup ? "群聊资料" : "客户信息"}
+                  title={activeConversationIsGroup ? "群聊资料" : "客户信息"}
+                  aria-pressed={messageLayoutMode === "full" ? messageProfileVisible : profileStandaloneOpen}
+                  onClick={() => {
+                    if (messageLayoutMode === "full") {
+                      setMessageProfileVisible(!messageProfileVisible);
+                    } else {
+                      setProfileStandaloneOpen(true);
+                    }
+                  }}
                 >
                   <PanelRight size={18} />
                 </button>
@@ -1924,6 +2166,17 @@ export function MessageCenter() {
 
             {notice && <ChatToastNotice text={notice} />}
 
+            {profileStandaloneOpen ? (
+              <StandaloneConversationInfoView
+                contact={activeConversationContact}
+                conversation={activeConversation}
+                groupAvatarSnapshot={groupAvatarSnapshotFor(activeConversation)}
+                groupMembers={groupMembersQuery.data ?? []}
+                loadingGroupMembers={groupMembersQuery.isLoading}
+                userIdentity={unreadIdentity}
+                onBack={() => setProfileStandaloneOpen(false)}
+              />
+            ) : (
             <section
               className="e-message-stage"
               aria-label="消息内容"
@@ -1955,8 +2208,8 @@ export function MessageCenter() {
                   </label>
                   <span>
                     {messageSearchKeyword
-                      ? `${visibleMessages.length} 条匹配`
-                      : "输入关键词后筛选当前会话消息"}
+                      ? `${visibleMessages.length} matches`
+                      : "输入关键词筛选当前消息"}
                   </span>
                 </div>
               )}
@@ -1965,14 +2218,14 @@ export function MessageCenter() {
                   <div>
                     <strong>历史记录</strong>
                     <span>
-                      当前已加载 {messages.length} 条消息
+                      已加载 {messages.length} 条消息
                       {messages[0]?.sentAt ? ` · 最早 ${formatChatTime(messages[0].sentAt)}` : ""}
                       {messages[messages.length - 1]?.sentAt
                         ? ` · 最新 ${formatChatTime(messages[messages.length - 1].sentAt)}`
                         : ""}
                     </span>
                   </div>
-                  <div className="chat-history-tags" aria-label="聊天历史快捷筛选">
+                  <div className="chat-history-tags" aria-label="Chat history filters">
                     {historyFilterTabs.map((tab) => {
                       const Icon = tab.icon;
                       const count = historyCounts[tab.key] ?? 0;
@@ -1992,7 +2245,7 @@ export function MessageCenter() {
                     })}
                   </div>
                   {(historyFilter !== "all" || messageSearchKeyword.trim()) && (
-                    <div className="chat-history-results" aria-label="历史筛选结果">
+                    <div className="chat-history-results" aria-label="Chat history results">
                       {visibleMessages.slice(0, 8).map((message) => (
                         <button
                           type="button"
@@ -2004,7 +2257,7 @@ export function MessageCenter() {
                         </button>
                       ))}
                       {visibleMessages.length === 0 && (
-                        <PanelState text="没有符合条件的聊天记录" />
+                        <PanelState text="没有匹配的聊天记录" />
                       )}
                     </div>
                   )}
@@ -2017,7 +2270,7 @@ export function MessageCenter() {
                   onClick={handleUnreadJump}
                 >
                   <ChevronsUp size={15} aria-hidden="true" />
-                  ↑↑ {unreadJump.count} 条新消息
+                  ↑ {unreadJump.count} 条新消息
                 </button>
               )}
               {pendingNewMessageCount > 0 && (
@@ -2111,7 +2364,7 @@ export function MessageCenter() {
                               ? undefined
                               : statusText
                           }
-                          timeText={formatChatTime(message.sentAt)}
+                          timeText={formatChatMessageTime(message.sentAt)}
                           translationText={messageAnnotations[message.messageId]}
                         />
                       )}
@@ -2124,23 +2377,39 @@ export function MessageCenter() {
                   text={
                     messageSearchKeyword
                       ? "没有匹配的消息"
-                      : "暂无消息，发送第一条消息开始沟通。"
+                      : "暂无消息，发送第一条消息开始聊天。"
                   }
                 />
               )}
             </section>
+            )}
 
-            {messageMenu && (
+            {!profileStandaloneOpen && messageMenu && (
               <MessageContextMenu
-                mine={isMineMessage(messageMenu.message, session)}
-                message={messageMenu.message}
                 onAction={(action) => void handleMenuAction(action, messageMenu.message)}
                 position={{ x: messageMenu.x, y: messageMenu.y }}
+                state={{
+                  canCopyMediaFile: Boolean(
+                    window.desktopApi?.copyMediaFile || window.desktopApi?.cacheMediaFile,
+                  ),
+                  hasMedia: hasOpenableMessageMedia(messageMenu.message),
+                  isImage: isImageMessage(messageMenu.message),
+                  isText: isTextLikeMessage(messageMenu.message),
+                  isVideo: isVideoMessage(messageMenu.message),
+                  isVoice: normalizeMessageType(messageMenu.message) === "voice",
+                  mediaCacheStatus: messageMenuMediaStatus,
+                  recallable:
+                    isMineMessage(messageMenu.message, session) &&
+                    isServerUsableMessage(messageMenu.message) &&
+                    isRecentMessage(messageMenu.message, 2),
+                  revealInFolderLabel: revealInFolderLabel(),
+                  serverUsable: isServerUsableMessage(messageMenu.message),
+                }}
               />
             )}
             {conversationMenu && (
               <ConversationContextMenu
-                conversation={conversationMenu.conversation}
+                isMuted={Boolean(conversationMenu.conversation.isMuted)}
                 onAction={(action) =>
                   handleConversationMenuAction(action, conversationMenu.conversation)
                 }
@@ -2155,11 +2424,11 @@ export function MessageCenter() {
               />
             )}
 
-            {replyTarget && (
+            {!profileStandaloneOpen && replyTarget && (
               <div className="composer-reply-preview" role="status">
                 <Reply size={15} />
                 <span>
-                  回复 {replyTarget.sender}：{replyTarget.preview}
+                  Reply to {replyTarget.sender}: {replyTarget.preview}
                 </span>
                 <button
                   type="button"
@@ -2171,9 +2440,9 @@ export function MessageCenter() {
               </div>
             )}
 
-            {multiSelectMode && (
+            {!profileStandaloneOpen && multiSelectMode && (
               <div className="pc-multi-select-bar" role="status">
-                <span>已选择 {selectedMessageIds.size} 条</span>
+                <span>Selected {selectedMessageIds.size}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -2207,6 +2476,7 @@ export function MessageCenter() {
               </div>
             )}
 
+            {!profileStandaloneOpen && (
             <MessageComposer
               dense
               attachmentUi="compact"
@@ -2313,6 +2583,7 @@ export function MessageCenter() {
               }
               onSendMedia={sendMediaOptimistically}
             />
+            )}
 
             {forwardTargetMessages.length > 0 && (
               <ForwardDialog
@@ -2320,6 +2591,11 @@ export function MessageCenter() {
                 conversations={conversations}
                 messages={forwardTargetMessages}
                 pending={forwardMutation.isPending}
+                resolveConversationAvatar={(conversation) =>
+                  resolveGroupConversationAvatar(conversation)
+                }
+                resolveConversationType={getImConversationType}
+                resolveMessagePreview={messageActionPreview}
                 userIdentity={unreadIdentity}
                 onClose={() => setForwardTargetMessages([])}
                 onForward={(targetConversationId) =>
@@ -2330,13 +2606,39 @@ export function MessageCenter() {
                 }
               />
             )}
+            {composerDialog === "direct" && (
+              <DirectChatDialog
+                contacts={contactPickerItems}
+                pending={createDirectChatMutation.isPending}
+                onClose={() => setComposerDialog(null)}
+                onSubmit={(userId) => createDirectChatMutation.mutate(userId)}
+              />
+            )}
+            {composerDialog === "group" && (
+              <GroupChatDialog
+                contacts={contactPickerItems}
+                pending={createGroupChatMutation.isPending}
+                onClose={() => setComposerDialog(null)}
+                onSubmit={(payload) => createGroupChatMutation.mutate(payload)}
+              />
+            )}
+            {composerDialog === "qr" && (
+              <InviteQrDialog
+                creating={createInviteQrMutation.isPending}
+                error={inviteQrsQuery.error}
+                loading={inviteQrsQuery.isLoading}
+                qrs={inviteQrsQuery.data ?? []}
+                onClose={() => setComposerDialog(null)}
+                onCreate={() => createInviteQrMutation.mutate()}
+              />
+            )}
           </>
         ) : (
-          <PanelState text="请选择一个普通 IM 会话" />
+          <PanelState text="请选择一个会话" />
         )}
       </main>
 
-      {messageProfileVisible && (
+      {dockProfile && (
         <>
           <div
             className="resizer profile-resizer"
@@ -2352,7 +2654,13 @@ export function MessageCenter() {
           />
 
           <ConversationInfoPanel
+            contact={activeConversationContact}
             conversation={activeConversation}
+            groupAvatar={resolveGroupConversationAvatar(
+              activeConversation,
+              groupMembersQuery.data ?? [],
+              groupAvatarSnapshotFor(activeConversation),
+            )}
             groupMembers={groupMembersQuery.data ?? []}
             loadingGroupMembers={groupMembersQuery.isLoading}
             userIdentity={unreadIdentity}
@@ -2363,275 +2671,195 @@ export function MessageCenter() {
   );
 }
 
-function ConversationRow({
+function StandaloneConversationInfoView({
+  contact,
   conversation,
-  active,
-  draft,
-  onClick,
-  onContextMenu,
+  groupAvatarSnapshot,
+  groupMembers,
+  loadingGroupMembers,
+  onBack,
   userIdentity,
 }: {
-  conversation: ConversationListItem;
-  active: boolean;
-  draft?: string;
-  onClick: () => void;
-  onContextMenu: (event: MouseEvent<HTMLElement>) => void;
+  contact?: ContactItem | null;
+  conversation?: ConversationListItem;
+  groupAvatarSnapshot?: string;
+  groupMembers: GroupMemberDto[];
+  loadingGroupMembers: boolean;
+  onBack: () => void;
   userIdentity?: CurrentUserIdentity | null;
 }) {
-  const draftText = draft?.trim();
   return (
-    <button
-      className={`e-conversation-row ${active ? "active" : ""}`}
-      type="button"
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-    >
-      <ConversationAvatar
+    <section className="message-info-standalone">
+      <header className="message-info-standalone-head">
+        <button type="button" onClick={onBack} aria-label="返回聊天">
+          <ChevronLeft size={20} />
+          <span>返回聊天</span>
+        </button>
+        <strong>客户信息</strong>
+      </header>
+      <ConversationInfoPanel
+        contact={contact}
         conversation={conversation}
-        badge
+        groupAvatar={
+          conversation
+            ? resolveGroupConversationAvatar(conversation, groupMembers, groupAvatarSnapshot)
+            : undefined
+        }
+        groupMembers={groupMembers}
+        loadingGroupMembers={loadingGroupMembers}
         userIdentity={userIdentity}
       />
-      <span className="e-conversation-copy">
-        <strong>{conversation.title || "未命名会话"}</strong>
-        {draftText ? (
-          <small className="e-conversation-draft">
-            <span className="e-draft-prefix">[草稿]</span>
-            <span className="e-draft-preview">{renderWechatEmojiText(draftText)}</span>
-          </small>
-        ) : (
-          <small>{renderWechatEmojiText(conversation.lastMessage?.preview || "暂无最近消息")}</small>
-        )}
-      </span>
-      <span className="e-conversation-side">
-        <time>{formatChatTime(conversation.lastMessage?.sentAt)}</time>
-        {conversation.isMuted && <BellOff className="e-muted-icon" size={15} />}
-      </span>
-    </button>
+    </section>
   );
 }
 
-function ConversationAvatar({
-  conversation,
-  badge = false,
-  userIdentity,
-}: {
-  conversation: ConversationListItem;
-  badge?: boolean;
-  userIdentity?: CurrentUserIdentity | null;
-}) {
-  const isGroup = conversation.conversationType === "group";
-  const unread = effectiveConversationUnreadCount(conversation, userIdentity);
-  return (
-    <PcAvatar
-      avatarUrl={conversation.avatarUrl}
-      className={`e-avatar e-avatar-badge-host ${isGroup ? "green" : "indigo"}`}
-      kind={isGroup ? "group" : "person"}
-      name={conversation.title || "未命名会话"}
-    >
-      {badge && unread > 0 && (
-        <em className="e-avatar-unread">{unread}</em>
-      )}
-    </PcAvatar>
-  );
-}
-
-function ConversationInfoPanel({
-  conversation,
-  groupMembers,
-  loadingGroupMembers = false,
-  userIdentity,
-}: {
-  conversation?: ConversationListItem;
-  groupMembers?: GroupMemberDto[];
-  loadingGroupMembers?: boolean;
-  userIdentity?: CurrentUserIdentity | null;
-}) {
-  const [activeTab, setActiveTab] = useState("资料");
-  const [expanded, setExpanded] = useState(true);
-
-  useEffect(() => {
-    setActiveTab("资料");
-  }, [conversation?.conversationId]);
-
-  if (!conversation) {
-    return (
-      <aside className="e-profile-panel message-info-panel">
-        <header className="customer-info-head">
-          <h2>会话资料</h2>
-        </header>
-        <PanelState text="请选择会话查看资料。" />
-      </aside>
-    );
-  }
-  const isGroup = conversation.conversationType === "group";
-  if (!isGroup) {
-    return (
-      <CustomerProfileWorkspace
-        className="e-profile-panel message-info-panel"
-        conversation={conversation}
-        title="客户信息"
-      />
-    );
-  }
-  const tabs = isGroup ? ["资料", "成员", "公告", "文件"] : ["资料", "账户", "行为", "工单"];
-  const unread = effectiveConversationUnreadCount(conversation, userIdentity);
-  const selectedTab = tabs.includes(activeTab) ? activeTab : "资料";
-  return (
-    <aside className="e-profile-panel customer-info-panel message-info-panel">
-      <header className="customer-info-head">
-        <h2>{isGroup ? "群聊资料" : "客户信息"}</h2>
-      </header>
-      <section className="customer-info-card">
-        <div className="customer-info-identity">
-          <ConversationAvatar
-            conversation={conversation}
-            userIdentity={userIdentity}
-          />
-          <div>
-            <strong>{conversation.title}</strong>
-            <p>
-              <span>{isGroup ? "群聊" : "好友私聊"}</span>
-              {unread > 0 && <span>{unread} 条未读</span>}
-            </p>
-          </div>
-        </div>
-        <nav className="customer-info-tabs" aria-label="消息资料页签">
-          {tabs.map((tab) => (
-            <button
-              className={selectedTab === tab ? "active" : ""}
-              type="button"
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
-        {renderConversationInfoTab(selectedTab, conversation, unread, groupMembers ?? [], loadingGroupMembers)}
-      </section>
-      {selectedTab === "资料" && expanded && (
-        <section className="customer-info-block">
-          <h3>{isGroup ? "群聊概览" : "会话概览"}</h3>
-          <div className="customer-info-rows">
-            <InfoRow label="置顶" value={conversation.isPinned ? "已置顶" : "--"} />
-            <InfoRow label="未读消息" value={String(unread)} />
-            <InfoRow label="最后时间" value={formatChatTime(conversation.lastMessage?.sentAt)} />
-          </div>
-        </section>
-      )}
-      {selectedTab === "资料" && (
-        <button
-          className="message-info-collapse"
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-        >
-          {expanded ? "收起群资料" : "展开群资料"}
-        </button>
-      )}
-    </aside>
-  );
-}
-
-function renderConversationInfoTab(
-  tab: string,
+function resolveGroupConversationAvatar(
   conversation: ConversationListItem,
-  unread: number,
-  groupMembers: GroupMemberDto[] = [],
-  loadingGroupMembers = false,
+  groupMembers?: GroupMemberDto[],
+  snapshotUrl?: string,
+): GroupConversationAvatar | undefined {
+  const formalAvatar = firstStringField(
+    conversation as unknown as Record<string, unknown>,
+    "groupAvatarUrl",
+    "groupIconUrl",
+    "iconUrl",
+    "avatarUrl",
+  );
+  if (formalAvatar) return { kind: "image", url: formalAvatar };
+  if (snapshotUrl) return { kind: "image", url: snapshotUrl };
+  if (!groupCompositeAvatarAllowed(conversation)) return undefined;
+  const cells = groupCompositeAvatarCells(conversation, groupMembers);
+  return cells.length > 0 ? { kind: "grid", cells } : undefined;
+}
+
+function groupCompositeAvatarAllowed(conversation: ConversationListItem) {
+  const record = conversation as unknown as Record<string, unknown>;
+  const avatarVisible = firstBooleanField(
+    record,
+    "memberAvatarVisible",
+    "canViewMemberAvatars",
+    "canViewMemberAvatar",
+    "avatarVisible",
+    "avatarsVisible",
+    "showMemberAvatar",
+    "showMemberAvatars",
+    "allowViewMemberAvatar",
+    "allowViewMemberAvatars",
+  );
+  const listVisible = firstBooleanField(
+    record,
+    "memberListVisible",
+    "canViewMemberList",
+    "membersVisible",
+    "showMemberList",
+    "allowViewMemberList",
+  );
+  return avatarVisible !== false && listVisible !== false;
+}
+
+function groupCompositeAvatarCells(
+  conversation: ConversationListItem,
+  groupMembers?: GroupMemberDto[],
 ) {
-  const isGroup = conversation.conversationType === "group";
-  if (isGroup) {
-    if (tab === "成员") {
-      return (
-        <>
-          <div className="customer-info-rows">
-            <InfoRow
-              label="成员数"
-              value={String((conversation.memberCount ?? groupMembers.length) || "--")}
-            />
-            <InfoRow label="群主" value={conversation.ownerDisplayName || "--"} />
-            <InfoRow label="我的身份" value={conversation.myRole || "--"} />
-          </div>
-          {loadingGroupMembers && <PanelState text="正在加载群成员..." />}
-          {!loadingGroupMembers && groupMembers.length > 0 && (
-            <div className="group-member-list" aria-label="群成员列表">
-              {groupMembers.slice(0, 24).map((member) => (
-                <div key={member.userId || member.displayName}>
-                  <PcAvatar
-                    avatarUrl={member.avatarUrl}
-                    className="group-member-avatar"
-                    name={member.displayName}
-                  />
-                  <span>{member.displayName || "成员"}</span>
-                  {(member.role || member.memberRole) && (
-                    <em>{member.role || member.memberRole}</em>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      );
-    }
-    if (tab === "公告") {
-      return <PanelState text="暂无群公告" />;
-    }
-    if (tab === "文件") {
-      return <PanelState text="暂无群文件" />;
-    }
-  } else {
-    if (tab === "账户") {
-      return (
-        <div className="customer-info-rows">
-          <InfoRow label="用户 ID" value={conversation.peerUserId || "--"} />
-          <InfoRow label="LPP 号" value={conversation.peerLppId || "--"} />
-          <InfoRow label="手机号" value={conversation.peerPhoneMasked || "--"} />
-          <InfoRow label="邮箱" value={conversation.peerEmailMasked || "--"} />
-        </div>
-      );
-    }
-    if (tab === "行为") {
-      return (
-        <div className="customer-info-rows">
-          <InfoRow label="未读消息" value={String(unread)} />
-          <InfoRow label="最近消息" value={renderWechatEmojiText(conversation.lastMessage?.preview || "--")} />
-          <InfoRow label="最后时间" value={formatChatTime(conversation.lastMessage?.sentAt)} />
-          <InfoRow label="免打扰" value={conversation.isMuted ? "已开启" : "未开启"} />
-        </div>
-      );
-    }
-    if (tab === "工单") {
-      return <PanelState text="暂无关联工单" />;
-    }
-  }
+  const record = conversation as unknown as Record<string, unknown>;
+  const cells: GroupAvatarCell[] = [];
+
+  arrayRecordField(record, "members", "groupMembers").forEach((member, index) => {
+    cells.push({
+      avatarUrl: firstStringField(member, "avatarUrl", "avatar", "photoUrl", "headUrl"),
+      name:
+        firstStringField(member, "displayName", "name", "nickname", "userName") ||
+        `成员${index + 1}`,
+    });
+  });
+
+  (groupMembers ?? [])
+    .slice()
+    .sort(compareGroupAvatarMemberPriority)
+    .forEach((member, index) => {
+      cells.push({
+        avatarUrl: member.avatarUrl,
+        name: usablePersonName(member.displayName) || member.userId || `成员${index + 1}`,
+      });
+    });
+
+  arrayStringField(record, "memberAvatarUrls", "memberAvatars", "avatarUrls").forEach((url, index) => {
+    cells.push({ avatarUrl: url, name: `成员${index + 1}` });
+  });
+
+  return uniqueGroupAvatarCells(cells).slice(0, 9);
+}
+
+function compareGroupAvatarMemberPriority(left: GroupMemberDto, right: GroupMemberDto) {
   return (
-    <>
-      <div className="customer-info-rows">
-        <InfoRow label="会话类型" value={isGroup ? "群聊" : "好友私聊"} />
-        <InfoRow
-          label={isGroup ? "成员数" : "用户 ID"}
-          value={isGroup ? String(conversation.memberCount ?? "--") : conversation.peerUserId || "--"}
-        />
-        <InfoRow label="免打扰" value={conversation.isMuted ? "已开启" : "未开启"} />
-        <InfoRow label="最近消息" value={renderWechatEmojiText(conversation.lastMessage?.preview || "--")} />
-      </div>
-      <div className="customer-info-tags">
-        {(isGroup ? ["群聊", "企业协作"] : ["好友", "IM"]).map((tag) => (
-          <span key={tag}>{tag}</span>
-        ))}
-        {!isGroup && <button type="button">+ 添加</button>}
-      </div>
-    </>
+    groupMemberRoleRank(left) - groupMemberRoleRank(right) ||
+    new Date(left.joinedAt ?? 0).getTime() - new Date(right.joinedAt ?? 0).getTime()
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="customer-info-row">
-      <span>{label}</span>
-      <strong>{value || "--"}</strong>
-    </div>
-  );
+function groupMemberRoleRank(member: GroupMemberDto) {
+  const role = `${member.role ?? member.memberRole ?? ""}`.toLowerCase();
+  if (role.includes("owner") || role.includes("??")) return 0;
+  if (role.includes("admin") || role.includes("???")) return 1;
+  return 2;
+}
+
+function firstStringField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function firstBooleanField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes", "visible", "enabled", "allow"].includes(normalized)) return true;
+      if (["false", "0", "no", "hidden", "disabled", "deny"].includes(normalized)) return false;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) return value !== 0;
+  }
+  return undefined;
+}
+
+function arrayStringField(record: Record<string, unknown>, ...keys: string[]) {
+  return keys.flatMap((key) => {
+    const value = record[key];
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()));
+  });
+}
+
+function arrayRecordField(record: Record<string, unknown>, ...keys: string[]) {
+  return keys.flatMap((key) => {
+    const value = record[key];
+    if (!Array.isArray(value)) return [];
+    return value.filter(
+      (item): item is Record<string, unknown> => Boolean(item && typeof item === "object"),
+    );
+  });
+}
+
+function uniqueGroupAvatarCells(values: GroupAvatarCell[]) {
+  const seen = new Set<string>();
+  const next: GroupAvatarCell[] = [];
+  values.forEach((value) => {
+    const normalized = `${value.avatarUrl || ""}|${value.name}`.trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    next.push(value);
+  });
+  return next;
+}
+
+function createdConversationId(result: unknown) {
+  if (!result || typeof result !== "object") return "";
+  const record = result as Record<string, unknown>;
+  return stringField(record, "conversationId", "chatId", "groupId", "id");
 }
 
 function PanelState({ text }: { text: string }) {
@@ -2684,340 +2912,6 @@ function AvatarProfilePopover({
   );
 }
 
-type MessageContextAction =
-  | "multi_select"
-  | "reply"
-  | "ai_reply"
-  | "copy"
-  | "copy_image"
-  | "copy_media"
-  | "open_media"
-  | "edit_media"
-  | "translate"
-  | "voice_to_text"
-  | "save_media_as"
-  | "reveal_in_folder"
-  | "forward"
-  | "favorite"
-  | "recall"
-  | "delete";
-
-function MessageContextMenu({
-  message,
-  mine,
-  onAction,
-  position,
-}: {
-  message: MessageItemDto;
-  mine: boolean;
-  onAction: (action: MessageContextAction) => void;
-  position: { x: number; y: number };
-}) {
-  const isText = isTextLikeMessage(message);
-  const isImage = isImageMessage(message);
-  const isVideo = isVideoMessage(message);
-  const isVoice = normalizeMessageType(message) === "voice";
-  const hasMedia = hasOpenableMedia(message);
-  const canCopyMediaFile = Boolean(window.desktopApi?.copyMediaFile || window.desktopApi?.cacheMediaFile);
-  const serverUsable = isServerUsableMessage(message);
-  const recallable = mine && serverUsable && isRecentMessage(message, 2);
-  const fallbackItems: Array<{
-    action: MessageContextAction;
-    label: string;
-    icon: ReactNode;
-    danger?: boolean;
-  }> = [
-    ...(serverUsable
-      ? [
-          {
-            action: "multi_select" as const,
-            label: "多选",
-            icon: <CheckSquare size={15} />,
-          },
-          { action: "reply" as const, label: "引用", icon: <Reply size={15} /> },
-        ]
-      : []),
-    ...(isText
-      ? [
-          { action: "copy" as const, label: "复制", icon: <Copy size={15} /> },
-          {
-            action: "ai_reply" as const,
-            label: "AI 回复",
-            icon: <Sparkles size={15} />,
-          },
-          {
-            action: "translate" as const,
-            label: "翻译",
-            icon: <Languages size={15} />,
-          },
-        ]
-      : []),
-    ...(isImage && hasMedia
-      ? [
-          {
-            action: "copy_image" as const,
-            label: "复制图片",
-            icon: <FileImage size={15} />,
-          },
-        ]
-      : []),
-    ...(serverUsable && isVoice
-      ? [
-          {
-            action: "voice_to_text" as const,
-            label: "转文字",
-            icon: <TextCursorInput size={15} />,
-          },
-        ]
-      : []),
-    ...(hasMedia
-      ? [
-          {
-            action: "save_media_as" as const,
-            label: "另存为",
-            icon: <Download size={15} />,
-          },
-          {
-            action: "reveal_in_folder" as const,
-            label: revealInFolderLabel(),
-            icon: <FolderOpen size={15} />,
-          },
-        ]
-      : []),
-    ...(serverUsable
-      ? [
-          { action: "forward" as const, label: "转发", icon: <Forward size={15} /> },
-          { action: "favorite" as const, label: "收藏", icon: <Star size={15} /> },
-        ]
-      : []),
-    ...(recallable
-      ? [
-          {
-            action: "recall" as const,
-            label: "撤回",
-            icon: <Undo2 size={15} />,
-            danger: true,
-          },
-        ]
-      : []),
-    {
-      action: "delete",
-      label: "删除",
-      icon: <Trash2 size={15} />,
-      danger: true,
-    },
-  ];
-  const mediaItems: typeof fallbackItems = [
-    ...(isImage || canCopyMediaFile
-      ? [
-          {
-            action: isImage ? ("copy_image" as const) : ("copy_media" as const),
-            label: "复制",
-            icon: isImage ? <FileImage size={15} /> : <Copy size={15} />,
-          },
-        ]
-      : []),
-    {
-      action: "save_media_as",
-      label: "另存为...",
-      icon: <Download size={15} />,
-    },
-    {
-      action: "open_media",
-      label: "打开",
-      icon: <FileText size={15} />,
-    },
-    ...(!isVideo
-      ? [
-          {
-            action: "edit_media" as const,
-            label: "编辑",
-            icon: <Edit3 size={15} />,
-          },
-        ]
-      : []),
-    {
-      action: "reveal_in_folder",
-      label: revealInFolderLabel(),
-      icon: <FolderOpen size={15} />,
-    },
-    ...(serverUsable
-      ? [
-          { action: "forward" as const, label: "转发...", icon: <Forward size={15} /> },
-          { action: "favorite" as const, label: "收藏", icon: <Star size={15} /> },
-          {
-            action: "multi_select" as const,
-            label: "多选",
-            icon: <CheckSquare size={15} />,
-          },
-          { action: "reply" as const, label: "引用", icon: <Reply size={15} /> },
-        ]
-      : []),
-    ...(recallable
-      ? [
-          {
-            action: "recall" as const,
-            label: "撤回",
-            icon: <Undo2 size={15} />,
-            danger: true,
-          },
-        ]
-      : []),
-    {
-      action: "delete",
-      label: "删除",
-      icon: <Trash2 size={15} />,
-      danger: true,
-    },
-  ];
-  const items = hasMedia ? mediaItems : fallbackItems;
-
-  return (
-    <div
-      className="message-context-menu"
-      role="menu"
-      style={{ left: position.x, top: position.y }}
-      onClick={(event) => event.stopPropagation()}
-    >
-      {items.map((item) => (
-        <button
-          className={item.danger ? "danger" : ""}
-          key={item.action}
-          type="button"
-          role="menuitem"
-          onClick={() => onAction(item.action)}
-        >
-          {item.icon}
-          <span>{item.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ConversationContextMenu({
-  conversation,
-  onAction,
-  position,
-}: {
-  conversation: ConversationListItem;
-  onAction: (action: "mute" | "hide" | "delete") => void;
-  position: { x: number; y: number };
-}) {
-  return (
-    <div
-      className="message-context-menu"
-      role="menu"
-      style={{ left: position.x, top: position.y }}
-      onClick={(event) => event.stopPropagation()}
-    >
-      <button type="button" role="menuitem" onClick={() => onAction("mute")}>
-        <BellOff size={15} />
-        <span>{conversation.isMuted ? "取消免打扰" : "免打扰"}</span>
-      </button>
-      <button type="button" role="menuitem" onClick={() => onAction("hide")}>
-        <X size={15} />
-        <span>隐藏会话</span>
-      </button>
-      <button className="danger" type="button" role="menuitem" onClick={() => onAction("delete")}>
-        <Trash2 size={15} />
-        <span>删除会话</span>
-      </button>
-    </div>
-  );
-}
-
-function ChatToastNotice({ text }: { text: string }) {
-  return (
-    <div
-      className={`pc-chat-toast${isNoticeErrorText(text) ? " error" : ""}`}
-      role="status"
-      aria-live="polite"
-    >
-      {text}
-    </div>
-  );
-}
-
-function isNoticeErrorText(text: string) {
-  return /失败|错误|异常|无法|不能|未能|请稍后重试/.test(text);
-}
-
-function ForwardDialog({
-  activeConversationId,
-  conversations,
-  messages,
-  pending,
-  userIdentity,
-  onClose,
-  onForward,
-}: {
-  activeConversationId: string;
-  conversations: ConversationListItem[];
-  messages: MessageItemDto[];
-  pending: boolean;
-  userIdentity?: CurrentUserIdentity | null;
-  onClose: () => void;
-  onForward: (conversationId: string) => void;
-}) {
-  const [keyword, setKeyword] = useState("");
-  const preview = messages.length > 1
-    ? `${messages.length} 条消息`
-    : messageActionPreview(messages[0]);
-  const targets = conversations
-    .filter((item) => item.conversationId !== activeConversationId)
-    .filter((item) =>
-      item.title.toLowerCase().includes(keyword.trim().toLowerCase()),
-    );
-  return (
-    <div className="pc-modal-backdrop" role="presentation" onClick={onClose}>
-      <section
-        className="pc-forward-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-label="转发消息"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header>
-          <div>
-            <h3>转发消息</h3>
-            <p>{preview}</p>
-          </div>
-          <button type="button" aria-label="关闭" onClick={onClose}>
-            <X size={16} />
-          </button>
-        </header>
-        <label className="e-search compact">
-          <Search size={15} />
-          <input
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索会话"
-            autoFocus
-          />
-        </label>
-        <div className="pc-forward-targets">
-          {targets.map((item) => (
-            <button
-              key={item.conversationId}
-              type="button"
-              disabled={pending}
-              onClick={() => onForward(item.conversationId)}
-            >
-              <ConversationAvatar conversation={item} userIdentity={userIdentity} />
-              <span>
-                <strong>{item.title}</strong>
-                <small>{conversationMetaText(item, userIdentity)}</small>
-              </span>
-            </button>
-          ))}
-          {targets.length === 0 && <PanelState text="没有可转发的会话" />}
-        </div>
-      </section>
-    </div>
-  );
-}
-
 async function invalidateMessages(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["pc-im-messages"] }),
@@ -3060,7 +2954,7 @@ function appendLocalMessage(
     preview: previewFromOutgoingBody(messageType, body),
     readAt: null,
     senderAvatarUrl: session?.avatarUrl,
-    senderDisplayName: session?.displayName || "我",
+    senderDisplayName: session?.displayName || "Me",
     senderLppId: session?.lppId,
     senderUserId: session?.userId || session?.platformUserId,
     sentAt,
@@ -3094,7 +2988,7 @@ function appendLocalMessage(
                       senderId: session?.userId,
                       senderPlatformUserId: session?.platformUserId,
                       senderLppId: session?.lppId,
-                      senderDisplayName: session?.displayName || "我",
+                      senderDisplayName: session?.displayName || "Me",
                       isSelf: true,
                       isMine: true,
                       direction: "out",
@@ -3121,7 +3015,7 @@ function appendLocalMessage(
     direction: "out",
     isMine: true,
     isSelf: true,
-    senderDisplayName: session?.displayName || "我",
+    senderDisplayName: session?.displayName || "Me",
     senderLppId: session?.lppId,
     senderUserId: session?.userId || session?.platformUserId,
   });
@@ -3157,7 +3051,7 @@ function replaceLocalMessageInCache(
     preview: previewFromOutgoingBody(messageType, body),
     readAt: null,
     senderAvatarUrl: session?.avatarUrl,
-    senderDisplayName: session?.displayName || "我",
+    senderDisplayName: session?.displayName || "Me",
     senderLppId: session?.lppId,
     senderUserId: session?.userId || session?.platformUserId,
     sentAt,
@@ -3194,7 +3088,7 @@ function replaceLocalMessageInCache(
                       senderId: session?.userId,
                       senderPlatformUserId: session?.platformUserId,
                       senderLppId: session?.lppId,
-                      senderDisplayName: session?.displayName || "我",
+                      senderDisplayName: session?.displayName || "Me",
                       isSelf: true,
                       isMine: true,
                       direction: "out",
@@ -3221,7 +3115,7 @@ function replaceLocalMessageInCache(
     direction: "out",
     isMine: true,
     isSelf: true,
-    senderDisplayName: session?.displayName || "我",
+    senderDisplayName: session?.displayName || "Me",
     senderLppId: session?.lppId,
     senderUserId: session?.userId || session?.platformUserId,
   });
@@ -3272,16 +3166,22 @@ function applySendSucceededToImCore(
   }
 }
 
-function withLocalImagePreviews(
+function withLocalMediaPreviews(
   messages: MessageItemDto[],
   localPreviews: Map<string, string>,
 ): MessageItemDto[] {
   if (localPreviews.size === 0) return messages;
   return messages.map((message) => {
     const type = normalizeMessageType(message);
-    if (!type.includes("image") && !message.body?.image) return message;
+    const mediaKind =
+      type.includes("video") || message.body?.video
+        ? "video"
+        : type.includes("image") || message.body?.image
+          ? "image"
+          : undefined;
+    if (!mediaKind) return message;
     const media = firstMessageMedia(message);
-    const localPreviewUrl = localImagePreviewKeys(message.messageId, media)
+    const localPreviewUrl = localMediaPreviewKeys(message.messageId, media)
       .map((key) => localPreviews.get(key))
       .find(Boolean);
     if (!localPreviewUrl) return message;
@@ -3289,13 +3189,13 @@ function withLocalImagePreviews(
       ...message,
       body: {
         ...(message.body ?? {}),
-        image: withLocalPreviewOnMedia(message.body?.image, localPreviewUrl),
+        [mediaKind]: withLocalPreviewOnMedia(message.body?.[mediaKind], localPreviewUrl),
       },
     });
   });
 }
 
-function localImagePreviewKeys(
+function localMediaPreviewKeys(
   messageId?: string,
   media?: MediaResourceDto,
 ): string[] {
@@ -3497,9 +3397,9 @@ function appendForwardedMessagesToCache(
         direction: "out",
         isMine: true,
         isSelf: true,
-        preview: `转发：${messageActionPreview(message)}`,
+        preview: `Forward: ${messageActionPreview(message)}`,
         senderAvatarUrl: session?.avatarUrl,
-        senderDisplayName: session?.displayName || "我",
+        senderDisplayName: session?.displayName || "Me",
         senderLppId: session?.lppId,
         senderUserId: session?.userId || session?.platformUserId,
         sentAt: new Date(now + index).toISOString(),
@@ -3666,7 +3566,7 @@ function buildMentionOptions(members: GroupMemberDto[]) {
   return members
     .map((member) => ({
       id: member.userId || member.platformUserId || member.lppId || member.displayName,
-      label: member.displayName || member.userId || "成员",
+      label: usablePersonName(member.displayName) || member.userId || "成员",
     }))
     .filter((item) => item.id && item.label);
 }
@@ -3681,6 +3581,51 @@ function extractMentions(content: string, members: GroupMemberDto[]) {
       userId: member.userId || member.platformUserId || member.lppId,
       displayName: member.displayName,
     }));
+}
+
+function buildDirectConversationContact(
+  conversation: ConversationListItem | undefined,
+  friends: FriendDto[],
+): ContactItem | null {
+  if (!conversation || getImConversationType(conversation) !== "direct") return null;
+  const friend = friends.find((item) => item.friendUserId === conversation.peerUserId);
+  if (!friend) {
+    return {
+      id: `conversation-${conversation.conversationId}`,
+      kind: conversation.peerUserType === 1 ? "customer" : "friend",
+      name: conversation.title || "好友",
+      subtitle: conversation.peerUserType === 1 ? "客户" : "好友",
+      remark: conversation.lastMessage?.preview || "普通 IM 会话",
+      tags: [conversation.peerUserType === 1 ? "客户" : "好友"],
+      userId: conversation.peerUserId ?? undefined,
+      lppId: conversation.peerLppId ?? undefined,
+      conversationId: conversation.conversationId,
+      avatarUrl: conversation.avatarUrl,
+      source: conversation.peerUserType === 1 ? "客户通讯录" : "好友私聊",
+      lastMessagePreview: conversation.lastMessage?.preview,
+      lastMessageAt: conversation.lastMessage?.sentAt,
+      muted: conversation.isMuted,
+    };
+  }
+  const kind = friend.userType === 1 ? "customer" : "friend";
+  return {
+    id: `friend-${friend.friendUserId}`,
+    kind,
+    name: friend.remarkName || friend.displayName || conversation.title || "好友",
+    subtitle: `${kind === "customer" ? "客户" : "好友"}${friend.groupName ? ` · ${friend.groupName}` : ""}`,
+    remark: friend.createdAt ? `添加于 ${formatChatTime(friend.createdAt)}` : "好友关系",
+    tags: [kind === "customer" ? "客户" : "好友", friend.groupName ?? ""].filter(Boolean),
+    userId: friend.friendUserId,
+    lppId: friend.lppId || friend.lppNo || friend.lppNumber || conversation.peerLppId || undefined,
+    conversationId: conversation.conversationId,
+    avatarUrl: friend.avatarUrl || conversation.avatarUrl,
+    groupName: friend.groupName,
+    createdAt: friend.createdAt,
+    source: kind === "customer" ? "客户通讯录" : "好友通讯录",
+    lastMessagePreview: conversation.lastMessage?.preview,
+    lastMessageAt: conversation.lastMessage?.sentAt,
+    muted: conversation.isMuted,
+  };
 }
 
 function filterMessages(messages: MessageItemDto[], keyword: string) {
@@ -3850,7 +3795,12 @@ function usablePersonName(value?: string | null) {
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) {
     return undefined;
   }
+  if (isLikelyMojibakeText(text)) return undefined;
   return text;
+}
+
+function isLikelyMojibakeText(text: string) {
+  return /[ÃÂ�]|(鎴|瀵|瀹|鎵|鎾|鉼|鐢|鍙|瑙|鏄|鍚|涓|浠|缇|濂|鑱|璐|鎬|鏉|钀|绾|€)/.test(text);
 }
 
 function resolveSenderDisplayName(
@@ -3863,7 +3813,8 @@ function resolveSenderDisplayName(
   if (conversation.conversationType === "direct") {
     return senderName || conversation.title || "对方";
   }
-  if (member?.displayName) return member.displayName;
+  const memberName = usablePersonName(member?.displayName);
+  if (memberName) return memberName;
   if (senderName) return senderName;
   const bodyName = usablePersonName(
     stringField(message.body ?? {}, "senderName", "senderDisplayName", "displayName"),
@@ -3901,7 +3852,7 @@ function isEventLikeMessage(message: MessageItemDto) {
 }
 
 function isGenericGroupJoinText(text: string) {
-  return ["成员已加入群聊", "成员加入群聊", "已加入群聊"].includes(text.trim());
+  return ["Member joined the group", "joined the group"].includes(text.trim());
 }
 
 function formatGroupMemberEventText(record: Record<string, unknown>) {
@@ -3918,7 +3869,7 @@ function formatGroupMemberEventText(record: Record<string, unknown>) {
   if (!joinTypes.has(type)) return undefined;
   const names = eventMemberNames(record);
   if (names.length === 0) return undefined;
-  return `${joinNames(names)} 加入群聊`;
+  return `${joinNames(names)}加入了群聊`;
 }
 
 function eventMemberNames(record: Record<string, unknown>) {
@@ -3971,7 +3922,7 @@ function eventMemberNames(record: Record<string, unknown>) {
 }
 
 function joinNames(names: string[]) {
-  return names.length <= 3 ? names.join("、") : `${names.slice(0, 3).join("、")}等${names.length}人`;
+  return names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} and ${names.length} people`;
 }
 
 function resolveSenderAvatarUrl(
@@ -4006,7 +3957,7 @@ function buildAvatarProfilePopover({
       subtitle: "当前账号",
       avatarUrl: session?.avatarUrl,
       rows: compactProfileRows([
-        ["LPP 号", session?.lppId],
+        ["绿泡泡号", session?.lppId],
         ["用户 ID", session?.userId],
         ["身份", "我"],
       ]),
@@ -4017,7 +3968,7 @@ function buildAvatarProfilePopover({
   const displayName =
     member?.displayName ||
     message.senderDisplayName ||
-    (isGroup ? "群成员" : conversation.title || "对方");
+    (isGroup ? "群成员" : conversation.title || "联系人");
   const lppId = member?.lppId || message.senderLppId || message.lppId;
   const userId =
     member?.userId ||
@@ -4038,7 +3989,7 @@ function buildAvatarProfilePopover({
       message.avatarUrl ||
       conversation.avatarUrl,
     rows: compactProfileRows([
-      ["LPP 号", lppId || conversation.peerLppId],
+      ["绿泡泡号", lppId || conversation.peerLppId],
       ["用户 ID", userId],
       ["平台 ID", platformUserId],
       ["角色", role],
@@ -4070,7 +4021,7 @@ function buildContactCardProfilePopover({
       "nickName",
       "nick_name",
     ) ||
-    "联系人名片";
+    "个人名片";
   const userId = stringField(value, "userId", "user_id", "friendUserId", "customerUserId", "id");
   const platformUserId = stringField(value, "platformUserId", "platform_user_id");
   const lppId = stringField(value, "lppId", "lpp_id", "lppNo", "lppNumber");
@@ -4085,7 +4036,7 @@ function buildContactCardProfilePopover({
     subtitle: lppId || mobile || email || "个人名片",
     avatarUrl,
     rows: compactProfileRows([
-      ["LPP 号", lppId],
+      ["绿泡泡号", lppId],
       ["用户 ID", userId],
       ["平台 ID", platformUserId],
       ["手机", mobile],
@@ -4382,39 +4333,6 @@ function mediaName(message: MessageItemDto) {
   return mediaFileName(media) || message.preview;
 }
 
-function mediaCacheFileName(message: MessageItemDto) {
-  const media = firstMessageMedia(message);
-  return mediaFileName(media) || mediaFallbackName(message);
-}
-
-function hasOpenableMedia(message: MessageItemDto) {
-  return Boolean(resolveMessageMediaUrl(message));
-}
-
-function resolveMessageMediaUrl(
-  message: MessageItemDto,
-  assetBaseUrl?: string,
-) {
-  const media = firstMessageMedia(message);
-  const raw = resolveNormalizedMediaUrl(
-    media,
-    assetBaseUrl || window.location.origin,
-    "url",
-    "downloadUrl",
-    "signedUrl",
-    "fileUrl",
-    "uri",
-    "path",
-    "thumbnailUrl",
-  );
-  if (!raw) return undefined;
-  try {
-    return new URL(raw, assetBaseUrl || window.location.origin).toString();
-  } catch {
-    return raw;
-  }
-}
-
 async function downloadMessageMedia(
   message: MessageItemDto,
   url: string,
@@ -4424,34 +4342,9 @@ async function downloadMessageMedia(
     conversationId?: string;
   },
 ) {
-  const fileName = safeDownloadFileName(mediaCacheFileName(message));
-  if (!/^(blob:|file:)/i.test(url) && window.desktopApi?.cacheMediaFile) {
-    await window.desktopApi.cacheMediaFile({
-      url,
-      fileName,
-      kind: mediaCacheKind(message),
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-    });
-    return;
-  }
-  if (/^(blob:|data:|file:)/i.test(url)) {
-    triggerDownload(url, fileName);
-    return;
-  }
-  try {
-    const response = await fetch(url, {
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    triggerDownload(objectUrl, fileName);
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5_000);
-  } catch {
-    triggerDownload(url, fileName);
-  }
+  await downloadDesktopMedia(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function saveMessageMediaAs(
@@ -4463,22 +4356,9 @@ async function saveMessageMediaAs(
     conversationId?: string;
   },
 ) {
-  const fileName = safeDownloadFileName(mediaCacheFileName(message));
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持另存为，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.saveMediaAs) {
-    return window.desktopApi.saveMediaAs({
-      url,
-      fileName,
-      kind: mediaCacheKind(message),
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-    });
-  }
-  await downloadAuthenticatedMediaBlob(url, fileName, authToken);
-  return fileName;
+  return saveDesktopMediaAs(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function revealMessageMediaInFolder(
@@ -4490,34 +4370,9 @@ async function revealMessageMediaInFolder(
     conversationId?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持显示位置，请先发送完成后再操作");
-  }
-  const fileName = safeDownloadFileName(mediaCacheFileName(message));
-  const kind = mediaCacheKind(message);
-  if (window.desktopApi?.revealMediaInFolder) {
-    return window.desktopApi.revealMediaInFolder({
-      url,
-      fileName,
-      kind,
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-    });
-  }
-  if (window.desktopApi?.cacheMediaFile && window.desktopApi?.openFile) {
-    const cached = await window.desktopApi.cacheMediaFile({
-      url,
-      fileName,
-      kind,
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-    });
-    await window.desktopApi.openFile(parentDirectory(cached.filePath));
-    return cached.filePath;
-  }
-  throw new Error("当前环境不支持显示文件位置");
+  return revealDesktopMediaInFolder(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function copyMessageMediaFile(
@@ -4530,24 +4385,9 @@ async function copyMessageMediaFile(
     fileName?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持复制，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.copyMediaFile) {
-    return window.desktopApi.copyMediaFile(mediaDesktopPayload(message, url, authToken, cacheContext));
-  }
-  if (window.desktopApi?.cacheMediaFile) {
-    const cached = await window.desktopApi.cacheMediaFile(
-      mediaDesktopPayload(message, url, authToken, cacheContext),
-    );
-    if (window.desktopApi?.copyFilePath) {
-      await window.desktopApi.copyFilePath(cached.filePath);
-    } else {
-      await navigator.clipboard.writeText(cached.filePath);
-    }
-    return cached.filePath;
-  }
-  throw new Error("PC 桌面能力未就绪，请重启 PC 客户端后再试");
+  return copyDesktopMediaFile(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function openMessageMediaFile(
@@ -4560,20 +4400,9 @@ async function openMessageMediaFile(
     fileName?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持打开，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.openMediaFile) {
-    return window.desktopApi.openMediaFile(mediaDesktopPayload(message, url, authToken, cacheContext));
-  }
-  if (window.desktopApi?.cacheMediaFile && window.desktopApi?.openFile) {
-    const cached = await window.desktopApi.cacheMediaFile(
-      mediaDesktopPayload(message, url, authToken, cacheContext),
-    );
-    await window.desktopApi.openFile(cached.filePath);
-    return cached.filePath;
-  }
-  throw new Error("当前环境不支持打开文件");
+  return openDesktopMediaFile(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 async function editMessageMediaFile(
@@ -4586,93 +4415,17 @@ async function editMessageMediaFile(
     fileName?: string;
   },
 ) {
-  if (/^blob:/i.test(url)) {
-    throw new Error("这条本地临时文件暂不支持编辑，请先发送完成后再操作");
-  }
-  if (window.desktopApi?.editMediaFile) {
-    return window.desktopApi.editMediaFile(mediaDesktopPayload(message, url, authToken, cacheContext));
-  }
-  return openMessageMediaFile(message, url, authToken, cacheContext);
-}
-
-function mediaDesktopPayload(
-  message: MessageItemDto,
-  url: string,
-  authToken?: string,
-  cacheContext?: {
-    accountId?: string;
-    conversationId?: string;
-    fileName?: string;
-  },
-) {
-  return {
-    url,
-    fileName: safeDownloadFileName(
-      cacheContext?.fileName || mediaCacheFileName(message),
-    ),
-    kind: mediaCacheKind(message),
-    authToken,
-    accountId: cacheContext?.accountId,
-    conversationId: cacheContext?.conversationId,
-  };
-}
-
-function mediaCacheKind(message: MessageItemDto): "image" | "video" | "file" {
-  const type = normalizeMessageType(message);
-  if (type.includes("image") || message.body?.image) return "image";
-  if (type.includes("video") || message.body?.video) return "video";
-  return "file";
+  return editDesktopMediaFile(
+    messageMediaActionPayload({ message, url, authToken, cacheContext }),
+  );
 }
 
 function revealInFolderLabel() {
-  return isMacPlatform() ? "在 Finder 中显示" : "在文件夹中显示";
+  return desktopRevealInFolderLabel();
 }
 
 function isMacPlatform() {
   return /mac/i.test(navigator.platform);
-}
-
-function parentDirectory(filePath: string) {
-  const normalized = filePath.trim();
-  const parent = normalized.replace(/[\\/][^\\/]*$/, "");
-  return parent || normalized;
-}
-
-async function downloadAuthenticatedMediaBlob(
-  url: string,
-  fileName: string,
-  authToken?: string,
-) {
-  const response = await fetch(url, {
-    headers: authToken
-      ? {
-          Accept: "application/octet-stream,*/*",
-          Authorization: `Bearer ${authToken}`,
-          "X-Access-Token": authToken,
-          "X-Tenant-Token": authToken,
-        }
-      : undefined,
-  });
-  const blob = await response.blob();
-  if (!response.ok || blob.type.includes("json")) {
-    const text = await blob.text().catch(() => "");
-    const message = jsonErrorMessage(text) || `文件下载失败：HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  const objectUrl = URL.createObjectURL(blob);
-  triggerDownload(objectUrl, fileName);
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5_000);
-}
-
-function jsonErrorMessage(text: string) {
-  if (!text.trim()) return undefined;
-  try {
-    const payload = JSON.parse(text) as { code?: string; message?: string };
-    if (payload.code === "AUTH_REQUIRED") return "文件下载需要登录认证，请重新登录后再试";
-    return payload.message || payload.code;
-  } catch {
-    return undefined;
-  }
 }
 
 async function copyMessageImage(
@@ -4684,73 +4437,13 @@ async function copyMessageImage(
     fileName?: string;
   },
 ) {
-  if (!/^(blob:|data:)/i.test(url) && window.desktopApi?.copyImageFromUrl) {
-    await window.desktopApi.copyImageFromUrl({
-      url,
-      authToken,
-      accountId: cacheContext?.accountId,
-      conversationId: cacheContext?.conversationId,
-      fileName: cacheContext?.fileName,
-    });
-    return;
-  }
-  const pngBlob = await imageUrlToPngBlob(url, authToken);
-  const ClipboardItemCtor = window.ClipboardItem;
-  if (!navigator.clipboard?.write || !ClipboardItemCtor) {
-    throw new Error("当前环境不支持复制图片");
-  }
-  await navigator.clipboard.write([
-    new ClipboardItemCtor({ "image/png": pngBlob }),
-  ]);
-}
-
-async function imageUrlToPngBlob(url: string, authToken?: string) {
-  const response = await fetch(url, {
-    headers:
-      authToken && !/^(blob:|data:)/i.test(url)
-        ? { Authorization: `Bearer ${authToken}` }
-        : undefined,
+  await copyDesktopImage({
+    url,
+    authToken,
+    accountId: cacheContext?.accountId,
+    conversationId: cacheContext?.conversationId,
+    fileName: cacheContext?.fileName || "image.png",
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const sourceBlob = await response.blob();
-  if (sourceBlob.type === "image/png") return sourceBlob;
-  const bitmap = await createImageBitmap(sourceBlob);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("无法创建图片画布");
-  context.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("图片转换失败"));
-    }, "image/png");
-  });
-}
-
-function triggerDownload(url: string, fileName: string) {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.rel = "noreferrer";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-}
-
-function safeDownloadFileName(value: string) {
-  const sanitized = value.trim().replace(/[\\/:*?"<>|]/g, "_");
-  return sanitized || "lpp-media";
-}
-
-function mediaFallbackName(message: MessageItemDto) {
-  const type = normalizeMessageType(message);
-  if (type.includes("image")) return "lpp-image.jpg";
-  if (type.includes("video")) return "lpp-video.mp4";
-  if (type.includes("voice") || type.includes("audio")) return "lpp-voice.m4a";
-  return "lpp-file";
 }
 
 function extractActionResultText(value: unknown): string | undefined {
@@ -4798,28 +4491,28 @@ function normalizeUploadedMedia(
     thumbnailUrl:
       media.thumbnailUrl ||
       stringField(record, "thumbUrl", "previewUrl", "previewPath", "coverUrl", "cover", "thumbnail"),
-    fileName: media.fileName || file.name,
-    mimeType: media.mimeType || file.type,
-    sizeBytes: media.sizeBytes || file.size,
-  };
+    fileName: file.name || media.fileName,
+    originalFileName: file.name,
+    mimeType: file.type || media.mimeType,
+    sizeBytes: file.size || media.sizeBytes,
+  } as MediaResourceDto;
 }
 
-function withVideoPosterMedia(
-  media: MediaResourceDto,
-  poster?: VideoPosterResult,
-  uploadedPoster?: MediaResourceDto,
-): MediaResourceDto {
-  if (!poster && !uploadedPoster) return media;
-  const posterUrl = uploadedPoster?.url || uploadedPoster?.thumbnailUrl || poster?.url;
-  return {
-    ...media,
-    thumbnailUrl: media.thumbnailUrl || posterUrl,
-    posterUrl,
-    localPosterUrl: poster?.url,
-    durationSeconds: media.durationSeconds || poster?.durationSeconds,
-    width: media.width || poster?.width,
-    height: media.height || poster?.height,
-  } as MediaResourceDto;
+async function settleVideoPosterForSend(
+  promise: Promise<VideoPosterResult | undefined>,
+  timeoutMs = 700,
+) {
+  let timer: number | undefined;
+  try {
+    return await Promise.race([
+      promise.catch(() => undefined),
+      new Promise<undefined>((resolve) => {
+        timer = window.setTimeout(() => resolve(undefined), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) window.clearTimeout(timer);
+  }
 }
 
 function stringField(record: Record<string, unknown>, ...keys: string[]) {

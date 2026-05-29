@@ -349,9 +349,32 @@ function appendMediaParts(
   value: unknown,
 ) {
   toMediaArray(value).forEach((media) => {
-    parts.push({ type, media } as NormalizedMessagePart);
+    parts.push({ type: correctedMediaPartType(type, media), media } as NormalizedMessagePart);
   });
 }
+
+function correctedMediaPartType(
+  type: "image" | "file" | "voice" | "video",
+  media: MediaResourceDto,
+) {
+  if (type !== "video") return type;
+  const extension = mediaFileName(media)?.split(".").pop()?.toLowerCase() ?? "";
+  if (!extension) return type;
+  return videoFileExtensions.has(extension) ? type : "file";
+}
+
+const videoFileExtensions = new Set([
+  "avi",
+  "m4v",
+  "mkv",
+  "mov",
+  "mp4",
+  "mpeg",
+  "mpg",
+  "ogv",
+  "webm",
+  "wmv",
+]);
 
 function toMediaArray(value: unknown): MediaResourceDto[] {
   const directUrl = stringValue(value);

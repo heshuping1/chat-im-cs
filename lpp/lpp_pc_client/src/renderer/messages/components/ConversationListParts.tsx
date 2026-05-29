@@ -1,0 +1,116 @@
+import { BellOff } from "lucide-react";
+import type { MouseEvent } from "react";
+
+import { PcAvatar } from "../../components/PcAvatar";
+import type { ConversationListItem } from "../../data/api-client";
+import { formatChatTime } from "../../lib/format";
+import { renderWechatEmojiText } from "../../lib/wechatEmoji";
+
+export type GroupAvatarCell = {
+  avatarUrl?: string | null;
+  name: string;
+};
+
+export type GroupConversationAvatar =
+  | { kind: "image"; url: string }
+  | { kind: "grid"; cells: GroupAvatarCell[] };
+
+export function ConversationAvatar({
+  avatarUrl,
+  badge = false,
+  groupAvatar,
+  isGroup,
+  title,
+  unread = 0,
+}: {
+  avatarUrl?: string | null;
+  badge?: boolean;
+  groupAvatar?: GroupConversationAvatar;
+  isGroup: boolean;
+  title?: string | null;
+  unread?: number;
+}) {
+  const displayTitle = title || "未命名会话";
+  return (
+    <span className="e-avatar-badge-host">
+      {isGroup && groupAvatar?.kind === "grid" ? (
+        <span
+          className={`pc-avatar group e-avatar green group-avatar-grid grid-${groupAvatar.cells.length}`}
+          aria-label={displayTitle}
+          title={displayTitle}
+        >
+          {groupAvatar.cells.map((cell, index) => (
+            <PcAvatar
+              avatarUrl={cell.avatarUrl}
+              className="group-avatar-cell"
+              key={`${cell.avatarUrl || cell.name}-${index}`}
+              name={cell.name}
+            />
+          ))}
+        </span>
+      ) : (
+        <PcAvatar
+          avatarUrl={isGroup && groupAvatar?.kind === "image" ? groupAvatar.url : isGroup ? undefined : avatarUrl}
+          className={`e-avatar ${isGroup ? "green" : "indigo"}`}
+          kind={isGroup ? "group" : "person"}
+          name={displayTitle}
+        />
+      )}
+      {badge && unread > 0 && <em className="e-avatar-unread">{unread}</em>}
+    </span>
+  );
+}
+
+export function ConversationRow({
+  active,
+  conversation,
+  draft,
+  groupAvatar,
+  isGroup,
+  onClick,
+  onContextMenu,
+  unread,
+}: {
+  active: boolean;
+  conversation: ConversationListItem;
+  draft?: string;
+  groupAvatar?: GroupConversationAvatar;
+  isGroup: boolean;
+  onClick: () => void;
+  onContextMenu: (event: MouseEvent<HTMLElement>) => void;
+  unread: number;
+}) {
+  const draftText = draft?.trim();
+  return (
+    <button
+      className={`e-conversation-row ${active ? "active" : ""}`}
+      type="button"
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+    >
+      <ConversationAvatar
+        avatarUrl={conversation.avatarUrl}
+        badge
+        groupAvatar={groupAvatar}
+        isGroup={isGroup}
+        title={conversation.title}
+        unread={unread}
+      />
+      <span className="e-conversation-copy">
+        <strong>{conversation.title || "未命名会话"}</strong>
+        {draftText ? (
+          <small className="e-conversation-draft">
+            <span className="e-draft-prefix">[草稿]</span>
+            <span className="e-draft-preview">{renderWechatEmojiText(draftText)}</span>
+          </small>
+        ) : (
+          <small>{renderWechatEmojiText(conversation.lastMessage?.preview || "暂无最近消息")}</small>
+        )}
+      </span>
+      <span className="e-conversation-side">
+        <time>{formatChatTime(conversation.lastMessage?.sentAt)}</time>
+        {conversation.isMuted && <BellOff className="e-muted-icon" size={15} />}
+      </span>
+    </button>
+  );
+}

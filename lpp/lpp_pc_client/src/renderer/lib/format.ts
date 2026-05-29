@@ -46,6 +46,18 @@ export function formatChatTime(value?: string | null) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+export function formatChatMessageTime(value?: string | null) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const now = new Date();
+  const time = `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
+  if (date.toDateString() === now.toDateString()) return time;
+  return `${date.getMonth() + 1}/${date.getDate()} ${time}`;
+}
+
 export function formatClockTime(value?: string | null) {
   if (!value) return "--";
   const date = new Date(value);

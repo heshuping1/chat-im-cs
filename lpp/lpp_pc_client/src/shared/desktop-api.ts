@@ -40,11 +40,24 @@ export interface CacheMediaPosterPayload extends CacheMediaFilePayload {
   dataUrl: string;
 }
 
+export type CachedMediaStatus = 'not_cached' | 'caching' | 'cached' | 'failed';
+
+export interface VideoPlayerPayload extends CacheMediaFilePayload {
+  title?: string;
+  posterUrl?: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+  sizeBytes?: number;
+}
+
 export interface DesktopApi {
   notify(payload: NotifyPayload): Promise<void>;
   openFile(path: string): Promise<void>;
   cacheMediaFile(payload: CacheMediaFilePayload): Promise<CachedMediaFileResult>;
+  getCachedMediaStatus(payload: CacheMediaFilePayload): Promise<CachedMediaStatus>;
   cacheMediaPoster(payload: CacheMediaPosterPayload): Promise<CachedMediaFileResult>;
+  openVideoPlayer(payload: VideoPlayerPayload): Promise<string>;
   openDownloadedFile(payload: Omit<CacheMediaFilePayload, 'kind'>): Promise<string>;
   openMediaFile(payload: CacheMediaFilePayload): Promise<string>;
   editMediaFile(payload: CacheMediaFilePayload): Promise<string>;

@@ -13,6 +13,9 @@ import {
   COMMAND_PRIORITY_LOW,
   DecoratorNode,
   DROP_COMMAND,
+  INSERT_LINE_BREAK_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DELETE_COMMAND,
   KEY_ENTER_COMMAND,
   PASTE_COMMAND,
   type EditorState,
@@ -37,7 +40,22 @@ import {
   useRef,
   type MutableRefObject,
 } from "react";
-import type { ComposerMediaKind } from "./MessageComposer";
+import type { ComposerMediaKind } from "../composer/domain/detectComposerMediaKind";
+import {
+  appendComposerTextPart,
+  composerDocumentAttachmentIds,
+  composerDocumentPreview,
+  composerDocumentText,
+  composerSendPartsFromDocument,
+  normalizeComposerDocumentParts,
+  type ComposerAttachmentPayload,
+  type ComposerDocumentPart,
+} from "../composer/domain/composerDocument";
+import {
+  composerFileAttachmentVisual,
+  composerMediaKindLabel,
+  formatComposerFileSize,
+} from "../composer/presentation/composerAttachmentPresentation";
 
 export type LexicalPendingAttachment = {
   id: string;
@@ -48,15 +66,7 @@ export type LexicalPendingAttachment = {
   error?: string;
 };
 
-type AttachmentPayload = {
-  id: string;
-  kind: ComposerMediaKind;
-  fileName: string;
-  size: number;
-  previewUrl?: string;
-  status?: "ready" | "failed";
-  error?: string;
-};
+type AttachmentPayload = ComposerAttachmentPayload;
 
 type SerializedAttachmentNode = Spread<
   AttachmentPayload & {
@@ -70,9 +80,7 @@ export type LexicalSendPart =
   | { type: "text"; text: string }
   | { type: "attachment"; attachment: LexicalPendingAttachment };
 
-export type LexicalDraftPart =
-  | { type: "text"; text: string }
-  | { type: "attachment"; payload: AttachmentPayload };
+export type LexicalDraftPart = ComposerDocumentPart;
 
 export type LexicalChatInputHandle = {
   focus: () => void;
@@ -99,7 +107,7 @@ export const LexicalChatInput = forwardRef<
       attachmentIds: string[];
     }) => void;
     onSend: () => void;
-    onFiles: (files: FileList | File[]) => void;
+    onFiles: (files: FileList | File[]) => void | Promise<void>;
     onPreviewAttachment: (attachmentId: string) => void;
     onRemoveAttachment: (attachmentId: string) => void;
     onAttachmentIdsChange: (attachmentIds: string[]) => void;
@@ -152,8 +160,12 @@ export const LexicalChatInput = forwardRef<
         if (!editor || items.length === 0) return;
         editor.update(() => {
           ensureRangeSelection();
-          $insertNodes(items.map((item) => $createAttachmentNode(item)));
-          $insertNodes([$createTextNode("")]);
+          const nodes = items.map((item) => $createAttachmentNode(item));
+          $insertNodes(nodes);
+          const lastNode = nodes.at(-1);
+          if ($isAttachmentNode(lastNode)) {
+            placeCaretAroundAttachment(lastNode, "after");
+          }
         });
         editor.focus();
       },
@@ -162,13 +174,9 @@ export const LexicalChatInput = forwardRef<
         if (!editor) return [];
         let parts: LexicalSendPart[] = [];
         editor.getEditorState().read(() => {
-          parts = collectDraftParts().flatMap((part): LexicalSendPart[] => {
-            if (part.type === "text") {
-              const text = part.text.trim();
-              return text ? [{ type: "text", text }] : [];
-            }
-            const attachment = attachmentById(part.payload.id);
-            return attachment ? [{ type: "attachment", attachment }] : [];
+          parts = composerSendPartsFromDocument({
+            parts: collectDraftParts(),
+            attachmentById,
           });
         });
         return parts;
@@ -252,6 +260,7 @@ export const LexicalChatInput = forwardRef<
         onPreviewAttachment={onPreviewAttachment}
         onRemoveAttachment={onRemoveAttachment}
       />
+      <AttachmentCursorPlugin onRemoveAttachment={onRemoveAttachment} />
     </LexicalComposer>
   );
 });
@@ -299,6 +308,10 @@ class AttachmentNode extends DecoratorNode<JSX.Element> {
     return true;
   }
 
+  isKeyboardSelectable(): false {
+    return false;
+  }
+
   getPayload(): AttachmentPayload {
     return this.__payload;
   }
@@ -337,7 +350,7 @@ function $isAttachmentNode(node: LexicalNode | null | undefined): node is Attach
 
 function AttachmentNodeView({ payload }: { payload: AttachmentPayload }) {
   const failed = payload.status === "failed";
-  const fileIcon = fileAttachmentVisual(payload.fileName);
+  const fileIcon = composerFileAttachmentVisual(payload.fileName);
   return (
     <span
       className={`composer-attachment-card ${payload.kind} ${failed ? "failed" : ""}`}
@@ -349,19 +362,20 @@ function AttachmentNodeView({ payload }: { payload: AttachmentPayload }) {
       }`}
     >
       {payload.kind === "image" && payload.previewUrl ? (
-        <button
+        <span
           className="composer-attachment-thumb"
-          type="button"
+          tabIndex={-1}
           aria-label={`预览待发送图片 ${payload.fileName}`}
-          onClick={() => dispatchAttachmentEvent("preview", payload.id)}
+          role="button"
+          onDoubleClick={() => dispatchAttachmentEvent("preview", payload.id)}
         >
           <img src={payload.previewUrl} alt={payload.fileName} />
-        </button>
+        </span>
       ) : (
         <>
           <span className="composer-attachment-copy">
             <strong>{payload.fileName || "文件"}</strong>
-            <small>{payload.error || formatFileSize(payload.size) || "待发送"}</small>
+            <small>{payload.error || formatComposerFileSize(payload.size) || "待发送"}</small>
           </span>
           <span
             className={`composer-attachment-file-icon ${fileIcon.kind}`}
@@ -373,28 +387,6 @@ function AttachmentNodeView({ payload }: { payload: AttachmentPayload }) {
       )}
     </span>
   );
-}
-
-function composerMediaKindLabel(kind: ComposerMediaKind) {
-  if (kind === "image") return "图片";
-  if (kind === "video") return "视频";
-  return "文件";
-}
-
-function fileAttachmentVisual(fileName: string) {
-  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (["mp4", "mov", "m4v", "webm", "avi", "mkv"].includes(extension)) {
-    return { kind: "video", label: "▶" };
-  }
-  if (["zip", "rar", "7z", "tar", "gz"].includes(extension)) {
-    return { kind: "archive", label: "ZIP" };
-  }
-  if (["xls", "xlsx", "csv"].includes(extension)) return { kind: "sheet", label: "X" };
-  if (extension === "pdf") return { kind: "pdf", label: "PDF" };
-  if (["doc", "docx"].includes(extension)) return { kind: "word", label: "W" };
-  if (["ppt", "pptx"].includes(extension)) return { kind: "slide", label: "P" };
-  if (["txt", "log", "md"].includes(extension)) return { kind: "document", label: "TXT" };
-  return { kind: "document", label: extension ? extension.slice(0, 3).toUpperCase() : "DOC" };
 }
 
 function EditorBridgePlugin({
@@ -420,20 +412,58 @@ function EditorBridgePlugin({
   return null;
 }
 
+function isShiftEnterEvent(event: KeyboardEvent) {
+  return (
+    event.key === "Enter" &&
+    event.shiftKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  );
+}
+
+function insertLineBreakAtSelection() {
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection)) return false;
+  selection.insertLineBreak(false);
+  return true;
+}
+
+function insertComposerLineBreak(editor: LexicalEditor) {
+  editor.update(() => {
+    ensureRangeSelection();
+    insertLineBreakAtSelection();
+  });
+  editor.focus();
+}
+
 function ComposerCommandPlugin({
   onSend,
   onFiles,
 }: {
   onSend: () => void;
-  onFiles: (files: FileList | File[]) => void;
+  onFiles: (files: FileList | File[]) => void | Promise<void>;
 }) {
   const [editor] = useLexicalComposerContext();
   useEffect(
     () =>
       editor.registerCommand(
+        INSERT_LINE_BREAK_COMMAND,
+        () => insertLineBreakAtSelection(),
+        COMMAND_PRIORITY_HIGH,
+      ),
+    [editor],
+  );
+  useEffect(
+    () =>
+      editor.registerCommand(
         KEY_ENTER_COMMAND,
         (event) => {
-          if (!event || event.shiftKey) return false;
+          if (!event) return false;
+          if (isShiftEnterEvent(event)) {
+            event.preventDefault();
+            return insertLineBreakAtSelection();
+          }
           if (event.ctrlKey || event.metaKey || event.altKey) return false;
           event.preventDefault();
           onSend();
@@ -508,6 +538,184 @@ function AttachmentEventPlugin({
   return null;
 }
 
+function AttachmentCursorPlugin({
+  onRemoveAttachment,
+}: {
+  onRemoveAttachment: (attachmentId: string) => void;
+}) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(
+    () =>
+      editor.registerCommand(
+        KEY_BACKSPACE_COMMAND,
+        (event) => {
+          const removed = removeAdjacentAttachment("backward", onRemoveAttachment);
+          if (!removed) return false;
+          event?.preventDefault();
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+    [editor, onRemoveAttachment],
+  );
+
+  useEffect(
+    () =>
+      editor.registerCommand(
+        KEY_DELETE_COMMAND,
+        (event) => {
+          const removed = removeAdjacentAttachment("forward", onRemoveAttachment);
+          if (!removed) return false;
+          event?.preventDefault();
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+    [editor, onRemoveAttachment],
+  );
+
+  useEffect(() => {
+    const root = editor.getRootElement();
+    if (!root) return undefined;
+
+    const placeFromPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const attachmentElement = target.closest<HTMLElement>("[data-attachment-id]");
+      if (attachmentElement && root.contains(attachmentElement)) {
+        event.preventDefault();
+        const rect = attachmentElement.getBoundingClientRect();
+        const side = event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+        editor.focus();
+        editor.update(() => {
+          const node = findAttachmentNode(attachmentElement.dataset.attachmentId);
+          if (node) placeCaretAroundAttachment(node, side);
+        });
+        return;
+      }
+
+      const lineAttachment = findAttachmentBeforeBlankClick(root, event);
+      if (!lineAttachment) return;
+      event.preventDefault();
+      editor.focus();
+      editor.update(() => {
+        const node = findAttachmentNode(lineAttachment.dataset.attachmentId);
+        if (node) placeCaretAroundAttachment(node, "after");
+      });
+    };
+
+    root.addEventListener("pointerdown", placeFromPointer);
+    return () => root.removeEventListener("pointerdown", placeFromPointer);
+  }, [editor]);
+
+  return null;
+}
+
+function removeAdjacentAttachment(
+  direction: "backward" | "forward",
+  onRemoveAttachment: (attachmentId: string) => void,
+) {
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false;
+  const node = adjacentAttachmentFromSelection(selection, direction);
+  if (!node) return false;
+  const attachmentId = node.getPayload().id;
+  const parent = node.getParent();
+  const index = node.getIndexWithinParent();
+  node.remove();
+  if (parent && $isElementNode(parent)) {
+    const offset = Math.max(0, Math.min(index, parent.getChildrenSize()));
+    parent.select(offset, offset);
+  }
+  onRemoveAttachment(attachmentId);
+  return true;
+}
+
+function adjacentAttachmentFromSelection(
+  selection: ReturnType<typeof $getSelection>,
+  direction: "backward" | "forward",
+) {
+  if (!$isRangeSelection(selection)) return null;
+  const anchor = selection.anchor;
+  const anchorNode = anchor.getNode();
+
+  if (anchor.type === "element" && $isElementNode(anchorNode)) {
+    const offset = anchor.offset + (direction === "backward" ? -1 : 0);
+    const candidate = anchorNode.getChildAtIndex(offset);
+    return $isAttachmentNode(candidate) ? candidate : null;
+  }
+
+  if (anchor.type !== "text" || !$isTextNode(anchorNode)) return null;
+  if (direction === "backward") {
+    if (anchor.offset !== 0) return null;
+    const candidate = anchorNode.getPreviousSibling();
+    return $isAttachmentNode(candidate) ? candidate : null;
+  }
+  if (anchor.offset !== anchorNode.getTextContentSize()) return null;
+  const candidate = anchorNode.getNextSibling();
+  return $isAttachmentNode(candidate) ? candidate : null;
+}
+
+function findAttachmentNode(attachmentId?: string) {
+  if (!attachmentId) return null;
+  return collectAttachmentNodes().find((node) => node.getPayload().id === attachmentId) ?? null;
+}
+
+function placeCaretAroundAttachment(
+  node: AttachmentNode,
+  side: "before" | "after",
+) {
+  const parent = node.getParent();
+  if (!parent || !$isElementNode(parent)) return;
+  const index = node.getIndexWithinParent();
+  const offset = side === "before" ? index : index + 1;
+  parent.select(offset, offset);
+}
+
+function findAttachmentBeforeBlankClick(root: HTMLElement, event: PointerEvent) {
+  const target = event.target;
+  if (!(target instanceof Node) || !root.contains(target)) return null;
+  if (target instanceof Element && target.closest("[data-attachment-id]")) return null;
+  if (!isEditorSurfaceClick(root, target)) return null;
+  const nativeCaret = caretRangeFromPoint(event.clientX, event.clientY);
+  if (nativeCaret?.startContainer.nodeType === Node.TEXT_NODE) return null;
+
+  const attachments = Array.from(
+    root.querySelectorAll<HTMLElement>("[data-attachment-id]"),
+  );
+  let closest: HTMLElement | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (const item of attachments) {
+    const rect = item.getBoundingClientRect();
+    const withinLine = event.clientY >= rect.top - 4 && event.clientY <= rect.bottom + 4;
+    if (!withinLine || event.clientX < rect.right) continue;
+    const distance = event.clientX - rect.right;
+    if (distance < closestDistance) {
+      closest = item;
+      closestDistance = distance;
+    }
+  }
+  return closest;
+}
+
+function isEditorSurfaceClick(root: HTMLElement, target: Node) {
+  if (target === root) return true;
+  return target instanceof HTMLElement && target.classList.contains("lexical-chat-paragraph");
+}
+
+function caretRangeFromPoint(clientX: number, clientY: number) {
+  if (document.caretRangeFromPoint) {
+    return document.caretRangeFromPoint(clientX, clientY);
+  }
+  const caretPosition = document.caretPositionFromPoint?.(clientX, clientY);
+  if (!caretPosition) return null;
+  const range = document.createRange();
+  range.setStart(caretPosition.offsetNode, caretPosition.offset);
+  range.collapse(true);
+  return range;
+}
+
 function dispatchAttachmentEvent(action: "preview" | "remove", attachmentId: string) {
   window.dispatchEvent(
     new CustomEvent("pc-im-composer-attachment", {
@@ -521,29 +729,11 @@ function createDraftSnapshot(state: EditorState) {
   state.read(() => {
     parts = collectDraftParts();
   });
-  const text = parts
-    .filter((part): part is Extract<LexicalDraftPart, { type: "text" }> => part.type === "text")
-    .map((part) => part.text)
-    .join("");
-  const preview = parts
-    .map((part) =>
-      part.type === "text"
-        ? part.text
-        : part.payload.kind === "image"
-          ? "[图片]"
-          : part.payload.kind === "video"
-            ? "[视频]"
-          : "[文件]",
-    )
-    .join("")
-    .trim();
   return {
     editorState: JSON.stringify(state.toJSON()),
-    text,
-    preview,
-    attachmentIds: parts.flatMap((part) =>
-      part.type === "attachment" ? [part.payload.id] : [],
-    ),
+    text: composerDocumentText(parts),
+    preview: composerDocumentPreview(parts),
+    attachmentIds: composerDocumentAttachmentIds(parts),
   };
 }
 
@@ -554,7 +744,7 @@ function collectDraftParts() {
     collectNodeParts(child, parts);
     if (index < children.length - 1) appendTextPart(parts, "\n");
   });
-  return mergeTextParts(parts);
+  return normalizeComposerDocumentParts(parts);
 }
 
 function collectNodeParts(node: LexicalNode, parts: LexicalDraftPart[]) {
@@ -576,25 +766,7 @@ function collectNodeParts(node: LexicalNode, parts: LexicalDraftPart[]) {
 }
 
 function appendTextPart(parts: LexicalDraftPart[], text: string) {
-  if (!text) return;
-  const previous = parts.at(-1);
-  if (previous?.type === "text") {
-    previous.text += text;
-    return;
-  }
-  parts.push({ type: "text", text });
-}
-
-function mergeTextParts(parts: LexicalDraftPart[]) {
-  const merged: LexicalDraftPart[] = [];
-  for (const part of parts) {
-    if (part.type === "text") {
-      appendTextPart(merged, part.text);
-      continue;
-    }
-    merged.push(part);
-  }
-  return merged;
+  appendComposerTextPart(parts, text);
 }
 
 function collectAttachmentNodes() {
@@ -636,11 +808,4 @@ function ensureRangeSelection() {
     root.append($createParagraphNode());
   }
   root.getLastChild()?.selectEnd();
-}
-
-function formatFileSize(size: number) {
-  if (!Number.isFinite(size) || size <= 0) return "";
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }

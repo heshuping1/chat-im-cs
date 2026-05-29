@@ -58,7 +58,7 @@ export function ChatMessageBubble({
             : message.senderAvatarUrl || message.avatarUrl || senderAvatarUrlFallback
         }
         className="pc-chat-avatar"
-        name={mine ? senderName : message.senderDisplayName || senderFallback || fallbackInitial}
+        name={mine ? senderName : senderName || fallbackInitial}
       />
     </button>
   );
@@ -69,7 +69,7 @@ export function ChatMessageBubble({
     >
       {!mine && avatar}
       <div className="pc-chat-message-main">
-        <div className="pc-chat-sender">{senderName}</div>
+        {!mine && <div className="pc-chat-sender">{senderName}</div>}
         <div className="pc-chat-bubble">
           {reply && (
             <div className="pc-chat-reply-quote">

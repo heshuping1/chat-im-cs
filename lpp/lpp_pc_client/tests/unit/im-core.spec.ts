@@ -179,7 +179,7 @@ describe("IM scenario matrix coverage", () => {
       "utf8",
     );
     const matrix =
-      spec.match(/## 场景矩阵\n([\s\S]*?)\n## 测试策略/)?.[1] ?? "";
+      spec.match(/## 场景矩阵\r?\n([\s\S]*?)\r?\n## 测试策略/)?.[1] ?? "";
     const ids = [...matrix.matchAll(/\| ([DROGMPAUF]-\d{2}) \|/g)].map(
       (match) => match[1],
     );

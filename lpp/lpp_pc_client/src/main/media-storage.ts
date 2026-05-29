@@ -1,13 +1,17 @@
 import { app } from 'electron';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, extname, isAbsolute, join } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type {
   CacheMediaFilePayload,
   CacheMediaPosterPayload,
   CachedMediaFileResult,
+  CachedMediaStatus,
 } from '../shared/desktop-api.js';
+
+const pendingMediaCacheKeys = new Set<string>();
+const failedMediaCacheKeys = new Set<string>();
 
 export async function ensureLocalMediaFile(
   payload: CacheMediaFilePayload,
@@ -24,24 +28,37 @@ export async function ensureLocalMediaFile(
     throw new Error('不支持的媒体地址');
   }
 
-  const fileName = safeMediaFileName(
-    payload.fileName || (isDownloadableMediaUrl(url) ? basename(new URL(url).pathname) : ''),
-    payload.kind,
-  );
-  const directory = mediaDirectory(payload);
-  const hash = createHash('sha1').update(url).digest('hex').slice(0, 16);
-  const filePath = join(directory, `${hash}-${fileName}`);
+  const { filePath, cacheKey } = mediaCacheTarget(payload);
 
   if (await fileExists(filePath)) {
     return { filePath, fileUrl: pathToFileURL(filePath).toString() };
   }
 
-  const bytes = url.startsWith('data:')
-    ? dataUrlBytes(url)
-    : await fetchMediaBytes(url, payload.authToken);
-  await mkdir(directory, { recursive: true });
-  await writeFile(filePath, bytes);
-  return { filePath, fileUrl: pathToFileURL(filePath).toString() };
+  pendingMediaCacheKeys.add(cacheKey);
+  failedMediaCacheKeys.delete(cacheKey);
+  try {
+    const bytes = url.startsWith('data:')
+      ? dataUrlBytes(url)
+      : await fetchMediaBytes(url, payload.authToken);
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, bytes);
+    return { filePath, fileUrl: pathToFileURL(filePath).toString() };
+  } catch (error) {
+    failedMediaCacheKeys.add(cacheKey);
+    throw error;
+  } finally {
+    pendingMediaCacheKeys.delete(cacheKey);
+  }
+}
+
+export async function getLocalMediaStatus(
+  payload: CacheMediaFilePayload,
+): Promise<CachedMediaStatus> {
+  const { filePath, cacheKey } = mediaCacheTarget(payload);
+  if (await fileExists(filePath)) return 'cached';
+  if (pendingMediaCacheKeys.has(cacheKey)) return 'caching';
+  if (failedMediaCacheKeys.has(cacheKey)) return 'failed';
+  return 'not_cached';
 }
 
 export async function readLocalOrRemoteImageBuffer(url: string, authToken?: string) {
@@ -95,6 +112,18 @@ function mediaDirectory(payload: CacheMediaFilePayload) {
     mediaKindDirectory,
     month,
   );
+}
+
+function mediaCacheTarget(payload: CacheMediaFilePayload) {
+  const url = payload.url;
+  const fileName = safeMediaFileName(
+    payload.fileName || (isDownloadableMediaUrl(url) ? basename(new URL(url).pathname) : ''),
+    payload.kind,
+  );
+  const directory = mediaDirectory(payload);
+  const hash = createHash('sha1').update(url).digest('hex').slice(0, 16);
+  const filePath = join(directory, `${hash}-${fileName}`);
+  return { cacheKey: filePath, directory, fileName, filePath };
 }
 
 function isDownloadableMediaUrl(url: string) {

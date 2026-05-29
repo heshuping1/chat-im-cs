@@ -6,6 +6,7 @@ import type {
   ConversationListResponse,
   DirectReadStatusDto,
   DirectChatCreatedDto,
+  GroupChatCreatedDto,
   MediaResourceDto,
   MessageItemDto,
 } from "./types";
@@ -36,6 +37,16 @@ export class MessagesApiClient extends ContactsApiClient {
     return this.request<DirectChatCreatedDto>(endpointPlan.directChats, {
       method: "POST",
       body: JSON.stringify({ peerUserId }),
+    });
+  }
+
+  createGroupChat(body: { name: string; memberUserIds: string[] }) {
+    return this.request<GroupChatCreatedDto>(endpointPlan.groups, {
+      method: "POST",
+      body: JSON.stringify({
+        name: body.name.trim(),
+        memberUserIds: body.memberUserIds,
+      }),
     });
   }
 
@@ -85,7 +96,7 @@ export class MessagesApiClient extends ContactsApiClient {
     options: MediaUploadOptions = {},
   ) {
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", mediaKind === "file" ? fileWithUploadSafeName(file) : file);
     form.append("mediaKind", mediaKind);
     return this.uploadFormData<MediaResourceDto>(endpointPlan.mediaUpload, form, options);
   }
@@ -293,4 +304,27 @@ function stringField(record: Record<string, unknown>, ...keys: string[]) {
 
 function normalizeGatewayType(value: string) {
   return value.trim().toLowerCase().replace(/-/g, "_");
+}
+
+function fileWithUploadSafeName(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const broadlyAcceptedExtensions = new Set([
+    "7z",
+    "csv",
+    "doc",
+    "docx",
+    "pdf",
+    "ppt",
+    "pptx",
+    "rar",
+    "txt",
+    "xls",
+    "xlsx",
+    "zip",
+  ]);
+  if (broadlyAcceptedExtensions.has(extension)) return file;
+  return new File([file], `${file.name}.txt`, {
+    type: file.type || "application/octet-stream",
+    lastModified: file.lastModified,
+  });
 }
