@@ -1,5 +1,4 @@
 import {
-  $applyNodeReplacement,
   $createParagraphNode,
   $createTextNode,
   $getRoot,
@@ -11,7 +10,6 @@ import {
   $isTextNode,
   COMMAND_PRIORITY_HIGH,
   COMMAND_PRIORITY_LOW,
-  DecoratorNode,
   DROP_COMMAND,
   INSERT_LINE_BREAK_COMMAND,
   KEY_BACKSPACE_COMMAND,
@@ -21,9 +19,6 @@ import {
   type EditorState,
   type LexicalEditor,
   type LexicalNode,
-  type NodeKey,
-  type SerializedLexicalNode,
-  type Spread,
 } from "lexical";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
@@ -40,7 +35,6 @@ import {
   useRef,
   type MutableRefObject,
 } from "react";
-import type { ComposerMediaKind } from "../composer/domain/detectComposerMediaKind";
 import {
   appendComposerTextPart,
   composerDocumentAttachmentIds,
@@ -48,33 +42,17 @@ import {
   composerDocumentText,
   composerSendPartsFromDocument,
   normalizeComposerDocumentParts,
-  type ComposerAttachmentPayload,
   type ComposerDocumentPart,
 } from "../composer/domain/composerDocument";
 import {
-  composerFileAttachmentVisual,
-  composerMediaKindLabel,
-  formatComposerFileSize,
-} from "../composer/presentation/composerAttachmentPresentation";
+  $createAttachmentNode,
+  $createAttachmentNodeFromPayload,
+  $isAttachmentNode,
+  AttachmentNode,
+  type LexicalPendingAttachment,
+} from "./LexicalAttachmentNode";
 
-export type LexicalPendingAttachment = {
-  id: string;
-  file: File;
-  kind: ComposerMediaKind;
-  previewUrl?: string;
-  status?: "ready" | "failed";
-  error?: string;
-};
-
-type AttachmentPayload = ComposerAttachmentPayload;
-
-type SerializedAttachmentNode = Spread<
-  AttachmentPayload & {
-    type: "composer-attachment";
-    version: 1;
-  },
-  SerializedLexicalNode
->;
+export type { LexicalPendingAttachment } from "./LexicalAttachmentNode";
 
 export type LexicalSendPart =
   | { type: "text"; text: string }
@@ -264,130 +242,6 @@ export const LexicalChatInput = forwardRef<
     </LexicalComposer>
   );
 });
-
-class AttachmentNode extends DecoratorNode<JSX.Element> {
-  __payload: AttachmentPayload;
-
-  static getType(): string {
-    return "composer-attachment";
-  }
-
-  static clone(node: AttachmentNode): AttachmentNode {
-    return new AttachmentNode(node.__payload, node.__key);
-  }
-
-  static importJSON(serializedNode: SerializedAttachmentNode): AttachmentNode {
-    const { type: _type, version: _version, ...payload } = serializedNode;
-    return $createAttachmentNodeFromPayload(payload);
-  }
-
-  constructor(payload: AttachmentPayload, key?: NodeKey) {
-    super(key);
-    this.__payload = payload;
-  }
-
-  exportJSON(): SerializedAttachmentNode {
-    return {
-      ...this.__payload,
-      type: "composer-attachment",
-      version: 1,
-    };
-  }
-
-  createDOM(): HTMLElement {
-    const element = document.createElement("span");
-    element.className = "composer-lexical-attachment-shell";
-    return element;
-  }
-
-  updateDOM(): false {
-    return false;
-  }
-
-  isInline(): true {
-    return true;
-  }
-
-  isKeyboardSelectable(): false {
-    return false;
-  }
-
-  getPayload(): AttachmentPayload {
-    return this.__payload;
-  }
-
-  setStatus(status: "ready" | "failed", error?: string) {
-    const writable = this.getWritable();
-    writable.__payload = { ...writable.__payload, status, error };
-  }
-
-  decorate(): JSX.Element {
-    return <AttachmentNodeView payload={this.__payload} />;
-  }
-}
-
-function $createAttachmentNode(item: LexicalPendingAttachment) {
-  return $applyNodeReplacement(
-    new AttachmentNode({
-      id: item.id,
-      kind: item.kind,
-      fileName: item.file.name || composerMediaKindLabel(item.kind),
-      size: item.file.size,
-      previewUrl: item.previewUrl,
-      status: item.status ?? "ready",
-      error: item.error,
-    }),
-  );
-}
-
-function $createAttachmentNodeFromPayload(payload: AttachmentPayload) {
-  return $applyNodeReplacement(new AttachmentNode(payload));
-}
-
-function $isAttachmentNode(node: LexicalNode | null | undefined): node is AttachmentNode {
-  return node instanceof AttachmentNode;
-}
-
-function AttachmentNodeView({ payload }: { payload: AttachmentPayload }) {
-  const failed = payload.status === "failed";
-  const fileIcon = composerFileAttachmentVisual(payload.fileName);
-  return (
-    <span
-      className={`composer-attachment-card ${payload.kind} ${failed ? "failed" : ""}`}
-      data-composer-part="attachment"
-      data-attachment-id={payload.id}
-      role="group"
-      aria-label={`待发送${composerMediaKindLabel(payload.kind)} ${
-        payload.fileName
-      }`}
-    >
-      {payload.kind === "image" && payload.previewUrl ? (
-        <span
-          className="composer-attachment-thumb"
-          tabIndex={-1}
-          aria-label={`预览待发送图片 ${payload.fileName}`}
-          role="button"
-          onDoubleClick={() => dispatchAttachmentEvent("preview", payload.id)}
-        >
-          <img src={payload.previewUrl} alt={payload.fileName} />
-        </span>
-      ) : (
-        <>
-          <span className="composer-attachment-copy">
-            <strong>{payload.fileName || "文件"}</strong>
-            <small>{payload.error || formatComposerFileSize(payload.size) || "待发送"}</small>
-          </span>
-          <span
-            className={`composer-attachment-file-icon ${fileIcon.kind}`}
-            aria-hidden="true"
-          >
-            <span className="file-type-glyph">{fileIcon.label}</span>
-          </span>
-        </>
-      )}
-    </span>
-  );
-}
 
 function EditorBridgePlugin({
   disabled,
@@ -714,14 +568,6 @@ function caretRangeFromPoint(clientX: number, clientY: number) {
   range.setStart(caretPosition.offsetNode, caretPosition.offset);
   range.collapse(true);
   return range;
-}
-
-function dispatchAttachmentEvent(action: "preview" | "remove", attachmentId: string) {
-  window.dispatchEvent(
-    new CustomEvent("pc-im-composer-attachment", {
-      detail: { action, attachmentId },
-    }),
-  );
 }
 
 function createDraftSnapshot(state: EditorState) {

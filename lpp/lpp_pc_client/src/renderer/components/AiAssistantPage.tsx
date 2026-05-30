@@ -24,9 +24,13 @@ import {
   normalizeCustomerServiceThreadType,
   staffServiceHistoryItemToThread,
 } from "../data/api-client";
+import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
-import { useWorkspaceStore } from "../data/store";
+import {
+  useActiveThreadId,
+  useSetActiveModule,
+} from "../data/workspace-ui/workspace-ui-store";
 import { formatError, formatMonthDayTime } from "../lib/format";
 
 const quickPrompts = [
@@ -36,9 +40,9 @@ const quickPrompts = [
 ];
 
 export function AiAssistantPage() {
-  const session = useWorkspaceStore((state) => state.authSession);
-  const activeThreadId = useWorkspaceStore((state) => state.activeThreadId);
-  const setActiveModule = useWorkspaceStore((state) => state.setActiveModule);
+  const session = useAuthSession();
+  const activeThreadId = useActiveThreadId();
+  const setActiveModule = useSetActiveModule();
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
   const [submittedPrompt, setSubmittedPrompt] = useState("");

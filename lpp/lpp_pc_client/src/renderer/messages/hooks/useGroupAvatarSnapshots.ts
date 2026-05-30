@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
-import type { AuthSession } from "../../data/store";
+import type { AuthSession } from "../../data/auth/auth-session";
 import {
   generateGroupAvatarSnapshot,
   getGroupAvatarSnapshot,
@@ -9,7 +9,7 @@ import {
   groupAvatarSnapshotKey,
   putGroupAvatarSnapshot,
 } from "../../lib/groupAvatarSnapshot";
-import type { GroupAvatarCell } from "../components/ConversationListParts";
+import type { GroupAvatarCell } from "../models/groupAvatarTypes";
 
 type ConversationType = "direct" | "group" | undefined;
 

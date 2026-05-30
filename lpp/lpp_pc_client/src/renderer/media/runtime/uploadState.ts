@@ -18,6 +18,18 @@ export type LocalUploadState = {
   taskId?: string;
 };
 
+export type VideoUploadOverlayIcon = "pause" | "play" | "retry" | "canceled";
+
+export type VideoUploadOverlayState = {
+  active: boolean;
+  canPlay: boolean;
+  action?: UploadAction;
+  icon?: VideoUploadOverlayIcon;
+  label?: string;
+  progress?: number;
+  taskId?: string;
+};
+
 export function localUploadStateFromMessage(message: MessageItemDto): LocalUploadState {
   const record = message as unknown as Record<string, unknown>;
   const rawStatus = typeof record.status === "string" ? record.status.trim().toLowerCase() : "";
@@ -66,6 +78,32 @@ export function uploadStatusLabel(
   return "";
 }
 
+export function videoUploadOverlayState(
+  uploadState?: LocalUploadState,
+): VideoUploadOverlayState {
+  const status = uploadState?.status;
+  if (!status || status === "sent") return { active: false, canPlay: true };
+
+  const progress = clampUploadProgress(uploadState.progress);
+  const base = {
+    active: true,
+    canPlay: false,
+    label: uploadStatusLabel(status, progress, uploadState.error),
+    progress,
+    taskId: uploadState.taskId,
+  };
+
+  if (status === "paused") return { ...base, action: "resume", icon: "play" };
+  if (status === "failed") return { ...base, action: "retry", icon: "retry" };
+  if (status === "canceled") return { ...base, action: undefined, icon: "canceled" };
+  return { ...base, action: "pause", icon: "pause" };
+}
+
 function isLocalUploadStatus(value: string): value is LocalUploadStatus {
   return ["queued", "uploading", "paused", "failed", "sent", "canceled"].includes(value);
+}
+
+function clampUploadProgress(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
 }

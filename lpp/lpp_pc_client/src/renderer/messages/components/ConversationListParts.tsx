@@ -3,17 +3,9 @@ import type { MouseEvent } from "react";
 
 import { PcAvatar } from "../../components/PcAvatar";
 import type { ConversationListItem } from "../../data/api-client";
-import { formatChatTime } from "../../lib/format";
+import { formatBadgeCount, formatChatTime } from "../../lib/format";
 import { renderWechatEmojiText } from "../../lib/wechatEmoji";
-
-export type GroupAvatarCell = {
-  avatarUrl?: string | null;
-  name: string;
-};
-
-export type GroupConversationAvatar =
-  | { kind: "image"; url: string }
-  | { kind: "grid"; cells: GroupAvatarCell[] };
+import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 
 export function ConversationAvatar({
   avatarUrl,
@@ -56,7 +48,7 @@ export function ConversationAvatar({
           name={displayTitle}
         />
       )}
-      {badge && unread > 0 && <em className="e-avatar-unread">{unread}</em>}
+      {badge && unread > 0 && <em className="e-avatar-unread">{formatBadgeCount(unread)}</em>}
     </span>
   );
 }

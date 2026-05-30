@@ -1,4 +1,5 @@
 import { ApiError } from "./base";
+import { staffServiceHistoryItemToThread } from "../customer-service/cs-history-model";
 
 export interface PlatformTenant {
   tenantId: string;
@@ -550,71 +551,7 @@ export interface StaffServiceHistoryResponse {
   nextCursor?: string | null;
 }
 
-export function staffServiceHistoryItemToThread(
-  item: StaffServiceHistoryItem,
-): CustomerServiceThread {
-  const threadType = normalizeCustomerServiceThreadType(item.threadType);
-  return {
-    threadType,
-    threadId: item.threadId,
-    conversationId: item.conversationId || item.threadId,
-    status: String(item.status ?? ""),
-    title: historyThreadTitle(item),
-    source: item.source,
-    from: item.from,
-    channel: item.channel,
-    sourceChannel: item.sourceChannel,
-    entryChannel: item.entryChannel,
-    platform: item.platform,
-    provider: item.provider,
-    avatarUrl: item.avatarUrl || item.customerAvatarUrl,
-    customerAvatarUrl: item.customerAvatarUrl,
-    lastMessagePreview:
-      item.lastMessagePreview ??
-      (item.closedAt
-        ? `关闭时间 ${formatApiShortDateTime(item.closedAt)}`
-        : item.lastMessageAt
-          ? `最近活跃 ${formatApiShortDateTime(item.lastMessageAt)}`
-          : item.participation === "transferred"
-            ? "转接参与的历史会话"
-            : "历史会话"),
-    lastMessageAt: item.lastMessageAt ?? item.closedAt ?? item.acceptedAt ?? item.startedAt,
-    unreadCount: item.unreadCount ?? 0,
-  };
-}
-
-function historyThreadTitle(item: StaffServiceHistoryItem) {
-  const raw =
-    item.title ||
-    readStringField(item, "customerDisplayName") ||
-    readStringField(item, "customerName") ||
-    readStringField(item, "customerNickname") ||
-    readStringField(item, "visitorDisplayName") ||
-    readStringField(item, "visitorName") ||
-    readStringField(item, "visitorNickname") ||
-    readStringField(item, "peerDisplayName") ||
-    readStringField(item, "displayName") ||
-    readStringField(item, "nickname") ||
-    readStringField(item, "name");
-  const value = raw?.trim();
-  if (!value || value.startsWith("历史会话")) return "访客";
-  return value;
-}
-
-function readStringField(source: unknown, key: string) {
-  if (!source || typeof source !== "object") return undefined;
-  const value = (source as Record<string, unknown>)[key];
-  return typeof value === "string" && value.trim() ? value : undefined;
-}
-
-function formatApiShortDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getMonth() + 1}/${date.getDate()} ${date
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-}
+export { staffServiceHistoryItemToThread };
 
 export interface StaffReceptionStatusDto {
   staffUserId?: string;

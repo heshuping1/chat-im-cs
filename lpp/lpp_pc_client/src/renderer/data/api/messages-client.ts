@@ -15,6 +15,15 @@ import {
   validateMessagePageContract,
 } from "../im-api-contract";
 import { normalizeMessageItem } from "../im-message-normalize";
+import { logApiContractDiagnostic } from "../api-contract/contract-diagnostics";
+import {
+  imConversationEntityToListItem,
+  normalizeImConversationDto,
+} from "../im/im-conversation-contract";
+import {
+  imMessageEntityToDto,
+  normalizeImMessageDto,
+} from "../im/im-message-contract";
 
 export type MediaUploadOptions = UploadRequestOptions;
 
@@ -29,7 +38,8 @@ export class MessagesApiClient extends ContactsApiClient {
       ...page,
       items: (page.items ?? [])
         .filter(isPlainImConversation)
-        .map(normalizeConversationSummaryFromContract),
+        .map(normalizeConversationSummaryFromContract)
+        .filter((item): item is ConversationListItem => Boolean(item)),
     }));
   }
 
@@ -68,13 +78,15 @@ export class MessagesApiClient extends ContactsApiClient {
         items: messages ?? [],
         page: { isLatestPage: true },
       });
-      return validation.normalized.items.map((message, index) =>
-        normalizeMessageItem({
-          ...(messages?.[index] ?? {}),
-          ...message,
-          conversationId: message.conversationId || conversationId,
-        }),
-      );
+      return (messages ?? [])
+        .map((message, index) =>
+          normalizeConversationMessageFromContract(
+            message,
+            validation.normalized.items[index],
+            conversationId,
+          ),
+        )
+        .filter((item): item is MessageItemDto => Boolean(item));
     });
   }
 
@@ -269,28 +281,61 @@ function isPlainImConversation(item: ConversationListItem) {
 
 function normalizeConversationSummaryFromContract(
   item: ConversationListItem,
-): ConversationListItem {
-  const validation = validateConversationSummaryContract(item);
-  const normalized = validation.normalized;
-  const lastMessage =
-    normalized.lastMessage || item.lastMessage
-      ? {
-          ...(item.lastMessage ?? {}),
-          ...(normalized.lastMessage ?? {}),
-        }
-      : item.lastMessage;
+): ConversationListItem | null {
+  const result = normalizeImConversationDto(item);
+  logApiContractDiagnostic({
+    api: "pc-im-conversations",
+    phase: "normalize",
+    status: result.status,
+    issues: result.issues,
+    context: {
+      conversationId: result.data?.id ?? item.conversationId,
+    },
+    error: result.error,
+  });
+  if (!result.data) return null;
+  const summaryReadValidation = validateConversationSummaryContract(item);
   return {
-    ...item,
-    conversationId: normalized.conversationId || item.conversationId,
-    conversationType: normalized.conversationType || item.conversationType,
-    lastMessage,
-    lastMessageSeq: normalized.lastMessageSeq,
-    lastReadSeq: normalized.lastReadSeq,
-    peerReadSeq: normalized.peerReadSeq,
-    unreadCount: validation.level === "blocking" ? 0 : normalized.unreadCount,
-    imReadContractLevel: validation.level,
-    imReadContractDiagnostics: validation.diagnostics,
+    ...imConversationEntityToListItem(result.data, item),
+    imReadContractLevel:
+      summaryReadValidation.level === "blocking"
+        ? "blocking"
+        : result.status === "ok"
+          ? "ok"
+          : "degraded",
+    imReadContractDiagnostics: [
+      ...summaryReadValidation.diagnostics,
+      ...result.issues.map((issue) => issue.code),
+    ],
   };
+}
+
+function normalizeConversationMessageFromContract(
+  item: MessageItemDto,
+  contractMessage: ReturnType<typeof validateMessagePageContract>["normalized"]["items"][number] | undefined,
+  conversationId: string,
+): MessageItemDto | null {
+  const result = normalizeImMessageDto(
+    {
+      ...item,
+      ...contractMessage,
+      conversationId: item.conversationId || contractMessage?.conversationId || conversationId,
+    },
+    { fallbackConversationId: conversationId },
+  );
+  logApiContractDiagnostic({
+    api: "pc-im-messages",
+    phase: "normalize",
+    status: result.status,
+    issues: result.issues,
+    context: {
+      conversationId: result.data?.conversationId ?? conversationId,
+      messageId: result.data?.id ?? item.messageId,
+    },
+    error: result.error,
+  });
+  if (!result.data) return null;
+  return normalizeMessageItem(imMessageEntityToDto(result.data, item));
 }
 
 function stringField(record: Record<string, unknown>, ...keys: string[]) {

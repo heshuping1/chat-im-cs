@@ -6,8 +6,8 @@ import type {
   FriendDto,
   TenantMemberDto,
 } from "../../data/api-client";
+import type { AuthSession } from "../../data/auth/auth-session";
 import { requireApiClient } from "../../data/runtime";
-import type { AuthSession } from "../../data/store";
 import type { ContactPickerItem } from "../components/MessageStartDialogs";
 
 type ComposerDialogKind = "direct" | "group" | "qr" | null;

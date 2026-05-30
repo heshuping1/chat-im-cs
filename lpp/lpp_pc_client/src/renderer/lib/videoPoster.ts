@@ -74,23 +74,30 @@ function capturePosterFromUrl(src: string, fileName: string) {
       video.load();
       resolve(result);
     };
-    const timeout = window.setTimeout(() => finish(), 3000);
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
-    video.addEventListener("error", () => finish(), { once: true });
-    video.addEventListener(
-      "loadedmetadata",
-      () => {
-        const targetTime = posterCaptureTime(video.duration);
-        try {
-          video.currentTime = targetTime;
-        } catch {
-          void finishFromFrame(video, fileName).then(finish);
-        }
-      },
-      { once: true },
-    );
+  const timeout = window.setTimeout(() => finish(), 3000);
+  const seekFallbackFrame = () => {
+    const targetTime = posterCaptureTime(video.duration);
+    try {
+      video.currentTime = targetTime;
+    } catch {
+      void finishFromFrame(video, fileName).then(finish);
+    }
+  };
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.addEventListener("error", () => finish(), { once: true });
+  video.addEventListener(
+    "loadedmetadata",
+    () => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0.2) {
+        void finishFromFrame(video, fileName).then((result) => {
+          if (result) finish(result);
+        });
+      }
+    },
+    { once: true },
+  );
     video.addEventListener(
       "seeked",
       () => {
@@ -98,15 +105,19 @@ function capturePosterFromUrl(src: string, fileName: string) {
       },
       { once: true },
     );
-    video.addEventListener(
-      "loadeddata",
-      () => {
-        if (!Number.isFinite(video.duration) || video.duration <= 0.2) {
-          void finishFromFrame(video, fileName).then(finish);
+  video.addEventListener(
+    "loadeddata",
+    () => {
+      void finishFromFrame(video, fileName).then((result) => {
+        if (result) {
+          finish(result);
+          return;
         }
-      },
-      { once: true },
-    );
+        seekFallbackFrame();
+      });
+    },
+    { once: true },
+  );
     video.src = src;
     video.load();
   });

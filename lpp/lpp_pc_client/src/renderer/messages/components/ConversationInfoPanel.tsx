@@ -1,13 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { CustomerProfileWorkspace } from "../../components/CustomerProfileWorkspace";
+import { PanelState } from "../../components/PanelState";
 import { PcAvatar } from "../../components/PcAvatar";
 import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
 import { effectiveConversationUnreadCount, type CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
-import { formatChatTime } from "../../lib/format";
+import { formatChatTime, timestampFromDateValue } from "../../lib/format";
 import { renderWechatEmojiText } from "../../lib/wechatEmoji";
-import { ConversationAvatar, type GroupConversationAvatar } from "./ConversationListParts";
+import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
+import { ConversationAvatar } from "./ConversationListParts";
 
 export function ConversationInfoPanel({
   contact,
@@ -195,7 +197,7 @@ function sortGroupMembersForDisplay(members: GroupMemberDto[]) {
     const roleRank = groupMemberRoleRank(left) - groupMemberRoleRank(right);
     if (roleRank !== 0) return roleRank;
     return (
-      new Date(left.joinedAt ?? 0).getTime() - new Date(right.joinedAt ?? 0).getTime() ||
+      timestampFromDateValue(left.joinedAt) - timestampFromDateValue(right.joinedAt) ||
       (left.displayName || "").localeCompare(right.displayName || "", "zh-Hans-CN")
     );
   });
@@ -222,8 +224,4 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
       <strong>{value || "--"}</strong>
     </div>
   );
-}
-
-function PanelState({ text }: { text: string }) {
-  return <div className="panel-state muted">{text}</div>;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  chatMediaItemsFromMessage,
   messageMediaActionPayload,
   messageMediaFileName,
   messageVideoPlayerPayload,
@@ -70,6 +71,29 @@ describe("normalizeMediaPart", () => {
 });
 
 describe("message media action model", () => {
+  it("builds neutral chat media items from a message", () => {
+    const message = {
+      messageId: "m-media-list",
+      messageType: "image",
+      preview: "photo.jpg",
+      body: {
+        image: {
+          thumbnailUrl: "/thumb.jpg",
+          url: "/image.jpg",
+          fileName: "photo.jpg",
+        },
+      },
+    } as never;
+
+    expect(chatMediaItemsFromMessage({ assetBaseUrl: "https://assets.example", message })).toEqual([
+      expect.objectContaining({
+        kind: "image",
+        fileName: "photo.jpg",
+        sourceUrl: "https://assets.example/thumb.jpg",
+      }),
+    ]);
+  });
+
   it("builds one desktop action payload from a message", () => {
     const message = {
       messageId: "m1",

@@ -14,16 +14,30 @@ import {
   staffServiceHistoryItemToThread,
   type CustomerServiceThread,
 } from "../data/api-client";
+import { useAuthSession } from "../data/auth/auth-store";
 import {
   customerServiceHistoryStatusLabel,
   customerServiceThreadStatusLabel,
   isQueuedCustomerServiceThread,
 } from "../data/customer-service-display";
+import { createCustomerServiceIdentityViewModel } from "../data/customer-service/cs-identity-view-model";
+import { chatConversationEntityFromCustomerServiceThread } from "../data/conversation/conversation-domain";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { customerServiceStatuses } from "../data/static-config";
-import { useWorkspaceStore } from "../data/store";
-import { formatChatTime } from "../lib/format";
+import {
+  useActiveThreadId,
+  useCustomerServiceStatus,
+  useServiceThreadFilter,
+  useSetActiveThread,
+  useSetCustomerServiceStatus,
+  useSetServiceThreadFilter,
+} from "../data/workspace-ui/workspace-ui-store";
+import {
+  createThreadRenderWindow,
+  threadRenderWindowExpandStep,
+} from "../customer-service/models/threadListWindowing";
+import { formatBadgeCount, formatChatTime } from "../lib/format";
 import { ChannelBadge } from "./ChannelBadge";
 import { PcAvatar } from "./PcAvatar";
 
@@ -33,17 +47,14 @@ type ThreadFilter = "all" | "queued" | "serving" | "vip";
 export function ThreadList() {
   const [mode, setMode] = useState<ThreadMode>("current");
   const [query, setQuery] = useState("");
-  const authSession = useWorkspaceStore((state) => state.authSession);
-  const selectedThreadId = useWorkspaceStore((state) => state.activeThreadId);
-  const setSelectedThread = useWorkspaceStore((state) => state.setActiveThread);
-  const filter = useWorkspaceStore((state) => state.filter);
-  const setFilter = useWorkspaceStore((state) => state.setFilter);
-  const customerServiceStatus = useWorkspaceStore(
-    (state) => state.customerServiceStatus,
-  );
-  const setCustomerServiceStatus = useWorkspaceStore(
-    (state) => state.setCustomerServiceStatus,
-  );
+  const [expandedThreadCount, setExpandedThreadCount] = useState(0);
+  const authSession = useAuthSession();
+  const selectedThreadId = useActiveThreadId();
+  const setSelectedThread = useSetActiveThread();
+  const filter = useServiceThreadFilter();
+  const setFilter = useSetServiceThreadFilter();
+  const customerServiceStatus = useCustomerServiceStatus();
+  const setCustomerServiceStatus = useSetCustomerServiceStatus();
   const queryClient = useQueryClient();
   const client = useMemo(
     () => (authSession ? createApiClient(authSession) : null),
@@ -183,11 +194,29 @@ export function ThreadList() {
       })
       .filter((thread) => {
         if (!normalizedQuery) return true;
-        return [thread.title, thread.lastMessagePreview, thread.source, thread.sourceChannel]
+        const entity = chatConversationEntityFromCustomerServiceThread(thread);
+        return [
+          entity.title,
+          entity.lastMessage?.preview,
+          entity.customerService?.source,
+          entity.customerService?.sourceChannel,
+        ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedQuery));
       });
   }, [currentThreads, filter, historyThreads, mode, query]);
+  useEffect(() => {
+    setExpandedThreadCount(0);
+  }, [filter, mode, query]);
+  const threadRenderWindow = useMemo(
+    () =>
+      createThreadRenderWindow({
+        enabled: true,
+        expandedCount: expandedThreadCount,
+        threads: visibleThreads,
+      }),
+    [expandedThreadCount, visibleThreads],
+  );
 
   useEffect(() => {
     if (selectedThreadId || visibleThreads.length === 0) return;
@@ -322,14 +351,20 @@ export function ThreadList() {
         )}
         {!listLoading &&
           !listError &&
-          visibleThreads.map((thread) => {
+          threadRenderWindow.renderedThreads.map((thread) => {
+            const entity = chatConversationEntityFromCustomerServiceThread(thread);
+            const identity = createCustomerServiceIdentityViewModel({
+              fallbackName: entity.title || (mode === "history" ? "访客" : "未知客户"),
+              history: mode === "history",
+              thread,
+            });
             const queued = mode === "current" && isQueuedCustomerServiceThread(thread);
             const claiming =
               claimThreadMutation.isPending &&
               claimThreadMutation.variables?.threadId === thread.threadId;
             return (
             <article
-              aria-label={`${thread.title || "访客"}，${
+              aria-label={`${identity.ariaName}，${
                 mode === "history"
                   ? customerServiceHistoryStatusLabel(thread.status)
                   : customerServiceThreadStatusLabel(thread)
@@ -349,19 +384,17 @@ export function ThreadList() {
               tabIndex={0}
             >
               <PcAvatar
-                avatarUrl={thread.customerAvatarUrl || thread.avatarUrl}
-                className={`e-avatar e-avatar-badge-host ${
-                  thread.isVip ? "gold" : "indigo"
-                }`}
-                name={thread.title || "客户"}
+                avatarUrl={identity.avatarUrl}
+                className={`e-avatar e-avatar-badge-host ${identity.avatarTone}`}
+                name={identity.avatarName}
               >
-                {(thread.unreadCount ?? 0) > 0 && (
-                  <em className="e-avatar-unread">{thread.unreadCount}</em>
+                {entity.unreadCount > 0 && (
+                  <em className="e-avatar-unread">{formatBadgeCount(entity.unreadCount)}</em>
                 )}
               </PcAvatar>
               <span className="h-thread-copy">
                 <span>
-                  <strong>{thread.title || (mode === "history" ? "访客" : "未知客户")}</strong>
+                  <strong>{identity.displayName}</strong>
                 </span>
                 <small>
                   <Headphones size={12} />
@@ -370,7 +403,7 @@ export function ThreadList() {
                     : customerServiceThreadStatusLabel(thread)}
                   <ChannelBadge source={thread.source ?? thread.sourceChannel} compact />
                 </small>
-                <p>{thread.lastMessagePreview || (mode === "history" ? "历史会话" : "暂无消息")}</p>
+                <p>{entity.lastMessage?.preview || (mode === "history" ? "历史会话" : "暂无消息")}</p>
               </span>
               <span className="h-thread-sla">
                 {queued ? (
@@ -397,13 +430,24 @@ export function ThreadList() {
                     <Clock3 size={14} />
                     {mode === "history"
                       ? "只读"
-                      : formatThreadTime(thread.lastMessageAt ?? thread.updatedAt ?? thread.assignedAt)}
+                      : formatChatTime(thread.lastMessageAt ?? thread.updatedAt ?? thread.assignedAt)}
                   </>
                 )}
               </span>
             </article>
           );
           })}
+        {!listLoading && !listError && threadRenderWindow.windowed && (
+          <button
+            className="h-thread-more"
+            type="button"
+            onClick={() =>
+              setExpandedThreadCount((count) => count + threadRenderWindowExpandStep)
+            }
+          >
+            显示更多 {threadRenderWindow.hiddenAfterCount} 个会话
+          </button>
+        )}
       </div>
     </section>
   );
@@ -435,9 +479,4 @@ function isRiskyThread(thread: CustomerServiceThread) {
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(token.toLowerCase())),
   );
-}
-
-function formatThreadTime(value?: string | null) {
-  const formatted = formatChatTime(value);
-  return formatted === "--" ? "--" : formatted;
 }

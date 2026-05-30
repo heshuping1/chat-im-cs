@@ -15,10 +15,10 @@ import type {
   KnowledgeDocumentDto,
   KnowledgeSearchResultDto,
 } from "../data/api-client";
+import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
-import { useWorkspaceStore } from "../data/store";
-import { formatError } from "../lib/format";
+import { formatError, formatShortDate } from "../lib/format";
 
 type KnowledgeSelection =
   | { type: "search"; item: KnowledgeSearchResultDto }
@@ -26,7 +26,7 @@ type KnowledgeSelection =
   | null;
 
 export function KnowledgeBasePage() {
-  const session = useWorkspaceStore((state) => state.authSession);
+  const session = useAuthSession();
   const client = useMemo(
     () => (session ? createApiClient(session) : null),
     [session],
@@ -424,10 +424,6 @@ function headingPathText(value: string | string[] | null | undefined) {
 }
 
 function shortDate(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
+  const text = formatShortDate(value);
+  return text === "--" ? "" : text;
 }

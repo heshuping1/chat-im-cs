@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, isAbsolute, join } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type {
   CacheMediaFilePayload,
@@ -19,9 +19,11 @@ export async function ensureLocalMediaFile(
   const url = payload.url;
   if (url.startsWith('file:')) {
     const filePath = fileURLToPath(url);
+    assertAllowedLocalMediaFilePath(filePath);
     return { filePath, fileUrl: pathToFileURL(filePath).toString() };
   }
   if (isLocalFilePath(url)) {
+    assertAllowedLocalMediaFilePath(url);
     return { filePath: url, fileUrl: pathToFileURL(url).toString() };
   }
   if (!isDownloadableMediaUrl(url) && !url.startsWith('data:')) {
@@ -112,6 +114,15 @@ function mediaDirectory(payload: CacheMediaFilePayload) {
     mediaKindDirectory,
     month,
   );
+}
+
+export function assertAllowedLocalMediaFilePath(filePath: string) {
+  const normalizedPath = resolve(filePath);
+  const userDataRoot = resolve(app.getPath('userData'));
+  if (normalizedPath === userDataRoot || normalizedPath.startsWith(`${userDataRoot}${sep}`)) {
+    return normalizedPath;
+  }
+  throw new Error('不允许访问应用缓存目录之外的本地文件');
 }
 
 function mediaCacheTarget(payload: CacheMediaFilePayload) {

@@ -26,6 +26,66 @@ const messageTypeLabels: Record<string, string> = {
   event: "系统消息",
   system: "系统消息",
 };
+const nestedBodyFields = ["parts", "bodies", "items", "contents", "messageBodies"] as const;
+const textFields = ["text", "content", "message", "caption"] as const;
+const markdownFields = ["markdown", "markdownText"] as const;
+const eventTextFields = ["eventText", "notice", "text", "content", "message"] as const;
+const contactFields = [
+  "contactCard",
+  "contact_card",
+  "contact",
+  "card",
+  "nameCard",
+  "name_card",
+  "businessCard",
+  "business_card",
+  "userCard",
+  "user_card",
+  "profileCard",
+  "profile_card",
+] as const;
+const mediaBodyFields = {
+  image: ["image", "images", "picture", "photo", "imageUrl", "image_url"],
+  file: ["file", "files", "attachment", "attachments", "fileUrl", "file_url"],
+  voice: ["voice", "audio", "audioUrl", "audio_url"],
+  video: ["video", "videoUrl", "video_url"],
+} as const;
+const mediaTypeFallbacks = {
+  image: ["image", "picture", "photo"],
+  file: ["file", "attachment"],
+  voice: ["voice", "audio"],
+  video: ["video"],
+} as const;
+const mediaRecordFields = {
+  url: [
+    "url",
+    "resourceUrl",
+    "mediaUrl",
+    "objectUrl",
+    "originalUrl",
+    "downloadUrl",
+    "signedUrl",
+    "fileUrl",
+    "filePath",
+    "uri",
+    "path",
+  ],
+  thumbnailUrl: [
+    "thumbnailUrl",
+    "thumbUrl",
+    "previewUrl",
+    "previewPath",
+    "coverUrl",
+    "cover",
+    "thumbnail",
+  ],
+  fileName: ["fileName", "filename", "name", "originalName", "originalFileName"],
+  mimeType: ["mimeType", "contentType", "mediaType"],
+} as const;
+const numericMediaRecordFields = {
+  sizeBytes: ["sizeBytes", "size", "fileSize"],
+  durationSeconds: ["durationSeconds", "duration"],
+} as const;
 
 export function normalizeMessageItem(message: MessageItemDto): MessageItemDto {
   const messageType = normalizeMessageType(message);
@@ -230,60 +290,18 @@ function appendBodyParts(parts: NormalizedMessagePart[], body: Record<string, un
     return;
   }
 
-  const text =
-    stringValue(valueBody.text) ||
-    stringValue(valueBody.content) ||
-    stringValue(valueBody.message) ||
-    stringValue(valueBody.caption);
-  const markdown =
-    stringValue(valueBody.markdown) ||
-    stringValue(valueBody.markdownText) ||
-    (type === "markdown" ? text : undefined);
+  const text = firstStringField(valueBody, textFields);
+  const markdown = firstStringField(valueBody, markdownFields) || (type === "markdown" ? text : undefined);
   if (markdown) {
     parts.push({ type: "markdown", text: renderWechatEmojiText(markdown) });
   } else if (text) {
     parts.push({ type: "text", text: renderWechatEmojiText(text) });
   }
 
-  appendMediaParts(
-    parts,
-    "image",
-    valueBody.image ??
-      valueBody.images ??
-      valueBody.picture ??
-      valueBody.photo ??
-      valueBody.imageUrl ??
-      valueBody.image_url ??
-      (type === "image" || type === "picture" || type === "photo" ? valueBody : undefined),
-  );
-  appendMediaParts(
-    parts,
-    "file",
-    valueBody.file ??
-      valueBody.files ??
-      valueBody.attachment ??
-      valueBody.attachments ??
-      valueBody.fileUrl ??
-      valueBody.file_url ??
-      (type === "file" || type === "attachment" ? valueBody : undefined),
-  );
-  appendMediaParts(
-    parts,
-    "voice",
-    valueBody.voice ??
-      valueBody.audio ??
-      valueBody.audioUrl ??
-      valueBody.audio_url ??
-      (type === "voice" || type === "audio" ? valueBody : undefined),
-  );
-  appendMediaParts(
-    parts,
-    "video",
-    valueBody.video ??
-      valueBody.videoUrl ??
-      valueBody.video_url ??
-      (type === "video" ? valueBody : undefined),
-  );
+  appendMediaParts(parts, "image", mediaBodyValue(valueBody, "image", type));
+  appendMediaParts(parts, "file", mediaBodyValue(valueBody, "file", type));
+  appendMediaParts(parts, "voice", mediaBodyValue(valueBody, "voice", type));
+  appendMediaParts(parts, "video", mediaBodyValue(valueBody, "video", type));
 
   const location =
     asRecord(valueBody.location) ??
@@ -300,13 +318,7 @@ function appendBodyParts(parts: NormalizedMessagePart[], body: Record<string, un
 }
 
 function nestedMessageBodies(body: Record<string, unknown>) {
-  return [
-    ...toBodyArray(body.parts),
-    ...toBodyArray(body.bodies),
-    ...toBodyArray(body.items),
-    ...toBodyArray(body.contents),
-    ...toBodyArray(body.messageBodies),
-  ];
+  return nestedBodyFields.flatMap((field) => toBodyArray(body[field]));
 }
 
 function eventMessageText(body: Record<string, unknown>, type: string) {
@@ -315,31 +327,25 @@ function eventMessageText(body: Record<string, unknown>, type: string) {
   }
   const eventRecord = asRecord(body.event);
   return (
-    stringValue(body.eventText) ||
-    stringValue(body.notice) ||
+    firstStringField(body, eventTextFields) ||
     stringField(eventRecord ?? {}, "text", "preview", "content") ||
     (typeof body.event === "string" ? body.event.trim() : undefined) ||
-    stringValue(body.text) ||
-    stringValue(body.content) ||
-    stringValue(body.message) ||
     messageTypeLabel(type)
   );
 }
 
 function contactRecord(body: Record<string, unknown>) {
-  return asRecord(
-    body.contactCard ??
-      body.contact_card ??
-      body.contact ??
-      body.card ??
-      body.nameCard ??
-      body.name_card ??
-      body.businessCard ??
-      body.business_card ??
-      body.userCard ??
-      body.user_card ??
-      body.profileCard ??
-      body.profile_card,
+  return asRecord(firstFieldValue(body, contactFields));
+}
+
+function mediaBodyValue(
+  body: Record<string, unknown>,
+  mediaType: keyof typeof mediaBodyFields,
+  messageType: string,
+) {
+  return (
+    firstFieldValue(body, mediaBodyFields[mediaType]) ??
+    (mediaTypeFallbacks[mediaType].includes(messageType as never) ? body : undefined)
   );
 }
 
@@ -392,43 +398,13 @@ function normalizeMediaRecord(record?: Record<string, unknown>) {
   if (!record) return undefined;
   return {
     ...record,
-    url:
-      stringValue(record.url) ||
-      stringValue(record.resourceUrl) ||
-      stringValue(record.mediaUrl) ||
-      stringValue(record.objectUrl) ||
-      stringValue(record.originalUrl) ||
-      stringValue(record.downloadUrl) ||
-      stringValue(record.signedUrl) ||
-      stringValue(record.fileUrl) ||
-      stringValue(record.filePath) ||
-      stringValue(record.uri) ||
-      stringValue(record.path),
-    thumbnailUrl:
-      stringValue(record.thumbnailUrl) ||
-      stringValue(record.thumbUrl) ||
-      stringValue(record.previewUrl) ||
-      stringValue(record.previewPath) ||
-      stringValue(record.coverUrl) ||
-      stringValue(record.cover) ||
-      stringValue(record.thumbnail),
-    fileName:
-      stringValue(record.fileName) ||
-      stringValue(record.filename) ||
-      stringValue(record.name) ||
-      stringValue(record.originalName) ||
-      stringValue(record.originalFileName),
-    mimeType:
-      stringValue(record.mimeType) ||
-      stringValue(record.contentType) ||
-      stringValue(record.mediaType),
-    sizeBytes:
-      numberValue(record.sizeBytes) ??
-      numberValue(record.size) ??
-      numberValue(record.fileSize),
+    url: firstStringField(record, mediaRecordFields.url),
+    thumbnailUrl: firstStringField(record, mediaRecordFields.thumbnailUrl),
+    fileName: firstStringField(record, mediaRecordFields.fileName),
+    mimeType: firstStringField(record, mediaRecordFields.mimeType),
+    sizeBytes: firstNumberField(record, numericMediaRecordFields.sizeBytes),
     durationSeconds:
-      numberValue(record.durationSeconds) ??
-      numberValue(record.duration) ??
+      firstNumberField(record, numericMediaRecordFields.durationSeconds) ??
       durationMsToSeconds(record.durationMs),
   } as MediaResourceDto;
 }
@@ -441,6 +417,39 @@ function toBodyArray(value: unknown): Record<string, unknown>[] {
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== "object") return undefined;
   return value as Record<string, unknown>;
+}
+
+function firstFieldValue(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+) {
+  for (const field of fields) {
+    const value = record[field];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
+function firstStringField(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+) {
+  for (const field of fields) {
+    const value = stringValue(record[field]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function firstNumberField(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+) {
+  for (const field of fields) {
+    const value = numberValue(record[field]);
+    if (value !== undefined) return value;
+  }
+  return undefined;
 }
 
 function durationMsToSeconds(value: unknown) {

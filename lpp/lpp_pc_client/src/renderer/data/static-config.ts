@@ -4,7 +4,7 @@ import type {
   WorkbenchShortcut,
   WorkspaceRole,
 } from "./types";
-import type { AuthSession } from "./store";
+import type { AuthSession } from "./auth/auth-session";
 
 export const imPresenceStatuses: Array<{ value: TrayStatus; label: string }> = [
   { value: "online", label: "在线" },

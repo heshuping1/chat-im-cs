@@ -6,15 +6,50 @@ export interface NotifyPayload {
   conversationId?: string;
 }
 
+export type DiagnosticsJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | DiagnosticsJsonValue[]
+  | { [key: string]: DiagnosticsJsonValue };
+
+export interface DiagnosticsModuleSnapshot {
+  recordCount: number;
+  truncated?: boolean;
+  records: DiagnosticsJsonValue[];
+}
+
 export interface DiagnosticsPayload {
   sessionId: string;
   traceId: string;
+  generatedAt?: string;
   breadcrumbs: string[];
   errors: Array<{
     at: string;
     message: string;
     requestId?: string;
   }>;
+  diagnostics?: Record<string, DiagnosticsModuleSnapshot>;
+}
+
+export interface DesktopAuthSessionPayload {
+  apiBaseUrl: string;
+  tenantToken: string;
+  platformToken?: string;
+  platformRefreshToken?: string;
+  refreshToken?: string;
+  tenantId?: string;
+  tenantCode?: string;
+  tenantName?: string;
+  tenantLogoUrl?: string | null;
+  userId?: string;
+  platformUserId?: string;
+  lppId?: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  roleLabel?: string;
+  tenants?: unknown[];
 }
 
 export interface ScreenshotCaptureResult {
@@ -74,11 +109,44 @@ export interface DesktopApi {
   }): Promise<void>;
   saveFile(defaultName: string, content: string): Promise<string | null>;
   openExternal(url: string): Promise<void>;
+  readAuthSession(): Promise<DesktopAuthSessionPayload | null>;
+  saveAuthSession(payload: DesktopAuthSessionPayload): Promise<void>;
+  clearAuthSession(): Promise<void>;
   captureScreenshot(): Promise<ScreenshotCaptureResult>;
   getAppVersion(): Promise<string>;
   exportDiagnostics(payload: DiagnosticsPayload): Promise<string | null>;
   setTrayStatus(status: TrayStatus): Promise<void>;
 }
+
+export type DesktopApiMethod = keyof DesktopApi;
+
+export const desktopIpcChannelByMethod = {
+  cacheMediaFile: 'desktop:cache-media-file',
+  cacheMediaPoster: 'desktop:cache-media-poster',
+  captureScreenshot: 'desktop:capture-screenshot',
+  clearAuthSession: 'desktop:clear-auth-session',
+  copyFilePath: 'desktop:copy-file-path',
+  copyImageFromUrl: 'desktop:copy-image-from-url',
+  copyMediaFile: 'desktop:copy-media-file',
+  editMediaFile: 'desktop:edit-media-file',
+  exportDiagnostics: 'desktop:export-diagnostics',
+  getAppVersion: 'desktop:get-app-version',
+  getCachedMediaStatus: 'desktop:get-cached-media-status',
+  notify: 'desktop:notify',
+  openDownloadedFile: 'desktop:open-downloaded-file',
+  openExternal: 'desktop:open-external',
+  openFile: 'desktop:open-file',
+  openMediaFile: 'desktop:open-media-file',
+  openVideoPlayer: 'desktop:open-video-player',
+  readAuthSession: 'desktop:read-auth-session',
+  revealMediaInFolder: 'desktop:reveal-media-in-folder',
+  saveAuthSession: 'desktop:save-auth-session',
+  saveFile: 'desktop:save-file',
+  saveMediaAs: 'desktop:save-media-as',
+  setTrayStatus: 'desktop:set-tray-status',
+} as const satisfies Record<DesktopApiMethod, `desktop:${string}`>;
+
+export type DesktopIpcChannel = (typeof desktopIpcChannelByMethod)[DesktopApiMethod];
 
 declare global {
   interface Window {

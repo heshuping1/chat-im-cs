@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 import { UsersRound } from "lucide-react";
-import { useWorkspaceStore } from "../data/store";
+import { useAuthSession } from "../data/auth/auth-store";
 import { getCachedAvatar, refreshCachedAvatar } from "../lib/avatarCache";
 
 export type PcAvatarKind = "person" | "group" | "tenant";
@@ -46,7 +46,7 @@ function PcAvatarImage({
   avatarUrl?: string | null;
   name: string;
 }) {
-  const token = useWorkspaceStore((state) => state.authSession?.tenantToken);
+  const token = useAuthSession()?.tenantToken;
   const [src, setSrc] = useState("");
   const [failed, setFailed] = useState(!avatarUrl);
 

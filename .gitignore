@@ -6,6 +6,7 @@
 *.iml
 *.ipr
 *.iws
+.tools/
 
 # Flutter/Dart generated files
 **/.dart_tool/

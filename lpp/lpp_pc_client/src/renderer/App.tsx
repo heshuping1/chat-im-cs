@@ -6,20 +6,59 @@ import {
 } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
 import { Suspense, lazy, useEffect } from 'react';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { LoginPage } from './components/LoginPage';
-import { GatewayBridge } from './components/GatewayBridge';
 import { ReminderCenter } from './components/ReminderCenter';
 import { Sidebar } from './components/Sidebar';
 import { ApiError } from './data/api-client';
-import { useWorkspaceStore } from './data/store';
+import {
+  getAuthSessionSnapshot,
+  getClearAuthSessionAction,
+  useAuthSession,
+  useRestoreDesktopAuthSession,
+} from './data/auth/auth-store';
+import { markFirstInteractive } from './data/performance/startup-performance';
+import type { PcSettings } from './data/settings/pc-settings';
+import { usePcSettings } from './data/settings/settings-store';
+import type { ModuleKey } from './data/types';
+import {
+  useActiveModule,
+  useListPaneWidth,
+  useMessageLayoutMode,
+  useMessageProfileVisible,
+  useProfilePaneWidth,
+  useSetActiveModule,
+} from './data/workspace-ui/workspace-ui-store';
 import './styles/theme.css';
+import './styles/shared/panel-state.css';
 import './styles/app.css';
+import './styles/account/auth.css';
+import './styles/shared/app-shell.css';
+import './styles/messages/message-shared.css';
+import './styles/messages/message-media-content.css';
+import './styles/messages/composer-shell.css';
+import './styles/pages/product-pages.css';
+import './styles/shared/porcelain-shell.css';
+import './styles/customer-service/customer-service-skin.css';
+import './styles/messages/composer-rich-input.css';
+import './styles/shared/porcelain-presence-footer.css';
+import './styles/pages/workbench-knowledge.css';
+import './styles/shared/scrollbar-theme-bridge.css';
+import './styles/contacts/contacts.css';
+import './styles/settings/settings.css';
+import './styles/customer-service/customer-service.css';
+import './styles/messages/message-center.css';
 import './styles/messages/context-menu.css';
 import './styles/messages/toast.css';
 
 const AiAssistantPage = lazy(() =>
   import('./components/AiAssistantPage').then((module) => ({
     default: module.AiAssistantPage,
+  })),
+);
+const GatewayBridge = lazy(() =>
+  import('./components/GatewayBridge').then((module) => ({
+    default: module.GatewayBridge,
   })),
 );
 const EnterpriseSwitchPage = lazy(() =>
@@ -93,73 +132,124 @@ const queryClient = new QueryClient({
 
 function handleUnauthorizedError(error: unknown) {
   if (!(error instanceof ApiError) || error.status !== 401) return;
-  const { authSession, clearAuthSession } = useWorkspaceStore.getState();
+  const authSession = getAuthSessionSnapshot();
   if (!authSession) return;
   queryClient.clear();
-  clearAuthSession();
+  getClearAuthSessionAction()();
 }
 
 export default function App() {
-  const activeModule = useWorkspaceStore((state) => state.activeModule);
-  const listPaneWidth = useWorkspaceStore((state) => state.listPaneWidth);
-  const profilePaneWidth = useWorkspaceStore((state) => state.profilePaneWidth);
-  const authSession = useWorkspaceStore((state) => state.authSession);
-  const pcSettings = useWorkspaceStore((state) => state.pcSettings);
-  const messageProfileVisible = useWorkspaceStore(
-    (state) => state.messageProfileVisible,
-  );
-  const messageLayoutMode = useWorkspaceStore((state) => state.messageLayoutMode);
+  const activeModule = useActiveModule();
+  const setActiveModule = useSetActiveModule();
+  const listPaneWidth = useListPaneWidth();
+  const profilePaneWidth = useProfilePaneWidth();
+  const authSession = useAuthSession();
+  const restoreDesktopAuthSession = useRestoreDesktopAuthSession();
+  const pcSettings = usePcSettings();
+  const messageProfileVisible = useMessageProfileVisible();
+  const messageLayoutMode = useMessageLayoutMode();
+  const safeActiveModule = normalizeActiveModule(activeModule);
 
   useTransientScrollbars();
   useAppearanceSettings(pcSettings);
+  useEffect(() => {
+    if (activeModule !== safeActiveModule) setActiveModule(safeActiveModule);
+  }, [activeModule, safeActiveModule, setActiveModule]);
+  useEffect(() => {
+    void restoreDesktopAuthSession?.();
+  }, [restoreDesktopAuthSession]);
+  useEffect(() => {
+    markFirstInteractive(authSession ? 'authenticated-shell' : 'login');
+  }, [authSession]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      {!authSession ? (
-        <LoginPage />
-      ) : (
-        <div
-          className={`app-shell ${
-            activeModule === 'messages'
+      <AppErrorBoundary resetKey={authSession ? safeActiveModule : 'login'}>
+        {!authSession ? (
+          <LoginPage />
+        ) : (
+          <div
+            className={`app-shell ${
+              safeActiveModule === 'messages'
                 ? `messages-layout layout-${messageLayoutMode} ${messageProfileVisible ? '' : 'profile-collapsed'}`
-              : 'page-layout'
-          } ${pcSettings.highDensityContext ? 'is-density-compact' : ''} ${
-            pcSettings.highContrastBoundary ? 'is-boundary-strong' : ''
-          }`}
-          data-theme={pcSettings.theme}
-          data-skin={pcSettings.skin}
-          style={
-            activeModule === 'messages'
-              ? ({
-                  '--list-pane-width': `${listPaneWidth}px`,
-                  '--profile-pane-width': `${profilePaneWidth}px`,
-                } as CSSProperties)
-              : undefined
-          }
-        >
-          <GatewayBridge />
-          <Sidebar />
-          <ReminderCenter />
-          <Suspense fallback={<PageFallback />}>
-            {activeModule === 'onlineService' && <OnlineServicePage />}
-            {activeModule === 'messages' && <MessageCenter />}
-            {activeModule === 'contacts' && <ContactsPage />}
-            {activeModule === 'knowledgeBase' && <KnowledgeBasePage />}
-            {activeModule === 'aiAssistant' && <AiAssistantPage />}
-            {activeModule === 'enterpriseSwitch' && <EnterpriseSwitchPage />}
-            {activeModule === 'favorites' && <FavoritesPage />}
-            {activeModule === 'ticketCenter' && <TicketCenterPage />}
-            {activeModule === 'dataCenter' && <DataCenterPage />}
-            {activeModule === 'workbench' && <WorkbenchPage />}
-            {activeModule === 'settings' && <MePage />}
-          </Suspense>
-        </div>
-      )}
+                : 'page-layout'
+            } ${pcSettings.highDensityContext ? 'is-density-compact' : ''} ${
+              pcSettings.highContrastBoundary ? 'is-boundary-strong' : ''
+            }`}
+            data-theme={pcSettings.theme}
+            data-skin={pcSettings.skin}
+            style={
+              safeActiveModule === 'messages'
+                ? ({
+                    '--list-pane-width': `${listPaneWidth}px`,
+                    '--profile-pane-width': `${profilePaneWidth}px`,
+                  } as CSSProperties)
+                : undefined
+            }
+          >
+            <Suspense fallback={null}>
+              <GatewayBridge />
+            </Suspense>
+            <Sidebar />
+            <ReminderCenter />
+            <Suspense fallback={<PageFallback />}>
+              <ActiveModulePage activeModule={safeActiveModule} />
+            </Suspense>
+          </div>
+        )}
+      </AppErrorBoundary>
     </QueryClientProvider>
   );
 }
 
-function useAppearanceSettings(settings: ReturnType<typeof useWorkspaceStore.getState>['pcSettings']) {
+function ActiveModulePage({ activeModule }: { activeModule: ModuleKey }) {
+  switch (activeModule) {
+    case 'onlineService':
+      return <OnlineServicePage />;
+    case 'messages':
+      return <MessageCenter />;
+    case 'contacts':
+      return <ContactsPage />;
+    case 'knowledgeBase':
+      return <KnowledgeBasePage />;
+    case 'aiAssistant':
+      return <AiAssistantPage />;
+    case 'enterpriseSwitch':
+      return <EnterpriseSwitchPage />;
+    case 'favorites':
+      return <FavoritesPage />;
+    case 'ticketCenter':
+      return <TicketCenterPage />;
+    case 'dataCenter':
+      return <DataCenterPage />;
+    case 'workbench':
+      return <WorkbenchPage />;
+    case 'settings':
+      return <MePage />;
+    default:
+      return <MessageCenter />;
+  }
+}
+
+function normalizeActiveModule(activeModule: ModuleKey): ModuleKey {
+  return knownModuleKeys.has(activeModule) ? activeModule : 'messages';
+}
+
+const knownModuleKeys = new Set<ModuleKey>([
+  'messages',
+  'onlineService',
+  'knowledgeBase',
+  'aiAssistant',
+  'contacts',
+  'ticketCenter',
+  'dataCenter',
+  'workbench',
+  'enterpriseSwitch',
+  'favorites',
+  'settings',
+]);
+
+function useAppearanceSettings(settings: PcSettings) {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.theme = settings.theme;
@@ -186,7 +276,7 @@ function useAppearanceSettings(settings: ReturnType<typeof useWorkspaceStore.get
   ]);
 }
 
-function fontSizeDatasetValue(fontSize: ReturnType<typeof useWorkspaceStore.getState>['pcSettings']['fontSize']) {
+function fontSizeDatasetValue(fontSize: PcSettings['fontSize']) {
   switch (fontSize) {
     case '小':
       return 'small';

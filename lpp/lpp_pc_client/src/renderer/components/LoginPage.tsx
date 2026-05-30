@@ -5,8 +5,8 @@ import {
   type CaptchaChallenge,
   type PlatformLoginResult,
 } from '../data/api-client';
+import { useSetAuthSession } from '../data/auth/auth-store';
 import { defaultApiBaseUrl, createTraceId } from '../data/runtime';
-import { useWorkspaceStore } from '../data/store';
 
 function roleLabel(role?: number) {
   if (role === 4) return '所有者';
@@ -18,7 +18,7 @@ function roleLabel(role?: number) {
 }
 
 export function LoginPage() {
-  const setAuthSession = useWorkspaceStore((state) => state.setAuthSession);
+  const setAuthSession = useSetAuthSession();
   const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');

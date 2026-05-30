@@ -1,7 +1,19 @@
+import { formatApiErrorForUser } from "../data/api/api-error-model";
+
 export function formatError(error: unknown, fallback = "未知错误") {
+  const apiMessage = formatApiErrorForUser(error, fallback);
+  if (apiMessage !== fallback || isLikelyApiError(error)) return apiMessage;
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error.trim()) return error;
   return fallback;
+}
+
+function isLikelyApiError(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      ("status" in error || "code" in error || "requestId" in error),
+  );
 }
 
 export function formatBadgeCount(count?: number | null) {
@@ -66,4 +78,16 @@ export function formatClockTime(value?: string | null) {
     2,
     "0",
   )}`;
+}
+
+export function timestampFromDateValue(value?: string | number | Date | null) {
+  if (value === undefined || value === null || value === "") return 0;
+  const date = value instanceof Date ? value : new Date(value);
+  const time = date.getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+export function currentIsoTimestamp(now: Date | number = Date.now()) {
+  const date = now instanceof Date ? now : new Date(now);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : new Date().toISOString();
 }

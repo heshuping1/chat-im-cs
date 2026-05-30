@@ -1,29 +1,34 @@
 import { MessageBodyView, type UploadActionHandler } from "./MessageBodyView";
 import { PcAvatar } from "./PcAvatar";
 import type { MessageItemDto } from "../data/api-client";
+import {
+  createChatMessageViewModel,
+  type ChatMessageViewModel,
+} from "../data/message/message-view-model";
 import type { MouseEvent } from "react";
 
 export function ChatMessageBubble({
   assetBaseUrl,
   authToken,
-  fallbackInitial,
+  conversationFallbackName,
   message,
   mine,
   onContextMenu,
   onAvatarClick,
   onContactClick,
   senderFallback,
-  senderAvatarUrlFallback,
-  mineAvatarUrlFallback,
+  senderAvatarUrl,
+  mineAvatarUrl,
   mediaCacheContext,
   onUploadAction,
   statusText,
   timeText,
   translationText,
+  viewModel,
 }: {
   assetBaseUrl?: string;
   authToken?: string;
-  fallbackInitial: string;
+  conversationFallbackName: string;
   message: MessageItemDto;
   mine: boolean;
   onContextMenu?: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
@@ -31,8 +36,8 @@ export function ChatMessageBubble({
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
   onUploadAction?: UploadActionHandler;
   senderFallback: string;
-  senderAvatarUrlFallback?: string | null;
-  mineAvatarUrlFallback?: string | null;
+  senderAvatarUrl?: string | null;
+  mineAvatarUrl?: string | null;
   mediaCacheContext?: {
     accountId?: string;
     conversationId?: string;
@@ -40,9 +45,24 @@ export function ChatMessageBubble({
   statusText?: string;
   timeText: string;
   translationText?: string;
+  viewModel?: ChatMessageViewModel;
 }) {
-  const senderName = mine ? "我" : senderFallback || message.senderDisplayName || "对方";
-  const reply = replyPreviewFromMessage(message);
+  const model =
+    viewModel ??
+    createChatMessageViewModel({
+      contextMenuEnabled: Boolean(onContextMenu),
+      conversationFallbackName,
+      message,
+      mine,
+      mineAvatarUrl,
+      senderAvatarUrl,
+      senderFallback,
+      statusText,
+      timeText,
+      translationText,
+    });
+  const senderName = model.sender.name;
+  const reply = model.bubble.reply;
   const avatar = (
     <button
       className="pc-chat-avatar-button"
@@ -52,19 +72,15 @@ export function ChatMessageBubble({
       onClick={(event) => onAvatarClick?.(event, message, mine)}
     >
       <PcAvatar
-        avatarUrl={
-          mine
-            ? mineAvatarUrlFallback
-            : message.senderAvatarUrl || message.avatarUrl || senderAvatarUrlFallback
-        }
+        avatarUrl={model.sender.avatarUrl}
         className="pc-chat-avatar"
-        name={mine ? senderName : senderName || fallbackInitial}
+        name={model.sender.fallbackName}
       />
     </button>
   );
   return (
     <article
-      className={`pc-chat-message ${mine ? "mine" : "other"}`}
+      className={model.bubble.className}
       onContextMenu={(event) => onContextMenu?.(event, message)}
     >
       {!mine && avatar}
@@ -86,41 +102,15 @@ export function ChatMessageBubble({
             onUploadAction={onUploadAction}
           />
         </div>
-        {translationText && (
-          <div className="pc-message-translation">{translationText}</div>
+        {model.content.translationText && (
+          <div className="pc-message-translation">{model.content.translationText}</div>
         )}
         <time className="pc-chat-time">
-          {timeText}
-          {statusText ? ` · ${statusText}` : ""}
+          {model.status.timeText}
+          {model.status.statusText ? ` · ${model.status.statusText}` : ""}
         </time>
       </div>
       {mine && avatar}
     </article>
   );
-}
-
-function replyPreviewFromMessage(message: MessageItemDto) {
-  const body = message.body ?? {};
-  const record = (
-    body.reply ||
-    body.replyTo ||
-    body.quotedMessage ||
-    body.quote ||
-    (message as unknown as Record<string, unknown>).reply
-  ) as Record<string, unknown> | undefined;
-  if (!record || typeof record !== "object") return undefined;
-  const preview = stringField(record, "preview", "text", "content", "message");
-  if (!preview) return undefined;
-  return {
-    sender: stringField(record, "sender", "senderDisplayName", "name") || "引用消息",
-    preview,
-  };
-}
-
-function stringField(record: Record<string, unknown>, ...keys: string[]) {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return undefined;
 }

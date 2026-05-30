@@ -1,6 +1,7 @@
 import { QrCode, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import { PanelState } from "../../components/PanelState";
 import type { FriendInviteQrDto } from "../../data/api-client";
 import { formatError } from "../../lib/format";
 
@@ -112,8 +113,4 @@ export function InviteQrDialog({
       </section>
     </div>
   );
-}
-
-function PanelState({ text }: { text: string }) {
-  return <div className="panel-state muted">{text}</div>;
 }

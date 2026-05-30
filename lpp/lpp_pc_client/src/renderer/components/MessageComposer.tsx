@@ -8,7 +8,6 @@ import {
   Scissors,
   Smile,
   Video,
-  X,
 } from "lucide-react";
 import type {
   MouseEvent as ReactMouseEvent,
@@ -21,46 +20,40 @@ import { cloneElement, isValidElement, useEffect, useRef, useState } from "react
 import { formatError } from "../lib/format";
 import {
   type WechatEmojiItem,
-  wechatEmojiItems,
 } from "../lib/wechatEmoji";
 import {
   LexicalChatInput,
   type LexicalChatInputHandle,
   type LexicalPendingAttachment,
 } from "./LexicalChatInput";
+import { MessageComposerEmojiPanel } from "./MessageComposerEmojiPanel";
+import {
+  MessageComposerAttachmentList,
+  MessageComposerAttachmentPreview,
+  MessageComposerFileInputs,
+  type PendingAttachment,
+} from "./MessageComposerAttachments";
 import {
   detectComposerMediaKind,
   type ComposerMediaKind,
 } from "../composer/domain/detectComposerMediaKind";
 import {
-  composerFileAttachmentVisual,
-  composerMediaKindLabel,
-  formatComposerFileSize,
-} from "../composer/presentation/composerAttachmentPresentation";
-import {
-  isScreenshotCancelError,
   matchesScreenshotShortcut,
-  screenshotDataUrlToFile,
   type ScreenshotShortcut,
 } from "../composer/runtime/composerScreenshot";
 import { sendComposerPartsInOrder } from "../media/runtime/sendQueue";
+import {
+  captureScreenshotFile,
+  isCaptureScreenshotCancelError,
+} from "../messages/runtime/screenshotCapture";
 
 export type { ScreenshotShortcut };
-
-interface PendingAttachment {
-  id: string;
-  file: File;
-  kind: ComposerMediaKind;
-  previewUrl?: string;
-  status?: "ready" | "failed";
-  error?: string;
-}
 
 export function MessageComposer({
   placeholder,
   disabled = false,
   dense = false,
-  attachmentUi = "legacy",
+  attachmentUi = "stacked",
   attachmentScopeKey,
   combinedAttachmentTool = false,
   enableScreenshot = false,
@@ -81,7 +74,7 @@ export function MessageComposer({
   placeholder: string;
   disabled?: boolean;
   dense?: boolean;
-  attachmentUi?: "legacy" | "compact";
+  attachmentUi?: "stacked" | "compact";
   attachmentScopeKey?: string;
   combinedAttachmentTool?: boolean;
   enableScreenshot?: boolean;
@@ -295,15 +288,10 @@ export function MessageComposer({
     if (disabled || !enableScreenshot) return;
     setError(null);
     try {
-      if (!window.desktopApi?.captureScreenshot) {
-        setError("截图仅在 Electron 客户端可用。");
-        return;
-      }
-      const result = await window.desktopApi.captureScreenshot();
-      addFiles([screenshotDataUrlToFile(result.dataUrl, result.fileName || "截图.png")]);
+      addFiles([await captureScreenshotFile()]);
     } catch (err) {
       const message = formatError(err);
-      if (isScreenshotCancelError(message)) return;
+      if (isCaptureScreenshotCancelError(err)) return;
       setError(message);
     }
   };
@@ -506,7 +494,7 @@ export function MessageComposer({
         </button>
       </div>
       {emojiOpen && (
-        <EmojiPanel
+        <MessageComposerEmojiPanel
           onPick={insertEmoji}
           recentEmojis={recentEmojis}
         />
@@ -543,73 +531,17 @@ export function MessageComposer({
           ))}
         </div>
       )}
-      <input
-        ref={attachmentInputRef}
-        className="hidden-file-input"
-        data-testid="composer-attachment-input"
-        type="file"
-        multiple
-        onChange={(event) => {
-          const files = Array.from(event.currentTarget.files ?? []);
-          event.currentTarget.value = "";
-          if (files.length) addFiles(files);
-        }}
+      <MessageComposerFileInputs
+        attachmentInputRef={attachmentInputRef}
+        imageInputRef={imageInputRef}
+        fileInputRef={fileInputRef}
+        onFiles={(files) => void addFiles(files)}
       />
-      <input
-        ref={imageInputRef}
-        className="hidden-file-input"
-        data-testid="composer-image-input"
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={(event) => {
-          const files = Array.from(event.currentTarget.files ?? []);
-          event.currentTarget.value = "";
-          if (files.length) addFiles(files);
-        }}
-      />
-      <input
-        ref={fileInputRef}
-        className="hidden-file-input"
-        data-testid="composer-file-input"
-        type="file"
-        multiple
-        onChange={(event) => {
-          const files = Array.from(event.currentTarget.files ?? []);
-          event.currentTarget.value = "";
-          if (files.length) addFiles(files);
-        }}
-      />
-      {attachments.length > 0 && attachmentUi === "legacy" && (
-        <div className="composer-attachments" aria-label="待发送附件">
-          {attachments.map((item) => (
-            <article className="composer-attachment" key={item.id}>
-              {item.kind === "image" && item.previewUrl ? (
-                <img src={item.previewUrl} alt={item.file.name || "待发送图片"} />
-              ) : (
-                <span
-                  className={`composer-attachment-icon ${composerFileAttachmentVisual(item.file.name).kind}`}
-                  aria-hidden="true"
-                >
-                  <span className="file-type-glyph">
-                    {composerFileAttachmentVisual(item.file.name).label}
-                  </span>
-                </span>
-              )}
-              <span>
-                <strong>{item.file.name || composerMediaKindLabel(item.kind)}</strong>
-                <small>{formatComposerFileSize(item.file.size)}</small>
-              </span>
-              <button
-                type="button"
-                aria-label={`移除 ${item.file.name || "附件"}`}
-                onClick={() => removeAttachment(item)}
-              >
-                <X size={13} />
-              </button>
-            </article>
-          ))}
-        </div>
+      {attachmentUi === "stacked" && (
+        <MessageComposerAttachmentList
+          attachments={attachments}
+          onRemove={removeAttachment}
+        />
       )}
       {error && (
         <p className="inline-error" role="alert">
@@ -699,29 +631,10 @@ export function MessageComposer({
           />
         )}
       </div>
-      {previewAttachment?.previewUrl && (
-        <div
-          className="composer-attachment-preview"
-          role="dialog"
-          aria-modal="true"
-          aria-label="待发送图片预览"
-          onClick={() => setPreviewAttachment(null)}
-        >
-          <button
-            className="composer-attachment-preview-close"
-            type="button"
-            aria-label="关闭待发送图片预览"
-            onClick={() => setPreviewAttachment(null)}
-          >
-            <X size={18} />
-          </button>
-          <img
-            src={previewAttachment.previewUrl}
-            alt={previewAttachment.file.name || "待发送图片"}
-            onClick={(event) => event.stopPropagation()}
-          />
-        </div>
-      )}
+      <MessageComposerAttachmentPreview
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </footer>
   );
 }
@@ -776,51 +689,4 @@ function focusComposerInput(
     ref.current?.focus();
     window.setTimeout(() => ref.current?.focus(), 0);
   });
-}
-
-function EmojiPanel({
-  onPick,
-  recentEmojis,
-}: {
-  onPick: (emoji: WechatEmojiItem) => void;
-  recentEmojis: WechatEmojiItem[];
-}) {
-  return (
-    <div className="composer-emoji-panel" role="dialog" aria-label="表情选择">
-      <section>
-        <h4>最近使用</h4>
-        {recentEmojis.length > 0 && (
-          <div className="composer-emoji-grid">
-            {recentEmojis.slice(0, 8).map((emoji) => (
-              <button
-                type="button"
-                key={emoji.id}
-                aria-label={`表情 ${emoji.label}`}
-                title={emoji.label}
-                onClick={() => onPick(emoji)}
-              >
-                <span>{emoji.value}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-      <section>
-        <h4>所有表情</h4>
-        <div className="composer-emoji-grid">
-          {wechatEmojiItems.map((emoji) => (
-            <button
-              type="button"
-              key={emoji.id}
-              aria-label={`表情 ${emoji.label}`}
-              title={emoji.label}
-              onClick={() => onPick(emoji)}
-            >
-              <span>{emoji.value}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
 }

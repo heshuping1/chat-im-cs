@@ -1,0 +1,18 @@
+.panel-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  background: var(--pc-surface);
+  color: var(--pc-text-secondary);
+  font-size: 13px;
+}
+
+.panel-state.error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}

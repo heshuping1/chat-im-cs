@@ -12,21 +12,23 @@ import { useMemo } from "react";
 import { ChatWorkspace } from "./ChatWorkspace";
 import { CustomerContextPanel } from "./CustomerContextPanel";
 import { ThreadList } from "./ThreadList";
+import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
-import { useWorkspaceStore } from "../data/store";
+import {
+  useServiceListPaneWidth,
+  useServiceProfilePaneWidth,
+  useSetServiceListPaneWidth,
+  useSetServiceProfilePaneWidth,
+} from "../data/workspace-ui/workspace-ui-store";
 import { startHorizontalPaneResize } from "../lib/paneResize";
 
 export function OnlineServicePage() {
-  const session = useWorkspaceStore((state) => state.authSession);
-  const serviceListPaneWidth = useWorkspaceStore((state) => state.serviceListPaneWidth);
-  const serviceProfilePaneWidth = useWorkspaceStore((state) => state.serviceProfilePaneWidth);
-  const setServiceListPaneWidth = useWorkspaceStore(
-    (state) => state.setServiceListPaneWidth,
-  );
-  const setServiceProfilePaneWidth = useWorkspaceStore(
-    (state) => state.setServiceProfilePaneWidth,
-  );
+  const session = useAuthSession();
+  const serviceListPaneWidth = useServiceListPaneWidth();
+  const serviceProfilePaneWidth = useServiceProfilePaneWidth();
+  const setServiceListPaneWidth = useSetServiceListPaneWidth();
+  const setServiceProfilePaneWidth = useSetServiceProfilePaneWidth();
   const client = useMemo(
     () => (session ? createApiClient(session) : null),
     [session],

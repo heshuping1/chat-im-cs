@@ -6,14 +6,15 @@ import {
   staffServiceHistoryItemToThread,
   type CustomerProfileCard,
 } from "../data/api-client";
+import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
-import { useWorkspaceStore } from "../data/store";
+import { useActiveThreadId } from "../data/workspace-ui/workspace-ui-store";
 import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
 
 export function CustomerContextPanel() {
-  const session = useWorkspaceStore((state) => state.authSession);
-  const selectedThreadId = useWorkspaceStore((state) => state.activeThreadId);
+  const session = useAuthSession();
+  const selectedThreadId = useActiveThreadId();
   const client = useMemo(
     () => (session ? createApiClient(session) : null),
     [session],

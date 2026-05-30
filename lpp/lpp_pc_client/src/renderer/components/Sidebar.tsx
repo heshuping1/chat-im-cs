@@ -1,15 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
   Building2,
   Check,
   ChartSpline,
-  ChevronRight,
   ClipboardCheck,
   Bot,
   BookOpenText,
-  Copy,
   Headset,
   LogOut,
   LayoutDashboard,
@@ -21,24 +18,50 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { TrayStatus } from "../../shared/desktop-api";
-import type { ConversationListItem, FriendInviteQrDto } from "../data/api-client";
+import type { ConversationListItem } from "../data/api-client";
 import { normalizeCustomerServiceThreadType } from "../data/api-client";
 import {
   effectiveConversationUnreadCount,
   isImConversation,
 } from "../data/message-display";
 import { isQueuedCustomerServiceThread } from "../data/customer-service-display";
-import type { ConversationReadState } from "../data/im-read-model";
+import {
+  useImReadStateByConversation,
+  useLocalImConversationReads,
+} from "../data/im-read/im-read-store";
+import { mergeUnifiedReadStateForIdentity } from "../data/im-read/im-read-view-model";
+import {
+  notifyDesktopOrBrowser,
+  shouldPushRealtimeReminder,
+  shouldShowDesktopNotification,
+} from "../data/reminder/reminder-service";
+import {
+  usePushRealtimeReminder,
+  useRealtimeReminders,
+} from "../data/reminder/reminder-store";
 import { pcQueryKeys } from "../data/query-keys";
+import {
+  useAuthSession,
+  useClearAuthSession,
+} from "../data/auth/auth-store";
+import { usePcSettings } from "../data/settings/settings-store";
+import {
+  useActiveModule,
+  useImPresenceStatus,
+  useSetActiveModule,
+  useSetImPresenceStatus,
+} from "../data/workspace-ui/workspace-ui-store";
 import { requireApiClient } from "../data/runtime";
 import { imPresenceStatuses } from "../data/static-config";
-import type { LocalImConversationRead } from "../data/store";
-import { useWorkspaceStore } from "../data/store";
 import type { ModuleKey } from "../data/types";
-import { formatBadgeCount, formatError, formatShortDate } from "../lib/format";
+import { formatBadgeCount, formatError } from "../lib/format";
 import { PcAvatar } from "./PcAvatar";
-
-type AccountPanel = "qrcode" | null;
+import {
+  AccountAction,
+  AccountDetailPanel,
+  copyToClipboard,
+  type AccountPanel,
+} from "./SidebarAccountPanels";
 
 const primaryNavItems = [
   { key: "messages", label: "消息", icon: MessageCircleMore },
@@ -72,25 +95,17 @@ export function Sidebar() {
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
   const [accountPanel, setAccountPanel] = useState<AccountPanel>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const activeModule = useWorkspaceStore((state) => state.activeModule);
-  const locallyReadConversationReads = useWorkspaceStore(
-    (state) => state.locallyReadImConversationReads,
-  );
-  const imReadStateByConversation = useWorkspaceStore(
-    (state) => state.imReadStateByConversation,
-  );
-  const authSession = useWorkspaceStore((state) => state.authSession);
-  const clearAuthSession = useWorkspaceStore((state) => state.clearAuthSession);
-  const setActiveModule = useWorkspaceStore((state) => state.setActiveModule);
-  const imPresenceStatus = useWorkspaceStore((state) => state.imPresenceStatus);
-  const setImPresenceStatus = useWorkspaceStore(
-    (state) => state.setImPresenceStatus,
-  );
-  const pcSettings = useWorkspaceStore((state) => state.pcSettings);
-  const pushRealtimeReminder = useWorkspaceStore(
-    (state) => state.pushRealtimeReminder,
-  );
-  const realtimeReminders = useWorkspaceStore((state) => state.realtimeReminders);
+  const activeModule = useActiveModule();
+  const locallyReadConversationReads = useLocalImConversationReads();
+  const imReadStateByConversation = useImReadStateByConversation();
+  const authSession = useAuthSession();
+  const clearAuthSession = useClearAuthSession();
+  const setActiveModule = useSetActiveModule();
+  const imPresenceStatus = useImPresenceStatus();
+  const setImPresenceStatus = useSetImPresenceStatus();
+  const pcSettings = usePcSettings();
+  const pushRealtimeReminder = usePushRealtimeReminder();
+  const realtimeReminders = useRealtimeReminders();
   const queueReminderReadyRef = useRef(false);
   const queueReminderSessionRef = useRef("");
   const previousQueuedThreadIdsRef = useRef<Set<string>>(new Set());
@@ -289,14 +304,14 @@ export function Sidebar() {
     previousServiceUnreadRef.current = currentUnread;
     previousServiceMessageRef.current = currentMessageStamps;
     if (
-      !pcSettings.serviceQueueNotifications ||
-      (newQueuedThreads.length === 0 &&
+      newQueuedThreads.length === 0 &&
         activeUnreadThreads.length === 0 &&
         changedMessageThreads.length === 0 &&
-        !queuedCountIncreased)
+        !queuedCountIncreased
     ) {
       return;
     }
+    if (!shouldPushRealtimeReminder(pcSettings, "serviceQueue")) return;
 
     const notifyThread = (
       thread: (typeof queuedTempSessions)[number],
@@ -327,8 +342,11 @@ export function Sidebar() {
         severity: "warning",
         icon: "service",
       });
-      if (pcSettings.desktopNotifications) {
-        notifyQueueDesktop(title, fallbackBody || body, id);
+      if (shouldShowDesktopNotification(pcSettings, "serviceQueue")) {
+        void notifyDesktopOrBrowser(
+          { title, body: fallbackBody || body, conversationId: id },
+          { channel: "serviceQueue" },
+        );
       }
     };
 
@@ -368,7 +386,9 @@ export function Sidebar() {
         severity: "warning",
         icon: "service",
       });
-      if (pcSettings.desktopNotifications) notifyQueueDesktop(title, body);
+      if (shouldShowDesktopNotification(pcSettings, "serviceQueue")) {
+        void notifyDesktopOrBrowser({ title, body }, { channel: "serviceQueue" });
+      }
     }
   }, [
     activeModule,
@@ -581,171 +601,4 @@ export function Sidebar() {
       </div>
     </aside>
   );
-}
-
-function AccountAction({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button className="account-action-row" type="button" onClick={onClick}>
-      {icon}
-      <span>{label}</span>
-      <ChevronRight size={14} />
-    </button>
-  );
-}
-
-function AccountDetailPanel({
-  panel,
-  inviteQrs,
-  inviteQrsLoading,
-  inviteQrsError,
-  onCreateInviteQr,
-  creatingInviteQr,
-  onCopy,
-  onClose,
-}: {
-  panel: Exclude<AccountPanel, null>;
-  inviteQrs: FriendInviteQrDto[];
-  inviteQrsLoading: boolean;
-  inviteQrsError: unknown;
-  onCreateInviteQr: () => void;
-  creatingInviteQr: boolean;
-  onCopy: (text: string) => void;
-  onClose: () => void;
-}) {
-  const titleMap = {
-    qrcode: "我的二维码",
-  } satisfies Record<Exclude<AccountPanel, null>, string>;
-
-  return (
-    <section className="account-detail-panel" aria-label={titleMap[panel]}>
-      <div className="account-detail-head">
-        <strong>{titleMap[panel]}</strong>
-        <button type="button" onClick={onClose}>
-          收起
-        </button>
-      </div>
-      {panel === "qrcode" && (
-        <div className="account-detail-body">
-          {inviteQrsLoading && <AccountInlineState text="正在读取二维码..." />}
-          {Boolean(inviteQrsError) && (
-            <AccountInlineState
-              tone="error"
-              text={`二维码加载失败：${formatError(inviteQrsError)}`}
-            />
-          )}
-          {inviteQrs.length > 0 ? (
-            inviteQrs.map((item) => (
-              <div className="account-real-card" key={item.tokenId || item.token}>
-                <InfoLine label="状态" value={item.status ?? "--"} />
-                <InfoLine label="有效期" value={formatShortDate(item.expiresAt)} />
-                <InfoLine label="使用次数" value={`${item.usedCount ?? 0}/${item.maxUses ?? 0}`} />
-                <InfoLine label="二维码内容" value={item.qrPayload ?? "--"} action={item.qrPayload ? () => onCopy(item.qrPayload!) : undefined} />
-              </div>
-            ))
-          ) : (
-            !inviteQrsLoading &&
-            !Boolean(inviteQrsError) && (
-              <div className="account-detail-empty">
-                <QrCode size={18} />
-                <strong>暂无有效二维码</strong>
-                <span>可以通过接口生成一个新的加好友二维码。</span>
-              </div>
-            )
-          )}
-          <button
-            type="button"
-            className="account-inline-action"
-            disabled={creatingInviteQr}
-            onClick={onCreateInviteQr}
-          >
-            <QrCode size={14} />
-            {creatingInviteQr ? "生成中..." : "生成二维码"}
-          </button>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function AccountInlineState({
-  text,
-  tone = "muted",
-}: {
-  text: string;
-  tone?: "muted" | "error";
-}) {
-  return <p className={`account-inline-state ${tone}`}>{text}</p>;
-}
-
-function InfoLine({
-  label,
-  value,
-  action,
-}: {
-  label: string;
-  value: string;
-  action?: () => void;
-}) {
-  return (
-    <div className="account-info-line">
-      <span>{label}</span>
-      <strong>{value || "--"}</strong>
-      {action && (
-        <button type="button" onClick={action} aria-label={`复制${label}`}>
-          <Copy size={13} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-async function copyToClipboard(text: string) {
-  if (!text || text === "--") return;
-  await navigator.clipboard?.writeText(text).catch(() => undefined);
-}
-
-function mergeUnifiedReadStateForIdentity(
-  legacyReads: Record<string, LocalImConversationRead>,
-  readStateByConversation: Record<string, ConversationReadState>,
-) {
-  const merged = { ...legacyReads };
-  Object.values(readStateByConversation).forEach((readState) => {
-    const readSeq = Math.max(0, Math.floor(readState.myReadSeq));
-    if (readSeq <= 0) return;
-    const read = { readSeq, readAt: readState.updatedAt };
-    const currentByKey = merged[readState.conversationKey];
-    if (!currentByKey || currentByKey.readSeq < readSeq) {
-      merged[readState.conversationKey] = read;
-    }
-    const currentById = merged[readState.conversationId];
-    if (!currentById || currentById.readSeq < readSeq) {
-      merged[readState.conversationId] = read;
-    }
-  });
-  return merged;
-}
-
-function notifyQueueDesktop(title: string, body: string, conversationId?: string) {
-  if (window.desktopApi?.notify) {
-    void window.desktopApi.notify({ title, body, conversationId });
-    return;
-  }
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "granted") {
-    new Notification(title, { body });
-    return;
-  }
-  if (Notification.permission === "default") {
-    void Notification.requestPermission().then((permission) => {
-      if (permission === "granted") new Notification(title, { body });
-    });
-  }
 }

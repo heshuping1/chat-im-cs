@@ -4,11 +4,13 @@ import {
   firstMessageMedia,
   imageMediaCacheKey,
   mediaFileName,
+  normalizeMessageParts,
   normalizeMessageType,
   resolveMediaUrl,
 } from "../../data/im-message-normalize";
 
 export type ImMediaKind = "image" | "file" | "voice" | "video";
+export type ChatMediaKind = ImMediaKind;
 
 export type ImMediaItem = {
   kind: ImMediaKind;
@@ -20,6 +22,7 @@ export type ImMediaItem = {
   posterUrl?: string;
   imageCacheKey?: string;
 };
+export type ChatMediaItem = ImMediaItem & { kind: ChatMediaKind };
 
 export type MediaCacheContext = {
   accountId?: string;
@@ -80,6 +83,24 @@ export function normalizeMediaPart({
       : undefined,
     imageCacheKey: part.type === "image" ? imageMediaCacheKey(media, sourceUrl) : undefined,
   };
+}
+
+export function chatMediaItemsFromMessage({
+  assetBaseUrl,
+  message,
+}: {
+  assetBaseUrl?: string;
+  message: MessageItemDto;
+}): ChatMediaItem[] {
+  return normalizeMessageParts(message)
+    .map((part) =>
+      normalizeMediaPart({
+        assetBaseUrl,
+        fallback: message.preview,
+        part,
+      }),
+    )
+    .filter((item): item is ChatMediaItem => Boolean(item));
 }
 
 export function messageMediaFileName(message: MessageItemDto) {

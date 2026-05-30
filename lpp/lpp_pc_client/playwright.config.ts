@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const chromeChannel = process.env.PLAYWRIGHT_CHROME_CHANNEL;
+
 export default defineConfig({
   testDir: './tests/browser',
   timeout: 30_000,
@@ -25,7 +27,7 @@ export default defineConfig({
       name: 'chrome',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome',
+        ...(chromeChannel ? { channel: chromeChannel } : {}),
       },
     },
   ],

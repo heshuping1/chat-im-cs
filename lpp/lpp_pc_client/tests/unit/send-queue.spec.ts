@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 import { sendComposerPartsInOrder } from "../../src/renderer/media/runtime/sendQueue";
 
 describe("sendComposerPartsInOrder", () => {
+  it("does nothing for an empty composer send", async () => {
+    const events: string[] = [];
+    await sendComposerPartsInOrder<{ id: string }>({
+      parts: [],
+      sendText: async (text) => {
+        events.push(`text:${text}`);
+      },
+      sendAttachment: async (attachment) => {
+        events.push(`attachment:${attachment.id}`);
+      },
+    });
+
+    expect(events).toEqual([]);
+  });
+
   it("sends text and attachments strictly in visible order", async () => {
     const events: string[] = [];
     await sendComposerPartsInOrder<{ id: string }>({

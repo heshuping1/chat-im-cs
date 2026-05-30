@@ -1,7 +1,16 @@
 import { Bell, Clock, Headphones, MessageSquare, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useWorkspaceStore } from "../data/store";
+import {
+  useDismissRealtimeReminder,
+  useRealtimeReminders,
+} from "../data/reminder/reminder-store";
 import type { ModuleKey } from "../data/types";
+import {
+  useSetActiveImConversation,
+  useSetActiveModule,
+  useSetActiveThread,
+  useSetServiceThreadFilter,
+} from "../data/workspace-ui/workspace-ui-store";
 
 type ReminderSeverity = "info" | "warning" | "critical";
 
@@ -18,16 +27,12 @@ interface ReminderItem {
 
 export function ReminderCenter() {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
-  const setActiveModule = useWorkspaceStore((state) => state.setActiveModule);
-  const setActiveThread = useWorkspaceStore((state) => state.setActiveThread);
-  const setFilter = useWorkspaceStore((state) => state.setFilter);
-  const setActiveImConversation = useWorkspaceStore(
-    (state) => state.setActiveImConversation,
-  );
-  const realtimeReminders = useWorkspaceStore((state) => state.realtimeReminders);
-  const dismissRealtimeReminder = useWorkspaceStore(
-    (state) => state.dismissRealtimeReminder,
-  );
+  const setActiveModule = useSetActiveModule();
+  const setActiveThread = useSetActiveThread();
+  const setFilter = useSetServiceThreadFilter();
+  const setActiveImConversation = useSetActiveImConversation();
+  const realtimeReminders = useRealtimeReminders();
+  const dismissRealtimeReminder = useDismissRealtimeReminder();
 
   const reminders = useMemo(
     () => [

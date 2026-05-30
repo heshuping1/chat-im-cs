@@ -1,0 +1,148 @@
+/* E2 bottom presence bar: 在线状态 + 更多菜单，贴近用户给的参考图 */
+.sidebar-footer {
+  padding-top: 16px !important;
+}
+
+.sidebar-footer-control {
+  position: relative;
+  display: flex !important;
+  width: 46px !important;
+  height: 44px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.footer-status-select,
+.footer-menu-button {
+  display: inline-flex !important;
+  height: 46px !important;
+  align-items: center !important;
+  border: 0 !important;
+  border-radius: 15px !important;
+  background: transparent !important;
+  color: #536276 !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+.footer-status-select {
+  min-width: 0;
+  position: relative;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  padding: 0 10px 0 2px !important;
+  font-size: 14px !important;
+}
+
+.footer-status-select select {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 900;
+  outline: 0;
+  cursor: pointer;
+}
+
+.footer-menu-button {
+  justify-content: center !important;
+  width: 44px !important;
+  padding: 0 !important;
+}
+
+.footer-status-select:hover,
+.footer-status-select:focus-within,
+.footer-menu-button:hover,
+.footer-menu-button.active {
+  background: rgba(232, 251, 243, 0.62) !important;
+  color: var(--e2-green-dark) !important;
+}
+
+.footer-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--e2-green);
+  box-shadow: 0 0 0 4px rgba(8, 185, 129, 0.1);
+}
+
+.footer-status-dot.busy {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+}
+
+.footer-status-dot.offline {
+  background: #a7b2c0;
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.12);
+}
+
+.footer-presence-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 50;
+  display: grid;
+  min-width: 132px;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid rgba(216, 226, 237, 0.92);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 46px rgba(20, 35, 55, 0.16);
+}
+
+.footer-presence-menu button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 16px;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #536276;
+  font-size: 13px;
+  font-weight: 850;
+  text-align: left;
+}
+
+.footer-presence-menu button:hover,
+.footer-presence-menu button.selected {
+  background: rgba(232, 251, 243, 0.78);
+  color: var(--e2-green-dark);
+}
+
+.footer-presence-menu .footer-status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.sidebar.collapsed .sidebar-footer-control {
+  width: 46px !important;
+  height: 44px !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.sidebar.collapsed .footer-status-select,
+.sidebar.collapsed .footer-menu-button {
+  width: 100% !important;
+  height: 42px !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+.sidebar.collapsed .footer-status-select select,
+.sidebar.collapsed .footer-status-select svg {
+  display: none !important;
+}

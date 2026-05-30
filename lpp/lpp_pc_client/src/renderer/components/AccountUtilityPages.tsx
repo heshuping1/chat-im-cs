@@ -20,18 +20,17 @@ import {
   type FavoriteSummaryDto,
   type PlatformTenant,
 } from "../data/api-client";
+import { useAuthSession, useSetAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createTraceId } from "../data/runtime";
 import { requireApiClient } from "../data/runtime";
-import { useWorkspaceStore } from "../data/store";
 import { formatError, formatShortDate } from "../lib/format";
 import { PcAvatar } from "./PcAvatar";
 
 export function EnterpriseSwitchPage() {
   const queryClient = useQueryClient();
-  const authSession = useWorkspaceStore((state) => state.authSession);
-  const setAuthSession = useWorkspaceStore((state) => state.setAuthSession);
-  const clearAuthSession = useWorkspaceStore((state) => state.clearAuthSession);
+  const authSession = useAuthSession();
+  const setAuthSession = useSetAuthSession();
   const [joinCode, setJoinCode] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -235,7 +234,7 @@ export function EnterpriseSwitchPage() {
 }
 
 export function FavoritesPage() {
-  const authSession = useWorkspaceStore((state) => state.authSession);
+  const authSession = useAuthSession();
   const [category, setCategory] = useState("all");
   const [keyword, setKeyword] = useState("");
   const summaryQuery = useQuery({

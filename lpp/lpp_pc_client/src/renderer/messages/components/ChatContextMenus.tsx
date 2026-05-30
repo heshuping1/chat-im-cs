@@ -19,44 +19,17 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { CachedMediaStatus } from "../../../shared/desktop-api";
-
-export type MessageContextAction =
-  | "multi_select"
-  | "reply"
-  | "ai_reply"
-  | "copy"
-  | "copy_image"
-  | "copy_media"
-  | "open_media"
-  | "edit_media"
-  | "translate"
-  | "voice_to_text"
-  | "save_media_as"
-  | "reveal_in_folder"
-  | "forward"
-  | "favorite"
-  | "recall"
-  | "delete";
+import {
+  getMessageContextActionAvailability,
+  type MessageContextAction,
+  type MessageContextMenuState,
+} from "../models/messageContextMenuModel";
 
 type MessageMenuItem = {
   action: MessageContextAction;
   danger?: boolean;
   icon: ReactNode;
   label: string;
-};
-
-type MessageContextMenuState = {
-  canCopyMediaFile: boolean;
-  hasMedia: boolean;
-  isImage: boolean;
-  isText: boolean;
-  isVideo: boolean;
-  isVoice: boolean;
-  mediaCacheStatus?: CachedMediaStatus;
-  recallable: boolean;
-  revealInFolderLabel: string;
-  serverUsable: boolean;
 };
 
 export function MessageContextMenu({
@@ -126,9 +99,9 @@ export function ConversationContextMenu({
 }
 
 function buildMessageContextMenuItems(state: MessageContextMenuState) {
-  const videoReadyForFileActions = !state.isVideo || state.mediaCacheStatus === "cached";
+  const actions = getMessageContextActionAvailability(state);
   const fallbackItems: MessageMenuItem[] = [
-    ...(state.serverUsable
+    ...(actions.multi_select
       ? [
           {
             action: "multi_select" as const,
@@ -138,14 +111,14 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
           { action: "reply" as const, label: "引用", icon: <Reply size={15} /> },
         ]
       : []),
-    ...(state.isText
+    ...(actions.copy
       ? [
           { action: "copy" as const, label: "复制", icon: <Copy size={15} /> },
           { action: "ai_reply" as const, label: "AI 回复", icon: <Sparkles size={15} /> },
           { action: "translate" as const, label: "翻译", icon: <Languages size={15} /> },
         ]
       : []),
-    ...(state.isImage && state.hasMedia
+    ...(actions.copy_image
       ? [
           {
             action: "copy_image" as const,
@@ -154,7 +127,7 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
           },
         ]
       : []),
-    ...(state.serverUsable && state.isVoice
+    ...(actions.voice_to_text
       ? [
           {
             action: "voice_to_text" as const,
@@ -163,7 +136,7 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
           },
         ]
       : []),
-    ...(state.hasMedia
+    ...(actions.save_media_as
       ? [
           { action: "save_media_as" as const, label: "另存为", icon: <Download size={15} /> },
           {
@@ -173,13 +146,13 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
           },
         ]
       : []),
-    ...(state.serverUsable
+    ...(actions.forward
       ? [
           { action: "forward" as const, label: "转发", icon: <Forward size={15} /> },
           { action: "favorite" as const, label: "收藏", icon: <Star size={15} /> },
         ]
       : []),
-    ...(state.recallable
+    ...(actions.recall
       ? [
           {
             action: "recall" as const,
@@ -192,7 +165,7 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
     { action: "delete", label: "删除", icon: <Trash2 size={15} />, danger: true },
   ];
   const mediaItems: MessageMenuItem[] = [
-    ...((state.isImage || state.canCopyMediaFile) && videoReadyForFileActions
+    ...(actions.copy_image || actions.copy_media
       ? [
           {
             action: state.isImage ? ("copy_image" as const) : ("copy_media" as const),
@@ -201,17 +174,25 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
           },
         ]
       : []),
-    { action: "save_media_as", label: "另存为...", icon: <Download size={15} /> },
-    { action: "open_media", label: "打开", icon: <FileText size={15} /> },
-    ...(!state.isVideo
+    ...(actions.save_media_as
+      ? [{ action: "save_media_as" as const, label: "另存为...", icon: <Download size={15} /> }]
+      : []),
+    ...(actions.open_media
+      ? [{ action: "open_media" as const, label: "打开", icon: <FileText size={15} /> }]
+      : []),
+    ...(actions.edit_media
       ? [{ action: "edit_media" as const, label: "编辑", icon: <Edit3 size={15} /> }]
       : []),
-    {
-      action: "reveal_in_folder",
-      label: state.revealInFolderLabel,
-      icon: <FolderOpen size={15} />,
-    },
-    ...(state.serverUsable
+    ...(actions.reveal_in_folder
+      ? [
+          {
+            action: "reveal_in_folder" as const,
+            label: state.revealInFolderLabel,
+            icon: <FolderOpen size={15} />,
+          },
+        ]
+      : []),
+    ...(actions.forward
       ? [
           { action: "forward" as const, label: "转发...", icon: <Forward size={15} /> },
           { action: "favorite" as const, label: "收藏", icon: <Star size={15} /> },
@@ -219,7 +200,7 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
           { action: "reply" as const, label: "引用", icon: <Reply size={15} /> },
         ]
       : []),
-    ...(state.recallable
+    ...(actions.recall
       ? [
           {
             action: "recall" as const,
@@ -233,10 +214,5 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
   ];
 
   if (!state.hasMedia) return fallbackItems;
-  return mediaItems.filter((item) => {
-    if (!state.isVideo || videoReadyForFileActions) return true;
-    return !["copy_media", "save_media_as", "open_media", "reveal_in_folder"].includes(
-      item.action,
-    );
-  });
+  return mediaItems;
 }

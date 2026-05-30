@@ -12,23 +12,20 @@ import {
   deriveMessageView,
   reduceImCoreEvent,
   coalesceImCoreCommands,
+  markReadEndpointType,
   type ConversationReadState,
   type ImCoreEvent,
 } from "../../src/renderer/data/im-read-model";
 import {
-  coalesceExecutableCommands,
-  markReadEndpointType,
-} from "../../src/renderer/data/im-command-executor";
-import {
   imCoreEventFromGatewayMessageForTest,
   imCoreEventFromGatewayReadForTest,
-} from "../../src/renderer/components/GatewayBridge";
+} from "../../src/renderer/data/gateway/gateway-payload-utils";
 import {
   type AuthSession,
   imConversationStorageKey,
   sanitizeStoredImReadState,
   useWorkspaceStore,
-} from "../../src/renderer/data/store";
+} from "../../src/renderer/data/workspace-ui/workspace-store-core";
 import {
   conversationReadStateKey,
   effectiveConversationUnreadCount,
@@ -1482,6 +1479,74 @@ describe("IM read model state machine", () => {
     });
   });
 
+  it("does not double count duplicate or out-of-order inactive gateway messages", () => {
+    const state: ConversationReadState = createInitialImReadState("direct", "chat-1", {
+      myReadSeq: 5,
+      lastMessageSeq: 10,
+      unreadCount: 2,
+    });
+
+    const result = reduceImCoreEvent({
+      identity,
+      stateByConversation: { "direct:chat-1": state },
+      event: {
+        type: "gateway.message_received",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        isActiveConversation: false,
+        message: {
+          messageId: "duplicate-9",
+          conversationSeq: 9,
+          senderUserId: "peer-user",
+        },
+      },
+    });
+
+    expect(result.stateByConversation["direct:chat-1"]).toMatchObject({
+      lastMessageSeq: 10,
+      unreadCount: 2,
+    });
+    expect(result.commands).toContainEqual({
+      type: "log_diagnostic",
+      event: "im.read.duplicate_or_out_of_order_message",
+      context: {
+        conversationId: "chat-1",
+        conversationType: "direct",
+        readSeq: 9,
+      },
+    });
+  });
+
+  it("retries pending mark_read when offline recovery snapshot is behind", () => {
+    const state: ConversationReadState = createInitialImReadState("direct", "chat-1", {
+      myReadSeq: 8,
+      pendingReadSeq: 12,
+      lastMessageSeq: 12,
+    });
+
+    const result = reduceImCoreEvent({
+      identity,
+      stateByConversation: { "direct:chat-1": state },
+      event: {
+        type: "api.conversation_snapshot",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        conversation: {
+          myReadSeq: 9,
+          lastMessageSeq: 12,
+          unreadCount: 3,
+        },
+      },
+    });
+
+    expect(result.commands).toContainEqual({
+      type: "retry_pending_read",
+      conversationId: "chat-1",
+      conversationType: "direct",
+      readSeq: 12,
+    });
+  });
+
   it("coalesces mark_read commands by highest readSeq per conversation", () => {
     expect(coalesceImCoreCommands([
       { type: "mark_read", conversationId: "chat-1", conversationType: "direct", readSeq: 10 },
@@ -1496,7 +1561,7 @@ describe("IM read model state machine", () => {
 
 describe("IM command executor helpers", () => {
   it("keeps only the highest mark_read per conversation", () => {
-    expect(coalesceExecutableCommands([
+    expect(coalesceImCoreCommands([
       { type: "mark_read", conversationId: "chat-1", conversationType: "direct", readSeq: 5 },
       { type: "mark_read", conversationId: "chat-1", conversationType: "direct", readSeq: 9 },
     ])).toEqual([

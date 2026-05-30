@@ -3,6 +3,7 @@ import { MessagesApiClient } from "./messages-client";
 import type {
   AiSuggestionDto,
   CustomerProfileCard,
+  CustomerServiceThread,
   CustomerServiceThreadType,
   CustomerServiceThreadsResponse,
   MediaResourceDto,
@@ -10,12 +11,23 @@ import type {
   StaffReceptionStatusDto,
   StaffServiceHistoryResponse,
 } from "./types";
+import { logApiContractDiagnostic } from "../api-contract/contract-diagnostics";
+import {
+  customerProfileEntityToDto,
+  customerServiceThreadEntityToDto,
+  normalizeCustomerProfileDto,
+  normalizeCustomerServiceThreadDto,
+} from "../customer-service/cs-contract";
+import {
+  customerServiceMessageEntityToDto,
+  normalizeCustomerServiceMessageDto,
+} from "../customer-service/cs-message-contract";
 
 export class CustomerServiceApiClient extends MessagesApiClient {
   getWorkbenchThreads() {
     return this.request<CustomerServiceThreadsResponse>(
       endpointPlan.customerServiceThreads,
-    );
+    ).then(normalizeCustomerServiceThreadsResponse);
   }
 
   getStaffServiceHistory(params: {
@@ -71,7 +83,7 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       endpointPlan.threadProfileCard
         .replace("{threadType}", threadRoutePathType(threadType))
         .replace("{threadId}", threadId),
-    );
+    ).then((profile) => normalizeCustomerProfileFromContract(profile, threadId));
   }
 
   getWorkbenchThreadDetail(
@@ -82,7 +94,12 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       endpointPlan.customerServiceThreadDetail
         .replace("{threadType}", threadRoutePathType(threadType))
         .replace("{threadId}", threadId),
-    ).then(normalizeWorkbenchThreadDetail);
+    ).then((detail) =>
+      normalizeWorkbenchThreadDetail(detail, {
+        fallbackThreadId: threadId,
+        fallbackThreadType: threadType,
+      }),
+    );
   }
 
   private sendWorkbenchMessage(
@@ -257,17 +274,83 @@ type CustomerServiceThreadDetailResponse = NestedThreadPayload & {
   direct_chat?: NestedThreadPayload | null;
 };
 
-function normalizeWorkbenchThreadDetail(detail: CustomerServiceThreadDetailResponse) {
+function normalizeCustomerServiceThreadsResponse(
+  response: CustomerServiceThreadsResponse,
+): CustomerServiceThreadsResponse {
+  return {
+    ...response,
+    queueItems: (response.queueItems ?? [])
+      .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
+      .filter((item): item is CustomerServiceThread => Boolean(item)),
+    activeItems: (response.activeItems ?? [])
+      .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
+      .filter((item): item is CustomerServiceThread => Boolean(item)),
+  };
+}
+
+function normalizeCustomerServiceThreadFromContract(
+  item: CustomerServiceThread,
+  api: string,
+): CustomerServiceThread | null {
+  const result = normalizeCustomerServiceThreadDto(item);
+  logApiContractDiagnostic({
+    api,
+    phase: "normalize",
+    status: result.status,
+    issues: result.issues,
+    context: {
+      conversationId: result.data?.conversationId ?? item.conversationId,
+      threadId: result.data?.id ?? item.threadId,
+      itemCount: 1,
+    },
+    error: result.error,
+  });
+  return result.data ? customerServiceThreadEntityToDto(result.data, item) : null;
+}
+
+function normalizeCustomerProfileFromContract(
+  profile: CustomerProfileCard,
+  threadId: string,
+): CustomerProfileCard {
+  const result = normalizeCustomerProfileDto(profile);
+  logApiContractDiagnostic({
+    api: "pc-cs-thread-profile",
+    phase: "normalize",
+    status: result.status,
+    issues: result.issues,
+    context: { threadId },
+    error: result.error,
+  });
+  return result.data ? customerProfileEntityToDto(result.data, profile) : profile;
+}
+
+function normalizeWorkbenchThreadDetail(
+  detail: CustomerServiceThreadDetailResponse,
+  options: {
+    fallbackThreadId: string;
+    fallbackThreadType: CustomerServiceThreadType;
+  },
+) {
   const tempSession = asRecord(detail.tempSession ?? detail.temp_session);
   const directChat = asRecord(detail.directChat ?? detail.direct_chat);
   const nested = asNestedPayload(tempSession) ?? asNestedPayload(directChat);
-  const messages = readMessages(detail.messages) ?? readMessages(nested?.messages) ?? [];
+  const threadType = normalizeResponseThreadType(detail.threadType || options.fallbackThreadType);
+  const threadId = detail.threadId || options.fallbackThreadId;
+  const conversationId = detail.conversationId || detail.threadId || options.fallbackThreadId;
+  const rawMessages = readMessages(detail.messages) ?? readMessages(nested?.messages) ?? [];
+  const messages = normalizeCustomerServiceMessagesFromContract(rawMessages, {
+    conversationId,
+    threadId,
+    threadType,
+  });
   const latest = latestMessage(messages);
   const sourceRecord = nested ?? {};
 
-  return {
+  const normalizedDetail = {
     ...detail,
-    threadType: normalizeResponseThreadType(detail.threadType),
+    threadType,
+    threadId,
+    conversationId,
     title:
       readString(detail.title) ||
       readString(sourceRecord.title) ||
@@ -318,6 +401,57 @@ function normalizeWorkbenchThreadDetail(detail: CustomerServiceThreadDetailRespo
       readString(sourceRecord.updatedAt),
     messages,
   };
+  const result = normalizeCustomerServiceThreadDto(normalizedDetail);
+  logApiContractDiagnostic({
+    api: "pc-cs-thread-detail",
+    phase: "normalize",
+    status: result.status,
+    issues: result.issues,
+    context: {
+      conversationId: result.data?.conversationId ?? normalizedDetail.conversationId,
+      threadId: result.data?.id ?? normalizedDetail.threadId,
+      itemCount: messages.length,
+    },
+    error: result.error,
+  });
+  return result.data
+    ? {
+        ...normalizedDetail,
+        ...customerServiceThreadEntityToDto(result.data, normalizedDetail),
+      }
+    : normalizedDetail;
+}
+
+function normalizeCustomerServiceMessagesFromContract(
+  messages: MessageItemDto[],
+  options: {
+    conversationId: string;
+    threadId: string;
+    threadType: CustomerServiceThreadType;
+  },
+) {
+  return messages
+    .map((message, index) => {
+      const result = normalizeCustomerServiceMessageDto(message, {
+        threadId: options.threadId,
+        threadType: options.threadType,
+        fallbackConversationId: options.conversationId,
+        fallbackMessageId: `${options.threadId}:message:${index}`,
+      });
+      logApiContractDiagnostic({
+        api: "pc-cs-thread-messages",
+        phase: "normalize",
+        status: result.status,
+        issues: result.issues,
+        context: {
+          conversationId: result.data?.conversation.conversationId ?? options.conversationId,
+          threadId: options.threadId,
+          itemCount: 1,
+        },
+        error: result.error,
+      });
+      return result.data ? customerServiceMessageEntityToDto(result.data, message) : message;
+    });
 }
 
 function threadRoutePathType(threadType: CustomerServiceThreadType) {

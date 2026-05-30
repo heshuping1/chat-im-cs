@@ -20,6 +20,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { customerServiceReceptionStatusLabel } from "../data/customer-service-display";
@@ -28,7 +29,6 @@ import {
   roleLabels,
   workbenchShortcuts,
 } from "../data/static-config";
-import { useWorkspaceStore } from "../data/store";
 import type {
   EnterpriseAnnouncementDto,
   CustomerServiceThreadsResponse,
@@ -36,6 +36,7 @@ import type {
   StaffReceptionStatusDto,
 } from "../data/api-client";
 import type { ModuleKey, WorkbenchShortcut } from "../data/types";
+import { useSetActiveModule } from "../data/workspace-ui/workspace-ui-store";
 import { formatError, formatMonthDayTime } from "../lib/format";
 
 const groupIcons: Record<string, LucideIcon> = {
@@ -74,8 +75,8 @@ const shortcutRoutes: Partial<Record<string, ModuleKey>> = {
 
 export function WorkbenchPage() {
   const queryClient = useQueryClient();
-  const authSession = useWorkspaceStore((state) => state.authSession);
-  const setActiveModule = useWorkspaceStore((state) => state.setActiveModule);
+  const authSession = useAuthSession();
+  const setActiveModule = useSetActiveModule();
   const currentWorkspaceRole = roleFromSession(authSession);
   const [selectedShortcutId, setSelectedShortcutId] = useState("wb-cs-notices");
   const [notice, setNotice] = useState<string | null>(null);

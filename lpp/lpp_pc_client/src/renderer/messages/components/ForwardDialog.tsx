@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { conversationMetaText, effectiveConversationUnreadCount } from "../../data/message-display";
-import { ConversationAvatar, type GroupConversationAvatar } from "./ConversationListParts";
+import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
+import { ConversationAvatar } from "./ConversationListParts";
 
 export function ForwardDialog({
   activeConversationId,

@@ -169,6 +169,7 @@ export function reduceImCoreEvent(input: ReduceImCoreInput): ImCoreResult {
 
   if (input.event.type === "gateway.message_received") {
     const seq = seqOf(input.event.message);
+    const isNewMessageSeq = seq > current.lastMessageSeq;
     next = advanceLastMessageSeq(next, seq);
     if (isMine(input.event.message, input.identity)) {
       next = advanceMyReadSeq(next, seq);
@@ -179,8 +180,18 @@ export function reduceImCoreEvent(input: ReduceImCoreInput): ImCoreResult {
       next = clearUnread(next);
       pushMarkRead(commands, next, seq);
       commands.push(clearJumpCommand(next));
-    } else if (seq > next.myReadSeq) {
+    } else if (seq > next.myReadSeq && isNewMessageSeq) {
       next = incrementUnread(next, 1);
+    } else if (seq > 0 && !isNewMessageSeq) {
+      commands.push({
+        type: "log_diagnostic",
+        event: "im.read.duplicate_or_out_of_order_message",
+        context: {
+          conversationId: input.event.conversationId,
+          conversationType: input.event.conversationType,
+          readSeq: seq,
+        },
+      });
     }
   }
 
@@ -343,6 +354,12 @@ export function coalesceImCoreCommands(commands: ImCoreCommand[]) {
     }
   }
   return [...markReads.values(), ...rest];
+}
+
+export function markReadEndpointType(
+  command: Extract<ImCoreCommand, { type: "mark_read" | "retry_pending_read" }>,
+) {
+  return command.conversationType === "group" ? "group" : "direct";
 }
 
 export function isMine(message: ImMessageLike, identity: ImIdentity | null) {

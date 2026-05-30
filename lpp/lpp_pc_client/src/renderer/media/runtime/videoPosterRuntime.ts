@@ -10,6 +10,7 @@ import type { MediaCacheContext } from "./videoPlayer";
 const readyVideoSourceCache = new Set<string>();
 const videoPosterCache = new Map<string, string>();
 const videoPosterPromiseCache = new Map<string, Promise<string | undefined>>();
+const maxVideoPosterCacheEntries = 120;
 
 export function cachedGeneratedVideoPoster(src: string | undefined) {
   return src ? videoPosterCache.get(src) : undefined;
@@ -151,11 +152,11 @@ export async function ensureLocalVideoPoster({
       conversationId: mediaCacheContext?.conversationId,
     });
     registerVideoPosterForMedia(mediaRecord, cachedPoster.fileUrl);
-    videoPosterCache.set(src, cachedPoster.fileUrl);
+    rememberVideoPoster(src, cachedPoster.fileUrl);
     return cachedPoster.fileUrl;
   } catch {
     registerVideoPosterForMedia(mediaRecord, posterFromMemory);
-    videoPosterCache.set(src, posterFromMemory);
+    rememberVideoPoster(src, posterFromMemory);
     return posterFromMemory;
   }
 }
@@ -187,12 +188,20 @@ function captureVideoPosterFromSource(src: string) {
       video.removeAttribute("src");
       video.load();
       if (poster) {
-        videoPosterCache.set(src, poster);
+        rememberVideoPoster(src, poster);
         readyVideoSourceCache.add(src);
       }
       resolve(poster);
     };
     const timeout = window.setTimeout(() => finish(), 2500);
+    const seekFallbackFrame = () => {
+      const targetTime = videoPosterCaptureTime(video.duration);
+      try {
+        video.currentTime = targetTime;
+      } catch {
+        finish(captureVideoFramePoster(video));
+      }
+    };
     video.crossOrigin = "anonymous";
     video.muted = true;
     video.playsInline = true;
@@ -201,11 +210,9 @@ function captureVideoPosterFromSource(src: string) {
     video.addEventListener(
       "loadedmetadata",
       () => {
-        const targetTime = videoPosterCaptureTime(video.duration);
-        try {
-          video.currentTime = targetTime;
-        } catch {
-          finish(captureVideoFramePoster(video));
+        if (!Number.isFinite(video.duration) || video.duration <= 0.2) {
+          const poster = captureVideoFramePoster(video);
+          if (poster) finish(poster);
         }
       },
       { once: true },
@@ -220,15 +227,28 @@ function captureVideoPosterFromSource(src: string) {
     video.addEventListener(
       "loadeddata",
       () => {
-        if (!Number.isFinite(video.duration) || video.duration <= 0.2) {
-          finish(captureVideoFramePoster(video));
+        const poster = captureVideoFramePoster(video);
+        if (poster) {
+          finish(poster);
+          return;
         }
+        seekFallbackFrame();
       },
       { once: true },
     );
     video.src = src;
     video.load();
   });
+}
+
+function rememberVideoPoster(src: string, poster: string) {
+  videoPosterCache.delete(src);
+  videoPosterCache.set(src, poster);
+  while (videoPosterCache.size > maxVideoPosterCacheEntries) {
+    const oldestKey = videoPosterCache.keys().next().value;
+    if (!oldestKey) break;
+    videoPosterCache.delete(oldestKey);
+  }
 }
 
 export function videoPosterCaptureTime(duration: number) {

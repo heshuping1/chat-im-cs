@@ -1,5 +1,5 @@
 import { ApiClient } from './api-client';
-import type { AuthSession } from './store';
+import type { AuthSession } from './auth/auth-session';
 
 export const defaultApiBaseUrl =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ||

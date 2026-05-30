@@ -4,6 +4,7 @@ import {
   fileMessageInlineStatusText,
   localUploadStateFromMessage,
   uploadStatusLabel,
+  videoUploadOverlayState,
 } from "../../src/renderer/media/runtime/uploadState";
 
 function message(overrides: Partial<MessageItemDto> & Record<string, unknown>): MessageItemDto {
@@ -49,5 +50,45 @@ describe("uploadState", () => {
     expect(uploadStatusLabel("paused")).toBe("已暂停");
     expect(uploadStatusLabel("failed", undefined, "offline")).toBe("发送失败：offline");
     expect(uploadStatusLabel("canceled")).toBe("已取消");
+  });
+
+  it("models WeChat-like video upload overlay actions", () => {
+    expect(videoUploadOverlayState({ status: "uploading", progress: 42, taskId: "task-1" }))
+      .toMatchObject({
+        active: true,
+        canPlay: false,
+        action: "pause",
+        icon: "pause",
+        progress: 42,
+      });
+    expect(videoUploadOverlayState({ status: "paused", progress: 42, taskId: "task-1" }))
+      .toMatchObject({
+        active: true,
+        canPlay: false,
+        action: "resume",
+        icon: "play",
+        progress: 42,
+      });
+    expect(videoUploadOverlayState({ status: "sent", taskId: "task-1" })).toMatchObject({
+      active: false,
+      canPlay: true,
+    });
+  });
+
+  it("keeps failed and canceled video upload states non-playable", () => {
+    expect(videoUploadOverlayState({ status: "failed", taskId: "task-1", error: "offline" }))
+      .toMatchObject({
+        active: true,
+        canPlay: false,
+        action: "retry",
+        icon: "retry",
+        label: "发送失败：offline",
+      });
+    expect(videoUploadOverlayState({ status: "canceled", taskId: "task-1" })).toMatchObject({
+      active: true,
+      canPlay: false,
+      action: undefined,
+      icon: "canceled",
+    });
   });
 });

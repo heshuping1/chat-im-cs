@@ -1,25 +1,20 @@
 import {
-  AlertTriangle,
   Building2,
-  Check,
-  ClipboardList,
-  Crown,
   MessageSquare,
   Search,
-  ShieldCheck,
-  UsersRound,
   UserCheck,
   UserPlus,
   UserRoundX,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CustomerInfoPanel } from "./CustomerInfoPanel";
+import { ContactSidePanel } from "./ContactSidePanel";
+import { ContactDetailContent } from "./ContactDetailViews";
+import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
 import {
   type DepartmentDto,
-  type DepartmentMemberDto,
   type FriendRequestDto,
 } from "../data/api-client";
 import {
@@ -27,16 +22,17 @@ import {
   contactKindLabels,
   contactRowHint,
   contactRowSubtitle,
-  filterContacts,
-  filterRequests,
-  mapContacts,
   requestStatusLabel,
   sourceLabel,
 } from "../data/contact-directory";
-import { pcQueryKeys } from "../data/query-keys";
-import { requireApiClient } from "../data/runtime";
-import { useWorkspaceStore } from "../data/store";
 import type { ContactFilter, ContactItem } from "../data/types";
+import {
+  useActiveContactId,
+  useContactFilter,
+  useSetActiveContact,
+  useSetContactFilter,
+} from "../data/workspace-ui/workspace-ui-store";
+import { useContactsDirectoryController } from "../contacts/hooks/useContactsDirectoryController";
 import { formatError, formatShortDate } from "../lib/format";
 
 const filters: Array<{ key: ContactFilter; label: string }> = [
@@ -48,122 +44,31 @@ const filters: Array<{ key: ContactFilter; label: string }> = [
 ];
 
 export function ContactsPage() {
-  const session = useWorkspaceStore((state) => state.authSession);
-  const activeContactId = useWorkspaceStore((state) => state.activeContactId);
-  const setActiveContact = useWorkspaceStore((state) => state.setActiveContact);
-  const contactFilter = useWorkspaceStore((state) => state.contactFilter);
-  const setContactFilter = useWorkspaceStore((state) => state.setContactFilter);
-  const setActiveConversation = useWorkspaceStore(
-    (state) => state.setActiveImConversation,
-  );
-  const queryClient = useQueryClient();
+  const activeContactId = useActiveContactId();
+  const setActiveContact = useSetActiveContact();
+  const contactFilter = useContactFilter();
+  const setContactFilter = useSetContactFilter();
   const [keyword, setKeyword] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState("");
-
-  const friendsQuery = useQuery({
-    queryKey: ["pc-friends", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
-    queryFn: async () => requireApiClient(session).getFriends(),
+  const {
+    activeRequest,
+    createDirectChatPending,
+    departments,
+    directoryContacts,
+    directoryError,
+    directoryLoading,
+    handleRequest,
+    openMessage,
+    requestPending,
+    visibleContacts,
+    visibleRequests,
+  } = useContactsDirectoryController({
+    contactFilter,
+    keyword,
+    selectedRequestId,
+    setNotice,
   });
-  const requestsQuery = useQuery({
-    queryKey: ["pc-friend-requests", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
-    queryFn: async () => requireApiClient(session).getFriendRequests(),
-  });
-  const membersQuery = useQuery({
-    queryKey: ["pc-tenant-members", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
-    queryFn: async () => requireApiClient(session).getTenantMembers(),
-  });
-  const departmentsQuery = useQuery({
-    queryKey: ["pc-departments", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
-    queryFn: async () => requireApiClient(session).getDepartments(),
-  });
-  const conversationsQuery = useQuery({
-    queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
-    enabled: Boolean(session),
-    queryFn: async () => requireApiClient(session).getConversations({ limit: 100 }),
-  });
-  const departmentMembersQueries = useQuery({
-    queryKey: [
-      "pc-department-members-bundle",
-      session?.apiBaseUrl,
-      session?.tenantToken,
-      departmentsQuery.data?.map((item) => item.departmentId).join(","),
-    ],
-    enabled: Boolean(session && departmentsQuery.data?.length),
-    queryFn: async () => {
-      const client = requireApiClient(session);
-      const entries = await Promise.all(
-        (departmentsQuery.data ?? []).map(async (department) => [
-          department.departmentId,
-          await client.getDepartmentMembers(department.departmentId).catch(
-            () => [] as DepartmentMemberDto[],
-          ),
-        ] as const),
-      );
-      return Object.fromEntries(entries) as Record<string, DepartmentMemberDto[]>;
-    },
-  });
-  const createDirectChatMutation = useMutation({
-    mutationFn: async (peerUserId: string) =>
-      requireApiClient(session).createDirectChat(peerUserId),
-    onSuccess: (chat) => setActiveConversation(chat.chatId),
-    onError: (error) => setNotice(`打开会话失败：${formatError(error)}`),
-  });
-  const requestMutation = useMutation({
-    mutationFn: async ({
-      requestId,
-      action,
-    }: {
-      requestId: string;
-      action: "accept" | "reject";
-    }) => requireApiClient(session).handleFriendRequest(requestId, action),
-    onSuccess: async (_result, variables) => {
-      setNotice(variables.action === "accept" ? "已通过好友申请" : "已拒绝好友申请");
-      await queryClient.invalidateQueries({ queryKey: ["pc-friend-requests"] });
-      await queryClient.invalidateQueries({ queryKey: ["pc-friends"] });
-    },
-    onError: (error) => setNotice(`处理申请失败：${formatError(error)}`),
-  });
-
-  const directoryContacts = useMemo(
-    () =>
-      mapContacts({
-        friends: friendsQuery.data ?? [],
-        members: membersQuery.data ?? [],
-        conversations: conversationsQuery.data?.items ?? [],
-        departments: departmentsQuery.data ?? [],
-        departmentMembersById: departmentMembersQueries.data ?? {},
-        currentUserId: session?.userId,
-      }),
-    [
-      conversationsQuery.data,
-      departmentMembersQueries.data,
-      departmentsQuery.data,
-      friendsQuery.data,
-      membersQuery.data,
-      session?.userId,
-    ],
-  );
-
-  const visibleContacts = useMemo(() => {
-    if (contactFilter === "requests") return [];
-    const base =
-      contactFilter === "all"
-        ? directoryContacts
-        : contactFilter === "organization"
-          ? directoryContacts.filter((item) => item.kind === "staff")
-          : directoryContacts.filter((item) => item.kind === contactFilter);
-    return filterContacts(base, keyword);
-  }, [contactFilter, directoryContacts, keyword]);
-
-  const visibleRequests = useMemo(
-    () => filterRequests(requestsQuery.data ?? [], keyword),
-    [keyword, requestsQuery.data],
-  );
 
   const activeContact =
     visibleContacts.find((item) => item.id === activeContactId) ??
@@ -171,39 +76,9 @@ export function ContactsPage() {
     (contactFilter !== "requests"
       ? directoryContacts.find((item) => item.kind === "customer") ?? directoryContacts[0]
       : undefined);
-  const activeRequest =
-    visibleRequests.find((item) => item.requestId === selectedRequestId) ??
-    visibleRequests[0];
   const effectiveFilter = filters.some((item) => item.key === contactFilter)
     ? contactFilter
     : "customer";
-  const directoryError =
-    friendsQuery.error ||
-    membersQuery.error ||
-    conversationsQuery.error ||
-    departmentsQuery.error ||
-    requestsQuery.error;
-  const directoryLoading =
-    friendsQuery.isLoading ||
-    membersQuery.isLoading ||
-    conversationsQuery.isLoading ||
-    departmentsQuery.isLoading ||
-    requestsQuery.isLoading;
-
-  const openMessage = () => {
-    if (!activeContact) return;
-    if (activeContact.kind === "group" && activeContact.conversationId) {
-      setActiveConversation(activeContact.conversationId);
-      return;
-    }
-    if (activeContact.conversationId) {
-      setActiveConversation(activeContact.conversationId);
-      return;
-    }
-    if (activeContact.userId) {
-      createDirectChatMutation.mutate(activeContact.userId);
-    }
-  };
 
   const showProfilePanel =
     activeContact && activeContact.kind === "customer";
@@ -267,7 +142,7 @@ export function ContactsPage() {
         <div className="contacts-list" aria-label="通讯录列表">
           {effectiveFilter === "organization" ? (
             <OrganizationList
-              departments={departmentsQuery.data ?? []}
+              departments={departments}
               contacts={visibleContacts}
               activeContactId={activeContact?.id}
               onSelect={setActiveContact}
@@ -301,13 +176,9 @@ export function ContactsPage() {
         {effectiveFilter === "requests" ? (
           <RequestDetail
             request={activeRequest}
-            pending={requestMutation.isPending}
-            onAccept={(requestId) =>
-              requestMutation.mutate({ requestId, action: "accept" })
-            }
-            onReject={(requestId) =>
-              requestMutation.mutate({ requestId, action: "reject" })
-            }
+            pending={requestPending}
+            onAccept={(requestId) => handleRequest(requestId, "accept")}
+            onReject={(requestId) => handleRequest(requestId, "reject")}
           />
         ) : activeContact ? (
           <>
@@ -320,9 +191,9 @@ export function ContactsPage() {
             </div>
 
             <div className="contacts-actions">
-              <button className="primary" onClick={openMessage} type="button">
+              <button className="primary" onClick={() => openMessage(activeContact)} type="button">
                 <MessageSquare size={16} />
-                {createDirectChatMutation.isPending
+                {createDirectChatPending
                   ? "打开中..."
                   : activeContact.kind === "group"
                     ? "进入群聊"
@@ -621,211 +492,5 @@ function RequestDetail({
         </div>
       </section>
     </>
-  );
-}
-
-function InfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="contacts-info-card">
-      <span>{label}</span>
-      <strong>{value || "--"}</strong>
-    </div>
-  );
-}
-
-function ContactDetailContent({ contact }: { contact: ContactItem }) {
-  if (contact.kind === "customer") return <CustomerContactDetail contact={contact} />;
-  if (contact.kind === "staff") return <StaffContactDetail contact={contact} />;
-  if (contact.kind === "group") return <GroupContactDetail contact={contact} />;
-  return <FriendContactDetail contact={contact} />;
-}
-
-function CustomerContactDetail({ contact }: { contact: ContactItem }) {
-  return (
-    <>
-      <div className="contacts-info-grid">
-        <InfoCard label="客户分组" value={contact.groupName || "--"} />
-        <InfoCard label="客户来源" value={contact.source || "客户通讯录"} />
-        <InfoCard label="添加时间" value={formatShortDate(contact.createdAt)} />
-        <InfoCard label="关联会话" value={contact.conversationId ? "已建立" : "未建立"} />
-      </div>
-      <section className="contacts-section-card">
-        <h3>
-          <ShieldCheck size={16} />
-          客户标签
-        </h3>
-        <ContactTags tags={contact.tags} />
-      </section>
-      <section className="contacts-section-card">
-        <h3>
-          <ClipboardList size={16} />
-          客户关系
-        </h3>
-        <div className="contacts-mini-rows">
-          <InfoLine label="关系类型" value="客户好友" />
-          <InfoLine label="备注" value={contact.remark || "--"} />
-          <InfoLine label="用户 ID" value={contact.userId || "--"} />
-        </div>
-      </section>
-    </>
-  );
-}
-
-function FriendContactDetail({ contact }: { contact: ContactItem }) {
-  return (
-    <>
-      <div className="contacts-info-grid">
-        <InfoCard label="好友分组" value={contact.groupName || "--"} />
-        <InfoCard label="来源" value={contact.source || "好友通讯录"} />
-        <InfoCard label="添加时间" value={formatShortDate(contact.createdAt)} />
-        <InfoCard label="关联会话" value={contact.conversationId ? "已建立" : "未建立"} />
-      </div>
-      <section className="contacts-section-card">
-        <h3>
-          <ShieldCheck size={16} />
-          好友标签
-        </h3>
-        <ContactTags tags={contact.tags} />
-      </section>
-    </>
-  );
-}
-
-function StaffContactDetail({ contact }: { contact: ContactItem }) {
-  return (
-    <>
-      <div className="contacts-info-grid">
-        <InfoCard label="员工角色" value={contact.roleLabel || "--"} />
-        <InfoCard label="所属部门" value={contact.departmentName || "--"} />
-        <InfoCard label="职位" value={contact.position || "--"} />
-        <InfoCard label="加入时间" value={formatShortDate(contact.joinedAt)} />
-      </div>
-      <section className="contacts-section-card">
-        <h3>
-          <Building2 size={16} />
-          组织信息
-        </h3>
-        <div className="contacts-mini-rows">
-          <InfoLine label="组织路径" value={contact.departmentName || "企业成员"} />
-          <InfoLine label="用户 ID" value={contact.userId || "--"} />
-          <InfoLine label="关联会话" value={contact.conversationId ? "已建立" : "未建立"} />
-        </div>
-      </section>
-      <section className="contacts-section-card">
-        <h3>
-          <Crown size={16} />
-          权限身份
-        </h3>
-        <ContactTags tags={contact.tags} />
-      </section>
-    </>
-  );
-}
-
-function GroupContactDetail({ contact }: { contact: ContactItem }) {
-  return (
-    <>
-      <div className="contacts-info-grid">
-        <InfoCard label="成员数" value={contact.members ? `${contact.members} 人` : "--"} />
-        <InfoCard label="提醒状态" value={contact.muted ? "免打扰" : "正常提醒"} />
-        <InfoCard label="最近消息" value={contact.lastMessagePreview || "--"} />
-        <InfoCard label="最后时间" value={formatShortDate(contact.lastMessageAt)} />
-      </div>
-      <section className="contacts-section-card">
-        <h3>
-          <UsersRound size={16} />
-          群聊信息
-        </h3>
-        <div className="contacts-mini-rows">
-          <InfoLine label="群类型" value={contact.source || "普通群聊"} />
-          <InfoLine label="会话 ID" value={contact.conversationId || "--"} />
-          <InfoLine label="备注" value={contact.remark || "--"} />
-        </div>
-      </section>
-      <section className="contacts-section-card">
-        <h3>
-          <ShieldCheck size={16} />
-          群标签
-        </h3>
-        <ContactTags tags={contact.tags} />
-      </section>
-    </>
-  );
-}
-
-function ContactTags({ tags }: { tags: string[] }) {
-  return (
-    <div className="contacts-tag-row">
-      {tags.length > 0 ? tags.map((tag) => <span key={tag}>{tag}</span>) : <em>暂无标签</em>}
-    </div>
-  );
-}
-
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value || "--"}</strong>
-    </div>
-  );
-}
-
-function ContactSidePanel({
-  filter,
-  contact,
-}: {
-  filter: ContactFilter;
-  contact?: ContactItem;
-}) {
-  if (contact?.kind === "staff") {
-    return (
-      <aside className="contacts-profile-panel contacts-side-empty">
-        <h2>员工资料</h2>
-        <p>员工只展示组织、职位、角色和会话入口，不展示客户画像。</p>
-        <div className="contacts-mini-rows">
-          <InfoLine label="姓名" value={contact.name} />
-          <InfoLine label="角色" value={contact.roleLabel || "--"} />
-          <InfoLine label="部门" value={contact.departmentName || "--"} />
-        </div>
-      </aside>
-    );
-  }
-  if (contact?.kind === "group") {
-    return (
-      <aside className="contacts-profile-panel contacts-side-empty">
-        <h2>群聊资料</h2>
-        <p>群聊展示成员、提醒和最近消息；成员管理、群公告、群文件等待群详情接口接入。</p>
-        <div className="contacts-mini-rows">
-          <InfoLine label="群名" value={contact.name} />
-          <InfoLine label="成员数" value={contact.members ? `${contact.members} 人` : "--"} />
-          <InfoLine label="提醒" value={contact.muted ? "免打扰" : "正常提醒"} />
-        </div>
-      </aside>
-    );
-  }
-  return (
-    <aside className="contacts-profile-panel contacts-side-empty">
-      <h2>{filter === "requests" ? "申请说明" : "资料"}</h2>
-      <p>
-        {filter === "requests"
-          ? "好友申请支持通过或拒绝，处理后会刷新申请列表。"
-          : "请选择联系人查看资料。"}
-      </p>
-    </aside>
-  );
-}
-
-function PanelState({
-  text,
-  tone = "muted",
-}: {
-  text: string;
-  tone?: "muted" | "error";
-}) {
-  return (
-    <div className={`panel-state ${tone}`}>
-      {tone === "error" && <AlertTriangle size={15} />}
-      <span>{text}</span>
-    </div>
   );
 }

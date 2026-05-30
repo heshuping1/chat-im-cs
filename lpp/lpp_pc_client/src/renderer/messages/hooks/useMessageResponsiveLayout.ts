@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from "react";
 
-import { type MessageLayoutMode } from "../../data/store";
+import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
 
 export const messageLayoutMetrics = {
   sidebarExpanded: 156,

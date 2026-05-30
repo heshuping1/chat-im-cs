@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+import {
+  customerServiceMessageEntityToDto,
+  normalizeCustomerServiceMessageDto,
+} from "../../src/renderer/data/customer-service/cs-message-contract";
+
+describe("customer service message contract", () => {
+  it("maps customer-service message dto to shared entity", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-m1",
+        conversationId: "cs-conv-1",
+        conversationSeq: 5,
+        senderDisplayName: "访客",
+        messageType: "text",
+        body: { text: "hello" },
+        direction: "incoming",
+      },
+      {
+        threadId: "thread-1",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.data).toMatchObject({
+      id: "cs-m1",
+      source: "customer_service",
+      threadId: "thread-1",
+      threadType: "temp_session",
+      conversation: {
+        source: "customer_service",
+        conversationId: "cs-conv-1",
+        conversationType: "temp_session",
+        threadId: "thread-1",
+      },
+      type: "text",
+      preview: "hello",
+      direction: "incoming",
+    });
+  });
+
+  it("keeps messages without id or sequence as degraded for compatibility", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        body: { file: { fileName: "a.pdf" } },
+      },
+      {
+        threadId: "thread-2",
+        threadType: "im_direct",
+        fallbackConversationId: "conv-2",
+        fallbackMessageId: "fallback-message-1",
+      },
+    );
+
+    expect(result.status).toBe("degraded");
+    expect(result.data).toMatchObject({
+      id: "fallback-message-1",
+      conversation: {
+        conversationId: "conv-2",
+        conversationType: "im_direct",
+      },
+      type: "file",
+      preview: "[文件]",
+    });
+    expect(result.issues.map((issue) => issue.code)).toEqual([
+      "cs.message.generated_id",
+      "cs.message.missing_seq",
+    ]);
+  });
+
+  it("maps shared entity back to compatible MessageItemDto", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-m3",
+        conversationId: "cs-conv-3",
+        conversationSeq: 9,
+        senderPlatformUserId: "platform-user-1",
+        messageType: "image",
+        body: { image: { url: "https://example.com/a.png" } },
+        isSelf: true,
+        status: "sent",
+      },
+      {
+        threadId: "thread-3",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(customerServiceMessageEntityToDto(result.data!)).toMatchObject({
+      messageId: "cs-m3",
+      conversationId: "cs-conv-3",
+      conversationSeq: 9,
+      senderPlatformUserId: "platform-user-1",
+      platformUserId: "platform-user-1",
+      messageType: "image",
+      preview: "[图片]",
+      isSelf: true,
+      status: "sent",
+    });
+  });
+});

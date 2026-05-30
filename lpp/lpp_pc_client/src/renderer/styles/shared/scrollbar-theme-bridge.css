@@ -1,0 +1,81 @@
+/* WeChat-style conversation panes: reserve the rail so content never shifts horizontally. */
+.app-shell .e-message-stage,
+.app-shell .h-message-stage,
+.app-shell .customer-info-panel {
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(156, 163, 175, 0.42) transparent !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar,
+.app-shell .h-message-stage::-webkit-scrollbar,
+.app-shell .customer-info-panel::-webkit-scrollbar,
+.app-shell .e-message-stage:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .h-message-stage:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .customer-info-panel:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .e-message-stage.is-scrolling::-webkit-scrollbar,
+.app-shell .h-message-stage.is-scrolling::-webkit-scrollbar,
+.app-shell .customer-info-panel.is-scrolling::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar-thumb,
+.app-shell .h-message-stage::-webkit-scrollbar-thumb,
+.app-shell .customer-info-panel::-webkit-scrollbar-thumb,
+.app-shell .e-message-stage:not(.is-scrolling)::-webkit-scrollbar-thumb,
+.app-shell .h-message-stage:not(.is-scrolling)::-webkit-scrollbar-thumb,
+.app-shell .customer-info-panel:not(.is-scrolling)::-webkit-scrollbar-thumb,
+.app-shell .e-message-stage.is-scrolling::-webkit-scrollbar-thumb,
+.app-shell .h-message-stage.is-scrolling::-webkit-scrollbar-thumb,
+.app-shell .customer-info-panel.is-scrolling::-webkit-scrollbar-thumb {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(156, 163, 175, 0.42) !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar-thumb:hover,
+.app-shell .h-message-stage::-webkit-scrollbar-thumb:hover,
+.app-shell .customer-info-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.58) !important;
+}
+
+.app-shell .e-message-stage::-webkit-scrollbar-track,
+.app-shell .h-message-stage::-webkit-scrollbar-track,
+.app-shell .customer-info-panel::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* Theme system bridge: keeps page classes aligned with theme tokens. */
+.app-shell :where(button, input, textarea, select) {
+  font-family: var(--pc-font-family);
+}
+
+.app-shell :where(input, textarea, select) {
+  color: var(--pc-text);
+}
+
+.app-shell :where(button, input, textarea, select):focus-visible {
+  outline: 3px solid var(--pc-focus);
+  outline-offset: 2px;
+}
+
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
+.app-shell.is-density-compact :where(.conversation-item, .contacts-row, .setting-detail-row) {
+  padding-top: calc(var(--pc-space-3) * var(--pc-density-scale));
+  padding-bottom: calc(var(--pc-space-3) * var(--pc-density-scale));
+}
+
+.app-shell.is-boundary-strong :where(.e-conversation-panel, .e-chat-panel, .h-context-panel, .page-main, .settings-page, .contacts-page) {
+  border-color: var(--pc-border) !important;
+}

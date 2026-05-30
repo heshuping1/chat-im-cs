@@ -1,3 +1,5 @@
+import { logApiErrorDiagnostic } from "./api-error-diagnostics";
+
 export interface ApiClientOptions {
   baseUrl: string;
   tenantToken?: string;
@@ -59,6 +61,7 @@ export class ApiBaseClient {
     body: FormData,
     options: UploadRequestOptions = {},
   ): Promise<T> {
+    const startedAt = Date.now();
     return new Promise<T>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       let settled = false;
@@ -74,9 +77,20 @@ export class ApiBaseClient {
         cleanup();
         callback();
       };
+      const rejectWithDiagnostic = (error: unknown) =>
+        finish(() => {
+          logApiErrorDiagnostic({
+            phase: "upload",
+            method: "POST",
+            path,
+            durationMs: Date.now() - startedAt,
+            error,
+          });
+          reject(error);
+        });
       const abort = () => {
         xhr.abort();
-        finish(() => reject(new DOMException("Upload aborted", "AbortError")));
+        rejectWithDiagnostic(new DOMException("Upload aborted", "AbortError"));
       };
       xhr.open("POST", `${this.options.baseUrl}${path}`);
       xhr.setRequestHeader("X-Client-Trace-Id", this.options.traceId);
@@ -93,21 +107,19 @@ export class ApiBaseClient {
               : undefined,
         });
       };
-      xhr.onerror = () => finish(() => reject(new ApiError(`网络错误 ${path}`)));
+      xhr.onerror = () => rejectWithDiagnostic(new ApiError(`网络错误 ${path}`));
       xhr.onabort = () =>
-        finish(() => reject(new DOMException("Upload aborted", "AbortError")));
+        rejectWithDiagnostic(new DOMException("Upload aborted", "AbortError"));
       xhr.onload = () => {
         const payload = parseJson<ApiEnvelope<T> | T | null>(xhr.responseText);
         if (xhr.status < 200 || xhr.status >= 300) {
           const envelope = payload as ApiEnvelope<T> | null;
-          finish(() =>
-            reject(
-              new ApiError(
-                envelope?.message ?? `HTTP ${xhr.status} ${path}`,
-                envelope?.code,
-                envelope?.requestId,
-                xhr.status,
-              ),
+          rejectWithDiagnostic(
+            new ApiError(
+              envelope?.message ?? `HTTP ${xhr.status} ${path}`,
+              envelope?.code,
+              envelope?.requestId,
+              xhr.status,
             ),
           );
           return;
@@ -120,14 +132,12 @@ export class ApiBaseClient {
         ) {
           const envelope = payload as ApiEnvelope<T>;
           if (envelope.code !== "OK" && envelope.code !== "SUCCESS") {
-            finish(() =>
-              reject(
-                new ApiError(
-                  envelope.message ?? envelope.code,
-                  envelope.code,
-                  envelope.requestId,
-                  xhr.status,
-                ),
+            rejectWithDiagnostic(
+              new ApiError(
+                envelope.message ?? envelope.code,
+                envelope.code,
+                envelope.requestId,
+                xhr.status,
               ),
             );
             return;
@@ -154,6 +164,8 @@ export class ApiBaseClient {
     init: RequestInit,
     token?: string,
   ): Promise<T> {
+    const startedAt = Date.now();
+    const method = init.method ?? "GET";
     const headers = new Headers(init.headers);
     if (!(init.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
@@ -163,40 +175,51 @@ export class ApiBaseClient {
       headers.set("Authorization", `Bearer ${token}`);
     }
 
-    const response = await fetch(`${this.options.baseUrl}${path}`, {
-      ...init,
-      headers,
-    });
-    const payload = (await response
-      .json()
-      .catch(() => null)) as ApiEnvelope<T> | null;
-    if (!response.ok) {
-      const suffix = payload?.requestId ? ` requestId=${payload.requestId}` : "";
-      throw new ApiError(
-        payload?.message ?? `HTTP ${response.status} ${path}${suffix}`,
-        payload?.code,
-        payload?.requestId,
-        response.status,
-      );
-    }
-    if (
-      payload &&
-      typeof payload === "object" &&
-      "code" in payload &&
-      "data" in payload
-    ) {
-      if (payload.code !== "OK" && payload.code !== "SUCCESS") {
-        const suffix = payload.requestId ? ` requestId=${payload.requestId}` : "";
+    try {
+      const response = await fetch(`${this.options.baseUrl}${path}`, {
+        ...init,
+        headers,
+      });
+      const payload = (await response
+        .json()
+        .catch(() => null)) as ApiEnvelope<T> | null;
+      if (!response.ok) {
+        const suffix = payload?.requestId ? ` requestId=${payload.requestId}` : "";
         throw new ApiError(
-          `${payload.message ?? payload.code}${suffix}`,
-          payload.code,
-          payload.requestId,
+          payload?.message ?? `HTTP ${response.status} ${path}${suffix}`,
+          payload?.code,
+          payload?.requestId,
           response.status,
         );
       }
-      return payload.data;
+      if (
+        payload &&
+        typeof payload === "object" &&
+        "code" in payload &&
+        "data" in payload
+      ) {
+        if (payload.code !== "OK" && payload.code !== "SUCCESS") {
+          const suffix = payload.requestId ? ` requestId=${payload.requestId}` : "";
+          throw new ApiError(
+            `${payload.message ?? payload.code}${suffix}`,
+            payload.code,
+            payload.requestId,
+            response.status,
+          );
+        }
+        return payload.data;
+      }
+      return payload as T;
+    } catch (error) {
+      logApiErrorDiagnostic({
+        phase: "request",
+        method,
+        path,
+        durationMs: Date.now() - startedAt,
+        error,
+      });
+      throw error;
     }
-    return payload as T;
   }
 }
 

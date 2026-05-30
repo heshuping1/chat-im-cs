@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
 import type { ConversationListItem } from "../../data/api-client";
+import type { AuthSession } from "../../data/auth/auth-session";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
-import type { AuthSession } from "../../data/store";
 
 type ImConversationType = "direct" | "group";
 

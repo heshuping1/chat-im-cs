@@ -1,13 +1,9 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import {
   Bell,
-  Bug,
   CheckCircle2,
-  ChevronRight,
   DatabaseBackup,
-  Download,
   HardDrive,
   Languages,
   MessageSquareText,
@@ -15,18 +11,30 @@ import {
   Palette,
   Route,
   ShieldCheck,
-  Trash2,
   UserRound,
 } from "lucide-react";
 import { pcQueryKeys } from "../data/query-keys";
 import { requireApiClient } from "../data/runtime";
 import type {
-  BlockedUserDto,
-  ProfilePrivacySettingsDto,
   UserProfileDto,
 } from "../data/api-client";
-import { useWorkspaceStore, type AuthSession, type PcSettings } from "../data/store";
+import type { AuthSession } from "../data/auth/auth-session";
+import { useAuthSession, useClearAuthSession } from "../data/auth/auth-store";
+import type { PcSettings } from "../data/settings/pc-settings";
+import { usePcSettings, useUpdatePcSetting } from "../data/settings/settings-store";
 import { formatError, formatShortDate } from "../lib/format";
+import { exportCurrentDiagnosticsPackage } from "../settings/runtime/diagnosticsExport";
+import {
+  ActionRow,
+  InfoRow,
+  InlineSettingsState,
+  SelectRow,
+  SwitchRow,
+} from "../settings/components/SettingsRows";
+import { AccountSecuritySection } from "../settings/components/AccountSecuritySection";
+import { ChatArchiveSection } from "../settings/components/ChatArchiveSection";
+import { DiagnosticsSettingsSection } from "../settings/components/DiagnosticsSettingsSection";
+import { PrivacySettingsSection } from "./MePrivacySections";
 
 type SettingKey = keyof PcSettings;
 type SectionId =
@@ -118,10 +126,10 @@ const settingSections = [
 
 export function MePage() {
   const queryClient = useQueryClient();
-  const pcSettings = useWorkspaceStore((state) => state.pcSettings);
-  const authSession = useWorkspaceStore((state) => state.authSession);
-  const clearAuthSession = useWorkspaceStore((state) => state.clearAuthSession);
-  const updatePcSetting = useWorkspaceStore((state) => state.updatePcSetting);
+  const pcSettings = usePcSettings();
+  const authSession = useAuthSession();
+  const clearAuthSession = useClearAuthSession();
+  const updatePcSetting = useUpdatePcSetting();
   const [activeSectionId, setActiveSectionId] =
     useState<SectionId>("profile");
   const [notice, setNotice] = useState("设置会自动保存在本机");
@@ -138,12 +146,7 @@ export function MePage() {
   };
 
   const exportDiagnostics = async () => {
-    const result = await window.desktopApi?.exportDiagnostics({
-      sessionId: "pc-local-session",
-      traceId: `pc-${Date.now()}`,
-      breadcrumbs: ["pc.open", "settings.open", "diagnostics.export"],
-      errors: [],
-    });
+    const result = await exportCurrentDiagnosticsPackage();
     setNotice(result ? "诊断包已导出" : "已取消导出诊断包");
   };
 
@@ -432,41 +435,11 @@ function renderSection(
       );
     case "chatHistory":
       return (
-        <>
-          <SwitchRow
-            label="聊天记录本地缓存"
-            desc="提升重新打开会话速度，缓存敏感信息按脱敏规则处理。"
-            checked={pcSettings.localMessageCache}
-            onChange={(value) => setSetting("localMessageCache", value)}
-          />
-          <ActionRow
-            label="导出聊天记录"
-            desc="按会话导出文本、图片、文件索引。"
-            action="导出"
-            onClick={() => actions.setNotice("聊天记录导出能力待接入")}
-          />
-          <ActionRow
-            label="备份聊天记录"
-            desc="备份到本机或后续支持的安全存储。"
-            action="备份"
-            onClick={() => actions.setNotice("聊天记录备份能力待接入")}
-          />
-          <ActionRow
-            label="恢复聊天记录"
-            desc="从本机备份恢复聊天记录。"
-            action="恢复"
-            onClick={() => actions.setNotice("聊天记录恢复能力待接入")}
-          />
-          <ActionRow
-            label="清理本地缓存"
-            desc="清理图片、文件缩略图和临时缓存，不删除服务端消息。"
-            action="清理"
-            onClick={() => {
-              localStorage.removeItem("lpp.pc.message-cache");
-              actions.setNotice("已清理本地聊天缓存");
-            }}
-          />
-        </>
+        <ChatArchiveSection
+          pcSettings={pcSettings}
+          setNotice={actions.setNotice}
+          setSetting={setSetting}
+        />
       );
     case "privacy":
       return (
@@ -477,7 +450,13 @@ function renderSection(
         />
       );
     case "security":
-      return <SecuritySettingsSection actions={actions} />;
+      return (
+        <AccountSecuritySection
+          authSession={actions.authSession}
+          clearAuthSession={actions.clearAuthSession}
+          setNotice={actions.setNotice}
+        />
+      );
     case "network":
       return (
         <>
@@ -504,29 +483,10 @@ function renderSection(
       );
     case "diagnostics":
       return (
-        <>
-          <ActionRow
-            label="导出诊断包"
-            desc="导出本地日志、traceId、接口错误和关键操作轨迹。"
-            action="导出"
-            icon={<Download size={15} />}
-            onClick={() => void actions.exportDiagnostics()}
-          />
-          <ActionRow
-            label="用户反馈"
-            desc="提交问题、截图和诊断线索给服务端。"
-            action="反馈"
-            icon={<Bug size={15} />}
-            onClick={() => actions.setNotice("反馈接口待接入")}
-          />
-          <ActionRow
-            label="关于客户端"
-            desc="查看版本号、构建信息和运行环境。"
-            action="查看"
-            icon={<HardDrive size={15} />}
-            onClick={() => actions.setNotice("LPP PC 客服客户端 v0.1.0")}
-          />
-        </>
+        <DiagnosticsSettingsSection
+          exportDiagnostics={actions.exportDiagnostics}
+          setNotice={actions.setNotice}
+        />
       );
   }
 }
@@ -565,291 +525,6 @@ function ProfileSettingsSection({
   );
 }
 
-function PrivacySettingsSection({
-  actions,
-  pcSettings,
-  setSetting,
-}: {
-  actions: {
-    authSession: AuthSession | null;
-    setNotice: (notice: string) => void;
-    queryClient: QueryClient;
-  };
-  pcSettings: PcSettings;
-  setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
-}) {
-  const privacyQuery = useQuery({
-    queryKey: pcQueryKeys.accountPrivacy(
-      actions.authSession?.apiBaseUrl,
-      actions.authSession?.tenantToken,
-    ),
-    enabled: Boolean(actions.authSession),
-    staleTime: 60_000,
-    queryFn: async () => requireApiClient(actions.authSession).getPrivacySettings(),
-  });
-  const updatePrivacy = useMutation({
-    mutationFn: async (body: Partial<ProfilePrivacySettingsDto>) =>
-      requireApiClient(actions.authSession).updatePrivacySettings(body),
-    onSuccess: async () => {
-      await actions.queryClient.invalidateQueries({
-        queryKey: pcQueryKeys.accountPrivacy(
-          actions.authSession?.apiBaseUrl,
-          actions.authSession?.tenantToken,
-        ),
-      });
-      actions.setNotice("朋友权限已保存");
-    },
-    onError: (error) => actions.setNotice(`朋友权限保存失败：${formatError(error)}`),
-  });
-  const data = privacyQuery.data;
-  return (
-    <>
-      {privacyQuery.error && (
-        <InlineSettingsState
-          tone="error"
-          text={`朋友权限加载失败：${formatError(privacyQuery.error)}`}
-        />
-      )}
-      <SwitchRow
-        label="允许通过手机号搜索"
-        desc="其他用户可通过手机号找到你。"
-        checked={data?.searchableByMobile ?? pcSettings.allowMobileSearch}
-        onChange={(value) => {
-          setSetting("allowMobileSearch", value);
-          updatePrivacy.mutate({ searchableByMobile: value });
-        }}
-      />
-      <SwitchRow
-        label="允许通过 LPP 号搜索"
-        desc="其他用户可通过 LPP 号找到你。"
-        checked={data?.searchableByLppId ?? pcSettings.allowLppSearch}
-        onChange={(value) => {
-          setSetting("allowLppSearch", value);
-          updatePrivacy.mutate({ searchableByLppId: value });
-        }}
-      />
-      <SelectRow
-        label="加我为好友"
-        desc="控制陌生人向你发起好友申请的范围。"
-        value={friendRequestLabel(data?.allowFriendRequest, pcSettings.friendRequestVerification)}
-        options={["所有人", "有共同好友的人", "不允许"]}
-        onChange={(value) => {
-          setSetting("friendRequestVerification", value !== "不允许");
-          updatePrivacy.mutate({ allowFriendRequest: friendRequestValue(value) });
-        }}
-      />
-      <SelectRow
-        label="个人资料可见性"
-        desc="控制资料页对外展示范围。"
-        value={profileVisibilityLabel(data?.profileVisibility, pcSettings.profileVisibility)}
-        options={["所有人", "仅好友", "不允许"]}
-        onChange={(value) => {
-          setSetting("profileVisibility", value);
-          updatePrivacy.mutate({ profileVisibility: profileVisibilityValue(value) });
-        }}
-      />
-      <SwitchRow
-        label="敏感信息脱敏"
-        desc="手机号、邮箱、证件、资金等敏感字段默认脱敏显示。"
-        checked={pcSettings.sensitiveMasking}
-        onChange={(value) => setSetting("sensitiveMasking", value)}
-      />
-      <BlacklistBlock actions={actions} />
-    </>
-  );
-}
-
-function BlacklistBlock({
-  actions,
-}: {
-  actions: {
-    authSession: AuthSession | null;
-    setNotice: (notice: string) => void;
-    queryClient: QueryClient;
-  };
-}) {
-  const blocklistQuery = useQuery({
-    queryKey: pcQueryKeys.accountBlocklist(
-      actions.authSession?.apiBaseUrl,
-      actions.authSession?.tenantToken,
-    ),
-    enabled: Boolean(actions.authSession),
-    staleTime: 60_000,
-    queryFn: async () => requireApiClient(actions.authSession).getBlocklist(),
-  });
-  const unblock = useMutation({
-    mutationFn: async (blockedUserId: string) =>
-      requireApiClient(actions.authSession).unblockUser(blockedUserId),
-    onSuccess: async () => {
-      await actions.queryClient.invalidateQueries({
-        queryKey: pcQueryKeys.accountBlocklist(
-          actions.authSession?.apiBaseUrl,
-          actions.authSession?.tenantToken,
-        ),
-      });
-      actions.setNotice("已移出黑名单");
-    },
-    onError: (error) => actions.setNotice(`移出黑名单失败：${formatError(error)}`),
-  });
-  const list = blocklistQuery.data ?? [];
-  return (
-    <div className="settings-sub-card">
-      <header>
-        <strong>黑名单</strong>
-        <span>{list.length} 人</span>
-      </header>
-      {blocklistQuery.isLoading && <InlineSettingsState text="正在读取黑名单..." />}
-      {blocklistQuery.error && (
-        <InlineSettingsState
-          tone="error"
-          text={`黑名单加载失败：${formatError(blocklistQuery.error)}`}
-        />
-      )}
-      {!blocklistQuery.isLoading && list.length === 0 && (
-        <InlineSettingsState text="暂无黑名单用户" />
-      )}
-      {list.map((item) => (
-        <div className="settings-list-row" key={item.blockedUserId}>
-          <span>
-            <strong>{item.displayName || item.blockedUserId}</strong>
-            <em>{formatShortDate(item.createdAt)}</em>
-          </span>
-          <button
-            type="button"
-            disabled={unblock.isPending}
-            onClick={() => unblock.mutate(item.blockedUserId)}
-          >
-            移出
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SecuritySettingsSection({
-  actions,
-}: {
-  actions: {
-    authSession: AuthSession | null;
-    setNotice: (notice: string) => void;
-    clearAuthSession: () => void;
-  };
-}) {
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
-  const [deactivateReason, setDeactivateReason] = useState("");
-  const changePassword = useMutation({
-    mutationFn: async () => {
-      if (!oldPassword || !newPassword) throw new Error("请输入旧密码和新密码");
-      return requireApiClient(actions.authSession).changePassword({
-        oldPassword,
-        newPassword,
-      });
-    },
-    onSuccess: () => {
-      setOldPassword("");
-      setNewPassword("");
-      actions.setNotice("密码已修改");
-    },
-    onError: (error) => actions.setNotice(`修改密码失败：${formatError(error)}`),
-  });
-  const deactivate = useMutation({
-    mutationFn: async () => {
-      if (!verificationCode.trim()) throw new Error("请输入注销验证码");
-      return requireApiClient(actions.authSession).deactivateAccount({
-        verificationCode,
-        reason: deactivateReason,
-      });
-    },
-    onSuccess: () => {
-      actions.setNotice("注销申请已提交，账号进入冷静期");
-      actions.clearAuthSession();
-    },
-    onError: (error) => actions.setNotice(`注销失败：${formatError(error)}`),
-  });
-  return (
-    <>
-      <div className="settings-sub-card">
-        <header>
-          <strong>修改密码</strong>
-          <span>账号登录密码</span>
-        </header>
-        <div className="settings-form-grid">
-          <input
-            type="password"
-            value={oldPassword}
-            placeholder="旧密码"
-            onChange={(event) => setOldPassword(event.target.value)}
-          />
-          <input
-            type="password"
-            value={newPassword}
-            placeholder="新密码"
-            onChange={(event) => setNewPassword(event.target.value)}
-          />
-          <button
-            type="button"
-            disabled={changePassword.isPending}
-            onClick={() => changePassword.mutate()}
-          >
-            {changePassword.isPending ? "提交中" : "修改密码"}
-          </button>
-        </div>
-      </div>
-      <ActionRow
-        label="登录设备"
-        desc="查看已登录设备并下线异常设备。"
-        action="查看"
-        onClick={() => actions.setNotice("登录设备列表待接入")}
-      />
-      <div className="settings-sub-card danger">
-        <header>
-          <strong>注销账户</strong>
-          <span>提交后进入 7 天冷静期</span>
-        </header>
-        <div className="settings-form-grid">
-          <input
-            value={verificationCode}
-            placeholder="注销验证码"
-            onChange={(event) => setVerificationCode(event.target.value)}
-          />
-          <input
-            value={deactivateReason}
-            placeholder="注销原因，可选"
-            onChange={(event) => setDeactivateReason(event.target.value)}
-          />
-          <button
-            type="button"
-            disabled={deactivate.isPending || !actions.authSession?.platformToken}
-            onClick={() => deactivate.mutate()}
-          >
-            <Trash2 size={14} />
-            {deactivate.isPending ? "提交中" : "申请注销"}
-          </button>
-        </div>
-        {!actions.authSession?.platformToken && (
-          <InlineSettingsState
-            tone="error"
-            text="当前会话缺少平台 Token，请重新登录后再注销账户。"
-          />
-        )}
-      </div>
-    </>
-  );
-}
-
-function InlineSettingsState({
-  text,
-  tone = "muted",
-}: {
-  text: string;
-  tone?: "muted" | "error";
-}) {
-  return <p className={`utility-inline-state ${tone}`}>{text}</p>;
-}
-
 function maskMobile(value?: string | null) {
   if (!value) return "--";
   const normalized = value.replace(/\s+/g, "");
@@ -863,142 +538,4 @@ function maskEmail(value?: string | null) {
   if (!name || !domain) return value;
   const visible = name.length <= 2 ? name.slice(0, 1) : name.slice(0, 2);
   return `${visible}***@${domain}`;
-}
-
-function friendRequestLabel(
-  value: ProfilePrivacySettingsDto["allowFriendRequest"],
-  fallback: boolean,
-) {
-  if (value === "nobody") return "不允许";
-  if (value === "friends_of_friends") return "有共同好友的人";
-  if (value === "everyone") return "所有人";
-  return fallback ? "所有人" : "不允许";
-}
-
-function friendRequestValue(value: string) {
-  if (value === "不允许") return "nobody";
-  if (value === "有共同好友的人") return "friends_of_friends";
-  return "everyone";
-}
-
-function profileVisibilityLabel(
-  value: ProfilePrivacySettingsDto["profileVisibility"],
-  fallback: PcSettings["profileVisibility"],
-) {
-  if (value === "everyone") return "所有人";
-  if (value === "nobody") return "不允许";
-  if (value === "friends") return "仅好友";
-  return fallback;
-}
-
-function profileVisibilityValue(value: string) {
-  if (value === "所有人") return "everyone";
-  if (value === "不允许") return "nobody";
-  return "friends";
-}
-
-function SwitchRow({
-  label,
-  desc,
-  checked,
-  onChange,
-}: {
-  label: string;
-  desc: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <button
-      className="setting-detail-row"
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-    >
-      <span>
-        <strong>{label}</strong>
-        <em>{desc}</em>
-      </span>
-      <span className={`setting-switch ${checked ? "on" : ""}`} aria-hidden="true">
-        <i />
-      </span>
-    </button>
-  );
-}
-
-function SelectRow<T extends string>({
-  label,
-  desc,
-  value,
-  options,
-  optionLabels,
-  onChange,
-}: {
-  label: string;
-  desc: string;
-  value: T;
-  options: T[];
-  optionLabels?: Partial<Record<T, string>>;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <label className="setting-detail-row select">
-      <span>
-        <strong>{label}</strong>
-        <em>{desc}</em>
-      </span>
-      <select
-        aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.target.value as T)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {optionLabels?.[option] ?? option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function ActionRow({
-  label,
-  desc,
-  action,
-  icon,
-  onClick,
-}: {
-  label: string;
-  desc: string;
-  action: string;
-  icon?: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button className="setting-detail-row action" type="button" onClick={onClick}>
-      <span>
-        <strong>{label}</strong>
-        <em>{desc}</em>
-      </span>
-      <b>
-        {icon}
-        {action}
-        <ChevronRight size={15} />
-      </b>
-    </button>
-  );
-}
-
-function InfoRow({ label, desc }: { label: string; desc: string }) {
-  return (
-    <div className="setting-detail-row info">
-      <span>
-        <strong>{label}</strong>
-        <em>{desc}</em>
-      </span>
-    </div>
-  );
 }
