@@ -16,6 +16,20 @@ describe("api error model", () => {
     );
   });
 
+  it("formats IM send permission errors with actionable copy", () => {
+    expect(
+      formatApiErrorForUser(
+        new ApiError("forbidden", "MSG_MEMBER_FORBIDDEN", "r1", 403),
+      ),
+    ).toBe("你不在该会话中，无法发送消息");
+    expect(
+      formatApiErrorForUser(new ApiError("muted", "MSG_GROUP_MUTED", "r2", 403)),
+    ).toBe("群聊已开启全员禁言，暂时无法发送");
+    expect(
+      formatApiErrorForUser(new ApiError("muted", "MSG_MEMBER_MUTED", "r3", 403)),
+    ).toBe("你已被禁言，暂时无法发言");
+  });
+
   it("maps common http errors without exposing backend internals", () => {
     expect(formatApiErrorForUser(new ApiError("not found", "NOT_FOUND", "r3", 404))).toBe(
       "目标内容不存在或已被删除",

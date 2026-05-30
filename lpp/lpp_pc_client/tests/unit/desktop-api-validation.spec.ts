@@ -7,6 +7,7 @@ import {
 import {
   validateCacheMediaFilePayload,
   validateDesktopApiCall,
+  validateDesktopIpcCall,
   validateDesktopAuthSessionPayload,
   validateDiagnosticsPayload,
   validateNotifyPayload,
@@ -20,6 +21,8 @@ describe("desktop api validation", () => {
     const channels = Object.values(desktopIpcChannelByMethod);
 
     expect(methods).toContain("notify");
+    expect(methods).toContain("cacheLocalMediaFile");
+    expect(desktopIpcChannelByMethod.cacheLocalMediaFile).toBe("desktop:cache-local-media-file");
     expect(channels.every((channel) => channel.startsWith("desktop:"))).toBe(true);
     expect(new Set(channels).size).toBe(channels.length);
   });
@@ -60,6 +63,100 @@ describe("desktop api validation", () => {
         url: "https://assets.example/report.xlsx",
       }),
     ).toThrow("Invalid media.kind");
+  });
+
+  it("validates local media cache payload without accepting renderer supplied source paths", () => {
+    expect(
+      validateDesktopApiCall("cacheLocalMediaFile", [
+        {
+          accountId: "u1",
+          conversationId: "c1",
+          fileName: "clip.mp4",
+          kind: "video",
+          sourcePath: "/Users/eric/Movies/clip.mp4",
+          url: "blob:local-video",
+        },
+        "/Users/eric/Movies/clip.mp4",
+      ]),
+    ).toEqual([
+      {
+        accountId: "u1",
+        authToken: undefined,
+        conversationId: "c1",
+        fileName: "clip.mp4",
+        kind: "video",
+        url: "blob:local-video",
+      },
+    ]);
+  });
+
+  it("keeps preload-derived local media sources when validating main ipc args", () => {
+    expect(
+      validateDesktopIpcCall("cacheLocalMediaFile", [
+        {
+          accountId: "u1",
+          conversationId: "c1",
+          fileName: "clip.mp4",
+          kind: "video",
+          sourcePath: "/Users/eric/Movies/forged.mp4",
+          url: "blob:local-video",
+        },
+        { kind: "path", sourcePath: "/Users/eric/Movies/clip.mp4" },
+      ]),
+    ).toEqual([
+      {
+        accountId: "u1",
+        authToken: undefined,
+        conversationId: "c1",
+        fileName: "clip.mp4",
+        kind: "video",
+        url: "blob:local-video",
+      },
+      { kind: "path", sourcePath: "/Users/eric/Movies/clip.mp4" },
+    ]);
+
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    expect(
+      validateDesktopIpcCall("cacheLocalMediaFile", [
+        {
+          fileName: "pasted.pdf",
+          kind: "file",
+          url: "local-file:pc-local-media-1",
+        },
+        { kind: "bytes", bytes },
+      ]),
+    ).toEqual([
+      {
+        accountId: undefined,
+        authToken: undefined,
+        conversationId: undefined,
+        fileName: "pasted.pdf",
+        kind: "file",
+        url: "local-file:pc-local-media-1",
+      },
+      { kind: "bytes", bytes },
+    ]);
+
+    expect(() =>
+      validateDesktopIpcCall("cacheLocalMediaFile", [
+        {
+          fileName: "clip.mp4",
+          kind: "video",
+          url: "blob:local-video",
+        },
+        { kind: "path", sourcePath: "" },
+      ]),
+    ).toThrow("media.sourcePath");
+    expect(() =>
+      validateDesktopIpcCall("cacheLocalMediaFile", [
+        {
+          fileName: "clip.mp4",
+          kind: "video",
+          url: "blob:local-video",
+        },
+        { kind: "bytes", bytes: new Uint8Array() },
+      ]),
+    ).toThrow("media.sourceBytes");
   });
 
   it("validates video metadata and rejects invalid poster data urls", () => {

@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  chatSendFailureContext,
   createChatSendDiagnosticRecord,
+  createUploadProgressDiagnosticSummary,
   initialChatSendStatusForKind,
+  logChatSendDiagnostic,
+  persistedSendDiagnosticsStorageKey,
   reduceChatSendState,
 } from "../../src/renderer/data/send/send-state-machine";
 
@@ -71,6 +75,143 @@ describe("send state machine", () => {
         auth: "Bearer ***",
         filePath: "[local-path]",
       },
+    });
+  });
+
+  it("persists a bounded sanitized diagnostics buffer for later export", () => {
+    const values = new Map<string, string>();
+    const originalWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => values.get(key) ?? null,
+          setItem: (key: string, value: string) => values.set(key, value),
+        },
+      },
+    });
+
+    try {
+      logChatSendDiagnostic({
+        channel: "im",
+        phase: "send",
+        result: "failed",
+        action: "send_failed",
+        reason: "当前账号没有权限执行此操作",
+        context: {
+          auth: "Bearer raw-token",
+          filePath: "/Users/eric/Desktop/private.mp4",
+          failureStage: "send",
+          path: "/api/client/v1/groups/g1/messages",
+        },
+      });
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: originalWindow,
+      });
+    }
+
+    const persisted = JSON.parse(values.get(persistedSendDiagnosticsStorageKey) ?? "[]");
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({
+      module: "send",
+      phase: "send",
+      result: "failed",
+      reason: "当前账号没有权限执行此操作",
+      context: {
+        auth: "Bearer ***",
+        filePath: "[local-path]",
+        failureStage: "send",
+        path: "/api/client/v1/groups/g1/messages",
+      },
+    });
+  });
+
+  it("extracts API status, code and request id for send failure diagnostics", () => {
+    expect(
+      chatSendFailureContext(new Error("plain error"), {
+        path: "/api/client/v1/direct-chats/c1/messages",
+      }),
+    ).toMatchObject({
+      path: "/api/client/v1/direct-chats/c1/messages",
+    });
+    expect(
+      chatSendFailureContext(
+        {
+          message: "forbidden",
+          code: "MSG_MEMBER_FORBIDDEN",
+          requestId: "req-1",
+          status: 403,
+        },
+        { path: "/api/client/v1/direct-chats/c1/messages" },
+      ),
+    ).toMatchObject({
+      code: "MSG_MEMBER_FORBIDDEN",
+      path: "/api/client/v1/direct-chats/c1/messages",
+      requestId: "req-1",
+      status: 403,
+    });
+  });
+
+  it("summarizes upload progress events for diagnosing fast and sparse video uploads", () => {
+    expect(
+      createUploadProgressDiagnosticSummary({
+        completedAt: 1_240,
+        fileSize: 8_192,
+        localTaskId: "task-video",
+        messageKind: "video",
+        percents: [10, 40, 80, 100],
+        phase: "uploading_media",
+        startedAt: 1_000,
+      }),
+    ).toMatchObject({
+      completedByProgress: true,
+      durationMs: 240,
+      eventCount: 4,
+      fileSize: 8_192,
+      firstPercent: 10,
+      lastPercent: 100,
+      localTaskId: "task-video",
+      messageKind: "video",
+      phase: "uploading_media",
+      progressSparse: false,
+    });
+
+    expect(
+      createUploadProgressDiagnosticSummary({
+        completedAt: 1_200,
+        fileSize: 8_192,
+        localTaskId: "task-fast",
+        messageKind: "video",
+        percents: [100],
+        phase: "uploading_media",
+        startedAt: 1_000,
+      }),
+    ).toMatchObject({
+      completedByProgress: true,
+      durationMs: 200,
+      eventCount: 1,
+      fastCompleted: true,
+      progressSparse: false,
+    });
+
+    expect(
+      createUploadProgressDiagnosticSummary({
+        completedAt: 2_000,
+        fileSize: 8_192,
+        localTaskId: "task-sparse",
+        messageKind: "video",
+        percents: [100],
+        phase: "uploading_media",
+        startedAt: 1_000,
+      }),
+    ).toMatchObject({
+      completedByProgress: true,
+      durationMs: 1_000,
+      eventCount: 1,
+      fastCompleted: false,
+      progressSparse: true,
     });
   });
 });

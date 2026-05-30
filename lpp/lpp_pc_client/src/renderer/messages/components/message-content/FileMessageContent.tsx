@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { MouseEvent } from "react";
+import { appProductName } from "../../../app/appMetadata";
 import { FileMessageCard } from "../../../media/components/FileMessageCard";
-import { UploadControls } from "../../../media/components/UploadControls";
 import type { ImMediaItem } from "../../../media/domain/mediaMessage";
 import type {
   LocalUploadState,
   UploadActionHandler,
 } from "../../../media/runtime/uploadState";
+import { fileMessageCardState } from "../../../media/runtime/uploadState";
 import { getCurrentMediaActionCapabilities } from "../../runtime/mediaActionCapabilities";
 import { openCurrentMessageFileMedia } from "../../runtime/messageMediaDesktopActions";
 
@@ -32,18 +33,22 @@ export function FileMessageContent({
 }) {
   const media = item?.media;
   const href = item?.sourceUrl;
+  const openUrl = item?.localOpenUrl || href;
   const fileName = item?.fileName || "文件消息";
   const [openError, setOpenError] = useState<string | null>(null);
   const { canOpenMediaFile } = getCurrentMediaActionCapabilities();
+  const fileCardState = fileMessageCardState(uploadState);
   const handleFileOpen = async (event: MouseEvent<HTMLButtonElement>) => {
-    if (!href) return;
     event.preventDefault();
     setOpenError(null);
-    if (sending || failed) return;
-    if (canOpenMediaFile && !/^blob:/i.test(href)) {
+    if (uploadBlocked) {
+      return;
+    }
+    if (!openUrl) return;
+    if (canOpenMediaFile && !/^blob:/i.test(openUrl)) {
       try {
         const opened = await openCurrentMessageFileMedia({
-          url: href,
+          url: openUrl,
           fileName,
           kind: "file",
           authToken,
@@ -56,12 +61,12 @@ export function FileMessageContent({
         return;
       }
     }
-    if (/^(blob:|data:|file:)/i.test(href)) {
-      triggerFileDownload(href, fileName);
+    if (/^(blob:|data:|file:)/i.test(openUrl)) {
+      triggerFileDownload(openUrl, fileName);
       return;
     }
     try {
-      const response = await fetch(href, {
+      const response = await fetch(openUrl, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -73,9 +78,22 @@ export function FileMessageContent({
       setOpenError(`文件打开失败：${formatInlineError(error)}`);
     }
   };
+  const handleFileControlClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setOpenError(null);
+    if (!uploadState?.taskId || !fileCardState.controlAction) return;
+    onUploadAction?.(uploadState.taskId, fileCardState.controlAction);
+  };
 
-  const sending = uploadState?.status === "uploading" || uploadState?.status === "queued";
-  const failed = Boolean(statusText?.startsWith("发送失败"));
+  const displayStatusText = statusText || fileCardState.metaText;
+  const uploadBlocked = Boolean(displayStatusText);
+  const sending =
+    uploadState?.status === "uploading" ||
+    uploadState?.status === "queued" ||
+    displayStatusText === "上传中" ||
+    Boolean(displayStatusText?.startsWith("上传中 "));
+  const failed = Boolean(displayStatusText?.startsWith("发送失败"));
   const paused = uploadState?.status === "paused";
   const canceled = uploadState?.status === "canceled";
   return (
@@ -86,11 +104,15 @@ export function FileMessageContent({
         }${canceled ? " canceled" : ""}`}
         onClick={handleFileOpen}
         ariaLabel={`文件消息 ${fileName}`}
+        controlLabel={fileCardState.controlLabel}
+        controlProgress={fileCardState.controlProgress}
+        controlState={fileCardState.controlState}
         fileName={fileName}
-        metaText={statusText || formatSize(media?.sizeBytes)}
+        metaText={displayStatusText || formatSize(media?.sizeBytes)}
+        onControlClick={fileCardState.controlAction ? handleFileControlClick : undefined}
+        sourceLabel={appProductName}
       />
       {openError && <span className="message-file-error">{openError}</span>}
-      <UploadControls uploadState={uploadState} onUploadAction={onUploadAction} />
     </span>
   );
 }

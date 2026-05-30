@@ -19,7 +19,7 @@ import type {
   TrayStatus,
 } from '../shared/desktop-api.js';
 import { desktopIpcChannelByMethod } from '../shared/desktop-api.js';
-import { validateDesktopApiCall } from '../shared/desktop-api-validation.js';
+import { validateDesktopIpcCall } from '../shared/desktop-api-validation.js';
 import {
   clearSecureAuthSession,
   readSecureAuthSession,
@@ -41,6 +41,7 @@ const allowedExternalProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 const appIconPath = app.isPackaged
   ? join(process.resourcesPath, 'app-icon.ico')
   : join(__dirname, '../../assets/app-icon-green-bubble.ico');
+const singleInstanceLock = app.requestSingleInstanceLock();
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -48,6 +49,10 @@ let trayStatus: TrayStatus = 'online';
 const registeredDesktopIpcChannels = new Set<string>();
 
 installElectronProcessDiagnostics();
+
+if (!singleInstanceLock) {
+  app.quit();
+}
 
 function handleDesktopIpc<Args extends unknown[]>(
   method: DesktopApiMethod,
@@ -59,7 +64,7 @@ function handleDesktopIpc<Args extends unknown[]>(
   }
   registeredDesktopIpcChannels.add(channel);
   ipcMain.handle(channel, (event, ...args) => {
-    const validatedArgs = validateDesktopApiCall(method, args) as Args;
+    const validatedArgs = validateDesktopIpcCall(method, args) as Args;
     return handler(event, ...validatedArgs);
   });
 }
@@ -183,11 +188,18 @@ handleDesktopIpc('setTrayStatus', async (_event, status: TrayStatus) => {
 });
 
 app.whenReady().then(() => {
+  if (!singleInstanceLock) return;
   installElectronAppDiagnostics(app);
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('second-instance', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
 });
 
 app.on('window-all-closed', () => {

@@ -1,17 +1,28 @@
 import type { MediaResourceDto } from "../../data/api-client";
-import { isBrowserNativeUrl, mediaFileName } from "../../data/im-message-normalize";
+import { mediaFileName } from "../../data/im-message-normalize";
 
 export type MediaCacheContext = {
   accountId?: string;
   conversationId?: string;
 };
 
+export type VideoPlayerOpenDiagnostic = {
+  event: "poster.resolve_failed";
+  posterKind: MediaUrlKind;
+  reason: string;
+  sourceKind: MediaUrlKind;
+};
+
+export type MediaUrlKind = "blob" | "data" | "file" | "http" | "relative" | "unknown";
+
 export async function openDesktopVideoPlayer({
   authToken,
   displaySrc,
   durationSeconds,
+  localOpenSrc,
   media,
   mediaCacheContext,
+  onDiagnostic,
   posterSrc,
   remoteSrc,
   videoSize,
@@ -19,28 +30,38 @@ export async function openDesktopVideoPlayer({
   authToken?: string;
   displaySrc?: string;
   durationSeconds?: number;
+  localOpenSrc?: string;
   media?: MediaResourceDto;
   mediaCacheContext?: MediaCacheContext;
+  onDiagnostic?: (diagnostic: VideoPlayerOpenDiagnostic) => void;
   posterSrc?: string;
   remoteSrc?: string;
   videoSize?: { width: number; height: number } | null;
 }) {
-  const desktopVideoUrl = remoteSrc && !isBrowserNativeUrl(remoteSrc)
-    ? remoteSrc
-    : displaySrc && !isBrowserNativeUrl(displaySrc)
-      ? displaySrc
-      : undefined;
+  const desktopVideoUrl =
+    desktopLocalVideoUrl(localOpenSrc) ??
+    desktopLocalVideoUrl(displaySrc) ??
+    desktopReachableVideoUrl(remoteSrc) ??
+    desktopReachableVideoUrl(displaySrc);
   if (!window.desktopApi?.openVideoPlayer || !desktopVideoUrl) return false;
 
-  const desktopPosterUrl = await resolveDesktopVideoPosterUrl(posterSrc);
+  const desktopPosterUrl = await resolveDesktopVideoPosterUrl(posterSrc).catch((error) => {
+    onDiagnostic?.({
+      event: "poster.resolve_failed",
+      posterKind: mediaUrlKind(posterSrc),
+      reason: videoOpenErrorSummary(error),
+      sourceKind: mediaUrlKind(desktopVideoUrl),
+    });
+    return undefined;
+  });
   await window.desktopApi.openVideoPlayer({
-    url: desktopVideoUrl,
+    url: absolutizeDesktopMediaUrl(desktopVideoUrl),
     fileName: mediaFileName(media) || "video.mp4",
     kind: "video",
     authToken,
     accountId: mediaCacheContext?.accountId,
     conversationId: mediaCacheContext?.conversationId,
-    posterUrl: desktopPosterUrl,
+    ...(desktopPosterUrl ? { posterUrl: absolutizeDesktopMediaUrl(desktopPosterUrl) } : {}),
     width: videoSize?.width ?? media?.width,
     height: videoSize?.height ?? media?.height,
     durationSeconds,
@@ -48,6 +69,50 @@ export async function openDesktopVideoPlayer({
     title: "原视频",
   });
   return true;
+}
+
+export function inlineVideoPreviewSrc(url?: string) {
+  if (!url || /^file:/i.test(url)) return undefined;
+  return url;
+}
+
+function desktopReachableVideoUrl(url?: string) {
+  if (!url || /^blob:/i.test(url)) return undefined;
+  return url;
+}
+
+function desktopLocalVideoUrl(url?: string) {
+  if (!url || !/^file:/i.test(url)) return undefined;
+  return url;
+}
+
+function absolutizeDesktopMediaUrl(url: string) {
+  if (/^(data:|https?:|file:)/i.test(url)) return url;
+  const baseUrl = window.location?.origin;
+  if (!baseUrl) return url;
+  try {
+    return new URL(url, baseUrl).toString();
+  } catch {
+    return url;
+  }
+}
+
+export function mediaUrlKind(url?: string): MediaUrlKind {
+  if (!url) return "unknown";
+  if (/^blob:/i.test(url)) return "blob";
+  if (/^data:/i.test(url)) return "data";
+  if (/^file:/i.test(url)) return "file";
+  if (/^https?:/i.test(url)) return "http";
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return "unknown";
+  return "relative";
+}
+
+export function videoOpenErrorSummary(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replace(/file:\/\/\S+/gi, "file://[local-path]")
+    .replace(/https?:\/\/\S+/gi, "https://[remote-url]")
+    .slice(0, 180);
 }
 
 async function resolveDesktopVideoPosterUrl(posterUrl?: string) {

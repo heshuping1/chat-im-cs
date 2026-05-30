@@ -227,11 +227,6 @@ function captureVideoPosterFromSource(src: string) {
     video.addEventListener(
       "loadeddata",
       () => {
-        const poster = captureVideoFramePoster(video);
-        if (poster) {
-          finish(poster);
-          return;
-        }
         seekFallbackFrame();
       },
       { once: true },

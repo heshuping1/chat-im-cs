@@ -60,4 +60,38 @@ describe("electron runtime diagnostics", () => {
       message: "crashed",
     });
   });
+
+  it("records sanitized media cache failures for video diagnostics", () => {
+    const record = createElectronRuntimeDiagnosticRecord({
+      event: "media.cache_failed",
+      error: new Error("文件下载失败：HTTP 403; content-type=application/json"),
+      occurredAt: new Date("2026-05-30T00:00:00.000Z"),
+      reason: "kind=video urlType=https fileName=clip.mp4 token=raw-token",
+    });
+
+    expect(record).toMatchObject({
+      event: "media.cache_failed",
+      reason: "kind=video urlType=https fileName=clip.mp4 [redacted]",
+      error: {
+        message: "文件下载失败：HTTP 403; content-type=application/json",
+      },
+    });
+  });
+
+  it("records local media cache failure reasons without full source paths", () => {
+    const record = createElectronRuntimeDiagnosticRecord({
+      event: "media.local_cache_failed",
+      error: new Error("本地媒体文件不可用：source_file_unavailable"),
+      occurredAt: new Date("2026-05-31T00:00:00.000Z"),
+      reason: "kind=video urlType=blob fileName=clip.mp4 source=source_file_unavailable",
+    });
+
+    expect(record).toMatchObject({
+      event: "media.local_cache_failed",
+      reason: "kind=video urlType=blob fileName=clip.mp4 source=source_file_unavailable",
+      error: {
+        message: "本地媒体文件不可用：source_file_unavailable",
+      },
+    });
+  });
 });

@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __LPP_PC_PRODUCT_NAME__: string | undefined;
+
 interface Window {
   __lppTestPushImMessage?: (payload: Record<string, unknown>) => void;
   __lppGatewayDiagnostics?: import("./data/gateway/gateway-diagnostics").GatewayDiagnosticRecord[];

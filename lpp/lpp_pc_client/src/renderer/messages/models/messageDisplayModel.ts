@@ -379,10 +379,7 @@ function messageReadStatusText(
     return type === "image" || type === "video" || type === "file" ? "上传中" : "发送中";
   }
   if (status === "failed") {
-    const reason = typeof record.localError === "string" && record.localError.trim()
-      ? `：${record.localError.trim()}`
-      : "";
-    return `发送失败${reason}`;
+    return "发送失败";
   }
   if (conversation.conversationType === "group") {
     if (typeof message.readCount === "number" && message.readCount > 0) {

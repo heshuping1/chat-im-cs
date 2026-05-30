@@ -9,6 +9,8 @@ import type {
 
 export type ElectronRuntimeDiagnosticEvent =
   | 'app.child_process_gone'
+  | 'media.cache_failed'
+  | 'media.local_cache_failed'
   | 'main.uncaught_exception'
   | 'main.unhandled_rejection'
   | 'renderer.render_process_gone';

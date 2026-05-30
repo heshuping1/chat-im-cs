@@ -6,10 +6,12 @@ import type {
   CacheMediaFilePayload,
   CacheMediaPosterPayload,
   DesktopApiMethod,
+  LocalMediaCacheSource,
   VideoPlayerPayload,
 } from '../shared/desktop-api.js';
 import {
   assertAllowedLocalMediaFilePath,
+  cacheLocalMediaFile,
   cacheMediaPosterFile,
   ensureLocalMediaFile,
   getLocalMediaStatus,
@@ -40,6 +42,12 @@ export function registerDesktopFileHandlers({
   register(
     'cacheMediaFile',
     async (_event, payload: CacheMediaFilePayload) => ensureLocalMediaFile(payload),
+  );
+
+  register(
+    'cacheLocalMediaFile',
+    async (_event, payload: CacheMediaFilePayload, source: LocalMediaCacheSource) =>
+      cacheLocalMediaFile(payload, source),
   );
 
   register(

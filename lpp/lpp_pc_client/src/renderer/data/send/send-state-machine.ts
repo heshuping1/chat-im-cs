@@ -1,4 +1,5 @@
 import type { ChatMessageDeliveryState } from "../message/message-domain";
+import { normalizeApiError } from "../api/api-error-model";
 
 export type ChatSendChannel = "im" | "customer_service";
 export type ChatSendMessageKind = "text" | "image" | "video" | "file";
@@ -9,6 +10,7 @@ export type ChatSendAction =
   | "enqueue_text"
   | "enqueue_media"
   | "start_upload"
+  | "cache_local_media"
   | "upload_progress"
   | "upload_succeeded"
   | "start_send"
@@ -67,9 +69,120 @@ export interface ChatSendDiagnosticInput {
   context?: Record<string, unknown>;
 }
 
+export type UploadProgressDiagnosticPhase = "uploading_media" | "uploading_poster";
+
+export type UploadProgressDiagnosticSummaryInput = {
+  completedAt: number;
+  fileSize?: number;
+  localTaskId: string;
+  messageKind: ChatSendMessageKind;
+  percents: number[];
+  phase: UploadProgressDiagnosticPhase;
+  startedAt: number;
+};
+
+export type UploadProgressDiagnosticLogInput = UploadProgressDiagnosticSummaryInput & {
+  channel: ChatSendChannel;
+  taskId?: ChatSendDiagnosticRecord["taskId"];
+};
+
+export type UploadProgressDiagnosticTracker = {
+  readonly percents: number[];
+  readonly startedAt: number;
+  track(percent: number): void;
+};
+
+export function chatSendFailureContext(
+  error: unknown,
+  context: Record<string, unknown> = {},
+) {
+  const normalized = normalizeApiError(error);
+  return {
+    ...context,
+    ...(normalized.status ? { status: normalized.status } : {}),
+    ...(normalized.code ? { code: normalized.code } : {}),
+    ...(normalized.requestId ? { requestId: normalized.requestId } : {}),
+  };
+}
+
+export function createUploadProgressDiagnosticSummary({
+  completedAt,
+  fileSize,
+  localTaskId,
+  messageKind,
+  percents,
+  phase,
+  startedAt,
+}: UploadProgressDiagnosticSummaryInput) {
+  const normalizedPercents = percents.filter((value) => Number.isFinite(value));
+  const eventCount = normalizedPercents.length;
+  const firstPercent = normalizedPercents[0];
+  const lastPercent = normalizedPercents[eventCount - 1];
+  const durationMs = Math.max(0, Math.round(completedAt - startedAt));
+  const completedByProgress = typeof lastPercent === "number" && lastPercent >= 100;
+  const fastCompleted =
+    durationMs < 300 &&
+    completedByProgress &&
+    (eventCount === 1 ||
+      (eventCount === 2 && normalizedPercents[0] === 0 && normalizedPercents[1] === 100));
+  return {
+    completedByProgress,
+    durationMs,
+    eventCount,
+    ...(typeof fileSize === "number" && Number.isFinite(fileSize) ? { fileSize } : {}),
+    ...(typeof firstPercent === "number" ? { firstPercent } : {}),
+    fastCompleted,
+    ...(typeof lastPercent === "number" ? { lastPercent } : {}),
+    localTaskId,
+    messageKind,
+    phase,
+    progressSparse: durationMs >= 800 && eventCount <= 1,
+  };
+}
+
+export function createUploadProgressDiagnosticTracker(
+  startedAt = Date.now(),
+): UploadProgressDiagnosticTracker {
+  const percents: number[] = [];
+  return {
+    percents,
+    startedAt,
+    track(percent) {
+      if (Number.isFinite(percent)) percents.push(percent);
+    },
+  };
+}
+
+export function logUploadProgressDiagnostic(input: UploadProgressDiagnosticLogInput) {
+  return logChatSendDiagnostic({
+    taskId: input.taskId,
+    channel: input.channel,
+    phase: "upload",
+    result: "ok",
+    action: "upload_progress",
+    context: createUploadProgressDiagnosticSummary(input),
+  });
+}
+
+export function logUploadProgressDiagnosticFromTracker(
+  input: Omit<UploadProgressDiagnosticLogInput, "completedAt" | "percents" | "startedAt"> & {
+    completedAt?: number;
+    tracker: UploadProgressDiagnosticTracker;
+  },
+) {
+  return logUploadProgressDiagnostic({
+    ...input,
+    completedAt: input.completedAt ?? Date.now(),
+    percents: input.tracker.percents,
+    startedAt: input.tracker.startedAt,
+  });
+}
+
 const terminalSendStatuses = new Set<ChatSendStatus>(["sent", "canceled", "recalled"]);
 const sendDiagnosticsFlag = "lpp.sendDiagnostics";
 const maxBufferedSendDiagnostics = 200;
+const maxPersistedSendDiagnostics = 80;
+export const persistedSendDiagnosticsStorageKey = "lpp.sendDiagnostics.buffer.v1";
 
 const transitionTable: Record<ChatSendStatus, Partial<Record<ChatSendAction, ChatSendStatus>>> = {
   queued: {
@@ -175,6 +288,7 @@ export function logChatSendDiagnostic(input: ChatSendDiagnosticInput) {
 
   const current = target.__lppSendDiagnostics ?? [];
   target.__lppSendDiagnostics = [...current, record].slice(-maxBufferedSendDiagnostics);
+  persistSendDiagnostics(target, target.__lppSendDiagnostics);
   if (shouldPrintSendDiagnostics(target)) {
     const printer = record.result === "failed" ? console.warn : console.debug;
     printer("[lpp:send]", record);
@@ -222,8 +336,33 @@ function sanitizeSendDiagnosticEntry(key: string, value: unknown): unknown {
 
 function sanitizeSendDiagnosticText(key: string, value: string) {
   const normalizedKey = key.toLowerCase();
-  if (normalizedKey.includes("path") || normalizedKey.includes("filename")) {
+  if (
+    normalizedKey.includes("filename") ||
+    normalizedKey === "filepath" ||
+    normalizedKey === "localpath" ||
+    looksLikeLocalFilePath(value)
+  ) {
     return "[local-path]";
   }
   return value.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer ***");
+}
+
+function persistSendDiagnostics(
+  target: Window,
+  records: ChatSendDiagnosticRecord[],
+) {
+  try {
+    target.localStorage?.setItem(
+      persistedSendDiagnosticsStorageKey,
+      JSON.stringify(records.slice(-maxPersistedSendDiagnostics)),
+    );
+  } catch {
+    // Diagnostics must never affect the send path.
+  }
+}
+
+function looksLikeLocalFilePath(value: string) {
+  return /^(file:\/\/|\/Users\/|\/private\/|\/var\/|\/tmp\/|[A-Za-z]:[\\/]|\\\\)/.test(
+    value,
+  );
 }

@@ -1,10 +1,24 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+
+const rootDir = dirname(fileURLToPath(import.meta.url));
+const packageJson = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8')) as {
+  build?: {
+    productName?: string;
+  };
+};
+const buildProductName = packageJson.build?.productName?.trim() || 'LPP 客服客户端';
 
 export default defineConfig({
   plugins: [react()],
   root: '.',
   base: './',
+  define: {
+    __LPP_PC_PRODUCT_NAME__: JSON.stringify(buildProductName),
+  },
   server: {
     port: 5173,
     strictPort: true,

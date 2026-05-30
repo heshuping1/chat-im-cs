@@ -179,7 +179,7 @@ describe("architecture boundaries", () => {
       "src/renderer/messages/runtime",
     ];
     const mediaMethods =
-      "copyMediaFile|saveMediaAs|openMediaFile|revealMediaInFolder|editMediaFile|cacheMediaFile|copyFilePath|copyImageFromUrl|openVideoPlayer|cacheMediaPoster";
+      "copyMediaFile|saveMediaAs|openMediaFile|revealMediaInFolder|editMediaFile|cacheMediaFile|cacheLocalMediaFile|copyFilePath|copyImageFromUrl|openVideoPlayer|cacheMediaPoster";
     const directMediaIpcPattern = new RegExp(
       `\\b(?:window\\.)?desktopApi(?:\\?\\.)?\\.?(?:${mediaMethods})\\b`,
     );
@@ -306,6 +306,7 @@ describe("architecture boundaries", () => {
       "src/renderer/lib/openExternal.ts",
       "src/renderer/media/runtime/desktopMediaActions.ts",
       "src/renderer/media/runtime/imagePrecache.ts",
+      "src/renderer/media/runtime/localMediaCache.ts",
       "src/renderer/media/runtime/videoPosterRuntime.ts",
       "src/renderer/media/runtime/videoPlayer.ts",
       "src/renderer/messages/runtime/mediaActionCapabilities.ts",

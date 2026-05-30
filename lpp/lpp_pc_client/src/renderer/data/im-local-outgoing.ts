@@ -85,6 +85,7 @@ function mergeServerAndLocalMediaRecord(serverValue: unknown, localValue: unknow
   const merged: Record<string, unknown> = { ...localRecord, ...serverRecord };
   for (const key of [
     "localPreviewUrl",
+    "localOpenUrl",
     "localPosterUrl",
     "posterUrl",
     "thumbnailUrl",

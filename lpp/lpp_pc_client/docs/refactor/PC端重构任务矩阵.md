@@ -1025,6 +1025,10 @@ P0-DOC-001 验收记录：
 | 编号 | 模块 | 目标 | 风险 | 验收 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | P20-FEAT-001 | Media Send | 视频发送时由客户端优先生成 JPEG 首帧封面，二次调用 `POST /api/client/v1/media/upload` 上传图片，并把上传响应的 `url` 写入 `body.video.thumbnailUrl`；本地乐观消息立即带封面，失败/取消不从列表消失；发送 payload 清洗本地展示字段并把 `durationSeconds/width/height/sizeBytes` 规整为整数；视频上传中使用微信式封面卡片、暗色遮罩、圆形进度/暂停控件，上传完成前禁止播放，播放器打开失败时回退当前可见视频源。 | P1 | L2 | 已完成 |
+| P20-FEAT-002 | Media Video UX | 修复视频源加载失败时丢封面的问题；视频打开失败时保留封面卡片并显示克制状态，不再退化为黑色/通用占位；上传、暂停、失败、取消态使用微信式圆形控件和短状态文案；发送失败诊断区分视频上传、封面上传和发消息阶段。 | P1 | L2 | 已完成 |
+| P20-FEAT-003 | Media Video Player | 修复视频点击后桌面播放器优先打开远端旧源导致的加载失败/反复刷新；播放器模板增加 `loading/ready/failed/unsupported` 状态机、失败保留封面并提供重试/系统播放器兜底；媒体缓存失败进入 electron-runtime 诊断；上传队列态不假装 0% 进度，上传圆环改为 SVG 进度。 | P1 | L2 | 已完成 |
+| P20-FEAT-004 | Media Send Diagnostics | 修复视频发送失败排查盲区：send 诊断除 renderer 内存 buffer 外同步写入有界本地诊断缓存，并让设置页诊断包在内存丢失后仍能导出最近 send 失败；同时保留 API endpoint path，避免被误判为本地文件路径而脱敏。 | P1 | L2 | 已完成 |
+| P20-FEAT-005 | Send Outbox | 新增 PC 端本地发送箱 owner，普通 IM 与客服文本/图片/视频/文件失败、暂停、取消和中断后写入 IndexedDB；刷新后按账号/租户/API scope 和会话恢复失败消息与媒体 Blob，重试复用原 `localMessageId/clientMsgId`，成功后清理本地记录。 | P0 | L4 | 已完成 |
 
 ---
 
@@ -1041,7 +1045,71 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 17. 当前关键风险清单
+## 17. 第二十二阶段任务：消息状态与已读回执统一治理
+
+第二十二阶段用于统一 IM 与在线客服的消息状态展示语言：失败态参考微信外置红点，文本不显示“发送中/已发送”，私聊逐条显示已读/未读，群聊仅消费服务端已有聚合字段，不新增 read receipt 请求接口。
+
+| 编号 | 模块 | 目标 | 风险 | 验收 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| P22-STATUS-001 | Message Status Model | 新增纯消息状态模型，统一推导发送态、失败态、私聊已读/未读和群聊聚合回执展示。 | P1 | L3 | 已完成 |
+| P22-STATUS-002 | Failure Marker UI | 自己消息发送失败时在气泡外显示微信式红色 `!`，hover/click 展示“发送失败，点击重试”，媒体失败可触发现有重试。 | P1 | L2 | 已完成 |
+| P22-STATUS-003 | IM / CS Status Wiring | IM 与在线客服共用同一 view model 状态；文本移除“发送中/已发送”，客服去掉固定“已发送”。 | P1 | L3 | 已完成 |
+| P22-STATUS-004 | Group Receipt Minimum | 群聊仅消费现有 `readCount/unreadCount/allRead` 字段，无字段时只显示时间；服务端批量回执接口登记为后续联调项。 | P1 | L2 | 已完成 |
+| P22-STATUS-005 | Docs / Validation | 更新任务矩阵、AI 文件路由和验证记录，保留验证命令与服务端接口假设。 | P1 | L1 | 已完成 |
+| P22-STATUS-006 | Message Refresh Stability | 修复活跃会话消息每 2.5 秒强制轮询导致媒体卡片反复重建的问题；保留 React Query key 不变，消息未变化时复用旧对象，轮询降为低频兜底并恢复窗口聚焦刷新。 | P1 | L2 | 已完成 |
+| P22-STATUS-007 | Failed Message Resend | 修复失败红点只提示不重发的问题：点击失败红点弹出微信式“重发该消息?”确认，文本失败复用原 localMessageId/clientMsgId 重发，媒体失败复用 upload retry；IM 403 错误按服务端 code 展示更明确原因并写入 send diagnostics。 | P1 | L3 | 已完成 |
+| P22-STATUS-008 | Failure Marker Stability | 修复文本发送过程中短暂 failed 状态导致红色 `!` 一闪而过的问题；失败红点延迟淡入，瞬时状态抖动不暴露给用户，稳定失败仍可点击重发。 | P1 | L1 | 已完成 |
+| P22-STATUS-009 | Text Sending Indicator Stability | 文本消息本地 echo 后默认静默发送；仅当 `sending` 超过 700ms 时在气泡外显示微信式轻量转圈，成功后进入已读/未读，失败后切换红点重发。 | P1 | L2 | 已完成 |
+| P22-STATUS-010 | Permission Failure UX Gate | 将 403/FORBIDDEN 等发送权限失败从用户文案中剥离：红点 tooltip 固定为“发送失败，点击重试”，重发确认使用“当前会话暂不可发送”等产品化短文案，真实 `status/code/requestId/path` 继续进入 diagnostics；不新增权限接口。 | P1 | L2 | 已完成 |
+| P22-STATUS-011 | WeChat Send Status Slot | 将自己消息的发送中和失败态收敛到同一状态位：发送中立即显示微信式小转圈，快速失败先保持转圈至少 650ms，再原地切换为紧凑红色 `!`；失败消息继续保留、可重发、可由 outbox 恢复。 | P1 | L2 | 已完成 |
+| P22-STATUS-012 | Media Upload Controls Dedupe | 移除图片/文件/视频气泡底部横向上传进度条、暂停和取消按钮；图片/文件发送态统一由气泡左侧状态位表达，视频保留封面内圆形上传控件，删除无调用的 `UploadControls` 组件和对应 CSS。 | P1 | L2 | 已完成 |
+| P22-STATUS-013 | Media Status Channel Split | 按微信式媒体差异拆分状态承载：图片用气泡外状态位，视频本地上传/失败由封面内圆形控件独立承载，文件卡片用自身 meta 展示上传/失败状态且未成功前不可打开。 | P1 | L2 | 已完成 |
+| P22-STATUS-014 | Media Upload Progress Channel Polish | 修正视频圆形控件进度展示和文件状态承载：视频有进度时显示确定圆环、无进度时显示不确定加载；文件上传/失败不再使用左侧状态位，改由文件卡片 meta、内部细进度线和卡片点击重试承载。 | P1 | L2 | 已完成 |
+| P22-STATUS-016 | Real Media Upload Progress | 按真实链路补齐媒体上传阶段模型：文件上传、视频上传、视频封面上传、发送 API 等待分别映射到本地 `uploadPhase` 和展示进度；不人为拖慢上传，只有服务端发送成功后才进入成功态。 | P1 | L3 | 已完成 |
+| P22-STATUS-017 | WeChat File Upload Card | 将文件上传状态改为微信式文件卡片自承载：右侧文件 icon 内嵌上传进度/暂停/继续/重试控件，移除底部进度线，底部只保留弱来源区；真实上传阶段模型不变。 | P1 | L2 | 已完成 |
+| P22-STATUS-018 | WeChat Video Upload Ring | 精修视频上传圆环视觉：上传中只保留封面内半透明暗色圆盘、白色短弧进度和中央暂停/继续/重试图标，移除上传中/发送中文字 pill；真实上传阶段模型不变。 | P1 | L2 | 已完成 |
+| P22-STATUS-019 | Video Determinate Upload Progress | 修复视频上传 progress 事件缺少 `percent` 时被丢弃的问题：用 `loaded/total` 或 `loaded/File.size` 计算真实确定进度，IM/客服媒体发送统一接入，避免视频一直显示不确定转圈。 | P1 | L2 | 已完成 |
+| P22-STATUS-020 | WeChat File Upload Progress Icon | 修正文件上传 icon 展示：文件类型层始终可见，上传控件不再整块遮挡 `ZIP/PDF` 等类型；有进度时用确定圆环，`sending` 显示 95% 完成态，不退化成不确定转圈。 | P1 | L2 | 已完成 |
+| P22-STATUS-021 | Video Fixed Determinate Upload Arc | 修复视频上传圆环仍以不确定短弧旋转的问题：状态模型显式返回 `progressMode`，视频上传、封面上传、暂停和发送阶段都使用固定确定进度弧，只有极端无进度态才旋转。 | P1 | L2 | 已完成 |
+| P22-STATUS-022 | Video Upload No Default Spin | 将视频上传态彻底改为静态进度弧：`queued/preparing/uploading/sending/paused/failed/canceled` 全程使用确定进度语义，移除视频上传自旋动画和 `is-indeterminate` 路径。 | P1 | L2 | 已完成 |
+| P22-STATUS-023 | Video Upload Progress Evidence | 为视频文件上传和封面上传补 progress summary 诊断，记录事件数、首尾进度、耗时、快速完成和长耗时稀疏事件判定，用证据区分真实快传与 progress 链路缺事件。 | P1 | L2 | 已完成 |
+| P22-STATUS-024 | WeChat File Icon Center Control | 修正文件上传卡片右侧 icon 的微信式表达：上传/发送/暂停/失败控件统一居中承载，文件名扩展名继续表达类型信息。 | P1 | L2 | 已完成 |
+| P22-STATUS-025 | File Completion and Source Polish | 补齐文件消息闭环：成功态恢复 `ZIP/PDF/APK/FILE` 类型文字；上传有进度时使用从 12 点开始的确定圆弧且不自旋；暂停无进度时冻结 0%；来源文案先对齐当前程序名，P22-STATUS-026 已改为 app metadata 注入。 | P1 | L2 | 已完成 |
+| P22-STATUS-026 | File Source App Metadata | 文件卡片来源不再由 `FileMessageCard` 硬编码具体产品名，改由 Vite 从 `package.json build.productName` 注入 renderer app metadata，再由 `FileMessageContent` 显式传给文件卡片。 | P1 | L1 | 已完成 |
+| P22-STATUS-027 | WeChat File Upload Card Polish | 精修文件上传卡片：右侧文件 icon 改为更柔和的文档形态，上传/暂停/发送/失败控件居中；文件上传全程使用静态 SVG 确定圆弧，缺进度时停在 0%，不再默认自旋。 | P1 | L2 | 已完成 |
+| P22-STATUS-028 | File Upload Card Final Polish | 最终精修文件上传卡片视觉：上传态 icon 不再整体灰化，改为低饱和文档色；圆环更细更轻，0% 时静态不造假进度；聊天气泡内文件卡片比例更接近微信式密度。 | P1 | L1 | 已完成 |
+| P22-STATUS-029 | Video Player Bad Cache Recovery | 修复桌面视频播放器打开失败：视频缓存命中时嗅探 JSON/HTML 错误页等坏缓存，发现后重新下载；播放器模板修正倍速文案，避免实体字符串泄露到 UI。 | P1 | L2 | 已完成 |
+| P22-STATUS-030 | Post-029 Regression Gate | 在 P22-STATUS-029 后继续执行媒体/状态/播放器回归门禁，确认局部单测、完整 unit、quick check 和 docs check 均通过；未发现需要新增业务改动的后续问题。 | P1 | L2 | 已完成 |
+| P22-STATUS-031 | Video Failed Retry Hit Area | 修复视频发送失败后只有中央小控件可重试的问题：上传失败/暂停等 overlay 有 action 时整张视频卡片和键盘 Enter/Space 都触发对应上传动作，失败态不尝试打开播放器。 | P1 | L2 | 已完成 |
+| P22-STATUS-032 | Video Open Failure Retry | 修复已发送视频内联预览或桌面打开失败后卡片不可再次点击的问题：`failed/openError` 只影响文案，不再阻断有视频源的卡片继续重试打开播放器。 | P1 | L2 | 已完成 |
+| P22-STATUS-033 | Video Player Fast Window | 修复桌面视频打开慢和无反馈等待：播放器窗口先显示封面和准备状态，视频缓存下载在后台完成后注入本地 `file://` 源；下载失败直接在播放器内展示失败原因，IPC contract 不变。 | P1 | L2 | 已完成 |
+| P22-STATUS-034 | Video Player Unsupported Fallback | 修复 Electron 内置播放器不支持部分视频编码时的卡死体验：区分视频准备失败、Chromium 不支持和未知加载失败；不支持时主按钮切换为“用系统播放器打开”，保留下载和倍速控制，IPC contract 不变。 | P1 | L2 | 已完成 |
+| P22-STATUS-035 | Video Player Build Sync Fallback | 修复 Electron main/template 改动未进入运行产物导致复测仍显示旧错误的问题：将播放器模板构建同步到 `dist/main/*`，并把任意已有视频 URL 的 `<video>` 播放失败统一兜底到“用系统播放器打开”。 | P1 | L2 | 已完成 |
+| P22-STATUS-036 | Video Player Server Source Priority | 修复桌面视频打开源选择回归：优先使用服务端媒体源 `remoteSrc` 打开原视频，避免当前预览源 `displaySrc` 绕开后端可播/转码资源；无服务端源时继续回退当前显示源，不改 IPC contract。 | P1 | L2 | 已完成 |
+| P22-STATUS-037 | Video Player File Document Host | 修复 Electron 播放器 HTML 使用 `data:text/html` 承载导致 `file://` 视频被 URL safety check 拒绝的问题：播放器模板改写入 userData 临时 HTML 并以 `file://` 加载，验证 H.264/AAC 样本可在 Electron `canplay`，IPC contract 不变。 | P1 | L2 | 已完成 |
+| P22-STATUS-038 | Video Player Autoplay Layout | 优化原视频窗口的 IM 播放体验：点击聊天视频后弹窗在 `canplay` 后自动播放，自动播放拒绝不误判失败；窗口尺寸改为内容优先的克制策略，竖屏/横屏/方形视频按工作区舒适比例开窗。 | P1 | L2 | 已完成 |
+| P22-STATUS-039 | Sent Video Open URL Normalization | 修复 PC 端发送成功后点击视频提示“打开失败”：renderer 内联 `<video>` 可播放的相对服务端地址在进入 Electron main 前统一按当前 web origin 规整为绝对 URL，避免 main 侧缓存下载误判“不支持的媒体地址”；不改 IPC contract，不新增依赖。 | P1 | L2 | 已完成 |
+| P22-STATUS-040 | Local Sent Video Cache Playback | 将本机刚发送的视频升级为本地缓存直开：新增窄 IPC 由 preload 通过 `webUtils.getPathForFile` 派生本地文件路径，main 复制进既有媒体缓存；IM/客服视频发送成功后优先保留 `file://` 本机缓存预览源，远端 URL 仅作历史/跨设备/缓存失败兜底。 | P1 | L3 | 已完成 |
+| P22-STATUS-041 | Video Player Opening State Polish | 精修本地上传视频点击后的原视频窗口打开态：loading 延迟展示且不提前暴露系统播放器兜底，ready 前隐藏控制条，autoplay 被系统拒绝时显示居中播放按钮而非失败态；失败/不支持态保留明确兜底。 | P1 | L2 | 已完成 |
+| P22-STATUS-042 | Video Message Poster Decode Gate | 修复消息窗口视频卡片偶发黑屏后才显示封面的问题：视频封面改由真实 `<img>` 解码事件驱动可见态，`posterSrc` 变化时重置 loading/ready/failed 状态，未解码前保持微信式浅色占位和播放按钮，不再提前进入黑底 `has-poster` 分支。 | P1 | L2 | 已完成 |
+| P22-STATUS-043 | Video Upload Display Progress Ticker | 修复视频上传 UI 经常从 0 直接跳到完成态的问题：视频上传展示进度改为真实 XHR progress 与本地阶段时钟合并，缺少连续 progress 事件时仍可见推进；上传中封顶在阶段上限，`sending` 最高 95，服务端确认后退出 overlay，不显示 100% 上传圆环。 | P1 | L2 | 已完成 |
+| P22-STATUS-044 | Local Sent Video Cache IPC Arg Preservation | 修复本机发送成功视频点击“打开失败”的根因：`cacheLocalMediaFile` 的 preload 派生 `sourcePath` 在 main 通用 IPC 校验层被丢弃；新增 main-only IPC 参数校验保留安全路径，renderer 仍不能直接传任意路径，本地缓存直开链路恢复。 | P1 | L3 | 已完成 |
+| P22-STATUS-045 | Local Video Open Source Decoupling | 彻底拆开视频消息卡片内联预览源与桌面播放器打开源：本地 `file://` 缓存只作为 open source，不再挂入消息列表 `<video>`；失效 `blob:` 封面转码失败改为 best-effort，不阻断 `openVideoPlayer`；新增脱敏视频打开诊断区分 attempt/success/failed/poster ignored。 | P1 | L2 | 已完成 |
+| P22-STATUS-046 | Local Sent Media Cache Unification | 统一选择/粘贴的图片、视频、文件本地发送缓存模型：preload 优先复制真实选择路径，粘贴无路径时把 bytes 物化到 app 管理缓存；消息体拆清 `localPreviewUrl` 与 `localOpenUrl`，发送成功后本机打开优先 app cache，远端 URL 仅兜底。 | P1 | L3 | 已完成 |
+
+---
+
+## 18. 第二十三阶段任务：播放器能力技术评估
+
+第二十三阶段用于评估是否引入更强的桌面视频播放能力。该阶段默认不直接改造播放技术栈；新增 native 依赖、打包资源、外部播放器或 libmpv 嵌入前必须负责人确认。
+
+| 编号 | 模块 | 目标 | 风险 | 验收 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| P23-PLAYER-001 | mpv/libmpv Assessment | 评估 mpv/libmpv 作为 PC 端全格式播放器能力的可行性，对比 Electron Chromium、系统播放器、外部 mpv 子进程和嵌入式 libmpv；覆盖 Windows 打包、签名、更新、体积、安全和 UX。 | P1 | L1 | 待确认 |
+
+---
+
+## 19. 当前关键风险清单
 
 | 编号 | 风险 | 影响 | 控制方式 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -1057,7 +1125,7 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 18. 第一阶段手工验收记录模板
+## 19. 第一阶段手工验收记录模板
 
 每完成 P1 任务，需要追加验收记录。
 
@@ -1093,7 +1161,7 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 19. 推进原则
+## 20. 推进原则
 
 1. 第一阶段不追求目录最终形态，优先追求边界可测试。
 2. 不允许为了重构把核心链路一次性改大。

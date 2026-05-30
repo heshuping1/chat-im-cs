@@ -44,7 +44,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
   return {
     kind,
     message,
-    userMessage: userMessageForApiError(kind, message),
+    userMessage: userMessageForApiError(kind, message, code),
     code,
     requestId,
     status,
@@ -60,7 +60,17 @@ export function formatApiErrorForUser(error: unknown, fallback = "未知错误")
   return normalized.userMessage || fallback;
 }
 
-export function userMessageForApiError(kind: ApiErrorKind, message: string) {
+export function userMessageForApiError(
+  kind: ApiErrorKind,
+  message: string,
+  errorCode?: string,
+) {
+  const code = (errorCode || message).toUpperCase();
+  if (code.includes("MSG_MEMBER_FORBIDDEN")) return "你不在该会话中，无法发送消息";
+  if (code.includes("MSG_CONVERSATION_FROZEN")) return "该会话已被冻结，暂时无法发送";
+  if (code.includes("MSG_GROUP_MUTED")) return "群聊已开启全员禁言，暂时无法发送";
+  if (code.includes("MSG_MEMBER_MUTED")) return "你已被禁言，暂时无法发言";
+  if (code.includes("MSG_USER_MUTED")) return "当前账号已被禁言，暂时无法发送";
   if (kind === "unauthorized") return "登录状态已失效，请重新登录";
   if (kind === "forbidden") return "当前账号没有权限执行此操作";
   if (kind === "not_found") return "目标内容不存在或已被删除";

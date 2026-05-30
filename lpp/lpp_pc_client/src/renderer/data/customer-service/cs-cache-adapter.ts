@@ -99,8 +99,7 @@ export function appendCustomerServiceLocalMessage(
       localTaskId: (message as unknown as Record<string, unknown>).localTaskId,
       messageId: message.messageId,
       messageType: message.messageType,
-      threadId: thread.threadId,
-      threadType: thread.threadType,
+      threadId: thread.threadId, threadType: thread.threadType,
     },
   });
 }
@@ -111,9 +110,10 @@ export function patchCustomerServiceLocalMessage(
   localMessageId: string,
   patch: {
     body?: Record<string, unknown>;
-    status?: string;
+    status?: string; uploadPhase?: string;
     uploadProgress?: number;
     localError?: string;
+    localFailedAt?: number;
   },
 ) {
   updateCustomerServiceDetailMessages(queryClient, thread.threadId, (messages) =>
@@ -123,12 +123,12 @@ export function patchCustomerServiceLocalMessage(
             ...message,
             ...(patch.body ? { body: patch.body } : {}),
             ...(patch.status ? { status: patch.status } : {}),
-            ...(typeof patch.uploadProgress === "number"
-              ? { uploadProgress: patch.uploadProgress }
-              : {}),
+            ...(patch.uploadPhase ? { uploadPhase: patch.uploadPhase } : {}),
+            ...(typeof patch.uploadProgress === "number" ? { uploadProgress: patch.uploadProgress } : {}),
             ...(patch.localError === undefined
               ? { localError: undefined }
               : { localError: patch.localError }),
+            ...(typeof patch.localFailedAt === "number" ? { localFailedAt: patch.localFailedAt } : {}),
           } as MessageItemDto)
         : message,
     ),
@@ -141,7 +141,7 @@ export function patchCustomerServiceLocalMessage(
       status: patch.status,
       threadId: thread.threadId,
       threadType: thread.threadType,
-      uploadProgress: patch.uploadProgress,
+      uploadPhase: patch.uploadPhase, uploadProgress: patch.uploadProgress,
     },
   });
 }

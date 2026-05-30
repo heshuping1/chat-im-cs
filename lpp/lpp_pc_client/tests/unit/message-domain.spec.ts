@@ -4,6 +4,7 @@ import {
   chatMessageEntityToDto,
   normalizeChatMessageDeliveryState,
   normalizeChatMessageDirection,
+  reuseStableMessageItems,
 } from "../../src/renderer/data/message/message-domain";
 import type { MessageItemDto } from "../../src/renderer/data/api/types";
 
@@ -58,6 +59,7 @@ describe("message domain", () => {
         isSelf: true,
         status: "uploading",
         localTaskId: "task-1",
+        uploadPhase: "uploading_media",
         uploadProgress: 42,
       } as MessageItemDto,
       {
@@ -85,6 +87,7 @@ describe("message domain", () => {
       delivery: "uploading",
       local: {
         localTaskId: "task-1",
+        uploadPhase: "uploading_media",
         uploadProgress: 42,
         optimistic: true,
       },
@@ -131,5 +134,73 @@ describe("message domain", () => {
       preview: "[文件]",
       status: "sent",
     });
+  });
+
+  it("reuses unchanged polled message items to avoid media card refresh", () => {
+    const previousVideo = {
+      messageId: "m-video",
+      conversationSeq: 12,
+      messageType: "video",
+      body: {
+        video: {
+          url: "https://cdn.example.test/video.mp4",
+          thumbnailUrl: "https://cdn.example.test/poster.jpg",
+          durationSeconds: 18,
+        },
+      },
+      preview: "[视频]",
+      status: "sent",
+      sentAt: "2026-05-30T10:00:00Z",
+      isSelf: true,
+    } satisfies MessageItemDto;
+    const previousText = {
+      messageId: "m-text",
+      conversationSeq: 13,
+      messageType: "text",
+      body: { text: "hello" },
+      preview: "hello",
+      status: "sent",
+    } satisfies MessageItemDto;
+
+    const result = reuseStableMessageItems([previousVideo, previousText], [
+      {
+        ...previousVideo,
+        body: { video: { ...(previousVideo.body?.video as object) } },
+      },
+      { ...previousText, body: { text: "hello" } },
+    ]);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toBeDefined();
+    expect(result?.[0]).toBe(previousVideo);
+    expect(result?.[1]).toBe(previousText);
+  });
+
+  it("keeps changed polled messages as new objects", () => {
+    const previous = {
+      messageId: "m-video",
+      conversationSeq: 12,
+      messageType: "video",
+      body: {
+        video: {
+          url: "https://cdn.example.test/video.mp4",
+          thumbnailUrl: "https://cdn.example.test/poster-old.jpg",
+        },
+      },
+      status: "sent",
+    } satisfies MessageItemDto;
+    const next = {
+      ...previous,
+      body: {
+        video: {
+          url: "https://cdn.example.test/video.mp4",
+          thumbnailUrl: "https://cdn.example.test/poster-new.jpg",
+        },
+      },
+    } satisfies MessageItemDto;
+
+    const result = reuseStableMessageItems([previous], [next]);
+
+    expect(result?.[0]).toBe(next);
   });
 });

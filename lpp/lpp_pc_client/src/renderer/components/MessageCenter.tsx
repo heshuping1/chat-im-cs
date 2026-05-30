@@ -8,6 +8,7 @@ import type { CurrentUserIdentity } from "../data/message-display";
 import { pcQueryKeys } from "../data/query-keys";
 import { requireApiClient } from "../data/runtime";
 import { useAuthSession } from "../data/auth/auth-store";
+import { failedMessageRetryAction } from "../data/message/message-retry-model";
 import {
   useClearPendingImRead,
   useImPeerReadReceipts,
@@ -53,6 +54,7 @@ import { useMessageCenterPageEffects } from "../messages/hooks/useMessageCenterP
 import { useDirectReadReceiptSync } from "../messages/hooks/useDirectReadReceiptSync";
 import { useMessageInteractionHandlers } from "../messages/hooks/useMessageInteractionHandlers";
 import { useMessageListData } from "../messages/hooks/useMessageListData";
+import { useImSendOutboxRestore } from "../messages/hooks/useImSendOutboxRestore";
 import { useMessageAuxiliaryData } from "../messages/hooks/useMessageAuxiliaryData";
 import { useMessageConversationSelection } from "../messages/hooks/useMessageConversationSelection";
 import { useMessageListScrollRegistry } from "../messages/hooks/useMessageListScrollRegistry";
@@ -134,6 +136,8 @@ export function MessageCenter() {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget>(null);
   const [composerHeight, setComposerHeight] = useState(220);
   const [forwardTargetMessages, setForwardTargetMessages] = useState<MessageItemDto[]>([]);
+  const [resendConfirmMessage, setResendConfirmMessage] =
+    useState<MessageItemDto | null>(null);
   const [conversationDrawerOpen, setConversationDrawerOpen] = useState(false);
   const [profileStandaloneOpen, setProfileStandaloneOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
@@ -298,6 +302,14 @@ export function MessageCenter() {
     serverMessages: messagesQuery.data ?? [],
     unreadIdentity,
   });
+  useImSendOutboxRestore({
+    activeConversation,
+    activeConversationType,
+    localImagePreviewByMessageIdRef,
+    mediaUploadTasks,
+    session,
+    setLocalOutgoingMessagesByConversation,
+  });
   useImReadCommandExecutor({
     activeConversation,
     activeConversationId,
@@ -364,7 +376,7 @@ export function MessageCenter() {
       `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`,
     messages,
   });
-  const sendTextOptimistically = useMessageTextSendController({
+  const { retryTextMessage, sendTextOptimistically } = useMessageTextSendController({
     activeConversation,
     activeConversationType,
     enqueueOutgoingTask,
@@ -483,6 +495,26 @@ export function MessageCenter() {
     uploadAction: handleUploadAction,
   });
 
+  const handleConfirmResendMessage = useCallback(() => {
+    const message = resendConfirmMessage;
+    if (!message) return;
+    const action = failedMessageRetryAction(message);
+    setResendConfirmMessage(null);
+    if (!action) {
+      setNotice("该消息暂时无法重发");
+      return;
+    }
+    if (action.type === "upload") {
+      messageCenterCommands.uploadAction(action.localTaskId, "retry");
+      return;
+    }
+    try {
+      retryTextMessage(message);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "该消息暂时无法重发");
+    }
+  }, [messageCenterCommands, resendConfirmMessage, retryTextMessage]);
+
   const dockProfile = messageProfileVisible && messageLayoutMode === "full";
 
   return (
@@ -574,15 +606,18 @@ export function MessageCenter() {
         onAvatarProfileClose={() => setAvatarProfilePopover(null)}
         onCloseComposerDialog={() => setComposerDialog(null)}
         onCloseForward={() => setForwardTargetMessages([])}
+        onCloseResend={() => setResendConfirmMessage(null)}
         onCreateDirectChat={(userId) => createDirectChatMutation.mutate(userId)}
         onCreateGroupChat={(payload) => createGroupChatMutation.mutate(payload)}
         onCreateInviteQr={() => createInviteQrMutation.mutate()}
+        onFailedMessageClick={setResendConfirmMessage}
         onForwardToConversation={(targetConversationId) =>
           forwardMutation.mutate({
             messages: forwardTargetMessages,
             targetConversationId,
           })
         }
+        onResendMessage={handleConfirmResendMessage}
         onMessageElementRef={messageListScrollRegistry.registerMessageElement}
         openMessageMenu={openMessageMenu}
         pcSettings={pcSettings}
@@ -595,6 +630,7 @@ export function MessageCenter() {
         selectedConversationEmptyText={selectedConversationEmptyText}
         selectedMessageIds={selectedMessageIds}
         session={session}
+        resendMessage={resendConfirmMessage}
         setActiveModule={setActiveModule}
         setComposerHeight={setComposerHeight}
         setConversationDrawerOpen={setConversationDrawerOpen}

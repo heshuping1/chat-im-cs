@@ -7,6 +7,7 @@ import {
   extractPerformanceSamples,
   summarizePerformanceSamples,
 } from "../performance/performance-samples";
+import { persistedSendDiagnosticsStorageKey } from "../send/send-state-machine";
 
 type DiagnosticsWindowKey =
   | "__lppApiContractDiagnostics"
@@ -26,6 +27,7 @@ type DiagnosticsWindowKey =
 interface DiagnosticsSource {
   module: string;
   key: DiagnosticsWindowKey;
+  persistedKey?: string;
 }
 
 type DiagnosticsTarget = Partial<Record<DiagnosticsWindowKey, unknown>> & {
@@ -37,6 +39,9 @@ type DiagnosticsTarget = Partial<Record<DiagnosticsWindowKey, unknown>> & {
     onLine?: boolean;
     platform?: string;
     userAgent?: string;
+  };
+  localStorage?: {
+    getItem(key: string): string | null;
   };
 };
 
@@ -55,7 +60,11 @@ const diagnosticsSources: DiagnosticsSource[] = [
   { module: "reminder", key: "__lppReminderDiagnostics" },
   { module: "api-contract", key: "__lppApiContractDiagnostics" },
   { module: "api-error", key: "__lppApiErrorDiagnostics" },
-  { module: "send", key: "__lppSendDiagnostics" },
+  {
+    module: "send",
+    key: "__lppSendDiagnostics",
+    persistedKey: persistedSendDiagnosticsStorageKey,
+  },
   { module: "message-center", key: "__lppMessageCenterDiagnostics" },
   { module: "cs-state", key: "__lppCustomerServiceStateDiagnostics" },
   { module: "cs-cache", key: "__lppCustomerServiceCacheDiagnostics" },
@@ -137,7 +146,9 @@ function collectDiagnosticsSnapshots(
   return Object.fromEntries(
     diagnosticsSources.map((source) => [
       source.module,
-      createModuleSnapshot(target?.[source.key]),
+      createModuleSnapshot(
+        target?.[source.key] ?? readPersistedDiagnostics(target, source.persistedKey),
+      ),
     ]),
   );
 }
@@ -149,6 +160,21 @@ function createModuleSnapshot(value: unknown): DiagnosticsModuleSnapshot {
     records: records.slice(-maxModuleRecords).map((record) => sanitizeDiagnosticsValue(record)),
     truncated: records.length > maxModuleRecords ? true : undefined,
   };
+}
+
+function readPersistedDiagnostics(
+  target: DiagnosticsTarget | null,
+  persistedKey?: string,
+) {
+  if (!persistedKey) return undefined;
+  try {
+    const value = target?.localStorage?.getItem(persistedKey);
+    if (!value) return undefined;
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function createPerformanceSummarySnapshot(

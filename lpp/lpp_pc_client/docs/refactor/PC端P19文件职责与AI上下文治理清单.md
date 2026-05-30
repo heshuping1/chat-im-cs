@@ -59,16 +59,17 @@ AI 上下文可读性第二；
 | 文件 | owner | 职责 | 不负责 | 当前行数 | AI 阅读风险 | 稳定入口 | 处理结论 |
 | --- | --- | --- | --- | ---: | --- | --- | --- |
 | `src/renderer/styles/shared/porcelain-shell.css` | shared CSS shell | app shell、账号弹层、客服外壳 skin 的 shared shell 样式 | 单个 feature 的消息/客服业务样式 | 1841 | 偏大，但 token/shell owner 清楚，当前拆分会增加跨文件跳转 | CSS owner 入口不变 | 例外保留；后续只有出现跨 feature 污染或难删除覆盖时再拆 |
-| `src/renderer/styles/messages/message-center.css` | messages CSS | IM 页面布局、会话区域、消息中心结构样式 | composer rich input、媒体内容 primitive、客服样式 | 1828 | 偏大，但属于完整 IM 页面 skin；已从全局 app.css 迁出 | message center 样式入口不变 | 例外保留；后续按消息列表、会话栏、dialog 三类 owner 再评估 |
+| `src/renderer/styles/messages/message-center.css` | messages CSS | IM 页面布局、会话区域、消息中心结构样式、消息状态外置 marker | composer rich input、媒体内容 primitive、客服样式 | 1994 | 接近 P12 CSS 2000 行硬线，但当前新增 spinner 与失败 marker 同 owner；另拆会增加状态样式跳转 | message center 样式入口不变 | 例外保留；后续新增状态样式前优先评估迁出 message status CSS owner |
 | `src/renderer/components/MessageComposer.tsx` | message composer presentation | composer 装配、输入区域、附件/emoji/screenshot 操作连接 | raw DTO、cache merge、Electron 直接 IPC | 692 | 组件较长，但已由 composer 子组件和 runtime owner 承担复杂职责 | `MessageComposer` props 入口不变 | 观察保留；下一次新增 composer 功能时优先迁到 existing composer owner |
 | `src/renderer/components/LexicalChatInput.tsx` | rich input presentation | Lexical editor wiring、粘贴/附件节点、输入事件 | 发送规则、API、cache、Electron IPC | 657 | Lexical 桥接代码集中，拆太碎会降低编辑器上下文完整性 | `LexicalChatInput` 入口不变 | 观察保留；只在新增 plugin 逻辑时抽 plugin owner |
 | `src/renderer/components/MessageCenter.tsx` | IM page assembly | 页面装配、布局、view model 连接、弹层组合 | 消息规则、raw DTO、cache 写入、desktopApi | 621 | 接近页面审查线，主要是装配导线；无新增拆分收益 | `MessageCenter` 路由入口不变 | 例外保留；功能变更必须先读 view model/hooks |
 | `src/renderer/components/Sidebar.tsx` | app sidebar assembly | 顶部导航、账号入口、在线状态、提醒入口 | 业务规则、API DTO、Electron IPC | 604 | 页面 shell 类装配偏长，但 owner 单一 | `Sidebar` 入口不变 | 观察保留；新增账号面板功能时优先沉到 `SidebarAccountPanels` |
-| `src/renderer/messages/models/messageCacheMutationModel.ts` | message cache mutation facade | 消息 cache 写入 facade、兼容旧调用、query cache 更新规则 | 页面交互、API client、React component | 582 | model 较长，P18 已拆 application service；facade 为稳定入口 | 原导出不变 | 例外保留；删除旧 facade 需单独确认 |
+| `src/renderer/messages/models/messageCacheMutationModel.ts` | message cache mutation facade | 消息 cache 写入 facade、兼容旧调用、query cache 更新规则 | 页面交互、API client、React component | 725 | model 较长，P18/P20 已拆 application service 和 outbox owner；facade 为稳定入口 | 原导出不变 | 例外保留；删除旧 facade 需单独确认 |
 | `src/renderer/messages/models/messageDisplayModel.ts` | message display model | 消息展示派生、菜单/状态展示判断、格式化前规则 | React hook、组件渲染、API client | 526 | 规则集合偏大但 owner 单一，已有结构测试防反向依赖 | 原导出不变 | 例外保留；新增媒体展示规则优先迁到 media owner |
 | `src/renderer/data/im-read-model.ts` | IM read compatibility facade | 已读模型兼容入口、view model 和旧 import 过渡 | 组件、Gateway raw event、API client UI 逻辑 | 512 | 兼容 facade 偏大；删除旧核心链路需确认 | 原导出不变 | 例外保留；后续只在确认旧链路删除窗口处理 |
-| `src/renderer/customer-service/hooks/useCustomerServiceSendController.ts` | CS send controller | 客服发送编排、媒体 poster、队列状态和线程 cache 协调 | 纯规则、DTO normalizer、组件渲染 | 464 | 行为编排长但流程完整，拆错会影响客服发送稳定性 | hook 名称和返回值不变 | 观察保留；下一步可按 text/media send command 再拆 |
+| `src/renderer/customer-service/hooks/useCustomerServiceSendController.ts` | CS send controller | 客服发送编排、媒体 poster、队列状态、outbox 和线程 cache 协调 | 纯规则、DTO normalizer、组件渲染 | 769 | 行为编排长但流程完整，拆错会影响客服发送稳定性；后续应按 text/media send command 分批拆 | hook 名称和返回值不变 | 观察保留；下一步可按 text/media send command 再拆 |
 | `src/renderer/messages/hooks/useMessageMediaSendController.ts` | IM media send controller | IM 媒体发送编排、上传状态、poster 和本地 echo | 纯 display 规则、组件渲染、Electron 直接 IPC | 447 | 行为编排长但 owner 单一；已有 send queue/domain 测试 | hook 名称和返回值不变 | 观察保留；新增媒体类型时优先抽 command helper |
+| `src/renderer/messages/hooks/useMessageTextSendController.ts` | IM text send controller | IM 文本发送、本地 echo、失败重发、outbox 状态和 send diagnostics | 媒体上传、组件展示、API DTO normalizer | 404 | 刚过 hook 审查线，但 owner 单一；失败重发与首次发送共享同一闭环，强拆会增加跳转成本 | hook 名称和返回值不变 | 例外保留；若后续继续增长，优先抽纯 text retry command helper |
 
 ## 5. 本轮最小拆分
 

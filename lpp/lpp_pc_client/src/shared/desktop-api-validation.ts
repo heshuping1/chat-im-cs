@@ -6,6 +6,7 @@ import type {
   DiagnosticsJsonValue,
   DiagnosticsModuleSnapshot,
   DiagnosticsPayload,
+  LocalMediaCacheSource,
   NotifyPayload,
   TrayStatus,
   VideoPlayerPayload,
@@ -39,6 +40,8 @@ export function validateDesktopApiCall(
       return [];
     case 'saveAuthSession':
       return [validateDesktopAuthSessionPayload(args[0])];
+    case 'cacheLocalMediaFile':
+      return [validateCacheMediaFilePayload(args[0])];
     case 'cacheMediaFile':
     case 'getCachedMediaStatus':
     case 'openMediaFile':
@@ -70,6 +73,38 @@ export function validateDesktopApiCall(
     default:
       throw new Error(`Unsupported desktopApi method: ${String(method)}`);
   }
+}
+
+export function validateDesktopIpcCall(
+  method: DesktopApiMethod,
+  args: unknown[],
+): unknown[] {
+  if (method === 'cacheLocalMediaFile') {
+    return [
+      validateCacheMediaFilePayload(args[0]),
+      validateLocalMediaCacheSource(args[1]),
+    ];
+  }
+  return validateDesktopApiCall(method, args);
+}
+
+export function validateLocalMediaCacheSource(value: unknown): LocalMediaCacheSource {
+  if (typeof value === 'string') {
+    return { kind: 'path', sourcePath: safeRequiredString(value, 'media.sourcePath') };
+  }
+  const record = objectValue(value, 'media.source');
+  const kind = safeRequiredString(record.kind, 'media.source.kind');
+  if (kind === 'path') {
+    return {
+      kind,
+      sourcePath: safeRequiredString(record.sourcePath, 'media.sourcePath'),
+    };
+  }
+  if (kind === 'bytes') {
+    const bytes = validateSourceBytes(record.bytes);
+    return { kind, bytes };
+  }
+  throw new Error(`Invalid media.source.kind: ${kind}`);
 }
 
 export function validateNotifyPayload(value: unknown): NotifyPayload {
@@ -197,6 +232,29 @@ function safeString(value: unknown, label: string, maxLength = maxShortTextLengt
   if (value.length > maxLength) throw new Error(`${label} is too long`);
   if (value.includes('\0')) throw new Error(`${label} contains invalid characters`);
   return value;
+}
+
+function safeRequiredString(value: unknown, label: string, maxLength = maxShortTextLength) {
+  const text = safeString(value, label, maxLength);
+  if (!text.trim()) throw new Error(`${label} must be a non-empty string`);
+  return text;
+}
+
+function validateSourceBytes(value: unknown) {
+  if (value instanceof Uint8Array) {
+    if (value.byteLength <= 0) throw new Error('media.sourceBytes must be non-empty');
+    return value;
+  }
+  if (value instanceof ArrayBuffer) {
+    if (value.byteLength <= 0) throw new Error('media.sourceBytes must be non-empty');
+    return value;
+  }
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    if (bytes.byteLength <= 0) throw new Error('media.sourceBytes must be non-empty');
+    return bytes;
+  }
+  throw new Error('media.sourceBytes must be bytes');
 }
 
 function optionalString(value: unknown, label: string, maxLength = maxShortTextLength) {

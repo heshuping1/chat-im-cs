@@ -13,6 +13,7 @@ export type MediaUploadReplyTarget = {
 } | null;
 
 export type LocalMediaUploadTask = {
+  clientMsgId?: string;
   localTaskId: string;
   localMessageId: string;
   file: File;
@@ -21,7 +22,9 @@ export type LocalMediaUploadTask = {
   conversationType: MediaUploadConversationType;
   body: Record<string, unknown>;
   reply: MediaUploadReplyTarget;
+  localOpenUrl?: string;
   localPreviewUrl?: string;
+  localCachedMediaPromise?: Promise<string | undefined>;
   videoPoster?: VideoPosterResult;
   videoPosterPromise?: Promise<VideoPosterResult | undefined>;
   controller?: AbortController;

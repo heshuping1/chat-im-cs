@@ -6,7 +6,7 @@ import type {
   TrayStatus,
 } from '../shared/desktop-api.js';
 
-const { contextBridge, ipcRenderer } = require('electron') as typeof import('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron') as typeof import('electron');
 
 type DesktopApiValidationModule = typeof import('../shared/desktop-api-validation.js');
 
@@ -31,6 +31,28 @@ const desktopApi: DesktopApi = {
   notify: (payload: NotifyPayload) => validatedInvoke('notify', 'desktop:notify', payload),
   openFile: (path: string) => validatedInvoke('openFile', 'desktop:open-file', path),
   cacheMediaFile: (payload) => validatedInvoke('cacheMediaFile', 'desktop:cache-media-file', payload),
+  cacheLocalMediaFile: async (payload, file) => {
+    const validatedArgs = await validateDesktopApiCall('cacheLocalMediaFile', [payload]);
+    const sourcePath = webUtils.getPathForFile(
+      file as Parameters<typeof webUtils.getPathForFile>[0],
+    );
+    if (sourcePath) {
+      return ipcRenderer.invoke(
+        'desktop:cache-local-media-file',
+        ...validatedArgs,
+        { kind: 'path', sourcePath },
+      );
+    }
+    const blob = file as Blob | undefined;
+    if (!blob?.arrayBuffer) throw new Error('无法读取本地媒体文件内容');
+    const bytes = await blob.arrayBuffer();
+    if (bytes.byteLength <= 0) throw new Error('本地媒体文件为空');
+    return ipcRenderer.invoke(
+      'desktop:cache-local-media-file',
+      ...validatedArgs,
+      { kind: 'bytes', bytes },
+    );
+  },
   getCachedMediaStatus: (payload) =>
     validatedInvoke('getCachedMediaStatus', 'desktop:get-cached-media-status', payload),
   cacheMediaPoster: (payload) =>

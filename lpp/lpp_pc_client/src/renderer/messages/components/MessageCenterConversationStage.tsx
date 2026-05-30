@@ -103,17 +103,21 @@ export function MessageCenterConversationStage({
   onAvatarProfileClose,
   onCloseComposerDialog,
   onCloseForward,
+  onCloseResend,
   onCreateDirectChat,
   onCreateGroupChat,
   onCreateInviteQr,
   onForwardToConversation,
+  onFailedMessageClick,
   onMessageElementRef,
+  onResendMessage,
   openMessageMenu,
   pcSettings,
   pendingNewMessageCount,
   profilePaneWidth,
   profileStandaloneOpen,
   replyTarget,
+  resendMessage,
   scrollMessagesToBottom,
   scrollToMessage,
   selectedConversationEmptyText,
@@ -197,17 +201,21 @@ export function MessageCenterConversationStage({
   onAvatarProfileClose: () => void;
   onCloseComposerDialog: () => void;
   onCloseForward: () => void;
+  onCloseResend: () => void;
   onCreateDirectChat: (userId: string) => void;
   onCreateGroupChat: (payload: { name: string; memberUserIds: string[] }) => void;
   onCreateInviteQr: () => void;
   onForwardToConversation: (targetConversationId: string) => void;
+  onFailedMessageClick: (message: MessageItemDto) => void;
   onMessageElementRef: (messageId: string, element: HTMLDivElement | null) => void;
+  onResendMessage: () => void;
   openMessageMenu: ComponentProps<typeof MessageListPanel>["onContextMenu"];
   pcSettings: PcSettings;
   pendingNewMessageCount: number;
   profilePaneWidth: number;
   profileStandaloneOpen: boolean;
   replyTarget: ReplyTarget;
+  resendMessage: MessageItemDto | null;
   scrollMessagesToBottom: (behavior?: ScrollBehavior) => void;
   scrollToMessage: (messageId: string) => void;
   selectedConversationEmptyText: string;
@@ -313,6 +321,7 @@ export function MessageCenterConversationStage({
                 onClearMessageSearch={() => setMessageSearchKeyword("")}
                 onContactClick={handleContactCardClick}
                 onContextMenu={openMessageMenu}
+                onFailedMessageClick={onFailedMessageClick}
                 onHistoryFilterChange={setHistoryFilter}
                 onJumpToLatest={jumpToLatest}
                 onLoadCapture={() => {
@@ -432,6 +441,7 @@ export function MessageCenterConversationStage({
               inviteQrError={inviteQrError}
               inviteQrLoading={inviteQrLoading}
               inviteQrs={inviteQrs}
+              resendMessage={resendMessage}
               resolveConversationAvatar={(conversation) =>
                 resolveGroupConversationAvatar(conversation)
               }
@@ -440,10 +450,12 @@ export function MessageCenterConversationStage({
               userIdentity={unreadIdentity}
               onCloseComposerDialog={onCloseComposerDialog}
               onCloseForward={onCloseForward}
+              onCloseResend={onCloseResend}
               onCreateDirectChat={onCreateDirectChat}
               onCreateGroupChat={onCreateGroupChat}
               onCreateInviteQr={onCreateInviteQr}
               onForward={onForwardToConversation}
+              onResend={onResendMessage}
             />
           </>
         ) : (

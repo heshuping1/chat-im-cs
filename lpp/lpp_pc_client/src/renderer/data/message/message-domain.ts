@@ -40,6 +40,8 @@ export interface ChatMessageSenderEntity {
 
 export interface ChatMessageLocalState {
   localTaskId?: string;
+  localSendStartedAt?: number;
+  uploadPhase?: string;
   uploadProgress?: number;
   localError?: string;
   optimistic?: boolean;
@@ -74,6 +76,8 @@ export interface ChatMessageEntityOptions {
 
 type LocalMessageDto = MessageItemDto & {
   localTaskId?: string;
+  localSendStartedAt?: number;
+  uploadPhase?: string;
   uploadProgress?: number;
   localError?: string;
 };
@@ -158,11 +162,45 @@ export function chatMessageEntityToDto(
     isSelf: entity.direction === "outgoing" ? true : source.isSelf,
     direction: entity.direction === "unknown" ? source.direction : entity.direction,
     ...(entity.local?.localTaskId ? { localTaskId: entity.local.localTaskId } : {}),
+    ...(typeof entity.local?.localSendStartedAt === "number"
+      ? { localSendStartedAt: entity.local.localSendStartedAt }
+      : {}),
     ...(typeof entity.local?.uploadProgress === "number"
       ? { uploadProgress: entity.local.uploadProgress }
       : {}),
+    ...(entity.local?.uploadPhase ? { uploadPhase: entity.local.uploadPhase } : {}),
     ...(entity.local?.localError ? { localError: entity.local.localError } : {}),
   } as MessageItemDto;
+}
+
+export function reuseStableMessageItems(
+  previous: MessageItemDto[] | undefined,
+  next: MessageItemDto[] | undefined,
+): MessageItemDto[] | undefined {
+  if (!next || !previous?.length) return next;
+
+  const previousByKey = new Map<string, MessageItemDto>();
+  const previousFingerprintByKey = new Map<string, string>();
+  previous.forEach((message) => {
+    const key = stableMessageKey(message);
+    if (!key) return;
+    previousByKey.set(key, message);
+    previousFingerprintByKey.set(key, stableMessageFingerprint(message));
+  });
+
+  let reusedEveryItem = previous.length === next.length;
+  const stableNext = next.map((message, index) => {
+    const key = stableMessageKey(message);
+    const previousMessage = key ? previousByKey.get(key) : undefined;
+    const shouldReuse =
+      Boolean(previousMessage) &&
+      previousFingerprintByKey.get(key) === stableMessageFingerprint(message);
+    const resolved = shouldReuse ? previousMessage! : message;
+    if (resolved !== previous[index]) reusedEveryItem = false;
+    return resolved;
+  });
+
+  return reusedEveryItem ? previous : stableNext;
 }
 
 export function normalizeChatMessageDeliveryState(
@@ -203,7 +241,11 @@ function normalizeLocalState(
 ): ChatMessageLocalState | undefined {
   const local: ChatMessageLocalState = {};
   if (message.localTaskId) local.localTaskId = message.localTaskId;
+  if (typeof message.localSendStartedAt === "number") {
+    local.localSendStartedAt = message.localSendStartedAt;
+  }
   if (typeof message.uploadProgress === "number") local.uploadProgress = message.uploadProgress;
+  if (message.uploadPhase) local.uploadPhase = message.uploadPhase;
   if (message.localError) local.localError = message.localError;
   if (["queued", "uploading", "paused", "sending", "failed", "canceled"].includes(delivery)) {
     local.optimistic = true;
@@ -213,4 +255,57 @@ function normalizeLocalState(
 
 function normalizeStatus(value?: string) {
   return value?.trim().toLowerCase().replace(/-/g, "_") ?? "";
+}
+
+function stableMessageKey(message: MessageItemDto) {
+  if (message.messageId) return message.messageId;
+  if (message.conversationSeq !== undefined) {
+    return [
+      message.conversationId ?? "",
+      message.conversationSeq,
+      message.sentAt ?? "",
+    ].join(":");
+  }
+  return "";
+}
+
+function stableMessageFingerprint(message: MessageItemDto) {
+  return stableStringify({
+    avatarUrl: message.avatarUrl,
+    body: message.body,
+    conversationId: message.conversationId,
+    conversationSeq: message.conversationSeq,
+    direction: message.direction,
+    fromUserId: message.fromUserId,
+    isMine: message.isMine,
+    isRead: message.isRead,
+    isRecalled: message.isRecalled,
+    isSelf: message.isSelf,
+    lppId: message.lppId,
+    localSendStartedAt: (message as unknown as { localSendStartedAt?: number }).localSendStartedAt,
+    messageType: message.messageType,
+    platformUserId: message.platformUserId,
+    preview: message.preview,
+    readAt: message.readAt,
+    readCount: message.readCount,
+    senderAvatarUrl: message.senderAvatarUrl,
+    senderDisplayName: message.senderDisplayName,
+    senderId: message.senderId,
+    senderLppId: message.senderLppId,
+    senderPlatformUserId: message.senderPlatformUserId,
+    senderUserId: message.senderUserId,
+    sentAt: message.sentAt,
+    status: message.status,
+  });
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(",")}}`;
 }

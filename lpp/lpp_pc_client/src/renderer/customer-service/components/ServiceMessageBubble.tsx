@@ -15,6 +15,7 @@ export function ServiceMessageBubble({
   onContextMenu,
   onUploadAction,
   senderFallback,
+  threadType,
 }: {
   assetBaseUrl?: string;
   authToken?: string;
@@ -28,14 +29,14 @@ export function ServiceMessageBubble({
   onContextMenu?: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
   onUploadAction?: (localTaskId: string, action: "pause" | "resume" | "cancel" | "retry") => void;
   senderFallback: string;
+  threadType?: string;
 }) {
-  const statusText = mine ? "已发送" : undefined;
   const messageViewModel = createChatMessageViewModel({
     conversationFallbackName,
+    conversationType: threadType,
     message,
     mine,
     senderFallback: senderFallback || "访客",
-    statusText,
     timeText: formatChatMessageTime(message.sentAt),
   });
 
@@ -50,7 +51,6 @@ export function ServiceMessageBubble({
       onContextMenu={onContextMenu}
       onUploadAction={onUploadAction}
       senderFallback={senderFallback || "访客"}
-      statusText={statusText}
       timeText={formatChatMessageTime(message.sentAt)}
       viewModel={messageViewModel}
     />

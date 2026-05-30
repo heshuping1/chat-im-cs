@@ -2,9 +2,13 @@ export type MessageCenterDiagnosticEvent =
   | "conversation.selected"
   | "command.invoked"
   | "command.failed"
-  | "message-list.windowed";
+  | "message-list.windowed"
+  | "video.open_attempt"
+  | "video.open_failed"
+  | "video.open_success"
+  | "video.poster_ignored";
 
-export type MessageCenterDiagnosticPhase = "selection" | "command" | "render";
+export type MessageCenterDiagnosticPhase = "selection" | "command" | "media" | "render";
 export type MessageCenterDiagnosticResult = "ok" | "ignored" | "failed";
 
 export interface MessageCenterDiagnosticRecord {
@@ -41,7 +45,7 @@ export function createMessageCenterDiagnosticRecord(
     phase: input.phase,
     result: input.result,
     timestamp: Date.now(),
-    reason: input.reason,
+    reason: input.reason ? sanitizeText("reason", input.reason) : undefined,
     context: sanitizeContext(input.context),
   };
 }
@@ -103,5 +107,8 @@ function sanitizeText(key: string, value: string) {
   if (normalizedKey.includes("path") || normalizedKey.includes("filename")) {
     return "[local-path]";
   }
-  return value.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer ***");
+  return value
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer ***")
+    .replace(/file:\/\/\S+/gi, "file://[local-path]")
+    .replace(/https?:\/\/\S+/gi, "https://[remote-url]");
 }

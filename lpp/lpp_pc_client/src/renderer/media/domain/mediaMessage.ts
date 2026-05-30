@@ -18,6 +18,7 @@ export type ImMediaItem = {
   fileName: string;
   sourceUrl?: string;
   remoteSourceUrl?: string;
+  localOpenUrl?: string;
   localPreviewUrl?: string;
   posterUrl?: string;
   imageCacheKey?: string;
@@ -68,6 +69,7 @@ export function normalizeMediaPart({
 
   const media = part.media;
   const localPreviewUrl = mediaStringField(media, "localPreviewUrl");
+  const localOpenUrl = mediaStringField(media, "localOpenUrl");
   const remoteSourceUrl = mediaSourceUrl(part.type, media, assetBaseUrl);
   const sourceUrl = localPreviewUrl || remoteSourceUrl;
   const fileName = normalizedMediaFileName(part.type, media, fallback);
@@ -77,6 +79,7 @@ export function normalizeMediaPart({
     fileName,
     sourceUrl,
     remoteSourceUrl,
+    localOpenUrl,
     localPreviewUrl,
     posterUrl: part.type === "video"
       ? videoPosterUrl(media, assetBaseUrl, Boolean(localPreviewUrl))

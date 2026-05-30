@@ -96,10 +96,11 @@ export class MessagesApiClient extends ContactsApiClient {
     text: string,
     replyToMessageId?: string | null,
     mentions: Array<{ userId?: string; displayName?: string }> = [],
+    options: { clientMsgId?: string } = {},
   ) {
     return this.sendConversationMessage(conversationType, conversationId, "text", {
       text,
-    }, replyToMessageId, mentions);
+    }, replyToMessageId, mentions, options);
   }
 
   uploadMedia(
@@ -119,10 +120,11 @@ export class MessagesApiClient extends ContactsApiClient {
     messageType: "image" | "video" | "file",
     media: MediaResourceDto,
     replyToMessageId?: string | null,
+    options: { clientMsgId?: string } = {},
   ) {
     return this.sendConversationMessage(conversationType, conversationId, messageType, {
       [messageType]: media,
-    }, replyToMessageId);
+    }, replyToMessageId, [], options);
   }
 
   recallMessage(messageId: string) {
@@ -226,6 +228,7 @@ export class MessagesApiClient extends ContactsApiClient {
     body: Record<string, unknown>,
     replyToMessageId?: string | null,
     mentions: Array<{ userId?: string; displayName?: string }> = [],
+    options: { clientMsgId?: string } = {},
   ) {
     const base =
       conversationType === "group"
@@ -239,7 +242,8 @@ export class MessagesApiClient extends ContactsApiClient {
     }>(base.replace("{conversationId}", conversationId), {
       method: "POST",
       body: JSON.stringify({
-        clientMsgId: `pc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        clientMsgId:
+          options.clientMsgId || `pc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         messageType,
         body,
         replyToMessageId: replyToMessageId ?? null,

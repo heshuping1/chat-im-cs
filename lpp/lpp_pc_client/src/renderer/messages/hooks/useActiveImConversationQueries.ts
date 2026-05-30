@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
+import type { MessageItemDto } from "../../data/api/types";
 import type { ConversationListItem } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { reuseStableMessageItems } from "../../data/message/message-domain";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 
@@ -30,10 +32,17 @@ export function useActiveImConversationQueries({
         activeConversation!.conversationId,
       ),
     gcTime: 30 * 60_000,
-    refetchInterval: 2_500,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
     staleTime: 5 * 60_000,
+    structuralSharing: (previous, next) => {
+      if (!isMessageItemList(next)) return next;
+      return reuseStableMessageItems(
+        isMessageItemList(previous) ? previous : undefined,
+        next,
+      );
+    },
   });
 
   const directReadStatusQuery = useQuery({
@@ -75,4 +84,8 @@ export function useActiveImConversationQueries({
     groupMembersQuery,
     messagesQuery,
   };
+}
+
+function isMessageItemList(value: unknown): value is MessageItemDto[] {
+  return Array.isArray(value);
 }

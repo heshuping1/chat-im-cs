@@ -107,6 +107,7 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     threadId: string,
     messageType: "text" | "image" | "video" | "file",
     body: Record<string, unknown>,
+    options: { clientMsgId?: string } = {},
   ) {
     return this.request<{
       threadType: CustomerServiceThreadType;
@@ -124,7 +125,9 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       {
         method: "POST",
         body: JSON.stringify({
-          clientMsgId: `pc-cs-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          clientMsgId:
+            options.clientMsgId ||
+            `pc-cs-${Date.now()}-${Math.random().toString(16).slice(2)}`,
           messageType,
           body,
           replyToMessageId: null,
@@ -137,8 +140,9 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     threadType: CustomerServiceThreadType,
     threadId: string,
     text: string,
+    options: { clientMsgId?: string } = {},
   ) {
-    return this.sendWorkbenchMessage(threadType, threadId, "text", { text });
+    return this.sendWorkbenchMessage(threadType, threadId, "text", { text }, options);
   }
 
   sendWorkbenchMediaMessage(
@@ -146,10 +150,11 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     threadId: string,
     messageType: "image" | "video" | "file",
     media: MediaResourceDto,
+    options: { clientMsgId?: string } = {},
   ) {
     return this.sendWorkbenchMessage(threadType, threadId, messageType, {
       [messageType]: media,
-    });
+    }, options);
   }
 
   claimCustomerServiceThread(

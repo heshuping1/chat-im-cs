@@ -71,6 +71,10 @@ export interface CacheMediaFilePayload {
   conversationId?: string;
 }
 
+export type LocalMediaCacheSource =
+  | { kind: 'path'; sourcePath: string }
+  | { kind: 'bytes'; bytes: ArrayBuffer | Uint8Array };
+
 export interface CacheMediaPosterPayload extends CacheMediaFilePayload {
   dataUrl: string;
 }
@@ -90,6 +94,7 @@ export interface DesktopApi {
   notify(payload: NotifyPayload): Promise<void>;
   openFile(path: string): Promise<void>;
   cacheMediaFile(payload: CacheMediaFilePayload): Promise<CachedMediaFileResult>;
+  cacheLocalMediaFile(payload: CacheMediaFilePayload, file: unknown): Promise<CachedMediaFileResult>;
   getCachedMediaStatus(payload: CacheMediaFilePayload): Promise<CachedMediaStatus>;
   cacheMediaPoster(payload: CacheMediaPosterPayload): Promise<CachedMediaFileResult>;
   openVideoPlayer(payload: VideoPlayerPayload): Promise<string>;
@@ -121,6 +126,7 @@ export interface DesktopApi {
 export type DesktopApiMethod = keyof DesktopApi;
 
 export const desktopIpcChannelByMethod = {
+  cacheLocalMediaFile: 'desktop:cache-local-media-file',
   cacheMediaFile: 'desktop:cache-media-file',
   cacheMediaPoster: 'desktop:cache-media-poster',
   captureScreenshot: 'desktop:capture-screenshot',

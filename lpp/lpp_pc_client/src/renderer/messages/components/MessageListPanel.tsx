@@ -64,6 +64,7 @@ export interface MessageListPanelProps {
   onClearMessageSearch: () => void;
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
   onContextMenu?: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
+  onFailedMessageClick?: (message: MessageItemDto) => void;
   onHistoryFilterChange: (filter: HistoryFilterKey) => void;
   onJumpToLatest: () => void;
   onLoadCapture: () => void;
@@ -124,6 +125,7 @@ export function MessageListPanel({
   onClearMessageSearch,
   onContactClick,
   onContextMenu,
+  onFailedMessageClick,
   onHistoryFilterChange,
   onJumpToLatest,
   onLoadCapture,
@@ -136,8 +138,8 @@ export function MessageListPanel({
   onUploadAction,
   resolveSenderAvatarUrl,
   resolveSenderDisplayName,
-  resolveStatusText,
-  shouldShowInlineStatus,
+  resolveStatusText: _resolveStatusText,
+  shouldShowInlineStatus: _shouldShowInlineStatus,
   isMineMessage,
 }: MessageListPanelProps) {
   const [expandedOlderCount, setExpandedOlderCount] = useState(0);
@@ -291,19 +293,17 @@ export function MessageListPanel({
         messageRenderWindow.renderedMessages.map((message) => {
           const mine = isMineMessage(message);
           const eventText = eventMessageText(message);
-          const statusText = resolveStatusText(message);
           const senderFallback = resolveSenderDisplayName(message);
           const senderAvatarUrl = resolveSenderAvatarUrl(message);
-          const bubbleStatusText = shouldShowInlineStatus(message) ? undefined : statusText;
           const messageViewModel = createChatMessageViewModel({
             contextMenuEnabled: !multiSelectMode,
             conversationFallbackName: conversation.title,
+            conversationType: conversation.conversationType,
             message,
             mine,
             mineAvatarUrl,
             senderAvatarUrl,
             senderFallback,
-            statusText: bubbleStatusText,
             timeText: formatChatMessageTime(message.sentAt),
             translationText: messageAnnotations[message.messageId],
           });
@@ -343,10 +343,10 @@ export function MessageListPanel({
                   onAvatarClick={onAvatarClick}
                   onContactClick={onContactClick}
                   onContextMenu={multiSelectMode ? undefined : onContextMenu}
+                  onFailedMessageClick={onFailedMessageClick}
                   onUploadAction={onUploadAction}
                   senderFallback={senderFallback}
                   senderAvatarUrl={senderAvatarUrl}
-                  statusText={bubbleStatusText}
                   timeText={formatChatMessageTime(message.sentAt)}
                   translationText={messageAnnotations[message.messageId]}
                   viewModel={messageViewModel}

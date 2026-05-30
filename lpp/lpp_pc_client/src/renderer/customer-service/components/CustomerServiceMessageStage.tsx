@@ -88,6 +88,7 @@ export function CustomerServiceMessageStage({
               senderFallback={title}
               onContextMenu={onContextMenu}
               onUploadAction={onUploadAction}
+              threadType={selectedThread.threadType}
             />
           ))}
       </section>

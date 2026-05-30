@@ -52,15 +52,18 @@ export function withVideoPosterMedia(
 export function localMediaResourceForSend({
   file,
   kind,
+  localOpenUrl,
   localPreviewUrl,
   videoPoster,
 }: {
   file: File;
   kind: VideoPosterUploadKind;
+  localOpenUrl?: string;
   localPreviewUrl?: string;
   videoPoster?: VideoPosterResult;
 }): MediaResourceDto {
   const media: MediaResourceDto & {
+    localOpenUrl?: string;
     localPreviewUrl?: string;
     localPosterUrl?: string;
     posterUrl?: string;
@@ -70,6 +73,7 @@ export function localMediaResourceForSend({
     fileName: file.name,
     mimeType: file.type,
     sizeBytes: file.size,
+    localOpenUrl,
     localPreviewUrl,
   };
   if (kind !== "video" || !videoPoster) return media;
@@ -124,5 +128,5 @@ export function videoSendDiagnosticsContext(media?: MediaResourceDto, error?: un
 }
 
 function isLocalMediaUrl(value: string) {
-  return /^(blob:|data:)/i.test(value.trim());
+  return /^(blob:|data:|file:|local-)/i.test(value.trim());
 }

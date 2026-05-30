@@ -5,7 +5,8 @@ import {
   createChatMessageViewModel,
   type ChatMessageViewModel,
 } from "../data/message/message-view-model";
-import type { MouseEvent } from "react";
+import { nextChatMessageStatusRefreshDelay } from "../data/message/message-status-model";
+import { useEffect, useState, type MouseEvent } from "react";
 
 export function ChatMessageBubble({
   assetBaseUrl,
@@ -16,6 +17,7 @@ export function ChatMessageBubble({
   onContextMenu,
   onAvatarClick,
   onContactClick,
+  onFailedMessageClick,
   senderFallback,
   senderAvatarUrl,
   mineAvatarUrl,
@@ -34,6 +36,7 @@ export function ChatMessageBubble({
   onContextMenu?: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
   onAvatarClick?: (event: MouseEvent<HTMLButtonElement>, message: MessageItemDto, mine: boolean) => void;
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
+  onFailedMessageClick?: (message: MessageItemDto) => void;
   onUploadAction?: UploadActionHandler;
   senderFallback: string;
   senderAvatarUrl?: string | null;
@@ -47,22 +50,53 @@ export function ChatMessageBubble({
   translationText?: string;
   viewModel?: ChatMessageViewModel;
 }) {
-  const model =
-    viewModel ??
-    createChatMessageViewModel({
-      contextMenuEnabled: Boolean(onContextMenu),
-      conversationFallbackName,
-      message,
-      mine,
-      mineAvatarUrl,
-      senderAvatarUrl,
-      senderFallback,
-      statusText,
-      timeText,
-      translationText,
-    });
+  const [statusNowMs, setStatusNowMs] = useState(() => Date.now());
+  const localSendStartedAt = localSendStartedAtMs(message);
+  const localFailedAt = localFailedAtMs(message);
+
+  useEffect(() => {
+    if (!mine || !isLocalSendStatus(message.status)) return undefined;
+    const now = Date.now();
+    setStatusNowMs((current) => (current < now ? now : current));
+    const remaining = nextChatMessageStatusRefreshDelay({ message, nowMs: now });
+    if (remaining === undefined) return undefined;
+    const timer = window.setTimeout(() => {
+      setStatusNowMs(Date.now());
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [localFailedAt, localSendStartedAt, message, message.messageId, message.status, mine]);
+
+  const computedModel = createChatMessageViewModel({
+    contextMenuEnabled: Boolean(onContextMenu),
+    conversationFallbackName,
+    message,
+    mine,
+    mineAvatarUrl,
+    senderAvatarUrl,
+    senderFallback,
+    statusText,
+    timeText,
+    translationText,
+    nowMs: statusNowMs,
+  });
+  const model = viewModel
+    ? { ...viewModel, actions: computedModel.actions, status: computedModel.status }
+    : computedModel;
   const senderName = model.sender.name;
   const reply = model.bubble.reply;
+  const sendStatusSlot = mine && model.status.sendStatusSlot !== "none" ? (
+    <MessageSendStatusSlot
+      failed={model.status.showFailureMarker}
+      onRetry={
+        model.status.showFailureMarker &&
+        model.actions.failureRetryAction &&
+        onFailedMessageClick
+          ? () => onFailedMessageClick(message)
+          : undefined
+      }
+      tooltip={model.status.failureTooltip || "发送失败，点击重试"}
+    />
+  ) : null;
   const avatar = (
     <button
       className="pc-chat-avatar-button"
@@ -86,21 +120,24 @@ export function ChatMessageBubble({
       {!mine && avatar}
       <div className="pc-chat-message-main">
         {!mine && <div className="pc-chat-sender">{senderName}</div>}
-        <div className="pc-chat-bubble">
-          {reply && (
-            <div className="pc-chat-reply-quote">
-              <span>{reply.sender}</span>
-              <strong>{reply.preview}</strong>
-            </div>
-          )}
-          <MessageBodyView
-            assetBaseUrl={assetBaseUrl}
-            authToken={authToken}
-            mediaCacheContext={mediaCacheContext}
-            message={message}
-            onContactClick={onContactClick}
-            onUploadAction={onUploadAction}
-          />
+        <div className="pc-chat-bubble-row">
+          {sendStatusSlot}
+          <div className="pc-chat-bubble">
+            {reply && (
+              <div className="pc-chat-reply-quote">
+                <span>{reply.sender}</span>
+                <strong>{reply.preview}</strong>
+              </div>
+            )}
+            <MessageBodyView
+              assetBaseUrl={assetBaseUrl}
+              authToken={authToken}
+              mediaCacheContext={mediaCacheContext}
+              message={message}
+              onContactClick={onContactClick}
+              onUploadAction={onUploadAction}
+            />
+          </div>
         </div>
         {model.content.translationText && (
           <div className="pc-message-translation">{model.content.translationText}</div>
@@ -112,5 +149,93 @@ export function ChatMessageBubble({
       </div>
       {mine && avatar}
     </article>
+  );
+}
+
+function MessageSendStatusSlot({
+  failed,
+  onRetry,
+  tooltip,
+}: {
+  failed: boolean;
+  onRetry?: () => void;
+  tooltip: string;
+}) {
+  return (
+    <span className="pc-chat-send-status-slot">
+      {failed ? (
+        <FailureStatusMarker onRetry={onRetry} tooltip={tooltip} />
+      ) : (
+        <SendingStatusMarker />
+      )}
+    </span>
+  );
+}
+
+function SendingStatusMarker() {
+  return (
+    <span aria-label="正在发送" className="pc-chat-sending-marker" role="status" title="正在发送">
+      <span aria-hidden="true" />
+    </span>
+  );
+}
+
+function FailureStatusMarker({
+  onRetry,
+  tooltip,
+}: {
+  onRetry?: () => void;
+  tooltip: string;
+}) {
+  const className = `pc-chat-failed-marker${onRetry ? " actionable" : ""}`;
+  const content = (
+    <>
+      <span aria-hidden="true">!</span>
+      <em>{tooltip}</em>
+    </>
+  );
+  if (onRetry) {
+    return (
+      <button
+        aria-label={tooltip}
+        className={className}
+        title={tooltip}
+        type="button"
+        onClick={onRetry}
+      >
+        {content}
+      </button>
+    );
+  }
+  return (
+    <span aria-label={tooltip} className={className} role="img" title={tooltip}>
+      {content}
+    </span>
+  );
+}
+
+function localSendStartedAtMs(message: MessageItemDto) {
+  const value = (message as unknown as Record<string, unknown>).localSendStartedAt;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function localFailedAtMs(message: MessageItemDto) {
+  const value = (message as unknown as Record<string, unknown>).localFailedAt;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function isLocalSendStatus(status?: string) {
+  return ["failed", "queued", "sending", "uploading"].includes(
+    String(status ?? "").trim().toLowerCase(),
   );
 }

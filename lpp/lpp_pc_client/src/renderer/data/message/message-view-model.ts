@@ -7,6 +7,15 @@ import {
   normalizeChatMessageDeliveryState,
   type ChatMessageDeliveryState,
 } from "./message-domain";
+import {
+  deriveChatMessageStatus,
+  type ChatMessageReceiptState,
+  type ChatMessageSendStatusSlot,
+} from "./message-status-model";
+import {
+  failedMessageRetryAction,
+  type FailedMessageRetryAction,
+} from "./message-retry-model";
 
 export type ChatMessageOwnership = "mine" | "other";
 
@@ -30,11 +39,17 @@ export interface ChatMessageViewModel {
   };
   status: {
     delivery: ChatMessageDeliveryState;
+    failureTooltip?: string;
+    receipt: ChatMessageReceiptState;
+    sendStatusSlot: ChatMessageSendStatusSlot;
+    showFailureMarker: boolean;
+    showSendingIndicator: boolean;
     statusText?: string;
     timeText: string;
   };
   actions: {
     contextMenuEnabled: boolean;
+    failureRetryAction?: FailedMessageRetryAction;
     uploadActionTaskId?: string;
   };
 }
@@ -53,8 +68,10 @@ export interface CreateChatMessageViewModelInput {
   mineAvatarUrl?: string | null;
   timeText: string;
   statusText?: string;
+  conversationType?: string;
   translationText?: string;
   contextMenuEnabled?: boolean;
+  nowMs?: number;
 }
 
 type LocalMessageRecord = MessageItemDto & {
@@ -68,6 +85,12 @@ export function createChatMessageViewModel(
   const message = input.message as LocalMessageRecord;
   const type = normalizeMessageType(message) || "text";
   const delivery = normalizeChatMessageDeliveryState(message.status, message.isRecalled);
+  const status = deriveChatMessageStatus({
+    conversationType: input.conversationType,
+    message,
+    mine: input.mine,
+    nowMs: input.nowMs,
+  });
   const senderName = input.mine
     ? "我"
     : input.senderFallback || message.senderDisplayName || "对方";
@@ -94,11 +117,17 @@ export function createChatMessageViewModel(
     },
     status: {
       delivery,
-      statusText: input.statusText ?? defaultStatusText(delivery, message),
+      failureTooltip: status.failureTooltip,
+      receipt: status.receiptState,
+      sendStatusSlot: status.sendStatusSlot,
+      showFailureMarker: status.showFailureMarker,
+      showSendingIndicator: status.showSendingIndicator,
+      statusText: input.statusText ?? status.statusLabel,
       timeText: input.timeText,
     },
     actions: {
       contextMenuEnabled: input.contextMenuEnabled ?? true,
+      failureRetryAction: failedMessageRetryAction(message),
       uploadActionTaskId: uploadActionTaskId(message, delivery),
     },
   };
@@ -122,18 +151,6 @@ export function replyViewModelFromMessage(
     sender: stringField(record, "sender", "senderDisplayName", "name") || "引用消息",
     preview,
   };
-}
-
-function defaultStatusText(
-  delivery: ChatMessageDeliveryState,
-  message: LocalMessageRecord,
-) {
-  if (delivery === "sending") return "发送中";
-  if (delivery === "uploading") return "上传中";
-  if (delivery === "paused") return "已暂停";
-  if (delivery === "canceled") return "已取消";
-  if (delivery === "failed") return message.localError ? "发送失败" : "发送失败";
-  return undefined;
 }
 
 function uploadActionTaskId(

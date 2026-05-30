@@ -9,7 +9,6 @@ import {
   resolveMediaUrl,
 } from "../../../data/im-message-normalize";
 import { ImageMessageFrame } from "../../../media/components/ImageMessageFrame";
-import { UploadControls } from "../../../media/components/UploadControls";
 import { VideoMessagePreview } from "../../../media/components/VideoMessagePreview";
 import type { ImMediaItem } from "../../../media/domain/mediaMessage";
 import {
@@ -21,7 +20,13 @@ import {
   sameMediaUrl,
   useCachedImageMediaUrl,
 } from "../../../media/runtime/useCachedImageMediaUrl";
-import { openDesktopVideoPlayer } from "../../../media/runtime/videoPlayer";
+import {
+  inlineVideoPreviewSrc,
+  mediaUrlKind,
+  openDesktopVideoPlayer,
+  videoOpenErrorSummary,
+  type VideoPlayerOpenDiagnostic,
+} from "../../../media/runtime/videoPlayer";
 import {
   isVideoSourceReady,
   markVideoSourceReady,
@@ -32,6 +37,7 @@ import {
   type LocalUploadState,
   type UploadActionHandler,
 } from "../../../media/runtime/uploadState";
+import { logMessageCenterDiagnostic } from "../../diagnostics/message-center-diagnostics";
 import { getCurrentMediaActionCapabilities } from "../../runtime/mediaActionCapabilities";
 import { cacheCurrentMessageImageFile } from "../../runtime/messageMediaDesktopActions";
 import type { MessageMediaCacheContext } from "./FileMessageContent";
@@ -40,8 +46,6 @@ export function ImagePart({
   authToken,
   item,
   mediaCacheContext,
-  uploadState,
-  onUploadAction,
 }: {
   authToken?: string;
   item?: ImMediaItem;
@@ -155,7 +159,6 @@ export function ImagePart({
         sourceAvailable={Boolean(src && !failed)}
         src={visibleImageSrc}
       />
-      <UploadControls uploadState={uploadState} onUploadAction={onUploadAction} />
     </div>
   );
 }
@@ -222,9 +225,11 @@ export function VideoPart({
   const media = item?.media;
   const remoteSrc = item?.remoteSourceUrl;
   const src = item?.sourceUrl;
+  const openSrc = item?.localOpenUrl || src;
+  const previewSrc = inlineVideoPreviewSrc(src);
   const poster = item?.posterUrl;
   const { displaySrc, failed, loadAuthenticatedMedia } = useAuthenticatedMediaUrl(
-    src,
+    previewSrc,
     authToken,
   );
   const [playing, setPlaying] = useState(false);
@@ -267,31 +272,62 @@ export function VideoPart({
     videoRef.current?.pause();
     setOpenError(false);
     if (!uploadOverlay.canPlay) return;
-    if (!displaySrc || previewLoading) return;
+    if (!openSrc || previewLoading) return;
+    logVideoOpenDiagnostic("video.open_attempt", "ok", {
+      openSrc,
+      posterSrc,
+      remoteSrc,
+    });
     setPreviewLoading(true);
     void openDesktopVideoPlayer({
       authToken,
-      displaySrc,
+      displaySrc: openSrc,
       durationSeconds: duration,
+      localOpenSrc: item?.localOpenUrl,
       media,
       mediaCacheContext,
+      onDiagnostic: (diagnostic) =>
+        logVideoOpenRuntimeDiagnostic(diagnostic, {
+          openSrc,
+          posterSrc,
+          remoteSrc,
+        }),
       posterSrc,
       remoteSrc,
       videoSize,
     })
       .then((opened) => {
-        if (opened) return;
-        if (displaySrc) {
-          openBrowserVideoFallback(displaySrc);
+        if (opened) {
+          logVideoOpenDiagnostic("video.open_success", "ok", {
+            openSrc,
+            posterSrc,
+            remoteSrc,
+          });
           return;
         }
-        if (canOpenVideoPlayer) setOpenError(true);
+        if (!canOpenVideoPlayer && openSrc) {
+          openBrowserVideoFallback(openSrc);
+          return;
+        }
+        logVideoOpenDiagnostic("video.open_failed", "failed", {
+          openSrc,
+          posterSrc,
+          reason: "no_desktop_player",
+          remoteSrc,
+        });
+        setOpenError(true);
       })
-      .catch(() => {
-        if (displaySrc) {
-          openBrowserVideoFallback(displaySrc);
+      .catch((error) => {
+        if (!canOpenVideoPlayer && openSrc) {
+          openBrowserVideoFallback(openSrc);
           return;
         }
+        logVideoOpenDiagnostic("video.open_failed", "failed", {
+          openSrc,
+          posterSrc,
+          reason: videoOpenErrorSummary(error),
+          remoteSrc,
+        });
         setOpenError(true);
       })
       .finally(() => setPreviewLoading(false));
@@ -335,21 +371,69 @@ export function VideoPart({
           if (uploadOverlay.taskId) onUploadAction?.(uploadOverlay.taskId, action);
         }}
         openError={openError}
+        openable={Boolean(openSrc)}
         playing={playing}
         posterSrc={posterSrc}
         src={displaySrc}
         uploadOverlay={uploadOverlay}
         videoRef={videoRef}
       />
-      {!uploadOverlay.active && (
-        <UploadControls uploadState={uploadState} onUploadAction={onUploadAction} />
-      )}
     </div>
   );
 }
 
 function openBrowserVideoFallback(fallbackSrc: string) {
   window.open(fallbackSrc, "_blank", "noopener,noreferrer");
+}
+
+function logVideoOpenRuntimeDiagnostic(
+  diagnostic: VideoPlayerOpenDiagnostic,
+  context: {
+    openSrc?: string;
+    posterSrc?: string;
+    remoteSrc?: string;
+  },
+) {
+  if (diagnostic.event !== "poster.resolve_failed") return;
+  logVideoOpenDiagnostic("video.poster_ignored", "ignored", {
+    ...context,
+    posterKind: diagnostic.posterKind,
+    reason: diagnostic.reason,
+    sourceKind: diagnostic.sourceKind,
+  });
+}
+
+function logVideoOpenDiagnostic(
+  event: "video.open_attempt" | "video.open_failed" | "video.open_success" | "video.poster_ignored",
+  result: "ok" | "ignored" | "failed",
+  {
+    openSrc,
+    posterKind,
+    posterSrc,
+    reason,
+    remoteSrc,
+    sourceKind,
+  }: {
+    openSrc?: string;
+    posterKind?: string;
+    posterSrc?: string;
+    reason?: string;
+    remoteSrc?: string;
+    sourceKind?: string;
+  },
+) {
+  logMessageCenterDiagnostic({
+    event,
+    phase: "media",
+    result,
+    reason,
+    context: {
+      hasLocalCache: mediaUrlKind(openSrc) === "file",
+      hasRemoteSource: Boolean(remoteSrc),
+      posterKind: posterKind ?? mediaUrlKind(posterSrc),
+      sourceKind: sourceKind ?? mediaUrlKind(openSrc),
+    },
+  });
 }
 
 function formatDuration(value?: number | null) {

@@ -25,7 +25,21 @@ import { getImConversationType } from "./messageConversationTypeModel";
 import { messageActionPreview } from "./messageListModel";
 
 export type ImConversationType = "direct" | "group";
-export type LocalUploadStatus = "queued" | "uploading" | "paused" | "failed" | "sent" | "canceled";
+export type LocalUploadStatus =
+  | "queued"
+  | "uploading"
+  | "paused"
+  | "sending"
+  | "failed"
+  | "sent"
+  | "canceled";
+export type LocalUploadPhase =
+  | "preparing"
+  | "uploading_media"
+  | "uploading_poster"
+  | "sending"
+  | "failed"
+  | "sent";
 
 export async function invalidateMessages(queryClient: QueryClient) {
   await Promise.all([
@@ -43,7 +57,9 @@ export function appendLocalMessage(
   result: { messageId?: string; conversationId?: string; conversationSeq?: number; serverTime?: string },
   options: {
     status?: string;
+    uploadPhase?: LocalUploadPhase;
     localError?: string;
+    localSendStartedAt?: number;
     uploadProgress?: number;
     localTaskId?: string;
   } = {},
@@ -75,9 +91,13 @@ export function appendLocalMessage(
     sentAt,
     status: options.status ?? "sent",
     ...(options.localError ? { localError: options.localError } : {}),
+    ...(typeof options.localSendStartedAt === "number"
+      ? { localSendStartedAt: options.localSendStartedAt }
+      : {}),
     ...(typeof options.uploadProgress === "number"
       ? { uploadProgress: options.uploadProgress }
       : {}),
+    ...(options.uploadPhase ? { uploadPhase: options.uploadPhase } : {}),
     ...(options.localTaskId ? { localTaskId: options.localTaskId } : {}),
   });
   queryClient.setQueryData<MessageItemDto[]>(queryKey, (old = []) => {
@@ -253,6 +273,7 @@ export function markLocalMessageFailed(
   conversation: ConversationListItem,
   localMessageId: string,
   reason: string,
+  failedAt = Date.now(),
 ) {
   const queryKey = pcQueryKeys.imMessages(
     session?.apiBaseUrl,
@@ -270,8 +291,66 @@ export function markLocalMessageFailed(
         messageId: localMessageId,
         reason,
       },
-    ).state.messages,
+    ).state.messages.map((message) =>
+      message.messageId === localMessageId
+        ? normalizeMessageItem({
+            ...message,
+            localFailedAt: failedAt,
+          } as MessageItemDto)
+        : message,
+    ),
   );
+}
+
+export function patchLocalMessageSendState(
+  queryClient: QueryClient,
+  session: AuthSession | null,
+  conversation: ConversationListItem,
+  conversationType: ImConversationType,
+  localMessageId: string,
+  patch: {
+    status?: "sending" | "failed";
+    localError?: string;
+    localFailedAt?: number;
+    localSendStartedAt?: number;
+  },
+  setLocalOutgoingMessagesByConversation: Dispatch<
+    SetStateAction<Record<string, MessageItemDto[]>>
+  >,
+) {
+  const applyPatch = (item: MessageItemDto) =>
+    normalizeMessageItem({
+      ...item,
+      ...(patch.status ? { status: patch.status } : {}),
+      ...(patch.localError === undefined
+        ? { localError: undefined }
+        : { localError: patch.localError }),
+      ...(typeof patch.localFailedAt === "number"
+        ? { localFailedAt: patch.localFailedAt }
+        : {}),
+      ...(typeof patch.localSendStartedAt === "number"
+        ? { localSendStartedAt: patch.localSendStartedAt }
+        : {}),
+    } as MessageItemDto);
+  const queryKey = pcQueryKeys.imMessages(
+    session?.apiBaseUrl,
+    session?.tenantToken,
+    getImConversationType(conversation),
+    conversation.conversationId,
+  );
+  queryClient.setQueryData<MessageItemDto[]>(queryKey, (old = []) =>
+    old.map((item) => (item.messageId === localMessageId ? applyPatch(item) : item)),
+  );
+  setLocalOutgoingMessagesByConversation((current) => {
+    const key = imConversationKey(conversationType, conversation.conversationId);
+    const existing = current[key] ?? [];
+    return {
+      ...current,
+      [key]: existing.map((item) =>
+        item.messageId === localMessageId ? applyPatch(item) : item,
+      ),
+    };
+  });
 }
 
 export function patchLocalMediaMessage(
@@ -283,8 +362,10 @@ export function patchLocalMediaMessage(
   patch: {
     body?: Record<string, unknown>;
     status?: LocalUploadStatus;
+    uploadPhase?: LocalUploadPhase;
     uploadProgress?: number;
     localError?: string;
+    localFailedAt?: number;
   },
   setLocalOutgoingMessagesByConversation: Dispatch<
     SetStateAction<Record<string, MessageItemDto[]>>
@@ -298,9 +379,13 @@ export function patchLocalMediaMessage(
       ...(typeof patch.uploadProgress === "number"
         ? { uploadProgress: patch.uploadProgress }
         : {}),
+      ...(patch.uploadPhase ? { uploadPhase: patch.uploadPhase } : {}),
       ...(patch.localError === undefined
         ? { localError: undefined }
         : { localError: patch.localError }),
+      ...(typeof patch.localFailedAt === "number"
+        ? { localFailedAt: patch.localFailedAt }
+        : {}),
     } as MessageItemDto);
   const queryKey = pcQueryKeys.imMessages(
     session?.apiBaseUrl,
@@ -363,6 +448,7 @@ export function markLocalOutgoingMessageFailed(
   conversationId: string,
   localMessageId: string,
   reason: string,
+  failedAt = Date.now(),
 ) {
   const key = imConversationKey(conversationType, conversationId);
   const existing = current[key] ?? [];
@@ -372,6 +458,7 @@ export function markLocalOutgoingMessageFailed(
           ...item,
           status: "failed",
           localError: reason,
+          localFailedAt: failedAt,
         } as MessageItemDto)
       : item,
   );

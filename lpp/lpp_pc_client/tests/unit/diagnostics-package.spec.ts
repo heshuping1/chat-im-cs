@@ -39,6 +39,20 @@ describe("diagnostics package", () => {
             },
           },
         ],
+        localStorage: {
+          getItem: (key: string) =>
+            key === "lpp.sendDiagnostics.buffer.v1"
+              ? JSON.stringify([
+                  {
+                    traceId: "send-1",
+                    module: "send",
+                    phase: "send",
+                    result: "failed",
+                    reason: "当前账号没有权限执行此操作",
+                  },
+                ])
+              : null,
+        },
         location: {
           pathname: "/settings",
         },
@@ -56,8 +70,18 @@ describe("diagnostics package", () => {
     expect(payload.traceId).toBe("trace-1");
     expect(payload.breadcrumbs).toContain("gateway:205");
     expect(payload.breadcrumbs).toContain("runtime-error:1");
+    expect(payload.breadcrumbs).toContain("send:1");
     expect(payload.diagnostics?.gateway.records).toHaveLength(200);
     expect(payload.diagnostics?.["runtime-error"].records).toHaveLength(1);
+    expect(payload.diagnostics?.send.records).toEqual([
+      {
+        traceId: "send-1",
+        module: "send",
+        phase: "send",
+        result: "failed",
+        reason: "当前账号没有权限执行此操作",
+      },
+    ]);
     expect(payload.diagnostics?.gateway.truncated).toBe(true);
     expect(payload.diagnostics?.runtime.records[0]).toMatchObject({
       language: "zh-CN",
@@ -67,6 +91,11 @@ describe("diagnostics package", () => {
       {
         at: "api-error-1",
         message: "request failed",
+        requestId: undefined,
+      },
+      {
+        at: "send-1",
+        message: "当前账号没有权限执行此操作",
         requestId: undefined,
       },
       {
