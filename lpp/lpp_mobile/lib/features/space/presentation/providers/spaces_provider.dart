@@ -7,6 +7,7 @@ import 'package:lpp_mobile/features/auth/data/datasources/auth_remote_datasource
 import 'package:lpp_mobile/features/auth/data/repositories/auth_repository_impl.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/space/data/repositories/space_repository_impl.dart';
@@ -274,21 +275,11 @@ List<Space> _overrideCurrentSpaceUnread(
 SpaceImUnreadSummary computeImUnreadSummaryForSpaceBadges(
   List<Conversation> conversations,
 ) {
-  var unreadConversationCount = 0;
-  var unreadMessageCount = 0;
-  for (final conversation in conversations) {
-    if (conversation.type != ConversationType.direct &&
-        conversation.type != ConversationType.group) {
-      continue;
-    }
-    final unread = conversation.unreadCount < 0 ? 0 : conversation.unreadCount;
-    if (unread <= 0) continue;
-    unreadConversationCount += 1;
-    unreadMessageCount += unread;
-  }
   return SpaceImUnreadSummary(
-    unreadConversationCount: unreadConversationCount,
-    unreadMessageCount: unreadMessageCount,
+    unreadConversationCount: calculateNumericUnreadConversationCount(
+      conversations,
+    ),
+    unreadMessageCount: calculateMessageBadgeCount(conversations),
   );
 }
 

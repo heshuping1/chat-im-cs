@@ -70,6 +70,7 @@ import 'package:lpp_mobile/features/space/presentation/pages/enterprise_broadcas
 import 'package:lpp_mobile/core/permissions/app_permissions.dart';
 import 'package:lpp_mobile/core/space/space_context.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
+import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/space/presentation/pages/enterprise_info_page.dart';
@@ -647,14 +648,12 @@ class _BottomNav extends ConsumerWidget {
             ? AppRoutes.ownerWorkbench
             : AppRoutes.customerService;
 
-    // 未读消息总数
+    // 未读消息总数：只统计会话列表里显示数字气泡的会话，和顶部标题保持同口径。
     final spaceId = space?.spaceId ?? '';
     final convAsync = ref.watch(conversationsProvider(spaceId));
-    // 免打扰会话不计入总未读数（参考微信）
-    final totalUnread = convAsync.valueOrNull
-            ?.where((c) => !c.isMuted)
-            .fold<int>(0, (sum, c) => sum + c.unreadCount) ??
-        0;
+    final totalUnread = calculateMessageBadgeCount(
+      convAsync.valueOrNull ?? const [],
+    );
 
     // 待处理好友申请数
     final friendRequestsAsync = ref.watch(pendingFriendRequestsProvider);

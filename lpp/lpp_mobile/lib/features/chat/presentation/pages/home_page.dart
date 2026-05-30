@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lpp_mobile/app/system_ui.dart';
 import 'package:lpp_mobile/core/permissions/app_permissions.dart';
 import 'package:lpp_mobile/core/space/space_context.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/app_toast.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/gateway_provider.dart';
@@ -99,14 +100,8 @@ class _HomePageState extends ConsumerState<HomePage>
     // 激活 WebSocket Gateway（确保实时消息推送正常工作）
     ref.watch(gatewayProvider);
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.white,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.black,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
+    return AnnotatedRegion(
+      value: appEdgeToEdgeOverlayStyle,
       child: Scaffold(
         backgroundColor: _homeBackground(context),
         body: Stack(
@@ -185,8 +180,7 @@ class _TopBar extends ConsumerWidget {
     final profileAsync = ref.watch(myPageProfileProvider);
     final conversations =
         ref.watch(conversationsProvider(spaceId)).valueOrNull ?? [];
-    final unreadConversationCount =
-        conversations.where((c) => c.unreadCount > 0).length;
+    final messageBadgeCount = calculateMessageBadgeCount(conversations);
     final currentSpaceInfo =
         spacesAsync.valueOrNull?.where((s) => s.spaceId == spaceId).firstOrNull;
     final currentTenant = authState?.availableTenants
@@ -241,8 +235,8 @@ class _TopBar extends ConsumerWidget {
                     Expanded(
                       child: Center(
                         child: Text(
-                          unreadConversationCount > 0
-                              ? '${AppLocalizations.of(context).navMessages} ($unreadConversationCount)'
+                          messageBadgeCount > 0
+                              ? '${AppLocalizations.of(context).navMessages} ($messageBadgeCount)'
                               : AppLocalizations.of(context).navMessages,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

@@ -4,6 +4,7 @@ import 'package:lpp_mobile/core/providers/font_size_provider.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/identity_badge.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
@@ -144,12 +145,11 @@ class ConversationRow extends ConsumerWidget {
                           Positioned(
                             top: -3,
                             right: -3,
-                            child: isGroup
-                                ? _GroupUnreadDot(
-                                    muted: conversation.isMuted,
-                                  )
-                                : _UnreadBadge(
+                            child: shouldShowNumericUnreadBadge(conversation)
+                                ? _UnreadBadge(
                                     count: conversation.unreadCount,
+                                  )
+                                : _UnreadDot(
                                     muted: conversation.isMuted,
                                   ),
                           ),
@@ -333,10 +333,10 @@ Color _rowSubtitleColor(BuildContext context) {
       : _rowSubtitleLight;
 }
 
-class _GroupUnreadDot extends StatelessWidget {
+class _UnreadDot extends StatelessWidget {
   final bool muted;
 
-  const _GroupUnreadDot({required this.muted});
+  const _UnreadDot({required this.muted});
 
   @override
   Widget build(BuildContext context) {
@@ -357,11 +357,9 @@ class _GroupUnreadDot extends StatelessWidget {
 
 class _UnreadBadge extends StatelessWidget {
   final int count;
-  final bool muted;
 
   const _UnreadBadge({
     required this.count,
-    required this.muted,
   });
 
   @override
@@ -370,7 +368,7 @@ class _UnreadBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: muted ? const Color(0xFF98A2B3) : const Color(0xFFF04438),
+        color: const Color(0xFFF04438),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: _rowSurface(context), width: 1.5),
       ),

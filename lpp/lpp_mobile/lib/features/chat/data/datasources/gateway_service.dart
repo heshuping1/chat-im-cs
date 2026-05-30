@@ -55,6 +55,16 @@ enum GatewayConnectionStatus {
   reconnecting,
 }
 
+GatewayConnectionStatus effectiveGatewayConnectionStatus(
+  GatewayConnectionStatus status, {
+  required bool isConnected,
+}) {
+  if (isConnected && status != GatewayConnectionStatus.disconnected) {
+    return GatewayConnectionStatus.connected;
+  }
+  return status;
+}
+
 class NewMessageEvent extends GatewayEvent {
   final Map<String, dynamic> data;
   NewMessageEvent(this.data);
@@ -312,7 +322,10 @@ class GatewayService {
   bool get isConnected => _connection?.state == HubConnectionState.Connected;
 
   Stream<GatewayEvent> get events => _eventController.stream;
-  GatewayConnectionStatus get status => _status;
+  GatewayConnectionStatus get status => effectiveGatewayConnectionStatus(
+        _status,
+        isConnected: isConnected,
+      );
   Stream<GatewayConnectionStatus> get statusStream => _statusController.stream;
 
   /// 连接到 Gateway
@@ -838,10 +851,10 @@ class GatewayService {
   List<int> _retryDelays() => [1000, 2000, 4000, 8000, 16000, 30000];
 
   void _setStatus(GatewayConnectionStatus status) {
-    if (_status == status) return;
+    final previousStatus = _status;
     _status = status;
-    if (!_statusController.isClosed) {
-      _statusController.add(status);
+    if (previousStatus != status && !_statusController.isClosed) {
+      _statusController.add(this.status);
     }
   }
 

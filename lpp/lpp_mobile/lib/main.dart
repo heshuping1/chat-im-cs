@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
+import 'app/system_ui.dart';
 import 'core/diagnostics/app_error_reporter.dart';
 import 'core/network/site_line_manager.dart';
 import 'core/notifications/push_notification_service.dart';
@@ -27,6 +28,7 @@ void main() {
       return true;
     };
 
+    await configureAppSystemUi();
     PushNotificationService.registerBackgroundHandler();
     await HiveStorage.init();
     await SiteLineManager.instance.bootstrap(SecureStorageServiceImpl());

@@ -4,7 +4,7 @@ import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider
 
 void main() {
   group('space unread summary', () {
-    test('counts only unread direct and group conversations', () {
+    test('counts only numeric unread bubble conversations', () {
       final summary = computeImUnreadSummaryForSpaceBadges(const [
         Conversation(
           conversationId: 'direct-1',
@@ -17,6 +17,13 @@ void main() {
           type: ConversationType.group,
           title: '运营群',
           unreadCount: 3,
+        ),
+        Conversation(
+          conversationId: 'muted-direct',
+          type: ConversationType.direct,
+          title: '免打扰单聊',
+          unreadCount: 4,
+          isMuted: true,
         ),
         Conversation(
           conversationId: 'temp-1',
@@ -32,8 +39,8 @@ void main() {
         ),
       ]);
 
-      expect(summary.unreadConversationCount, 2);
-      expect(summary.unreadMessageCount, 5);
+      expect(summary.unreadConversationCount, 1);
+      expect(summary.unreadMessageCount, 2);
     });
 
     test('normalizes negative unread counts to zero', () {
