@@ -5,13 +5,17 @@ import type {
   MessageItemDto,
 } from "../../src/renderer/data/api-client";
 import {
+  applyConversationReadToCache,
   localMediaPreviewKeys,
   markLocalOutgoingMessageFailed,
+  markMessageRecalledInCache,
   patchLocalMediaMessage,
+  removeMessageFromCache,
   replaceLocalOutgoingMessage,
   upsertLocalOutgoingMessage,
   withLocalMediaPreviews,
 } from "../../src/renderer/messages/models/messageCacheMutationModel";
+import type { ConversationListResponse } from "../../src/renderer/data/api-client";
 
 describe("messageCacheMutationModel", () => {
   it("upserts and replaces local outgoing messages by conversation key", () => {
@@ -113,5 +117,119 @@ describe("messageCacheMutationModel", () => {
     ]));
 
     expect(next[0].body?.image).toMatchObject({ localPreviewUrl: "blob:local-preview" });
+  });
+
+  it("recomputes the conversation preview when recalling the last message", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData<MessageItemDto[]>(
+      ["pc-im-messages", "base", "token", "direct", "c1"],
+      [
+        {
+          conversationId: "c1",
+          conversationSeq: 1,
+          messageId: "m1",
+          messageType: "text",
+          preview: "first",
+          sentAt: "2026-05-30T00:00:00.000Z",
+        },
+        {
+          conversationId: "c1",
+          conversationSeq: 2,
+          messageId: "m2",
+          messageType: "text",
+          preview: "second",
+          sentAt: "2026-05-30T00:00:01.000Z",
+        },
+      ] as MessageItemDto[],
+    );
+    queryClient.setQueryData<ConversationListResponse>(["pc-im-conversations"], {
+      items: [
+        {
+          conversationId: "c1",
+          conversationType: "direct",
+          title: "Peer",
+          lastMessage: { messageId: "m2", preview: "second" },
+          lastMessageSeq: 2,
+          unreadCount: 0,
+        },
+      ],
+    });
+
+    markMessageRecalledInCache(queryClient, "m2");
+
+    expect(
+      queryClient.getQueryData<ConversationListResponse>(["pc-im-conversations"])
+        ?.items[0].lastMessage,
+    ).toMatchObject({ messageId: "m2", preview: "消息已撤回" });
+  });
+
+  it("falls back to the previous message when deleting the last message", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData<MessageItemDto[]>(
+      ["pc-im-messages", "base", "token", "direct", "c1"],
+      [
+        {
+          conversationId: "c1",
+          conversationSeq: 1,
+          messageId: "m1",
+          messageType: "text",
+          preview: "first",
+          sentAt: "2026-05-30T00:00:00.000Z",
+        },
+        {
+          conversationId: "c1",
+          conversationSeq: 2,
+          messageId: "m2",
+          messageType: "text",
+          preview: "second",
+          sentAt: "2026-05-30T00:00:01.000Z",
+        },
+      ] as MessageItemDto[],
+    );
+    queryClient.setQueryData<ConversationListResponse>(["pc-im-conversations"], {
+      items: [
+        {
+          conversationId: "c1",
+          conversationType: "direct",
+          title: "Peer",
+          lastMessage: { messageId: "m2", preview: "second" },
+          lastMessageSeq: 2,
+          unreadCount: 0,
+        },
+      ],
+    });
+
+    removeMessageFromCache(queryClient, "m2");
+
+    expect(
+      queryClient.getQueryData<ConversationListResponse>(["pc-im-conversations"])
+        ?.items[0],
+    ).toMatchObject({
+      lastMessage: { messageId: "m1", preview: "first" },
+      lastMessageSeq: 1,
+    });
+  });
+
+  it("applies read seq to conversation cache through the message core path", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData<ConversationListResponse>(["pc-im-conversations"], {
+      items: [
+        {
+          conversationId: "c1",
+          conversationType: "direct",
+          title: "Peer",
+          lastMessageSeq: 3,
+          lastReadSeq: 0,
+          unreadCount: 2,
+        },
+      ],
+    });
+
+    applyConversationReadToCache(queryClient, "c1", 3);
+
+    expect(
+      queryClient.getQueryData<ConversationListResponse>(["pc-im-conversations"])
+        ?.items[0],
+    ).toMatchObject({ lastReadSeq: 3, unreadCount: 0 });
   });
 });

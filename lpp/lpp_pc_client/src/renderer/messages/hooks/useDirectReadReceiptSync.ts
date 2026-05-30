@@ -7,8 +7,8 @@ import {
   type ConversationReadState,
 } from "../../data/im-read-model";
 import { getImReadSnapshot } from "../../data/im-read/im-read-store";
+import { reduceMessageCoreEvent } from "../../data/message-core/message-core";
 import type { CurrentUserIdentity } from "../../data/message-display";
-import { applyDirectReadReceiptToMessages } from "../../data/read-receipts";
 import { getImConversationType } from "./useMessageCenterViewModel";
 
 export function useDirectReadReceiptSync({
@@ -69,7 +69,17 @@ export function useDirectReadReceiptSync({
       },
       (old) =>
         old
-          ? applyDirectReadReceiptToMessages(old, peerReadSeq, unreadIdentity)
+          ? reduceMessageCoreEvent(
+              { messages: old },
+              {
+                type: "read.updated",
+                conversationId: activeConversation.conversationId,
+                conversationType: "direct",
+                readSeq: currentReadState?.myReadSeq ?? activeConversation.lastReadSeq ?? 0,
+                peerReadSeq,
+                identity: unreadIdentity,
+              },
+            ).state.messages
           : old,
     );
   }, [

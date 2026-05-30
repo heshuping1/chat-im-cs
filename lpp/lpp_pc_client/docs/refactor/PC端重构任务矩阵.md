@@ -1028,7 +1028,20 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 16. 当前关键风险清单
+## 16. 第二十一阶段任务：普通 IM 消息内核一致性治理
+
+第二十一阶段用于修正普通 IM 核心链路中“Gateway、轮询、本地发送、已读、撤回/删除多入口直接 patch cache”的一致性风险。目标是把消息状态规则收敛到可测试的纯函数内核，再由现有 React Query cache facade 渐进接入。
+
+| 编号 | 模块 | 目标 | 风险 | 验收 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| P21-MSG-CORE-001 | Message Core Tests | 补齐 Gateway/轮询去重、本地发送回显、撤回/删除最后一条、旧 seq、已读未读等保护测试。 | P0 | L4 | 已完成 |
+| P21-MSG-CORE-002 | Message Core Reducer | 新增普通 IM `message-core` 纯 reducer，统一 `message.polled/gateway_received/local_created/send_confirmed/send_failed/recalled/deleted/read.updated` 事件归约。 | P0 | L4 | 已完成 |
+| P21-MSG-CORE-003 | Cache Facade Integration | 将 Gateway cache、本地发送 cache mutation、撤回/删除、read cache 更新接入 `message-core`，保留现有页面调用面。 | P0 | L4 | 已完成 |
+| P21-MSG-CORE-004 | Docs / Validation | 落地计划、验证记录和诊断事件说明，保证后续可追踪。 | P1 | L2 | 已完成 |
+
+---
+
+## 17. 当前关键风险清单
 
 | 编号 | 风险 | 影响 | 控制方式 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -1044,7 +1057,7 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 17. 第一阶段手工验收记录模板
+## 18. 第一阶段手工验收记录模板
 
 每完成 P1 任务，需要追加验收记录。
 
@@ -1080,7 +1093,7 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 16. 推进原则
+## 19. 推进原则
 
 1. 第一阶段不追求目录最终形态，优先追求边界可测试。
 2. 不允许为了重构把核心链路一次性改大。

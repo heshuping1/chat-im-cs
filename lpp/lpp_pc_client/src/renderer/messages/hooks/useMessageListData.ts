@@ -3,6 +3,7 @@ import type { MutableRefObject } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import { mergeLocalOutgoingMessages } from "../../data/im-local-outgoing";
+import { reduceMessageCoreEvent } from "../../data/message-core/message-core";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { applyDirectReadReceiptToMessages } from "../../data/read-receipts";
 import { withLocalMediaPreviews } from "../models/messageCacheMutationModel";
@@ -49,8 +50,20 @@ export function useMessageListData({
           ? (localOutgoingMessagesByConversation[activeConversationKey] ?? [])
           : [],
       );
+      const reducedMessages =
+        activeConversation?.conversationId && activeConversationType
+          ? reduceMessageCoreEvent(
+              { messages: [] },
+              {
+                type: "message.polled",
+                conversationId: activeConversation.conversationId,
+                conversationType: activeConversationType,
+                messages: mergedOutgoingMessages,
+              },
+            ).state.messages
+          : mergedOutgoingMessages;
       const messagesWithPreviews = withLocalMediaPreviews(
-        mergedOutgoingMessages,
+        reducedMessages,
         localImagePreviewByMessageIdRef.current,
       );
       const peerReadSeq = activeConversation?.conversationId

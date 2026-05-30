@@ -57,7 +57,7 @@ describe("im gateway cache adapter", () => {
         "direct",
         "direct-1",
       ]),
-    ).toEqual([message]);
+    ).toMatchObject([message]);
     expect(
       queryClient.getQueryData<ConversationListResponse>(["pc-im-conversations"])
         ?.items[0]?.unreadCount,

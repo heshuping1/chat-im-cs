@@ -5,8 +5,8 @@ import type {
   MessageItemDto,
 } from "../api-client";
 import { normalizeMessageType } from "../im-message-normalize";
+import { reduceMessageCoreEvent } from "../message-core/message-core";
 import { isImConversation, type CurrentUserIdentity } from "../message-display";
-import { applyDirectReadReceiptToMessages } from "../read-receipts";
 import type { ConversationReadView } from "../im-read-model";
 
 export interface ApplyImGatewayMessageCacheInput {
@@ -38,7 +38,7 @@ export function applyImGatewayMessageCache(
         query.queryKey[0] === "pc-im-messages" &&
         query.queryKey.includes(input.conversationId),
     },
-    (old) => appendImMessage(old, input.message),
+    (old) => appendImMessageForConversation(old, input),
   );
 
   queryClient.setQueriesData<ConversationListResponse>(
@@ -73,10 +73,7 @@ export function applyImGatewayReadCache(
           query.queryKey[0] === "pc-im-messages" &&
           query.queryKey.includes(input.conversationId),
       },
-      (old) =>
-        old
-          ? applyDirectReadReceiptToMessages(old, input.peerReadSeq, input.identity)
-          : old,
+      (old) => applyGatewayReadToMessages(old, input),
     );
   }
 }
@@ -86,17 +83,73 @@ export function isImEventMessage(message: MessageItemDto) {
   return type === "event" || type === "system" || type === "notice";
 }
 
-function appendImMessage(old: MessageItemDto[] | undefined, message: MessageItemDto) {
-  const items = old ? [...old] : [];
-  if (items.some((item) => item.messageId === message.messageId)) return old;
-  items.push(message);
-  items.sort((a, b) => {
-    const seqA = a.conversationSeq ?? 0;
-    const seqB = b.conversationSeq ?? 0;
-    if (seqA !== seqB) return seqA - seqB;
-    return Date.parse(a.sentAt ?? "") - Date.parse(b.sentAt ?? "");
-  });
-  return items;
+function applyGatewayMessageToConversation(
+  item: ConversationListItem,
+  input: ApplyImGatewayMessageCacheInput,
+) {
+  return reduceMessageCoreEvent(
+    { conversation: item, messages: [] },
+    {
+      type: "message.gateway_received",
+      conversationId: input.conversationId,
+      conversationType: input.conversationType === "group" ? "group" : "direct",
+      message: input.message,
+      readSeq: input.readSeq,
+      unreadCount: input.unreadCount,
+    },
+  ).state.conversation ?? item;
+}
+
+function applyReadToConversation(
+  item: ConversationListItem,
+  input: ApplyImGatewayReadCacheInput,
+) {
+  return reduceMessageCoreEvent(
+    { conversation: item, messages: [] },
+    {
+      type: "read.updated",
+      conversationId: input.conversationId,
+      conversationType: item.conversationType === "group" ? "group" : "direct",
+      readSeq: input.myReadSeq,
+      peerReadSeq: input.peerReadSeq,
+      identity: input.identity,
+    },
+  ).state.conversation ?? item;
+}
+
+function appendImMessageForConversation(
+  old: MessageItemDto[] | undefined,
+  input: ApplyImGatewayMessageCacheInput,
+) {
+  return reduceMessageCoreEvent(
+    { messages: old ?? [] },
+    {
+      type: "message.gateway_received",
+      conversationId: input.conversationId,
+      conversationType: input.conversationType === "group" ? "group" : "direct",
+      message: input.message,
+      readSeq: input.readSeq,
+      unreadCount: input.unreadCount,
+    },
+  ).state.messages;
+}
+
+function applyGatewayReadToMessages(
+  old: MessageItemDto[] | undefined,
+  input: ApplyImGatewayReadCacheInput,
+) {
+  if (!old) return old;
+  return reduceMessageCoreEvent(
+    { messages: old },
+    {
+      type: "read.updated",
+      conversationId: input.conversationId,
+      conversationType: "direct",
+      readSeq: input.myReadSeq,
+      peerReadSeq: input.peerReadSeq,
+      identity: input.identity,
+    },
+  ).state.messages;
 }
 
 function updateImConversationList(
@@ -108,7 +161,7 @@ function updateImConversationList(
   const items = old.items.map((item) => {
     if (item.conversationId !== input.conversationId) return item;
     found = true;
-    return updateImConversationItem(item, input);
+    return applyGatewayMessageToConversation(item, input);
   });
   if (!found) {
     const conversation = gatewayConversation(input.payload, input);
@@ -119,64 +172,14 @@ function updateImConversationList(
   return { ...old, items };
 }
 
-function updateImConversationItem(
-  item: ConversationListItem,
-  input: ApplyImGatewayMessageCacheInput,
-): ConversationListItem {
-  const lastSeq = input.message.conversationSeq ?? item.lastMessageSeq ?? 0;
-  const alreadyMerged = isSameOrOlderConversationMessage(item, input.message);
-  const nextReadSeq =
-    input.readSeq !== undefined
-      ? Math.max(item.lastReadSeq ?? 0, input.readSeq)
-      : item.lastReadSeq;
-  if (alreadyMerged) {
-    return input.readSeq !== undefined || input.unreadCount !== undefined
-      ? {
-          ...item,
-          unreadCount: input.unreadCount ?? 0,
-          lastReadSeq: nextReadSeq,
-        }
-      : item;
-  }
-  return {
-    ...item,
-    lastMessage: {
-      messageId: input.message.messageId,
-      messageType: input.message.messageType,
-      preview: input.message.preview,
-      sentAt: input.message.sentAt,
-      senderUserId: input.message.senderUserId,
-      senderId: input.message.senderId,
-      fromUserId: input.message.fromUserId,
-      senderPlatformUserId: input.message.senderPlatformUserId,
-      platformUserId: input.message.platformUserId,
-      senderLppId: input.message.senderLppId,
-      lppId: input.message.lppId,
-      senderDisplayName: input.message.senderDisplayName,
-      isSelf: input.message.isSelf,
-      isMine: input.message.isMine,
-      direction: input.message.direction,
-    },
-    lastMessageSeq: Math.max(item.lastMessageSeq ?? 0, lastSeq),
-    lastReadSeq: nextReadSeq,
-    unreadCount:
-      input.unreadCount !== undefined
-        ? input.unreadCount
-        : input.readSeq !== undefined
-          ? 0
-          : item.unreadCount,
-  };
-}
-
 function updateImConversationReadReceiptItem(
   item: ConversationListItem,
   input: ApplyImGatewayReadCacheInput,
 ): ConversationListItem {
   if (input.readerIsCurrentUser) {
     return {
-      ...item,
+      ...applyReadToConversation(item, input),
       unreadCount: input.view?.unreadCount ?? 0,
-      lastReadSeq: Math.max(item.lastReadSeq ?? 0, input.myReadSeq),
     };
   }
   return item;
@@ -222,18 +225,6 @@ function gatewayConversation(
     lastReadSeq: input.readSeq,
     lastMessageSeq: input.message.conversationSeq,
   };
-}
-
-function isSameOrOlderConversationMessage(
-  item: ConversationListItem,
-  message: MessageItemDto,
-) {
-  const incomingId = message.messageId;
-  const existingId = item.lastMessage?.messageId;
-  if (incomingId && existingId && incomingId === existingId) return true;
-  const incomingSeq = message.conversationSeq ?? 0;
-  const existingSeq = item.lastMessageSeq ?? 0;
-  return incomingSeq > 0 && existingSeq > 0 && incomingSeq <= existingSeq;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

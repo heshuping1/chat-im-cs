@@ -13,9 +13,12 @@ import {
   normalizeMessageItem,
   normalizeMessageType,
 } from "../../data/im-message-normalize";
-import { applyImReadSeqToConversationSnapshot } from "../../data/im-read/im-read-service";
 import { conversationKey as imConversationKey } from "../../data/im-read-model";
 import { applySendSucceededToImRead } from "../../data/im-read/im-send-succeeded-service";
+import {
+  reduceMessageCoreEvent,
+  type MessageCoreEvent,
+} from "../../data/message-core/message-core";
 import { pcQueryKeys } from "../../data/query-keys";
 import { currentIsoTimestamp, timestampFromDateValue } from "../../lib/format";
 import { getImConversationType } from "./messageConversationTypeModel";
@@ -78,8 +81,13 @@ export function appendLocalMessage(
     ...(options.localTaskId ? { localTaskId: options.localTaskId } : {}),
   });
   queryClient.setQueryData<MessageItemDto[]>(queryKey, (old = []) => {
-    if (old.some((item) => item.messageId === messageId)) return old;
-    return [...old, next].sort(sortMessagesForCache);
+    return reduceMessageCoreEvent(
+      { messages: old },
+      outgoingMessageCoreEvent({
+        conversation,
+        message: next,
+      }),
+    ).state.messages;
   });
   queryClient.setQueriesData<{ items: ConversationListItem[] }>(
     { queryKey: ["pc-im-conversations"] },
@@ -89,32 +97,13 @@ export function appendLocalMessage(
             ...old,
             items: old.items.map((item) =>
               item.conversationId === conversation.conversationId
-                ? {
-                    ...item,
-                    lastMessage: {
-                      messageId,
-                      messageType,
-                      preview: previewFromOutgoingBody(messageType, body),
-                      sentAt,
-                      senderUserId: session?.userId || session?.platformUserId,
-                      senderId: session?.userId,
-                      senderPlatformUserId: session?.platformUserId,
-                      senderLppId: session?.lppId,
-                      senderDisplayName: session?.displayName || "Me",
-                      isSelf: true,
-                      isMine: true,
-                      direction: "out",
-                    },
-                    lastMessageSeq: Math.max(
-                      item.lastMessageSeq ?? 0,
-                      conversationSeq ?? 0,
-                    ),
-                    lastReadSeq: Math.max(
-                      item.lastReadSeq ?? 0,
-                      conversationSeq ?? 0,
-                    ),
-                    unreadCount: 0,
-                  }
+                ? reduceMessageCoreEvent(
+                    { conversation: item, messages: [] },
+                    outgoingMessageCoreEvent({
+                      conversation,
+                      message: next,
+                    }),
+                  ).state.conversation ?? item
                 : item,
             ),
           }
@@ -175,15 +164,16 @@ export function replaceLocalMessageInCache(
     status: "sent",
   });
   queryClient.setQueryData<MessageItemDto[]>(queryKey, (old = []) => {
-    const withoutServerDuplicate = old.filter(
-      (item) => item.messageId === localMessageId || item.messageId !== messageId,
-    );
-    if (!withoutServerDuplicate.some((item) => item.messageId === localMessageId)) {
-      return [...withoutServerDuplicate, next].sort(sortMessagesForCache);
-    }
-    return withoutServerDuplicate
-      .map((item) => (item.messageId === localMessageId ? next : item))
-      .sort(sortMessagesForCache);
+    return reduceMessageCoreEvent(
+      { messages: old },
+      {
+        type: "message.send_confirmed",
+        conversationId: conversation.conversationId,
+        conversationType: getImConversationType(conversation) === "group" ? "group" : "direct",
+        localMessageId,
+        message: next,
+      },
+    ).state.messages;
   });
   queryClient.setQueriesData<{ items: ConversationListItem[] }>(
     { queryKey: ["pc-im-conversations"] },
@@ -193,33 +183,17 @@ export function replaceLocalMessageInCache(
             ...old,
             items: old.items.map((item) =>
               item.conversationId === conversation.conversationId
-                ? {
-                    ...item,
-                    lastMessage: {
-                      ...(item.lastMessage ?? {}),
-                      messageId,
-                      messageType,
-                      preview: previewFromOutgoingBody(messageType, body),
-                      sentAt,
-                      senderUserId: session?.userId || session?.platformUserId,
-                      senderId: session?.userId,
-                      senderPlatformUserId: session?.platformUserId,
-                      senderLppId: session?.lppId,
-                      senderDisplayName: session?.displayName || "Me",
-                      isSelf: true,
-                      isMine: true,
-                      direction: "out",
+                ? reduceMessageCoreEvent(
+                    { conversation: item, messages: [] },
+                    {
+                      type: "message.send_confirmed",
+                      conversationId: conversation.conversationId,
+                      conversationType:
+                        getImConversationType(conversation) === "group" ? "group" : "direct",
+                      localMessageId,
+                      message: next,
                     },
-                    lastMessageSeq: Math.max(
-                      item.lastMessageSeq ?? 0,
-                      result.conversationSeq ?? 0,
-                    ),
-                    lastReadSeq: Math.max(
-                      item.lastReadSeq ?? 0,
-                      result.conversationSeq ?? 0,
-                    ),
-                    unreadCount: 0,
-                  }
+                  ).state.conversation ?? item
                 : item,
             ),
           }
@@ -287,15 +261,16 @@ export function markLocalMessageFailed(
     conversation.conversationId,
   );
   queryClient.setQueryData<MessageItemDto[]>(queryKey, (old = []) =>
-    old.map((item) =>
-      item.messageId === localMessageId
-        ? normalizeMessageItem({
-            ...item,
-            status: "failed",
-            localError: reason,
-          } as MessageItemDto)
-        : item,
-    ),
+    reduceMessageCoreEvent(
+      { messages: old },
+      {
+        type: "message.send_failed",
+        conversationId: conversation.conversationId,
+        conversationType: getImConversationType(conversation) === "group" ? "group" : "direct",
+        messageId: localMessageId,
+        reason,
+      },
+    ).state.messages,
   );
 }
 
@@ -444,32 +419,52 @@ export function markMessageRecalledInCache(
   queryClient: QueryClient,
   messageId: string,
 ) {
+  const affected = messageSnapshotsForMutation(queryClient, messageId);
   queryClient.setQueriesData<MessageItemDto[]>(
     { queryKey: ["pc-im-messages"] },
     (old) =>
-      old?.map((message) =>
-        message.messageId === messageId
-          ? normalizeMessageItem({
-              ...message,
-              body: { eventText: "消息已撤回", messageType: "event" },
-              isRecalled: true,
-              messageType: "event",
-              preview: "消息已撤回",
-              status: "recalled",
-            })
-          : message,
-      ),
+      old
+        ? reduceMessageCoreEvent(
+            { messages: old },
+            {
+              type: "message.recalled",
+              conversationId: affected.conversationId,
+              conversationType: affected.conversationType,
+              messageId,
+            },
+          ).state.messages
+        : old,
   );
+  patchConversationAfterMessageMutation(queryClient, affected, {
+    type: "message.recalled",
+    messageId,
+  });
 }
 
 export function removeMessageFromCache(
   queryClient: QueryClient,
   messageId: string,
 ) {
+  const affected = messageSnapshotsForMutation(queryClient, messageId);
   queryClient.setQueriesData<MessageItemDto[]>(
     { queryKey: ["pc-im-messages"] },
-    (old) => old?.filter((message) => message.messageId !== messageId),
+    (old) =>
+      old
+        ? reduceMessageCoreEvent(
+            { messages: old },
+            {
+              type: "message.deleted",
+              conversationId: affected.conversationId,
+              conversationType: affected.conversationType,
+              messageId,
+            },
+          ).state.messages
+        : old,
   );
+  patchConversationAfterMessageMutation(queryClient, affected, {
+    type: "message.deleted",
+    messageId,
+  });
 }
 
 export function markMessageFavoriteInCache(
@@ -564,6 +559,94 @@ function sortMessagesForCache(left: MessageItemDto, right: MessageItemDto) {
   );
 }
 
+function outgoingMessageCoreEvent({
+  conversation,
+  localMessageId,
+  message,
+}: {
+  conversation: ConversationListItem;
+  localMessageId?: string;
+  message: MessageItemDto;
+}): Extract<MessageCoreEvent, { type: "message.local_created" | "message.send_confirmed" }> {
+  const conversationType = getImConversationType(conversation) === "group" ? "group" as const : "direct" as const;
+  const status = String(message.status ?? "").trim().toLowerCase();
+  if (!status || status === "sent" || status === "read") {
+    return {
+      type: "message.send_confirmed" as const,
+      conversationId: conversation.conversationId,
+      conversationType,
+      localMessageId,
+      message,
+    };
+  }
+  return {
+    type: "message.local_created" as const,
+    conversationId: conversation.conversationId,
+    conversationType,
+    message,
+  };
+}
+
+function messageSnapshotsForMutation(queryClient: QueryClient, messageId: string) {
+  const snapshots = queryClient.getQueriesData<MessageItemDto[]>({
+    queryKey: ["pc-im-messages"],
+  });
+  for (const [, messages] of snapshots) {
+    const target = messages?.find((message) => message.messageId === messageId);
+    if (!target) continue;
+    return {
+      conversationId: target.conversationId ?? "",
+      conversationType:
+        target.conversationId?.startsWith("group") || target.messageType === "group"
+          ? ("group" as const)
+          : ("direct" as const),
+      messages: messages ?? [],
+    };
+  }
+  return {
+    conversationId: "",
+    conversationType: "direct" as const,
+    messages: [] as MessageItemDto[],
+  };
+}
+
+function patchConversationAfterMessageMutation(
+  queryClient: QueryClient,
+  affected: {
+    conversationId: string;
+    conversationType: "direct" | "group";
+    messages: MessageItemDto[];
+  },
+  mutation: { type: "message.recalled" | "message.deleted"; messageId: string },
+) {
+  if (!affected.conversationId) return;
+  queryClient.setQueriesData<{ items: ConversationListItem[] }>(
+    { queryKey: ["pc-im-conversations"] },
+    (old) =>
+      old
+        ? {
+            ...old,
+            items: old.items.map((item) => {
+              if (item.conversationId !== affected.conversationId) return item;
+              const result = reduceMessageCoreEvent(
+                { conversation: item, messages: affected.messages },
+                {
+                  type: mutation.type,
+                  conversationId: affected.conversationId,
+                  conversationType:
+                    getImConversationType(item) === "group"
+                      ? "group"
+                      : affected.conversationType,
+                  messageId: mutation.messageId,
+                },
+              );
+              return result.state.conversation ?? item;
+            }),
+          }
+        : old,
+  );
+}
+
 function previewFromOutgoingBody(
   messageType: "text" | "image" | "video" | "file",
   body: Record<string, unknown>,
@@ -575,10 +658,17 @@ function applyReadSeqToConversationListItem(
   item: ConversationListItem,
   readSeq: number,
 ) {
-  const next = applyImReadSeqToConversationSnapshot(item, readSeq);
-  return {
-    ...item,
-    unreadCount: next.unreadCount,
-    lastReadSeq: next.lastReadSeq,
-  };
+  const conversationType = getImConversationType(item) === "group" ? "group" : "direct";
+  return (
+    reduceMessageCoreEvent(
+      { conversation: item, messages: [] },
+      {
+        type: "read.updated",
+        conversationId: item.conversationId,
+        conversationType,
+        readSeq,
+        identity: null,
+      },
+    ).state.conversation ?? item
+  );
 }
