@@ -10,7 +10,7 @@ import type { AuthSession } from "../../data/auth/auth-session";
 import { requireApiClient } from "../../data/runtime";
 import type { ContactPickerItem } from "../components/MessageStartDialogs";
 
-type ComposerDialogKind = "direct" | "group" | "qr" | null;
+type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
 
 export function useMessageContactPickerData(
   session: AuthSession | null,

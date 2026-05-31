@@ -90,8 +90,15 @@
   overflow-wrap: anywhere;
 }
 
+.app-error-fallback small {
+  color: #7b8797;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .app-error-actions {
   display: flex;
+  gap: 10px;
   justify-content: flex-end;
 }
 
@@ -103,6 +110,12 @@
   background: #0f766e;
   color: #fff;
   font-weight: 800;
+}
+
+.app-error-actions button:first-child {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
 }
 
 .captcha-inline {

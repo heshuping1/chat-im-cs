@@ -110,8 +110,7 @@ export function buildCustomerModel({
     agentCreatedAt: shortDate(valueAt(external, ["ib", "agent", "代理"], ["建立时间", "createdAt"])),
     agentType: textValue(valueAt(external, ["ib", "agent", "代理"], ["类型", "agentType"])),
     appName: textValue(
-      profileValue(profile, ["appName", "appDisplayName", "packageName", "brandName", "tenantAppName"]) ??
-        contact?.groupName,
+      profileValue(profile, ["appName", "appDisplayName", "packageName", "brandName", "tenantAppName"]),
     ),
     assignedStaff: textValue(profile?.assignedAgentName ?? profileValue(profile, ["assignedStaffName", "assignedStaffDisplayName"])),
     avatarUrl: profile?.avatarUrl || avatarUrl || conversation?.avatarUrl || contact?.avatarUrl,

@@ -2,12 +2,13 @@ import type { ChatMessageDeliveryState } from "../message/message-domain";
 import { normalizeApiError } from "../api/api-error-model";
 
 export type ChatSendChannel = "im" | "customer_service";
-export type ChatSendMessageKind = "text" | "image" | "video" | "file";
+export type ChatSendMessageKind = "text" | "image" | "video" | "file" | "contact_card";
 
 export type ChatSendStatus = Exclude<ChatMessageDeliveryState, "idle">;
 
 export type ChatSendAction =
   | "enqueue_text"
+  | "enqueue_contact_card"
   | "enqueue_media"
   | "start_upload"
   | "cache_local_media"
@@ -45,7 +46,7 @@ export type ChatSendDiagnosticPhase =
 export interface ChatSendDiagnosticRecord {
   traceId: string;
   module: "send";
-  taskId: "P4-MSG-005B" | "P4-MSG-005C" | "P4-MSG-005D";
+  taskId: "P4-MSG-005B" | "P4-MSG-005C" | "P4-MSG-005D" | "P24-CONTACT-001";
   channel: ChatSendChannel;
   phase: ChatSendDiagnosticPhase;
   result: "ok" | "failed" | "ignored";

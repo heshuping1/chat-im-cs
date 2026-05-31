@@ -209,7 +209,7 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
         <PanelBlock title="业务归属" icon={<BriefcaseBusiness size={16} />}>
           <InfoGrid
             rows={[
-              ["马甲包", model.appName],
+              ["渠道应用", model.appName],
               ["业务线", model.businessLine],
               ["归属客服", model.assignedStaff],
               ["注册时间", model.registeredAt],

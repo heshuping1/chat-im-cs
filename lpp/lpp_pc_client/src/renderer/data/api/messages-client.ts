@@ -9,6 +9,7 @@ import type {
   GroupChatCreatedDto,
   MediaResourceDto,
   MessageItemDto,
+  ContactCardDto,
 } from "./types";
 import {
   validateConversationSummaryContract,
@@ -127,6 +128,18 @@ export class MessagesApiClient extends ContactsApiClient {
     }, replyToMessageId, [], options);
   }
 
+  sendConversationContactCardMessage(
+    conversationType: "direct" | "group",
+    conversationId: string,
+    contactCard: ContactCardDto,
+    replyToMessageId?: string | null,
+    options: { clientMsgId?: string } = {},
+  ) {
+    return this.sendConversationMessage(conversationType, conversationId, "contact_card", {
+      contactCard,
+    }, replyToMessageId, [], options);
+  }
+
   recallMessage(messageId: string) {
     return this.request<{ messageId?: string }>(
       endpointPlan.messageRecall.replace("{messageId}", messageId),
@@ -224,7 +237,7 @@ export class MessagesApiClient extends ContactsApiClient {
   private sendConversationMessage(
     conversationType: "direct" | "group",
     conversationId: string,
-    messageType: "text" | "image" | "video" | "file",
+    messageType: "text" | "image" | "video" | "file" | "contact_card",
     body: Record<string, unknown>,
     replyToMessageId?: string | null,
     mentions: Array<{ userId?: string; displayName?: string }> = [],

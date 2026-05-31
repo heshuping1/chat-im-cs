@@ -39,8 +39,14 @@ import {
 } from "../../../media/runtime/uploadState";
 import { logMessageCenterDiagnostic } from "../../diagnostics/message-center-diagnostics";
 import { getCurrentMediaActionCapabilities } from "../../runtime/mediaActionCapabilities";
-import { cacheCurrentMessageImageFile } from "../../runtime/messageMediaDesktopActions";
+import {
+  cacheCurrentMessageImageFile,
+  copyCurrentMessageImage,
+  revealCurrentMessageImageInFolder,
+  saveCurrentMessageImageAs,
+} from "../../runtime/messageMediaDesktopActions";
 import type { MessageMediaCacheContext } from "./FileMessageContent";
+import { formatError } from "../../../lib/format";
 
 export function ImagePart({
   authToken,
@@ -55,6 +61,10 @@ export function ImagePart({
 }) {
   const media = item?.media;
   const src = item?.sourceUrl;
+  const imageActionSrc =
+    item?.localOpenUrl ||
+    item?.remoteSourceUrl ||
+    (src && !isTransientImageUrl(src) ? src : undefined);
   const fileName = item?.fileName;
   const localImage = Boolean(
     typeof src === "string" && (src.startsWith("blob:") || src.startsWith("data:")),
@@ -71,6 +81,8 @@ export function ImagePart({
   );
   const [brokenImageSrc, setBrokenImageSrc] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(localImage);
+  const [imageActionBusy, setImageActionBusy] = useState(false);
+  const [imageActionNotice, setImageActionNotice] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { canCacheMediaFile } = getCurrentMediaActionCapabilities();
 
@@ -127,6 +139,16 @@ export function ImagePart({
   }, [brokenImageSrc, cached, imageSrc, localFileSrc, localImage]);
 
   const visibleImageSrc = imageVisibleSource(localFileSrc, imageSrc, brokenImageSrc);
+  const imageActionPayload = imageActionSrc
+    ? {
+        url: imageActionSrc,
+        fileName: fileName || "image.png",
+        kind: "image" as const,
+        authToken,
+        accountId: mediaCacheContext?.accountId,
+        conversationId: mediaCacheContext?.conversationId,
+      }
+    : undefined;
 
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     const failedSrc = event.currentTarget.currentSrc || event.currentTarget.src || visibleImageSrc;
@@ -137,14 +159,41 @@ export function ImagePart({
     }
     loadCachedMedia();
   };
+  const runImageAction = useCallback(
+    async (action: () => Promise<unknown>, successText: string) => {
+      setImageActionBusy(true);
+      setImageActionNotice(null);
+      try {
+        await action();
+        setImageActionNotice(successText);
+        window.setTimeout(() => setImageActionNotice(null), 1800);
+      } catch (error) {
+        setImageActionNotice(formatError(error));
+      } finally {
+        setImageActionBusy(false);
+      }
+    },
+    [],
+  );
 
   return (
     <div className="message-media">
       <ImageMessageFrame
         altText={fileName || "图片消息"}
+        actionBusy={imageActionBusy}
+        actionNotice={imageActionNotice}
         fileName={fileName}
         imageLoaded={imageLoaded}
         onClosePreview={() => setPreviewOpen(false)}
+        onCopyImage={
+          imageActionPayload
+            ? () =>
+                runImageAction(
+                  () => copyCurrentMessageImage(imageActionPayload),
+                  "图片已复制",
+                )
+            : undefined
+        }
         onImageError={handleImageError}
         onImageLoad={() => {
           setImageLoaded(true);
@@ -155,12 +204,39 @@ export function ImagePart({
         onOpenPreview={() => {
           if (imageLoaded && visibleImageSrc) setPreviewOpen(true);
         }}
+        onRetryImage={() => {
+          setBrokenImageSrc(null);
+          setImageLoaded(localImage);
+          loadCachedMedia();
+        }}
+        onRevealImage={
+          imageActionPayload
+            ? () =>
+                runImageAction(
+                  () => revealCurrentMessageImageInFolder(imageActionPayload),
+                  "已打开文件位置",
+                )
+            : undefined
+        }
+        onSaveImageAs={
+          imageActionPayload
+            ? () =>
+                runImageAction(
+                  () => saveCurrentMessageImageAs(imageActionPayload),
+                  "已另存图片",
+                )
+            : undefined
+        }
         previewOpen={previewOpen}
-        sourceAvailable={Boolean(src && !failed)}
+        sourceAvailable={Boolean(visibleImageSrc || (src && !failed))}
         src={visibleImageSrc}
       />
     </div>
   );
+}
+
+function isTransientImageUrl(value: string) {
+  return /^(blob:|data:)/i.test(value);
 }
 
 export function VoicePart({

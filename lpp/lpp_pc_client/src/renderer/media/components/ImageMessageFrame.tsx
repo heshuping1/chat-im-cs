@@ -1,14 +1,21 @@
-import { ImageIcon, X } from "lucide-react";
+import { Copy, Download, FolderOpen, ImageIcon, X } from "lucide-react";
+import { useEffect } from "react";
 import type { SyntheticEvent } from "react";
 
 export function ImageMessageFrame({
   altText,
   fileName,
   imageLoaded,
+  actionBusy = false,
+  actionNotice,
   onClosePreview,
+  onCopyImage,
   onImageError,
   onImageLoad,
   onOpenPreview,
+  onRetryImage,
+  onRevealImage,
+  onSaveImageAs,
   previewOpen,
   src,
   sourceAvailable,
@@ -16,14 +23,29 @@ export function ImageMessageFrame({
   altText: string;
   fileName?: string;
   imageLoaded: boolean;
+  actionBusy?: boolean;
+  actionNotice?: string | null;
   onClosePreview: () => void;
+  onCopyImage?: () => void;
   onImageError: (event: SyntheticEvent<HTMLImageElement>) => void;
   onImageLoad: () => void;
   onOpenPreview: () => void;
+  onRetryImage?: () => void;
+  onRevealImage?: () => void;
+  onSaveImageAs?: () => void;
   previewOpen: boolean;
   src?: string;
   sourceAvailable: boolean;
 }) {
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClosePreview();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClosePreview, previewOpen]);
+
   return (
     <>
       {sourceAvailable ? (
@@ -52,7 +74,12 @@ export function ImageMessageFrame({
       ) : (
         <span className="message-media-empty">
           <ImageIcon size={18} />
-          {fileName || "图片消息"}
+          <em>{fileName || "图片消息"}</em>
+          {onRetryImage && (
+            <button className="message-image-retry" type="button" onClick={onRetryImage}>
+              重新加载
+            </button>
+          )}
         </span>
       )}
       {previewOpen && src && (
@@ -71,6 +98,43 @@ export function ImageMessageFrame({
           >
             <X size={20} />
           </button>
+          <div
+            className="message-image-viewer-toolbar"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              disabled={actionBusy || !onCopyImage}
+              onClick={onCopyImage}
+              type="button"
+            >
+              <Copy size={16} />
+              复制图片
+            </button>
+            <button
+              disabled={actionBusy || !onSaveImageAs}
+              onClick={onSaveImageAs}
+              type="button"
+            >
+              <Download size={16} />
+              另存为
+            </button>
+            <button
+              disabled={actionBusy || !onRevealImage}
+              onClick={onRevealImage}
+              type="button"
+            >
+              <FolderOpen size={16} />
+              显示位置
+            </button>
+          </div>
+          {actionNotice && (
+            <div
+              className="message-image-viewer-notice"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {actionNotice}
+            </div>
+          )}
           <img
             src={src}
             alt={fileName || "图片预览"}

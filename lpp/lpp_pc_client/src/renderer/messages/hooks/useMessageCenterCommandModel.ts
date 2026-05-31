@@ -2,12 +2,15 @@ import { useMemo } from "react";
 
 import type { ComposerMediaKind } from "../../composer/domain/detectComposerMediaKind";
 import type { MessageItemDto } from "../../data/api/types";
+import type { NormalizedContactCard } from "../models/contactCardModel";
 import { logMessageCenterDiagnostic } from "../diagnostics/message-center-diagnostics";
 import type { MessageContextAction } from "../models/messageContextMenuModel";
 
 export interface MessageCenterCommandModel {
   deleteSelectedMessages: () => Promise<void>;
   menuAction: (action: MessageContextAction, message: MessageItemDto) => Promise<void>;
+  openContactCardPicker: () => void;
+  sendContactCard: (card: NormalizedContactCard) => Promise<void> | void;
   sendMedia: (file: File, kind: ComposerMediaKind) => Promise<void>;
   sendText: (content: string) => void;
   unreadJump: () => void;
@@ -48,6 +51,32 @@ export function useMessageCenterCommandModel(
             messageId: message.messageId,
             messageType: message.messageType,
             conversationId: message.conversationId,
+          });
+          throw error;
+        });
+      },
+      openContactCardPicker: () => {
+        logMessageCenterDiagnostic({
+          event: "command.invoked",
+          phase: "command",
+          result: "ok",
+          reason: "open_contact_card_picker",
+        });
+        commands.openContactCardPicker();
+      },
+      sendContactCard: async (card) => {
+        logMessageCenterDiagnostic({
+          event: "command.invoked",
+          phase: "command",
+          result: "ok",
+          reason: "send_contact_card",
+          context: {
+            hasUserId: Boolean(card.userId),
+          },
+        });
+        return Promise.resolve(commands.sendContactCard(card)).catch((error) => {
+          logCommandFailed("send_contact_card", error, {
+            hasUserId: Boolean(card.userId),
           });
           throw error;
         });
@@ -110,6 +139,8 @@ export function useMessageCenterCommandModel(
     [
       commands.deleteSelectedMessages,
       commands.menuAction,
+      commands.openContactCardPicker,
+      commands.sendContactCard,
       commands.sendMedia,
       commands.sendText,
       commands.unreadJump,

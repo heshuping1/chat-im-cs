@@ -1,4 +1,4 @@
-import { ChevronLeft, Clock3, PanelRight, Search } from "lucide-react";
+import { ChevronLeft, PanelRight, Search } from "lucide-react";
 
 import type { ConversationListItem } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
@@ -21,9 +21,8 @@ export function MessageChatHeader({
   unreadIdentity,
   onOpenConversationDrawer,
   onOpenStandaloneProfile,
-  onToggleHistory,
+  onToggleLookup,
   onToggleProfileVisible,
-  onToggleSearch,
 }: {
   conversation: ConversationListItem;
   conversationIsGroup: boolean;
@@ -36,10 +35,10 @@ export function MessageChatHeader({
   unreadIdentity?: CurrentUserIdentity | null;
   onOpenConversationDrawer: () => void;
   onOpenStandaloneProfile: () => void;
-  onToggleHistory: () => void;
+  onToggleLookup: () => void;
   onToggleProfileVisible: () => void;
-  onToggleSearch: () => void;
 }) {
+  const lookupOpen = messageSearchOpen || historyOpen;
   return (
     <header className="e-chat-header">
       <div className={`e-chat-title ${conversationIsGroup ? "group-title" : ""}`}>
@@ -70,25 +69,15 @@ export function MessageChatHeader({
       </div>
       <div className="e-chat-actions">
         <button
-          className={`e-icon-button ${messageSearchOpen ? "active" : ""}`}
+          className={`e-icon-button ${lookupOpen ? "active" : ""}`}
           type="button"
-          aria-label={conversationIsGroup ? "查找聊天记录" : "查找"}
-          title={conversationIsGroup ? "查找聊天记录" : "查找"}
-          onClick={onToggleSearch}
+          aria-label="查找聊天内容"
+          title="查找聊天内容"
+          aria-pressed={lookupOpen}
+          onClick={onToggleLookup}
         >
           <Search size={18} />
         </button>
-        {!conversationIsGroup && (
-          <button
-            className={`e-icon-button ${historyOpen ? "active" : ""}`}
-            type="button"
-            aria-label="历史"
-            title="历史"
-            onClick={onToggleHistory}
-          >
-            <Clock3 size={18} />
-          </button>
-        )}
         <button
           className={`e-icon-button ${
             layoutMode === "full"

@@ -19,6 +19,7 @@ export function MessageComposerSurface({
   onDraftEditorStateChange,
   onDraftPreviewChange,
   onKnowledgeBase,
+  onOpenContactCardPicker,
   onResizeStart,
   onSendMedia,
   onSendText,
@@ -34,6 +35,7 @@ export function MessageComposerSurface({
   onDraftEditorStateChange: (value: string) => void;
   onDraftPreviewChange: (value: string) => void;
   onKnowledgeBase: () => void;
+  onOpenContactCardPicker: () => void;
   onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void;
   onSendMedia: (file: File, kind: ComposerMediaKind) => void | Promise<void>;
   onSendText: (content: string) => void | Promise<void>;
@@ -103,6 +105,7 @@ export function MessageComposerSurface({
       }
       onSendText={onSendText}
       onTranslateDraft={onTranslateDraft}
+      onOpenContactCardPicker={onOpenContactCardPicker}
       onSendMedia={onSendMedia}
     />
   );

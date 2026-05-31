@@ -40,6 +40,7 @@ export type LocalUploadPhase =
   | "sending"
   | "failed"
   | "sent";
+export type OutgoingMessageType = "text" | "image" | "video" | "file" | "contact_card";
 
 export async function invalidateMessages(queryClient: QueryClient) {
   await Promise.all([
@@ -52,7 +53,7 @@ export function appendLocalMessage(
   queryClient: QueryClient,
   session: AuthSession | null,
   conversation: ConversationListItem,
-  messageType: "text" | "image" | "video" | "file",
+  messageType: OutgoingMessageType,
   body: Record<string, unknown>,
   result: { messageId?: string; conversationId?: string; conversationSeq?: number; serverTime?: string },
   options: {
@@ -153,7 +154,7 @@ export function replaceLocalMessageInCache(
   session: AuthSession | null,
   conversation: ConversationListItem,
   localMessageId: string,
-  messageType: "text" | "image" | "video" | "file",
+  messageType: OutgoingMessageType,
   body: Record<string, unknown>,
   result: { messageId?: string; conversationId?: string; conversationSeq?: number; serverTime?: string },
 ) {
@@ -735,7 +736,7 @@ function patchConversationAfterMessageMutation(
 }
 
 function previewFromOutgoingBody(
-  messageType: "text" | "image" | "video" | "file",
+  messageType: OutgoingMessageType,
   body: Record<string, unknown>,
 ) {
   return messagePreviewFromBody(body, messageType);

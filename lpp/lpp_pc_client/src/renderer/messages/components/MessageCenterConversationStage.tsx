@@ -56,6 +56,12 @@ export function MessageCenterConversationStage({
   activeConversationReadState,
   activeConversationType,
   avatarProfilePopover,
+  contactCardActionPending,
+  contactCardProfile,
+  contactCardProfileData,
+  contactCardProfileError,
+  contactCardProfileLoading,
+  contactCardRelation,
   chatPanelRef,
   composerDialog,
   composerHeight,
@@ -101,12 +107,20 @@ export function MessageCenterConversationStage({
   multiSelectMode,
   notice,
   onAvatarProfileClose,
+  onContactCardAccept,
+  onContactCardBlock,
+  onContactCardClose,
+  onContactCardDeleteFriend,
+  onContactCardReject,
+  onContactCardSendRequest,
+  onContactCardStartChat,
   onCloseComposerDialog,
   onCloseForward,
   onCloseResend,
   onCreateDirectChat,
   onCreateGroupChat,
   onCreateInviteQr,
+  onSendContactCard,
   onForwardToConversation,
   onFailedMessageClick,
   onMessageElementRef,
@@ -152,8 +166,14 @@ export function MessageCenterConversationStage({
   activeConversationReadState?: ConversationReadState;
   activeConversationType?: "direct" | "group";
   avatarProfilePopover: AvatarProfilePopoverState | null;
+  contactCardActionPending?: boolean;
+  contactCardProfile: MessageOverlayProps["contactCardProfile"];
+  contactCardProfileData: MessageOverlayProps["contactCardProfileData"];
+  contactCardProfileError: MessageOverlayProps["contactCardProfileError"];
+  contactCardProfileLoading: MessageOverlayProps["contactCardProfileLoading"];
+  contactCardRelation: MessageOverlayProps["contactCardRelation"];
   chatPanelRef: Ref<HTMLElement>;
-  composerDialog: "direct" | "group" | "qr" | null;
+  composerDialog: "direct" | "group" | "qr" | "card" | null;
   composerHeight: number;
   contactPickerItems: ContactPickerItem[];
   conversationMenu: MessageOverlayProps["conversationMenu"];
@@ -199,12 +219,20 @@ export function MessageCenterConversationStage({
   multiSelectMode: boolean;
   notice: string | null;
   onAvatarProfileClose: () => void;
+  onContactCardAccept: MessageOverlayProps["onContactCardAccept"];
+  onContactCardBlock: MessageOverlayProps["onContactCardBlock"];
+  onContactCardClose: MessageOverlayProps["onContactCardClose"];
+  onContactCardDeleteFriend: MessageOverlayProps["onContactCardDeleteFriend"];
+  onContactCardReject: MessageOverlayProps["onContactCardReject"];
+  onContactCardSendRequest: MessageOverlayProps["onContactCardSendRequest"];
+  onContactCardStartChat: MessageOverlayProps["onContactCardStartChat"];
   onCloseComposerDialog: () => void;
   onCloseForward: () => void;
   onCloseResend: () => void;
   onCreateDirectChat: (userId: string) => void;
   onCreateGroupChat: (payload: { name: string; memberUserIds: string[] }) => void;
   onCreateInviteQr: () => void;
+  onSendContactCard: ComponentProps<typeof MessageDialogsLayer>["onSendContactCard"];
   onForwardToConversation: (targetConversationId: string) => void;
   onFailedMessageClick: (message: MessageItemDto) => void;
   onMessageElementRef: (messageId: string, element: HTMLDivElement | null) => void;
@@ -263,15 +291,14 @@ export function MessageCenterConversationStage({
               unreadIdentity={unreadIdentity}
               onOpenConversationDrawer={() => setConversationDrawerOpen(true)}
               onOpenStandaloneProfile={() => setProfileStandaloneOpen(true)}
-              onToggleHistory={() => {
-                setHistoryOpen((value) => !value);
-                setMessageSearchOpen(false);
+              onToggleLookup={() => {
+                const nextOpen = !(messageSearchOpen || historyOpen);
+                setProfileStandaloneOpen(false);
+                setHistoryOpen(nextOpen);
+                setMessageSearchOpen(nextOpen);
+                if (nextOpen) setHistoryFilter("all");
               }}
               onToggleProfileVisible={() => setMessageProfileVisible(!messageProfileVisible)}
-              onToggleSearch={() => {
-                setMessageSearchOpen((value) => !value);
-                setHistoryOpen(false);
-              }}
             />
 
             {notice && <ChatToastNotice text={notice} />}
@@ -319,6 +346,10 @@ export function MessageCenterConversationStage({
                 isMineMessage={(message) => isMineMessage(message, session)}
                 onAvatarClick={handleAvatarClick}
                 onClearMessageSearch={() => setMessageSearchKeyword("")}
+                onCloseMessageLookup={() => {
+                  setHistoryOpen(false);
+                  setMessageSearchOpen(false);
+                }}
                 onContactClick={handleContactCardClick}
                 onContextMenu={openMessageMenu}
                 onFailedMessageClick={onFailedMessageClick}
@@ -364,12 +395,25 @@ export function MessageCenterConversationStage({
 
             <MessageOverlayLayer
               avatarProfilePopover={avatarProfilePopover}
+              contactCardActionPending={contactCardActionPending}
+              contactCardProfile={contactCardProfile}
+              contactCardProfileData={contactCardProfileData}
+              contactCardProfileError={contactCardProfileError}
+              contactCardProfileLoading={contactCardProfileLoading}
+              contactCardRelation={contactCardRelation}
               conversationMenu={conversationMenu}
               messageMenu={messageMenu}
               messageMenuMediaStatus={messageMenuMediaStatus}
               profileStandaloneOpen={profileStandaloneOpen}
               isMineMessage={(message) => isMineMessage(message, session)}
               onAvatarProfileClose={onAvatarProfileClose}
+              onContactCardAccept={onContactCardAccept}
+              onContactCardBlock={onContactCardBlock}
+              onContactCardClose={onContactCardClose}
+              onContactCardDeleteFriend={onContactCardDeleteFriend}
+              onContactCardReject={onContactCardReject}
+              onContactCardSendRequest={onContactCardSendRequest}
+              onContactCardStartChat={onContactCardStartChat}
               onConversationAction={handleConversationMenuAction}
               onMessageAction={(action, message) =>
                 void messageCenterCommands.menuAction(action, message)
@@ -454,6 +498,7 @@ export function MessageCenterConversationStage({
               onCreateDirectChat={onCreateDirectChat}
               onCreateGroupChat={onCreateGroupChat}
               onCreateInviteQr={onCreateInviteQr}
+              onSendContactCard={onSendContactCard}
               onForward={onForwardToConversation}
               onResend={onResendMessage}
             />

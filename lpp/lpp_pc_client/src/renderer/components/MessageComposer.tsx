@@ -7,6 +7,7 @@ import {
   Plus,
   Scissors,
   Smile,
+  UserRound,
   Video,
 } from "lucide-react";
 import type {
@@ -68,6 +69,7 @@ export function MessageComposer({
   onDraftPreviewChange,
   onDraftEditorStateChange,
   onTranslateDraft,
+  onOpenContactCardPicker,
   onSendText,
   onSendMedia,
 }: {
@@ -89,6 +91,7 @@ export function MessageComposer({
   onDraftPreviewChange?: (value: string) => void;
   onDraftEditorStateChange?: (value: string) => void;
   onTranslateDraft?: (content: string) => Promise<string | undefined>;
+  onOpenContactCardPicker?: () => void;
   onSendText: (content: string) => void | Promise<void>;
   onSendMedia: (file: File, kind: ComposerMediaKind) => void | Promise<void>;
 }) {
@@ -513,8 +516,22 @@ export function MessageComposer({
               <span>视频</span>
               <em>待接入</em>
             </button>
+            <button
+              className="composer-plus-item"
+              type="button"
+              aria-label="名片"
+              disabled={disabled}
+              onClick={() => {
+                setMoreOpen(false);
+                onOpenContactCardPicker?.();
+              }}
+            >
+              <UserRound size={17} />
+              <span>名片</span>
+              <em>联系人</em>
+            </button>
           </div>
-          <p>位置、名片等发送能力需要完整选择器和服务端联调后再开放。</p>
+          <p>选择联系人后发送个人名片。</p>
         </div>
       )}
       {mentionCandidates.length > 0 && (

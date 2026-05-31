@@ -79,7 +79,7 @@ function StaffContactDetail({ contact }: { contact: ContactItem }) {
   return (
     <>
       <div className="contacts-info-grid">
-        <InfoCard label="员工角色" value={contact.roleLabel || "--"} />
+        <InfoCard label="组织角色" value={contact.roleLabel || "--"} />
         <InfoCard label="所属部门" value={contact.departmentName || "--"} />
         <InfoCard label="职位" value={contact.position || "--"} />
         <InfoCard label="加入时间" value={formatShortDate(contact.joinedAt)} />

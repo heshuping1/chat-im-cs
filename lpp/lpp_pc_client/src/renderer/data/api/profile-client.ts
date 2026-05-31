@@ -118,10 +118,23 @@ export class ProfileApiClient extends AuthApiClient {
     return this.request<BlockedUserDto[]>(endpointPlan.blocklist);
   }
 
+  blockUser(blockedUserId: string) {
+    return this.request<{ blockedUserId?: string }>(endpointPlan.blocklist, {
+      method: "POST",
+      body: JSON.stringify({ blockedUserId }),
+    });
+  }
+
   unblockUser(blockedUserId: string) {
     return this.request<{ blockedUserId?: string }>(
       endpointPlan.blocklistItem.replace("{blockedUserId}", blockedUserId),
       { method: "DELETE" },
+    );
+  }
+
+  getUserProfile(userId: string) {
+    return this.request<UserProfileDto>(
+      endpointPlan.userProfile.replace("{userId}", encodeURIComponent(userId)),
     );
   }
 

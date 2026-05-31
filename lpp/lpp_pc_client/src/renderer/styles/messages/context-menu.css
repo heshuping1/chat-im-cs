@@ -136,3 +136,165 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.contact-card-profile-backdrop {
+  z-index: 76;
+}
+
+.contact-card-profile-dialog {
+  position: relative;
+  display: grid;
+  width: min(392px, calc(100vw - 44px));
+  gap: 13px;
+  padding: 18px;
+  border: 1px solid var(--pc-border, rgba(211, 222, 234, 0.96));
+  border-radius: 12px;
+  background: var(--pc-surface, #fbfdff);
+  box-shadow: 0 22px 54px rgba(20, 35, 55, 0.16);
+  color: var(--pc-text, #142033);
+}
+
+.contact-card-profile-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8a9ab0;
+}
+
+.contact-card-profile-close:hover {
+  background: rgba(238, 244, 249, 0.9);
+  color: #334155;
+}
+
+.contact-card-profile-dialog header {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding-right: 30px;
+}
+
+.contact-card-profile-avatar {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 13px !important;
+  font-size: 21px !important;
+}
+
+.contact-card-profile-dialog header strong,
+.contact-card-profile-dialog header span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-card-profile-dialog header strong {
+  font-size: 17px;
+  font-weight: 860;
+}
+
+.contact-card-profile-dialog header span {
+  margin-top: 4px;
+  color: #708199;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.contact-card-profile-rows {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pc-border-soft, rgba(223, 230, 239, 0.9));
+}
+
+.contact-card-profile-rows div {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.contact-card-profile-rows span,
+.contact-card-profile-request span {
+  color: #8999ac;
+  font-weight: 760;
+}
+
+.contact-card-profile-rows strong {
+  overflow: hidden;
+  color: #2f4056;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-card-profile-hint {
+  margin: 0;
+  color: #74849a;
+  font-size: 12px;
+}
+
+.contact-card-profile-request {
+  display: grid;
+  gap: 7px;
+}
+
+.contact-card-profile-request textarea {
+  min-height: 68px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid var(--pc-border, #dce6f2);
+  border-radius: 9px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  outline: 0;
+}
+
+.contact-card-profile-request textarea:focus {
+  border-color: var(--pc-primary, #10b981);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.13);
+}
+
+.contact-card-profile-dialog footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.contact-card-profile-dialog footer button {
+  min-width: 82px;
+  height: 34px;
+  border: 1px solid var(--pc-border, #dce6f2);
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  font-weight: 780;
+}
+
+.contact-card-profile-dialog footer button.primary {
+  border-color: var(--pc-primary, #10b981);
+  background: var(--pc-primary, #10b981);
+  color: #fff;
+}
+
+.contact-card-profile-dialog footer button.danger {
+  border-color: rgba(239, 68, 68, 0.34);
+  color: #dc2626;
+}
+
+.contact-card-profile-dialog footer button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

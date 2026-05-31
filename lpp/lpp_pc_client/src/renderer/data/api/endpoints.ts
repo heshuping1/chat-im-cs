@@ -15,6 +15,7 @@ export const endpointPlan = {
   changePassword: "/api/client/v1/auth/change-password",
   blocklist: "/api/client/v1/blocklist",
   blocklistItem: "/api/client/v1/blocklist/{blockedUserId}",
+  userProfile: "/api/client/v1/users/{userId}/profile",
   friendInviteQr: "/api/client/v1/friends/invite-qr",
   favoritesSummary: "/api/client/v1/favorites/summary",
   favoritesList: "/api/client/v1/favorites/list",
@@ -22,8 +23,10 @@ export const endpointPlan = {
   enterpriseAnnouncementRead:
     "/api/client/v1/enterprise/announcements/{announcementId}/read",
   friends: "/api/client/v1/friends",
+  friendRequest: "/api/client/v1/friends/request",
   friendRequests: "/api/client/v1/friends/requests",
   friendRequestHandle: "/api/client/v1/friends/requests/{requestId}/handle",
+  friendItem: "/api/client/v1/friends/{friendUserId}",
   tenantMembers: "/api/client/v1/tenant/members",
   departments: "/api/client/v1/departments/",
   departmentMembers: "/api/client/v1/departments/{departmentId}/members",

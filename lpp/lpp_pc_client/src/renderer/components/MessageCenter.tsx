@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   ConversationListItem,
@@ -68,6 +68,12 @@ import {
   groupCompositeAvatarCells,
 } from "../messages/models/groupAvatarModel";
 import type { ReplyTarget } from "../messages/models/messageComposerModel";
+import {
+  contactCardActionErrorText,
+  normalizeContactCard,
+  resolveContactCardRelation,
+  type NormalizedContactCard,
+} from "../messages/models/contactCardModel";
 import { clampComposerHeight } from "../messages/models/messageComposerLayoutModel";
 import {
   buildGroupMemberMap,
@@ -80,6 +86,7 @@ import { useMessageCenterCommandModel } from "../messages/hooks/useMessageCenter
 import { useMessageResponsiveLayout } from "../messages/hooks/useMessageResponsiveLayout";
 import { useSerialTaskQueue } from "../messages/hooks/useSerialTaskQueue";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
+import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
 
 type MessageMenuState = {
   message: MessageItemDto;
@@ -129,6 +136,10 @@ export function MessageCenter() {
   const [conversationMenu, setConversationMenu] = useState<ConversationMenuState>(null);
   const [avatarProfilePopover, setAvatarProfilePopover] =
     useState<AvatarProfilePopoverState | null>(null);
+  const [contactCardProfile, setContactCardProfile] =
+    useState<NormalizedContactCard | null>(null);
+  const [localOutgoingContactRequestIds, setLocalOutgoingContactRequestIds] =
+    useState<Set<string>>(() => new Set());
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(
     () => new Set(),
@@ -141,7 +152,7 @@ export function MessageCenter() {
   const [conversationDrawerOpen, setConversationDrawerOpen] = useState(false);
   const [profileStandaloneOpen, setProfileStandaloneOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
-  const [composerDialog, setComposerDialog] = useState<"direct" | "group" | "qr" | null>(null);
+  const [composerDialog, setComposerDialog] = useState<"direct" | "group" | "qr" | "card" | null>(null);
   const [unreadJump, setUnreadJump] = useState<UnreadJumpState | null>(null);
   const [messageAnnotations, setMessageAnnotations] = useState<
     Record<string, string>
@@ -256,6 +267,46 @@ export function MessageCenter() {
     friendsQuery,
     inviteQrsQuery,
   } = useMessageContactPickerData(session, composerDialog);
+  const friendRequestsQuery = useQuery({
+    queryKey: ["pc-friend-requests", session?.apiBaseUrl, session?.tenantToken],
+    enabled: Boolean(session),
+    queryFn: async () => requireApiClient(session).getFriendRequests(),
+    staleTime: 30_000,
+  });
+  const contactCardProfileQuery = useQuery({
+    queryKey: [
+      "pc-user-profile",
+      session?.apiBaseUrl,
+      session?.tenantToken,
+      contactCardProfile?.userId ?? "",
+    ],
+    enabled: Boolean(session && contactCardProfile?.userId),
+    queryFn: async () => requireApiClient(session).getUserProfile(contactCardProfile!.userId),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const contactCardRelation = useMemo(() => {
+    if (!contactCardProfile) return undefined;
+    const relation = resolveContactCardRelation({
+      card: contactCardProfile,
+      friends: friendsQuery.data ?? [],
+      requests: friendRequestsQuery.data ?? [],
+      session,
+    });
+    if (
+      relation.status === "none" &&
+      localOutgoingContactRequestIds.has(contactCardProfile.userId)
+    ) {
+      return { status: "outgoingPending" as const, requestId: "local" };
+    }
+    return relation;
+  }, [
+    contactCardProfile,
+    friendRequestsQuery.data,
+    friendsQuery.data,
+    localOutgoingContactRequestIds,
+    session,
+  ]);
 
   const {
     createDirectChatMutation,
@@ -267,6 +318,59 @@ export function MessageCenter() {
     setActiveConversation,
     setComposerDialog,
     setNotice,
+  });
+  const refreshContactRelation = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["pc-friends"] }),
+      queryClient.invalidateQueries({ queryKey: ["pc-friend-requests"] }),
+      queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.accountBlocklist(session?.apiBaseUrl, session?.tenantToken),
+      }),
+      queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] }),
+      queryClient.invalidateQueries({ queryKey: ["pc-user-profile"] }),
+    ]);
+  }, [queryClient, session?.apiBaseUrl, session?.tenantToken]);
+  const sendFriendRequestMutation = useMutation({
+    mutationFn: async (message: string) => {
+      if (!contactCardProfile?.userId) throw new Error("名片缺少用户 ID");
+      return requireApiClient(session).sendFriendRequest(contactCardProfile.userId, message);
+    },
+    onSuccess: async () => {
+      const targetUserId = contactCardProfile?.userId;
+      if (targetUserId) {
+        setLocalOutgoingContactRequestIds((current) => new Set(current).add(targetUserId));
+      }
+      setNotice("好友申请已发送");
+      await refreshContactRelation();
+    },
+    onError: (error) => setNotice(contactCardActionErrorText(error, "发送好友申请失败")),
+  });
+  const handleFriendRequestMutation = useMutation({
+    mutationFn: async (payload: { action: "accept" | "reject"; requestId: string }) =>
+      requireApiClient(session).handleFriendRequest(payload.requestId, payload.action),
+    onSuccess: async (_result, payload) => {
+      setNotice(payload.action === "accept" ? "已通过好友申请" : "已拒绝好友申请");
+      await refreshContactRelation();
+    },
+    onError: (error) => setNotice(contactCardActionErrorText(error, "处理好友申请失败")),
+  });
+  const deleteFriendMutation = useMutation({
+    mutationFn: async (friendUserId: string) =>
+      requireApiClient(session).deleteFriend(friendUserId),
+    onSuccess: async () => {
+      setNotice("已删除好友");
+      await refreshContactRelation();
+    },
+    onError: (error) => setNotice(contactCardActionErrorText(error, "删除好友失败")),
+  });
+  const blockUserMutation = useMutation({
+    mutationFn: async (userId: string) => requireApiClient(session).blockUser(userId),
+    onSuccess: async () => {
+      setNotice("已加入黑名单");
+      setContactCardProfile(null);
+      await refreshContactRelation();
+    },
+    onError: (error) => setNotice(contactCardActionErrorText(error, "加入黑名单失败")),
   });
 
   const {
@@ -376,7 +480,11 @@ export function MessageCenter() {
       `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`,
     messages,
   });
-  const { retryTextMessage, sendTextOptimistically } = useMessageTextSendController({
+  const {
+    retryTextMessage,
+    sendContactCardOptimistically,
+    sendTextOptimistically,
+  } = useMessageTextSendController({
     activeConversation,
     activeConversationType,
     enqueueOutgoingTask,
@@ -421,6 +529,7 @@ export function MessageCenter() {
 
   useWindowDismiss(Boolean(conversationMenu), () => setConversationMenu(null));
   useWindowDismiss(Boolean(avatarProfilePopover), () => setAvatarProfilePopover(null));
+  useWindowDismiss(Boolean(contactCardProfile), () => setContactCardProfile(null));
 
   const {
     handleAvatarClick,
@@ -440,6 +549,7 @@ export function MessageCenter() {
     session,
     setActiveConversation,
     setAvatarProfilePopover,
+    setContactCardProfile,
     setConversationMenu,
     setLocalHiddenConversationIds,
     setLocalMutedConversationIds,
@@ -489,6 +599,8 @@ export function MessageCenter() {
   const messageCenterCommands = useMessageCenterCommandModel({
     deleteSelectedMessages: handleBatchDeleteSelected,
     menuAction: handleMenuAction,
+    openContactCardPicker: () => setComposerDialog("card"),
+    sendContactCard: sendContactCardOptimistically,
     sendMedia: sendMediaOptimistically,
     sendText: sendTextOptimistically,
     unreadJump: handleUnreadJump,
@@ -559,6 +671,17 @@ export function MessageCenter() {
         activeConversationReadState={activeConversationReadState}
         activeConversationType={activeConversationType}
         avatarProfilePopover={avatarProfilePopover}
+        contactCardActionPending={
+          sendFriendRequestMutation.isPending ||
+          handleFriendRequestMutation.isPending ||
+          deleteFriendMutation.isPending ||
+          blockUserMutation.isPending
+        }
+        contactCardProfile={contactCardProfile}
+        contactCardProfileData={contactCardProfileQuery.data}
+        contactCardProfileError={contactCardProfileQuery.error}
+        contactCardProfileLoading={contactCardProfileQuery.isLoading}
+        contactCardRelation={contactCardRelation}
         chatPanelRef={chatPanelRef}
         composerDialog={composerDialog}
         composerHeight={composerHeight}
@@ -604,12 +727,55 @@ export function MessageCenter() {
         multiSelectMode={multiSelectMode}
         notice={notice}
         onAvatarProfileClose={() => setAvatarProfilePopover(null)}
+        onContactCardAccept={() => {
+          if (contactCardRelation?.status !== "incomingPending") return;
+          handleFriendRequestMutation.mutate({
+            action: "accept",
+            requestId: contactCardRelation.requestId,
+          });
+        }}
+        onContactCardBlock={() => {
+          if (!contactCardProfile?.userId) return;
+          if (!requestMessageDangerConfirmation({ action: "block-user" })) {
+            return;
+          }
+          blockUserMutation.mutate(contactCardProfile.userId);
+        }}
+        onContactCardClose={() => setContactCardProfile(null)}
+        onContactCardDeleteFriend={() => {
+          if (contactCardRelation?.status !== "friend") return;
+          if (!requestMessageDangerConfirmation({ action: "delete-friend" })) return;
+          deleteFriendMutation.mutate(contactCardRelation.friendUserId);
+        }}
+        onContactCardReject={() => {
+          if (contactCardRelation?.status !== "incomingPending") return;
+          handleFriendRequestMutation.mutate({
+            action: "reject",
+            requestId: contactCardRelation.requestId,
+          });
+        }}
+        onContactCardSendRequest={(message) => sendFriendRequestMutation.mutate(message)}
+        onContactCardStartChat={() => {
+          if (!contactCardProfile?.userId) return;
+          setContactCardProfile(null);
+          createDirectChatMutation.mutate(contactCardProfile.userId);
+        }}
         onCloseComposerDialog={() => setComposerDialog(null)}
         onCloseForward={() => setForwardTargetMessages([])}
         onCloseResend={() => setResendConfirmMessage(null)}
         onCreateDirectChat={(userId) => createDirectChatMutation.mutate(userId)}
         onCreateGroupChat={(payload) => createGroupChatMutation.mutate(payload)}
         onCreateInviteQr={() => createInviteQrMutation.mutate()}
+        onSendContactCard={(contact) => {
+          messageCenterCommands.sendContactCard(
+            normalizeContactCard({
+              userId: contact.id,
+              displayName: contact.name,
+              avatarUrl: contact.avatarUrl,
+            }),
+          );
+          setComposerDialog(null);
+        }}
         onFailedMessageClick={setResendConfirmMessage}
         onForwardToConversation={(targetConversationId) =>
           forwardMutation.mutate({

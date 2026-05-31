@@ -9,12 +9,13 @@ import { ForwardDialog } from "./ForwardDialog";
 import { InviteQrDialog } from "./InviteQrDialog";
 import {
   DirectChatDialog,
+  ContactCardDialog,
   GroupChatDialog,
   type ContactPickerItem,
 } from "./MessageStartDialogs";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 
-type ComposerDialogKind = "direct" | "group" | "qr" | null;
+type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
 
 export function MessageDialogsLayer({
   activeConversationId,
@@ -37,6 +38,7 @@ export function MessageDialogsLayer({
   onCreateDirectChat,
   onCreateGroupChat,
   onCreateInviteQr,
+  onSendContactCard,
   onForward,
   onResend,
   resolveConversationAvatar,
@@ -63,6 +65,7 @@ export function MessageDialogsLayer({
   onCreateDirectChat: (userId: string) => void;
   onCreateGroupChat: (payload: { name: string; memberUserIds: string[] }) => void;
   onCreateInviteQr: () => void;
+  onSendContactCard: (contact: ContactPickerItem) => void;
   onForward: (targetConversationId: string) => void;
   onResend: () => void;
   resolveConversationAvatar: (
@@ -110,6 +113,14 @@ export function MessageDialogsLayer({
           pending={createGroupPending}
           onClose={onCloseComposerDialog}
           onSubmit={onCreateGroupChat}
+        />
+      )}
+      {composerDialog === "card" && (
+        <ContactCardDialog
+          contacts={contactPickerItems}
+          pending={false}
+          onClose={onCloseComposerDialog}
+          onSubmit={onSendContactCard}
         />
       )}
       {composerDialog === "qr" && (

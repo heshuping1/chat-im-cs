@@ -310,6 +310,14 @@ export interface FriendDto {
   lppNumber?: string;
 }
 
+export interface ContactCardDto {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  mobile?: string | null;
+  email?: string | null;
+}
+
 export interface FriendRequestDto {
   requestId: string;
   fromUserId: string;

@@ -64,6 +64,15 @@ describe("message list model", () => {
         }),
       ),
     ).toBe("[视频]");
+    expect(
+      messageActionPreview(
+        message({
+          body: { contactCard: { userId: "u1", displayName: "张三" } },
+          messageId: "card",
+          messageType: "contact_card",
+        }),
+      ),
+    ).toBe("[名片]");
   });
 });
 

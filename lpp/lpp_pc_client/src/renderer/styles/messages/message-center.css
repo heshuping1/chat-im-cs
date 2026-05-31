@@ -51,6 +51,44 @@
   font-weight: 950;
 }
 
+.chat-lookup-panel {
+  gap: 10px;
+}
+
+.chat-lookup-head {
+  padding: 7px 8px;
+  border: 1px solid rgba(214, 224, 236, 0.88);
+  border-radius: 11px;
+  background: rgba(248, 251, 253, 0.94);
+}
+
+.chat-lookup-head .chat-inline-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-lookup-head > button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  border: 1px solid rgba(214, 224, 236, 0.92);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #52657a;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.chat-lookup-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .chat-history-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1030,6 +1068,32 @@
   border-color: #07c160;
   background: #07c160;
   color: #fff;
+}
+
+.message-start-footer button svg {
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+
+.message-card-confirm {
+  justify-content: space-between;
+}
+
+.message-card-confirm-preview {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: #61738a;
+  font-size: 12px;
+  font-weight: 740;
+}
+
+.message-card-confirm-preview span {
+  overflow: hidden;
+  max-width: 190px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .message-start-footer button:disabled {

@@ -1,7 +1,9 @@
 import {
+  Ban,
   Building2,
   MessageSquare,
   Search,
+  Trash2,
   UserCheck,
   UserPlus,
   UserRoundX,
@@ -11,19 +13,20 @@ import { useMemo, useState } from "react";
 import { CustomerInfoPanel } from "./CustomerInfoPanel";
 import { ContactSidePanel } from "./ContactSidePanel";
 import { ContactDetailContent } from "./ContactDetailViews";
+import { ContactsInviteQrCard } from "./ContactsInviteQrCard";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
 import {
   type DepartmentDto,
+  type FriendInviteQrDto,
   type FriendRequestDto,
 } from "../data/api-client";
 import {
   contactKindBadge,
-  contactKindLabels,
   contactRowHint,
   contactRowSubtitle,
+  normalizeContactDirectoryFilter,
   requestStatusLabel,
-  sourceLabel,
 } from "../data/contact-directory";
 import type { ContactFilter, ContactItem } from "../data/types";
 import {
@@ -34,11 +37,12 @@ import {
 } from "../data/workspace-ui/workspace-ui-store";
 import { useContactsDirectoryController } from "../contacts/hooks/useContactsDirectoryController";
 import { formatError, formatShortDate } from "../lib/format";
+import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
 
 const filters: Array<{ key: ContactFilter; label: string }> = [
   { key: "customer", label: "客户" },
-  { key: "organization", label: "组织架构" },
-  { key: "staff", label: "员工" },
+  { key: "friend", label: "好友" },
+  { key: "organization", label: "组织" },
   { key: "group", label: "群聊" },
   { key: "requests", label: "申请" },
 ];
@@ -53,13 +57,21 @@ export function ContactsPage() {
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const {
     activeRequest,
+    blockContact,
     createDirectChatPending,
+    createInviteQrPending,
+    deleteFriend,
     departments,
     directoryContacts,
     directoryError,
     directoryLoading,
     handleRequest,
+    inviteQrError,
+    inviteQrLoading,
+    inviteQrs,
     openMessage,
+    onCreateInviteQr,
+    relationshipActionPending,
     requestPending,
     visibleContacts,
     visibleRequests,
@@ -70,18 +82,46 @@ export function ContactsPage() {
     setNotice,
   });
 
+  const effectiveFilter = filters.some(
+    (item) => item.key === normalizeContactDirectoryFilter(contactFilter),
+  )
+    ? normalizeContactDirectoryFilter(contactFilter)
+    : "customer";
   const activeContact =
     visibleContacts.find((item) => item.id === activeContactId) ??
     visibleContacts[0] ??
-    (contactFilter !== "requests"
+    (effectiveFilter !== "requests"
       ? directoryContacts.find((item) => item.kind === "customer") ?? directoryContacts[0]
       : undefined);
-  const effectiveFilter = filters.some((item) => item.key === contactFilter)
-    ? contactFilter
-    : "customer";
 
   const showProfilePanel =
     activeContact && activeContact.kind === "customer";
+  const relationshipActionsAvailable =
+    activeContact?.kind === "customer" || activeContact?.kind === "friend";
+
+  const handleAddContact = () => {
+    setContactFilter("requests");
+    setSelectedRequestId("");
+    setNotice("添加联系人可通过好友二维码、名片或收到的好友申请完成；申请会在这里集中处理。");
+  };
+
+  const onDeleteFriend = (contact: ContactItem) => {
+    if (!contact.userId) {
+      setNotice("当前联系人缺少用户 ID，无法删除好友。");
+      return;
+    }
+    if (!requestMessageDangerConfirmation({ action: "delete-friend" })) return;
+    deleteFriend(contact);
+  };
+
+  const onBlockContact = (contact: ContactItem) => {
+    if (!contact.userId) {
+      setNotice("当前联系人缺少用户 ID，无法加入黑名单。");
+      return;
+    }
+    if (!requestMessageDangerConfirmation({ action: "block-user" })) return;
+    blockContact(contact);
+  };
 
   return (
     <main className="contacts-page contacts-b-layout">
@@ -95,8 +135,8 @@ export function ContactsPage() {
             className="contacts-icon-button"
             type="button"
             aria-label="添加联系人"
-            title="添加联系人接口未接入"
-            disabled
+            title="添加好友与处理申请"
+            onClick={handleAddContact}
           >
             <UserPlus size={17} />
           </button>
@@ -107,7 +147,7 @@ export function ContactsPage() {
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索客户、员工、群聊、组织"
+            placeholder="搜索客户、好友、组织、群聊"
           />
         </label>
 
@@ -118,6 +158,7 @@ export function ContactsPage() {
               key={item.key}
               onClick={() => {
                 setContactFilter(item.key);
+                setSelectedRequestId("");
                 setNotice(null);
               }}
               type="button"
@@ -175,9 +216,14 @@ export function ContactsPage() {
       <section className="contacts-detail-panel">
         {effectiveFilter === "requests" ? (
           <RequestDetail
+            creatingInviteQr={createInviteQrPending}
+            inviteQrError={inviteQrError}
+            inviteQrLoading={inviteQrLoading}
+            inviteQrs={inviteQrs}
             request={activeRequest}
             pending={requestPending}
             onAccept={(requestId) => handleRequest(requestId, "accept")}
+            onCreateInviteQr={onCreateInviteQr}
             onReject={(requestId) => handleRequest(requestId, "reject")}
           />
         ) : activeContact ? (
@@ -204,18 +250,26 @@ export function ContactsPage() {
                   客户画像
                 </button>
               )}
-              {activeContact.kind !== "group" && (
-                <button type="button" title="备注编辑接口未接入" disabled>
-                  备注
+              {relationshipActionsAvailable && (
+                <button
+                  className="danger-subtle"
+                  disabled={relationshipActionPending}
+                  onClick={() => onDeleteFriend(activeContact)}
+                  type="button"
+                >
+                  <Trash2 size={15} />
+                  删除好友
                 </button>
               )}
-              {activeContact.kind === "group" ? (
-                <button type="button" title="群成员管理接口未接入" disabled>
-                  群成员
-                </button>
-              ) : (
-                <button type="button" title="历史会话接口未接入" disabled>
-                  历史会话
+              {relationshipActionsAvailable && (
+                <button
+                  className="danger-subtle"
+                  disabled={relationshipActionPending}
+                  onClick={() => onBlockContact(activeContact)}
+                  type="button"
+                >
+                  <Ban size={15} />
+                  加入黑名单
                 </button>
               )}
             </div>
@@ -225,7 +279,7 @@ export function ContactsPage() {
         ) : (
           <div className="contacts-empty-detail">
             <h2>暂无通讯录数据</h2>
-            <p>请选择客户、员工、群聊或申请查看详情。</p>
+            <p>请选择客户、好友、组织成员、群聊或申请查看详情。</p>
           </div>
         )}
       </section>
@@ -263,8 +317,13 @@ function ContactRow({
     >
       <ContactAvatar contact={contact} />
       <span className="contacts-row-copy">
-        <strong>{contact.name}</strong>
-        {roleOnly && <em>{contact.roleLabel || "员工"}</em>}
+        <span className="contacts-name-line">
+          <strong>{contact.name}</strong>
+          {roleOnly && (
+            <span className="contacts-role-chip">{contact.roleLabel || "成员"}</span>
+          )}
+        </span>
+        {roleOnly && <em>{contactRowSubtitle(contact)}</em>}
         {!nameOnly && (
           <>
             <em>{contactRowSubtitle(contact)}</em>
@@ -369,14 +428,14 @@ function OrganizationList({
         );
       })}
       {contactsWithoutDepartment.map((contact) => (
-          <ContactRow
-            active={activeContactId === contact.id}
-            compact
-            contact={contact}
-            key={contact.id}
-            onClick={() => onSelect(contact.id)}
-          />
-        ))}
+        <ContactRow
+          active={activeContactId === contact.id}
+          compact
+          contact={contact}
+          key={contact.id}
+          onClick={() => onSelect(contact.id)}
+        />
+      ))}
     </>
   );
 }
@@ -416,22 +475,41 @@ function RequestList({
 }
 
 function RequestDetail({
+  creatingInviteQr,
+  inviteQrError,
+  inviteQrLoading,
+  inviteQrs,
   request,
   pending,
   onAccept,
+  onCreateInviteQr,
   onReject,
 }: {
+  creatingInviteQr: boolean;
+  inviteQrError: unknown;
+  inviteQrLoading: boolean;
+  inviteQrs: FriendInviteQrDto[];
   request?: FriendRequestDto;
   pending: boolean;
   onAccept: (requestId: string) => void;
+  onCreateInviteQr: () => void;
   onReject: (requestId: string) => void;
 }) {
   if (!request) {
     return (
-      <div className="contacts-empty-detail">
-        <h2>暂无好友申请</h2>
-        <p>新的好友申请会在这里处理，不进入在线客服临时会话。</p>
-      </div>
+      <>
+        <div className="contacts-empty-detail">
+          <h2>暂无好友申请</h2>
+          <p>新的好友申请会在这里处理，不进入在线客服临时会话。</p>
+        </div>
+        <ContactsInviteQrCard
+          creating={creatingInviteQr}
+          error={inviteQrError}
+          loading={inviteQrLoading}
+          qrs={inviteQrs}
+          onCreate={onCreateInviteQr}
+        />
+      </>
     );
   }
   return (
@@ -491,6 +569,13 @@ function RequestDetail({
           </div>
         </div>
       </section>
+      <ContactsInviteQrCard
+        creating={creatingInviteQr}
+        error={inviteQrError}
+        loading={inviteQrLoading}
+        qrs={inviteQrs}
+        onCreate={onCreateInviteQr}
+      />
     </>
   );
 }

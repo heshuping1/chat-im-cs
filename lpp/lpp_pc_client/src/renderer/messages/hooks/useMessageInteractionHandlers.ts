@@ -5,10 +5,13 @@ import type { ConversationListItem, MessageItemDto } from "../../data/api-client
 import type { AuthSession } from "../../data/auth/auth-session";
 import {
   buildAvatarProfilePopover,
-  buildContactCardProfilePopover,
   buildGroupMemberMap,
   type AvatarProfilePopoverState,
 } from "../models/messageDisplayModel";
+import {
+  normalizeContactCard,
+  type NormalizedContactCard,
+} from "../models/contactCardModel";
 import { requestMessageDangerConfirmation } from "../runtime/messageConfirm";
 
 type MessageMenuState = {
@@ -33,6 +36,7 @@ export function useMessageInteractionHandlers({
   session,
   setActiveConversation,
   setAvatarProfilePopover,
+  setContactCardProfile,
   setConversationMenu,
   setLocalHiddenConversationIds,
   setLocalMutedConversationIds,
@@ -52,6 +56,7 @@ export function useMessageInteractionHandlers({
   session: AuthSession | null;
   setActiveConversation: (conversationId: string) => void;
   setAvatarProfilePopover: Dispatch<SetStateAction<AvatarProfilePopoverState | null>>;
+  setContactCardProfile: Dispatch<SetStateAction<NormalizedContactCard | null>>;
   setConversationMenu: Dispatch<SetStateAction<ConversationMenuState>>;
   setLocalHiddenConversationIds: Dispatch<SetStateAction<Set<string>>>;
   setLocalMutedConversationIds: Dispatch<SetStateAction<Set<string>>>;
@@ -140,6 +145,7 @@ export function useMessageInteractionHandlers({
       event.preventDefault();
       event.stopPropagation();
       if (!activeConversation) return;
+      if (activeConversation.conversationType === "group") return;
       setMessageMenu(null);
       setNotice(null);
       const rect = event.currentTarget.getBoundingClientRect();
@@ -173,16 +179,9 @@ export function useMessageInteractionHandlers({
       event.stopPropagation();
       setMessageMenu(null);
       setNotice(null);
-      const rect = event.currentTarget.getBoundingClientRect();
-      setAvatarProfilePopover(
-        buildContactCardProfilePopover({
-          value,
-          x: Math.min(rect.left + 24, window.innerWidth - 332),
-          y: Math.max(12, Math.min(rect.top, window.innerHeight - 284)),
-        }),
-      );
+      setContactCardProfile(normalizeContactCard(value));
     },
-    [setAvatarProfilePopover, setMessageMenu, setNotice],
+    [setContactCardProfile, setMessageMenu, setNotice],
   );
 
   const scrollToMessage = useCallback(

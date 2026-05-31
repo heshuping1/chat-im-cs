@@ -10,8 +10,8 @@ export function ContactSidePanel({
   if (contact?.kind === "staff") {
     return (
       <aside className="contacts-profile-panel contacts-side-empty">
-        <h2>员工资料</h2>
-        <p>员工只展示组织、职位、角色和会话入口，不展示客户画像。</p>
+        <h2>组织成员资料</h2>
+        <p>组织成员只展示部门、职位、角色和会话入口，不展示客户画像或好友危险操作。</p>
         <div className="contacts-mini-rows">
           <InfoLine label="姓名" value={contact.name} />
           <InfoLine label="角色" value={contact.roleLabel || "--"} />

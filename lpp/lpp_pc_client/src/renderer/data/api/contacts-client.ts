@@ -18,6 +18,20 @@ export class ContactsApiClient extends ProfileApiClient {
     return this.request<FriendRequestDto[]>(endpointPlan.friendRequests);
   }
 
+  sendFriendRequest(toUserId: string, message?: string) {
+    const trimmedMessage = message?.trim();
+    return this.request<{ requestId?: string; status?: string }>(
+      endpointPlan.friendRequest,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          toUserId,
+          ...(trimmedMessage ? { message: trimmedMessage } : {}),
+        }),
+      },
+    );
+  }
+
   handleFriendRequest(requestId: string, action: "accept" | "reject") {
     return this.request<{ requestId?: string; status?: string }>(
       endpointPlan.friendRequestHandle.replace("{requestId}", requestId),
@@ -25,6 +39,13 @@ export class ContactsApiClient extends ProfileApiClient {
         method: "POST",
         body: JSON.stringify({ action }),
       },
+    );
+  }
+
+  deleteFriend(friendUserId: string) {
+    return this.request<{ friendUserId?: string }>(
+      endpointPlan.friendItem.replace("{friendUserId}", encodeURIComponent(friendUserId)),
+      { method: "DELETE" },
     );
   }
 

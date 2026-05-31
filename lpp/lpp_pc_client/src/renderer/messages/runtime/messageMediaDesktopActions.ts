@@ -3,7 +3,14 @@ import type {
   CachedMediaStatus,
   DesktopApi,
 } from "../../../shared/desktop-api";
-import { openDesktopMediaFile } from "../../media/runtime/desktopMediaActions";
+import {
+  copyDesktopImage,
+  openDesktopMediaFile,
+  revealDesktopMediaInFolder,
+  saveDesktopMediaAs,
+} from "../../media/runtime/desktopMediaActions";
+
+type ImageMediaFilePayload = Omit<CacheMediaFilePayload, "kind"> & { kind: "image" };
 
 export async function cacheMessageImageFile({
   desktopApi,
@@ -17,6 +24,18 @@ export async function cacheMessageImageFile({
 
 export async function cacheCurrentMessageImageFile(payload: CacheMediaFilePayload) {
   return window.desktopApi?.cacheMediaFile?.(payload) ?? null;
+}
+
+export async function copyCurrentMessageImage(payload: ImageMediaFilePayload) {
+  return copyDesktopImage(payload);
+}
+
+export async function saveCurrentMessageImageAs(payload: ImageMediaFilePayload) {
+  return saveDesktopMediaAs(payload);
+}
+
+export async function revealCurrentMessageImageInFolder(payload: ImageMediaFilePayload) {
+  return revealDesktopMediaInFolder(payload);
 }
 
 export async function openMessageFileMedia({

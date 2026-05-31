@@ -70,8 +70,14 @@ export function normalizeMediaPart({
   const media = part.media;
   const localPreviewUrl = mediaStringField(media, "localPreviewUrl");
   const localOpenUrl = mediaStringField(media, "localOpenUrl");
-  const remoteSourceUrl = mediaSourceUrl(part.type, media, assetBaseUrl);
-  const sourceUrl = localPreviewUrl || remoteSourceUrl;
+  const remoteSourceUrl =
+    part.type === "image"
+      ? imageActionSourceUrl(media, assetBaseUrl)
+      : mediaSourceUrl(part.type, media, assetBaseUrl);
+  const sourceUrl =
+    part.type === "image"
+      ? localPreviewUrl || imageVisualSourceUrl(media, assetBaseUrl) || localOpenUrl
+      : localPreviewUrl || remoteSourceUrl;
   const fileName = normalizedMediaFileName(part.type, media, fallback);
   return {
     kind: part.type,
@@ -131,17 +137,35 @@ export function resolveMessageMediaUrl(
 ) {
   const media = firstMessageMedia(message);
   const baseUrl = assetBaseUrl || globalThis.location?.origin;
-  const raw = resolveMediaUrl(
-    media,
-    baseUrl,
-    "url",
-    "downloadUrl",
-    "signedUrl",
-    "fileUrl",
-    "uri",
-    "path",
-    "thumbnailUrl",
-  );
+  const kind = messageMediaKind(message);
+  const raw =
+    kind === "image"
+      ? resolveMediaUrl(
+          media,
+          baseUrl,
+          "localOpenUrl",
+          "url",
+          "downloadUrl",
+          "signedUrl",
+          "fileUrl",
+          "uri",
+          "path",
+          "thumbnailUrl",
+          "thumbUrl",
+          "previewUrl",
+        )
+      : resolveMediaUrl(
+          media,
+          baseUrl,
+          "localOpenUrl",
+          "url",
+          "downloadUrl",
+          "signedUrl",
+          "fileUrl",
+          "uri",
+          "path",
+          "thumbnailUrl",
+        );
   if (!raw) return undefined;
   try {
     return new URL(raw, baseUrl).toString();
@@ -235,6 +259,44 @@ function mediaSourceUrl(
     "fileUrl",
     "uri",
     "path",
+  );
+}
+
+function imageVisualSourceUrl(
+  media: MediaResourceDto | undefined,
+  assetBaseUrl: string | undefined,
+) {
+  return resolveMediaUrl(
+    media,
+    assetBaseUrl,
+    "thumbnailUrl",
+    "thumbUrl",
+    "previewUrl",
+    "url",
+    "downloadUrl",
+    "signedUrl",
+    "fileUrl",
+    "uri",
+    "path",
+  );
+}
+
+function imageActionSourceUrl(
+  media: MediaResourceDto | undefined,
+  assetBaseUrl: string | undefined,
+) {
+  return resolveMediaUrl(
+    media,
+    assetBaseUrl,
+    "url",
+    "downloadUrl",
+    "signedUrl",
+    "fileUrl",
+    "uri",
+    "path",
+    "thumbnailUrl",
+    "thumbUrl",
+    "previewUrl",
   );
 }
 

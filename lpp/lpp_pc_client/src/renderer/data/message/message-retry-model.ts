@@ -8,6 +8,11 @@ export type FailedMessageRetryAction =
       replyToMessageId?: string;
     }
   | {
+      type: "contact_card";
+      body: Record<string, unknown>;
+      replyToMessageId?: string;
+    }
+  | {
       type: "upload";
       localTaskId: string;
     };
@@ -32,6 +37,13 @@ export function failedMessageRetryAction(
   if (localTaskId) return { type: "upload", localTaskId };
 
   const type = normalizeMessageType(message) || "text";
+  if (type === "contact_card" && message.body?.contactCard) {
+    return {
+      type: "contact_card",
+      body: message.body,
+      replyToMessageId: replyToMessageIdFromBody(message.body),
+    };
+  }
   if (type !== "text") return undefined;
 
   const content = textContentFromMessage(message);
@@ -50,6 +62,7 @@ export function resendConfirmPreview(message: MessageItemDto) {
   const action = failedMessageRetryAction(message);
   if (!action) return "该消息暂时无法重发";
   if (action.type === "text") return action.content;
+  if (action.type === "contact_card") return "重新发送这张名片";
   return "重新上传并发送这条媒体消息";
 }
 

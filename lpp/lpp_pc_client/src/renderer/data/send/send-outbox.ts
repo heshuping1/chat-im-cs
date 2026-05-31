@@ -2,7 +2,7 @@ import type { MessageItemDto } from "../api/types";
 import type { AuthSession } from "../auth/auth-session";
 
 export type SendOutboxChannel = "im" | "customer_service";
-export type SendOutboxMessageType = "text" | "image" | "video" | "file";
+export type SendOutboxMessageType = "text" | "image" | "video" | "file" | "contact_card";
 export type SendOutboxStatus =
   | "queued"
   | "uploading"
@@ -219,6 +219,7 @@ function previewFromOutboxBody(
   if (messageType === "image") return "[图片]";
   if (messageType === "video") return "[视频]";
   if (messageType === "file") return "[文件]";
+  if (messageType === "contact_card") return "[名片]";
   return "[消息]";
 }
 

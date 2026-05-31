@@ -48,4 +48,30 @@ describe("runtime error diagnostics", () => {
     expect(target.__lppRuntimeErrorDiagnostics).toHaveLength(1);
     expect(target.__lppRuntimeErrorDiagnostics?.[0].error.message).toBe("boom");
   });
+
+  it("records React boundary context without leaking URL query secrets", () => {
+    const record = createRuntimeErrorDiagnosticRecord({
+      event: "renderer.error",
+      error: new Error("Should have a queue. token=secret"),
+      message: "\n    at MessageCenter (http://localhost:5173/src/renderer/components/MessageCenter.tsx)",
+      now: new Date("2026-05-31T00:00:00.000Z"),
+      source: "AppErrorBoundary",
+      context: {
+        activeModule: "messages",
+        componentStack:
+          "\n    at MessageCenter (http://localhost:5173/src/renderer/components/MessageCenter.tsx?token=secret)",
+        resetKey: "messages",
+        url: "http://localhost:5173/?token=secret&conversationId=c1",
+      },
+    });
+
+    expect(record.error.message).toBe("Should have a queue. [redacted]");
+    expect(record.context).toMatchObject({
+      activeModule: "messages",
+      componentStack: expect.stringContaining("MessageCenter"),
+      resetKey: "messages",
+      url: "http://localhost:5173/?[redacted]&conversationId=c1",
+    });
+    expect(JSON.stringify(record)).not.toContain("secret");
+  });
 });

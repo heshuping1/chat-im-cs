@@ -626,6 +626,10 @@
   margin: 16px 0;
 }
 
+.contacts-actions.compact {
+  margin: 10px 0 0;
+}
+
 .contacts-actions button {
   display: inline-flex;
   height: 34px;
@@ -646,9 +650,69 @@
   color: #fff;
 }
 
+.contacts-actions button.danger-subtle {
+  border-color: rgba(239, 68, 68, 0.18);
+  background: rgba(255, 247, 247, 0.94);
+  color: #b4232a;
+}
+
+.contacts-actions button.danger-subtle:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: #fff1f1;
+}
+
 .contacts-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.contacts-name-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.contacts-row-copy .contacts-name-line strong,
+.contacts-page.contacts-b-layout .contacts-row-copy .contacts-name-line strong {
+  display: inline-block !important;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contacts-role-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 18px;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #edf7f2;
+  color: #15825c;
+  font-size: 10px;
+  font-weight: 820;
+  line-height: 18px;
+}
+
+.contacts-invite-card .contacts-mini-rows button {
+  justify-self: start;
+  width: fit-content;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(216, 226, 237, 0.9);
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #43546a;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.contacts-invite-card .contacts-mini-rows strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .contacts-info-grid {

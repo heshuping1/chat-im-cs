@@ -12,6 +12,14 @@ export interface RuntimeErrorDiagnosticRecord {
     lineno?: number;
     colno?: number;
   };
+  context?: RuntimeErrorDiagnosticContext;
+}
+
+export interface RuntimeErrorDiagnosticContext {
+  activeModule?: string;
+  componentStack?: string;
+  resetKey?: string;
+  url?: string;
 }
 
 type RuntimeErrorTarget = Window & {
@@ -58,8 +66,10 @@ export function createRuntimeErrorDiagnosticRecord({
   message,
   now = new Date(),
   source,
+  context,
 }: {
   colno?: number;
+  context?: RuntimeErrorDiagnosticContext;
   error?: unknown;
   event: RuntimeErrorDiagnosticRecord['event'];
   lineno?: number;
@@ -81,6 +91,7 @@ export function createRuntimeErrorDiagnosticRecord({
       lineno,
       colno,
     },
+    context: sanitizeRuntimeContext(context),
   };
 }
 
@@ -109,6 +120,18 @@ function normalizeRuntimeError(error: unknown, fallback?: string) {
   return {
     message: redactRuntimeText(fallback || String(error ?? 'Unknown runtime error')),
   };
+}
+
+function sanitizeRuntimeContext(
+  context: RuntimeErrorDiagnosticContext | undefined,
+): RuntimeErrorDiagnosticContext | undefined {
+  if (!context) return undefined;
+  const next: RuntimeErrorDiagnosticContext = {};
+  if (context.activeModule) next.activeModule = redactRuntimeText(context.activeModule);
+  if (context.componentStack) next.componentStack = redactRuntimeText(context.componentStack);
+  if (context.resetKey) next.resetKey = redactRuntimeText(context.resetKey);
+  if (context.url) next.url = redactRuntimeText(context.url);
+  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 function redactRuntimeText(value: string) {

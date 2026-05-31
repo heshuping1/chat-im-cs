@@ -105,6 +105,7 @@ export function MessageComposerDock({
           onDraftEditorStateChange(conversationId, value)
         }
         onKnowledgeBase={onKnowledgeBase}
+        onOpenContactCardPicker={messageCenterCommands.openContactCardPicker}
         onResizeStart={(event) =>
           resizeComposerFromPointer({
             composerHeight,

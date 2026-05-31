@@ -164,7 +164,10 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppErrorBoundary resetKey={authSession ? safeActiveModule : 'login'}>
+      <AppErrorBoundary
+        activeModule={authSession ? safeActiveModule : 'login'}
+        resetKey={authSession ? safeActiveModule : 'login'}
+      >
         {!authSession ? (
           <LoginPage />
         ) : (

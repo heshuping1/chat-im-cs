@@ -6,7 +6,7 @@ import type { AuthSession } from "../../data/auth/auth-session";
 import { requireApiClient } from "../../data/runtime";
 import { formatError } from "../../lib/format";
 
-type ComposerDialogKind = "direct" | "group" | "qr" | null;
+type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
 
 export function useMessageStartConversationController({
   queryClient,

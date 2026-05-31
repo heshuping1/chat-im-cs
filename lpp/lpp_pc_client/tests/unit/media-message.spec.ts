@@ -77,6 +77,29 @@ describe("normalizeMediaPart", () => {
     });
   });
 
+  it("uses local open urls for image actions while keeping thumbnail display", () => {
+    const part: NormalizedMessagePart = {
+      type: "image",
+      media: {
+        fileName: "photo.jpg",
+        localOpenUrl: "file:///app-cache/photo.jpg",
+        localPreviewUrl: "blob:local-preview",
+        thumbnailUrl: "/thumbs/photo.jpg",
+        url: "/files/photo.jpg",
+      } as MediaResourceDto & {
+        localOpenUrl: string;
+        localPreviewUrl: string;
+      },
+    };
+
+    expect(normalizeMediaPart({ assetBaseUrl: "https://assets.example", part })).toMatchObject({
+      kind: "image",
+      sourceUrl: "blob:local-preview",
+      remoteSourceUrl: "https://assets.example/files/photo.jpg",
+      localOpenUrl: "file:///app-cache/photo.jpg",
+    });
+  });
+
   it("falls back to the message preview only for file cards", () => {
     const part: NormalizedMessagePart = {
       type: "file",
@@ -154,6 +177,27 @@ describe("message media action model", () => {
       accountId: "u1",
       conversationId: "c1",
     });
+  });
+
+  it("resolves image desktop actions from local cache before blob preview and thumbnail", () => {
+    const message = {
+      messageId: "m-image",
+      conversationId: "c1",
+      messageType: "image",
+      body: {
+        image: {
+          localOpenUrl: "file:///app-cache/photo.jpg",
+          localPreviewUrl: "blob:preview",
+          thumbnailUrl: "/thumbs/photo.jpg",
+          url: "/files/photo.jpg",
+          fileName: "photo.jpg",
+        },
+      },
+    } as never;
+
+    expect(resolveMessageMediaUrl(message, "https://assets.example")).toBe(
+      "file:///app-cache/photo.jpg",
+    );
   });
 
   it("keeps video player metadata in the same media action model", () => {
@@ -298,6 +342,40 @@ describe("message media upload presentation", () => {
     expect(viteConfig).toContain("__LPP_PC_PRODUCT_NAME__");
   });
 
+  it("opens the composer contact card entry while keeping voice and live video disabled", () => {
+    const composer = readFileSync(
+      resolve(process.cwd(), "src/renderer/components/MessageComposer.tsx"),
+      "utf8",
+    );
+    const composerSurface = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/components/MessageComposerSurface.tsx"),
+      "utf8",
+    );
+
+    expect(composer).toContain("onOpenContactCardPicker");
+    expect(composer).toContain("aria-label=\"名片\"");
+    expect(composer).toContain("<UserRound size={17} />");
+    expect(composer).toContain("<span>名片</span>");
+    expect(composer).not.toContain("位置、名片等发送能力需要完整选择器");
+    expect(composerSurface).toContain("onOpenContactCardPicker");
+  });
+
+  it("keeps group avatars available while disabling the group member list view", () => {
+    const conversationInfoPanel = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/components/ConversationInfoPanel.tsx"),
+      "utf8",
+    );
+    const interactionHandlers = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/hooks/useMessageInteractionHandlers.ts"),
+      "utf8",
+    );
+
+    expect(conversationInfoPanel).toContain('const tabs = ["资料", "公告", "文件"];');
+    expect(conversationInfoPanel).not.toContain("group-member-list");
+    expect(conversationInfoPanel).toContain("conversation.memberCount");
+    expect(interactionHandlers).toContain("if (activeConversation.conversationType === \"group\") return;");
+  });
+
   it("keeps video upload progress in the central ring without visible uploading text", () => {
     expect(videoMessagePreview).toContain("showUploadLabel");
     expect(videoMessagePreview).toContain("triggerUploadOverlayAction");
@@ -394,5 +472,26 @@ describe("message media upload presentation", () => {
       expect(source).toContain("localOpenUrl: localOpenForSent");
       expect(source).not.toContain("cacheLocalVideoFileForDesktop");
     }
+  });
+
+  it("keeps image viewer actions inside the image frame instead of inventing a new window", () => {
+    const imageFrame = readFileSync(
+      resolve(process.cwd(), "src/renderer/media/components/ImageMessageFrame.tsx"),
+      "utf8",
+    );
+    const mediaParts = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/components/message-content/MessageMediaParts.tsx"),
+      "utf8",
+    );
+
+    expect(imageFrame).toContain("message-image-viewer-toolbar");
+    expect(imageFrame).toContain("复制图片");
+    expect(imageFrame).toContain("另存为");
+    expect(imageFrame).toContain("显示位置");
+    expect(imageFrame).toContain("message-image-retry");
+    expect(mediaParts).toContain("imageActionSrc");
+    expect(mediaParts).toContain("copyCurrentMessageImage");
+    expect(mediaParts).toContain("saveCurrentMessageImageAs");
+    expect(mediaParts).toContain("revealCurrentMessageImageInFolder");
   });
 });

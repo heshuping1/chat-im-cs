@@ -62,6 +62,7 @@ export interface MessageListPanelProps {
     mine: boolean,
   ) => void;
   onClearMessageSearch: () => void;
+  onCloseMessageLookup: () => void;
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
   onContextMenu?: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
   onFailedMessageClick?: (message: MessageItemDto) => void;
@@ -123,6 +124,7 @@ export function MessageListPanel({
   unreadJump,
   onAvatarClick,
   onClearMessageSearch,
+  onCloseMessageLookup,
   onContactClick,
   onContextMenu,
   onFailedMessageClick,
@@ -144,7 +146,8 @@ export function MessageListPanel({
 }: MessageListPanelProps) {
   const [expandedOlderCount, setExpandedOlderCount] = useState(0);
   const lastWindowDiagnosticKeyRef = useRef("");
-  const windowingEnabled = !historyOpen && !messageSearchOpen && !unreadJump;
+  const lookupOpen = messageSearchOpen || historyOpen;
+  const windowingEnabled = !lookupOpen && !unreadJump;
   const messageRenderWindow = useMemo(
     () =>
       createMessageRenderWindow({
@@ -192,36 +195,36 @@ export function MessageListPanel({
       onScroll={onMessageStageScroll}
       ref={messageStageRef}
     >
-      {messageSearchOpen && (
-        <div className="chat-inline-panel">
-          <label className="chat-inline-search">
-            <Search size={15} />
-            <input
-              value={messageSearchKeyword}
-              onChange={(event) => onMessageSearchKeywordChange(event.target.value)}
-              placeholder="在当前会话中查找消息"
-              autoFocus
-            />
-            {messageSearchKeyword && (
-              <button type="button" aria-label="清空查找" onClick={onClearMessageSearch}>
-                <X size={14} />
-              </button>
-            )}
-          </label>
-          <span>
-            {messageSearchKeyword
-              ? `${messages.length} matches`
-              : "输入关键词筛选当前消息"}
-          </span>
-        </div>
-      )}
-
-      {historyOpen && (
-        <div className="chat-history-panel">
-          <div>
-            <strong>历史记录</strong>
+      {lookupOpen && (
+        <div className="chat-history-panel chat-lookup-panel">
+          <div className="chat-lookup-head">
+            <label className="chat-inline-search">
+              <Search size={15} />
+              <input
+                value={messageSearchKeyword}
+                onChange={(event) => onMessageSearchKeywordChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") onCloseMessageLookup();
+                }}
+                placeholder="搜索当前聊天内容"
+                autoFocus
+              />
+              {messageSearchKeyword && (
+                <button type="button" aria-label="清空查找" onClick={onClearMessageSearch}>
+                  <X size={14} />
+                </button>
+              )}
+            </label>
+            <button type="button" aria-label="关闭查找" onClick={onCloseMessageLookup}>
+              关闭查找
+            </button>
+          </div>
+          <div className="chat-lookup-summary">
+            <strong>聊天记录</strong>
             <span>
-              已加载 {loadedMessages.length} 条消息
+              {messageSearchKeyword
+                ? `${messages.length} 条匹配`
+                : `已加载 ${loadedMessages.length} 条消息`}
               {loadedMessages[0]?.sentAt ? ` · 最早 ${formatChatTime(loadedMessages[0].sentAt)}` : ""}
               {loadedMessages[loadedMessages.length - 1]?.sentAt
                 ? ` · 最新 ${formatChatTime(loadedMessages[loadedMessages.length - 1].sentAt)}`

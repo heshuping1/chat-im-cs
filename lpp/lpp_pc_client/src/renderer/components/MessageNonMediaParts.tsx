@@ -2,9 +2,7 @@ import {
   ChevronRight,
   MapPin,
   PhoneCall,
-  UserRound,
 } from "lucide-react";
-import { useState } from "react";
 import type { MouseEvent } from "react";
 import {
   normalizeType,
@@ -12,6 +10,8 @@ import {
   stringValue,
 } from "../data/im-message-normalize";
 import { handleExternalLinkClick } from "../lib/openExternal";
+import { normalizeContactCard } from "../messages/models/contactCardModel";
+import { PcAvatar } from "./PcAvatar";
 
 export function LocationPart({ value }: { value: Record<string, unknown> }) {
   const name = stringValue(value.name) || stringValue(value.title) || "位置消息";
@@ -60,25 +60,9 @@ export function ContactPart({
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
   value: Record<string, unknown>;
 }) {
-  const name =
-    stringValue(value.displayName) ||
-    stringValue(value.display_name) ||
-    stringValue(value.name) ||
-    stringValue(value.userName) ||
-    stringValue(value.user_name) ||
-    stringValue(value.realName) ||
-    stringValue(value.real_name) ||
-    stringValue(value.nickname) ||
-    stringValue(value.nickName) ||
-    stringValue(value.nick_name) ||
-    "联系人名片";
-  const subtitle =
-    stringValue(value.lppId) ||
-    stringValue(value.lpp_id) ||
-    stringValue(value.userNo) ||
-    stringValue(value.mobile) ||
-    stringValue(value.phone) ||
-    stringValue(value.email);
+  const card = normalizeContactCard(value);
+  const name = card.displayName;
+  const subtitle = card.subtitle;
   return (
     <button
       className="message-contact-card"
@@ -86,7 +70,12 @@ export function ContactPart({
       aria-label={`查看名片 ${name}`}
       onClick={(event) => onContactClick?.(event, value)}
     >
-      <AvatarThumb value={value} />
+      <PcAvatar
+        avatarUrl={card.avatarUrl}
+        className="message-contact-avatar"
+        iconSize={18}
+        name={name}
+      />
       <span className="message-contact-main">
         <strong>{name}</strong>
         {subtitle && <em>{subtitle}</em>}
@@ -121,38 +110,6 @@ export function CallPart({ value }: { value: Record<string, unknown> }) {
         <em>{detail}</em>
       </span>
     </div>
-  );
-}
-
-function AvatarThumb({ value }: { value: Record<string, unknown> }) {
-  const [failed, setFailed] = useState(false);
-  const name =
-    stringValue(value.displayName) ||
-    stringValue(value.display_name) ||
-    stringValue(value.name) ||
-    stringValue(value.nickname) ||
-    stringValue(value.nickName) ||
-    stringValue(value.nick_name) ||
-    "名";
-  const avatarUrl =
-    stringValue(value.avatarUrl) ||
-    stringValue(value.avatar_url) ||
-    stringValue(value.avatar) ||
-    stringValue(value.photoUrl);
-  if (avatarUrl && !failed) {
-    return (
-      <img
-        className="message-contact-avatar"
-        src={avatarUrl}
-        alt={name}
-        onError={() => setFailed(true)}
-      />
-    );
-  }
-  return (
-    <span className="message-contact-avatar">
-      {name === "联系人名片" ? <UserRound size={18} /> : name.slice(0, 1)}
-    </span>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Check, CheckSquare, QrCode, Search, UserPlus, UsersRound, X } from "lucide-react";
+import { Check, CheckSquare, QrCode, Search, Send, UserPlus, UserRound, UsersRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { PcAvatar } from "../../components/PcAvatar";
 
@@ -122,6 +122,91 @@ export function GroupChatDialog({
         })
       }
     />
+  );
+}
+
+export function ContactCardDialog({
+  contacts,
+  onClose,
+  onSubmit,
+  pending,
+}: {
+  contacts: ContactPickerItem[];
+  onClose: () => void;
+  onSubmit: (contact: ContactPickerItem) => void;
+  pending: boolean;
+}) {
+  const [keyword, setKeyword] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const targets = filterContactPickerItems(contacts, keyword);
+  const selected = contacts.find((item) => item.id === selectedId);
+  return (
+    <div className="pc-modal-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="pc-forward-dialog message-start-dialog message-card-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="选择名片"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header>
+          <div>
+            <h3>选择名片</h3>
+            <p>选择一个联系人，确认后发送个人名片</p>
+          </div>
+          <button type="button" aria-label="关闭" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </header>
+        <label className="e-search compact">
+          <Search size={15} />
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="搜索联系人"
+            autoFocus
+          />
+        </label>
+        <div className="pc-forward-targets message-contact-targets">
+          {targets.map((item) => {
+            const selectedContact = item.id === selectedId;
+            return (
+              <button
+                key={`${item.source}-${item.id}`}
+                type="button"
+                className={selectedContact ? "selected" : ""}
+                disabled={pending}
+                onClick={() => setSelectedId(item.id)}
+              >
+                <PcAvatar avatarUrl={item.avatarUrl} className="e-avatar" name={item.name} />
+                <span>
+                  <strong>{item.name}</strong>
+                  <small>{item.subtitle}</small>
+                </span>
+                {selectedContact && <Check size={16} />}
+              </button>
+            );
+          })}
+          {targets.length === 0 && <div className="panel-state muted">没有可发送的联系人名片</div>}
+        </div>
+        <footer className="message-start-footer message-card-confirm">
+          <div className="message-card-confirm-preview">
+            <UserRound size={16} />
+            <span>{selected ? `发送 ${selected.name} 的名片` : "选择一张名片"}</span>
+          </div>
+          <button type="button" onClick={onClose}>取消</button>
+          <button
+            className="primary"
+            type="button"
+            disabled={pending || !selected}
+            onClick={() => selected && onSubmit(selected)}
+          >
+            <Send size={15} />
+            {pending ? "发送中..." : "发送"}
+          </button>
+        </footer>
+      </section>
+    </div>
   );
 }
 

@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import type { DepartmentMemberDto, FriendRequestDto } from "../../data/api-client";
 import { useAuthSession } from "../../data/auth/auth-store";
@@ -7,6 +12,7 @@ import {
   filterContacts,
   filterRequests,
   mapContacts,
+  normalizeContactDirectoryFilter,
 } from "../../data/contact-directory";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
@@ -54,6 +60,13 @@ export function useContactsDirectoryController({
     enabled: Boolean(session),
     queryFn: async () => requireApiClient(session).getConversations({ limit: 100 }),
   });
+  const inviteQrsQuery = useQuery({
+    queryKey: pcQueryKeys.accountInviteQrs(session?.apiBaseUrl, session?.tenantToken),
+    enabled: Boolean(
+      session && normalizeContactDirectoryFilter(contactFilter) === "requests",
+    ),
+    queryFn: async () => requireApiClient(session).getFriendInviteQrs(),
+  });
   const departmentMembersQueries = useQuery({
     queryKey: [
       "pc-department-members-bundle",
@@ -97,6 +110,33 @@ export function useContactsDirectoryController({
     },
     onError: (error) => setNotice(`处理申请失败：${formatError(error)}`),
   });
+  const deleteFriendMutation = useMutation({
+    mutationFn: async (friendUserId: string) =>
+      requireApiClient(session).deleteFriend(friendUserId),
+    onSuccess: async () => {
+      setNotice("已删除好友");
+      await refreshContactRelations(queryClient, session);
+    },
+    onError: (error) => setNotice(`删除好友失败：${formatError(error)}`),
+  });
+  const blockUserMutation = useMutation({
+    mutationFn: async (userId: string) => requireApiClient(session).blockUser(userId),
+    onSuccess: async () => {
+      setNotice("已加入黑名单");
+      await refreshContactRelations(queryClient, session);
+    },
+    onError: (error) => setNotice(`加入黑名单失败：${formatError(error)}`),
+  });
+  const createInviteQrMutation = useMutation({
+    mutationFn: async () => requireApiClient(session).createFriendInviteQr(),
+    onSuccess: async () => {
+      setNotice("好友二维码已生成");
+      await queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.accountInviteQrs(session?.apiBaseUrl, session?.tenantToken),
+      });
+    },
+    onError: (error) => setNotice(`生成二维码失败：${formatError(error)}`),
+  });
 
   const directoryContacts = useMemo(
     () =>
@@ -119,13 +159,14 @@ export function useContactsDirectoryController({
   );
 
   const visibleContacts = useMemo(() => {
-    if (contactFilter === "requests") return [];
+    const normalizedFilter = normalizeContactDirectoryFilter(contactFilter);
+    if (normalizedFilter === "requests") return [];
     const base =
-      contactFilter === "all"
+      normalizedFilter === "all"
         ? directoryContacts
-        : contactFilter === "organization"
+        : normalizedFilter === "organization"
           ? directoryContacts.filter((item) => item.kind === "staff")
-          : directoryContacts.filter((item) => item.kind === contactFilter);
+          : directoryContacts.filter((item) => item.kind === normalizedFilter);
     return filterContacts(base, keyword);
   }, [contactFilter, directoryContacts, keyword]);
 
@@ -165,17 +206,52 @@ export function useContactsDirectoryController({
     requestMutation.mutate({ requestId, action });
   };
 
+  const deleteFriend = (contact: ContactItem) => {
+    if (!contact.userId) return;
+    deleteFriendMutation.mutate(contact.userId);
+  };
+
+  const blockContact = (contact: ContactItem) => {
+    if (!contact.userId) return;
+    blockUserMutation.mutate(contact.userId);
+  };
+
   return {
     activeRequest,
+    blockContact,
     createDirectChatPending: createDirectChatMutation.isPending,
+    deleteFriend,
     departments: departmentsQuery.data ?? [],
     directoryContacts,
     directoryError,
     directoryLoading,
     handleRequest,
+    inviteQrError: inviteQrsQuery.error,
+    inviteQrLoading: inviteQrsQuery.isLoading,
+    inviteQrs: inviteQrsQuery.data ?? [],
     openMessage,
+    onCreateInviteQr: () => createInviteQrMutation.mutate(),
+    relationshipActionPending:
+      deleteFriendMutation.isPending || blockUserMutation.isPending,
+    createInviteQrPending: createInviteQrMutation.isPending,
     requestPending: requestMutation.isPending,
     visibleContacts,
     visibleRequests,
   };
+}
+
+async function refreshContactRelations(
+  queryClient: QueryClient,
+  session: ReturnType<typeof useAuthSession>,
+) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["pc-friends"] }),
+    queryClient.invalidateQueries({ queryKey: ["pc-friend-requests"] }),
+    queryClient.invalidateQueries({
+      queryKey: pcQueryKeys.accountBlocklist(session?.apiBaseUrl, session?.tenantToken),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
+    }),
+  ]);
 }

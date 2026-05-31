@@ -6,7 +6,7 @@ import type {
   FriendRequestDto,
   TenantMemberDto,
 } from "./api-client";
-import type { ContactItem, ContactKind } from "./types";
+import type { ContactFilter, ContactItem, ContactKind } from "./types";
 import { formatShortDate } from "../lib/format";
 
 export const contactKindLabels: Record<ContactKind, string> = {
@@ -20,6 +20,10 @@ export function requestStatusLabel(status?: string) {
   if (status === "accepted") return "已通过";
   if (status === "rejected") return "已拒绝";
   return "待处理";
+}
+
+export function normalizeContactDirectoryFilter(filter: ContactFilter): ContactFilter {
+  return filter === "staff" ? "organization" : filter;
 }
 
 export function filterContacts(contacts: ContactItem[], keyword: string) {
@@ -162,7 +166,7 @@ export function sourceLabel(contact: ContactItem) {
 export function contactRowSubtitle(contact: ContactItem) {
   if (contact.kind === "customer") return `客户 · ${contact.groupName || "默认分组"}`;
   if (contact.kind === "staff") {
-    return `${contact.roleLabel || "员工"} · ${contact.departmentName || "企业成员"}`;
+    return [contact.departmentName || "企业成员", contact.position].filter(Boolean).join(" · ");
   }
   if (contact.kind === "group") {
     return `${contact.members ?? "--"} 人 · ${contact.muted ? "免打扰" : "正常提醒"}`;

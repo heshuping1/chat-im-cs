@@ -2,11 +2,10 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { CustomerProfileWorkspace } from "../../components/CustomerProfileWorkspace";
 import { PanelState } from "../../components/PanelState";
-import { PcAvatar } from "../../components/PcAvatar";
 import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
 import { effectiveConversationUnreadCount, type CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
-import { formatChatTime, timestampFromDateValue } from "../../lib/format";
+import { formatChatTime } from "../../lib/format";
 import { renderWechatEmojiText } from "../../lib/wechatEmoji";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import { ConversationAvatar } from "./ConversationListParts";
@@ -16,7 +15,7 @@ export function ConversationInfoPanel({
   conversation,
   groupAvatar,
   groupMembers,
-  loadingGroupMembers = false,
+  loadingGroupMembers: _loadingGroupMembers = false,
   userIdentity,
 }: {
   contact?: ContactItem | null;
@@ -54,7 +53,7 @@ export function ConversationInfoPanel({
       />
     );
   }
-  const tabs = ["资料", "成员", "公告", "文件"];
+  const tabs = ["资料", "公告", "文件"];
   const unread = effectiveConversationUnreadCount(conversation, userIdentity);
   const selectedTab = tabs.includes(activeTab) ? activeTab : "资料";
   return (
@@ -91,7 +90,7 @@ export function ConversationInfoPanel({
             </button>
           ))}
         </nav>
-        {renderConversationInfoTab(selectedTab, conversation, unread, groupMembers ?? [], loadingGroupMembers)}
+        {renderConversationInfoTab(selectedTab, conversation, unread, groupMembers ?? [])}
       </section>
       {selectedTab === "资料" && expanded && (
         <section className="customer-info-block">
@@ -121,46 +120,7 @@ function renderConversationInfoTab(
   conversation: ConversationListItem,
   unread: number,
   groupMembers: GroupMemberDto[] = [],
-  loadingGroupMembers = false,
 ) {
-  if (tab === "成员") {
-    const ownerName =
-      conversation.ownerDisplayName ||
-      groupMembers.find((member) => groupMemberRoleRank(member) === 0)?.displayName;
-    const adminNames = groupMembers
-      .filter((member) => groupMemberRoleRank(member) === 1)
-      .map((member) => member.displayName)
-      .filter(Boolean);
-    return (
-      <>
-        <div className="customer-info-rows">
-          <InfoRow
-            label="成员"
-            value={String((conversation.memberCount ?? groupMembers.length) || "--")}
-          />
-          <InfoRow label="群主" value={ownerName || "--"} />
-          <InfoRow label="群管理员" value={adminNames.length > 0 ? joinCompactNames(adminNames) : "--"} />
-          <InfoRow label="我的角色" value={groupRoleLabel(conversation.myRole) || "--"} />
-        </div>
-        {loadingGroupMembers && <PanelState text="正在加载群成员..." />}
-        {!loadingGroupMembers && groupMembers.length > 0 && (
-          <div className="group-member-list" aria-label="群成员">
-            {sortGroupMembersForDisplay(groupMembers).map((member) => (
-              <div key={member.userId || member.displayName}>
-                <PcAvatar
-                  avatarUrl={member.avatarUrl}
-                  className="group-member-avatar"
-                  name={member.displayName}
-                />
-                <span>{member.displayName || "成员"}</span>
-                <em>{groupRoleLabel(member.role || member.memberRole)}</em>
-              </div>
-            ))}
-          </div>
-        )}
-      </>
-    );
-  }
   if (tab === "公告") {
     return <PanelState text="暂无群公告" />;
   }
@@ -168,11 +128,21 @@ function renderConversationInfoTab(
     return <PanelState text="暂无群文件" />;
   }
 
+  const ownerName =
+    conversation.ownerDisplayName ||
+    groupMembers.find((member) => groupMemberRoleRank(member) === 0)?.displayName;
+  const adminNames = groupMembers
+    .filter((member) => groupMemberRoleRank(member) === 1)
+    .map((member) => member.displayName)
+    .filter(Boolean);
   return (
     <>
       <div className="customer-info-rows">
         <InfoRow label="会话类型" value="群聊" />
         <InfoRow label="成员" value={String(conversation.memberCount ?? "--")} />
+        <InfoRow label="群主" value={ownerName || "--"} />
+        <InfoRow label="群管理员" value={adminNames.length > 0 ? joinCompactNames(adminNames) : "--"} />
+        <InfoRow label="我的角色" value={groupRoleLabel(conversation.myRole) || "--"} />
         <InfoRow label="免打扰" value={conversation.isMuted ? "已开启" : "未开启"} />
         <InfoRow label="最近消息" value={renderWechatEmojiText(conversation.lastMessage?.preview || "--")} />
       </div>
@@ -190,17 +160,6 @@ function groupMemberRoleRank(member: GroupMemberDto) {
   if (role.includes("owner") || role.includes("群主")) return 0;
   if (role.includes("admin") || role.includes("管理员")) return 1;
   return 2;
-}
-
-function sortGroupMembersForDisplay(members: GroupMemberDto[]) {
-  return members.slice().sort((left, right) => {
-    const roleRank = groupMemberRoleRank(left) - groupMemberRoleRank(right);
-    if (roleRank !== 0) return roleRank;
-    return (
-      timestampFromDateValue(left.joinedAt) - timestampFromDateValue(right.joinedAt) ||
-      (left.displayName || "").localeCompare(right.displayName || "", "zh-Hans-CN")
-    );
-  });
 }
 
 function groupRoleLabel(role?: string | null) {

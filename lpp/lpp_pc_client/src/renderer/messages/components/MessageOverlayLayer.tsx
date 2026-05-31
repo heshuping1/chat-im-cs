@@ -12,8 +12,14 @@ import {
 } from "./ChatContextMenus";
 import {
   AvatarProfilePopover,
+  ContactCardProfileDialog,
 } from "./ConversationInfoViews";
 import type { AvatarProfilePopoverState } from "../models/messageDisplayModel";
+import type {
+  ContactCardRelation,
+  NormalizedContactCard,
+} from "../models/contactCardModel";
+import type { UserProfileDto } from "../../data/api-client";
 
 type MessageMenuState = {
   message: MessageItemDto;
@@ -31,22 +37,48 @@ type ConversationContextAction = "mute" | "hide" | "delete";
 
 export function MessageOverlayLayer({
   avatarProfilePopover,
+  contactCardProfile,
+  contactCardProfileData,
+  contactCardProfileError,
+  contactCardProfileLoading,
+  contactCardRelation,
+  contactCardActionPending,
   conversationMenu,
   messageMenu,
   messageMenuMediaStatus,
   profileStandaloneOpen,
   isMineMessage,
   onAvatarProfileClose,
+  onContactCardAccept,
+  onContactCardBlock,
+  onContactCardClose,
+  onContactCardDeleteFriend,
+  onContactCardReject,
+  onContactCardSendRequest,
+  onContactCardStartChat,
   onConversationAction,
   onMessageAction,
 }: {
   avatarProfilePopover: AvatarProfilePopoverState | null;
+  contactCardProfile: NormalizedContactCard | null;
+  contactCardProfileData?: UserProfileDto;
+  contactCardProfileError?: unknown;
+  contactCardProfileLoading?: boolean;
+  contactCardRelation?: ContactCardRelation;
+  contactCardActionPending?: boolean;
   conversationMenu: ConversationMenuState;
   messageMenu: MessageMenuState;
   messageMenuMediaStatus: CachedMediaStatus;
   profileStandaloneOpen: boolean;
   isMineMessage: (message: MessageItemDto) => boolean;
   onAvatarProfileClose: () => void;
+  onContactCardAccept: () => void;
+  onContactCardBlock: () => void;
+  onContactCardClose: () => void;
+  onContactCardDeleteFriend: () => void;
+  onContactCardReject: () => void;
+  onContactCardSendRequest: (message: string) => void;
+  onContactCardStartChat: () => void;
   onConversationAction: (
     action: ConversationContextAction,
     conversation: ConversationListItem,
@@ -82,6 +114,23 @@ export function MessageOverlayLayer({
         <AvatarProfilePopover
           profile={avatarProfilePopover}
           onClose={onAvatarProfileClose}
+        />
+      )}
+      {contactCardProfile && contactCardRelation && (
+        <ContactCardProfileDialog
+          actionPending={contactCardActionPending}
+          card={contactCardProfile}
+          profile={contactCardProfileData}
+          profileError={contactCardProfileError}
+          profileLoading={contactCardProfileLoading}
+          relation={contactCardRelation}
+          onAccept={onContactCardAccept}
+          onBlock={onContactCardBlock}
+          onClose={onContactCardClose}
+          onDeleteFriend={onContactCardDeleteFriend}
+          onReject={onContactCardReject}
+          onSendRequest={onContactCardSendRequest}
+          onStartChat={onContactCardStartChat}
         />
       )}
     </>

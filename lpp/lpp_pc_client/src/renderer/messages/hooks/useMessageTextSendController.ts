@@ -37,6 +37,12 @@ import {
   type ReplyTarget,
 } from "../models/messageComposerModel";
 import { failedMessageRetryAction } from "../../data/message/message-retry-model";
+import {
+  contactCardMessageBody,
+  normalizeContactCard,
+  sanitizeContactCard,
+  type NormalizedContactCard,
+} from "../models/contactCardModel";
 
 export function useMessageTextSendController({
   activeConversation,
@@ -69,7 +75,7 @@ export function useMessageTextSendController({
         throw new Error("请选择一个普通 IM 会话");
       }
       const retryAction = failedMessageRetryAction(message);
-      if (!retryAction || retryAction.type !== "text") {
+      if (!retryAction || (retryAction.type !== "text" && retryAction.type !== "contact_card")) {
         throw new Error("该消息暂时无法重发");
       }
       const conversation = activeConversation;
@@ -79,7 +85,9 @@ export function useMessageTextSendController({
       const body =
         message.body && Object.keys(message.body).length
           ? message.body
-          : { text: retryAction.content };
+          : retryAction.type === "text"
+            ? { text: retryAction.content }
+            : retryAction.body;
       const sendStartedAt = Date.now();
       const storage = getSendOutboxStorage();
       const scopeKey = sendOutboxScopeKey(session);
@@ -98,7 +106,7 @@ export function useMessageTextSendController({
         clientMsgId,
         createdAt: Date.parse(message.sentAt ?? "") || Date.now(),
         localMessageId,
-        messageType: "text",
+        messageType: retryAction.type,
         scopeKey,
         status: "sending",
         targetId: conversation.conversationId,
@@ -106,7 +114,7 @@ export function useMessageTextSendController({
         updatedAt: sendStartedAt,
       });
       logChatSendDiagnostic({
-        taskId: "P4-MSG-005C",
+        taskId: retryAction.type === "contact_card" ? "P24-CONTACT-001" : "P4-MSG-005C",
         channel: "im",
         phase: "transition",
         result: "ok",
@@ -117,27 +125,35 @@ export function useMessageTextSendController({
           conversationId: conversation.conversationId,
           conversationType,
           localMessageId,
-          messageKind: "text",
+          messageKind: retryAction.type,
         },
       });
       enqueueOutgoingTask(async () => {
         try {
-          const result = await requireApiClient(session).sendConversationTextMessage(
-            conversationType,
-            conversation.conversationId,
-            retryAction.content,
-            retryAction.replyToMessageId,
-            conversationType === "group"
-              ? extractMentions(retryAction.content, groupMembers)
-              : [],
-            { clientMsgId },
-          );
+          const result = retryAction.type === "text"
+            ? await requireApiClient(session).sendConversationTextMessage(
+              conversationType,
+              conversation.conversationId,
+              retryAction.content,
+              retryAction.replyToMessageId,
+              conversationType === "group"
+                ? extractMentions(retryAction.content, groupMembers)
+                : [],
+              { clientMsgId },
+            )
+            : await requireApiClient(session).sendConversationContactCardMessage(
+              conversationType,
+              conversation.conversationId,
+              sanitizeContactCard(normalizeContactCard(retryAction.body.contactCard)),
+              retryAction.replyToMessageId,
+              { clientMsgId },
+            );
           const sentMessage = replaceLocalMessageInCache(
             queryClient,
             session,
             conversation,
             localMessageId,
-            "text",
+            retryAction.type,
             body,
             result,
           );
@@ -154,7 +170,7 @@ export function useMessageTextSendController({
               conversationType,
               localMessageId,
               messageId: sentMessage.messageId,
-              messageKind: "text",
+              messageKind: retryAction.type,
             },
           });
           setLocalOutgoingMessagesByConversation((current) =>
@@ -185,7 +201,7 @@ export function useMessageTextSendController({
               conversationId: conversation.conversationId,
               conversationType,
               localMessageId,
-              messageKind: "text",
+              messageKind: retryAction.type,
               path: conversationType === "group"
                 ? "/api/client/v1/groups/{conversationId}/messages"
                 : "/api/client/v1/direct-chats/{conversationId}/messages",
@@ -405,8 +421,185 @@ export function useMessageTextSendController({
     ],
   );
 
+  const sendContactCardOptimistically = useCallback(
+    (card: NormalizedContactCard) => {
+      if (!session || !activeConversation || !activeConversationType) {
+        throw new Error("请选择一个普通 IM 会话");
+      }
+      if (!card.userId) {
+        throw new Error("这张名片缺少用户 ID，暂时无法发送");
+      }
+      const conversation = activeConversation;
+      const conversationType = activeConversationType;
+      const reply = replyTarget;
+      const localMessageId = `pc-local-card-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const clientMsgId = localMessageId;
+      const body = withReplyBody(contactCardMessageBody(card), reply);
+      const initialStatus = initialChatSendStatusForKind("text");
+      const sendStartedAt = Date.now();
+      const storage = getSendOutboxStorage();
+      const scopeKey = sendOutboxScopeKey(session);
+      const localMessage = appendLocalMessage(
+        queryClient,
+        session,
+        conversation,
+        "contact_card",
+        body,
+        {
+          messageId: localMessageId,
+          conversationId: conversation.conversationId,
+          serverTime: currentIsoTimestamp(),
+        },
+        { status: initialStatus, localSendStartedAt: sendStartedAt },
+      );
+      logChatSendDiagnostic({
+        taskId: "P24-CONTACT-001",
+        channel: "im",
+        phase: "local_echo",
+        result: "ok",
+        action: "enqueue_contact_card",
+        to: initialStatus,
+        context: {
+          conversationId: conversation.conversationId,
+          conversationType,
+          localMessageId,
+          messageKind: "contact_card",
+        },
+      });
+      setLocalOutgoingMessagesByConversation((current) =>
+        upsertLocalOutgoingMessage(
+          current,
+          conversationType,
+          conversation.conversationId,
+          localMessage,
+        ),
+      );
+      setReplyTarget(null);
+      scrollMessagesToBottom("smooth");
+      void storage.upsertRecord({
+        body,
+        channel: "im",
+        clientMsgId,
+        createdAt: sendStartedAt,
+        localMessageId,
+        messageType: "contact_card",
+        scopeKey,
+        status: initialStatus as SendOutboxStatus,
+        targetId: conversation.conversationId,
+        targetType: conversationType,
+        updatedAt: sendStartedAt,
+      });
+      enqueueOutgoingTask(async () => {
+        try {
+          const result = await requireApiClient(session).sendConversationContactCardMessage(
+            conversationType,
+            conversation.conversationId,
+            sanitizeContactCard(card),
+            reply?.messageId,
+            { clientMsgId },
+          );
+          const sentMessage = replaceLocalMessageInCache(
+            queryClient,
+            session,
+            conversation,
+            localMessageId,
+            "contact_card",
+            body,
+            result,
+          );
+          logChatSendDiagnostic({
+            taskId: "P24-CONTACT-001",
+            channel: "im",
+            phase: "send",
+            result: "ok",
+            action: "send_succeeded",
+            from: "sending",
+            to: "sent",
+            context: {
+              conversationId: conversation.conversationId,
+              conversationType,
+              localMessageId,
+              messageId: sentMessage.messageId,
+              messageKind: "contact_card",
+            },
+          });
+          setLocalOutgoingMessagesByConversation((current) =>
+            replaceLocalOutgoingMessage(
+              current,
+              conversationType,
+              conversation.conversationId,
+              localMessageId,
+              sentMessage,
+            ),
+          );
+          void storage.deleteRecord(scopeKey, localMessageId);
+          void invalidateMessages(queryClient);
+          scrollMessagesToBottom("smooth");
+        } catch (error) {
+          const failedAt = Date.now();
+          const reason = formatError(error);
+          logChatSendDiagnostic({
+            taskId: "P24-CONTACT-001",
+            channel: "im",
+            phase: "send",
+            result: "failed",
+            action: "send_failed",
+            from: "sending",
+            to: "failed",
+            reason,
+            context: chatSendFailureContext(error, {
+              conversationId: conversation.conversationId,
+              conversationType,
+              localMessageId,
+              messageKind: "contact_card",
+              path: conversationType === "group"
+                ? "/api/client/v1/groups/{conversationId}/messages"
+                : "/api/client/v1/direct-chats/{conversationId}/messages",
+            }),
+          });
+          markLocalMessageFailed(
+            queryClient,
+            session,
+            conversation,
+            localMessageId,
+            reason,
+            failedAt,
+          );
+          setLocalOutgoingMessagesByConversation((current) =>
+            markLocalOutgoingMessageFailed(
+              current,
+              conversationType,
+              conversation.conversationId,
+              localMessageId,
+              reason,
+              failedAt,
+            ),
+          );
+          void storage.patchRecord(scopeKey, localMessageId, {
+            localFailedAt: failedAt,
+            localError: reason,
+            status: "failed",
+            updatedAt: failedAt,
+          });
+        }
+      });
+    },
+    [
+      activeConversation,
+      activeConversationType,
+      enqueueOutgoingTask,
+      queryClient,
+      replyTarget,
+      scrollMessagesToBottom,
+      session,
+      setLocalOutgoingMessagesByConversation,
+      setReplyTarget,
+    ],
+  );
+
   return {
     retryTextMessage,
+    sendContactCardOptimistically,
     sendTextOptimistically,
   };
 }

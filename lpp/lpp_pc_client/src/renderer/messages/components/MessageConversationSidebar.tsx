@@ -12,7 +12,7 @@ import {
   type MessagePlusAction,
 } from "./MessageConversationListPanel";
 
-type ComposerDialog = "direct" | "group" | "qr" | null;
+type ComposerDialog = "direct" | "group" | "qr" | "card" | null;
 
 export function MessageConversationSidebar({
   activeConversation,
