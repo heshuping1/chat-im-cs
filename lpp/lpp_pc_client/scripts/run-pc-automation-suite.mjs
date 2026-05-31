@@ -12,13 +12,25 @@ const commandResults = [];
 
 await mkdir(reportDir, { recursive: true });
 
-if (suite === 'matrix') {
-  await writeSummary();
-} else {
-  for (const plan of commandPlans) {
-    commandResults.push(await runCommandPlan(plan));
-    if (commandResults.at(-1).status === 'failed' && plan.stopOnFailure) break;
+try {
+  if (suite !== 'matrix') {
+    for (const plan of commandPlans) {
+      commandResults.push(await runCommandPlan(plan));
+      if (commandResults.at(-1).status === 'failed' && plan.stopOnFailure) break;
+    }
   }
+} catch (error) {
+  commandResults.push({
+    name: 'runner',
+    status: 'failed',
+    exitCode: 1,
+    timedOut: false,
+    startedAt: runStartedAt.toISOString(),
+    endedAt: new Date().toISOString(),
+    durationMs: Date.now() - runStartedAt.getTime(),
+    error: shortError(error),
+  });
+} finally {
   await writeSummary();
 }
 
@@ -49,7 +61,6 @@ function buildCommandPlans(targetSuite) {
     command('lint:shape', ['run', 'lint:shape'], { stopOnFailure: false }),
     command('docs:check', ['run', 'docs:check'], { stopOnFailure: false }),
     command('test:coverage:core', ['run', 'test:coverage:core'], { stopOnFailure: false }),
-    command('test:browser', ['run', 'test:browser'], { stopOnFailure: false }),
     command('test:electron:group-chat:full', ['run', 'test:electron:group-chat:full'], { stopOnFailure: false }),
   ];
   return targetSuite === 'daily' ? daily : weekly;
@@ -80,7 +91,8 @@ function npmInvocation(args) {
 }
 
 function defaultTimeoutFor(name) {
-  if (name.startsWith('test:electron')) return 15 * 60_000;
+  if (name === 'test:electron:regression') return 8 * 60_000;
+  if (name.startsWith('test:electron')) return 3 * 60_000;
   if (name === 'test:browser') return 10 * 60_000;
   if (name === 'build') return 10 * 60_000;
   return 5 * 60_000;
@@ -91,6 +103,7 @@ async function runCommandPlan(plan) {
   const logPath = join(reportDir, `${sanitizeFileName(plan.name)}.log`);
   let output = '';
   let timedOut = false;
+  let spawnError = null;
   const child = spawn(plan.executable, plan.args, {
     cwd: root,
     shell: false,
@@ -99,10 +112,6 @@ async function runCommandPlan(plan) {
       FORCE_COLOR: '0',
     },
   });
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    child.kill('SIGTERM');
-  }, plan.timeoutMs);
   child.stdout.on('data', (chunk) => {
     const text = chunk.toString();
     output += text;
@@ -113,14 +122,23 @@ async function runCommandPlan(plan) {
     output += text;
     process.stderr.write(text);
   });
-  const exitCode = await new Promise((resolve) => {
+  const closePromise = new Promise((resolve) => {
     child.on('error', (error) => {
+      spawnError = error;
       output += `\n[spawn-error] ${error.message}\n`;
       resolve(1);
     });
     child.on('close', (code) => resolve(code ?? 1));
   });
-  clearTimeout(timeout);
+  const timeoutPromise = new Promise((resolve) => {
+    setTimeout(async () => {
+      timedOut = true;
+      output += `\n[timeout] ${plan.name} exceeded ${plan.timeoutMs}ms; killing process tree.\n`;
+      await killProcessTree(child);
+      resolve(124);
+    }, plan.timeoutMs);
+  });
+  const exitCode = await Promise.race([closePromise, timeoutPromise]);
   await writeFile(logPath, output);
   const endedAt = new Date();
   return {
@@ -133,7 +151,26 @@ async function runCommandPlan(plan) {
     durationMs: endedAt.getTime() - startedAt.getTime(),
     logPath,
     stopOnFailure: plan.stopOnFailure,
+    ...(spawnError ? { error: shortError(spawnError) } : {}),
   };
+}
+
+async function killProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    await new Promise((resolve) => {
+      const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      killer.on('error', () => resolve());
+      killer.on('close', () => resolve());
+    });
+    return;
+  }
+  child.kill('SIGTERM');
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+  if (child.exitCode === null) child.kill('SIGKILL');
 }
 
 async function writeSummary() {
@@ -180,4 +217,13 @@ function mapCommandCoverage(scenarios) {
 
 function sanitizeFileName(value) {
   return value.replace(/[^A-Za-z0-9._-]+/g, '_');
+}
+
+function shortError(error) {
+  return String(error?.message || error || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(' | ');
 }

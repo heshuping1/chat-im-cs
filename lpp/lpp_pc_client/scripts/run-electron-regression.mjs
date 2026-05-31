@@ -68,23 +68,28 @@ try {
 
   const pool = await step('server-api: prepare dynamic account pool', async () =>
     prepareAccountPool(env),
+    { timeoutMs: 90_000 },
   );
-  await step('build: electron main/preload', () => runNpmCommand(['run', 'build:electron']));
-  viteProcess = await step('server: start Vite renderer', () => startViteServer());
+  await step('build: electron main/preload', () => runNpmCommand(['run', 'build:electron'], 90_000), {
+    timeoutMs: 100_000,
+  });
+  viteProcess = await step('server: start Vite renderer', () => startViteServer(), { timeoutMs: 90_000 });
   const launched = await step('electron: launch multi-profile clients', () =>
     launchProfileClients(env, pool.accounts),
+    { timeoutMs: 120_000 },
   );
   await step('electron: assert profile isolation', () => assertProfileIsolation(launched));
   await step('electron: duplicate profile launch is blocked', () =>
     assertDuplicateProfileBlocked(launched[0]?.account.profileId),
+    { timeoutMs: 60_000 },
   );
-  await step('auth: login dynamic accounts', () => loginAccounts(env, launched));
+  await step('auth: login dynamic accounts', () => loginAccounts(env, launched), { timeoutMs: 180_000 });
   await step('auth: assert account isolation after login', () => assertAccountIsolation(launched));
   await step('customer-service: full workflow probe', () =>
     probeCustomerServiceWorkflow(launched, pool),
-    { fatal: false },
+    { fatal: false, timeoutMs: 120_000 },
   );
-  await step('im: full workflow probe', () => probeImWorkflow(launched, pool), { fatal: false });
+  await step('im: full workflow probe', () => probeImWorkflow(launched, pool), { fatal: false, timeoutMs: 120_000 });
   await step('quality: no sensitive data in report model', () => assertNoSensitiveReportData(), {
     fatal: false,
   });
@@ -636,7 +641,12 @@ async function startViteServer() {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   captureProcessOutput('vite', child);
-  await waitForUrl(viteUrl, 60_000);
+  try {
+    await waitForUrl(viteUrl, 60_000);
+  } catch (error) {
+    await killProcessTree(child);
+    throw error;
+  }
   return child;
 }
 
@@ -852,7 +862,7 @@ async function step(name, fn, options = {}) {
   const fatal = options.fatal !== false;
   const startedAt = Date.now();
   try {
-    const value = await fn();
+    const value = await withTimeout(fn(), options.timeoutMs ?? 180_000, name);
     results.push({ name, status: 'passed', durationMs: Date.now() - startedAt });
     return value;
   } catch (error) {
@@ -875,6 +885,24 @@ async function step(name, fn, options = {}) {
     if (fatal) throw error;
     return undefined;
   }
+}
+
+function withTimeout(promise, timeoutMs, name) {
+  return new Promise((resolvePromise, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${name} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    Promise.resolve(promise).then(
+      (value) => {
+        clearTimeout(timer);
+        resolvePromise(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function addTask(task) {
@@ -958,22 +986,29 @@ async function cleanup() {
     await app.close().catch(() => {});
   }
   if (viteProcess) {
-    viteProcess.kill('SIGTERM');
+    await killProcessTree(viteProcess);
     await waitForExit(viteProcess, 5_000).catch(() => {});
-    if (viteProcess.exitCode === null) viteProcess.kill('SIGKILL');
   }
 }
 
-function runNpmCommand(args) {
+function runNpmCommand(args, timeoutMs = 120_000) {
   return new Promise((resolvePromise, reject) => {
     const child = spawnNpm(args, {
       cwd: pcRoot,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    const timer = setTimeout(async () => {
+      await killProcessTree(child);
+      reject(new Error(`npm ${args.join(' ')} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
     captureProcessOutput(args.join(' '), child);
-    child.on('error', reject);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
     child.on('exit', (code) => {
+      clearTimeout(timer);
       if (code === 0) resolvePromise();
       else reject(new Error(`npm ${args.join(' ')} exited with code ${code}`));
     });
@@ -985,6 +1020,24 @@ function spawnNpm(args, options) {
     return spawn('cmd.exe', ['/c', 'npm.cmd', ...args], { ...options, shell: false });
   }
   return spawn('npm', args, { ...options, shell: false });
+}
+
+async function killProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    await new Promise((resolvePromise) => {
+      const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      killer.on('error', () => resolvePromise());
+      killer.on('close', () => resolvePromise());
+    });
+    return;
+  }
+  child.kill('SIGTERM');
+  await delay(2_000);
+  if (child.exitCode === null) child.kill('SIGKILL');
 }
 
 function captureProcessOutput(name, child) {
