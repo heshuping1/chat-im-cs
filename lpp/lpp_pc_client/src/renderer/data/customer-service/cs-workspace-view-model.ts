@@ -192,6 +192,21 @@ export function selectCustomerServiceThread(input: {
     queueItems?: CustomerServiceThread[];
   };
 }) {
+  const selectableThreads = listCustomerServiceSelectableThreads(input);
+
+  return (
+    selectableThreads.find((thread) => thread.threadId === input.selectedThreadId) ??
+    selectableThreads[0]
+  );
+}
+
+export function listCustomerServiceSelectableThreads(input: {
+  historyItems?: StaffServiceHistoryItem[];
+  threads?: {
+    activeItems?: CustomerServiceThread[];
+    queueItems?: CustomerServiceThread[];
+  };
+}) {
   const currentThreads = [
     ...(input.threads?.queueItems ?? []),
     ...(input.threads?.activeItems ?? []),
@@ -202,13 +217,17 @@ export function selectCustomerServiceThread(input: {
     .map(staffServiceHistoryItemToThread)
     .filter((thread) => thread.threadType === "temp_session");
 
-  return (
-    [...currentThreads, ...historyThreads].find(
-      (thread) => thread.threadId === input.selectedThreadId,
-    ) ??
-    currentThreads[0] ??
-    historyThreads[0]
-  );
+  return dedupeCustomerServiceThreads([...currentThreads, ...historyThreads]);
+}
+
+function dedupeCustomerServiceThreads(threads: CustomerServiceThread[]) {
+  const seen = new Set<string>();
+  return threads.filter((thread) => {
+    const key = `${thread.threadType}-${thread.threadId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function usableThreadTitle(value?: string | null) {

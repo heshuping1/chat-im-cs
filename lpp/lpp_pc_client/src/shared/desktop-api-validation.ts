@@ -37,7 +37,12 @@ export function validateDesktopApiCall(
       return [safeExternalUrl(args[0], method)];
     case 'readAuthSession':
     case 'clearAuthSession':
+    case 'getAppInstanceProfile':
       return [];
+    case 'openAppProfile':
+      return args[0] === undefined || args[0] === null
+        ? []
+        : [optionalProfileId(args[0], 'appProfile.profileId')];
     case 'saveAuthSession':
       return [validateDesktopAuthSessionPayload(args[0])];
     case 'cacheLocalMediaFile':
@@ -260,6 +265,15 @@ function validateSourceBytes(value: unknown) {
 function optionalString(value: unknown, label: string, maxLength = maxShortTextLength) {
   if (value === undefined || value === null) return undefined;
   return safeString(value, label, maxLength);
+}
+
+function optionalProfileId(value: unknown, label: string) {
+  const text = safeString(value, label, 64).trim();
+  if (!text) return undefined;
+  if (!/^[A-Za-z0-9._-]+$/.test(text)) {
+    throw new Error(`${label} must use letters, numbers, dot, underscore or dash`);
+  }
+  return text;
 }
 
 function optionalNullableString(value: unknown, label: string, maxLength = maxShortTextLength) {

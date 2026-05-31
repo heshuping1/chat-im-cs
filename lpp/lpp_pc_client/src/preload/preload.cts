@@ -77,6 +77,10 @@ const desktopApi: DesktopApi = {
   saveAuthSession: (payload) =>
     validatedInvoke('saveAuthSession', 'desktop:save-auth-session', payload),
   clearAuthSession: () => validatedInvoke('clearAuthSession', 'desktop:clear-auth-session'),
+  openAppProfile: (profileId?: string) =>
+    validatedInvoke('openAppProfile', 'desktop:open-app-profile', profileId),
+  getAppInstanceProfile: () =>
+    validatedInvoke('getAppInstanceProfile', 'desktop:get-app-instance-profile'),
   captureScreenshot: () => validatedInvoke('captureScreenshot', 'desktop:capture-screenshot'),
   getAppVersion: () => validatedInvoke('getAppVersion', 'desktop:get-app-version'),
   exportDiagnostics: (payload: DiagnosticsPayload) =>

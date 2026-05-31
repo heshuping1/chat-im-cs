@@ -243,11 +243,15 @@
   box-shadow: 0 12px 26px rgba(8, 185, 129, 0.08);
 }
 
+.h-flagship-grid .h-thread-card.is-open:not(.active) {
+  border-color: rgba(8, 185, 129, 0.28);
+}
+
 .h-flagship-grid .h-chat-workspace {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 72px 42px minmax(0, 1fr) auto;
+  grid-template-rows: 36px 72px 42px minmax(0, 1fr) auto;
   overflow: hidden;
   border-right: 1px solid rgba(216, 226, 237, 0.9);
   background:
@@ -606,7 +610,17 @@
 }
 
 .h-flagship-grid .h-chat-workspace {
-  grid-template-rows: 64px 34px minmax(0, 1fr) 130px !important;
+  grid-template-rows: 34px 64px 34px minmax(0, 1fr) 130px !important;
+}
+
+.h-flagship-grid .h-service-open-tabs {
+  min-height: 34px;
+  padding: 4px 10px !important;
+}
+
+.h-flagship-grid .h-service-open-tab {
+  flex-basis: 126px;
+  height: 25px;
 }
 
 .h-flagship-grid .h-chat-head {

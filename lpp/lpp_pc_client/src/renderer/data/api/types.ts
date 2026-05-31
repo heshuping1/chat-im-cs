@@ -73,6 +73,23 @@ export interface TenantInfoDto {
   logoUrl?: string | null;
 }
 
+export interface AccountDeviceDto {
+  deviceId: string;
+  tenantId?: string | null;
+  tenantName?: string | null;
+  deviceName?: string | null;
+  deviceType?: string | null;
+  lastActiveAt?: string | null;
+  isCurrent?: boolean;
+  activeSessionCount?: number;
+}
+
+export interface RevokeAccountDeviceResultDto {
+  deviceId: string;
+  revokedSessionCount?: number;
+  revokedAt?: string | null;
+}
+
 export interface FriendInviteQrDto {
   tokenId: string;
   token?: string;

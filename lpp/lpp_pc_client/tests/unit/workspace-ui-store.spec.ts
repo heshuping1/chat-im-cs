@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  selectCloseOpenServiceThread,
   selectActiveModule,
   selectMessageLayoutState,
+  selectOpenServiceThreadIds,
   selectServiceLayoutState,
   selectSetActiveModule,
   selectSetServiceThreadFilter,
@@ -10,10 +12,12 @@ import {
 describe("workspace ui store selectors", () => {
   it("selects navigation and layout state from compatible workspace state", () => {
     const setActiveModule = vi.fn();
+    const closeOpenServiceThread = vi.fn();
     const setFilter = vi.fn();
     const state = {
       activeModule: "messages" as const,
       activeThreadId: "thread-1",
+      openServiceThreadIds: ["thread-1", "thread-2"],
       activeImConversationId: "conversation-1",
       activeContactId: "contact-1",
       listPaneWidth: 220,
@@ -27,6 +31,7 @@ describe("workspace ui store selectors", () => {
       contactFilter: "customer" as const,
       setActiveModule,
       setActiveThread: vi.fn(),
+      closeOpenServiceThread,
       setActiveImConversation: vi.fn(),
       setActiveContact: vi.fn(),
       setListPaneWidth: vi.fn(),
@@ -42,6 +47,8 @@ describe("workspace ui store selectors", () => {
 
     expect(selectActiveModule(state)).toBe("messages");
     expect(selectSetActiveModule(state)).toBe(setActiveModule);
+    expect(selectOpenServiceThreadIds(state)).toEqual(["thread-1", "thread-2"]);
+    expect(selectCloseOpenServiceThread(state)).toBe(closeOpenServiceThread);
     expect(selectSetServiceThreadFilter(state)).toBe(setFilter);
     expect(selectMessageLayoutState(state)).toMatchObject({
       listPaneWidth: 220,

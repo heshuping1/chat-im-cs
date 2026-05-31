@@ -300,6 +300,7 @@ describe("architecture boundaries", () => {
 
   it("keeps direct desktopApi calls pinned to documented owners", () => {
     const allowedDirectDesktopApiCallers = new Set([
+      "src/renderer/data/app-instance/app-instance.ts",
       "src/renderer/data/auth/auth-session.ts",
       "src/renderer/data/reminder/reminder-service.ts",
       "src/renderer/data/workspace-ui/workspaceTrayStatusEffect.ts",
@@ -446,7 +447,11 @@ function isUnder(file: string, segment: string) {
 }
 
 function relative(file: string) {
-  return normalize(file).replace(`${repoRoot}/`, "");
+  const normalizedRoot = normalize(repoRoot);
+  return normalize(file)
+    .replace(`${normalizedRoot}\\`, "")
+    .replace(`${normalizedRoot}/`, "")
+    .replace(/\\/g, "/");
 }
 
 function lineCount(file: string) {

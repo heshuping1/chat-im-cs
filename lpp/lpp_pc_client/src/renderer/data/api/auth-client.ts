@@ -1,5 +1,6 @@
 import { ApiBaseClient } from "./base";
 import { endpointPlan } from "./endpoints";
+import { getAppInstanceProfile } from "../app-instance/app-instance";
 import type {
   CaptchaChallenge,
   PlatformLoginResult,
@@ -7,13 +8,14 @@ import type {
 } from "./types";
 
 export class AuthApiClient extends ApiBaseClient {
-  platformLogin(body: {
+  async platformLogin(body: {
     identifier: string;
     password: string;
     loginType?: string;
     captchaToken?: string;
     captchaAnswer?: string;
   }) {
+    const instance = await getAppInstanceProfile();
     return this.platformRequest<PlatformLoginResult>(endpointPlan.platformLogin, {
       method: "POST",
       body: JSON.stringify({
@@ -22,9 +24,12 @@ export class AuthApiClient extends ApiBaseClient {
         captchaToken: body.captchaToken ?? null,
         captchaAnswer: body.captchaAnswer ?? null,
         issueRefreshToken: true,
+        deviceId: instance.deviceId,
         devicePlatform: "pc",
-        deviceName: "LPP PC Client",
+        deviceName: `LPP PC Client (${instance.profileName})`,
         appVersion: "0.1.0",
+        clientInstanceId: instance.clientInstanceId,
+        profileName: instance.profileName,
       }),
     });
   }

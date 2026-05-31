@@ -85,6 +85,8 @@ export const pcQueryKeys = {
     ["pc-account-blocklist", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountSpaces: (apiBaseUrl?: string, platformToken?: string) =>
     ["pc-account-spaces", apiBaseUrl ?? "", platformToken ?? ""] as const,
+  accountDevices: (apiBaseUrl?: string, platformToken?: string) =>
+    ["pc-account-devices", apiBaseUrl ?? "", platformToken ?? ""] as const,
   workbenchAnnouncements: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-workbench-announcements", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   knowledgeBases: (apiBaseUrl?: string, tenantToken?: string) =>

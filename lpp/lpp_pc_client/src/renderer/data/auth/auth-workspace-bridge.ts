@@ -22,6 +22,7 @@ export function createAuthSessionClearedState() {
   return {
     authSession: null,
     activeThreadId: "",
+    openServiceThreadIds: [],
     activeImConversationId: "",
     locallyReadImConversationReads: {},
     imPeerReadReceipts: {},

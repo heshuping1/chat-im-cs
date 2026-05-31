@@ -484,6 +484,38 @@
   gap: 8px;
 }
 
+.account-client-card {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid rgba(216, 226, 237, 0.95);
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.account-client-card span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.account-client-card strong {
+  overflow: hidden;
+  color: var(--pc-text);
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-client-card em {
+  color: var(--pc-text-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .account-action-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

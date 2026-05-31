@@ -11,8 +11,11 @@ import {
   usePushRealtimeReminder,
 } from "../data/reminder/reminder-store";
 import {
+  useCloseOpenServiceThread,
   useActiveThreadId,
+  useOpenServiceThreadIds,
   useSetActiveModule,
+  useSetActiveThread,
 } from "../data/workspace-ui/workspace-ui-store";
 import { type CurrentUserIdentity, isSelfSender } from "../data/message-display";
 import {
@@ -43,6 +46,7 @@ import {
   type ServiceMessageContextAction,
 } from "../customer-service/components/ServiceMessageContextMenu";
 import { CustomerServiceComposerSurface } from "../customer-service/components/CustomerServiceComposerSurface";
+import { CustomerServiceMultiOpenBar } from "../customer-service/components/CustomerServiceMultiOpenBar";
 import { CustomerServiceWorkspaceHeader } from "../customer-service/components/CustomerServiceWorkspaceHeader";
 import { CustomerServiceReceptionStrip } from "../customer-service/components/CustomerServiceReceptionStrip";
 import { CustomerServiceMessageStage } from "../customer-service/components/CustomerServiceMessageStage";
@@ -52,6 +56,7 @@ import { useCustomerServiceSendController } from "../customer-service/hooks/useC
 import { useCustomerServiceWorkspaceController } from "../customer-service/hooks/useCustomerServiceWorkspaceController";
 import { startVerticalPaneResize } from "../lib/paneResize";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
+import { maxOpenServiceThreads } from "../data/customer-service/cs-multi-open";
 
 const composerHeightBounds = {
   min: 176,
@@ -73,9 +78,12 @@ function clampComposerHeight(height: number) {
 
 export function ChatWorkspace() {
   const selectedThreadId = useActiveThreadId();
+  const openServiceThreadIds = useOpenServiceThreadIds();
   const [notice, setNotice] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<ServiceMessageMenuState>(null);
   const setActiveModule = useSetActiveModule();
+  const setActiveThread = useSetActiveThread();
+  const closeOpenServiceThread = useCloseOpenServiceThread();
   const pcSettings = usePcSettings();
   const [composerHeight, setComposerHeight] = useState(176);
   const pushRealtimeReminder = usePushRealtimeReminder();
@@ -86,6 +94,7 @@ export function ChatWorkspace() {
     detailLoading,
     queryClient,
     selectedThread,
+    selectableThreads,
     session,
     threadActionMutation,
     workspaceViewModel,
@@ -108,6 +117,18 @@ export function ChatWorkspace() {
     threadState,
     title,
   } = workspaceViewModel;
+  const openThreads = useMemo(() => {
+    const threadsById = new Map(
+      selectableThreads.map((thread) => [thread.threadId, thread]),
+    );
+    const opened = openServiceThreadIds
+      .map((threadId) => threadsById.get(threadId))
+      .filter((thread): thread is NonNullable<typeof thread> => Boolean(thread));
+    if (selectedThread && !opened.some((thread) => thread.threadId === selectedThread.threadId)) {
+      return [...opened, selectedThread].slice(-maxOpenServiceThreads);
+    }
+    return opened;
+  }, [openServiceThreadIds, selectableThreads, selectedThread]);
   useCustomerServiceThreadLifecycle({
     detail,
     dismissRealtimeRemindersForTarget,
@@ -270,6 +291,14 @@ export function ChatWorkspace() {
       className="h-chat-workspace"
       style={{ "--composer-height": `${composerHeight}px` } as CSSProperties}
     >
+      <CustomerServiceMultiOpenBar
+        activeThreadId={selectedThread.threadId}
+        maxOpenCount={maxOpenServiceThreads}
+        openThreads={openThreads}
+        onClose={closeOpenServiceThread}
+        onSelect={setActiveThread}
+      />
+
       <CustomerServiceWorkspaceHeader
         identity={identity}
         modeLabel={modeLabel}

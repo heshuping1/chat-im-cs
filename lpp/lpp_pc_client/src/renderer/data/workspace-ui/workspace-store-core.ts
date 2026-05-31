@@ -48,6 +48,10 @@ import {
   type ModuleKey,
 } from '../types';
 import { applyWorkspaceTrayStatus } from './workspaceTrayStatusEffect';
+import {
+  closeServiceThread,
+  openServiceThread,
+} from '../customer-service/cs-multi-open';
 
 // Compatibility export only. New code should import AuthSession from data/auth/auth-session.
 export type { AuthSession } from '../auth/auth-session';
@@ -76,6 +80,7 @@ interface WorkspaceState {
   authSession: AuthSession | null;
   activeModule: ModuleKey;
   activeThreadId: string;
+  openServiceThreadIds: string[];
   activeImConversationId: string;
   locallyReadImConversationReads: Record<string, LocalImConversationRead>;
   imPeerReadReceipts: Record<string, LocalImPeerReadReceipt>;
@@ -96,6 +101,7 @@ interface WorkspaceState {
   realtimeReminders: PcRealtimeReminder[];
   setActiveModule: (module: ModuleKey) => void;
   setActiveThread: (id: string) => void;
+  closeOpenServiceThread: (id: string) => void;
   setActiveImConversation: (id: string) => void;
   markImConversationReadLocally: (
     id: string,
@@ -136,6 +142,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   authSession: initialAuthSession,
   activeModule: 'messages',
   activeThreadId: '',
+  openServiceThreadIds: [],
   activeImConversationId: '',
   locallyReadImConversationReads: readStoredLocalImConversationReads(initialAuthSession),
   imPeerReadReceipts: readStoredLocalImPeerReadReceipts(initialAuthSession),
@@ -155,7 +162,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   pcSettings: readStoredPcSettings(),
   realtimeReminders: [],
   setActiveModule: (activeModule) => set({ activeModule }),
-  setActiveThread: (id) => set({ activeThreadId: id }),
+  setActiveThread: (id) =>
+    set((state) => ({
+      activeThreadId: id,
+      openServiceThreadIds: openServiceThread(state.openServiceThreadIds, id),
+    })),
+  closeOpenServiceThread: (id) =>
+    set((state) =>
+      closeServiceThread({
+        activeThreadId: state.activeThreadId,
+        closingThreadId: id,
+        openThreadIds: state.openServiceThreadIds,
+      }),
+    ),
   setActiveImConversation: (id) =>
     set({ activeImConversationId: id, activeModule: 'messages' }),
   markImConversationReadLocally: (id, readSeq = 0, messageKey) =>

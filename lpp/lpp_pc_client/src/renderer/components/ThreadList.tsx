@@ -28,6 +28,7 @@ import { customerServiceStatuses } from "../data/static-config";
 import {
   useActiveThreadId,
   useCustomerServiceStatus,
+  useOpenServiceThreadIds,
   useServiceThreadFilter,
   useSetActiveThread,
   useSetCustomerServiceStatus,
@@ -50,6 +51,7 @@ export function ThreadList() {
   const [expandedThreadCount, setExpandedThreadCount] = useState(0);
   const authSession = useAuthSession();
   const selectedThreadId = useActiveThreadId();
+  const openServiceThreadIds = useOpenServiceThreadIds();
   const setSelectedThread = useSetActiveThread();
   const filter = useServiceThreadFilter();
   const setFilter = useSetServiceThreadFilter();
@@ -359,6 +361,7 @@ export function ThreadList() {
               thread,
             });
             const queued = mode === "current" && isQueuedCustomerServiceThread(thread);
+            const opened = openServiceThreadIds.includes(thread.threadId);
             const claiming =
               claimThreadMutation.isPending &&
               claimThreadMutation.variables?.threadId === thread.threadId;
@@ -372,7 +375,7 @@ export function ThreadList() {
               aria-pressed={selectedThreadId === thread.threadId}
               className={`h-thread-card ${
                 selectedThreadId === thread.threadId ? "active" : ""
-              }`}
+              } ${opened ? "is-open" : ""}`}
               key={`${thread.threadType}-${thread.threadId}`}
               onClick={() => setSelectedThread(thread.threadId)}
               onKeyDown={(event) => {

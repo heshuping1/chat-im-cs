@@ -7,6 +7,8 @@ export const endpointPlan = {
   tenantJoinByCode: "/api/platform/v1/tenants/join-by-code",
   tenantJoinRequest: "/api/platform/v1/tenants/{tenantId}/join-request",
   accountDeactivate: "/api/platform/v1/account/deactivate",
+  accountDevices: "/api/platform/v1/account/devices",
+  accountDevice: "/api/platform/v1/account/devices/{deviceId}",
   captchaGenerate: "/api/client/v1/auth/captcha/generate",
   conversations: "/api/client/v1/conversations",
   profileMe: "/api/client/v1/profile/me",

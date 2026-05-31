@@ -13,6 +13,7 @@ export type MessageConversationFilter = "all" | "friends" | "groups" | "unread";
 export interface WorkspaceUiCompatibleState {
   activeModule: ModuleKey;
   activeThreadId: string;
+  openServiceThreadIds: string[];
   activeImConversationId: string;
   activeContactId: string;
   listPaneWidth: number;
@@ -28,6 +29,7 @@ export interface WorkspaceUiCompatibleState {
   customerServiceStatus: CustomerServiceStatus;
   setActiveModule: (module: ModuleKey) => void;
   setActiveThread: (id: string) => void;
+  closeOpenServiceThread: (id: string) => void;
   setActiveImConversation: (id: string) => void;
   setActiveContact: (id: string) => void;
   setListPaneWidth: (width: number) => void;
@@ -55,8 +57,16 @@ export function selectActiveThreadId(state: WorkspaceUiCompatibleState) {
   return state.activeThreadId;
 }
 
+export function selectOpenServiceThreadIds(state: WorkspaceUiCompatibleState) {
+  return state.openServiceThreadIds;
+}
+
 export function selectSetActiveThread(state: WorkspaceUiCompatibleState) {
   return state.setActiveThread;
+}
+
+export function selectCloseOpenServiceThread(state: WorkspaceUiCompatibleState) {
+  return state.closeOpenServiceThread;
 }
 
 export function selectActiveImConversationId(state: WorkspaceUiCompatibleState) {
@@ -197,8 +207,16 @@ export function useActiveThreadId() {
   return useWorkspaceStore(selectActiveThreadId);
 }
 
+export function useOpenServiceThreadIds() {
+  return useWorkspaceStore(selectOpenServiceThreadIds);
+}
+
 export function useSetActiveThread() {
   return useWorkspaceStore(selectSetActiveThread);
+}
+
+export function useCloseOpenServiceThread() {
+  return useWorkspaceStore(selectCloseOpenServiceThread);
 }
 
 export function useActiveImConversationId() {

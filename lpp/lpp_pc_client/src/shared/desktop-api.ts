@@ -52,6 +52,13 @@ export interface DesktopAuthSessionPayload {
   tenants?: unknown[];
 }
 
+export interface AppInstanceProfilePayload {
+  profileId: string | null;
+  profileName: string;
+  clientInstanceId: string;
+  deviceId: string;
+}
+
 export interface ScreenshotCaptureResult {
   dataUrl: string;
   fileName: string;
@@ -117,6 +124,8 @@ export interface DesktopApi {
   readAuthSession(): Promise<DesktopAuthSessionPayload | null>;
   saveAuthSession(payload: DesktopAuthSessionPayload): Promise<void>;
   clearAuthSession(): Promise<void>;
+  openAppProfile(profileId?: string): Promise<void>;
+  getAppInstanceProfile(): Promise<AppInstanceProfilePayload>;
   captureScreenshot(): Promise<ScreenshotCaptureResult>;
   getAppVersion(): Promise<string>;
   exportDiagnostics(payload: DiagnosticsPayload): Promise<string | null>;
@@ -139,7 +148,9 @@ export const desktopIpcChannelByMethod = {
   getAppVersion: 'desktop:get-app-version',
   getCachedMediaStatus: 'desktop:get-cached-media-status',
   notify: 'desktop:notify',
+  getAppInstanceProfile: 'desktop:get-app-instance-profile',
   openDownloadedFile: 'desktop:open-downloaded-file',
+  openAppProfile: 'desktop:open-app-profile',
   openExternal: 'desktop:open-external',
   openFile: 'desktop:open-file',
   openMediaFile: 'desktop:open-media-file',

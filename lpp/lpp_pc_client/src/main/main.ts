@@ -11,6 +11,9 @@ import {
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import type {
   DesktopAuthSessionPayload,
   DesktopApiMethod,
@@ -34,6 +37,13 @@ import {
   recordRendererProcessGone,
 } from './runtime-diagnostics.js';
 import { selectScreenshotRegion } from './screenshot-selection-window.js';
+import {
+  buildAppProfileLaunchArgs,
+  createNextProfileId,
+  configureAppInstanceProfile,
+  formatProfileWindowTitle,
+} from './app-instance-profile.js';
+import { readOrCreateAppInstanceIdentity } from './app-instance-identity.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -42,7 +52,18 @@ const appIconPath = app.isPackaged
   ? join(process.resourcesPath, 'app-icon.ico')
   : join(__dirname, '../../assets/app-icon-green-bubble.ico');
 const devDockIconPath = join(__dirname, '../../assets/app-icon-green-bubble.png');
-const singleInstanceLock = app.requestSingleInstanceLock();
+const appInstanceProfile = configureAppInstanceProfile(app);
+const appTitle = formatProfileWindowTitle(
+  'LPP \u5ba2\u670d\u5ba2\u6237\u7aef',
+  appInstanceProfile.profileId,
+);
+let profileLockPath: string | null = null;
+const singleInstanceLock = appInstanceProfile.profileId
+  ? acquireProfileInstanceLock()
+  : app.requestSingleInstanceLock({
+      profileId: 'default',
+    });
+const appInstanceIdentityPromise = readOrCreateAppInstanceIdentity(appInstanceProfile);
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -54,6 +75,8 @@ installElectronProcessDiagnostics();
 if (!singleInstanceLock) {
   app.quit();
 }
+
+app.once('will-quit', releaseProfileInstanceLock);
 
 function handleDesktopIpc<Args extends unknown[]>(
   method: DesktopApiMethod,
@@ -76,7 +99,7 @@ function createWindow() {
     height: 920,
     minWidth: 520,
     minHeight: 760,
-    title: 'LPP \u5ba2\u670d\u5ba2\u6237\u7aef',
+    title: appTitle,
     icon: appIconPath,
     backgroundColor: '#f5f7fb',
     webPreferences: {
@@ -121,7 +144,7 @@ function ensureTray() {
   if (!emptyIcon) return;
   try {
     tray = new Tray(emptyIcon);
-    tray.setToolTip('LPP \u5ba2\u670d\u5ba2\u6237\u7aef');
+    tray.setToolTip(appTitle);
   } catch {
     tray = null;
   }
@@ -147,6 +170,13 @@ handleDesktopIpc(
 );
 
 handleDesktopIpc('clearAuthSession', async () => clearSecureAuthSession());
+
+handleDesktopIpc('getAppInstanceProfile', async () => appInstanceIdentityPromise);
+
+handleDesktopIpc('openAppProfile', async (_event, profileId?: string) => {
+  const nextProfileId = profileId?.trim() || await nextAvailableProfileId();
+  openProfileInstance(nextProfileId);
+});
 
 handleDesktopIpc('captureScreenshot', async () => {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -185,7 +215,7 @@ handleDesktopIpc('exportDiagnostics', async (_event, payload: DiagnosticsPayload
 handleDesktopIpc('setTrayStatus', async (_event, status: TrayStatus) => {
   trayStatus = status;
   ensureTray();
-  tray?.setToolTip(`LPP \u5ba2\u670d\u5ba2\u6237\u7aef - ${trayStatus}`);
+  tray?.setToolTip(`${appTitle} - ${trayStatus}`);
 });
 
 app.whenReady().then(() => {
@@ -213,6 +243,90 @@ app.on('window-all-closed', () => {
 async function openExternalUrl(url: string) {
   if (!isAllowedExternalUrl(url)) return;
   await shell.openExternal(url);
+}
+
+async function nextAvailableProfileId() {
+  try {
+    const profileRoot = join(appInstanceProfile.defaultUserDataPath, 'profiles');
+    const entries = await readdir(profileRoot, { withFileTypes: true });
+    return createNextProfileId(
+      entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    );
+  } catch {
+    return createNextProfileId([]);
+  }
+}
+
+function openProfileInstance(profileId: string) {
+  const args = buildAppProfileLaunchArgs(process.argv, profileId);
+  const child = spawn(process.execPath, args, {
+    detached: true,
+    env: {
+      ...process.env,
+      LPP_PC_INSTANCE_PROFILE: profileId,
+    },
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
+function acquireProfileInstanceLock() {
+  const lockPath = join(appInstanceProfile.userDataPath, 'profile.lock');
+  try {
+    mkdirSync(appInstanceProfile.userDataPath, { recursive: true });
+    const existing = readProfileLock(lockPath);
+    if (
+      existing?.pid &&
+      existing.pid !== process.pid &&
+      isProcessAlive(existing.pid)
+    ) {
+      return false;
+    }
+    writeFileSync(
+      lockPath,
+      JSON.stringify(
+        {
+          pid: process.pid,
+          profileId: appInstanceProfile.profileId,
+          startedAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+    profileLockPath = lockPath;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseProfileInstanceLock() {
+  if (!profileLockPath) return;
+  const existing = readProfileLock(profileLockPath);
+  if (existing?.pid === process.pid) {
+    rmSync(profileLockPath, { force: true });
+  }
+  profileLockPath = null;
+}
+
+function readProfileLock(lockPath: string) {
+  try {
+    const parsed = JSON.parse(readFileSync(lockPath, 'utf8')) as { pid?: unknown };
+    return typeof parsed.pid === 'number' ? { pid: parsed.pid } : null;
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isAllowedExternalUrl(url: string) {

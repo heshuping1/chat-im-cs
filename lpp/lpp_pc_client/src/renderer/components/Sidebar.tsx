@@ -12,7 +12,10 @@ import {
   LayoutDashboard,
   Menu,
   MessageCircleMore,
+  MonitorCog,
+  Plus,
   QrCode,
+  ShieldCheck,
   Star,
   Settings,
   UsersRound,
@@ -40,6 +43,11 @@ import {
   useRealtimeReminders,
 } from "../data/reminder/reminder-store";
 import { pcQueryKeys } from "../data/query-keys";
+import {
+  formatAppInstanceLabel,
+  getAppInstanceProfile,
+  openAppProfile,
+} from "../data/app-instance/app-instance";
 import {
   useAuthSession,
   useClearAuthSession,
@@ -144,6 +152,19 @@ export function Sidebar() {
     staleTime: 60_000,
     queryFn: async () => requireApiClient(authSession).getTenantInfo(),
   });
+  const appInstanceQuery = useQuery({
+    queryKey: ["pc-app-instance-profile"],
+    enabled: accountOpen,
+    staleTime: Infinity,
+    queryFn: getAppInstanceProfile,
+  });
+  const openAppProfileMutation = useMutation({
+    mutationFn: async () => {
+      await openAppProfile();
+    },
+    onSuccess: () => setAccountNotice("已打开新的 PC 客户端"),
+    onError: (error) => setAccountNotice(`打开新客户端失败：${formatError(error)}`),
+  });
   const inviteQrsQuery = useQuery({
     queryKey: pcQueryKeys.accountInviteQrs(
       authSession?.apiBaseUrl,
@@ -220,6 +241,11 @@ export function Sidebar() {
     "--";
   const roleLabel = authSession?.roleLabel ?? "成员";
   const signature = profile?.signature || profile?.bio || "暂无签名";
+  const appInstance = appInstanceQuery.data;
+  const appInstanceLabel = appInstance
+    ? formatAppInstanceLabel(appInstance)
+    : "正在识别客户端";
+  const appInstanceShortId = appInstance?.clientInstanceId.slice(0, 8) ?? "--";
   const queueReminderSessionKey = authSession
     ? `${authSession.apiBaseUrl}|${authSession.tenantToken}`
     : "";
@@ -453,6 +479,33 @@ export function Sidebar() {
                 <small className="account-profile-signature">{signature}</small>
               </div>
             </div>
+
+            <section className="account-popover-section">
+              <span className="account-section-label">账号与客户端</span>
+              <div className="account-client-card">
+                <span>
+                  <MonitorCog size={15} />
+                  <strong>{appInstanceLabel}</strong>
+                </span>
+                <em>实例 {appInstanceShortId}</em>
+              </div>
+              <div className="account-action-list">
+                <AccountAction
+                  icon={<Plus size={15} />}
+                  label={openAppProfileMutation.isPending ? "正在打开" : "打开新客户端"}
+                  onClick={() => openAppProfileMutation.mutate()}
+                />
+                <AccountAction
+                  icon={<ShieldCheck size={15} />}
+                  label="管理登录设备"
+                  onClick={() => {
+                    setActiveModule("settings");
+                    setAccountOpen(false);
+                    setAccountPanel(null);
+                  }}
+                />
+              </div>
+            </section>
 
             <section className="account-popover-section">
               <span className="account-section-label">IM 在线状态</span>

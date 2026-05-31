@@ -1,6 +1,7 @@
 import { AuthApiClient } from "./auth-client";
 import { endpointPlan } from "./endpoints";
 import type {
+  AccountDeviceDto,
   EnterpriseAnnouncementDto,
   FavoriteItemDto,
   FavoriteSummaryDto,
@@ -14,6 +15,7 @@ import type {
   TenantInfoDto,
   PlatformTenant,
   ProfilePrivacySettingsDto,
+  RevokeAccountDeviceResultDto,
   UserProfileDto,
 } from "./types";
 import type { PagedResult } from "./base";
@@ -29,6 +31,17 @@ export class ProfileApiClient extends AuthApiClient {
 
   getPlatformTenants() {
     return this.platformRequest<PlatformTenant[]>(endpointPlan.platformTenants);
+  }
+
+  getAccountDevices() {
+    return this.platformRequest<AccountDeviceDto[]>(endpointPlan.accountDevices);
+  }
+
+  revokeAccountDevice(deviceId: string) {
+    return this.platformRequest<RevokeAccountDeviceResultDto>(
+      endpointPlan.accountDevice.replace("{deviceId}", encodeURIComponent(deviceId)),
+      { method: "DELETE" },
+    );
   }
 
   searchTenants(keyword: string) {

@@ -22,6 +22,8 @@ describe("desktop api validation", () => {
 
     expect(methods).toContain("notify");
     expect(methods).toContain("cacheLocalMediaFile");
+    expect(methods).toContain("openAppProfile");
+    expect(methods).toContain("getAppInstanceProfile");
     expect(desktopIpcChannelByMethod.cacheLocalMediaFile).toBe("desktop:cache-local-media-file");
     expect(channels.every((channel) => channel.startsWith("desktop:"))).toBe(true);
     expect(new Set(channels).size).toBe(channels.length);
@@ -35,7 +37,13 @@ describe("desktop api validation", () => {
     });
     expect(validateTrayStatus("busy")).toBe("busy");
     expect(validateDesktopApiCall("captureScreenshot", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("getAppInstanceProfile", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("openAppProfile", ["client-2"])).toEqual(["client-2"]);
+    expect(validateDesktopApiCall("openAppProfile", [undefined])).toEqual([]);
     expect(() => validateTrayStatus("root")).toThrow("Invalid tray status");
+    expect(() => validateDesktopApiCall("openAppProfile", ["客服二号"])).toThrow(
+      "appProfile.profileId",
+    );
   });
 
   it("validates media payloads without changing valid fields", () => {

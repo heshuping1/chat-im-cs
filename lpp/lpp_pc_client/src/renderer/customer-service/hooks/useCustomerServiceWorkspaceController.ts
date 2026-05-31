@@ -11,6 +11,7 @@ import {
 import { createCustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
 import {
   createCustomerServiceWorkspaceViewModel,
+  listCustomerServiceSelectableThreads,
   selectCustomerServiceThread,
 } from "../../data/customer-service/cs-workspace-view-model";
 import {
@@ -55,6 +56,14 @@ export function useCustomerServiceWorkspaceController({
       threads: threadsQuery.data,
     });
   }, [historyQuery.data, selectedThreadId, threadsQuery.data]);
+  const selectableThreads = useMemo(
+    () =>
+      listCustomerServiceSelectableThreads({
+        historyItems: historyQuery.data?.items ?? [],
+        threads: threadsQuery.data,
+      }),
+    [historyQuery.data?.items, threadsQuery.data],
+  );
 
   const threadType = selectedThread?.threadType ?? "temp_session";
   const threadId = selectedThread?.threadId ?? "";
@@ -120,6 +129,7 @@ export function useCustomerServiceWorkspaceController({
     detailLoading: detailQuery.isLoading,
     queryClient,
     selectedThread,
+    selectableThreads,
     session,
     threadActionMutation,
     workspaceViewModel,

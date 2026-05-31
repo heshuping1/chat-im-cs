@@ -1,4 +1,5 @@
 import { logApiErrorDiagnostic } from "./api-error-diagnostics";
+import { getAppInstanceHeaders } from "../app-instance/app-instance";
 
 export interface ApiClientOptions {
   baseUrl: string;
@@ -92,7 +93,11 @@ export class ApiBaseClient {
         xhr.abort();
         rejectWithDiagnostic(new DOMException("Upload aborted", "AbortError"));
       };
-      xhr.open("POST", `${this.options.baseUrl}${path}`);
+      void getAppInstanceHeaders().then((appHeaders) => {
+        xhr.open("POST", `${this.options.baseUrl}${path}`);
+        Object.entries(appHeaders).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
       xhr.setRequestHeader("X-Client-Trace-Id", this.options.traceId);
       if (this.options.tenantToken) {
         xhr.setRequestHeader("Authorization", `Bearer ${this.options.tenantToken}`);
@@ -155,7 +160,8 @@ export class ApiBaseClient {
         abortListener = abort;
         options.signal.addEventListener("abort", abortListener, { once: true });
       }
-      xhr.send(body);
+        xhr.send(body);
+      }).catch(rejectWithDiagnostic);
     });
   }
 
@@ -171,6 +177,9 @@ export class ApiBaseClient {
       headers.set("Content-Type", "application/json");
     }
     headers.set("X-Client-Trace-Id", this.options.traceId);
+    Object.entries(await getAppInstanceHeaders()).forEach(([key, value]) => {
+      headers.set(key, value);
+    });
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
     }
