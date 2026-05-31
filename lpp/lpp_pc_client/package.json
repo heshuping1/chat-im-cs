@@ -70,6 +70,9 @@
     "appId": "com.lpp.pcclient",
     "productName": "LPP 客服客户端",
     "icon": "assets/app-icon-green-bubble.ico",
+    "mac": {
+      "icon": "assets/app-icon-green-bubble.icns"
+    },
     "directories": {
       "output": "release"
     },

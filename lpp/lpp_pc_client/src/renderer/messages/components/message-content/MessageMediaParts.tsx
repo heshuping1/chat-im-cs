@@ -350,6 +350,7 @@ export function VideoPart({
     if (!uploadOverlay.canPlay) return;
     if (!openSrc || previewLoading) return;
     logVideoOpenDiagnostic("video.open_attempt", "ok", {
+      hasLocalOpenUrl: Boolean(item?.localOpenUrl),
       openSrc,
       posterSrc,
       remoteSrc,
@@ -375,6 +376,7 @@ export function VideoPart({
       .then((opened) => {
         if (opened) {
           logVideoOpenDiagnostic("video.open_success", "ok", {
+            hasLocalOpenUrl: Boolean(item?.localOpenUrl),
             openSrc,
             posterSrc,
             remoteSrc,
@@ -386,6 +388,7 @@ export function VideoPart({
           return;
         }
         logVideoOpenDiagnostic("video.open_failed", "failed", {
+          hasLocalOpenUrl: Boolean(item?.localOpenUrl),
           openSrc,
           posterSrc,
           reason: "no_desktop_player",
@@ -399,6 +402,7 @@ export function VideoPart({
           return;
         }
         logVideoOpenDiagnostic("video.open_failed", "failed", {
+          hasLocalOpenUrl: Boolean(item?.localOpenUrl),
           openSrc,
           posterSrc,
           reason: videoOpenErrorSummary(error),
@@ -470,7 +474,16 @@ function logVideoOpenRuntimeDiagnostic(
     remoteSrc?: string;
   },
 ) {
-  if (diagnostic.event !== "poster.resolve_failed") return;
+  if (diagnostic.event === "open.prepare") {
+    logVideoOpenDiagnostic("video.open_prepare", "ok", {
+      ...context,
+      hasLocalOpenUrl: diagnostic.hasLocalOpenUrl,
+      openedWithInitialFileUrl: diagnostic.openedWithInitialFileUrl,
+      prepareElapsedMs: diagnostic.prepareElapsedMs,
+      sourceKind: diagnostic.sourceKind,
+    });
+    return;
+  }
   logVideoOpenDiagnostic("video.poster_ignored", "ignored", {
     ...context,
     posterKind: diagnostic.posterKind,
@@ -480,19 +493,25 @@ function logVideoOpenRuntimeDiagnostic(
 }
 
 function logVideoOpenDiagnostic(
-  event: "video.open_attempt" | "video.open_failed" | "video.open_success" | "video.poster_ignored",
+  event: "video.open_attempt" | "video.open_failed" | "video.open_prepare" | "video.open_success" | "video.poster_ignored",
   result: "ok" | "ignored" | "failed",
   {
+    hasLocalOpenUrl,
     openSrc,
+    openedWithInitialFileUrl,
     posterKind,
     posterSrc,
+    prepareElapsedMs,
     reason,
     remoteSrc,
     sourceKind,
   }: {
+    hasLocalOpenUrl?: boolean;
     openSrc?: string;
+    openedWithInitialFileUrl?: boolean;
     posterKind?: string;
     posterSrc?: string;
+    prepareElapsedMs?: number;
     reason?: string;
     remoteSrc?: string;
     sourceKind?: string;
@@ -505,8 +524,11 @@ function logVideoOpenDiagnostic(
     reason,
     context: {
       hasLocalCache: mediaUrlKind(openSrc) === "file",
+      hasLocalOpenUrl: hasLocalOpenUrl ?? mediaUrlKind(openSrc) === "file",
       hasRemoteSource: Boolean(remoteSrc),
+      openedWithInitialFileUrl,
       posterKind: posterKind ?? mediaUrlKind(posterSrc),
+      prepareElapsedMs,
       sourceKind: sourceKind ?? mediaUrlKind(openSrc),
     },
   });

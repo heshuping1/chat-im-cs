@@ -82,6 +82,7 @@ describe("openDesktopVideoPlayer", () => {
 
   it("uses explicit local open urls before preview and server video sources", async () => {
     const openVideoPlayer = vi.fn(async () => "cached-file");
+    const onDiagnostic = vi.fn();
     (window as Window & { desktopApi: { openVideoPlayer: typeof openVideoPlayer } }).desktopApi = {
       openVideoPlayer,
     };
@@ -96,12 +97,56 @@ describe("openDesktopVideoPlayer", () => {
           width: 720,
           height: 1280,
         },
+        onDiagnostic,
       }),
     ).resolves.toBe(true);
 
     expect(openVideoPlayer).toHaveBeenCalledWith(
       expect.objectContaining({
         url: "file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/local-open.mp4",
+      }),
+    );
+    expect(onDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "open.prepare",
+        sourceKind: "file",
+        hasLocalOpenUrl: true,
+        openedWithInitialFileUrl: true,
+      }),
+    );
+  });
+
+  it("records a degraded remote open when no local open url is available", async () => {
+    const openVideoPlayer = vi.fn(async () => "cached-file");
+    const onDiagnostic = vi.fn();
+    (window as Window & { desktopApi: { openVideoPlayer: typeof openVideoPlayer } }).desktopApi = {
+      openVideoPlayer,
+    };
+
+    await expect(
+      openDesktopVideoPlayer({
+        displaySrc: "blob:http://127.0.0.1:5173/preview",
+        remoteSrc: "https://cdn.example.com/server-video.mp4?token=secret",
+        media: {
+          fileName: "clip.mp4",
+          width: 720,
+          height: 1280,
+        },
+        onDiagnostic,
+      }),
+    ).resolves.toBe(true);
+
+    expect(openVideoPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://cdn.example.com/server-video.mp4?token=secret",
+      }),
+    );
+    expect(onDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "open.prepare",
+        sourceKind: "http",
+        hasLocalOpenUrl: false,
+        openedWithInitialFileUrl: false,
       }),
     );
   });

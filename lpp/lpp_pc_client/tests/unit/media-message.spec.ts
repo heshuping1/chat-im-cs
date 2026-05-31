@@ -437,6 +437,13 @@ describe("message media upload presentation", () => {
     expect(videoMessagePreview).not.toContain("openError || failed");
   });
 
+  it("records whether video opens with a local cache or degrades to remote preparation", () => {
+    expect(messageMediaParts).toContain("hasLocalOpenUrl");
+    expect(messageMediaParts).toContain("openedWithInitialFileUrl");
+    expect(messageMediaParts).toContain("prepareElapsedMs");
+    expect(messageMediaParts).toContain("localOpenSrc: item?.localOpenUrl");
+  });
+
   it("uses local open urls for file cards before remote source urls", () => {
     expect(fileMessageContent).toContain("const openUrl = item?.localOpenUrl || href;");
     expect(fileMessageContent).toContain("url: openUrl");

@@ -26,6 +26,7 @@ export function videoPlayerHtml(payload: {
     button svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.9; fill: none; stroke-linecap: round; stroke-linejoin: round; }
     .stage { position: relative; display: grid; min-height: 0; place-items: center; padding: 0 47px; background: #ececec; }
     .video-wrap { position: relative; display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; background: #ececec; }
+    .video-wrap.awaiting-source.no-poster::before { content: ""; width: 64px; height: 64px; border-radius: 999px; background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 1px rgba(15,23,42,.08), 0 12px 32px rgba(15,23,42,.08); }
     .poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 1; transition: opacity .16s ease; pointer-events: none; }
     video { display: block; position: relative; z-index: 1; max-width: 100%; max-height: 100%; background: transparent; outline: none; object-fit: contain; opacity: 0; transition: opacity .16s ease; }
     .video-wrap.no-poster.ready video,
@@ -66,7 +67,7 @@ export function videoPlayerHtml(payload: {
     </div>
   </header>
   <main class="stage">
-    <div id="wrap" class="video-wrap ${payload.posterUrl ? 'has-poster' : 'no-poster'}">
+    <div id="wrap" class="video-wrap ${payload.posterUrl ? 'has-poster' : 'no-poster'} ${payload.fileUrl ? 'has-source' : 'awaiting-source'}">
       ${payload.posterUrl ? `<img id="poster" class="poster" src="${escapeHtml(payload.posterUrl)}" alt="" />` : ''}
       <video id="video" ${payload.fileUrl ? `src="${escapeHtml(payload.fileUrl)}"` : ''} ${payload.posterUrl ? `poster="${escapeHtml(payload.posterUrl)}"` : ''} playsinline preload="auto"></video>
       <div id="state" class="state">
@@ -110,12 +111,14 @@ export function videoPlayerHtml(payload: {
     const mute = document.getElementById('mute');
     const rates = [1, 1.25, 1.5, 2, 0.5];
     const playerState = { value: 'loading' };
-    const loadingChromeDelayMs = 320;
+    const loadingChromeDelayMs = 500;
+    const sourceWaitDelayMs = 1500;
     let rateIndex = 0;
     let retryAttempts = 0;
     let shouldAutoplay = true;
     let controlsTimer = 0;
     let loadingChromeTimer = 0;
+    let sourceWaitTimer = 0;
     const fmt = (value) => {
       const s = Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
       return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
@@ -132,8 +135,22 @@ export function videoPlayerHtml(payload: {
     }
     function clearLoadingChrome() {
       window.clearTimeout(loadingChromeTimer);
+      clearSourceWaitNotice();
       wrap.classList.remove('loading-visible');
       if (playerState.value === 'loading') state.classList.remove('show');
+    }
+    function clearSourceWaitNotice() {
+      window.clearTimeout(sourceWaitTimer);
+    }
+    function showSourceWaitNotice() {
+      window.clearTimeout(sourceWaitTimer);
+      if (payload.fileUrl) return;
+      sourceWaitTimer = window.setTimeout(() => {
+        if (playerState.value !== 'loading' || payload.fileUrl) return;
+        stateTitle.textContent = '\u6b63\u5728\u6253\u5f00\u89c6\u9891';
+        stateDetail.textContent = '';
+        state.classList.add('show');
+      }, sourceWaitDelayMs);
     }
     function showLoadingChrome() {
       window.clearTimeout(loadingChromeTimer);
@@ -147,8 +164,12 @@ export function videoPlayerHtml(payload: {
       playerState.value = nextState;
       state.className = 'state ' + nextState;
       wrap.classList.toggle('ready', nextState === 'ready');
-      if (nextState === 'loading') showLoadingChrome();
-      else clearLoadingChrome();
+      if (nextState === 'loading') {
+        showLoadingChrome();
+        showSourceWaitNotice();
+      } else {
+        clearLoadingChrome();
+      }
       const isFailure = nextState === 'failed' || nextState === 'unsupported';
       const showState = isFailure || nextState === 'gesture';
       state.classList.toggle('show', showState);
@@ -233,6 +254,8 @@ export function videoPlayerHtml(payload: {
     function setVideoSource(fileUrl) {
       payload.fileUrl = fileUrl;
       video.src = fileUrl;
+      wrap.classList.remove('awaiting-source');
+      wrap.classList.add('has-source');
       shouldAutoplay = true;
       const playSupport = canPlayCurrentType();
       if (playSupport === '') {
@@ -281,7 +304,7 @@ export function videoPlayerHtml(payload: {
       if (event.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 5);
       if (event.key === 'ArrowRight') video.currentTime = Math.min(video.duration || video.currentTime + 5, video.currentTime + 5);
     });
-    setPlayerState(payload.fileUrl ? 'loading' : 'loading', payload.fileUrl ? '' : '\u6b63\u5728\u51c6\u5907\u89c6\u9891');
+    setPlayerState(payload.fileUrl ? 'loading' : 'loading', '');
     sync();
   </script>
 </body>

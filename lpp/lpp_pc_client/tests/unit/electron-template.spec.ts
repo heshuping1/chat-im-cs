@@ -49,7 +49,7 @@ describe("electron html templates", () => {
     expect(html).not.toContain("&#20493;&#36895;");
   });
 
-  it("can render the video player before the cached local file is ready", () => {
+  it("can render the video player before the cached local file is ready without the old blank preparing copy", () => {
     const html = videoPlayerHtml({
       fileName: "clip.mp4",
       posterUrl: "file:///tmp/clip-poster.jpg",
@@ -58,7 +58,9 @@ describe("electron html templates", () => {
 
     expect(html).toContain('id="video"');
     expect(html).not.toContain('src="undefined"');
-    expect(html).toContain("正在准备视频");
+    expect(html).toContain("sourceWaitDelayMs");
+    expect(html).toContain("正在打开视频");
+    expect(html).not.toContain("正在准备视频");
     expect(html).toContain("setVideoSource(fileUrl)");
   });
 
@@ -100,16 +102,33 @@ describe("electron html templates", () => {
       title: "原视频",
     });
 
-    expect(html).toContain("const loadingChromeDelayMs = 320");
+    expect(html).toContain("const loadingChromeDelayMs = 500");
+    expect(html).toContain("const sourceWaitDelayMs = 1500");
     expect(html).toContain("let loadingChromeTimer = 0");
+    expect(html).toContain("let sourceWaitTimer = 0");
     expect(html).toContain("showLoadingChrome()");
     expect(html).toContain("window.setTimeout(() => {");
     expect(html).toContain("const showState = isFailure || nextState === 'gesture';");
     expect(html).toContain("wrap.classList.toggle('loading-visible'");
+    expect(html).toContain("if (payload.fileUrl) return;");
     expect(html).toContain(".state.loading .state-actions { display: none; }");
     expect(html).toContain(".video-wrap:not(.ready) .controls");
     expect(html).toContain("视频打开中");
     expect(html).not.toContain("视频加载中");
+  });
+
+  it("keeps local file payloads in the initial player source and never uses the source-wait copy", () => {
+    const html = videoPlayerHtml({
+      fileName: "clip.mp4",
+      fileUrl: "file:///tmp/clip.mp4",
+      posterUrl: "file:///tmp/clip-poster.jpg",
+      title: "原视频",
+    });
+
+    expect(html).toContain('src="file:///tmp/clip.mp4"');
+    expect(html).toContain("setPlayerState(payload.fileUrl ? 'loading' : 'loading', '')");
+    expect(html).toContain("if (payload.fileUrl) return;");
+    expect(html).not.toContain("正在准备视频");
   });
 
   it("shows system fallback only for real failure states and uses a gesture play state for autoplay rejection", () => {

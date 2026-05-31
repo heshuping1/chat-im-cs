@@ -6,12 +6,20 @@ export type MediaCacheContext = {
   conversationId?: string;
 };
 
-export type VideoPlayerOpenDiagnostic = {
-  event: "poster.resolve_failed";
-  posterKind: MediaUrlKind;
-  reason: string;
-  sourceKind: MediaUrlKind;
-};
+export type VideoPlayerOpenDiagnostic =
+  | {
+      event: "open.prepare";
+      hasLocalOpenUrl: boolean;
+      openedWithInitialFileUrl: boolean;
+      prepareElapsedMs: number;
+      sourceKind: MediaUrlKind;
+    }
+  | {
+      event: "poster.resolve_failed";
+      posterKind: MediaUrlKind;
+      reason: string;
+      sourceKind: MediaUrlKind;
+    };
 
 export type MediaUrlKind = "blob" | "data" | "file" | "http" | "relative" | "unknown";
 
@@ -38,6 +46,7 @@ export async function openDesktopVideoPlayer({
   remoteSrc?: string;
   videoSize?: { width: number; height: number } | null;
 }) {
+  const prepareStartedAt = Date.now();
   const desktopVideoUrl =
     desktopLocalVideoUrl(localOpenSrc) ??
     desktopLocalVideoUrl(displaySrc) ??
@@ -45,14 +54,22 @@ export async function openDesktopVideoPlayer({
     desktopReachableVideoUrl(displaySrc);
   if (!window.desktopApi?.openVideoPlayer || !desktopVideoUrl) return false;
 
+  const sourceKind = mediaUrlKind(desktopVideoUrl);
   const desktopPosterUrl = await resolveDesktopVideoPosterUrl(posterSrc).catch((error) => {
     onDiagnostic?.({
       event: "poster.resolve_failed",
       posterKind: mediaUrlKind(posterSrc),
       reason: videoOpenErrorSummary(error),
-      sourceKind: mediaUrlKind(desktopVideoUrl),
+      sourceKind,
     });
     return undefined;
+  });
+  onDiagnostic?.({
+    event: "open.prepare",
+    hasLocalOpenUrl: Boolean(desktopLocalVideoUrl(localOpenSrc)),
+    openedWithInitialFileUrl: sourceKind === "file",
+    prepareElapsedMs: Math.max(0, Date.now() - prepareStartedAt),
+    sourceKind,
   });
   await window.desktopApi.openVideoPlayer({
     url: absolutizeDesktopMediaUrl(desktopVideoUrl),

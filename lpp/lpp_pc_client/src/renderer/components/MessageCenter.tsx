@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   ConversationListItem,
+  FriendProfileUpdateDto,
   MessageItemDto,
 } from "../data/api-client";
 import type { CurrentUserIdentity } from "../data/message-display";
@@ -285,6 +286,22 @@ export function MessageCenter() {
     retry: false,
     staleTime: 60_000,
   });
+  const activeConversationProfileQuery = useQuery({
+    queryKey: pcQueryKeys.customerServiceThreadProfile(
+      session?.apiBaseUrl,
+      session?.tenantToken,
+      activeConversationType,
+      activeConversation?.conversationId,
+    ),
+    enabled: Boolean(session && activeConversation && activeConversationType === "direct"),
+    queryFn: async () =>
+      requireApiClient(session).getThreadProfileCard(
+        "im_direct",
+        activeConversation!.conversationId,
+      ),
+    retry: false,
+    staleTime: 60_000,
+  });
   const contactCardRelation = useMemo(() => {
     if (!contactCardProfile) return undefined;
     const relation = resolveContactCardRelation({
@@ -371,6 +388,24 @@ export function MessageCenter() {
       await refreshContactRelation();
     },
     onError: (error) => setNotice(contactCardActionErrorText(error, "加入黑名单失败")),
+  });
+  const updateFriendProfileMutation = useMutation({
+    mutationFn: async ({
+      friendUserId,
+      payload,
+    }: {
+      friendUserId: string;
+      payload: FriendProfileUpdateDto;
+    }) => requireApiClient(session).updateFriendProfile(friendUserId, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["pc-friends"] }),
+        queryClient.invalidateQueries({
+          queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
+        }),
+      ]);
+    },
+    onError: (error) => setNotice(contactCardActionErrorText(error, "客户资料更新失败")),
   });
 
   const {
@@ -766,6 +801,22 @@ export function MessageCenter() {
         onCreateDirectChat={(userId) => createDirectChatMutation.mutate(userId)}
         onCreateGroupChat={(payload) => createGroupChatMutation.mutate(payload)}
         onCreateInviteQr={() => createInviteQrMutation.mutate()}
+        onUpdateCustomerRemark={async (remarkName) => {
+          const friendUserId = activeConversationContact?.userId || activeConversation?.peerUserId;
+          if (!friendUserId) throw new Error("当前客户缺少好友 ID，无法编辑备注");
+          await updateFriendProfileMutation.mutateAsync({
+            friendUserId,
+            payload: { remarkName },
+          });
+        }}
+        onUpdateCustomerTags={async (tags) => {
+          const friendUserId = activeConversationContact?.userId || activeConversation?.peerUserId;
+          if (!friendUserId) throw new Error("当前客户缺少好友 ID，无法编辑标签");
+          await updateFriendProfileMutation.mutateAsync({
+            friendUserId,
+            payload: { tags },
+          });
+        }}
         onSendContactCard={(contact) => {
           messageCenterCommands.sendContactCard(
             normalizeContactCard({
@@ -789,6 +840,10 @@ export function MessageCenter() {
         pcSettings={pcSettings}
         pendingNewMessageCount={pendingNewMessageCount}
         profilePaneWidth={profilePaneWidth}
+        profileActionPending={updateFriendProfileMutation.isPending}
+        profileData={activeConversationProfileQuery.data}
+        profileError={activeConversationProfileQuery.error}
+        profileLoading={activeConversationProfileQuery.isLoading}
         profileStandaloneOpen={profileStandaloneOpen}
         replyTarget={replyTarget}
         scrollMessagesToBottom={scrollMessagesToBottom}

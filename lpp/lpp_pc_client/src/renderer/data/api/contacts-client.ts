@@ -3,6 +3,7 @@ import { ProfileApiClient } from "./profile-client";
 import type {
   DepartmentDto,
   DepartmentMemberDto,
+  FriendProfileUpdateDto,
   FriendDto,
   FriendRequestDto,
   GroupMemberDto,
@@ -46,6 +47,16 @@ export class ContactsApiClient extends ProfileApiClient {
     return this.request<{ friendUserId?: string }>(
       endpointPlan.friendItem.replace("{friendUserId}", encodeURIComponent(friendUserId)),
       { method: "DELETE" },
+    );
+  }
+
+  updateFriendProfile(friendUserId: string, payload: FriendProfileUpdateDto) {
+    return this.request<FriendDto>(
+      endpointPlan.friendItem.replace("{friendUserId}", encodeURIComponent(friendUserId)),
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
     );
   }
 

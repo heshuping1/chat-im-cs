@@ -21,6 +21,7 @@ export interface CustomerModel {
   customerId: string;
   customerLanguage: string;
   emailMasked: string;
+  friendUserId: string;
   id: string;
   kyc: string;
   language: string;
@@ -41,6 +42,7 @@ export interface CustomerModel {
   profileVisibility: string;
   recentTradeTime: string;
   registeredAt: string;
+  remark: string;
   remoteLoginAlert: string;
   risk: string;
   sections: Record<"trading" | "funds" | "sessions" | "touch" | "compliance" | "device" | "other", ExternalSection[]>;
@@ -121,6 +123,7 @@ export function buildCustomerModel({
     customerId: textValue(firstKnownValue(profile?.customerUserId, profile?.customerId, profile?.userId, conversation?.peerUserId, contact?.userId, contact?.id)),
     customerLanguage: textValue(profileValue(profile, ["customerLanguage", "receiveLanguage", "preferredLanguage"]) ?? profile?.language),
     emailMasked: textValue(firstKnownValue(profile?.emailMasked, profile?.email, conversation?.peerEmailMasked)),
+    friendUserId: textValue(firstKnownValue(contact?.userId, conversation?.peerUserId)),
     id: String(firstKnownValue(profile?.customerUserId, profile?.customerId, profile?.userId, conversation?.peerUserId, contact?.userId, contact?.id, conversation?.conversationId) ?? "customer"),
     kyc: textValue(firstKnownValue(profile?.kycStatus, profile?.kyc, profile?.kycLevel, profile?.complianceStatus, valueAt(external, ["kyc", "compliance", "合规"], ["状态", "status", "kycStatus", "kyc"]))),
     language: textValue(profileValue(profile, ["language", "customerLanguage", "preferredLanguage"])),
@@ -141,6 +144,10 @@ export function buildCustomerModel({
     profileVisibility: textValue(profileValue(profile, ["profileVisibility"])),
     recentTradeTime: shortDate(tradingSummary.recentTradeTime ?? tradingSummary.lastTradeAt),
     registeredAt: shortDate(profile?.registeredAt ?? tradingSummary.registeredAt),
+    remark: textValue(firstKnownValue(
+      profileValue(profile, ["customerRemark", "remarkName", "remark", "note"]),
+      contact?.remark,
+    )),
     remoteLoginAlert: textValue(valueAt(external, ["device", "security", "设备"], ["异地登录提醒", "remoteLoginAlert"])),
     risk: textValue(firstKnownValue(profile?.riskLevel, profile?.risk, profile?.riskStatus, valueAt(external, ["risk", "kyc", "compliance", "风险", "合规"], ["风险", "risk", "riskLevel", "riskStatus"]))),
     sections: {

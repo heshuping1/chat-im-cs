@@ -36,11 +36,12 @@ export async function openVideoPlayerWindow(
     },
   });
   player.setMenuBarVisibility(false);
+  const initialFileUrl = initialVideoFileUrl(payload.url);
   const playerDocument = await createVideoPlayerDocument({
     userDataPath: app.getPath('userData'),
     html: videoPlayerHtml({
       fileName: payload.fileName || 'video.mp4',
-      fileUrl: initialVideoFileUrl(payload.url),
+      fileUrl: initialFileUrl,
       posterUrl: isUsableVideoPosterUrl(payload.posterUrl) ? payload.posterUrl : undefined,
       title,
     }),
@@ -50,6 +51,7 @@ export async function openVideoPlayerWindow(
   void ensureLocalMediaFile({ ...payload, kind: 'video' })
     .then((cached) => {
       if (player.isDestroyed()) return;
+      if (initialFileUrl === cached.fileUrl) return;
       executePlayerScript(
         player,
         `window.__lppSetVideoSource?.(${JSON.stringify(cached.fileUrl)})`,

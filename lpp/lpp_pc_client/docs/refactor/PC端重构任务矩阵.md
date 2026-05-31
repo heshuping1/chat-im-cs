@@ -1096,6 +1096,7 @@ P0-DOC-001 验收记录：
 | P22-STATUS-044 | Local Sent Video Cache IPC Arg Preservation | 修复本机发送成功视频点击“打开失败”的根因：`cacheLocalMediaFile` 的 preload 派生 `sourcePath` 在 main 通用 IPC 校验层被丢弃；新增 main-only IPC 参数校验保留安全路径，renderer 仍不能直接传任意路径，本地缓存直开链路恢复。 | P1 | L3 | 已完成 |
 | P22-STATUS-045 | Local Video Open Source Decoupling | 彻底拆开视频消息卡片内联预览源与桌面播放器打开源：本地 `file://` 缓存只作为 open source，不再挂入消息列表 `<video>`；失效 `blob:` 封面转码失败改为 best-effort，不阻断 `openVideoPlayer`；新增脱敏视频打开诊断区分 attempt/success/failed/poster ignored。 | P1 | L2 | 已完成 |
 | P22-STATUS-046 | Local Sent Media Cache Unification | 统一选择/粘贴的图片、视频、文件本地发送缓存模型：preload 优先复制真实选择路径，粘贴无路径时把 bytes 物化到 app 管理缓存；消息体拆清 `localPreviewUrl` 与 `localOpenUrl`，发送成功后本机打开优先 app cache，远端 URL 仅兜底。 | P1 | L3 | 已完成 |
+| P22-STATUS-047 | Local Sent Video Player Open Shell | 治理本机发送视频上传完成后的原视频开屏体验：`localOpenUrl=file://` 作为初始播放器源直开，避免无源灰屏“正在准备视频”；远端缓存准备态改为 poster-first 和延迟轻提示，并补充本地直开/远端降级/开屏耗时诊断。 | P1 | L2 | 已完成 |
 
 ---
 

@@ -13,11 +13,19 @@ export function CustomerProfileMetric({
   );
 }
 
-export function CustomerProfileTagList({ tags }: { tags: string[] }) {
+export function CustomerProfileTagList({
+  onAdd,
+  tags,
+}: {
+  onAdd?: () => void;
+  tags: string[];
+}) {
   return (
     <div className="customer-info-tags">
       {tags.length > 0 ? tags.map((tag) => <span key={tag}>{tag}</span>) : <span>暂无标签</span>}
-      <button type="button">+ 添加</button>
+      <button aria-label="添加标签" title="添加标签" type="button" onClick={onAdd}>
+        +
+      </button>
     </div>
   );
 }

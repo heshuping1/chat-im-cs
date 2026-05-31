@@ -5,6 +5,7 @@ export type MessageCenterDiagnosticEvent =
   | "message-list.windowed"
   | "video.open_attempt"
   | "video.open_failed"
+  | "video.open_prepare"
   | "video.open_success"
   | "video.poster_ignored";
 

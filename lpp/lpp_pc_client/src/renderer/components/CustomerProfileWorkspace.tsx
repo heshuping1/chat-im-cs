@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { ConversationListItem, CustomerProfileCard } from "../data/api-client";
 import type { ContactItem } from "../data/types";
+import { CustomerProfileActionRows } from "./CustomerProfileActionRows";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
 import {
@@ -32,7 +33,6 @@ import {
 } from "./CustomerProfileModel";
 import {
   CustomerProfileMetric,
-  CustomerProfileTagList,
 } from "./CustomerProfileBits";
 
 type CustomerTab =
@@ -63,6 +63,9 @@ export function CustomerProfileWorkspace({
   contact,
   error,
   loading = false,
+  onUpdateRemark,
+  onUpdateTags,
+  profileActionPending = false,
   profile,
   title = "客户信息",
 }: {
@@ -72,11 +75,15 @@ export function CustomerProfileWorkspace({
   contact?: ContactItem | null;
   error?: unknown;
   loading?: boolean;
+  onUpdateRemark?: (remarkName: string) => Promise<void> | void;
+  onUpdateTags?: (tags: string[]) => Promise<void> | void;
+  profileActionPending?: boolean;
   profile?: CustomerProfileCard;
   title?: string;
 }) {
   const [activeTab, setActiveTab] = useState<CustomerTab>("overview");
   const [tabsExpanded, setTabsExpanded] = useState(false);
+  const [actionNotice, setActionNotice] = useState("");
   const model = useMemo(
     () => buildCustomerModel({ avatarUrl, conversation, contact, profile }),
     [avatarUrl, conversation, contact, profile],
@@ -100,8 +107,8 @@ export function CustomerProfileWorkspace({
         <div>
           <strong>{model.name}</strong>
           <p>
-            {[model.level, model.kyc, model.risk, model.source].filter(isKnown).join(" · ") ||
-              "暂无客户摘要"}
+            {[model.lppId, model.customerId].filter(isKnown).join(" · ") ||
+              "暂无客户识别信息"}
           </p>
           <div className="customer-profile-badges" aria-label="客户状态">
             <span>{isKnown(model.level) ? model.level : "普通客户"}</span>
@@ -118,6 +125,19 @@ export function CustomerProfileWorkspace({
           text="客户资料暂不可用，已展示会话和通讯录中的基础信息。"
         />
       )}
+
+      <CustomerProfileActionRows
+        model={model}
+        notice={actionNotice}
+        pending={profileActionPending}
+        onPendingAction={setActionNotice}
+        onOpenTickets={() => {
+          setActiveTab("tickets");
+          setActionNotice("");
+        }}
+        onUpdateRemark={onUpdateRemark}
+        onUpdateTags={onUpdateTags}
+      />
 
       <section className="customer-profile-scorebar">
         <CustomerProfileMetric label="账户余额" value={model.accountBalance} />
@@ -181,10 +201,9 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
               ["绿泡泡号", model.lppId],
               ["姓名", model.name],
               ["客户等级", model.level],
-              ["来源", model.source],
+              ["客户来源", model.source],
             ]}
           />
-          <CustomerProfileTagList tags={model.tags} />
         </PanelBlock>
         <PanelBlock title="联系方式" icon={<Smartphone size={16} />}>
           <InfoGrid

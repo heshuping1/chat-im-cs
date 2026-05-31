@@ -41,6 +41,7 @@ const allowedExternalProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 const appIconPath = app.isPackaged
   ? join(process.resourcesPath, 'app-icon.ico')
   : join(__dirname, '../../assets/app-icon-green-bubble.ico');
+const devDockIconPath = join(__dirname, '../../assets/app-icon-green-bubble.png');
 const singleInstanceLock = app.requestSingleInstanceLock();
 
 let mainWindow: BrowserWindow | null = null;
@@ -190,6 +191,9 @@ handleDesktopIpc('setTrayStatus', async (_event, status: TrayStatus) => {
 app.whenReady().then(() => {
   if (!singleInstanceLock) return;
   installElectronAppDiagnostics(app);
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    app.dock?.setIcon(devDockIconPath);
+  }
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

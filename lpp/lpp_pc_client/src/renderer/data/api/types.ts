@@ -310,6 +310,14 @@ export interface FriendDto {
   lppNumber?: string;
 }
 
+export interface FriendProfileUpdateDto {
+  remarkName?: string | null;
+  groupName?: string | null;
+  tags?: string[] | null;
+  note?: string | null;
+  source?: string | null;
+}
+
 export interface ContactCardDto {
   userId: string;
   displayName: string;

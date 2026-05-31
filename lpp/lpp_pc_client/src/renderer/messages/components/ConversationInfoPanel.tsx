@@ -2,7 +2,11 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { CustomerProfileWorkspace } from "../../components/CustomerProfileWorkspace";
 import { PanelState } from "../../components/PanelState";
-import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
+import type {
+  ConversationListItem,
+  CustomerProfileCard,
+  GroupMemberDto,
+} from "../../data/api-client";
 import { effectiveConversationUnreadCount, type CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
 import { formatChatTime } from "../../lib/format";
@@ -16,6 +20,12 @@ export function ConversationInfoPanel({
   groupAvatar,
   groupMembers,
   loadingGroupMembers: _loadingGroupMembers = false,
+  onUpdateRemark,
+  onUpdateTags,
+  profile,
+  profileActionPending = false,
+  profileError,
+  profileLoading = false,
   userIdentity,
 }: {
   contact?: ContactItem | null;
@@ -23,6 +33,12 @@ export function ConversationInfoPanel({
   groupAvatar?: GroupConversationAvatar;
   groupMembers?: GroupMemberDto[];
   loadingGroupMembers?: boolean;
+  onUpdateRemark?: (remarkName: string) => Promise<void> | void;
+  onUpdateTags?: (tags: string[]) => Promise<void> | void;
+  profile?: CustomerProfileCard;
+  profileActionPending?: boolean;
+  profileError?: unknown;
+  profileLoading?: boolean;
   userIdentity?: CurrentUserIdentity | null;
 }) {
   const [activeTab, setActiveTab] = useState("资料");
@@ -49,6 +65,12 @@ export function ConversationInfoPanel({
         className="e-profile-panel message-info-panel"
         contact={contact}
         conversation={conversation}
+        error={profileError}
+        loading={profileLoading}
+        onUpdateRemark={onUpdateRemark}
+        onUpdateTags={onUpdateTags}
+        profile={profile}
+        profileActionPending={profileActionPending}
         title="客户信息"
       />
     );

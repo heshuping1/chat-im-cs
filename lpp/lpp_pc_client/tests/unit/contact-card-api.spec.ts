@@ -91,6 +91,26 @@ describe("contact card and friend relation api", () => {
       },
     ]);
   });
+
+  it("updates friend profile metadata through the documented friend item endpoint", async () => {
+    const client = apiClient();
+
+    await client.updateFriendProfile("u2", {
+      note: "私人备注",
+      remarkName: "李四",
+      tags: ["重点", "跟进"],
+    });
+
+    expect(requests[0]).toEqual({
+      method: "PUT",
+      url: "https://api.example/api/client/v1/friends/u2",
+      body: {
+        note: "私人备注",
+        remarkName: "李四",
+        tags: ["重点", "跟进"],
+      },
+    });
+  });
 });
 
 function apiClient() {

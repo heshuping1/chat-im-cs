@@ -120,6 +120,8 @@ export function MessageCenterConversationStage({
   onCreateDirectChat,
   onCreateGroupChat,
   onCreateInviteQr,
+  onUpdateCustomerRemark,
+  onUpdateCustomerTags,
   onSendContactCard,
   onForwardToConversation,
   onFailedMessageClick,
@@ -129,6 +131,10 @@ export function MessageCenterConversationStage({
   pcSettings,
   pendingNewMessageCount,
   profilePaneWidth,
+  profileActionPending,
+  profileData,
+  profileError,
+  profileLoading,
   profileStandaloneOpen,
   replyTarget,
   resendMessage,
@@ -232,6 +238,8 @@ export function MessageCenterConversationStage({
   onCreateDirectChat: (userId: string) => void;
   onCreateGroupChat: (payload: { name: string; memberUserIds: string[] }) => void;
   onCreateInviteQr: () => void;
+  onUpdateCustomerRemark?: (remarkName: string) => Promise<void> | void;
+  onUpdateCustomerTags?: (tags: string[]) => Promise<void> | void;
   onSendContactCard: ComponentProps<typeof MessageDialogsLayer>["onSendContactCard"];
   onForwardToConversation: (targetConversationId: string) => void;
   onFailedMessageClick: (message: MessageItemDto) => void;
@@ -241,6 +249,10 @@ export function MessageCenterConversationStage({
   pcSettings: PcSettings;
   pendingNewMessageCount: number;
   profilePaneWidth: number;
+  profileActionPending?: boolean;
+  profileData?: StandaloneProfileProps["profile"];
+  profileError?: unknown;
+  profileLoading?: boolean;
   profileStandaloneOpen: boolean;
   replyTarget: ReplyTarget;
   resendMessage: MessageItemDto | null;
@@ -290,9 +302,13 @@ export function MessageCenterConversationStage({
               profileStandaloneOpen={profileStandaloneOpen}
               unreadIdentity={unreadIdentity}
               onOpenConversationDrawer={() => setConversationDrawerOpen(true)}
-              onOpenStandaloneProfile={() => setProfileStandaloneOpen(true)}
+              onOpenStandaloneProfile={() => {
+                setHistoryOpen(false);
+                setMessageSearchOpen(false);
+                setProfileStandaloneOpen(true);
+              }}
               onToggleLookup={() => {
-                const nextOpen = !(messageSearchOpen || historyOpen);
+                const nextOpen = profileStandaloneOpen ? true : !(messageSearchOpen || historyOpen);
                 setProfileStandaloneOpen(false);
                 setHistoryOpen(nextOpen);
                 setMessageSearchOpen(nextOpen);
@@ -310,7 +326,13 @@ export function MessageCenterConversationStage({
                 groupAvatarSnapshot={groupAvatarSnapshotFor(activeConversation)}
                 groupMembers={groupMembers}
                 loadingGroupMembers={loadingGroupMembers}
+                profile={profileData}
+                profileActionPending={profileActionPending}
+                profileError={profileError}
+                profileLoading={profileLoading}
                 userIdentity={unreadIdentity}
+                onUpdateRemark={onUpdateCustomerRemark}
+                onUpdateTags={onUpdateCustomerTags}
                 onBack={() => setProfileStandaloneOpen(false)}
               />
             ) : (

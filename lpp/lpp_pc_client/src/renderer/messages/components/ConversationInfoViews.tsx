@@ -2,7 +2,12 @@ import { ChevronLeft, X } from "lucide-react";
 import { useState } from "react";
 
 import { PcAvatar } from "../../components/PcAvatar";
-import type { ConversationListItem, GroupMemberDto, UserProfileDto } from "../../data/api-client";
+import type {
+  ConversationListItem,
+  CustomerProfileCard,
+  GroupMemberDto,
+  UserProfileDto,
+} from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
 import type { AvatarProfilePopoverState } from "../models/messageDisplayModel";
@@ -19,7 +24,13 @@ export function StandaloneConversationInfoView({
   groupAvatarSnapshot,
   groupMembers,
   loadingGroupMembers,
+  onUpdateRemark,
+  onUpdateTags,
   onBack,
+  profile,
+  profileActionPending = false,
+  profileError,
+  profileLoading = false,
   userIdentity,
 }: {
   contact?: ContactItem | null;
@@ -27,7 +38,13 @@ export function StandaloneConversationInfoView({
   groupAvatarSnapshot?: string;
   groupMembers: GroupMemberDto[];
   loadingGroupMembers: boolean;
+  onUpdateRemark?: (remarkName: string) => Promise<void> | void;
+  onUpdateTags?: (tags: string[]) => Promise<void> | void;
   onBack: () => void;
+  profile?: CustomerProfileCard;
+  profileActionPending?: boolean;
+  profileError?: unknown;
+  profileLoading?: boolean;
   userIdentity?: CurrentUserIdentity | null;
 }) {
   return (
@@ -49,6 +66,12 @@ export function StandaloneConversationInfoView({
         }
         groupMembers={groupMembers}
         loadingGroupMembers={loadingGroupMembers}
+        onUpdateRemark={onUpdateRemark}
+        onUpdateTags={onUpdateTags}
+        profile={profile}
+        profileActionPending={profileActionPending}
+        profileError={profileError}
+        profileLoading={profileLoading}
         userIdentity={userIdentity}
       />
     </section>
