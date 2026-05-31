@@ -8,6 +8,7 @@ import {
   contactCardMessageBody,
   normalizeContactCard,
   resolveContactCardRelation,
+  resolveUserRelation,
 } from "../../src/renderer/messages/models/contactCardModel";
 
 describe("contact card model", () => {
@@ -90,5 +91,15 @@ describe("contact card model", () => {
       requests,
       userId: "me",
     })).toEqual({ status: "none" });
+  });
+
+  it("adapts user search relation checks to the shared contact card relation model", () => {
+    expect(resolveUserRelation({
+      friends: [],
+      localOutgoingUserIds: ["pending-1"],
+      requests: [],
+      targetUserId: "pending-1",
+      userId: "me",
+    })).toEqual({ requestId: "local", status: "outgoingPending" });
   });
 });

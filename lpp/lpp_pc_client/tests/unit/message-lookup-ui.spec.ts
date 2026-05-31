@@ -19,6 +19,38 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
     "utf8",
   );
+  const contactProfileController = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/hooks/useMessageContactProfileController.ts"),
+    "utf8",
+  );
+  const conversationInfoPanel = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/ConversationInfoPanel.tsx"),
+    "utf8",
+  );
+  const startDialogs = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/MessageStartDialogs.tsx"),
+    "utf8",
+  );
+  const conversationListPanel = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/MessageConversationListPanel.tsx"),
+    "utf8",
+  );
+  const conversationSidebar = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/MessageConversationSidebar.tsx"),
+    "utf8",
+  );
+  const sidebar = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/Sidebar.tsx"),
+    "utf8",
+  );
+  const reminderCenter = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/ReminderCenter.tsx"),
+    "utf8",
+  );
+  const messageCenterCss = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/messages/message-center.css"),
+    "utf8",
+  );
 
   it("uses one WeChat-style lookup entry instead of separate search and history buttons", () => {
     expect(header).toContain("onToggleLookup");
@@ -52,12 +84,65 @@ describe("message lookup UI", () => {
   });
 
   it("loads im_direct profile-card for ordinary IM customer info and refreshes existing caches after edits", () => {
-    expect(messageCenter).toContain("activeConversationProfileQuery");
-    expect(messageCenter).toContain('getThreadProfileCard(');
-    expect(messageCenter).toContain('"im_direct"');
-    expect(messageCenter).toContain("pcQueryKeys.customerServiceThreadProfile");
-    expect(messageCenter).toContain("updateFriendProfileMutation");
-    expect(messageCenter).toContain('queryClient.invalidateQueries({ queryKey: ["pc-friends"] })');
-    expect(messageCenter).toContain("pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken)");
+    expect(messageCenter).toContain("useMessageContactProfileController");
+    expect(messageCenter).toContain("contactProfileController.profileQuery.data");
+    expect(contactProfileController).toContain('getThreadProfileCard(');
+    expect(contactProfileController).toContain('"im_direct"');
+    expect(contactProfileController).toContain("pcQueryKeys.customerServiceThreadProfile");
+    expect(contactProfileController).toContain("getFriendProfileExtra(activeFriendUserId)");
+    expect(contactProfileController).toContain("updateFriendProfileMutation");
+    expect(contactProfileController).toContain('queryClient.invalidateQueries({ queryKey: ["pc-friends"] })');
+    expect(contactProfileController).toContain("pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken)");
+    expect(conversationInfoPanel).toContain('errorMode="silent"');
+    expect(conversationInfoPanel).toContain('variant="im"');
+  });
+
+  it("only shows real direct-chat customer channel chips in the IM header", () => {
+    expect(header).toContain("customerApplicationName");
+    expect(header).toContain("customerSource");
+    expect(header).toContain("chat-header-meta-chips");
+    expect(header).toContain("渠道应用");
+    expect(header).toContain("来源渠道");
+    expect(header).not.toContain("conversationMetaText");
+    expect(stage).toContain("directCustomerHeaderMeta");
+    expect(stage).toContain("readCustomerHeaderApplicationName(profileData)");
+    expect(stage).toContain("readCustomerHeaderSource(profileData, profileExtra)");
+    expect(stage).toContain("customerApplicationName={directCustomerHeaderMeta.applicationName}");
+    expect(stage).toContain("customerSource={directCustomerHeaderMeta.source}");
+    expect(stage).toContain("excludedHeaderSources");
+    expect(stage).toContain("\"客户通讯录\"");
+  });
+
+  it("lets standalone customer info consume the composer row instead of leaving a blank footer", () => {
+    expect(stage).toContain("profile-standalone-open");
+    expect(stage).toContain('profileStandaloneOpen ? "profile-standalone-open" : ""');
+    expect(messageCenterCss).toContain(".e-chat-panel.profile-standalone-open");
+    expect(messageCenterCss).toContain("grid-template-rows: 72px minmax(0, 1fr)");
+  });
+
+  it("adds a first-class add-friend action to the message plus menu", () => {
+    expect(startDialogs).toContain('action: "addFriend"');
+    expect(startDialogs).toContain("添加好友");
+    expect(startDialogs).toContain("UserPlus");
+    expect(conversationListPanel).toContain('title="创建与添加"');
+    expect(conversationListPanel).toContain("friendRequestCount");
+    expect(conversationSidebar).toContain('if (action === "addFriend")');
+    expect(conversationSidebar).toContain("onAddFriend");
+    expect(messageCenter).toContain("addFriendDialogOpen");
+    expect(messageCenter).toContain("ContactAddFriendDialog");
+    expect(messageCenter).toContain("useContactAddFriendController");
+  });
+
+  it("surfaces incoming friend requests across navigation, message plus and reminders", () => {
+    expect(conversationListPanel).toContain("message-plus-request-badge");
+    expect(conversationListPanel).toContain("friendRequestCount > 0");
+    expect(startDialogs).toContain("friendRequestCount");
+    expect(sidebar).toContain("useFriendRequestReminderController");
+    expect(sidebar).toContain('item.key === "contacts"');
+    expect(sidebar).toContain("pendingIncomingRequestCount");
+    expect(sidebar).toContain("条好友申请");
+    expect(reminderCenter).toContain('item.targetModule === "contacts"');
+    expect(reminderCenter).toContain('setContactFilter("requests")');
+    expect(reminderCenter).toContain("处理申请");
   });
 });

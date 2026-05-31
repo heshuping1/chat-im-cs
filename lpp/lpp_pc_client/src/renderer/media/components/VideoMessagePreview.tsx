@@ -8,6 +8,11 @@ import type {
   SyntheticEvent,
 } from "react";
 import { videoPreviewPreloadMode } from "../runtime/mediaPerformancePolicy";
+import {
+  initialVideoPosterLoadState,
+  markVideoPosterReady,
+  readyVideoPosterSrc,
+} from "../runtime/videoPosterRuntime";
 import type {
   UploadAction,
   VideoUploadOverlayState,
@@ -33,6 +38,8 @@ export function VideoMessagePreview({
   openable,
   aspectRatio,
   playing,
+  posterKey,
+  posterReadyHint,
   posterSrc,
   src,
   uploadOverlay,
@@ -57,6 +64,8 @@ export function VideoMessagePreview({
   openable?: boolean;
   aspectRatio?: number;
   playing: boolean;
+  posterKey?: string;
+  posterReadyHint?: boolean;
   posterSrc?: string;
   src?: string;
   uploadOverlay?: VideoUploadOverlayState;
@@ -64,14 +73,12 @@ export function VideoMessagePreview({
 }) {
   const [posterLoadState, setPosterLoadState] = useState<
     "idle" | "loading" | "ready" | "failed"
-  >(posterSrc ? "loading" : "idle");
+  >(() => initialVideoPosterLoadState({ posterKey, posterReadyHint, posterSrc }));
   useEffect(() => {
-    if (posterSrc) {
-      setPosterLoadState("loading");
-      return;
-    }
-    setPosterLoadState("idle");
-  }, [posterSrc]);
+    setPosterLoadState(
+      initialVideoPosterLoadState({ posterKey, posterReadyHint, posterSrc }),
+    );
+  }, [posterKey, posterReadyHint, posterSrc]);
 
   const canAttemptOpen = Boolean(openable ?? src);
   if (!src && !posterSrc && !canAttemptOpen) {
@@ -86,6 +93,8 @@ export function VideoMessagePreview({
     ...(aspectRatio ? { "--video-bubble-aspect": String(aspectRatio) } : {}),
   } as CSSProperties;
   const hasVisiblePoster = Boolean(posterSrc && posterLoadState === "ready");
+  const visiblePosterSrc =
+    posterLoadState === "ready" ? readyVideoPosterSrc(posterKey) ?? posterSrc : posterSrc;
   const posterStateClass = !posterSrc
     ? "poster-none"
     : posterLoadState === "ready"
@@ -172,8 +181,11 @@ export function VideoMessagePreview({
           alt=""
           aria-hidden="true"
           className="message-video-poster"
-          src={posterSrc}
-          onLoad={() => setPosterLoadState("ready")}
+          src={visiblePosterSrc}
+          onLoad={() => {
+            markVideoPosterReady(posterKey, visiblePosterSrc);
+            setPosterLoadState("ready");
+          }}
           onError={() => setPosterLoadState("failed")}
         />
       )}

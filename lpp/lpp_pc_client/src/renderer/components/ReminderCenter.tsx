@@ -1,4 +1,4 @@
-import { Bell, Clock, Headphones, MessageSquare, X } from "lucide-react";
+import { Clock, Headphones, MessageSquare, UserPlus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   useDismissRealtimeReminder,
@@ -7,6 +7,7 @@ import {
 import type { ModuleKey } from "../data/types";
 import {
   useSetActiveImConversation,
+  useSetContactFilter,
   useSetActiveModule,
   useSetActiveThread,
   useSetServiceThreadFilter,
@@ -22,7 +23,7 @@ interface ReminderItem {
   severity: ReminderSeverity;
   targetModule: ModuleKey;
   targetId?: string;
-  icon: "im" | "service" | "sla";
+  icon: "contacts" | "im" | "service" | "sla";
 }
 
 export function ReminderCenter() {
@@ -30,6 +31,7 @@ export function ReminderCenter() {
   const setActiveModule = useSetActiveModule();
   const setActiveThread = useSetActiveThread();
   const setFilter = useSetServiceThreadFilter();
+  const setContactFilter = useSetContactFilter();
   const setActiveImConversation = useSetActiveImConversation();
   const realtimeReminders = useRealtimeReminders();
   const dismissRealtimeReminder = useDismissRealtimeReminder();
@@ -40,9 +42,20 @@ export function ReminderCenter() {
         .filter((item) => item.targetModule !== "onlineService")
         .map((item) => ({
           ...item,
-          actionLabel: item.targetModule === "messages" ? "查看消息" : "查看会话",
+          actionLabel:
+            item.targetModule === "messages"
+              ? "查看消息"
+              : item.targetModule === "contacts"
+                ? "处理申请"
+                : "查看会话",
           severity: item.severity ?? "info",
-          icon: item.icon ?? (item.targetModule === "messages" ? "im" : "service"),
+          icon:
+            item.icon ??
+            (item.targetModule === "messages"
+              ? "im"
+              : item.targetModule === "contacts"
+                ? "contacts"
+                : "service"),
         })),
       ...buildReminders(),
     ] satisfies ReminderItem[],
@@ -55,6 +68,9 @@ export function ReminderCenter() {
   const openReminder = (item: ReminderItem) => {
     if (item.targetModule === "messages" && item.targetId) {
       setActiveImConversation(item.targetId);
+    } else if (item.targetModule === "contacts") {
+      setContactFilter("requests");
+      setActiveModule("contacts");
     } else {
       if (item.targetId) setActiveThread(item.targetId);
       if (item.id === "service-queue") setFilter("queued");
@@ -69,7 +85,13 @@ export function ReminderCenter() {
     <aside className="reminder-stack" role="region" aria-label="提醒中心">
       {visibleReminders.slice(0, 3).map((item) => {
         const Icon =
-          item.icon === "im" ? MessageSquare : item.icon === "sla" ? Clock : Headphones;
+          item.icon === "im"
+            ? MessageSquare
+            : item.icon === "sla"
+              ? Clock
+              : item.icon === "contacts"
+                ? UserPlus
+                : Headphones;
         return (
           <article className={`reminder-card ${item.severity}`} key={item.id}>
             <span className="reminder-icon">

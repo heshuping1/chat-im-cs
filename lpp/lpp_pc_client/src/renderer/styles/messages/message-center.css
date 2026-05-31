@@ -1651,6 +1651,22 @@ body.is-pane-resizing .app-shell.messages-layout > .profile-resizer {
   background: rgba(229, 235, 242, 0.92) !important;
 }
 
+.message-plus-request-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 12px;
+}
+
 .message-plus-menu {
   position: absolute;
   top: 38px;
@@ -1681,7 +1697,7 @@ body.is-pane-resizing .app-shell.messages-layout > .profile-resizer {
 
 .message-plus-menu button {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
   gap: 9px;
   min-height: 36px;
@@ -1694,6 +1710,25 @@ body.is-pane-resizing .app-shell.messages-layout > .profile-resizer {
   font-weight: 720;
   text-align: left;
   white-space: nowrap;
+}
+
+.message-plus-menu button em {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 18px;
+  text-align: center;
+}
+
+.message-plus-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .message-plus-menu button svg {
@@ -1790,6 +1825,10 @@ body.is-pane-resizing .app-shell.messages-layout > .profile-resizer {
   background: #f8fafc;
 }
 
+.e-chat-panel.profile-standalone-open {
+  grid-template-rows: 72px minmax(0, 1fr);
+}
+
 .message-info-standalone-head {
   display: flex;
   align-items: center;
@@ -1829,6 +1868,14 @@ body.is-pane-resizing .app-shell.messages-layout > .profile-resizer {
   min-width: 0 !important;
   height: 100% !important;
   border-left: 0 !important;
+}
+
+.message-info-standalone > .customer-profile-workspace .customer-info-head {
+  display: none;
+}
+
+.message-info-standalone > .customer-profile-workspace {
+  overflow: auto;
 }
 
 @media (max-width: 1080px) {

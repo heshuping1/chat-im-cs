@@ -26,6 +26,7 @@ export function MessageDialogsLayer({
   createDirectPending,
   createGroupPending,
   createInviteQrPending,
+  sendContactCardPending,
   forwardMessages,
   forwardPending,
   inviteQrError,
@@ -53,6 +54,7 @@ export function MessageDialogsLayer({
   createDirectPending: boolean;
   createGroupPending: boolean;
   createInviteQrPending: boolean;
+  sendContactCardPending: boolean;
   forwardMessages: MessageItemDto[];
   forwardPending: boolean;
   inviteQrError: unknown;
@@ -66,7 +68,7 @@ export function MessageDialogsLayer({
   onCreateDirectChat: (userId: string) => void;
   onCreateGroupChat: (payload: CreateGroupChatPayload) => void;
   onCreateInviteQr: () => void;
-  onSendContactCard: (contact: ContactPickerItem) => void;
+  onSendContactCard: (contact: ContactPickerItem) => Promise<void> | void;
   onForward: (targetConversationId: string) => void;
   onResend: () => void;
   resolveConversationAvatar: (
@@ -119,7 +121,7 @@ export function MessageDialogsLayer({
       {composerDialog === "card" && (
         <ContactCardDialog
           contacts={contactPickerItems}
-          pending={false}
+          pending={sendContactCardPending}
           onClose={onCloseComposerDialog}
           onSubmit={onSendContactCard}
         />

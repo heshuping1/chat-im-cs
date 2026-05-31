@@ -30,6 +30,8 @@ export const endpointPlan = {
   friendRequests: "/api/client/v1/friends/requests",
   friendRequestHandle: "/api/client/v1/friends/requests/{requestId}/handle",
   friendItem: "/api/client/v1/friends/{friendUserId}",
+  friendProfileExtra: "/api/client/v1/friends/{friendUserId}/profile-extra",
+  searchUsers: "/api/client/v1/search/users",
   tenantMembers: "/api/client/v1/tenant/members",
   departments: "/api/client/v1/departments/",
   departmentMembers: "/api/client/v1/departments/{departmentId}/members",

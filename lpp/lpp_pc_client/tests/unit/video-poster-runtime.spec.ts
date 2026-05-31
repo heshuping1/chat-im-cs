@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  initialVideoPosterLoadState,
+  isVideoPosterReady,
+  markVideoPosterReady,
+  readyVideoPosterSrc,
   resolveVideoPosterSource,
+  videoPosterRenderKey,
   videoPosterCaptureTime,
   videoPosterFileName,
 } from "../../src/renderer/media/runtime/videoPosterRuntime";
@@ -49,6 +54,49 @@ describe("videoPosterRuntime", () => {
         generatedPoster: "generated-cover.jpg",
       }),
     ).toEqual({ posterSrc: "cached-cover.jpg", source: "cached" });
+  });
+
+  it("keeps decoded video posters ready across preview remounts", () => {
+    const posterA = "https://cdn.example.com/media/video-poster.jpg?token=old";
+    const posterB = "https://cdn.example.com/media/video-poster.jpg?token=new";
+    const media = {
+      mediaId: "media-1",
+      url: "https://cdn.example.com/media/video.mp4?token=old",
+    };
+    const posterKey = videoPosterRenderKey(media, posterA, media.url);
+
+    expect(initialVideoPosterLoadState({ posterKey, posterSrc: posterA })).toBe("loading");
+
+    markVideoPosterReady(posterKey, posterA);
+
+    expect(isVideoPosterReady(posterKey)).toBe(true);
+    expect(readyVideoPosterSrc(posterKey)).toBe(posterA);
+    expect(
+      initialVideoPosterLoadState({
+        posterKey,
+        posterReadyHint: false,
+        posterSrc: posterB,
+      }),
+    ).toBe("ready");
+  });
+
+  it("uses stable poster keys when signed media urls refresh", () => {
+    expect(
+      videoPosterRenderKey(
+        undefined,
+        "https://cdn.example.com/posters/p1.jpg?signature=a#frag",
+        undefined,
+      ),
+    ).toBe(
+      videoPosterRenderKey(
+        undefined,
+        "https://cdn.example.com/posters/p1.jpg?signature=b",
+        undefined,
+      ),
+    );
+    expect(initialVideoPosterLoadState({ posterSrc: "https://cdn.example.com/cold.jpg" }))
+      .toBe("loading");
+    expect(initialVideoPosterLoadState({ posterSrc: undefined })).toBe("idle");
   });
 
   it("uses the uploaded poster image url as the video thumbnail source", () => {

@@ -19,19 +19,38 @@ describe("customer profile model business ownership", () => {
     expect(model.appName).toBe("--");
   });
 
-  it("exposes contact remark for the customer handling summary", () => {
+  it("uses profile extra note as the private customer handling remark", () => {
     const model = buildCustomerModel({
       contact: {
         id: "contact-1",
         kind: "customer",
         name: "测试客户",
-        remark: "重点跟进客户",
+        remark: "联系人备注名",
+        subtitle: "",
+        tags: [],
+      },
+      profileExtra: {
+        friendUserId: "u2",
+        note: "重点跟进客户",
+      },
+    });
+
+    expect(model.remark).toBe("重点跟进客户");
+  });
+
+  it("does not use contact remark fallback as private handling remark", () => {
+    const model = buildCustomerModel({
+      contact: {
+        id: "contact-1",
+        kind: "customer",
+        name: "测试客户",
+        remark: "添加于 2026-05-31",
         subtitle: "",
         tags: [],
       },
     });
 
-    expect(model.remark).toBe("重点跟进客户");
+    expect(model.remark).toBe("--");
   });
 
   it("exposes direct conversation peer id for friend profile edits", () => {

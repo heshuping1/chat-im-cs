@@ -5,6 +5,7 @@ import { PanelState } from "../../components/PanelState";
 import type {
   ConversationListItem,
   CustomerProfileCard,
+  FriendProfileExtraDto,
   GroupMemberDto,
 } from "../../data/api-client";
 import { effectiveConversationUnreadCount, type CurrentUserIdentity } from "../../data/message-display";
@@ -25,6 +26,8 @@ export function ConversationInfoPanel({
   profile,
   profileActionPending = false,
   profileError,
+  profileExtra,
+  profileExtraLoading = false,
   profileLoading = false,
   userIdentity,
 }: {
@@ -38,6 +41,8 @@ export function ConversationInfoPanel({
   profile?: CustomerProfileCard;
   profileActionPending?: boolean;
   profileError?: unknown;
+  profileExtra?: FriendProfileExtraDto;
+  profileExtraLoading?: boolean;
   profileLoading?: boolean;
   userIdentity?: CurrentUserIdentity | null;
 }) {
@@ -65,13 +70,16 @@ export function ConversationInfoPanel({
         className="e-profile-panel message-info-panel"
         contact={contact}
         conversation={conversation}
+        errorMode="silent"
         error={profileError}
-        loading={profileLoading}
+        loading={profileLoading || profileExtraLoading}
         onUpdateRemark={onUpdateRemark}
         onUpdateTags={onUpdateTags}
         profile={profile}
         profileActionPending={profileActionPending}
+        profileExtra={profileExtra}
         title="客户信息"
+        variant="im"
       />
     );
   }

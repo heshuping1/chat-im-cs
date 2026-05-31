@@ -120,6 +120,37 @@ export function resolveContactCardRelation({
   return { status: "none" };
 }
 
+export function resolveUserRelation({
+  friends,
+  localOutgoingUserIds = [],
+  requests,
+  session,
+  targetUserId,
+  userId,
+}: {
+  friends: FriendDto[];
+  localOutgoingUserIds?: string[];
+  requests: FriendRequestDto[];
+  session?: AuthSession | null;
+  targetUserId?: string | null;
+  userId?: string | null;
+}): ContactCardRelation {
+  const relation = resolveContactCardRelation({
+    card: { userId: targetUserId ?? "" },
+    friends,
+    requests,
+    session,
+    userId,
+  });
+  if (
+    relation.status === "none" &&
+    localOutgoingUserIds.some((item) => sameId(item, targetUserId))
+  ) {
+    return { status: "outgoingPending", requestId: "local" };
+  }
+  return relation;
+}
+
 export function contactCardActionErrorText(error: unknown, fallback = "操作失败") {
   const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
   const code = stringValue(record.code)?.toUpperCase() ?? "";

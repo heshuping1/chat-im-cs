@@ -405,7 +405,11 @@ describe("message media upload presentation", () => {
     expect(videoMessagePreview).toContain("useEffect");
     expect(videoMessagePreview).toContain("useState");
     expect(videoMessagePreview).toContain("const [posterLoadState, setPosterLoadState]");
-    expect(videoMessagePreview).toContain('setPosterLoadState("loading")');
+    expect(videoMessagePreview).toContain("initialVideoPosterLoadState");
+    expect(videoMessagePreview).toContain("markVideoPosterReady");
+    expect(videoMessagePreview).toContain("readyVideoPosterSrc");
+    expect(videoMessagePreview).toContain("posterReadyHint");
+    expect(videoMessagePreview).toContain("initialVideoPosterLoadState({ posterKey, posterReadyHint, posterSrc })");
     expect(videoMessagePreview).toContain('setPosterLoadState("ready")');
     expect(videoMessagePreview).toContain('setPosterLoadState("failed")');
     expect(videoMessagePreview).toContain("const hasVisiblePoster = Boolean(posterSrc && posterLoadState === \"ready\");");
@@ -413,8 +417,11 @@ describe("message media upload presentation", () => {
     expect(videoMessagePreview).toContain("poster-loading");
     expect(videoMessagePreview).toContain("poster-failed");
     expect(videoMessagePreview).toContain('className="message-video-poster"');
-    expect(videoMessagePreview).toContain("onLoad={() => setPosterLoadState(\"ready\")}");
+    expect(videoMessagePreview).toContain("markVideoPosterReady(posterKey, visiblePosterSrc)");
     expect(videoMessagePreview).toContain("onError={() => setPosterLoadState(\"failed\")}");
+    expect(messageMediaParts).toContain("videoPosterRenderKey");
+    expect(messageMediaParts).toContain("posterKey={posterKey}");
+    expect(messageMediaParts).toContain("posterReadyHint={posterReadyHint}");
     expect(videoMessagePreview).not.toContain("backgroundImage: `url(");
     expect(mediaCss).toContain(".message-video-poster");
     expect(mediaCss).toContain(".message-video-frame.poster-ready .message-video-poster");

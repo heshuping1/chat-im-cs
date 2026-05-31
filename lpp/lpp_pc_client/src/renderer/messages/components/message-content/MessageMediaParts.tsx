@@ -28,9 +28,11 @@ import {
   type VideoPlayerOpenDiagnostic,
 } from "../../../media/runtime/videoPlayer";
 import {
+  isVideoPosterReady,
   isVideoSourceReady,
   markVideoSourceReady,
   useVideoPosterSource,
+  videoPosterRenderKey,
 } from "../../../media/runtime/videoPosterRuntime";
 import {
   videoUploadOverlayState,
@@ -340,6 +342,8 @@ export function VideoPart({
     mediaCacheContext,
     onPosterReady: handlePosterReady,
   });
+  const posterKey = videoPosterRenderKey(media, posterSrc, displaySrc);
+  const posterReadyHint = isVideoPosterReady(posterKey);
   const markFrameReady = () => {
     markVideoSourceReady(displaySrc);
     setFrameReady(true);
@@ -453,6 +457,8 @@ export function VideoPart({
         openError={openError}
         openable={Boolean(openSrc)}
         playing={playing}
+        posterKey={posterKey}
+        posterReadyHint={posterReadyHint}
         posterSrc={posterSrc}
         src={displaySrc}
         uploadOverlay={uploadOverlay}

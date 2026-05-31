@@ -60,6 +60,8 @@ describe("contact card and friend relation api", () => {
     const client = apiClient();
 
     await client.sendFriendRequest("u2", "我是 Eric");
+    await client.handleFriendRequest("req-1", "accept");
+    await client.handleFriendRequest("req-2", "reject");
     await client.deleteFriend("u2");
     await client.blockUser("u2");
     await client.getUserProfile("u2");
@@ -73,6 +75,16 @@ describe("contact card and friend relation api", () => {
         body: { message: "我是 Eric", toUserId: "u2" },
         method: "POST",
         path: "/api/client/v1/friends/request",
+      },
+      {
+        body: { action: "accept" },
+        method: "POST",
+        path: "/api/client/v1/friends/requests/req-1/handle",
+      },
+      {
+        body: { action: "reject" },
+        method: "POST",
+        path: "/api/client/v1/friends/requests/req-2/handle",
       },
       {
         body: undefined,

@@ -1,8 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type {
   ConversationListItem,
-  FriendProfileUpdateDto,
   MessageItemDto,
 } from "../data/api-client";
 import type { CurrentUserIdentity } from "../data/message-display";
@@ -64,6 +63,7 @@ import { useMessageAuxiliaryData } from "../messages/hooks/useMessageAuxiliaryDa
 import { useMessageConversationSelection } from "../messages/hooks/useMessageConversationSelection";
 import { useMessageListScrollRegistry } from "../messages/hooks/useMessageListScrollRegistry";
 import { useMessageContactPickerData } from "../messages/hooks/useMessageContactPickerData";
+import { useMessageContactProfileController } from "../messages/hooks/useMessageContactProfileController";
 import {
   getImConversationType,
   useMessageCenterViewModel,
@@ -76,7 +76,6 @@ import type { ReplyTarget } from "../messages/models/messageComposerModel";
 import {
   contactCardActionErrorText,
   normalizeContactCard,
-  resolveContactCardRelation,
   type NormalizedContactCard,
 } from "../messages/models/contactCardModel";
 import { clampComposerHeight } from "../messages/models/messageComposerLayoutModel";
@@ -92,6 +91,8 @@ import { useMessageResponsiveLayout } from "../messages/hooks/useMessageResponsi
 import { useSerialTaskQueue } from "../messages/hooks/useSerialTaskQueue";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
 import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
+import { useContactAddFriendController } from "../contacts/hooks/useContactAddFriendController";
+import { ContactAddFriendDialog } from "./ContactAddFriendDialog";
 
 type MessageMenuState = {
   message: MessageItemDto;
@@ -144,8 +145,7 @@ export function MessageCenter() {
     useState<AvatarProfilePopoverState | null>(null);
   const [contactCardProfile, setContactCardProfile] =
     useState<NormalizedContactCard | null>(null);
-  const [localOutgoingContactRequestIds, setLocalOutgoingContactRequestIds] =
-    useState<Set<string>>(() => new Set());
+  const [contactCardSendPending, setContactCardSendPending] = useState(false);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(
     () => new Set(),
@@ -159,6 +159,7 @@ export function MessageCenter() {
   const [profileStandaloneOpen, setProfileStandaloneOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [composerDialog, setComposerDialog] = useState<"direct" | "group" | "qr" | "card" | null>(null);
+  const [addFriendDialogOpen, setAddFriendDialogOpen] = useState(false);
   const [unreadJump, setUnreadJump] = useState<UnreadJumpState | null>(null);
   const [messageAnnotations, setMessageAnnotations] = useState<
     Record<string, string>
@@ -273,62 +274,20 @@ export function MessageCenter() {
     friendsQuery,
     inviteQrsQuery,
   } = useMessageContactPickerData(session, composerDialog);
-  const friendRequestsQuery = useQuery({
-    queryKey: ["pc-friend-requests", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
-    queryFn: async () => requireApiClient(session).getFriendRequests(),
-    staleTime: 30_000,
+  const addFriendController = useContactAddFriendController({
+    onDirectChatCreated: () => setAddFriendDialogOpen(false),
+    setNotice,
   });
-  const contactCardProfileQuery = useQuery({
-    queryKey: [
-      "pc-user-profile",
-      session?.apiBaseUrl,
-      session?.tenantToken,
-      contactCardProfile?.userId ?? "",
-    ],
-    enabled: Boolean(session && contactCardProfile?.userId),
-    queryFn: async () => requireApiClient(session).getUserProfile(contactCardProfile!.userId),
-    retry: false,
-    staleTime: 60_000,
-  });
-  const activeConversationProfileQuery = useQuery({
-    queryKey: pcQueryKeys.customerServiceThreadProfile(
-      session?.apiBaseUrl,
-      session?.tenantToken,
-      activeConversationType,
-      activeConversation?.conversationId,
-    ),
-    enabled: Boolean(session && activeConversation && activeConversationType === "direct"),
-    queryFn: async () =>
-      requireApiClient(session).getThreadProfileCard(
-        "im_direct",
-        activeConversation!.conversationId,
-      ),
-    retry: false,
-    staleTime: 60_000,
-  });
-  const contactCardRelation = useMemo(() => {
-    if (!contactCardProfile) return undefined;
-    const relation = resolveContactCardRelation({
-      card: contactCardProfile,
-      friends: friendsQuery.data ?? [],
-      requests: friendRequestsQuery.data ?? [],
-      session,
-    });
-    if (
-      relation.status === "none" &&
-      localOutgoingContactRequestIds.has(contactCardProfile.userId)
-    ) {
-      return { status: "outgoingPending" as const, requestId: "local" };
-    }
-    return relation;
-  }, [
+  const contactProfileController = useMessageContactProfileController({
+    activeConversation,
+    activeConversationType,
     contactCardProfile,
-    friendRequestsQuery.data,
-    friendsQuery.data,
-    localOutgoingContactRequestIds,
+    friends: friendsQuery.data ?? [],
+    queryClient,
     session,
-  ]);
+    setContactCardProfile,
+    setNotice,
+  });
 
   const {
     createDirectChatMutation,
@@ -342,78 +301,6 @@ export function MessageCenter() {
     setComposerDialog,
     setNotice,
   });
-  const refreshContactRelation = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["pc-friends"] }),
-      queryClient.invalidateQueries({ queryKey: ["pc-friend-requests"] }),
-      queryClient.invalidateQueries({
-        queryKey: pcQueryKeys.accountBlocklist(session?.apiBaseUrl, session?.tenantToken),
-      }),
-      queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] }),
-      queryClient.invalidateQueries({ queryKey: ["pc-user-profile"] }),
-    ]);
-  }, [queryClient, session?.apiBaseUrl, session?.tenantToken]);
-  const sendFriendRequestMutation = useMutation({
-    mutationFn: async (message: string) => {
-      if (!contactCardProfile?.userId) throw new Error("名片缺少用户 ID");
-      return requireApiClient(session).sendFriendRequest(contactCardProfile.userId, message);
-    },
-    onSuccess: async () => {
-      const targetUserId = contactCardProfile?.userId;
-      if (targetUserId) {
-        setLocalOutgoingContactRequestIds((current) => new Set(current).add(targetUserId));
-      }
-      setNotice("好友申请已发送");
-      await refreshContactRelation();
-    },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "发送好友申请失败")),
-  });
-  const handleFriendRequestMutation = useMutation({
-    mutationFn: async (payload: { action: "accept" | "reject"; requestId: string }) =>
-      requireApiClient(session).handleFriendRequest(payload.requestId, payload.action),
-    onSuccess: async (_result, payload) => {
-      setNotice(payload.action === "accept" ? "已通过好友申请" : "已拒绝好友申请");
-      await refreshContactRelation();
-    },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "处理好友申请失败")),
-  });
-  const deleteFriendMutation = useMutation({
-    mutationFn: async (friendUserId: string) =>
-      requireApiClient(session).deleteFriend(friendUserId),
-    onSuccess: async () => {
-      setNotice("已删除好友");
-      await refreshContactRelation();
-    },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "删除好友失败")),
-  });
-  const blockUserMutation = useMutation({
-    mutationFn: async (userId: string) => requireApiClient(session).blockUser(userId),
-    onSuccess: async () => {
-      setNotice("已加入黑名单");
-      setContactCardProfile(null);
-      await refreshContactRelation();
-    },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "加入黑名单失败")),
-  });
-  const updateFriendProfileMutation = useMutation({
-    mutationFn: async ({
-      friendUserId,
-      payload,
-    }: {
-      friendUserId: string;
-      payload: FriendProfileUpdateDto;
-    }) => requireApiClient(session).updateFriendProfile(friendUserId, payload),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["pc-friends"] }),
-        queryClient.invalidateQueries({
-          queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
-        }),
-      ]);
-    },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "客户资料更新失败")),
-  });
-
   const {
     deleteMutation,
     favoriteMutation,
@@ -683,6 +570,7 @@ export function MessageCenter() {
         }}
         emptyText={conversationList.emptyText}
         errorText={errorText}
+        friendRequestCount={addFriendController.pendingIncomingRequestCount}
         groupAvatarSnapshotFor={groupAvatarSnapshotFor}
         groupCreateAccess={groupCreateAccess}
         groupMembersByConversation={groupMembersByConversation}
@@ -693,6 +581,10 @@ export function MessageCenter() {
         unreadCount={counts.unread}
         unreadIdentity={unreadIdentity as CurrentUserIdentity}
         visibleConversations={visibleConversations}
+        onAddFriend={() => {
+          setAddFriendDialogOpen(true);
+          addFriendController.resetFriendSearch();
+        }}
         onConversationClick={openConversationFromUserClick}
         onConversationContextMenu={openConversationMenu}
         setActiveModule={setActiveModule}
@@ -714,16 +606,13 @@ export function MessageCenter() {
         activeConversationType={activeConversationType}
         avatarProfilePopover={avatarProfilePopover}
         contactCardActionPending={
-          sendFriendRequestMutation.isPending ||
-          handleFriendRequestMutation.isPending ||
-          deleteFriendMutation.isPending ||
-          blockUserMutation.isPending
+          contactProfileController.contactCardActionPending
         }
         contactCardProfile={contactCardProfile}
-        contactCardProfileData={contactCardProfileQuery.data}
-        contactCardProfileError={contactCardProfileQuery.error}
-        contactCardProfileLoading={contactCardProfileQuery.isLoading}
-        contactCardRelation={contactCardRelation}
+        contactCardProfileData={contactProfileController.contactCardProfileQuery.data}
+        contactCardProfileError={contactProfileController.contactCardProfileQuery.error}
+        contactCardProfileLoading={contactProfileController.contactCardProfileQuery.isLoading}
+        contactCardRelation={contactProfileController.contactCardRelation}
         chatPanelRef={chatPanelRef}
         canOpenAiAssistant={isModuleVisibleForAccess("aiAssistant", workspaceAccess)}
         canOpenKnowledgeBase={isModuleVisibleForAccess("knowledgeBase", workspaceAccess)}
@@ -735,6 +624,7 @@ export function MessageCenter() {
         createDirectPending={createDirectChatMutation.isPending}
         createGroupPending={createGroupChatMutation.isPending}
         createInviteQrPending={createInviteQrMutation.isPending}
+        sendContactCardPending={contactCardSendPending}
         dockProfile={dockProfile}
         draftEditorStatesByConversation={draftEditorStatesByConversation}
         forwardMessages={forwardTargetMessages}
@@ -772,33 +662,30 @@ export function MessageCenter() {
         notice={notice}
         onAvatarProfileClose={() => setAvatarProfilePopover(null)}
         onContactCardAccept={() => {
-          if (contactCardRelation?.status !== "incomingPending") return;
-          handleFriendRequestMutation.mutate({
-            action: "accept",
-            requestId: contactCardRelation.requestId,
-          });
+          const relation = contactProfileController.contactCardRelation;
+          if (relation?.status !== "incomingPending") return;
+          contactProfileController.acceptContactRequest(relation.requestId);
         }}
         onContactCardBlock={() => {
           if (!contactCardProfile?.userId) return;
           if (!requestMessageDangerConfirmation({ action: "block-user" })) {
             return;
           }
-          blockUserMutation.mutate(contactCardProfile.userId);
+          contactProfileController.blockUser(contactCardProfile.userId);
         }}
         onContactCardClose={() => setContactCardProfile(null)}
         onContactCardDeleteFriend={() => {
-          if (contactCardRelation?.status !== "friend") return;
+          const relation = contactProfileController.contactCardRelation;
+          if (relation?.status !== "friend") return;
           if (!requestMessageDangerConfirmation({ action: "delete-friend" })) return;
-          deleteFriendMutation.mutate(contactCardRelation.friendUserId);
+          contactProfileController.deleteFriend(relation.friendUserId);
         }}
         onContactCardReject={() => {
-          if (contactCardRelation?.status !== "incomingPending") return;
-          handleFriendRequestMutation.mutate({
-            action: "reject",
-            requestId: contactCardRelation.requestId,
-          });
+          const relation = contactProfileController.contactCardRelation;
+          if (relation?.status !== "incomingPending") return;
+          contactProfileController.rejectContactRequest(relation.requestId);
         }}
-        onContactCardSendRequest={(message) => sendFriendRequestMutation.mutate(message)}
+        onContactCardSendRequest={(message) => contactProfileController.sendContactRequest(message)}
         onContactCardStartChat={() => {
           if (!contactCardProfile?.userId) return;
           setContactCardProfile(null);
@@ -810,31 +697,24 @@ export function MessageCenter() {
         onCreateDirectChat={(userId) => createDirectChatMutation.mutate(userId)}
         onCreateGroupChat={(payload) => createGroupChatMutation.mutate(payload)}
         onCreateInviteQr={() => createInviteQrMutation.mutate()}
-        onUpdateCustomerRemark={async (remarkName) => {
-          const friendUserId = activeConversationContact?.userId || activeConversation?.peerUserId;
-          if (!friendUserId) throw new Error("当前客户缺少好友 ID，无法编辑备注");
-          await updateFriendProfileMutation.mutateAsync({
-            friendUserId,
-            payload: { remarkName },
-          });
-        }}
-        onUpdateCustomerTags={async (tags) => {
-          const friendUserId = activeConversationContact?.userId || activeConversation?.peerUserId;
-          if (!friendUserId) throw new Error("当前客户缺少好友 ID，无法编辑标签");
-          await updateFriendProfileMutation.mutateAsync({
-            friendUserId,
-            payload: { tags },
-          });
-        }}
-        onSendContactCard={(contact) => {
-          messageCenterCommands.sendContactCard(
-            normalizeContactCard({
-              userId: contact.id,
-              displayName: contact.name,
-              avatarUrl: contact.avatarUrl,
-            }),
-          );
-          setComposerDialog(null);
+        onUpdateCustomerRemark={contactProfileController.updateCustomerRemark}
+        onUpdateCustomerTags={contactProfileController.updateCustomerTags}
+        onSendContactCard={async (contact) => {
+          setContactCardSendPending(true);
+          try {
+            await messageCenterCommands.sendContactCard(
+              normalizeContactCard({
+                userId: contact.id,
+                displayName: contact.name,
+                avatarUrl: contact.avatarUrl,
+              }),
+            );
+            setComposerDialog(null);
+          } catch (error) {
+            setNotice(contactCardActionErrorText(error, "发送名片失败"));
+          } finally {
+            setContactCardSendPending(false);
+          }
         }}
         onFailedMessageClick={setResendConfirmMessage}
         onForwardToConversation={(targetConversationId) =>
@@ -849,10 +729,12 @@ export function MessageCenter() {
         pcSettings={pcSettings}
         pendingNewMessageCount={pendingNewMessageCount}
         profilePaneWidth={profilePaneWidth}
-        profileActionPending={updateFriendProfileMutation.isPending}
-        profileData={activeConversationProfileQuery.data}
-        profileError={activeConversationProfileQuery.error}
-        profileLoading={activeConversationProfileQuery.isLoading}
+        profileActionPending={contactProfileController.profileActionPending}
+        profileData={contactProfileController.profileQuery.data}
+        profileError={contactProfileController.profileQuery.error}
+        profileExtra={contactProfileController.profileExtraQuery.data}
+        profileExtraLoading={contactProfileController.profileExtraQuery.isLoading}
+        profileLoading={contactProfileController.profileQuery.isLoading}
         profileStandaloneOpen={profileStandaloneOpen}
         replyTarget={replyTarget}
         scrollMessagesToBottom={scrollMessagesToBottom}
@@ -882,6 +764,38 @@ export function MessageCenter() {
         unreadJump={unreadJump}
         visibleMessages={visibleMessages}
       />
+
+      {addFriendDialogOpen && (
+        <ContactAddFriendDialog
+          actionPending={
+            addFriendController.sendFriendRequestPending ||
+            addFriendController.requestPending ||
+            addFriendController.createDirectChatPending
+          }
+          contactRelation={addFriendController.contactRelation}
+          createInviteQrPending={addFriendController.createInviteQrPending}
+          inviteQrError={addFriendController.inviteQrError}
+          inviteQrLoading={addFriendController.inviteQrLoading}
+          inviteQrs={addFriendController.inviteQrs}
+          pendingFriendRequestUserId={addFriendController.pendingFriendRequestUserId}
+          requestPending={addFriendController.requestPending}
+          searchError={addFriendController.friendSearchError}
+          searchLoading={addFriendController.friendSearchLoading}
+          searchResults={addFriendController.friendSearchResults}
+          onAccept={(requestId) => addFriendController.handleRequest(requestId, "accept")}
+          onClose={() => setAddFriendDialogOpen(false)}
+          onCreateInviteQr={addFriendController.onCreateInviteQr}
+          onReject={(requestId) => addFriendController.handleRequest(requestId, "reject")}
+          onShowRequests={() => {
+            setAddFriendDialogOpen(false);
+            setContactFilter("requests");
+            setActiveModule("contacts");
+          }}
+          onStartChat={addFriendController.openDirectMessage}
+          searchUsers={addFriendController.searchUsers}
+          sendFriendRequest={addFriendController.sendFriendRequest}
+        />
+      )}
     </>
   );
 }

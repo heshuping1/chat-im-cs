@@ -76,9 +76,14 @@ export function CustomerProfileActionRows({
   };
 
   return (
-    <section className="customer-profile-actions" aria-label="客户处理">
+    <section
+      className="customer-profile-actions"
+      aria-label="客户处理"
+      data-testid="customer-profile-actions"
+    >
       {editingRemark ? (
         <CustomerProfileInlineEditor
+          actionKey="remark"
           icon={<PencilLine size={15} />}
           label="备注"
           pending={pending}
@@ -90,6 +95,7 @@ export function CustomerProfileActionRows({
       ) : (
         <CustomerProfileActionRow
           actionLabel="编辑"
+          actionKey="remark"
           icon={<PencilLine size={15} />}
           label="备注"
           onAction={() => {
@@ -100,7 +106,7 @@ export function CustomerProfileActionRows({
           value={isKnown(model.remark) ? model.remark : "暂无备注"}
         />
       )}
-      <div className="customer-profile-action-row">
+      <div className="customer-profile-action-row" data-action-row="tags">
         <span className="customer-profile-action-label">
           <Tags size={15} />
           标签
@@ -152,6 +158,7 @@ export function CustomerProfileActionRows({
       </div>
       <CustomerProfileActionRow
         actionLabel="设置"
+        actionKey="follow-up"
         icon={<CalendarClock size={15} />}
         label="跟进"
         onAction={() => onPendingAction("跟进接口待接入")}
@@ -159,6 +166,7 @@ export function CustomerProfileActionRows({
       />
       <CustomerProfileActionRow
         actionLabel="查看"
+        actionKey="tickets"
         icon={<ClipboardList size={15} />}
         label="工单"
         onAction={onOpenTickets}
@@ -174,6 +182,7 @@ export function CustomerProfileActionRows({
 }
 
 function CustomerProfileInlineEditor({
+  actionKey,
   icon,
   label,
   onCancel,
@@ -182,6 +191,7 @@ function CustomerProfileInlineEditor({
   pending,
   value,
 }: {
+  actionKey: string;
   icon: ReactNode;
   label: string;
   onCancel: () => void;
@@ -191,7 +201,7 @@ function CustomerProfileInlineEditor({
   value: string;
 }) {
   return (
-    <div className="customer-profile-action-row editing">
+    <div className="customer-profile-action-row editing" data-action-row={actionKey}>
       <span className="customer-profile-action-label">
         {icon}
         {label}
@@ -231,19 +241,21 @@ function CustomerProfileInlineEditor({
 
 function CustomerProfileActionRow({
   actionLabel,
+  actionKey,
   icon,
   label,
   onAction,
   value,
 }: {
   actionLabel: string;
+  actionKey: string;
   icon: ReactNode;
   label: string;
   onAction: () => void;
   value: string;
 }) {
   return (
-    <div className="customer-profile-action-row">
+    <div className="customer-profile-action-row" data-action-row={actionKey}>
       <span className="customer-profile-action-label">
         {icon}
         {label}

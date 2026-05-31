@@ -10,8 +10,8 @@ import type { CurrentUserIdentity } from "../../data/message-display";
 import {
   MessageConversationListPanel,
   type MessageConversationFilterKey,
-  type MessagePlusAction,
 } from "./MessageConversationListPanel";
+import type { MessagePlusAction } from "./MessageStartDialogs";
 
 type ComposerDialog = "direct" | "group" | "qr" | "card" | null;
 
@@ -22,6 +22,7 @@ export function MessageConversationSidebar({
   draftsByConversation,
   emptyText,
   errorText,
+  friendRequestCount,
   groupAvatarSnapshotFor,
   groupCreateAccess,
   groupMembersByConversation,
@@ -33,6 +34,7 @@ export function MessageConversationSidebar({
   unreadIdentity,
   visibleConversations,
   activeGroupMembers,
+  onAddFriend,
   onConversationClick,
   onConversationContextMenu,
   setActiveModule,
@@ -49,6 +51,7 @@ export function MessageConversationSidebar({
   draftsByConversation: Record<string, string | undefined>;
   emptyText: string;
   errorText?: string | null;
+  friendRequestCount: number;
   groupAvatarSnapshotFor: (conversation?: ConversationListItem) => string | undefined;
   groupCreateAccess: GroupCreateAccess;
   groupMembersByConversation: Record<string, GroupMemberDto[]>;
@@ -60,6 +63,7 @@ export function MessageConversationSidebar({
   unreadIdentity: CurrentUserIdentity;
   visibleConversations: ConversationListItem[];
   activeGroupMembers?: GroupMemberDto[];
+  onAddFriend: () => void;
   onConversationClick: (conversation: ConversationListItem) => void;
   onConversationContextMenu: (
     event: React.MouseEvent<HTMLElement>,
@@ -83,6 +87,7 @@ export function MessageConversationSidebar({
         draftsByConversation={draftsByConversation}
         emptyText={emptyText}
         errorText={errorText}
+        friendRequestCount={friendRequestCount}
         groupCreateAccess={groupCreateAccess}
         keyword={keyword}
         loading={loading}
@@ -99,6 +104,7 @@ export function MessageConversationSidebar({
             setComposerDialog,
             setContactFilter,
             setPlusMenuOpen,
+            onAddFriend,
           })
         }
         onTogglePlusMenu={() => setPlusMenuOpen((value) => !value)}
@@ -137,14 +143,20 @@ function handlePlusAction({
   setComposerDialog,
   setContactFilter,
   setPlusMenuOpen,
+  onAddFriend,
 }: {
   action: MessagePlusAction;
   setActiveModule: (module: "contacts") => void;
   setComposerDialog: Dispatch<SetStateAction<ComposerDialog>>;
   setContactFilter: (filter: "requests") => void;
   setPlusMenuOpen: Dispatch<SetStateAction<boolean>>;
+  onAddFriend: () => void;
 }) {
   setPlusMenuOpen(false);
+  if (action === "addFriend") {
+    onAddFriend();
+    return;
+  }
   if (action === "requests") {
     setContactFilter("requests");
     setActiveModule("contacts");

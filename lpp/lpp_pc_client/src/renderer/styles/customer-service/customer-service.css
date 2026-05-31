@@ -1012,6 +1012,31 @@
     #fff !important;
 }
 
+.customer-profile-workspace > .customer-info-head,
+.customer-profile-workspace > .customer-profile-hero,
+.customer-profile-workspace > .panel-state,
+.customer-profile-workspace > .customer-profile-actions,
+.customer-profile-workspace > .customer-profile-scorebar,
+.customer-profile-workspace > .customer-profile-tabbox {
+  flex-shrink: 0;
+}
+
+.h-flagship-grid .h-customer-title > div,
+.e-chat-title > div {
+  min-width: 0;
+}
+
+.h-flagship-grid .h-customer-title .chat-header-meta-chips {
+  max-width: min(430px, 46vw);
+  overflow: visible;
+  flex-wrap: wrap;
+  white-space: normal;
+}
+
+.h-flagship-grid .h-customer-title .chat-header-meta-chips > span {
+  flex: 0 1 auto;
+}
+
 .customer-profile-hero {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
@@ -1085,6 +1110,9 @@
 
 .customer-profile-actions {
   display: grid;
+  flex-shrink: 0;
+  grid-auto-rows: minmax(42px, auto);
+  min-height: calc(42px * 4 + 2px);
   overflow: hidden;
   border: 1px solid rgba(222, 231, 241, 0.92);
   border-radius: 13px;
@@ -1277,6 +1305,8 @@
 
 .customer-profile-tabbox {
   display: grid;
+  position: relative;
+  z-index: 2;
   padding: 1px 0 2px;
 }
 
@@ -1285,6 +1315,12 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   overflow: visible;
+}
+
+.customer-profile-tabs-more {
+  position: relative;
+  display: block;
+  min-width: 0;
 }
 
 .customer-profile-tabs button {
@@ -1359,9 +1395,66 @@
   color: #089a78;
 }
 
+.customer-profile-tabs-toggle.active {
+  border-style: solid;
+  border-color: rgba(16, 185, 129, 0.55);
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.98), #fff);
+  color: #059669;
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.08);
+}
+
+.customer-profile-tabs-toggle em {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #10b981;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 18px;
+  text-align: center;
+}
+
+.customer-profile-tabs-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 8;
+  display: grid;
+  width: min(210px, calc(100vw - 32px));
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid rgba(214, 224, 236, 0.92);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 38px rgba(30, 45, 65, 0.14);
+}
+
+.customer-profile-tabs-menu button {
+  min-height: 32px;
+  justify-content: flex-start;
+  padding: 0 10px;
+  border-radius: 9px;
+}
+
 .customer-profile-content {
   display: grid;
+  flex: 1 1 auto;
   gap: 9px;
+  min-height: 0;
+}
+
+.customer-profile-content > .customer-profile-block:only-child {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.customer-profile-block:only-child .panel-state {
+  flex: 1 1 auto;
+  justify-content: center;
+  margin: 0;
 }
 
 .customer-profile-block {

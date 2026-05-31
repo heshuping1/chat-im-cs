@@ -3,10 +3,12 @@ import { ProfileApiClient } from "./profile-client";
 import type {
   DepartmentDto,
   DepartmentMemberDto,
+  FriendProfileExtraDto,
   FriendProfileUpdateDto,
   FriendDto,
   FriendRequestDto,
   GroupMemberDto,
+  SearchUserDto,
   TenantMemberDto,
 } from "./types";
 
@@ -17,6 +19,13 @@ export class ContactsApiClient extends ProfileApiClient {
 
   getFriendRequests() {
     return this.request<FriendRequestDto[]>(endpointPlan.friendRequests);
+  }
+
+  searchUsers(keyword: string) {
+    const trimmedKeyword = keyword.trim();
+    if (!trimmedKeyword) return Promise.resolve([] as SearchUserDto[]);
+    const params = new URLSearchParams({ keyword: trimmedKeyword });
+    return this.request<SearchUserDto[]>(`${endpointPlan.searchUsers}?${params.toString()}`);
   }
 
   sendFriendRequest(toUserId: string, message?: string) {
@@ -57,6 +66,12 @@ export class ContactsApiClient extends ProfileApiClient {
         method: "PUT",
         body: JSON.stringify(payload),
       },
+    );
+  }
+
+  getFriendProfileExtra(friendUserId: string) {
+    return this.request<FriendProfileExtraDto>(
+      endpointPlan.friendProfileExtra.replace("{friendUserId}", encodeURIComponent(friendUserId)),
     );
   }
 

@@ -8,9 +8,11 @@ import {
 import type { MediaCacheContext } from "./videoPlayer";
 
 const readyVideoSourceCache = new Set<string>();
+const readyVideoPosterSources = new Map<string, string | undefined>();
 const videoPosterCache = new Map<string, string>();
 const videoPosterPromiseCache = new Map<string, Promise<string | undefined>>();
 const maxVideoPosterCacheEntries = 120;
+const maxVideoPosterReadyEntries = 180;
 
 export function cachedGeneratedVideoPoster(src: string | undefined) {
   return src ? videoPosterCache.get(src) : undefined;
@@ -24,7 +26,48 @@ export function markVideoSourceReady(src: string | undefined) {
   if (src) readyVideoSourceCache.add(src);
 }
 
+export type VideoPosterLoadState = "idle" | "loading" | "ready" | "failed";
 export type VideoPosterSource = "explicit" | "registered" | "cached" | "generated" | "none";
+
+export function videoPosterRenderKey(
+  media: MediaResourceDto | undefined,
+  posterSrc: string | undefined,
+  displaySrc: string | undefined,
+) {
+  const mediaKey = mediaStrongRenderKey(media);
+  if (mediaKey) return mediaKey;
+  const posterKey = stableUrlRenderKey(posterSrc);
+  if (posterKey) return `poster:${posterKey}`;
+  const sourceKey = stableUrlRenderKey(displaySrc);
+  return sourceKey ? `source:${sourceKey}` : undefined;
+}
+
+export function isVideoPosterReady(key: string | undefined) {
+  return Boolean(key && readyVideoPosterSources.has(key));
+}
+
+export function readyVideoPosterSrc(key: string | undefined) {
+  return key ? readyVideoPosterSources.get(key) : undefined;
+}
+
+export function markVideoPosterReady(key: string | undefined, posterSrc?: string) {
+  rememberVideoPosterReadyKey(key, posterSrc);
+  const posterKey = stableUrlRenderKey(posterSrc);
+  if (posterKey) rememberVideoPosterReadyKey(`poster:${posterKey}`, posterSrc);
+}
+
+export function initialVideoPosterLoadState({
+  posterKey,
+  posterReadyHint,
+  posterSrc,
+}: {
+  posterKey?: string;
+  posterReadyHint?: boolean;
+  posterSrc?: string;
+}): VideoPosterLoadState {
+  if (!posterSrc) return "idle";
+  return posterReadyHint || isVideoPosterReady(posterKey) ? "ready" : "loading";
+}
 
 export function resolveVideoPosterSource({
   cachedPoster,
@@ -244,6 +287,56 @@ function rememberVideoPoster(src: string, poster: string) {
     if (!oldestKey) break;
     videoPosterCache.delete(oldestKey);
   }
+}
+
+function rememberVideoPosterReadyKey(key: string | undefined, posterSrc?: string) {
+  if (!key) return;
+  const previousPosterSrc = readyVideoPosterSources.get(key);
+  readyVideoPosterSources.delete(key);
+  readyVideoPosterSources.set(key, posterSrc || previousPosterSrc);
+  while (readyVideoPosterSources.size > maxVideoPosterReadyEntries) {
+    const oldestKey = readyVideoPosterSources.keys().next().value;
+    if (!oldestKey) break;
+    readyVideoPosterSources.delete(oldestKey);
+  }
+}
+
+function mediaStrongRenderKey(media: MediaResourceDto | undefined) {
+  const record = media as Record<string, unknown> | undefined;
+  if (!record) return undefined;
+  const value = [
+    record.id,
+    record.mediaId,
+    record.resourceId,
+    record.fileId,
+    record.objectKey,
+    record.storageKey,
+  ].map(stableScalarValue).find(Boolean);
+  return value ? `media:${value}` : undefined;
+}
+
+function stableUrlRenderKey(value: string | undefined) {
+  if (!value?.trim()) return undefined;
+  const raw = value.trim();
+  if (/^(blob:|data:|file:)/i.test(raw)) return raw;
+  try {
+    const base =
+      typeof globalThis.location?.origin === "string"
+        ? globalThis.location.origin
+        : "http://lpp.local";
+    const url = new URL(raw, base);
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return raw.split(/[?#]/, 1)[0] || raw;
+  }
+}
+
+function stableScalarValue(value: unknown) {
+  if (typeof value === "string") return value.trim() || undefined;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return undefined;
 }
 
 export function videoPosterCaptureTime(duration: number) {

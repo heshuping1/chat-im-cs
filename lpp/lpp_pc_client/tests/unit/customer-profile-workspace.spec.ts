@@ -22,7 +22,7 @@ describe("customer profile workspace copy", () => {
   });
 
   it("keeps customer source as profile detail instead of hero summary", () => {
-    expect(workspaceSource).toContain('["客户来源", model.source]');
+    expect(workspaceSource).toContain('["来源渠道", model.source]');
     expect(workspaceSource).not.toContain("model.level, model.kyc, model.risk, model.source");
     expect(workspaceSource).toContain("暂无客户识别信息");
   });

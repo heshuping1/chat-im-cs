@@ -1119,6 +1119,7 @@ P0-DOC-001 验收记录：
 | P24-CONTACT-001 | Contact Card And Friend Relation Loop | 完成 PC 端名片消息闭环：输入框“更多”可发送 `contact_card` 名片，消息卡片点击打开关系感知资料弹窗；好友可发消息/删除/拉黑，非好友可发送好友申请，收到申请可通过/拒绝；群资料禁用成员列表和群成员头像资料查看，但保留聊天头像、群头像和 @ 数据能力。 | P1 | L3 | 已完成 |
 | P24-CONTACT-002 | Contacts Directory And Image Message Closure | 完成通讯录与图片消息闭环：通讯录合并组织/员工入口，保留 `staff` 兼容别名，组织成员按部门展示并在姓名同行标记角色；客户/好友支持发消息、删除好友、加入黑名单，组织成员只保留发消息；图片消息采用微信式自然气泡和内置 viewer，支持复制、另存、显示位置与本地缓存优先动作源。 | P1 | L3 | 已完成 |
 | P24-CONTACT-005 | Customer Contacts Directory Alignment | 将客户 PC 端通讯录从客服分类语言调整为个人社交通讯录：客户身份只展示新的朋友、全部联系人、好友、群聊；旧 `customer/organization` 筛选运行时归一到 `all`，`userType=1` 好友按好友展示，不打开客户画像；客服/员工身份继续保留客户、好友、组织、群聊闭环。 | P1 | L2 | 已完成 |
+| P24-CONTACT-006 | Contact Card Runtime Closure Repair | 修复名片/好友运行态闭环：发送名片弹窗接入真实 pending 和失败提示，名片资料查询、好友申请、通过/拒绝、删除好友、拉黑与关系刷新收敛到已跟踪 controller；补充运行态静态断言，避免只靠 API/model 测试导致 main 中缺文件或弹窗硬编码。 | P1 | L2 | 已完成 |
 | P24-STABILITY-001 | React Hook Queue Crash Guard | 治理 `Should have a queue` 类 React hooks 崩溃：错误边界改为中文恢复界面与错误编号，runtime diagnostics 记录 component stack/resetKey/module/url，新增 renderer-wide `lint:hooks` 并纳入 `check:quick`，防止条件 hooks 顺序问题回流。 | P1 | L2 | 已完成 |
 | P24-AUTH-001 | Register And Login Experience Closure | 完成 PC 端注册与登录体验治理：新增平台注册 API client 和 DTO，登录页改为「登录 / 注册」同一 Auth Shell，注册成功复用登录与空间选择链路；服务地址和 tenantId 收进高级设置，多企业账号进入轻量空间选择，不改 auth persist key、Gateway、Electron IPC 或 React Query key。 | P1 | L3 | 已完成 |
 | P24-BRAND-002 | App Icon Asset Closure | 闭环应用图标生效链路：以 `assets/app-icon-green-bubble.png` 为单一源，补齐 Windows `.ico`、macOS `.icns`、web favicon 与 macOS 开发态 Dock 图标；打包配置区分 Windows/NSIS 与 macOS 图标，避免只更新截图或 PNG 后运行态不生效。 | P2 | L2 | 已完成 |
@@ -1136,7 +1137,26 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 21. 当前关键风险清单
+## 21. 第二十六阶段任务：客户信息、联系人入口与设置稳态治理
+
+第二十六阶段聚焦普通 IM 与在线客服共用客户信息的分层模型、真实数据口径、消息页联系人入口、好友申请提醒和设置页可信体验。所有变更默认不扩大 Gateway/Electron/Zustand 边界；涉及 API/React Query 的改动必须复用既有 owner 和现有合同。
+
+| 编号 | 模块 | 目标 | 风险 | 验收 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| P26-CUSTOMER-001 | Customer Profile Shared Layer | 客户信息按“共用模型/基础 UI + IM/在线客服场景适配”分层，四行处理区稳定展示，IM profile-card 失败降级不显示阻断红条。 | P1 | L3 | 已完成 |
+| P26-CUSTOMER-002 | Customer Profile Real Data | 普通 IM 客户信息接入 `profile-extra`，备注/标签/来源使用服务端真实字段；备注保存提交 `note`，标签保存提交 `tags`，刷新既有联系人和会话缓存。 | P1 | L3 | 已完成 |
+| P26-CUSTOMER-003 | Standalone Profile Layout | 普通 IM 客户信息独立页移除聊天输入区预留空行，资料页占满剩余高度；更多分类改为紧凑 overflow menu，短内容 tab 使用完整详情区承载空态。 | P1 | L2 | 已完成 |
+| P26-CUSTOMER-004 | Header Channel Real Data | 普通 IM header 移除“好友私聊/暂无未读”和通讯录 fallback 来源，只在存在真实渠道应用或来源渠道时展示 chip。 | P1 | L2 | 已完成 |
+| P26-CONTACT-004 | Message Add Friend Entry | 消息页 `+` 菜单新增一级“添加好友”，复用添加好友弹窗和真实搜索/申请/二维码能力；“好友申请”继续进入申请处理页。 | P1 | L2 | 已完成 |
+| P26-CONTACT-005 | Friend Request Layered Reminder | 好友申请按全局导航、消息页 `+`、菜单行和提醒中心分层提醒；首次加载只显示 badge，新增申请 diff 后推轻提醒，已在申请页时抑制打扰。 | P1 | L3 | 已完成 |
+| P26-SETTINGS-001 | Settings Source Layering | 设置 owner 内部建立 catalog，区分本地偏好、账号设置、企业规则和系统能力，防止未接入能力伪装成可用开关。 | P1 | L2 | 已完成 |
+| P26-SETTINGS-002 | Settings User Copy | 设置 UI 改成用户语言，减少架构说明；未支持能力收敛到轻量信息区，不作为主列表开关。 | P1 | L2 | 已完成 |
+| P26-SETTINGS-003 | Settings Visible Copy Distillation | 普通设置行去掉“所有设备同步/仅当前电脑”等常驻标签，仅保留标题、说明、控件和保存/失败结果；内部治理字段继续保留在 catalog。 | P1 | L2 | 已完成 |
+| P26-RECOVERY-001 | Session Work Recovery | 从旧分支和本地证据选择性找回 P26 改动，重建缺失实现与测试，并记录恢复来源与验证命令，避免再次丢失。 | P1 | L2 | 已完成 |
+
+---
+
+## 22. 当前关键风险清单
 
 | 编号 | 风险 | 影响 | 控制方式 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -1152,7 +1172,7 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 21. 第一阶段手工验收记录模板
+## 23. 第一阶段手工验收记录模板
 
 每完成 P1 任务，需要追加验收记录。
 
@@ -1188,7 +1208,7 @@ P0-DOC-001 验收记录：
 
 ---
 
-## 22. 推进原则
+## 24. 推进原则
 
 1. 第一阶段不追求目录最终形态，优先追求边界可测试。
 2. 不允许为了重构把核心链路一次性改大。

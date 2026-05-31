@@ -1,17 +1,17 @@
-import { ChevronLeft, PanelRight, Search } from "lucide-react";
+import { AppWindow, ChevronLeft, PanelRight, Search } from "lucide-react";
 
+import { ChannelBadge, channelLabel } from "../../components/ChannelBadge";
 import type { ConversationListItem } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
-import {
-  conversationMetaText,
-  effectiveConversationUnreadCount,
-} from "../../data/message-display";
+import { effectiveConversationUnreadCount } from "../../data/message-display";
 import { ConversationAvatar } from "./ConversationListParts";
 
 export function MessageChatHeader({
   conversation,
   conversationIsGroup,
+  customerApplicationName,
+  customerSource,
   headerTitle,
   historyOpen,
   layoutMode,
@@ -26,6 +26,8 @@ export function MessageChatHeader({
 }: {
   conversation: ConversationListItem;
   conversationIsGroup: boolean;
+  customerApplicationName?: string;
+  customerSource?: string;
   headerTitle: string;
   historyOpen: boolean;
   layoutMode: MessageLayoutMode;
@@ -39,6 +41,8 @@ export function MessageChatHeader({
   onToggleProfileVisible: () => void;
 }) {
   const lookupOpen = messageSearchOpen || historyOpen;
+  const hasApplication = Boolean(customerApplicationName?.trim());
+  const hasSource = Boolean(customerSource?.trim());
   return (
     <header className="e-chat-header">
       <div className={`e-chat-title ${conversationIsGroup ? "group-title" : ""}`}>
@@ -62,8 +66,28 @@ export function MessageChatHeader({
         )}
         <div>
           <h2>{headerTitle}</h2>
-          {!conversationIsGroup && (
-            <p>{conversationMetaText(conversation, unreadIdentity)}</p>
+          {!conversationIsGroup && (hasApplication || hasSource) && (
+            <p className="chat-header-meta-chips">
+              {hasApplication && (
+                <span
+                  className="customer-meta-chip customer-meta-chip-app"
+                  title={`渠道应用：${customerApplicationName}`}
+                  aria-label={`渠道应用：${customerApplicationName}`}
+                >
+                  <AppWindow size={11} strokeWidth={2.4} aria-hidden="true" />
+                  <span>{customerApplicationName}</span>
+                </span>
+              )}
+              {hasSource && (
+                <span
+                  className="customer-meta-chip customer-meta-chip-source"
+                  title={`来源渠道：${channelLabel(customerSource)}`}
+                  aria-label={`来源渠道：${channelLabel(customerSource)}`}
+                >
+                  <ChannelBadge source={customerSource} compact />
+                </span>
+              )}
+            </p>
           )}
         </div>
       </div>

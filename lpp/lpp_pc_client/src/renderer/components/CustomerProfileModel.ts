@@ -1,4 +1,8 @@
-import type { ConversationListItem, CustomerProfileCard } from "../data/api-client";
+import type {
+  ConversationListItem,
+  CustomerProfileCard,
+  FriendProfileExtraDto,
+} from "../data/api-client";
 import type { ContactItem } from "../data/types";
 import { formatChatTime, formatShortDate } from "../lib/format";
 import { channelLabel } from "./ChannelBadge";
@@ -67,18 +71,21 @@ export function buildCustomerModel({
   conversation,
   contact,
   profile,
+  profileExtra,
 }: {
   avatarUrl?: string | null;
   conversation?: ConversationListItem;
   contact?: ContactItem | null;
   profile?: CustomerProfileCard;
+  profileExtra?: FriendProfileExtraDto;
 }): CustomerModel {
   const external = profile?.externalSections ?? [];
   const tradingSummary = profile?.tradingSummary ?? {};
-  const tags = [...(profile?.tags ?? []), ...(contact?.tags ?? [])].filter(Boolean);
+  const profileExtraTags = Array.isArray(profileExtra?.tags) ? profileExtra.tags : [];
+  const tags = profileExtraTags.length > 0 ? profileExtraTags : profile?.tags ?? [];
   const categorizedExternal = categorizeSections(external);
   const profileSource = sourceLabel(profile);
-  const source = isKnown(profileSource) ? profileSource : contact?.source || "--";
+  const source = textValue(firstKnownValue(profileExtra?.source, profileSource, contact?.source));
   const lppId = firstKnownValue(
     profileValue(profile, [
       "lppId",
@@ -112,7 +119,18 @@ export function buildCustomerModel({
     agentCreatedAt: shortDate(valueAt(external, ["ib", "agent", "代理"], ["建立时间", "createdAt"])),
     agentType: textValue(valueAt(external, ["ib", "agent", "代理"], ["类型", "agentType"])),
     appName: textValue(
-      profileValue(profile, ["appName", "appDisplayName", "packageName", "brandName", "tenantAppName"]),
+      profileValue(profile, [
+        "appName",
+        "app_name",
+        "appDisplayName",
+        "app_display_name",
+        "packageName",
+        "package_name",
+        "brandName",
+        "brand_name",
+        "tenantAppName",
+        "tenant_app_name",
+      ]),
     ),
     assignedStaff: textValue(profile?.assignedAgentName ?? profileValue(profile, ["assignedStaffName", "assignedStaffDisplayName"])),
     avatarUrl: profile?.avatarUrl || avatarUrl || conversation?.avatarUrl || contact?.avatarUrl,
@@ -144,10 +162,7 @@ export function buildCustomerModel({
     profileVisibility: textValue(profileValue(profile, ["profileVisibility"])),
     recentTradeTime: shortDate(tradingSummary.recentTradeTime ?? tradingSummary.lastTradeAt),
     registeredAt: shortDate(profile?.registeredAt ?? tradingSummary.registeredAt),
-    remark: textValue(firstKnownValue(
-      profileValue(profile, ["customerRemark", "remarkName", "remark", "note"]),
-      contact?.remark,
-    )),
+    remark: textValue(profileExtra?.note),
     remoteLoginAlert: textValue(valueAt(external, ["device", "security", "设备"], ["异地登录提醒", "remoteLoginAlert"])),
     risk: textValue(firstKnownValue(profile?.riskLevel, profile?.risk, profile?.riskStatus, valueAt(external, ["risk", "kyc", "compliance", "风险", "合规"], ["风险", "risk", "riskLevel", "riskStatus"]))),
     sections: {
@@ -291,15 +306,19 @@ function firstKnownValue(...values: unknown[]) {
 }
 
 function sourceLabel(profile?: CustomerProfileCard) {
-  const raw =
-    profile?.source ||
-    profile?.sourceChannel ||
-    profile?.entryChannel ||
-    profile?.channel ||
-    profile?.from ||
-    profile?.platform ||
-    profile?.provider;
-  return raw ? channelLabel(raw) : "--";
+  const raw = profileValue(profile, [
+    "source",
+    "sourceChannel",
+    "source_channel",
+    "entryChannel",
+    "entry_channel",
+    "channel",
+    "from",
+    "platform",
+    "provider",
+  ]);
+  const source = textValue(raw);
+  return isKnown(source) ? channelLabel(source) : "--";
 }
 
 function shortDate(value: unknown) {

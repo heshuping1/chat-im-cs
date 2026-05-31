@@ -64,6 +64,7 @@ import { imPresenceStatuses } from "../data/static-config";
 import type { ModuleKey } from "../data/types";
 import { derivePcWorkspaceAccess } from "../data/workspace-access";
 import { formatBadgeCount, formatError } from "../lib/format";
+import { useFriendRequestReminderController } from "../contacts/hooks/useFriendRequestReminderController";
 import { PcAvatar } from "./PcAvatar";
 import {
   AccountAction,
@@ -116,6 +117,7 @@ export function Sidebar() {
   const pcSettings = usePcSettings();
   const pushRealtimeReminder = usePushRealtimeReminder();
   const realtimeReminders = useRealtimeReminders();
+  const { pendingIncomingRequestCount } = useFriendRequestReminderController();
   const queueReminderReadyRef = useRef(false);
   const queueReminderSessionRef = useRef("");
   const previousQueuedThreadIdsRef = useRef<Set<string>>(new Set());
@@ -591,8 +593,15 @@ export function Sidebar() {
               ? unreadCount
               : item.key === "onlineService"
                 ? Math.max(serviceAlertCount, realtimeServiceAlertCount)
+                : item.key === "contacts"
+                  ? pendingIncomingRequestCount
                 : 0;
-          const badgeLabel = badgeCount > 0 ? `，${badgeCount} 条提醒` : "";
+          const badgeLabel =
+            badgeCount > 0
+              ? item.key === "contacts"
+                ? `，${badgeCount} 条好友申请`
+                : `，${badgeCount} 条提醒`
+              : "";
           return (
             <button
               className={`nav-item ${activeModule === item.key ? "active" : ""}`}

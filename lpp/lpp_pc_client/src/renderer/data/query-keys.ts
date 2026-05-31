@@ -57,6 +57,8 @@ export const pcQueryKeys = {
       threadType ?? "",
       threadId ?? "",
     ] as const,
+  friendProfileExtra: (apiBaseUrl?: string, tenantToken?: string, friendUserId?: string) =>
+    ["pc-friend-profile-extra", ...sessionKey(apiBaseUrl, tenantToken), friendUserId ?? ""] as const,
   accountProfile: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-account-profile", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountTenant: (apiBaseUrl?: string, tenantToken?: string) =>

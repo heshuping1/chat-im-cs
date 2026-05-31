@@ -5,6 +5,7 @@ import { PcAvatar } from "../../components/PcAvatar";
 import type {
   ConversationListItem,
   CustomerProfileCard,
+  FriendProfileExtraDto,
   GroupMemberDto,
   UserProfileDto,
 } from "../../data/api-client";
@@ -30,6 +31,8 @@ export function StandaloneConversationInfoView({
   profile,
   profileActionPending = false,
   profileError,
+  profileExtra,
+  profileExtraLoading = false,
   profileLoading = false,
   userIdentity,
 }: {
@@ -44,6 +47,8 @@ export function StandaloneConversationInfoView({
   profile?: CustomerProfileCard;
   profileActionPending?: boolean;
   profileError?: unknown;
+  profileExtra?: FriendProfileExtraDto;
+  profileExtraLoading?: boolean;
   profileLoading?: boolean;
   userIdentity?: CurrentUserIdentity | null;
 }) {
@@ -71,6 +76,8 @@ export function StandaloneConversationInfoView({
         profile={profile}
         profileActionPending={profileActionPending}
         profileError={profileError}
+        profileExtra={profileExtra}
+        profileExtraLoading={profileExtraLoading}
         profileLoading={profileLoading}
         userIdentity={userIdentity}
       />

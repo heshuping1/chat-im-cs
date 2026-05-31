@@ -2,7 +2,6 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   ChevronDown,
-  ChevronUp,
   ClipboardList,
   Languages,
   MessageCircleMore,
@@ -16,7 +15,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { ConversationListItem, CustomerProfileCard } from "../data/api-client";
+import type {
+  ConversationListItem,
+  CustomerProfileCard,
+  FriendProfileExtraDto,
+} from "../data/api-client";
 import type { ContactItem } from "../data/types";
 import { CustomerProfileActionRows } from "./CustomerProfileActionRows";
 import { PanelState } from "./PanelState";
@@ -44,6 +47,8 @@ type CustomerTab =
   | "touch"
   | "compliance"
   | "agentDevice";
+type CustomerProfileVariant = "im" | "customerService";
+type CustomerProfileErrorMode = "silent" | "inline" | "blocking";
 
 const tabs: Array<{ key: CustomerTab; label: string; icon: LucideIcon }> = [
   { key: "overview", label: "总览", icon: Tags },
@@ -55,6 +60,8 @@ const tabs: Array<{ key: CustomerTab; label: string; icon: LucideIcon }> = [
   { key: "compliance", label: "KYC/合规", icon: ShieldCheck },
   { key: "agentDevice", label: "代理/设备", icon: Smartphone },
 ];
+const primaryTabs = tabs.slice(0, 5);
+const overflowTabs = tabs.slice(5);
 
 export function CustomerProfileWorkspace({
   avatarUrl,
@@ -62,42 +69,52 @@ export function CustomerProfileWorkspace({
   conversation,
   contact,
   error,
+  errorMode = "blocking",
   loading = false,
   onUpdateRemark,
   onUpdateTags,
   profileActionPending = false,
+  profileExtra,
   profile,
   title = "客户信息",
+  variant = "customerService",
 }: {
   avatarUrl?: string | null;
   className?: string;
   conversation?: ConversationListItem;
   contact?: ContactItem | null;
   error?: unknown;
+  errorMode?: CustomerProfileErrorMode;
   loading?: boolean;
   onUpdateRemark?: (remarkName: string) => Promise<void> | void;
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
   profileActionPending?: boolean;
+  profileExtra?: FriendProfileExtraDto;
   profile?: CustomerProfileCard;
   title?: string;
+  variant?: CustomerProfileVariant;
 }) {
   const [activeTab, setActiveTab] = useState<CustomerTab>("overview");
-  const [tabsExpanded, setTabsExpanded] = useState(false);
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const model = useMemo(
-    () => buildCustomerModel({ avatarUrl, conversation, contact, profile }),
-    [avatarUrl, conversation, contact, profile],
+    () => buildCustomerModel({ avatarUrl, conversation, contact, profile, profileExtra }),
+    [avatarUrl, conversation, contact, profile, profileExtra],
   );
-  const visibleTabs = tabsExpanded ? tabs : tabs.slice(0, 5);
-  const hasMoreTabs = tabs.length > visibleTabs.length;
+  const activeOverflowTab = overflowTabs.find((tab) => tab.key === activeTab);
+  const showBlockingError = Boolean(error) && errorMode === "blocking";
+  const showInlineError = Boolean(error) && errorMode === "inline";
 
   useEffect(() => {
     setActiveTab("overview");
-    setTabsExpanded(false);
+    setOverflowMenuOpen(false);
   }, [model.id]);
 
   return (
-    <aside className={`customer-profile-workspace customer-info-panel ${className}`.trim()}>
+    <aside
+      className={`customer-profile-workspace customer-info-panel ${className}`.trim()}
+      data-customer-profile-variant={variant}
+    >
       <header className="customer-info-head">
         <h2>{title}</h2>
       </header>
@@ -119,11 +136,14 @@ export function CustomerProfileWorkspace({
       </section>
 
       {loading && <PanelState text="正在加载客户资料..." />}
-      {Boolean(error) && (
+      {showBlockingError && (
         <PanelState
           tone="error"
           text="客户资料暂不可用，已展示会话和通讯录中的基础信息。"
         />
+      )}
+      {showInlineError && (
+        <PanelState text="部分客户画像暂未同步，已展示当前可用资料。" />
       )}
 
       <CustomerProfileActionRows
@@ -133,6 +153,7 @@ export function CustomerProfileWorkspace({
         onPendingAction={setActionNotice}
         onOpenTickets={() => {
           setActiveTab("tickets");
+          setOverflowMenuOpen(false);
           setActionNotice("");
         }}
         onUpdateRemark={onUpdateRemark}
@@ -145,9 +166,9 @@ export function CustomerProfileWorkspace({
         <CustomerProfileMetric label="总订单" value={model.totalOrders} />
       </section>
 
-      <section className={`customer-profile-tabbox ${tabsExpanded ? "expanded" : ""}`}>
+      <section className={`customer-profile-tabbox ${overflowMenuOpen ? "menu-open" : ""}`}>
         <nav className="customer-profile-tabs" aria-label="客户资料页签">
-          {visibleTabs.map((tab) => {
+          {primaryTabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
@@ -162,26 +183,48 @@ export function CustomerProfileWorkspace({
               </button>
             );
           })}
-          {(hasMoreTabs || tabsExpanded) && (
+          <span className="customer-profile-tabs-more">
             <button
-              className="customer-profile-tabs-toggle"
+              className={`customer-profile-tabs-toggle ${activeOverflowTab ? "active" : ""}`}
               type="button"
-              aria-expanded={tabsExpanded}
-              onClick={() => setTabsExpanded((expanded) => !expanded)}
+              aria-expanded={overflowMenuOpen}
+              aria-haspopup="menu"
+              onClick={() => setOverflowMenuOpen((open) => !open)}
             >
-              {tabsExpanded ? (
-                <>
-                  <ChevronUp size={14} />
-                  收起分类
-                </>
-              ) : (
-                <>
-                  <ChevronDown size={14} />
-                  更多分类
-                </>
+              <ChevronDown size={14} />
+              {activeOverflowTab ? activeOverflowTab.label : "更多分类"}
+              {activeOverflowTab && tabCount(activeOverflowTab.key, model) > 0 && (
+                <em>{tabCount(activeOverflowTab.key, model)}</em>
               )}
             </button>
-          )}
+            {overflowMenuOpen && (
+              <div
+                className="customer-profile-tabs-menu"
+                role="menu"
+                aria-label="更多客户资料分类"
+              >
+                {overflowTabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      className={activeTab === tab.key ? "active" : ""}
+                      type="button"
+                      role="menuitem"
+                      key={tab.key}
+                      onClick={() => {
+                        setActiveTab(tab.key);
+                        setOverflowMenuOpen(false);
+                      }}
+                    >
+                      <Icon size={15} />
+                      {tab.label}
+                      {tabCount(tab.key, model) > 0 && <em>{tabCount(tab.key, model)}</em>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </span>
         </nav>
       </section>
 
@@ -201,7 +244,6 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
               ["绿泡泡号", model.lppId],
               ["姓名", model.name],
               ["客户等级", model.level],
-              ["客户来源", model.source],
             ]}
           />
         </PanelBlock>
@@ -229,6 +271,7 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
           <InfoGrid
             rows={[
               ["渠道应用", model.appName],
+              ["来源渠道", model.source],
               ["业务线", model.businessLine],
               ["归属客服", model.assignedStaff],
               ["注册时间", model.registeredAt],

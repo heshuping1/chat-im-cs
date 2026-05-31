@@ -4,13 +4,12 @@ import type { MouseEvent } from "react";
 import type { ConversationListItem } from "../../data/api-client";
 import { PanelState } from "../../components/PanelState";
 import { formatBadgeCount } from "../../lib/format";
-import { MessagePlusMenu } from "./MessageStartDialogs";
+import { MessagePlusMenu, type MessagePlusAction } from "./MessageStartDialogs";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import { ConversationRow } from "./ConversationListParts";
 
 export type MessageConversationFilterKey = "all" | "unread" | "friends" | "groups";
-export type MessagePlusAction = "direct" | "group" | "requests" | "qr";
 
 export interface MessageConversationListPanelProps {
   activeConversationId?: string;
@@ -20,6 +19,7 @@ export interface MessageConversationListPanelProps {
   draftsByConversation: Record<string, string | undefined>;
   emptyText: string;
   errorText?: string | null;
+  friendRequestCount: number;
   groupCreateAccess: GroupCreateAccess;
   keyword: string;
   loading: boolean;
@@ -59,6 +59,7 @@ export function MessageConversationListPanel({
   draftsByConversation,
   emptyText,
   errorText,
+  friendRequestCount,
   groupCreateAccess,
   keyword,
   loading,
@@ -89,16 +90,26 @@ export function MessageConversationListPanel({
           <button
             className="e-icon-button message-plus-button"
             type="button"
-            aria-label="打开消息操作菜单"
-            title="发起聊天"
+            aria-label={
+              friendRequestCount > 0
+                ? `打开消息操作菜单，${friendRequestCount} 条好友申请`
+                : "打开消息操作菜单"
+            }
+            title="创建与添加"
             aria-haspopup="menu"
             aria-expanded={plusMenuOpen}
             onClick={onTogglePlusMenu}
           >
             <Plus size={18} />
+            {friendRequestCount > 0 && (
+              <span className="message-plus-request-badge" aria-hidden="true">
+                {formatBadgeCount(friendRequestCount)}
+              </span>
+            )}
           </button>
           {plusMenuOpen && (
             <MessagePlusMenu
+              friendRequestCount={friendRequestCount}
               groupCreateAccess={groupCreateAccess}
               onAction={onPlusAction}
             />

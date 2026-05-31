@@ -22,6 +22,7 @@ import { formatChatMessageTime, formatChatTime } from "../../lib/format";
 import type { UploadActionHandler } from "../../components/MessageBodyView";
 import type { HistoryFilterKey } from "../models/messageListModel";
 import { messageActionPreview } from "../models/messageListModel";
+import { chatMessageRenderKey } from "../models/messageRenderKey";
 import {
   createMessageRenderWindow,
   messageRenderWindowExpandStep,
@@ -318,7 +319,7 @@ export function MessageListPanel({
               } ${eventText ? "event" : ""} ${
                 selectedMessageIds.has(message.messageId) ? "selected" : ""
               }`}
-              key={message.messageId}
+              key={chatMessageRenderKey(message)}
               ref={(element) => onMessageElementRef(message.messageId, element)}
             >
               {multiSelectMode && !eventText && (

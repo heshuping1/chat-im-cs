@@ -7,6 +7,7 @@ import type {
 } from "react";
 
 import { PanelState } from "../../components/PanelState";
+import { isKnown } from "../../components/CustomerProfileModel";
 import type {
   ConversationListItem,
   GroupMemberDto,
@@ -74,6 +75,7 @@ export function MessageCenterConversationStage({
   createDirectPending,
   createGroupPending,
   createInviteQrPending,
+  sendContactCardPending,
   dockProfile,
   draftEditorStatesByConversation,
   forwardMessages,
@@ -137,6 +139,8 @@ export function MessageCenterConversationStage({
   profileActionPending,
   profileData,
   profileError,
+  profileExtra,
+  profileExtraLoading,
   profileLoading,
   profileStandaloneOpen,
   replyTarget,
@@ -192,6 +196,7 @@ export function MessageCenterConversationStage({
   createDirectPending: boolean;
   createGroupPending: boolean;
   createInviteQrPending: boolean;
+  sendContactCardPending: boolean;
   dockProfile: boolean;
   draftEditorStatesByConversation: Record<string, string>;
   forwardMessages: MessageItemDto[];
@@ -257,6 +262,8 @@ export function MessageCenterConversationStage({
   profileActionPending?: boolean;
   profileData?: StandaloneProfileProps["profile"];
   profileError?: unknown;
+  profileExtra?: StandaloneProfileProps["profileExtra"];
+  profileExtraLoading?: boolean;
   profileLoading?: boolean;
   profileStandaloneOpen: boolean;
   replyTarget: ReplyTarget;
@@ -287,11 +294,24 @@ export function MessageCenterConversationStage({
   unreadJump: UnreadJumpState | null;
   visibleMessages: MessageItemDto[];
 }) {
+  const directCustomerHeaderMeta =
+    activeConversation && activeConversationType === "direct" && !activeConversationIsGroup
+      ? {
+          applicationName: readCustomerHeaderApplicationName(profileData),
+          source: readCustomerHeaderSource(profileData, profileExtra),
+        }
+      : { applicationName: undefined, source: undefined };
+  const chatPanelClassName = [
+    "e-chat-panel",
+    activeConversationIsGroup ? "group-chat-mode" : "",
+    profileStandaloneOpen ? "profile-standalone-open" : "",
+  ].filter(Boolean).join(" ");
+
   return (
     <>
       <main
         ref={chatPanelRef}
-        className={`e-chat-panel ${activeConversationIsGroup ? "group-chat-mode" : ""}`}
+        className={chatPanelClassName}
         style={{ "--composer-height": `${composerHeight}px` } as CSSProperties}
       >
         {activeConversation ? (
@@ -299,6 +319,8 @@ export function MessageCenterConversationStage({
             <MessageChatHeader
               conversation={activeConversation}
               conversationIsGroup={activeConversationIsGroup}
+              customerApplicationName={directCustomerHeaderMeta.applicationName}
+              customerSource={directCustomerHeaderMeta.source}
               headerTitle={activeConversationHeaderTitle}
               historyOpen={historyOpen}
               layoutMode={messageLayoutMode}
@@ -334,6 +356,8 @@ export function MessageCenterConversationStage({
                 profile={profileData}
                 profileActionPending={profileActionPending}
                 profileError={profileError}
+                profileExtra={profileExtra}
+                profileExtraLoading={profileExtraLoading}
                 profileLoading={profileLoading}
                 userIdentity={unreadIdentity}
                 onUpdateRemark={onUpdateCustomerRemark}
@@ -509,6 +533,7 @@ export function MessageCenterConversationStage({
               createDirectPending={createDirectPending}
               createGroupPending={createGroupPending}
               createInviteQrPending={createInviteQrPending}
+              sendContactCardPending={sendContactCardPending}
               forwardMessages={forwardMessages}
               forwardPending={forwardPending}
               inviteQrError={inviteQrError}
@@ -555,4 +580,74 @@ export function MessageCenterConversationStage({
       )}
     </>
   );
+}
+
+const excludedHeaderSources = new Set(["客户通讯录", "好友通讯录", "好友私聊"]);
+
+function readCustomerHeaderApplicationName(profile?: StandaloneProfileProps["profile"]) {
+  return profileValue(profile, [
+    "appDisplayName",
+    "app_display_name",
+    "appName",
+    "app_name",
+    "tenantAppName",
+    "tenant_app_name",
+    "brandName",
+    "brand_name",
+    "packageName",
+    "package_name",
+  ]);
+}
+
+function readCustomerHeaderSource(
+  profile?: StandaloneProfileProps["profile"],
+  profileExtra?: StandaloneProfileProps["profileExtra"],
+) {
+  return firstKnownHeaderValue(
+    [
+      profileExtra?.source,
+      profileValue(profile, [
+        "sourceChannel",
+        "source_channel",
+        "entryChannel",
+        "entry_channel",
+        "channel",
+        "source",
+        "from",
+        "platform",
+        "provider",
+      ], excludedHeaderSources),
+    ],
+    excludedHeaderSources,
+  );
+}
+
+function profileValue(
+  profile: StandaloneProfileProps["profile"] | undefined,
+  keys: string[],
+  excludedValues = new Set<string>(),
+) {
+  if (!profile) return undefined;
+  const record = profile as Record<string, unknown>;
+  for (const key of keys) {
+    const text = headerTextValue(record[key]);
+    if (text && !excludedValues.has(text)) return text;
+  }
+  return undefined;
+}
+
+function firstKnownHeaderValue(values: unknown[], excludedValues = new Set<string>()) {
+  for (const value of values) {
+    const text = headerTextValue(value);
+    if (text && !excludedValues.has(text)) return text;
+  }
+  return undefined;
+}
+
+function headerTextValue(value: unknown) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : undefined;
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  return isKnown(text) ? text : undefined;
 }

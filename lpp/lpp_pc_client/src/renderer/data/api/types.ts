@@ -352,6 +352,38 @@ export interface FriendProfileUpdateDto {
   source?: string | null;
 }
 
+export interface FriendProfileExtraDto {
+  friendUserId: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  remarkName?: string | null;
+  groupName?: string | null;
+  note?: string | null;
+  tags?: string[] | null;
+  source?: string | null;
+  addedAt?: string | null;
+  createdAt?: string | null;
+  userType?: number | null;
+  lppId?: string | null;
+  mobile?: string | null;
+  email?: string | null;
+  signature?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  genderValue?: number | string | null;
+  birthday?: string | null;
+}
+
+export interface SearchUserDto {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  signature?: string | null;
+  lppId?: string | null;
+  userType?: number | null;
+  matchType?: string | null;
+}
+
 export interface ContactCardDto {
   userId: string;
   displayName: string;
@@ -448,6 +480,9 @@ export interface MessageItemDto {
   messageId: string;
   conversationId?: string;
   conversationSeq?: number;
+  clientMsgId?: string;
+  clientMessageId?: string;
+  localTaskId?: string;
   senderUserId?: string;
   senderId?: string;
   fromUserId?: string;
@@ -541,6 +576,13 @@ export interface CustomerServiceThread {
   conversationId: string;
   status: string;
   title: string;
+  appId?: string;
+  appCode?: string;
+  appName?: string;
+  appDisplayName?: string;
+  packageName?: string;
+  brandName?: string;
+  tenantAppName?: string;
   source?: string;
   from?: string;
   channel?: string;
@@ -575,6 +617,13 @@ export interface StaffServiceHistoryItem {
   staffUserId?: string | null;
   status: string | number;
   title?: string;
+  appId?: string;
+  appCode?: string;
+  appName?: string;
+  appDisplayName?: string;
+  packageName?: string;
+  brandName?: string;
+  tenantAppName?: string;
   source?: string;
   from?: string;
   channel?: string;
@@ -651,6 +700,13 @@ export interface CustomerProfileCard {
   totalDeposit?: string | number;
   netDeposit?: string | number;
   language?: string;
+  appId?: string;
+  appCode?: string;
+  appName?: string;
+  appDisplayName?: string;
+  packageName?: string;
+  brandName?: string;
+  tenantAppName?: string;
   source?: string;
   from?: string;
   channel?: string;

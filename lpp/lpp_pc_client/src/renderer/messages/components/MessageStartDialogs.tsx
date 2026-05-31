@@ -1,6 +1,18 @@
-import { Check, CheckSquare, QrCode, Search, Send, UserPlus, UserRound, UsersRound, X } from "lucide-react";
+import {
+  Check,
+  CheckSquare,
+  MessageSquare,
+  QrCode,
+  Search,
+  Send,
+  UserPlus,
+  UserRound,
+  UsersRound,
+  X,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { PcAvatar } from "../../components/PcAvatar";
+import { formatBadgeCount } from "../../lib/format";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
 
 export type ContactPickerItem = {
@@ -11,21 +23,26 @@ export type ContactPickerItem = {
   subtitle: string;
 };
 
+export type MessagePlusAction = "direct" | "group" | "addFriend" | "requests" | "qr";
+
 export function MessagePlusMenu({
+  friendRequestCount = 0,
   groupCreateAccess,
   onAction,
 }: {
+  friendRequestCount?: number;
   groupCreateAccess: GroupCreateAccess;
-  onAction: (action: "direct" | "group" | "requests" | "qr") => void;
+  onAction: (action: MessagePlusAction) => void;
 }) {
   const items: Array<{
-    action: "direct" | "group" | "requests" | "qr";
+    action: MessagePlusAction;
+    badge?: number;
     icon: ReactNode;
     label: string;
     disabled?: boolean;
     title?: string;
   }> = [
-    { action: "direct", icon: <UserPlus size={16} />, label: "发起聊天" },
+    { action: "direct", icon: <MessageSquare size={16} />, label: "发起聊天" },
     {
       action: "group",
       disabled: !groupCreateAccess.canCreateGroup,
@@ -33,7 +50,13 @@ export function MessagePlusMenu({
       label: "发起群聊",
       title: groupCreateAccess.reason ?? "当前角色暂无建群权限",
     },
-    { action: "requests", icon: <CheckSquare size={16} />, label: "好友申请" },
+    { action: "addFriend", icon: <UserPlus size={16} />, label: "添加好友" },
+    {
+      action: "requests",
+      badge: friendRequestCount,
+      icon: <CheckSquare size={16} />,
+      label: "好友申请",
+    },
     { action: "qr", icon: <QrCode size={16} />, label: "我的二维码" },
   ];
 
@@ -56,6 +79,7 @@ export function MessagePlusMenu({
         >
           {item.icon}
           <span>{item.label}</span>
+          {Boolean(item.badge) && <em>{formatBadgeCount(item.badge ?? 0)}</em>}
         </button>
       ))}
     </div>
@@ -147,7 +171,7 @@ export function ContactCardDialog({
 }: {
   contacts: ContactPickerItem[];
   onClose: () => void;
-  onSubmit: (contact: ContactPickerItem) => void;
+  onSubmit: (contact: ContactPickerItem) => Promise<void> | void;
   pending: boolean;
 }) {
   const [keyword, setKeyword] = useState("");
@@ -213,7 +237,7 @@ export function ContactCardDialog({
             className="primary"
             type="button"
             disabled={pending || !selected}
-            onClick={() => selected && onSubmit(selected)}
+            onClick={() => selected && void onSubmit(selected)}
           >
             <Send size={15} />
             {pending ? "发送中..." : "发送"}
