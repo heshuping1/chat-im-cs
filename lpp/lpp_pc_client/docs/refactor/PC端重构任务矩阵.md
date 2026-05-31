@@ -1119,6 +1119,8 @@ P0-DOC-001 验收记录：
 | P24-CONTACT-001 | Contact Card And Friend Relation Loop | 完成 PC 端名片消息闭环：输入框“更多”可发送 `contact_card` 名片，消息卡片点击打开关系感知资料弹窗；好友可发消息/删除/拉黑，非好友可发送好友申请，收到申请可通过/拒绝；群资料禁用成员列表和群成员头像资料查看，但保留聊天头像、群头像和 @ 数据能力。 | P1 | L3 | 已完成 |
 | P24-CONTACT-002 | Contacts Directory And Image Message Closure | 完成通讯录与图片消息闭环：通讯录合并组织/员工入口，保留 `staff` 兼容别名，组织成员按部门展示并在姓名同行标记角色；客户/好友支持发消息、删除好友、加入黑名单，组织成员只保留发消息；图片消息采用微信式自然气泡和内置 viewer，支持复制、另存、显示位置与本地缓存优先动作源。 | P1 | L3 | 已完成 |
 | P24-STABILITY-001 | React Hook Queue Crash Guard | 治理 `Should have a queue` 类 React hooks 崩溃：错误边界改为中文恢复界面与错误编号，runtime diagnostics 记录 component stack/resetKey/module/url，新增 renderer-wide `lint:hooks` 并纳入 `check:quick`，防止条件 hooks 顺序问题回流。 | P1 | L2 | 已完成 |
+| P24-BRAND-002 | App Icon Asset Closure | 闭环应用图标生效链路：以 `assets/app-icon-green-bubble.png` 为单一源，补齐 Windows `.ico`、macOS `.icns`、web favicon 与 macOS 开发态 Dock 图标；打包配置区分 Windows/NSIS 与 macOS 图标，避免只更新截图或 PNG 后运行态不生效。 | P2 | L2 | 已完成 |
+| P24-BRAND-003 | Premium IM Service App Icon | 将绿色气泡应用图标升级为小尺寸优先的系统级 IM+客服图标：去掉硬白底和碎细节，保留绿色会话与全球沟通识别，重绘 canonical PNG 并同步 ICO/ICNS/favicon，新增多尺寸视觉验收图，确保 Dock、浏览器页签和安装包图标不再像贴图。 | P2 | L2 | 已完成 |
 
 ---
 

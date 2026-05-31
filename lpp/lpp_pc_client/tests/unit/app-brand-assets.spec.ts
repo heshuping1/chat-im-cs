@@ -18,6 +18,14 @@ describe("app brand assets", () => {
   };
   const indexHtml = readFileSync(resolve(root, "index.html"), "utf8");
   const mainSource = readFileSync(resolve(root, "src/main/main.ts"), "utf8");
+  const readPngMetadata = (file: string) => {
+    const bytes = readFileSync(resolve(root, file));
+    return {
+      width: bytes.readUInt32BE(16),
+      height: bytes.readUInt32BE(20),
+      colorType: bytes.readUInt8(25),
+    };
+  };
 
   it("keeps one app icon source with Windows, macOS and web outputs", () => {
     expect(existsSync(resolve(root, "assets/app-icon-green-bubble.png"))).toBe(true);
@@ -43,5 +51,26 @@ describe("app brand assets", () => {
     expect(indexHtml).toContain("/app-icon-green-bubble.png");
     expect(mainSource).toContain("app.dock?.setIcon");
     expect(mainSource).toContain("app-icon-green-bubble.png");
+  });
+
+  it("keeps a small-size visual acceptance board for the app icon", () => {
+    expect(readPngMetadata("assets/app-icon-green-bubble.png")).toEqual({
+      width: 1254,
+      height: 1254,
+      colorType: 6,
+    });
+    expect(readPngMetadata("public/app-icon-green-bubble.png")).toEqual({
+      width: 1254,
+      height: 1254,
+      colorType: 6,
+    });
+    expect(existsSync(resolve(root, "docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png"))).toBe(
+      true,
+    );
+    expect(readPngMetadata("docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png")).toEqual({
+      width: 1180,
+      height: 420,
+      colorType: 6,
+    });
   });
 });
