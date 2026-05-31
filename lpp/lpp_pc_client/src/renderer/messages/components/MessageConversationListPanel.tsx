@@ -5,6 +5,7 @@ import type { ConversationListItem } from "../../data/api-client";
 import { PanelState } from "../../components/PanelState";
 import { formatBadgeCount } from "../../lib/format";
 import { MessagePlusMenu } from "./MessageStartDialogs";
+import type { GroupCreateAccess } from "../models/groupCreateModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import { ConversationRow } from "./ConversationListParts";
 
@@ -19,6 +20,7 @@ export interface MessageConversationListPanelProps {
   draftsByConversation: Record<string, string | undefined>;
   emptyText: string;
   errorText?: string | null;
+  groupCreateAccess: GroupCreateAccess;
   keyword: string;
   loading: boolean;
   plusMenuOpen: boolean;
@@ -57,6 +59,7 @@ export function MessageConversationListPanel({
   draftsByConversation,
   emptyText,
   errorText,
+  groupCreateAccess,
   keyword,
   loading,
   plusMenuOpen,
@@ -94,7 +97,12 @@ export function MessageConversationListPanel({
           >
             <Plus size={18} />
           </button>
-          {plusMenuOpen && <MessagePlusMenu onAction={onPlusAction} />}
+          {plusMenuOpen && (
+            <MessagePlusMenu
+              groupCreateAccess={groupCreateAccess}
+              onAction={onPlusAction}
+            />
+          )}
         </div>
       </header>
 

@@ -32,3 +32,19 @@ export function matchesScreenshotShortcut(
 export function isScreenshotCancelError(message: string) {
   return /screenshot\s+cancell?ed|capture\s+cancell?ed|已取消截图|取消截图/i.test(message);
 }
+
+export function formatScreenshotCaptureError(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  const message = raw
+    .replace(/^Error invoking remote method 'desktop:capture-screenshot':\s*/i, "")
+    .trim();
+  if (isScreenshotCancelError(message)) return "已取消截图";
+  if (
+    /failed to get sources|no sources|empty thumbnail|screen recording|screen sharing|permission|权限|屏幕录制|屏幕共享/i.test(
+      message,
+    )
+  ) {
+    return "截图失败：请在系统设置中允许 LPP 客服客户端录制屏幕后重试。";
+  }
+  return message || "截图失败：请在系统设置中允许 LPP 客服客户端录制屏幕后重试。";
+}

@@ -430,6 +430,85 @@
   font-size: 14px !important;
 }
 
+.contacts-page.contacts-b-layout .contacts-entry-list {
+  display: grid !important;
+  flex: 0 0 auto !important;
+  gap: 5px !important;
+  padding: 2px 0 !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry {
+  display: grid !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  grid-template-columns: 34px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 0 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 11px !important;
+  background: transparent !important;
+  color: #52657a !important;
+  text-align: left !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry:hover {
+  background: #ebeef2 !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry.active {
+  border-color: rgba(8, 185, 129, 0.2) !important;
+  background: #dff0e8 !important;
+  color: #07895f !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry-icon {
+  display: inline-flex !important;
+  width: 34px !important;
+  height: 34px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  background: #edf2f7 !important;
+  color: #52657a !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry.active .contacts-entry-icon {
+  background: #fff !important;
+  color: #07895f !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry strong {
+  overflow: hidden !important;
+  color: inherit !important;
+  font-size: 14px !important;
+  font-weight: 780 !important;
+  line-height: 20px !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry em {
+  display: inline-flex !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  background: #edf3fa !important;
+  color: #7d8da1 !important;
+  font-size: 12px !important;
+  font-style: normal !important;
+  font-weight: 760 !important;
+  line-height: 24px !important;
+}
+
+.contacts-page.contacts-b-layout .contacts-entry.active em {
+  background: #eef7f2 !important;
+  color: #07895f !important;
+}
+
 .contacts-page.contacts-b-layout .contacts-tabs {
   display: flex !important;
   flex: 0 0 34px !important;

@@ -14,6 +14,7 @@ import {
   type ContactPickerItem,
 } from "./MessageStartDialogs";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
+import type { CreateGroupChatPayload } from "../models/groupCreateModel";
 
 type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
 
@@ -63,7 +64,7 @@ export function MessageDialogsLayer({
   onCloseForward: () => void;
   onCloseResend: () => void;
   onCreateDirectChat: (userId: string) => void;
-  onCreateGroupChat: (payload: { name: string; memberUserIds: string[] }) => void;
+  onCreateGroupChat: (payload: CreateGroupChatPayload) => void;
   onCreateInviteQr: () => void;
   onSendContactCard: (contact: ContactPickerItem) => void;
   onForward: (targetConversationId: string) => void;

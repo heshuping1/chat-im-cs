@@ -26,6 +26,8 @@ export function MessageComposerDock({
   replyTarget,
   screenshotShortcut,
   selectedMessageIds,
+  showAiTools,
+  showKnowledgeTools,
   getChatPanelHeight,
   onAiDraft,
   onDraftChange,
@@ -53,6 +55,8 @@ export function MessageComposerDock({
   replyTarget: ReplyTarget;
   screenshotShortcut: PcSettings["screenshotShortcut"];
   selectedMessageIds: Set<string>;
+  showAiTools: boolean;
+  showKnowledgeTools: boolean;
   getChatPanelHeight: () => number | null;
   onAiDraft: () => void;
   onDraftChange: (conversationId: string, value: string) => void;
@@ -117,6 +121,8 @@ export function MessageComposerDock({
           })
         }
         onSendText={messageCenterCommands.sendText}
+        showAiTools={showAiTools}
+        showKnowledgeTools={showKnowledgeTools}
         onTranslateDraft={onTranslateDraft}
         onSendMedia={messageCenterCommands.sendMedia}
       />

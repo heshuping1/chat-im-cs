@@ -22,6 +22,10 @@ import type { AuthSession } from "../data/auth/auth-session";
 import { useAuthSession, useClearAuthSession } from "../data/auth/auth-store";
 import type { PcSettings } from "../data/settings/pc-settings";
 import { usePcSettings, useUpdatePcSetting } from "../data/settings/settings-store";
+import {
+  derivePcWorkspaceAccess,
+  type PcSettingsProfile,
+} from "../data/workspace-access";
 import { formatError, formatShortDate } from "../lib/format";
 import { exportCurrentDiagnosticsPackage } from "../settings/runtime/diagnosticsExport";
 import {
@@ -124,10 +128,17 @@ const settingSections = [
   icon: typeof Bell;
 }>;
 
+function visibleSettingSections(settingsProfile: PcSettingsProfile) {
+  if (settingsProfile === "customer") return settingSections;
+  return settingSections;
+}
+
 export function MePage() {
   const queryClient = useQueryClient();
   const pcSettings = usePcSettings();
   const authSession = useAuthSession();
+  const workspaceAccess = derivePcWorkspaceAccess(authSession);
+  const settingsProfile = workspaceAccess.settingsProfile;
   const clearAuthSession = useClearAuthSession();
   const updatePcSetting = useUpdatePcSetting();
   const [activeSectionId, setActiveSectionId] =
@@ -135,9 +146,10 @@ export function MePage() {
   const [notice, setNotice] = useState("设置会自动保存在本机");
   const activeSection = useMemo(
     () =>
-      settingSections.find((section) => section.id === activeSectionId) ??
-      settingSections[0],
-    [activeSectionId],
+      visibleSettingSections(settingsProfile).find(
+        (section) => section.id === activeSectionId,
+      ) ?? visibleSettingSections(settingsProfile)[0],
+    [activeSectionId, settingsProfile],
   );
 
   const setSetting = <K extends SettingKey>(key: K, value: PcSettings[K]) => {
@@ -163,10 +175,10 @@ export function MePage() {
       <aside className="settings-nav" aria-label="设置分组">
         <div>
           <span className="settings-nav-kicker">SETTINGS</span>
-          <strong>系统设置</strong>
+          <strong>{settingsProfile === "customer" ? "客户设置" : "系统设置"}</strong>
           <p>个人资料、提醒、显示、安全和诊断</p>
         </div>
-        {settingSections.map((section) => {
+        {visibleSettingSections(settingsProfile).map((section) => {
           const Icon = section.icon;
           return (
             <button
@@ -189,9 +201,11 @@ export function MePage() {
         <section className="settings-hero-panel settings-hero-compact">
           <div>
             <span className="eyebrow">PC 客户端</span>
-            <h1>系统设置</h1>
+            <h1>{settingsProfile === "customer" ? "客户设置" : "系统设置"}</h1>
             <p>
-              个人资料、聊天、朋友权限、黑名单和账号安全按 App 功能归属完整呈现。
+              {settingsProfile === "customer"
+                ? "个人资料、聊天、朋友权限、黑名单和账号安全按客户功能归属完整呈现。"
+                : "个人资料、聊天、朋友权限、黑名单和账号安全按 App 功能归属完整呈现。"}
             </p>
           </div>
           <div className="settings-health">
@@ -213,6 +227,8 @@ export function MePage() {
           <div className="settings-detail-body">
             {renderSection(activeSectionId, pcSettings, setSetting, {
               exportDiagnostics,
+              canReadServiceWorkbench: workspaceAccess.canReadServiceWorkbench,
+              settingsProfile,
               setNotice,
               authSession,
               profile: profileQuery.data,
@@ -234,6 +250,8 @@ function renderSection(
   setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void,
   actions: {
     exportDiagnostics: () => Promise<void>;
+    canReadServiceWorkbench: boolean;
+    settingsProfile: PcSettingsProfile;
     setNotice: (notice: string) => void;
     authSession: AuthSession | null;
     profile?: UserProfileDto;
@@ -256,23 +274,27 @@ function renderSection(
             onChange={(value) => setSetting("imNotifications", value)}
           />
           <SwitchRow
-            label="在线客服排队提醒"
-            desc="有访客排队、待接入时提醒客服。"
-            checked={pcSettings.serviceQueueNotifications}
-            onChange={(value) => setSetting("serviceQueueNotifications", value)}
-          />
-          <SwitchRow
-            label="SLA 超时提醒"
-            desc="会话接近超时或已经超时时提醒。"
-            checked={pcSettings.slaTimeoutNotifications}
-            onChange={(value) => setSetting("slaTimeoutNotifications", value)}
-          />
-          <SwitchRow
             label="桌面系统通知"
-            desc="允许 Windows 通知中心展示消息和客服提醒。"
+            desc="允许系统通知中心展示消息提醒。"
             checked={pcSettings.desktopNotifications}
             onChange={(value) => setSetting("desktopNotifications", value)}
           />
+          {actions.canReadServiceWorkbench && (
+            <>
+              <SwitchRow
+                label="客服队列提醒"
+                desc="有访客排队、待接入时提醒客服。"
+                checked={pcSettings.serviceQueueNotifications}
+                onChange={(value) => setSetting("serviceQueueNotifications", value)}
+              />
+              <SwitchRow
+                label="服务 SLA 提醒"
+                desc="会话接近超时或已经超时时提醒。"
+                checked={pcSettings.slaTimeoutNotifications}
+                onChange={(value) => setSetting("slaTimeoutNotifications", value)}
+              />
+            </>
+          )}
         </>
       );
     case "desktop":

@@ -2,10 +2,20 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import type { DepartmentDto, TenantMemberDto } from "../../src/renderer/data/api/types";
+import type {
+  ConversationListItem,
+  DepartmentDto,
+  FriendDto,
+  TenantMemberDto,
+} from "../../src/renderer/data/api/types";
+import { deriveContactDirectoryAccess } from "../../src/renderer/data/contact-directory-permissions";
 import {
+  contactDirectoryEmptyText,
+  contactDirectorySearchPlaceholder,
+  createContactDirectoryEntries,
   mapContacts,
   normalizeContactDirectoryFilter,
+  resolveContactDirectoryFilter,
 } from "../../src/renderer/data/contact-directory";
 
 describe("contact directory model", () => {
@@ -13,6 +23,30 @@ describe("contact directory model", () => {
     expect(normalizeContactDirectoryFilter("staff")).toBe("organization");
     expect(normalizeContactDirectoryFilter("organization")).toBe("organization");
     expect(normalizeContactDirectoryFilter("customer")).toBe("customer");
+  });
+
+  it("resolves customer directory legacy filters to a personal contacts view", () => {
+    expect(
+      resolveContactDirectoryFilter({
+        filter: "customer",
+        viewMode: "customer",
+        canReadOrganization: false,
+      }),
+    ).toBe("all");
+    expect(
+      resolveContactDirectoryFilter({
+        filter: "organization",
+        viewMode: "customer",
+        canReadOrganization: false,
+      }),
+    ).toBe("all");
+    expect(
+      resolveContactDirectoryFilter({
+        filter: "friend",
+        viewMode: "customer",
+        canReadOrganization: false,
+      }),
+    ).toBe("friend");
   });
 
   it("maps tenant members into organization contacts with role labels", () => {
@@ -50,6 +84,104 @@ describe("contact directory model", () => {
       }),
     ]);
   });
+
+  it("keeps customer friends as customers for staff but displays them as friends for customer users", () => {
+    const friends: FriendDto[] = [
+      { friendUserId: "customer-1", displayName: "客户好友", userType: 1 },
+    ];
+    const shared = {
+      conversations: [],
+      currentUserId: "me",
+      departmentMembersById: {},
+      departments: [],
+      friends,
+      members: [],
+    };
+
+    expect(mapContacts({ ...shared, viewMode: "staff" })[0]).toMatchObject({
+      kind: "customer",
+      source: "客户通讯录",
+      subtitle: "客户",
+    });
+    expect(mapContacts({ ...shared, viewMode: "customer" })[0]).toMatchObject({
+      kind: "friend",
+      source: "好友通讯录",
+      subtitle: "好友",
+    });
+  });
+
+  it("creates customer and staff entry models without leaking staff-only categories", () => {
+    const contacts = mapContacts({
+      conversations: [
+        {
+          conversationId: "group-1",
+          conversationType: "group",
+          title: "交流群",
+          memberCount: 3,
+        } satisfies ConversationListItem,
+      ],
+      currentUserId: "me",
+      departmentMembersById: {},
+      departments: [],
+      friends: [
+        { friendUserId: "friend-1", displayName: "好友", userType: 2 },
+        { friendUserId: "customer-1", displayName: "客户", userType: 1 },
+      ],
+      members: [],
+      viewMode: "customer",
+    });
+
+    const customerEntries = createContactDirectoryEntries({
+      contacts,
+      requestCount: 2,
+      viewMode: "customer",
+      canReadOrganization: false,
+    });
+    expect([...customerEntries.fixed, ...customerEntries.shortcuts].map((item) => item.label))
+      .toEqual(["新的朋友", "全部联系人", "好友", "群聊"]);
+    expect(customerEntries.shortcuts.map((item) => item.key)).not.toContain("customer");
+    expect(customerEntries.shortcuts.map((item) => item.key)).not.toContain("organization");
+
+    const staffEntries = createContactDirectoryEntries({
+      contacts: [
+        ...contacts,
+        {
+          id: "staff-1",
+          kind: "staff",
+          name: "客服",
+          subtitle: "员工",
+          remark: "企业成员",
+          tags: ["员工"],
+        },
+      ],
+      requestCount: 1,
+      viewMode: "staff",
+      canReadOrganization: true,
+    });
+    expect([...staffEntries.fixed, ...staffEntries.shortcuts].map((item) => item.label))
+      .toEqual(["新的朋友", "全部联系人", "客户", "好友", "组织", "群聊"]);
+  });
+
+  it("uses customer-specific search and empty copy", () => {
+    expect(
+      contactDirectorySearchPlaceholder({
+        viewMode: "customer",
+        canReadOrganization: false,
+      }),
+    ).toBe("搜索好友、群聊");
+    expect(
+      contactDirectorySearchPlaceholder({
+        viewMode: "staff",
+        canReadOrganization: true,
+      }),
+    ).toBe("搜索客户、好友、组织、群聊");
+    expect(
+      contactDirectoryEmptyText({
+        filter: "all",
+        viewMode: "customer",
+      }),
+    ).toContain("新的朋友");
+  });
 });
 
 describe("contacts page closure", () => {
@@ -57,9 +189,18 @@ describe("contacts page closure", () => {
     resolve(process.cwd(), "src/renderer/components/ContactsPage.tsx"),
     "utf8",
   );
+  const contactsController = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/renderer/contacts/hooks/useContactsDirectoryController.ts",
+    ),
+    "utf8",
+  );
 
-  it("shows one organization tab instead of separate organization and staff tabs", () => {
-    expect(contactsPage).toContain('{ key: "organization", label: "组织" }');
+  it("uses list entries instead of horizontal contact tabs", () => {
+    expect(contactsPage).toContain("contacts-entry-list");
+    expect(contactsPage).toContain("ContactEntryButton");
+    expect(contactsPage).not.toContain("contacts-tabs");
     expect(contactsPage).not.toContain('{ key: "staff", label: "员工" }');
   });
 
@@ -69,5 +210,80 @@ describe("contacts page closure", () => {
     expect(contactsPage).toContain("onDeleteFriend");
     expect(contactsPage).toContain("onBlockContact");
     expect(contactsPage).toContain("contacts-role-chip");
+  });
+
+  it("hides organization affordances for customer tenant members", () => {
+    expect(contactsPage).toContain("directoryViewMode");
+    expect(contactsPage).toContain("createContactDirectoryEntries");
+    expect(contactsPage).toContain("contactAccess.canReadOrganization");
+    expect(contactsPage).toContain("contactDirectorySearchPlaceholder");
+    expect(contactsPage).toContain('directoryViewMode === "staff"');
+  });
+
+  it("guards organization directory queries behind the access model", () => {
+    expect(contactsController).toContain("contactAccess.canReadOrganization");
+    expect(contactsController).toContain("organizationQueriesEnabled");
+    expect(contactsController).toContain("requestListError");
+    expect(contactsController).not.toContain(
+      "membersQuery.error ||\n    conversationsQuery.error ||\n    departmentsQuery.error ||\n    requestsQuery.error",
+    );
+  });
+});
+
+describe("contact directory access", () => {
+  it("blocks organization reads for customer tenant members", () => {
+    expect(
+      deriveContactDirectoryAccess({
+        apiBaseUrl: "https://example.test",
+        displayName: "客户",
+        membershipRole: 0,
+        tenantToken: "token",
+        userType: 1,
+      }),
+    ).toMatchObject({
+      canReadOrganization: false,
+      canReadSocialContacts: true,
+      isCustomerTenantMember: true,
+    });
+  });
+
+  it("allows staff and admin roles to read the organization directory", () => {
+    expect(
+      deriveContactDirectoryAccess({
+        apiBaseUrl: "https://example.test",
+        displayName: "客服",
+        membershipRole: 2,
+        tenantToken: "token",
+        userType: 2,
+      }).canReadOrganization,
+    ).toBe(true);
+    expect(
+      deriveContactDirectoryAccess({
+        apiBaseUrl: "https://example.test",
+        displayName: "管理员",
+        membershipRole: 3,
+        tenantToken: "token",
+      }).canReadOrganization,
+    ).toBe(true);
+  });
+
+  it("falls back to tenant membership role and keeps unknown legacy sessions open", () => {
+    expect(
+      deriveContactDirectoryAccess({
+        apiBaseUrl: "https://example.test",
+        displayName: "旧客户会话",
+        tenantId: "tenant-1",
+        tenantToken: "token",
+        tenants: [{ tenantId: "tenant-1", tenantName: "企业", membershipRole: 0 }],
+      }).canReadOrganization,
+    ).toBe(false);
+
+    expect(
+      deriveContactDirectoryAccess({
+        apiBaseUrl: "https://example.test",
+        displayName: "旧员工会话",
+        tenantToken: "token",
+      }).canReadOrganization,
+    ).toBe(true);
   });
 });

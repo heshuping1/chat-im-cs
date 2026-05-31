@@ -9,6 +9,15 @@ import type {
 import type { ContactFilter, ContactItem, ContactKind } from "./types";
 import { formatShortDate } from "../lib/format";
 
+export type ContactDirectoryViewMode = "staff" | "customer";
+
+export interface ContactDirectoryEntry {
+  key: ContactFilter;
+  label: string;
+  count?: number;
+  kind: "fixed" | "shortcut";
+}
+
 export const contactKindLabels: Record<ContactKind, string> = {
   friend: "好友",
   group: "群聊",
@@ -24,6 +33,95 @@ export function requestStatusLabel(status?: string) {
 
 export function normalizeContactDirectoryFilter(filter: ContactFilter): ContactFilter {
   return filter === "staff" ? "organization" : filter;
+}
+
+export function resolveContactDirectoryFilter({
+  filter,
+  viewMode,
+  canReadOrganization,
+}: {
+  filter: ContactFilter;
+  viewMode: ContactDirectoryViewMode;
+  canReadOrganization: boolean;
+}): ContactFilter {
+  const normalized = normalizeContactDirectoryFilter(filter);
+  if (viewMode === "customer") {
+    if (normalized === "customer" || normalized === "organization") return "all";
+    return normalized;
+  }
+  if (normalized === "organization" && !canReadOrganization) return "customer";
+  return normalized;
+}
+
+export function createContactDirectoryEntries({
+  contacts,
+  requestCount,
+  viewMode,
+  canReadOrganization,
+}: {
+  contacts: ContactItem[];
+  requestCount: number;
+  viewMode: ContactDirectoryViewMode;
+  canReadOrganization: boolean;
+}) {
+  const counts = countContactsByFilter(contacts);
+  const fixed: ContactDirectoryEntry[] = [
+    { key: "requests", label: "新的朋友", count: requestCount, kind: "fixed" },
+    { key: "all", label: "全部联系人", count: counts.all, kind: "fixed" },
+  ];
+  const shortcuts: ContactDirectoryEntry[] =
+    viewMode === "customer"
+      ? [
+          { key: "friend", label: "好友", count: counts.friend, kind: "shortcut" },
+          { key: "group", label: "群聊", count: counts.group, kind: "shortcut" },
+        ]
+      : [
+          { key: "customer", label: "客户", count: counts.customer, kind: "shortcut" },
+          { key: "friend", label: "好友", count: counts.friend, kind: "shortcut" },
+          ...(canReadOrganization
+            ? [
+                {
+                  key: "organization" as ContactFilter,
+                  label: "组织",
+                  count: counts.organization,
+                  kind: "shortcut" as const,
+                },
+              ]
+            : []),
+          { key: "group", label: "群聊", count: counts.group, kind: "shortcut" },
+        ];
+  return { fixed, shortcuts };
+}
+
+export function contactDirectorySearchPlaceholder({
+  viewMode,
+  canReadOrganization,
+}: {
+  viewMode: ContactDirectoryViewMode;
+  canReadOrganization: boolean;
+}) {
+  if (viewMode === "customer") return "搜索好友、群聊";
+  return canReadOrganization ? "搜索客户、好友、组织、群聊" : "搜索客户、好友、群聊";
+}
+
+export function contactDirectoryEmptyText({
+  filter,
+  viewMode,
+}: {
+  filter: ContactFilter;
+  viewMode: ContactDirectoryViewMode;
+}) {
+  if (filter === "requests") return "暂无好友申请";
+  if (viewMode === "customer") {
+    if (filter === "friend") return "暂无好友，可以通过新的朋友添加联系人。";
+    if (filter === "group") return "暂无群聊。";
+    return "暂无联系人，可以先处理新的朋友或添加好友。";
+  }
+  if (filter === "customer") return "暂无客户联系人";
+  if (filter === "organization") return "暂无组织成员";
+  if (filter === "group") return "暂无群聊";
+  if (filter === "friend") return "暂无好友";
+  return "暂无通讯录数据";
 }
 
 export function filterContacts(contacts: ContactItem[], keyword: string) {
@@ -65,6 +163,7 @@ export function mapContacts({
   departments,
   departmentMembersById,
   currentUserId,
+  viewMode = "staff",
 }: {
   friends: FriendDto[];
   members: TenantMemberDto[];
@@ -72,6 +171,7 @@ export function mapContacts({
   departments: DepartmentDto[];
   departmentMembersById: Record<string, DepartmentMemberDto[]>;
   currentUserId?: string;
+  viewMode?: ContactDirectoryViewMode;
 }): ContactItem[] {
   const directByPeer = new Map(
     conversations
@@ -111,7 +211,8 @@ export function mapContacts({
     }));
 
   const friendContacts: ContactItem[] = friends.map((friend) => {
-    const kind: ContactKind = friend.userType === 1 ? "customer" : "friend";
+    const kind: ContactKind =
+      viewMode === "customer" ? "friend" : friend.userType === 1 ? "customer" : "friend";
     const lppId = friend.lppId || friend.lppNo || friend.lppNumber;
     return {
       id: `friend-${friend.friendUserId}`,
@@ -154,6 +255,21 @@ export function mapContacts({
     });
 
   return [...friendContacts, ...memberContacts, ...groupContacts];
+}
+
+function countContactsByFilter(contacts: ContactItem[]) {
+  return contacts.reduce(
+    (result, contact) => {
+      result.all += 1;
+      if (contact.kind === "staff") {
+        result.organization += 1;
+      } else {
+        result[contact.kind] += 1;
+      }
+      return result;
+    },
+    { all: 0, customer: 0, friend: 0, group: 0, organization: 0 },
+  );
 }
 
 export function sourceLabel(contact: ContactItem) {

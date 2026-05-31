@@ -6,6 +6,7 @@ import {
   ipcMain,
   screen,
   shell,
+  systemPreferences,
   Tray,
 } from 'electron';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +38,11 @@ import {
   recordRendererProcessGone,
 } from './runtime-diagnostics.js';
 import { selectScreenshotRegion } from './screenshot-selection-window.js';
+import {
+  createScreenshotCapturePayload,
+  normalizeScreenshotCaptureError,
+  selectScreenshotSource,
+} from './screenshot-capture.js';
 import {
   buildAppProfileLaunchArgs,
   createNextProfileId,
@@ -182,20 +188,23 @@ handleDesktopIpc('captureScreenshot', async () => {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const width = Math.round(display.size.width * display.scaleFactor);
   const height = Math.round(display.size.height * display.scaleFactor);
-  const sources = await desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: { width, height },
-  });
-  const primary =
-    sources.find((source) => source.display_id === String(display.id)) ?? sources[0];
-  if (!primary || primary.thumbnail.isEmpty()) {
-    throw new Error('\u672a\u80fd\u83b7\u53d6\u5c4f\u5e55\u622a\u56fe\uff0c\u8bf7\u786e\u8ba4\u7cfb\u7edf\u5df2\u5141\u8bb8\u5c4f\u5e55\u5f55\u5236\u6743\u9650\u3002');
+  const permissionStatus = process.platform === 'darwin'
+    ? systemPreferences.getMediaAccessStatus('screen')
+    : undefined;
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width, height },
+    });
+    return selectScreenshotRegion(
+      createScreenshotCapturePayload(
+        selectScreenshotSource(sources, display),
+        display,
+      ),
+    );
+  } catch (error) {
+    throw normalizeScreenshotCaptureError(error, permissionStatus);
   }
-  return selectScreenshotRegion({
-    dataUrl: primary.thumbnail.toDataURL(),
-    displayBounds: display.bounds,
-    displaySize: display.size,
-  });
 });
 
 handleDesktopIpc('getAppVersion', async () => app.getVersion());

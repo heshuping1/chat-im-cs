@@ -17,6 +17,9 @@ export interface AuthSession {
   lppId?: string;
   displayName: string;
   avatarUrl?: string | null;
+  userType?: number;
+  membershipRole?: number;
+  spaceType?: number;
   roleLabel?: string;
   tenants?: PlatformTenant[];
 }

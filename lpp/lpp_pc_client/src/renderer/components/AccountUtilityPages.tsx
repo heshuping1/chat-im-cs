@@ -104,6 +104,9 @@ export function EnterpriseSwitchPage() {
         lppId: profile?.lppId ?? tenant.lppId,
         displayName: profile?.displayName ?? tenant.displayName,
         avatarUrl: profile?.avatarUrl ?? tenant.avatarUrl,
+        userType: profile?.userType ?? authSession.userType,
+        membershipRole: space ? space.membershipRole : undefined,
+        spaceType: space ? 2 : 1,
         roleLabel: space ? roleLabel(space.membershipRole) : "个人空间",
       });
       await queryClient.invalidateQueries();

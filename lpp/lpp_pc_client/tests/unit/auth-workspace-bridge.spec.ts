@@ -37,6 +37,7 @@ describe("auth workspace bridge", () => {
     expect(createAuthSessionClearedState()).toEqual({
       authSession: null,
       activeThreadId: "",
+      openServiceThreadIds: [],
       activeImConversationId: "",
       locallyReadImConversationReads: {},
       imPeerReadReceipts: {},

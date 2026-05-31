@@ -22,6 +22,11 @@ import type { PcSettings } from './data/settings/pc-settings';
 import { usePcSettings } from './data/settings/settings-store';
 import type { ModuleKey } from './data/types';
 import {
+  derivePcWorkspaceAccess,
+  normalizeActiveModuleForAccess,
+  type PcWorkspaceAccess,
+} from './data/workspace-access';
+import {
   useActiveModule,
   useListPaneWidth,
   useMessageLayoutMode,
@@ -148,7 +153,12 @@ export default function App() {
   const pcSettings = usePcSettings();
   const messageProfileVisible = useMessageProfileVisible();
   const messageLayoutMode = useMessageLayoutMode();
-  const safeActiveModule = normalizeActiveModule(activeModule);
+  const workspaceAccess = derivePcWorkspaceAccess(authSession);
+  const safeKnownModule = normalizeActiveModule(activeModule);
+  const safeActiveModule = normalizeActiveModuleForAccess(
+    safeKnownModule,
+    workspaceAccess,
+  );
 
   useTransientScrollbars();
   useAppearanceSettings(pcSettings);
@@ -196,7 +206,10 @@ export default function App() {
             <Sidebar />
             <ReminderCenter />
             <Suspense fallback={<PageFallback />}>
-              <ActiveModulePage activeModule={safeActiveModule} />
+              <ActiveModulePage
+                activeModule={safeActiveModule}
+                workspaceAccess={workspaceAccess}
+              />
             </Suspense>
           </div>
         )}
@@ -205,7 +218,14 @@ export default function App() {
   );
 }
 
-function ActiveModulePage({ activeModule }: { activeModule: ModuleKey }) {
+function ActiveModulePage({
+  activeModule,
+  workspaceAccess,
+}: {
+  activeModule: ModuleKey;
+  workspaceAccess: PcWorkspaceAccess;
+}) {
+  if (!workspaceAccess.visibleModules.includes(activeModule)) return <MessageCenter />;
   switch (activeModule) {
     case 'onlineService':
       return <OnlineServicePage />;
@@ -224,7 +244,7 @@ function ActiveModulePage({ activeModule }: { activeModule: ModuleKey }) {
     case 'ticketCenter':
       return <TicketCenterPage />;
     case 'dataCenter':
-      return <DataCenterPage />;
+      return <DataCenterPage dataCenterView={workspaceAccess.dataCenterView} />;
     case 'workbench':
       return <WorkbenchPage />;
     case 'settings':

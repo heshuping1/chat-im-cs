@@ -1,0 +1,5 @@
+step	status	exitCode	durationSeconds	log
+account	FAIL	1	0	logs/account.log
+typecheck	SKIP	0	0	
+build	SKIP	0	0	
+browser	SKIP	0	0	

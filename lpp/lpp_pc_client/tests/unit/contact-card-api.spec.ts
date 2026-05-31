@@ -111,6 +111,26 @@ describe("contact card and friend relation api", () => {
       },
     });
   });
+
+  it("creates group chats using the documented title payload only", async () => {
+    const client = apiClient();
+
+    await client.createGroupChat({
+      name: "旧入口群名",
+      title: "  项目联调群  ",
+      memberUserIds: ["u1", "u2", "u1", ""],
+    });
+
+    expect(requests[0]).toEqual({
+      method: "POST",
+      url: "https://api.example/api/client/v1/groups/",
+      body: {
+        title: "项目联调群",
+        memberUserIds: ["u1", "u2"],
+      },
+    });
+    expect(requests[0]?.body).not.toHaveProperty("name");
+  });
 });
 
 function apiClient() {

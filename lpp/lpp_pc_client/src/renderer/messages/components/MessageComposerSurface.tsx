@@ -24,6 +24,8 @@ export function MessageComposerSurface({
   onSendMedia,
   onSendText,
   onTranslateDraft,
+  showAiTools,
+  showKnowledgeTools,
 }: {
   attachmentScopeKey: string;
   draftEditorState?: string;
@@ -40,6 +42,8 @@ export function MessageComposerSurface({
   onSendMedia: (file: File, kind: ComposerMediaKind) => void | Promise<void>;
   onSendText: (content: string) => void | Promise<void>;
   onTranslateDraft: (content: string) => Promise<string | undefined>;
+  showAiTools: boolean;
+  showKnowledgeTools: boolean;
 }) {
   return (
     <MessageComposer
@@ -60,36 +64,42 @@ export function MessageComposerSurface({
       onResizeStart={onResizeStart}
       leadingTools={
         <>
-          <button
-            className="composer-advanced-tool"
-            type="button"
-            aria-label="快捷话术"
-            title="快捷话术"
-            onClick={onKnowledgeBase}
-          >
-            <MessageSquareQuote size={16} />
-            <span>话术</span>
-          </button>
-          <button
-            className="composer-advanced-tool"
-            type="button"
-            aria-label="知识库"
-            title="知识库"
-            onClick={onKnowledgeBase}
-          >
-            <ClipboardList size={16} />
-            <span>知识库</span>
-          </button>
-          <button
-            className="composer-advanced-tool"
-            type="button"
-            aria-label="AI 起草"
-            title="AI 起草"
-            onClick={onAiDraft}
-          >
-            <Sparkles size={16} />
-            <span>AI起草</span>
-          </button>
+          {showKnowledgeTools && (
+            <>
+              <button
+                className="composer-advanced-tool"
+                type="button"
+                aria-label="快捷话术"
+                title="快捷话术"
+                onClick={onKnowledgeBase}
+              >
+                <MessageSquareQuote size={16} />
+                <span>话术</span>
+              </button>
+              <button
+                className="composer-advanced-tool"
+                type="button"
+                aria-label="知识库"
+                title="知识库"
+                onClick={onKnowledgeBase}
+              >
+                <ClipboardList size={16} />
+                <span>知识库</span>
+              </button>
+            </>
+          )}
+          {showAiTools && (
+            <button
+              className="composer-advanced-tool"
+              type="button"
+              aria-label="AI 起草"
+              title="AI 起草"
+              onClick={onAiDraft}
+            >
+              <Sparkles size={16} />
+              <span>AI起草</span>
+            </button>
+          )}
         </>
       }
       extraTools={

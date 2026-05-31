@@ -62,6 +62,7 @@ import {
 import { requireApiClient } from "../data/runtime";
 import { imPresenceStatuses } from "../data/static-config";
 import type { ModuleKey } from "../data/types";
+import { derivePcWorkspaceAccess } from "../data/workspace-access";
 import { formatBadgeCount, formatError } from "../lib/format";
 import { PcAvatar } from "./PcAvatar";
 import {
@@ -107,6 +108,7 @@ export function Sidebar() {
   const locallyReadConversationReads = useLocalImConversationReads();
   const imReadStateByConversation = useImReadStateByConversation();
   const authSession = useAuthSession();
+  const workspaceAccess = derivePcWorkspaceAccess(authSession);
   const clearAuthSession = useClearAuthSession();
   const setActiveModule = useSetActiveModule();
   const imPresenceStatus = useImPresenceStatus();
@@ -135,7 +137,7 @@ export function Sidebar() {
       authSession?.apiBaseUrl,
       authSession?.tenantToken,
     ),
-    enabled: Boolean(authSession),
+    enabled: Boolean(authSession && workspaceAccess.canReadServiceWorkbench),
     refetchInterval: 5_000,
     refetchIntervalInBackground: true,
     queryFn: async () => requireApiClient(authSession).getWorkbenchThreads(),
@@ -246,12 +248,18 @@ export function Sidebar() {
     ? formatAppInstanceLabel(appInstance)
     : "正在识别客户端";
   const appInstanceShortId = appInstance?.clientInstanceId.slice(0, 8) ?? "--";
+  const visiblePrimaryNavItems = primaryNavItems.filter((item) =>
+    workspaceAccess.visibleModules.includes(item.key),
+  );
+  const visibleAccountNavItems = accountNavItems.filter((item) =>
+    workspaceAccess.visibleModules.includes(item.key),
+  );
   const queueReminderSessionKey = authSession
     ? `${authSession.apiBaseUrl}|${authSession.tenantToken}`
     : "";
 
   useEffect(() => {
-    if (!queueReminderSessionKey) {
+    if (!queueReminderSessionKey || !workspaceAccess.canReadServiceWorkbench) {
       queueReminderReadyRef.current = false;
       queueReminderSessionRef.current = "";
       previousQueuedThreadIdsRef.current = new Set();
@@ -427,6 +435,7 @@ export function Sidebar() {
     queuedServiceCount,
     queuedTempSessions,
     queueReminderSessionKey,
+    workspaceAccess.canReadServiceWorkbench,
   ]);
 
   return (
@@ -575,7 +584,7 @@ export function Sidebar() {
         )}
       </div>
       <nav className="nav-list" aria-label="主导航">
-        {primaryNavItems.map((item) => {
+        {visiblePrimaryNavItems.map((item) => {
           const Icon = item.icon;
           const badgeCount =
             item.key === "messages"
@@ -604,7 +613,7 @@ export function Sidebar() {
             </button>
           );
         })}
-        {accountNavItems.map((item) => {
+        {visibleAccountNavItems.map((item) => {
           const Icon = item.icon;
           return (
             <button

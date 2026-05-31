@@ -5,6 +5,13 @@ import type { Dispatch, SetStateAction } from "react";
 import type { AuthSession } from "../../data/auth/auth-session";
 import { requireApiClient } from "../../data/runtime";
 import { formatError } from "../../lib/format";
+import {
+  deriveGroupCreateAccess,
+  extractCreatedGroupConversationId,
+  formatGroupCreateError,
+  normalizeCreateGroupChatPayload,
+  type CreateGroupChatPayload,
+} from "../models/groupCreateModel";
 
 type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
 
@@ -21,6 +28,7 @@ export function useMessageStartConversationController({
   setComposerDialog: Dispatch<SetStateAction<ComposerDialogKind>>;
   setNotice: Dispatch<SetStateAction<string | null>>;
 }) {
+  const groupCreateAccess = deriveGroupCreateAccess(session);
   const createDirectChatMutation = useMutation({
     mutationFn: async (peerUserId: string) =>
       requireApiClient(session).createDirectChat(peerUserId),
@@ -38,10 +46,16 @@ export function useMessageStartConversationController({
   });
 
   const createGroupChatMutation = useMutation({
-    mutationFn: async (payload: { name: string; memberUserIds: string[] }) =>
-      requireApiClient(session).createGroupChat(payload),
+    mutationFn: async (payload: CreateGroupChatPayload) => {
+      if (!groupCreateAccess.canCreateGroup) {
+        throw new Error(groupCreateAccess.reason ?? "当前角色暂无建群权限");
+      }
+      return requireApiClient(session).createGroupChat(
+        normalizeCreateGroupChatPayload(payload),
+      );
+    },
     onSuccess: async (group) => {
-      const conversationId = createdConversationId(group);
+      const conversationId = extractCreatedGroupConversationId(group);
       if (!conversationId) {
         setNotice("建群失败：服务端未返回群聊会话 ID");
         return;
@@ -50,7 +64,7 @@ export function useMessageStartConversationController({
       await queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
       setActiveConversation(conversationId);
     },
-    onError: (error) => setNotice(`建群失败：${formatError(error)}`),
+    onError: (error) => setNotice(`建群失败：${formatGroupCreateError(error)}`),
   });
 
   const createInviteQrMutation = useMutation({
@@ -65,6 +79,7 @@ export function useMessageStartConversationController({
     createDirectChatMutation,
     createGroupChatMutation,
     createInviteQrMutation,
+    groupCreateAccess,
   };
 }
 

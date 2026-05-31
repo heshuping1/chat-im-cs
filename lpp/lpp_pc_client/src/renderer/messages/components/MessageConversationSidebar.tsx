@@ -5,6 +5,7 @@ import { effectiveConversationUnreadCount } from "../../data/message-display";
 import { startHorizontalPaneResize } from "../../lib/paneResize";
 import { getImConversationType } from "../hooks/useMessageCenterViewModel";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
+import type { GroupCreateAccess } from "../models/groupCreateModel";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import {
   MessageConversationListPanel,
@@ -22,6 +23,7 @@ export function MessageConversationSidebar({
   emptyText,
   errorText,
   groupAvatarSnapshotFor,
+  groupCreateAccess,
   groupMembersByConversation,
   keyword,
   listPaneWidth,
@@ -48,6 +50,7 @@ export function MessageConversationSidebar({
   emptyText: string;
   errorText?: string | null;
   groupAvatarSnapshotFor: (conversation?: ConversationListItem) => string | undefined;
+  groupCreateAccess: GroupCreateAccess;
   groupMembersByConversation: Record<string, GroupMemberDto[]>;
   keyword: string;
   listPaneWidth: number;
@@ -80,6 +83,7 @@ export function MessageConversationSidebar({
         draftsByConversation={draftsByConversation}
         emptyText={emptyText}
         errorText={errorText}
+        groupCreateAccess={groupCreateAccess}
         keyword={keyword}
         loading={loading}
         plusMenuOpen={plusMenuOpen}

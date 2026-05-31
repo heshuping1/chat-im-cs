@@ -34,6 +34,7 @@ import { messageActionPreview, type HistoryFilterKey } from "../models/messageLi
 import type { MessageCenterCommandModel } from "../hooks/useMessageCenterCommandModel";
 import { getImConversationType } from "../hooks/useMessageCenterViewModel";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
+import type { CreateGroupChatPayload } from "../models/groupCreateModel";
 import { ChatToastNotice } from "./ChatToastNotice";
 import { StandaloneConversationInfoView } from "./ConversationInfoViews";
 import { MessageChatHeader } from "./MessageChatHeader";
@@ -63,6 +64,8 @@ export function MessageCenterConversationStage({
   contactCardProfileLoading,
   contactCardRelation,
   chatPanelRef,
+  canOpenAiAssistant,
+  canOpenKnowledgeBase,
   composerDialog,
   composerHeight,
   contactPickerItems,
@@ -179,6 +182,8 @@ export function MessageCenterConversationStage({
   contactCardProfileLoading: MessageOverlayProps["contactCardProfileLoading"];
   contactCardRelation: MessageOverlayProps["contactCardRelation"];
   chatPanelRef: Ref<HTMLElement>;
+  canOpenAiAssistant: boolean;
+  canOpenKnowledgeBase: boolean;
   composerDialog: "direct" | "group" | "qr" | "card" | null;
   composerHeight: number;
   contactPickerItems: ContactPickerItem[];
@@ -236,7 +241,7 @@ export function MessageCenterConversationStage({
   onCloseForward: () => void;
   onCloseResend: () => void;
   onCreateDirectChat: (userId: string) => void;
-  onCreateGroupChat: (payload: { name: string; memberUserIds: string[] }) => void;
+  onCreateGroupChat: (payload: CreateGroupChatPayload) => void;
   onCreateInviteQr: () => void;
   onUpdateCustomerRemark?: (remarkName: string) => Promise<void> | void;
   onUpdateCustomerTags?: (tags: string[]) => Promise<void> | void;
@@ -459,6 +464,8 @@ export function MessageCenterConversationStage({
                 replyTarget={replyTarget}
                 screenshotShortcut={pcSettings.screenshotShortcut}
                 selectedMessageIds={selectedMessageIds}
+                showAiTools={canOpenAiAssistant}
+                showKnowledgeTools={canOpenKnowledgeBase}
                 getChatPanelHeight={getChatPanelHeight}
                 onAiDraft={() => setActiveModule("aiAssistant")}
                 onDraftChange={(conversationId, value) => {

@@ -4,6 +4,8 @@ import { getAppInstanceProfile } from "../app-instance/app-instance";
 import type {
   CaptchaChallenge,
   PlatformLoginResult,
+  PlatformRegisterRequest,
+  PlatformRegisterResult,
   TenantAuthResult,
 } from "./types";
 
@@ -34,6 +36,22 @@ export class AuthApiClient extends ApiBaseClient {
     });
   }
 
+  platformRegister(body: PlatformRegisterRequest) {
+    return this.platformRequest<PlatformRegisterResult>(endpointPlan.platformRegister, {
+      method: "POST",
+      body: JSON.stringify({
+        displayName: body.displayName.trim(),
+        email: optionalText(body.email),
+        mobile: optionalText(body.mobile),
+        password: body.password,
+        captchaToken: optionalText(body.captchaToken),
+        captchaAnswer: optionalText(body.captchaAnswer),
+        verificationCode: optionalText(body.verificationCode),
+        tenantId: optionalText(body.tenantId),
+      }),
+    });
+  }
+
   generateCaptcha() {
     return this.request<CaptchaChallenge>(endpointPlan.captchaGenerate, {
       method: "POST",
@@ -57,4 +75,8 @@ export class AuthApiClient extends ApiBaseClient {
       },
     );
   }
+}
+
+function optionalText(value: string | null | undefined) {
+  return value?.trim() || null;
 }

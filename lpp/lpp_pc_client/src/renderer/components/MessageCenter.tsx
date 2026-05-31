@@ -22,6 +22,10 @@ import {
 import { useDismissRealtimeRemindersForTarget } from "../data/reminder/reminder-store";
 import { usePcSettings } from "../data/settings/settings-store";
 import {
+  derivePcWorkspaceAccess,
+  isModuleVisibleForAccess,
+} from "../data/workspace-access";
+import {
   useActiveImConversationId,
   useListPaneWidth,
   useMessageConversationFilter,
@@ -116,6 +120,7 @@ export function MessageCenter() {
   const messageFilter = useMessageConversationFilter();
   const setMessageFilter = useSetMessageConversationFilter();
   const pcSettings = usePcSettings();
+  const workspaceAccess = derivePcWorkspaceAccess(session);
   const listPaneWidth = useListPaneWidth();
   const profilePaneWidth = useProfilePaneWidth();
   const setListPaneWidth = useSetListPaneWidth();
@@ -329,6 +334,7 @@ export function MessageCenter() {
     createDirectChatMutation,
     createGroupChatMutation,
     createInviteQrMutation,
+    groupCreateAccess,
   } = useMessageStartConversationController({
     queryClient,
     session,
@@ -678,6 +684,7 @@ export function MessageCenter() {
         emptyText={conversationList.emptyText}
         errorText={errorText}
         groupAvatarSnapshotFor={groupAvatarSnapshotFor}
+        groupCreateAccess={groupCreateAccess}
         groupMembersByConversation={groupMembersByConversation}
         keyword={keyword}
         listPaneWidth={listPaneWidth}
@@ -718,6 +725,8 @@ export function MessageCenter() {
         contactCardProfileLoading={contactCardProfileQuery.isLoading}
         contactCardRelation={contactCardRelation}
         chatPanelRef={chatPanelRef}
+        canOpenAiAssistant={isModuleVisibleForAccess("aiAssistant", workspaceAccess)}
+        canOpenKnowledgeBase={isModuleVisibleForAccess("knowledgeBase", workspaceAccess)}
         composerDialog={composerDialog}
         composerHeight={composerHeight}
         contactPickerItems={contactPickerItems}

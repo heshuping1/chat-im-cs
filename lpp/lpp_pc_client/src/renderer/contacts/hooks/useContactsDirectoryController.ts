@@ -9,11 +9,13 @@ import {
 import type { DepartmentMemberDto, FriendRequestDto } from "../../data/api-client";
 import { useAuthSession } from "../../data/auth/auth-store";
 import {
+  type ContactDirectoryViewMode,
   filterContacts,
   filterRequests,
   mapContacts,
-  normalizeContactDirectoryFilter,
+  resolveContactDirectoryFilter,
 } from "../../data/contact-directory";
+import { deriveContactDirectoryAccess } from "../../data/contact-directory-permissions";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import type { ContactFilter, ContactItem } from "../../data/types";
@@ -34,25 +36,39 @@ export function useContactsDirectoryController({
   const session = useAuthSession();
   const setActiveConversation = useSetActiveImConversation();
   const queryClient = useQueryClient();
+  const contactAccess = useMemo(
+    () => deriveContactDirectoryAccess(session),
+    [session],
+  );
+  const directoryViewMode: ContactDirectoryViewMode =
+    contactAccess.isCustomerTenantMember ? "customer" : "staff";
+  const effectiveContactFilter = resolveContactDirectoryFilter({
+    filter: contactFilter,
+    viewMode: directoryViewMode,
+    canReadOrganization: contactAccess.canReadOrganization,
+  });
+  const organizationQueriesEnabled = Boolean(
+    session && contactAccess.canReadOrganization,
+  );
 
   const friendsQuery = useQuery({
     queryKey: ["pc-friends", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
+    enabled: Boolean(session && contactAccess.canReadSocialContacts),
     queryFn: async () => requireApiClient(session).getFriends(),
   });
   const requestsQuery = useQuery({
     queryKey: ["pc-friend-requests", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
+    enabled: Boolean(session && contactAccess.canReadSocialContacts),
     queryFn: async () => requireApiClient(session).getFriendRequests(),
   });
   const membersQuery = useQuery({
     queryKey: ["pc-tenant-members", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
+    enabled: organizationQueriesEnabled,
     queryFn: async () => requireApiClient(session).getTenantMembers(),
   });
   const departmentsQuery = useQuery({
     queryKey: ["pc-departments", session?.apiBaseUrl, session?.tenantToken],
-    enabled: Boolean(session),
+    enabled: organizationQueriesEnabled,
     queryFn: async () => requireApiClient(session).getDepartments(),
   });
   const conversationsQuery = useQuery({
@@ -62,9 +78,7 @@ export function useContactsDirectoryController({
   });
   const inviteQrsQuery = useQuery({
     queryKey: pcQueryKeys.accountInviteQrs(session?.apiBaseUrl, session?.tenantToken),
-    enabled: Boolean(
-      session && normalizeContactDirectoryFilter(contactFilter) === "requests",
-    ),
+    enabled: Boolean(session && effectiveContactFilter === "requests"),
     queryFn: async () => requireApiClient(session).getFriendInviteQrs(),
   });
   const departmentMembersQueries = useQuery({
@@ -74,7 +88,7 @@ export function useContactsDirectoryController({
       session?.tenantToken,
       departmentsQuery.data?.map((item) => item.departmentId).join(","),
     ],
-    enabled: Boolean(session && departmentsQuery.data?.length),
+    enabled: Boolean(organizationQueriesEnabled && departmentsQuery.data?.length),
     queryFn: async () => {
       const client = requireApiClient(session);
       const entries = await Promise.all(
@@ -142,15 +156,22 @@ export function useContactsDirectoryController({
     () =>
       mapContacts({
         friends: friendsQuery.data ?? [],
-        members: membersQuery.data ?? [],
+        members: contactAccess.canReadOrganization ? membersQuery.data ?? [] : [],
         conversations: conversationsQuery.data?.items ?? [],
-        departments: departmentsQuery.data ?? [],
-        departmentMembersById: departmentMembersQueries.data ?? {},
+        departments: contactAccess.canReadOrganization
+          ? departmentsQuery.data ?? []
+          : [],
+        departmentMembersById: contactAccess.canReadOrganization
+          ? departmentMembersQueries.data ?? {}
+          : {},
         currentUserId: session?.userId,
+        viewMode: directoryViewMode,
       }),
     [
+      contactAccess.canReadOrganization,
       conversationsQuery.data,
       departmentMembersQueries.data,
+      directoryViewMode,
       departmentsQuery.data,
       friendsQuery.data,
       membersQuery.data,
@@ -159,16 +180,15 @@ export function useContactsDirectoryController({
   );
 
   const visibleContacts = useMemo(() => {
-    const normalizedFilter = normalizeContactDirectoryFilter(contactFilter);
-    if (normalizedFilter === "requests") return [];
+    if (effectiveContactFilter === "requests") return [];
     const base =
-      normalizedFilter === "all"
+      effectiveContactFilter === "all"
         ? directoryContacts
-        : normalizedFilter === "organization"
+        : effectiveContactFilter === "organization"
           ? directoryContacts.filter((item) => item.kind === "staff")
-          : directoryContacts.filter((item) => item.kind === normalizedFilter);
+          : directoryContacts.filter((item) => item.kind === effectiveContactFilter);
     return filterContacts(base, keyword);
-  }, [contactFilter, directoryContacts, keyword]);
+  }, [directoryContacts, effectiveContactFilter, keyword]);
 
   const visibleRequests = useMemo(
     () => filterRequests(requestsQuery.data ?? [], keyword),
@@ -178,18 +198,22 @@ export function useContactsDirectoryController({
   const activeRequest =
     visibleRequests.find((item) => item.requestId === selectedRequestId) ??
     visibleRequests[0];
+  const organizationError = contactAccess.canReadOrganization
+    ? membersQuery.error || departmentsQuery.error
+    : null;
+  const organizationLoading =
+    contactAccess.canReadOrganization &&
+    (membersQuery.isLoading || departmentsQuery.isLoading);
+  const requestListError = requestsQuery.error;
   const directoryError =
     friendsQuery.error ||
-    membersQuery.error ||
     conversationsQuery.error ||
-    departmentsQuery.error ||
-    requestsQuery.error;
+    organizationError;
   const directoryLoading =
     friendsQuery.isLoading ||
-    membersQuery.isLoading ||
     conversationsQuery.isLoading ||
-    departmentsQuery.isLoading ||
-    requestsQuery.isLoading;
+    organizationLoading ||
+    (effectiveContactFilter === "requests" && requestsQuery.isLoading);
 
   const openMessage = (activeContact?: ContactItem) => {
     if (!activeContact) return;
@@ -219,12 +243,15 @@ export function useContactsDirectoryController({
   return {
     activeRequest,
     blockContact,
+    contactAccess,
     createDirectChatPending: createDirectChatMutation.isPending,
     deleteFriend,
-    departments: departmentsQuery.data ?? [],
+    departments: contactAccess.canReadOrganization ? departmentsQuery.data ?? [] : [],
     directoryContacts,
     directoryError,
     directoryLoading,
+    directoryViewMode,
+    effectiveContactFilter,
     handleRequest,
     inviteQrError: inviteQrsQuery.error,
     inviteQrLoading: inviteQrsQuery.isLoading,
@@ -234,6 +261,8 @@ export function useContactsDirectoryController({
     relationshipActionPending:
       deleteFriendMutation.isPending || blockUserMutation.isPending,
     createInviteQrPending: createInviteQrMutation.isPending,
+    requestListError,
+    requestCount: requestsQuery.data?.length ?? 0,
     requestPending: requestMutation.isPending,
     visibleContacts,
     visibleRequests,

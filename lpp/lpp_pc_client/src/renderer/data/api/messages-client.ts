@@ -25,6 +25,10 @@ import {
   imMessageEntityToDto,
   normalizeImMessageDto,
 } from "../im/im-message-contract";
+import {
+  normalizeCreateGroupChatPayload,
+  type CreateGroupChatInput,
+} from "../group-create-contract";
 
 export type MediaUploadOptions = UploadRequestOptions;
 
@@ -51,13 +55,11 @@ export class MessagesApiClient extends ContactsApiClient {
     });
   }
 
-  createGroupChat(body: { name: string; memberUserIds: string[] }) {
+  createGroupChat(body: CreateGroupChatInput) {
+    const payload = normalizeCreateGroupChatPayload(body);
     return this.request<GroupChatCreatedDto>(endpointPlan.groups, {
       method: "POST",
-      body: JSON.stringify({
-        name: body.name.trim(),
-        memberUserIds: body.memberUserIds,
-      }),
+      body: JSON.stringify(payload),
     });
   }
 

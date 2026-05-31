@@ -7,6 +7,7 @@ import {
   UserCheck,
   UserPlus,
   UserRoundX,
+  UsersRound,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -22,10 +23,13 @@ import {
   type FriendRequestDto,
 } from "../data/api-client";
 import {
+  contactDirectoryEmptyText,
+  contactDirectorySearchPlaceholder,
+  type ContactDirectoryEntry,
   contactKindBadge,
   contactRowHint,
   contactRowSubtitle,
-  normalizeContactDirectoryFilter,
+  createContactDirectoryEntries,
   requestStatusLabel,
 } from "../data/contact-directory";
 import type { ContactFilter, ContactItem } from "../data/types";
@@ -39,14 +43,6 @@ import { useContactsDirectoryController } from "../contacts/hooks/useContactsDir
 import { formatError, formatShortDate } from "../lib/format";
 import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
 
-const filters: Array<{ key: ContactFilter; label: string }> = [
-  { key: "customer", label: "客户" },
-  { key: "friend", label: "好友" },
-  { key: "organization", label: "组织" },
-  { key: "group", label: "群聊" },
-  { key: "requests", label: "申请" },
-];
-
 export function ContactsPage() {
   const activeContactId = useActiveContactId();
   const setActiveContact = useSetActiveContact();
@@ -58,6 +54,7 @@ export function ContactsPage() {
   const {
     activeRequest,
     blockContact,
+    contactAccess,
     createDirectChatPending,
     createInviteQrPending,
     deleteFriend,
@@ -65,6 +62,8 @@ export function ContactsPage() {
     directoryContacts,
     directoryError,
     directoryLoading,
+    directoryViewMode,
+    effectiveContactFilter,
     handleRequest,
     inviteQrError,
     inviteQrLoading,
@@ -72,6 +71,8 @@ export function ContactsPage() {
     openMessage,
     onCreateInviteQr,
     relationshipActionPending,
+    requestListError,
+    requestCount,
     requestPending,
     visibleContacts,
     visibleRequests,
@@ -82,20 +83,36 @@ export function ContactsPage() {
     setNotice,
   });
 
-  const effectiveFilter = filters.some(
-    (item) => item.key === normalizeContactDirectoryFilter(contactFilter),
-  )
-    ? normalizeContactDirectoryFilter(contactFilter)
-    : "customer";
+  const directoryEntries = useMemo(
+    () =>
+      createContactDirectoryEntries({
+        contacts: directoryContacts,
+        requestCount,
+        viewMode: directoryViewMode,
+        canReadOrganization: contactAccess.canReadOrganization,
+      }),
+    [
+      contactAccess.canReadOrganization,
+      directoryContacts,
+      directoryViewMode,
+      requestCount,
+    ],
+  );
+  const effectiveFilter = effectiveContactFilter;
+  const searchPlaceholder = contactDirectorySearchPlaceholder({
+    viewMode: directoryViewMode,
+    canReadOrganization: contactAccess.canReadOrganization,
+  });
+  const emptyText = contactDirectoryEmptyText({
+    filter: effectiveFilter,
+    viewMode: directoryViewMode,
+  });
   const activeContact =
     visibleContacts.find((item) => item.id === activeContactId) ??
-    visibleContacts[0] ??
-    (effectiveFilter !== "requests"
-      ? directoryContacts.find((item) => item.kind === "customer") ?? directoryContacts[0]
-      : undefined);
+    visibleContacts[0];
 
   const showProfilePanel =
-    activeContact && activeContact.kind === "customer";
+    directoryViewMode === "staff" && activeContact && activeContact.kind === "customer";
   const relationshipActionsAvailable =
     activeContact?.kind === "customer" || activeContact?.kind === "friend";
 
@@ -147,27 +164,22 @@ export function ContactsPage() {
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索客户、好友、组织、群聊"
+            placeholder={searchPlaceholder}
           />
         </label>
 
-        <nav className="contacts-tabs" aria-label="通讯录筛选">
-          {filters.map((item) => (
-            <button
-              className={effectiveFilter === item.key ? "selected" : ""}
-              key={item.key}
+        <nav className="contacts-entry-list" aria-label="通讯录入口">
+          {[...directoryEntries.fixed, ...directoryEntries.shortcuts].map((entry) => (
+            <ContactEntryButton
+              active={effectiveFilter === entry.key}
+              entry={entry}
+              key={entry.key}
               onClick={() => {
-                setContactFilter(item.key);
+                setContactFilter(entry.key);
                 setSelectedRequestId("");
                 setNotice(null);
               }}
-              type="button"
-            >
-              {item.label}
-              {item.key === "requests" && visibleRequests.length > 0 && (
-                <em>{visibleRequests.length}</em>
-              )}
-            </button>
+            />
           ))}
         </nav>
 
@@ -177,6 +189,12 @@ export function ContactsPage() {
           <PanelState
             tone="error"
             text={`通讯录接口失败：${formatError(directoryError)}`}
+          />
+        )}
+        {effectiveFilter === "requests" && requestListError && (
+          <PanelState
+            tone="error"
+            text={`好友申请加载失败：${formatError(requestListError)}`}
           />
         )}
 
@@ -205,10 +223,12 @@ export function ContactsPage() {
             ))
           )}
           {effectiveFilter !== "requests" && visibleContacts.length === 0 && (
-            <PanelState text="暂无通讯录数据" />
+            <PanelState text={emptyText} />
           )}
-          {effectiveFilter === "requests" && visibleRequests.length === 0 && (
-            <PanelState text="暂无好友申请" />
+          {effectiveFilter === "requests" &&
+            !requestListError &&
+            visibleRequests.length === 0 && (
+            <PanelState text={emptyText} />
           )}
         </div>
       </section>
@@ -294,6 +314,39 @@ export function ContactsPage() {
       )}
     </main>
   );
+}
+
+function ContactEntryButton({
+  active,
+  entry,
+  onClick,
+}: {
+  active: boolean;
+  entry: ContactDirectoryEntry;
+  onClick: () => void;
+}) {
+  const Icon = contactEntryIcon(entry.key);
+  const shouldShowCount = entry.key !== "requests" || Boolean(entry.count);
+  return (
+    <button
+      className={`contacts-entry ${entry.kind} ${active ? "active" : ""}`}
+      onClick={onClick}
+      type="button"
+    >
+      <span className="contacts-entry-icon">
+        <Icon size={18} />
+      </span>
+      <strong>{entry.label}</strong>
+      {shouldShowCount && <em>{entry.count ?? 0}</em>}
+    </button>
+  );
+}
+
+function contactEntryIcon(key: ContactFilter) {
+  if (key === "requests") return UserCheck;
+  if (key === "customer" || key === "organization") return Building2;
+  if (key === "group") return MessageSquare;
+  return UsersRound;
 }
 
 function ContactRow({

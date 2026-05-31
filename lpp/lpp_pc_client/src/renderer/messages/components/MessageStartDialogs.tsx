@@ -1,6 +1,7 @@
 import { Check, CheckSquare, QrCode, Search, Send, UserPlus, UserRound, UsersRound, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { PcAvatar } from "../../components/PcAvatar";
+import type { GroupCreateAccess } from "../models/groupCreateModel";
 
 export type ContactPickerItem = {
   avatarUrl?: string | null;
@@ -11,17 +12,27 @@ export type ContactPickerItem = {
 };
 
 export function MessagePlusMenu({
+  groupCreateAccess,
   onAction,
 }: {
+  groupCreateAccess: GroupCreateAccess;
   onAction: (action: "direct" | "group" | "requests" | "qr") => void;
 }) {
   const items: Array<{
     action: "direct" | "group" | "requests" | "qr";
     icon: ReactNode;
     label: string;
+    disabled?: boolean;
+    title?: string;
   }> = [
     { action: "direct", icon: <UserPlus size={16} />, label: "发起聊天" },
-    { action: "group", icon: <UsersRound size={16} />, label: "发起群聊" },
+    {
+      action: "group",
+      disabled: !groupCreateAccess.canCreateGroup,
+      icon: <UsersRound size={16} />,
+      label: "发起群聊",
+      title: groupCreateAccess.reason ?? "当前角色暂无建群权限",
+    },
     { action: "requests", icon: <CheckSquare size={16} />, label: "好友申请" },
     { action: "qr", icon: <QrCode size={16} />, label: "我的二维码" },
   ];
@@ -38,7 +49,10 @@ export function MessagePlusMenu({
           key={item.action}
           type="button"
           role="menuitem"
-          onClick={() => onAction(item.action)}
+          aria-disabled={item.disabled || undefined}
+          disabled={item.disabled}
+          title={item.disabled ? item.title : undefined}
+          onClick={() => !item.disabled && onAction(item.action)}
         >
           {item.icon}
           <span>{item.label}</span>
@@ -84,7 +98,7 @@ export function GroupChatDialog({
 }: {
   contacts: ContactPickerItem[];
   onClose: () => void;
-  onSubmit: (payload: { name: string; memberUserIds: string[] }) => void;
+  onSubmit: (payload: { title: string; memberUserIds: string[] }) => void;
   pending: boolean;
 }) {
   const [keyword, setKeyword] = useState("");
@@ -117,7 +131,7 @@ export function GroupChatDialog({
       }
       onMultiSubmit={() =>
         onSubmit({
-          name: groupName,
+          title: groupName,
           memberUserIds: Array.from(selectedIds),
         })
       }

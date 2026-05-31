@@ -179,6 +179,7 @@ export function validateDesktopAuthSessionPayload(value: unknown): DesktopAuthSe
     avatarUrl: optionalNullableString(record.avatarUrl, 'authSession.avatarUrl'),
     displayName: safeString(record.displayName, 'authSession.displayName'),
     lppId: optionalString(record.lppId, 'authSession.lppId'),
+    membershipRole: optionalPositiveNumber(record.membershipRole, 'authSession.membershipRole'),
     platformRefreshToken: optionalString(
       record.platformRefreshToken,
       'authSession.platformRefreshToken',
@@ -194,6 +195,8 @@ export function validateDesktopAuthSessionPayload(value: unknown): DesktopAuthSe
     tenantToken: safeString(record.tenantToken, 'authSession.tenantToken'),
     tenants: Array.isArray(record.tenants) ? record.tenants.slice(0, 200) : undefined,
     userId: optionalString(record.userId, 'authSession.userId'),
+    userType: optionalPositiveNumber(record.userType, 'authSession.userType'),
+    spaceType: optionalPositiveNumber(record.spaceType, 'authSession.spaceType'),
   };
 }
 

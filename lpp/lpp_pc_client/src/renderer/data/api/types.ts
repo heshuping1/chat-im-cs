@@ -28,6 +28,23 @@ export interface PlatformLoginResult {
   };
 }
 
+export interface PlatformRegisterRequest {
+  displayName: string;
+  password: string;
+  email?: string | null;
+  mobile?: string | null;
+  captchaToken?: string | null;
+  captchaAnswer?: string | null;
+  verificationCode?: string | null;
+  tenantId?: string | null;
+}
+
+export interface PlatformRegisterResult extends Partial<PlatformLoginResult> {
+  message?: string;
+  pendingApproval?: boolean;
+  tenantId?: string;
+}
+
 export interface CaptchaChallenge {
   token: string;
   question: string;
