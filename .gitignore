@@ -22,6 +22,9 @@
 **/scripts/**/test-data/*.sh
 **/scripts/**/test-data/test_accounts.md
 **/scripts/**/e2e/*.py
+**/.local/
+lpp/reports/pc/
+lpp/reports/mobile/api-probes/
 
 # Release/signing secrets
 **/android/key.properties
