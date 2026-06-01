@@ -79,10 +79,7 @@ async function login(client, account) {
     const { page } = client;
     await page.locator('.login-page, .account-entry').first().waitFor({ state: 'visible', timeout: 12_000 });
     if (await page.locator('.login-page').isVisible({ timeout: 1_000 }).catch(() => false)) {
-      const inputs = page.locator('input');
-      await inputs.nth(0).fill(apiBaseUrl);
-      await inputs.nth(1).fill(account.identifier);
-      await inputs.nth(2).fill(account.password);
+      await fillAuthLoginForm(page, account);
       await page.locator('.login-submit').click();
       await solveCaptchaIfVisible(page);
       await page.locator('.login-page').waitFor({ state: 'hidden', timeout: 25_000 });
@@ -96,6 +93,22 @@ async function login(client, account) {
       hasPlatformToken: Boolean(session.platformToken),
     };
   });
+}
+
+async function fillAuthLoginForm(page, account) {
+  const loginInputs = page.locator('.login-panel > label input');
+  if ((await loginInputs.count()) < 2) {
+    throw new Error('login form did not expose identifier/password inputs');
+  }
+  await loginInputs.nth(0).fill(account.identifier);
+  await loginInputs.nth(1).fill(account.password);
+
+  const advanced = page.locator('.auth-advanced');
+  if ((await advanced.count()) < 1) return;
+  const isOpen = await advanced.evaluate((node) => node.hasAttribute('open')).catch(() => false);
+  if (!isOpen) await advanced.locator('summary').click();
+  const advancedInputs = advanced.locator('input');
+  if ((await advancedInputs.count()) >= 1) await advancedInputs.nth(0).fill(apiBaseUrl);
 }
 
 async function exerciseCustomerOutboundMessage(customer) {

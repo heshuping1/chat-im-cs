@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PC在线客服工作台-B微信客服增强稿</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --primary: #10b981;
+        --primary-dark: #047857;
+        --blue: #2563eb;
+        --amber: #f59e0b;
+        --danger: #dc2626;
+        --bg: #f6f9fc;
+        --panel: #ffffff;
+        --line: #dde7f1;
+        --line-soft: #e8eff6;
+        --text: #101827;
+        --muted: #64748b;
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #edf3f7; color: var(--text); }
+      .canvas { width: 1920px; height: 982px; overflow: hidden; background: var(--bg); }
+      .app { display: grid; width: 100%; height: 100%; grid-template-columns: 156px minmax(0, 1fr); }
+
+      .sidebar {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        padding: 18px 10px 14px;
+        border-right: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .brand, .user-card {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr);
+        gap: 9px;
+        align-items: center;
+      }
+
+      .brand { margin: 2px 6px 26px; }
+      .logo, .avatar, .nav-icon, .mini-avatar, .tool { display: grid; place-items: center; font-weight: 950; }
+      .logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #00b889, #12caa2); color: #fff; }
+      .brand strong, .user-card strong { display: block; overflow: hidden; font-size: 13px; font-weight: 950; text-overflow: ellipsis; white-space: nowrap; }
+      .brand span, .user-card span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 800; }
+      .nav { display: grid; gap: 5px; }
+      .nav-item {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+        min-height: 39px;
+        padding: 0 8px;
+        border-radius: 10px;
+        color: #52647a;
+        font-size: 13px;
+        font-weight: 850;
+      }
+      .nav-icon { width: 28px; height: 28px; border-radius: 9px; background: #eef4f8; color: #52647a; font-size: 12px; }
+      .nav-item.active { background: #e9fbf3; color: var(--primary-dark); }
+      .nav-item.active .nav-icon { background: var(--primary); color: #fff; }
+      .sidebar-bottom { display: grid; gap: 10px; margin-top: auto; }
+      .user-card, .service-mini { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+      .user-card { padding: 8px; }
+      .user-card .avatar { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #f97316, #fbbf24); color: #fff; }
+      .service-mini { display: grid; gap: 4px; padding: 9px; font-size: 12px; font-weight: 900; }
+      .service-mini em { color: var(--primary-dark); font-size: 10px; font-style: normal; }
+
+      .workspace { display: grid; min-width: 0; min-height: 0; grid-template-rows: 72px minmax(0, 1fr); }
+      .topbar {
+        display: grid;
+        grid-template-columns: 270px minmax(0, 1fr) 262px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, #fff, #fbfdff);
+      }
+      .title {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        align-items: center;
+        gap: 11px;
+        padding: 0 18px;
+        border-right: 1px solid var(--line-soft);
+      }
+      .title-mark { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 13px; background: #e9fbf3; color: var(--primary-dark); font-weight: 950; }
+      .title strong { display: block; font-size: 16px; font-weight: 950; }
+      .title span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; font-weight: 800; }
+      .metric-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-items: center; padding: 0 14px; }
+      .metric {
+        display: grid;
+        gap: 3px;
+        padding: 8px 10px;
+        border: 1px solid var(--line-soft);
+        border-radius: 10px;
+        background: #fff;
+      }
+      .metric span { color: var(--muted); font-size: 11px; font-weight: 850; }
+      .metric strong { font-size: 21px; font-weight: 950; line-height: 1; }
+      .metric.good strong { color: var(--primary-dark); }
+      .status-control { display: flex; align-items: center; justify-content: flex-end; padding: 0 16px 0 8px; }
+      .status-control button {
+        display: inline-flex;
+        height: 38px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 13px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #fff;
+        color: #1f2937;
+        font-size: 12px;
+        font-weight: 900;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--primary); }
+
+      .main { display: grid; min-width: 0; min-height: 0; grid-template-columns: 300px minmax(540px, 1fr) 320px 52px; }
+      .queue {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: auto auto auto auto minmax(0, 1fr);
+        gap: 10px;
+        padding: 16px 14px;
+        border-right: 1px solid var(--line);
+        background: #fff;
+      }
+      .queue h1 { margin: 0; font-size: 18px; font-weight: 950; }
+      .queue p { margin: 4px 0 0; color: var(--muted); font-size: 11px; font-weight: 800; }
+      .search { display: flex; height: 36px; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid #d7e2ec; border-radius: 10px; color: #94a3b8; font-size: 12px; font-weight: 800; }
+      .mode { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+      .mode button, .filter button {
+        height: 31px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: #53657c;
+        font-size: 12px;
+        font-weight: 900;
+      }
+      .mode .selected, .filter .selected { border-color: rgba(16, 185, 129, 0.38); background: #ecfff7; color: var(--primary-dark); }
+      .filter { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+      .list { display: grid; align-content: start; gap: 8px; min-height: 0; overflow: auto; }
+      .thread {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 10px;
+        min-height: 72px;
+        align-items: center;
+        padding: 9px;
+        border-radius: 10px;
+        background: #f8fbfd;
+      }
+      .thread.active { background: #e9fbf3; box-shadow: inset 3px 0 0 var(--primary); }
+      .mini-avatar { width: 42px; height: 42px; border-radius: 12px; background: var(--primary); color: #fff; }
+      .thread strong { display: block; overflow: hidden; font-size: 13px; font-weight: 950; text-overflow: ellipsis; white-space: nowrap; }
+      .thread small, .thread p { display: block; overflow: hidden; margin: 3px 0 0; color: var(--muted); font-size: 11px; font-weight: 780; text-overflow: ellipsis; white-space: nowrap; }
+      .empty {
+        padding: 14px;
+        border: 1px dashed #d7e2ec;
+        border-radius: 10px;
+        background: #fbfdff;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 780;
+        line-height: 1.5;
+      }
+
+      .chat {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: 72px 36px minmax(0, 1fr) 132px;
+        border-right: 1px solid var(--line);
+        background: #f3f7fb;
+      }
+      .chat-head { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--line); background: #fff; }
+      .chat-id { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 11px; }
+      .chat-id .mini-avatar { width: 46px; height: 46px; border-radius: 13px; }
+      .chat-id strong { display: block; font-size: 17px; font-weight: 950; }
+      .chips { display: flex; gap: 5px; margin-top: 5px; }
+      .chips span { display: inline-flex; height: 21px; align-items: center; padding: 0 8px; border: 1px solid var(--line-soft); border-radius: 999px; background: #fff; color: #52647a; font-size: 11px; font-weight: 850; }
+      .head-actions { display: flex; gap: 6px; }
+      .tool { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: #53657c; font-size: 12px; }
+      .strip { display: flex; align-items: center; gap: 8px; padding: 0 18px; border-bottom: 1px solid rgba(16, 185, 129, 0.16); background: #e9fbf3; color: var(--primary-dark); font-size: 12px; font-weight: 850; }
+      .strip span:last-child { margin-left: auto; color: #52647a; }
+      .messages { display: flex; min-height: 0; flex-direction: column; gap: 15px; overflow: auto; padding: 20px 22px; }
+      .time { align-self: center; color: #94a3b8; font-size: 11px; font-weight: 850; }
+      .msg { display: grid; grid-template-columns: 36px minmax(0, max-content); gap: 9px; max-width: 74%; }
+      .msg.mine { grid-template-columns: minmax(0, max-content) 36px; align-self: flex-end; }
+      .msg .mini-avatar { width: 36px; height: 36px; border-radius: 10px; }
+      .bubble { padding: 10px 13px; border: 1px solid var(--line-soft); border-radius: 9px; background: #fff; box-shadow: 0 8px 18px rgba(31, 45, 61, 0.04); }
+      .mine .bubble { border-color: rgba(16, 185, 129, 0.22); background: #dff8ed; }
+      .bubble strong { display: block; color: var(--muted); font-size: 11px; font-weight: 900; }
+      .bubble p { margin: 5px 0; font-size: 14px; line-height: 1.55; }
+      .bubble time { color: #94a3b8; font-size: 11px; font-weight: 760; }
+      .composer { display: grid; grid-template-rows: 34px minmax(0, 1fr); gap: 8px; padding: 10px 16px 14px; border-top: 1px solid var(--line); background: #fff; }
+      .composer-tools { display: flex; gap: 6px; }
+      .composer-tools .tool { width: 32px; height: 32px; border-radius: 9px; }
+      .composer-tools .wide { width: auto; padding: 0 10px; }
+      .input { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 8px; }
+      textarea { min-height: 60px; resize: none; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; color: var(--text); font: inherit; font-size: 13px; outline: 0; }
+      .send { border: 1px solid var(--primary); border-radius: 10px; background: var(--primary); color: #fff; font-size: 14px; font-weight: 950; }
+
+      .customer { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto auto auto minmax(0, 1fr); gap: 10px; overflow: auto; padding: 16px 14px; border-right: 1px solid var(--line); background: #fff; }
+      .customer h2 { margin: 0; font-size: 16px; font-weight: 950; }
+      .customer-card, .block, .kpi { border: 1px solid var(--line-soft); border-radius: 10px; background: #fff; }
+      .customer-card { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; padding: 12px; background: #fbfdff; }
+      .customer-card .mini-avatar { width: 44px; height: 44px; border-radius: 12px; }
+      .customer-card strong { display: block; overflow: hidden; font-size: 15px; font-weight: 950; text-overflow: ellipsis; white-space: nowrap; }
+      .customer-card span { color: var(--muted); font-size: 11px; font-weight: 800; }
+      .tabs { display: grid; grid-template-columns: repeat(4, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: 9px; }
+      .tabs span { display: grid; height: 30px; place-items: center; color: #53657c; font-size: 12px; font-weight: 900; }
+      .tabs .selected { background: #ecfff7; color: var(--primary-dark); }
+      .customer-body { display: grid; align-content: start; gap: 9px; }
+      .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .kpi { display: grid; gap: 5px; min-height: 62px; padding: 10px; }
+      .kpi span, .row span, .ticket p { color: var(--muted); font-size: 11px; font-weight: 800; }
+      .kpi strong { font-size: 16px; font-weight: 950; }
+      .block { padding: 12px; }
+      .block h3 { margin: 0 0 8px; font-size: 13px; font-weight: 950; }
+      .row { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; }
+      .row + .row { border-top: 1px solid var(--line-soft); }
+      .row strong { font-size: 12px; font-weight: 900; }
+      .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+      .tag-row span { padding: 4px 7px; border-radius: 999px; background: #eef6ff; color: var(--blue); font-size: 11px; font-weight: 900; }
+      .ticket { padding: 9px; border: 1px solid var(--line-soft); border-radius: 8px; background: #fbfdff; }
+      .ticket strong { font-size: 12px; }
+      .ticket p { margin: 4px 0 0; }
+
+      .rail { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 7px; background: #fff; }
+      .rail .mini-avatar { width: 38px; height: 38px; border-radius: 10px; }
+      .rail .tool { width: 36px; height: 36px; }
+      .specs { padding: 28px 36px; background: #fff; }
+      .specs h2 { margin: 0 0 12px; }
+      .specs p { margin: 6px 0; color: #334155; line-height: 1.65; }
+      code { color: #047857; font-weight: 800; }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand"><span class="logo">L</span><div><strong>LPP</strong><span>专业版 · v0.1.0</span></div></div>
+          <nav class="nav">
+            <div class="nav-item"><span class="nav-icon">消</span>消息</div>
+            <div class="nav-item active"><span class="nav-icon">客</span>在线客服</div>
+            <div class="nav-item"><span class="nav-icon">联</span>通讯录</div>
+            <div class="nav-item"><span class="nav-icon">台</span>工作台</div>
+            <div class="nav-item"><span class="nav-icon">单</span>工单中心</div>
+            <div class="nav-item"><span class="nav-icon">数</span>数据中心</div>
+            <div class="nav-item"><span class="nav-icon">库</span>知识库</div>
+            <div class="nav-item"><span class="nav-icon">设</span>设置</div>
+          </nav>
+          <div class="sidebar-bottom">
+            <div class="user-card"><span class="avatar">m</span><div><strong>mouse客服</strong><span>在线</span></div></div>
+            <div class="service-mini">客服在线 <em>接 5 · 排 0</em></div>
+          </div>
+        </aside>
+        <section class="workspace">
+          <header class="topbar">
+            <div class="title"><span class="title-mark">客</span><div><strong>在线客服工作台</strong><span>会话 5 · 手动接入 · 容量 5/10</span></div></div>
+            <div class="metric-row">
+              <div class="metric good"><span>容量</span><strong>5/10</strong></div>
+              <div class="metric"><span>排队</span><strong>0</strong></div>
+              <div class="metric"><span>进行中</span><strong>5</strong></div>
+              <div class="metric"><span>未读</span><strong>0</strong></div>
+              <div class="metric"><span>SLA</span><strong>0</strong></div>
+            </div>
+            <div class="status-control"><button><span class="dot"></span> 在线 · 手动接入 · 5/10</button></div>
+          </header>
+          <section class="main">
+            <aside class="queue">
+              <div><h1>会话池</h1><p>当前 0 · 排队 0 · 历史 50</p></div>
+              <div class="search">搜索客户、渠道、会话内容</div>
+              <div class="mode"><button class="selected">当前 0</button><button>历史 50</button></div>
+              <div class="filter"><button class="selected">全部</button><button>排队</button><button>进行中</button><button>SLA</button></div>
+              <div class="list">
+                <div class="thread active"><span class="mini-avatar">访</span><div><strong>访客</strong><small>在线客服 · 来源未知 · 只读</small><p>您好，欢迎咨询在线客服。</p></div></div>
+                <div class="empty">暂无当前会话。排队访客出现后自动进入会话池；也可以切换历史查看已结束会话。</div>
+              </div>
+            </aside>
+            <section class="chat">
+              <header class="chat-head">
+                <div class="chat-id"><span class="mini-avatar">访</span><div><strong>访客</strong><div class="chips"><span>在线客服</span><span>来源未知</span><span>普通客户</span><span>历史会话</span><span>只读</span></div></div></div>
+                <div class="head-actions"><span class="tool">话</span><span class="tool">AI</span><span class="tool">库</span><span class="tool">更</span></div>
+              </header>
+              <div class="strip"><span class="dot"></span>历史会话 · 只读查看 · 超时关闭<span>不可接入、接管、关闭或发送</span></div>
+              <div class="messages">
+                <span class="time">5/30 13:34</span>
+                <div class="msg"><span class="mini-avatar">访</span><div class="bubble"><strong>访客</strong><p>您好，欢迎咨询在线客服。</p><time>13:34</time></div></div>
+                <div class="msg mine"><div class="bubble"><strong>mouse客服</strong><p>您好，我是在线客服，请问有什么可以帮您？</p><time>13:35 已读</time></div><span class="mini-avatar">客</span></div>
+              </div>
+              <div class="composer">
+                <div class="composer-tools"><span class="tool">表</span><span class="tool">+</span><span class="tool wide">快捷话术</span><span class="tool wide">知识库</span><span class="tool wide">AI 起草</span></div>
+                <div class="input"><textarea readonly>历史会话只读，不能发送消息。</textarea><button class="send">发送</button></div>
+              </div>
+            </section>
+            <aside class="customer">
+              <h2>客户资料</h2>
+              <div class="customer-card"><span class="mini-avatar">访</span><div><strong>访客</strong><span>未注册 · 来源未知 · 历史会话</span></div></div>
+              <div class="tabs"><span class="selected">总览</span><span>工单</span><span>交易</span><span>审计</span></div>
+              <div class="customer-body">
+                <div class="kpis"><div class="kpi"><span>账户余额</span><strong>-</strong></div><div class="kpi"><span>累计入金</span><strong>-</strong></div><div class="kpi"><span>总订单</span><strong>0</strong></div><div class="kpi"><span>风险</span><strong>未知</strong></div></div>
+                <div class="block"><h3>基础信息</h3><div class="row"><span>语言</span><strong>简体中文</strong></div><div class="row"><span>来源</span><strong>在线客服</strong></div><div class="row"><span>归属客服</span><strong>mouse客服</strong></div></div>
+                <div class="block"><h3>标签</h3><div class="tag-row"><span>临时访客</span><span>历史会话</span><span>只读查看</span></div></div>
+                <div class="block"><h3>工单摘要</h3><div class="ticket"><strong>暂无关联工单</strong><p>当前内容保持不变，仅展示可承载区域。</p></div></div>
+              </div>
+            </aside>
+            <aside class="rail"><span class="mini-avatar">访</span><span class="tool">人</span><span class="tool">话</span><span class="tool">AI</span><span class="tool">库</span></aside>
+          </section>
+        </section>
+      </div>
+    </main>
+    <section class="specs">
+      <h2>B 微信客服增强稿参数</h2>
+      <p>画布 <code>1920x982</code>；主区栅格 <code>300px / 1fr / 320px / 52px</code>；顶部 <code>72px</code>；会话卡 <code>72px</code>；输入区 <code>132px</code>。</p>
+      <p>视觉策略：保留轻白 IM 心智，降低替换风险；主色 <code>#10B981</code>，背景 <code>#F6F9FC</code>，圆角 <code>9-10px</code>。</p>
+      <p>字号：顶部标题 <code>16px / 950</code>，列表主文本 <code>13px / 950</code>，辅助文本 <code>11-12px / 780</code>。</p>
+    </section>
+  </body>
+</html>

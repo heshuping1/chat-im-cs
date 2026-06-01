@@ -353,11 +353,35 @@ describe("message media upload presentation", () => {
     );
 
     expect(composer).toContain("onOpenContactCardPicker");
-    expect(composer).toContain("aria-label=\"名片\"");
+    expect(composer).toContain('aria-label="发送联系人名片"');
     expect(composer).toContain("<UserRound size={17} />");
     expect(composer).toContain("<span>名片</span>");
+    expect(composer).toContain("<em>发送联系人名片</em>");
+    expect(composer).toContain('className="composer-plus-item is-disabled" type="button" disabled');
+    expect(composer).toContain("<em>待接入</em>");
     expect(composer).not.toContain("位置、名片等发送能力需要完整选择器");
+    expect(composer).not.toContain("更多发送能力");
     expect(composerSurface).toContain("onOpenContactCardPicker");
+  });
+
+  it("keeps the composer more menu as a fixed floating panel outside clipped composer layout", () => {
+    const composer = readFileSync(
+      resolve(process.cwd(), "src/renderer/components/MessageComposer.tsx"),
+      "utf8",
+    );
+    const composerCss = readFileSync(
+      resolve(process.cwd(), "src/renderer/styles/messages/composer-shell.css"),
+      "utf8",
+    );
+
+    expect(composer).toContain("createPortal(");
+    expect(composer).toContain("moreButtonRef.current");
+    expect(composer).toContain("getBoundingClientRect()");
+    expect(composer).toContain('aria-label="发送内容"');
+    const plusPanelCss = composerCss.match(/\.composer-plus-panel\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(plusPanelCss).toContain("position: fixed;");
+    expect(plusPanelCss).toContain("z-index: 130;");
+    expect(plusPanelCss).not.toContain("bottom:");
   });
 
   it("keeps group avatars available while disabling the group member list view", () => {
@@ -433,7 +457,7 @@ describe("message media upload presentation", () => {
     expect(messageMediaParts).toContain("inlineVideoPreviewSrc");
     expect(messageMediaParts).toContain("const openSrc = item?.localOpenUrl || src;");
     expect(messageMediaParts).toContain("const previewSrc = inlineVideoPreviewSrc(src);");
-    expect(messageMediaParts).toContain("useAuthenticatedMediaUrl(\n    previewSrc,");
+    expect(messageMediaParts).toMatch(/useAuthenticatedMediaUrl\(\s*previewSrc,/);
     expect(messageMediaParts).toContain("displaySrc: openSrc");
     expect(messageMediaParts).toContain("openable={Boolean(openSrc)}");
     expect(videoMessagePreview).toContain("openable");

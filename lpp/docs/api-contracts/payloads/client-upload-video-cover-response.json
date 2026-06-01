@@ -1,0 +1,17 @@
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "0HNLT65F7GCBV",
+  "data": {
+    "mediaId": "019e71c1-2f11-722a-bf9b-9b98b22ac925",
+    "mediaKind": "image",
+    "url": "/media/019e71c1-2f11-722a-bf9b-9b98b22ac925",
+    "relativePath": "11111111111111111111111111111111/2026/05/29/image/019e71c12f11722abf9b9b98b22ac925.png",
+    "fileName": "walkthrough-cover.png",
+    "mimeType": "image/png",
+    "sizeBytes": 12,
+    "thumbnailUrl": null,
+    "signedUrl": "/media/019e71c1-2f11-722a-bf9b-9b98b22ac925?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780028546\u0026sig=zWcznkCND8eHwF4_dyN5vB06tgKnJ0mcHOuzFs8DPO8",
+    "downloadUrl": "/media/019e71c1-2f11-722a-bf9b-9b98b22ac925?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780028546\u0026sig=zWcznkCND8eHwF4_dyN5vB06tgKnJ0mcHOuzFs8DPO8\u0026download=1"
+  }
+}

@@ -1,34 +1,263 @@
-import {
-  ChevronDown,
-  Gauge,
-  Route,
-  SmilePlus,
-  TrendingUp,
-  UsersRound,
-} from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import type { CSSProperties } from "react";
-import { useMemo } from "react";
+import { GripVertical, SmilePlus, TrendingUp, UsersRound } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CSSProperties, DragEvent, ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChatWorkspace } from "./ChatWorkspace";
-import { CustomerContextPanel } from "./CustomerContextPanel";
-import { ThreadList } from "./ThreadList";
+import { AiReplySuggestionPanel } from "./AiReplySuggestionDrawer";
+import { CustomerContextPanel, CustomerContextRail } from "./CustomerContextPanel";
+import { isRiskyThread, ThreadList } from "./ThreadList";
+import { CustomerServiceKnowledgePanel } from "../customer-service/components/CustomerServiceKnowledgeDrawer";
+import { CustomerServiceQuickReplyPanel } from "../customer-service/components/CustomerServiceQuickReplyDrawer";
+import { ServiceReceptionControl } from "../customer-service/components/ServiceReceptionControl";
+import {
+  createServiceCommandMetrics,
+  type ServiceCommandMetrics,
+} from "../customer-service/models/serviceWorkbenchModel";
+import {
+  getReceptionControlLayout,
+  type ReceptionQueueMode,
+} from "../customer-service/models/serviceReceptionControlModel";
+import { emitCustomerServiceAssistantInsert } from "../customer-service/runtime/customer-service-assistant-events";
+import {
+  aiReplyTargetForServiceThread,
+  type AiReplyThreadTarget,
+} from "../data/ai/ai-reply-thread-target";
 import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
+import type { CustomerServiceStatus } from "../data/types";
 import {
+  type ServiceAssistantPane,
+  type ServiceLayoutMode,
+  useActiveThreadId,
+  useServiceAssistantPane,
+  useServiceAssistantPaneWidth,
+  useServiceCustomerPaneCollapsed,
+  useServiceListPaneCollapsed,
   useServiceListPaneWidth,
+  useServiceLayoutMode,
   useServiceProfilePaneWidth,
+  useSetServiceAssistantPane,
+  useSetServiceAssistantPaneWidth,
+  useSetServiceCustomerPaneCollapsed,
+  useSetCustomerServiceStatus,
+  useSetActiveThread,
+  useSetServiceLayoutMode,
+  useSetServiceListPaneCollapsed,
   useSetServiceListPaneWidth,
   useSetServiceProfilePaneWidth,
+  useSetServiceThreadFilter,
+  useSidebarCollapsed,
 } from "../data/workspace-ui/workspace-ui-store";
 import { startHorizontalPaneResize } from "../lib/paneResize";
 
+export const serviceLayoutMetrics = {
+  chatMin: 420,
+  customerRail: 56,
+  listRail: 64,
+  resizer: 3,
+  sidebarCollapsed: 76,
+  sidebarExpanded: 156,
+  sidebarHidden: 0,
+};
+
+type ServiceResizablePane = "assistant" | "customer" | "list";
+
+type ServiceLayoutSnapshot = {
+  serviceAssistantPane: ServiceAssistantPane;
+  serviceAssistantPaneWidth: number;
+  serviceCustomerPaneCollapsed: boolean;
+  serviceListPaneCollapsed: boolean;
+  serviceListPaneWidth: number;
+  serviceProfilePaneWidth: number;
+  sidebarCollapsed: boolean;
+};
+type ServiceContextPaneOrder = "assistant" | "customer";
+const serviceCustomerPinStorageKey = "lpp_pc_service_customer_pinned";
+const serviceContextOrderStorageKey = "lpp_pc_service_context_order";
+
+function readServiceContextOrder(): ServiceContextPaneOrder[] {
+  if (typeof window === "undefined") return ["assistant", "customer"];
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(serviceContextOrderStorageKey) ?? "[]",
+    );
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      parsed.includes("assistant") &&
+      parsed.includes("customer")
+    ) {
+      return parsed as ServiceContextPaneOrder[];
+    }
+  } catch {
+    // Ignore invalid persisted layout and fall back to default order.
+  }
+  return ["assistant", "customer"];
+}
+
+export function calculateServiceRequiredWidth({
+  serviceAssistantPane,
+  serviceAssistantPaneWidth,
+  serviceCustomerPaneCollapsed,
+  serviceListPaneCollapsed,
+  serviceListPaneWidth,
+  serviceProfilePaneWidth,
+  sidebarCollapsed,
+}: ServiceLayoutSnapshot, mode: ServiceLayoutMode = "full") {
+  const sidebarSegment =
+    mode === "compact-sidebar"
+      ? serviceLayoutMetrics.sidebarCollapsed
+      : mode === "no-sidebar" ||
+          mode === "queue-focus" ||
+          mode === "chat-focus"
+        ? serviceLayoutMetrics.sidebarHidden
+        : sidebarCollapsed
+          ? serviceLayoutMetrics.sidebarCollapsed
+          : serviceLayoutMetrics.sidebarExpanded;
+  const listSegment =
+    mode === "chat-focus"
+      ? 0
+      : serviceListPaneCollapsed || mode === "queue-focus"
+        ? serviceLayoutMetrics.listRail
+        : serviceListPaneWidth + serviceLayoutMetrics.resizer;
+  const assistantSegment = isServiceAssistantPaneVisible(mode, serviceAssistantPane)
+    ? serviceLayoutMetrics.resizer + serviceAssistantPaneWidth
+    : 0;
+  const customerSegment =
+    serviceCustomerPaneCollapsed ||
+    mode === "no-customer" ||
+    mode === "compact-sidebar" ||
+    mode === "no-sidebar" ||
+    mode === "queue-focus" ||
+    mode === "chat-focus"
+    ? serviceLayoutMetrics.customerRail
+    : serviceLayoutMetrics.resizer +
+      serviceProfilePaneWidth +
+      serviceLayoutMetrics.customerRail;
+
+  return (
+    sidebarSegment +
+    listSegment +
+    serviceLayoutMetrics.chatMin +
+    assistantSegment +
+    customerSegment
+  );
+}
+
+export function isServiceAssistantPaneVisible(
+  mode: ServiceLayoutMode,
+  pane: ServiceAssistantPane,
+) {
+  return Boolean(pane && (mode === "full" || mode === "no-customer"));
+}
+
+function clampServicePaneWidth(pane: ServiceResizablePane, width: number) {
+  const [min, max] =
+    pane === "list" ? [260, 420] : pane === "assistant" ? [320, 420] : [300, 440];
+  return Math.min(max, Math.max(min, Math.round(width)));
+}
+
+export function calculateServiceResizeWidth({
+  mode,
+  pane,
+  requestedWidth,
+  shellWidth,
+  snapshot,
+}: {
+  mode: ServiceLayoutMode;
+  pane: ServiceResizablePane;
+  requestedWidth: number;
+  shellWidth: number;
+  snapshot: ServiceLayoutSnapshot;
+}) {
+  const nextWidth = clampServicePaneWidth(pane, requestedWidth);
+  const nextSnapshot: ServiceLayoutSnapshot = {
+    ...snapshot,
+    serviceAssistantPaneWidth:
+      pane === "assistant" ? nextWidth : snapshot.serviceAssistantPaneWidth,
+    serviceListPaneWidth: pane === "list" ? nextWidth : snapshot.serviceListPaneWidth,
+    serviceProfilePaneWidth:
+      pane === "customer" ? nextWidth : snapshot.serviceProfilePaneWidth,
+  };
+  const overflow = calculateServiceRequiredWidth(nextSnapshot, mode) - shellWidth;
+  if (overflow <= 0) return nextWidth;
+  return clampServicePaneWidth(pane, nextWidth - overflow);
+}
+
+function serviceAssistantPaneLabel(pane: Exclude<ServiceAssistantPane, null>) {
+  if (pane === "quickReply") return "快捷话术";
+  if (pane === "aiDraft") return "AI 起草";
+  return "知识库";
+}
+
+export function calculateServiceResponsiveLayout(
+  snapshot: ServiceLayoutSnapshot & { width: number },
+): ServiceLayoutMode {
+  const modes: ServiceLayoutMode[] = snapshot.serviceAssistantPane
+    ? [
+        "full",
+        "no-customer",
+        "no-assistant",
+        "compact-sidebar",
+        "no-sidebar",
+        "queue-focus",
+        "chat-focus",
+      ]
+    : [
+        "full",
+        "no-assistant",
+        "no-customer",
+        "compact-sidebar",
+        "no-sidebar",
+        "queue-focus",
+        "chat-focus",
+      ];
+  for (const mode of modes) {
+    if (snapshot.sidebarCollapsed && mode === "compact-sidebar") continue;
+    if (snapshot.width >= calculateServiceRequiredWidth(snapshot, mode)) {
+      return mode;
+    }
+  }
+  return "chat-focus";
+}
+
 export function OnlineServicePage() {
   const session = useAuthSession();
+  const queryClient = useQueryClient();
+  const shellRef = useRef<HTMLElement | null>(null);
+  const layoutSnapshotRef = useRef<ServiceLayoutSnapshot | null>(null);
+  const lastObservedShellWidthRef = useRef<string | null>(null);
+  const activeThreadId = useActiveThreadId();
+  const serviceAssistantPane = useServiceAssistantPane();
+  const serviceAssistantPaneWidth = useServiceAssistantPaneWidth();
+  const serviceCustomerPaneCollapsed = useServiceCustomerPaneCollapsed();
+  const serviceListPaneCollapsed = useServiceListPaneCollapsed();
   const serviceListPaneWidth = useServiceListPaneWidth();
+  const serviceLayoutMode = useServiceLayoutMode();
   const serviceProfilePaneWidth = useServiceProfilePaneWidth();
+  const sidebarCollapsed = useSidebarCollapsed();
+  const [confirmedServiceStatus, setConfirmedServiceStatus] =
+    useState<CustomerServiceStatus | null>(null);
+  const [queueRadarHint, setQueueRadarHint] = useState<string | null>(null);
+  const [serviceCustomerPinned, setServiceCustomerPinned] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(serviceCustomerPinStorageKey) === "1",
+  );
+  const [serviceContextPaneOrder, setServiceContextPaneOrder] = useState<
+    ServiceContextPaneOrder[]
+  >(readServiceContextOrder);
+  const setCustomerServiceStatus = useSetCustomerServiceStatus();
+  const setActiveThread = useSetActiveThread();
+  const setServiceAssistantPane = useSetServiceAssistantPane();
+  const setServiceAssistantPaneWidth = useSetServiceAssistantPaneWidth();
+  const setServiceCustomerPaneCollapsed = useSetServiceCustomerPaneCollapsed();
+  const setServiceLayoutMode = useSetServiceLayoutMode();
+  const setServiceListPaneCollapsed = useSetServiceListPaneCollapsed();
   const setServiceListPaneWidth = useSetServiceListPaneWidth();
   const setServiceProfilePaneWidth = useSetServiceProfilePaneWidth();
+  const setServiceThreadFilter = useSetServiceThreadFilter();
   const client = useMemo(
     () => (session ? createApiClient(session) : null),
     [session],
@@ -49,90 +278,428 @@ export function OnlineServicePage() {
     refetchIntervalInBackground: true,
   });
 
-  const summary = threadsQuery.data?.summary;
-  const queuedCount =
-    summary?.queuedCount ?? threadsQuery.data?.queueItems?.length ?? 0;
-  const activeCount =
-    summary?.activeCount ?? threadsQuery.data?.activeItems?.length ?? 0;
-  const totalCount =
-    summary?.allCount ?? queuedCount + activeCount;
-  const vipCount = summary?.vipCount ?? "--";
+  const selectableThreads = useMemo(
+    () => [
+      ...(threadsQuery.data?.activeItems ?? []),
+      ...(threadsQuery.data?.queueItems ?? []),
+    ],
+    [threadsQuery.data?.activeItems, threadsQuery.data?.queueItems],
+  );
+  const selectedThread = selectableThreads.find((thread) => thread.threadId === activeThreadId);
+  const aiReplyTarget = aiReplyTargetForServiceThread(selectedThread);
   const receptionStatus = receptionStatusQuery.data;
-  const maxSessions = receptionStatus?.maxConcurrentSessions;
-  const activeSessions = receptionStatus?.activeSessionCount ?? activeCount;
-  const queueEnabled = receptionStatus?.queueAcceptEnabled;
-  const metrics: Array<{ label: string; value: string; trend?: string }> = [
-    { label: "会话总量", value: String(totalCount) },
-    { label: "排队中", value: String(queuedCount) },
-    { label: "进行中", value: String(activeCount) },
-    { label: "VIP", value: String(vipCount) },
-    { label: "SLA 风险", value: "--" },
-  ];
+  const commandMetrics = useMemo(
+    () =>
+      createServiceCommandMetrics({
+        isRiskyThread,
+        lastKnownStatus: confirmedServiceStatus,
+        receptionStatus,
+        threads: threadsQuery.data,
+      }),
+    [confirmedServiceStatus, receptionStatus, threadsQuery.data],
+  );
+  const {
+    activeCount,
+    activeUnreadCount,
+    queuedCount,
+    slaRiskCount,
+  } = commandMetrics;
+  useEffect(() => {
+    setActiveThread("");
+  }, [setActiveThread]);
+  useEffect(() => {
+    window.localStorage.setItem(
+      serviceCustomerPinStorageKey,
+      serviceCustomerPinned ? "1" : "0",
+    );
+  }, [serviceCustomerPinned]);
+  useEffect(() => {
+    window.localStorage.setItem(
+      serviceContextOrderStorageKey,
+      JSON.stringify(serviceContextPaneOrder),
+    );
+  }, [serviceContextPaneOrder]);
+
+  useEffect(() => {
+    const serverStatus = receptionStatus?.serviceStatus;
+    if (
+      serverStatus === "online" ||
+      serverStatus === "busy" ||
+      serverStatus === "break" ||
+      serverStatus === "offline"
+    ) {
+      setConfirmedServiceStatus(serverStatus);
+      setCustomerServiceStatus(serverStatus);
+    }
+  }, [receptionStatus?.serviceStatus, setCustomerServiceStatus]);
+  const receptionStatusMutation = useMutation({
+    mutationFn: async (serviceStatus: CustomerServiceStatus) => {
+      if (!client) throw new Error("Customer service API is not ready");
+      return client.updateReceptionStatus({
+        serviceStatus,
+        queueAcceptEnabled:
+          serviceStatus === "online"
+            ? (receptionStatus?.queueAcceptEnabled ?? false)
+            : false,
+      });
+    },
+    onSuccess: (status) => {
+      if (
+        status.serviceStatus === "online" ||
+        status.serviceStatus === "busy" ||
+        status.serviceStatus === "break" ||
+        status.serviceStatus === "offline"
+      ) {
+        setConfirmedServiceStatus(status.serviceStatus);
+        setCustomerServiceStatus(status.serviceStatus);
+      }
+      void queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.customerServiceReception(...queryBaseKey),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
+      });
+    },
+  });
+  const queueAcceptMutation = useMutation({
+    mutationFn: async (mode: ReceptionQueueMode) => {
+      if (!client) throw new Error("Customer service API is not ready");
+      const serviceStatus = receptionStatus?.serviceStatus ?? confirmedServiceStatus;
+      if (!serviceStatus) throw new Error("接待状态未同步，请稍后重试");
+      return client.updateReceptionStatus({
+        serviceStatus,
+        queueAcceptEnabled: serviceStatus === "online" && mode === "auto",
+      });
+    },
+    onSuccess: (status) => {
+      if (
+        status.serviceStatus === "online" ||
+        status.serviceStatus === "busy" ||
+        status.serviceStatus === "break" ||
+        status.serviceStatus === "offline"
+      ) {
+        setConfirmedServiceStatus(status.serviceStatus);
+        setCustomerServiceStatus(status.serviceStatus);
+      }
+      void queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.customerServiceReception(...queryBaseKey),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
+      });
+    },
+  });
+  const handleServiceContextDragStart = (
+    event: DragEvent<HTMLElement>,
+    pane: ServiceContextPaneOrder,
+  ) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-lpp-context-pane", pane);
+  };
+  const handleServiceContextDragOver = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  };
+  const handleServiceContextDrop = (
+    event: DragEvent<HTMLElement>,
+    targetPane: ServiceContextPaneOrder,
+  ) => {
+    event.preventDefault();
+    const draggedPane = event.dataTransfer.getData("application/x-lpp-context-pane");
+    if (
+      draggedPane !== "assistant" &&
+      draggedPane !== "customer"
+    ) {
+      return;
+    }
+    if (draggedPane === targetPane) return;
+    setServiceContextPaneOrder([
+      draggedPane,
+      draggedPane === "assistant" ? "customer" : "assistant",
+    ]);
+  };
+  const toggleAssistantPane = (pane: Exclude<ServiceAssistantPane, null>) => {
+    const nextPane = serviceAssistantPane === pane ? null : pane;
+    setServiceAssistantPane(nextPane);
+    if (nextPane) {
+      if (serviceCustomerPinned) {
+        setServiceCustomerPaneCollapsed(false);
+      } else {
+        setServiceCustomerPaneCollapsed(true);
+      }
+    }
+    if (
+      !nextPane ||
+      serviceCustomerPinned ||
+      !shellRef.current ||
+      serviceCustomerPaneCollapsed
+    ) {
+      return;
+    }
+
+    const appShell = shellRef.current.closest(".app-shell") as HTMLElement | null;
+    const width = Math.round(
+      (appShell ?? shellRef.current).getBoundingClientRect().width,
+    );
+    const fullWidthWithAssistant = calculateServiceRequiredWidth(
+      {
+        serviceAssistantPane: nextPane,
+        serviceAssistantPaneWidth,
+        serviceCustomerPaneCollapsed: false,
+        serviceListPaneCollapsed,
+        serviceListPaneWidth,
+        serviceProfilePaneWidth,
+        sidebarCollapsed,
+      },
+      "full",
+    );
+    if (width < fullWidthWithAssistant) {
+      setServiceCustomerPaneCollapsed(true);
+    }
+  };
+
+  layoutSnapshotRef.current = {
+    serviceAssistantPane,
+    serviceAssistantPaneWidth,
+    serviceCustomerPaneCollapsed,
+    serviceListPaneCollapsed,
+    serviceListPaneWidth,
+    serviceProfilePaneWidth,
+    sidebarCollapsed,
+  };
+  const effectiveServiceAssistantPane = isServiceAssistantPaneVisible(
+    serviceLayoutMode,
+    serviceAssistantPane,
+  )
+    ? serviceAssistantPane
+    : null;
+  const hiddenAssistantHint =
+    serviceAssistantPane && !effectiveServiceAssistantPane
+      ? `${serviceAssistantPaneLabel(serviceAssistantPane)}需要更宽的工作区，请拉宽窗口或先收起队列后查看。`
+      : null;
+  const effectiveServiceCustomerPaneCollapsed =
+    serviceCustomerPaneCollapsed ||
+    serviceLayoutMode === "no-customer" ||
+    serviceLayoutMode === "compact-sidebar" ||
+    serviceLayoutMode === "no-sidebar" ||
+    serviceLayoutMode === "queue-focus" ||
+    serviceLayoutMode === "chat-focus";
+  const effectiveServiceListPaneHidden = serviceLayoutMode === "chat-focus";
+  const effectiveServiceListPaneCollapsed =
+    !effectiveServiceListPaneHidden &&
+    (serviceListPaneCollapsed || serviceLayoutMode === "queue-focus");
+  const serviceCustomerFirst =
+    Boolean(effectiveServiceAssistantPane) &&
+    !effectiveServiceCustomerPaneCollapsed &&
+    serviceContextPaneOrder[0] === "customer";
+  const resizeServicePane = (pane: ServiceResizablePane, requestedWidth: number) => {
+    const snapshot = layoutSnapshotRef.current;
+    const measuredShell =
+      shellRef.current?.closest(".app-shell") ?? shellRef.current;
+    if (!snapshot || !measuredShell) return requestedWidth;
+    return calculateServiceResizeWidth({
+      mode: serviceLayoutMode,
+      pane,
+      requestedWidth,
+      shellWidth: Math.round(measuredShell.getBoundingClientRect().width),
+      snapshot,
+    });
+  };
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return undefined;
+    const appShell = shell.closest(".app-shell") as HTMLElement | null;
+
+    const updateServiceLayout = (force = false) => {
+      const measuredShell = appShell ?? shell;
+      const width = Math.round(measuredShell.getBoundingClientRect().width);
+      const snapshot = layoutSnapshotRef.current;
+      const signature = snapshot
+        ? [
+            width,
+            snapshot.serviceAssistantPane,
+            snapshot.serviceAssistantPaneWidth,
+            snapshot.serviceCustomerPaneCollapsed,
+            snapshot.serviceListPaneCollapsed,
+            snapshot.serviceListPaneWidth,
+            snapshot.serviceProfilePaneWidth,
+            snapshot.sidebarCollapsed,
+          ].join("|")
+        : String(width);
+      if (!force && lastObservedShellWidthRef.current === signature) return;
+      lastObservedShellWidthRef.current = signature;
+
+      if (!snapshot) return;
+      const next = calculateServiceResponsiveLayout({ ...snapshot, width });
+      setServiceLayoutMode(next);
+    };
+
+    updateServiceLayout(true);
+    const handleShellResize = () => updateServiceLayout();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(handleShellResize);
+    resizeObserver?.observe(appShell ?? shell);
+    window.addEventListener("resize", handleShellResize);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", handleShellResize);
+    };
+  }, [
+    serviceAssistantPane,
+    serviceAssistantPaneWidth,
+    serviceCustomerPaneCollapsed,
+    serviceListPaneCollapsed,
+    serviceListPaneWidth,
+    serviceProfilePaneWidth,
+    sidebarCollapsed,
+    setServiceLayoutMode,
+  ]);
+
+  const serviceAssistantBlock: ReactNode = effectiveServiceAssistantPane ? (
+    <>
+      <div
+        className="resizer service-assistant-resizer"
+        role="separator"
+        aria-label="调整客服辅助工具宽度"
+        onPointerDown={(event) =>
+          startHorizontalPaneResize(event, {
+            initialWidth: serviceAssistantPaneWidth,
+            onResize: (width) =>
+              setServiceAssistantPaneWidth(resizeServicePane("assistant", width)),
+            direction: -1,
+          })
+        }
+      />
+      <ServiceAssistantShell
+        aiReplyTarget={aiReplyTarget}
+        pane={effectiveServiceAssistantPane}
+        onClose={() => setServiceAssistantPane(null)}
+        onDragOverContextPane={handleServiceContextDragOver}
+        onDragStartContextPane={handleServiceContextDragStart}
+        onDropContextPane={handleServiceContextDrop}
+      />
+    </>
+  ) : null;
+  const serviceCustomerBlock: ReactNode = effectiveServiceCustomerPaneCollapsed ? null : (
+    <>
+      <div
+        className="resizer service-profile-resizer"
+        role="separator"
+        aria-label="调整客户资料宽度"
+        onPointerDown={(event) =>
+          startHorizontalPaneResize(event, {
+            initialWidth: serviceProfilePaneWidth,
+            onResize: (width) =>
+              setServiceProfilePaneWidth(resizeServicePane("customer", width)),
+            direction: -1,
+          })
+        }
+      />
+      <section className="service-customer-pane">
+        <CustomerContextPanel
+          pinned={serviceCustomerPinned}
+          onDragOverContextPane={handleServiceContextDragOver}
+          onDragStartContextPane={handleServiceContextDragStart}
+          onDropContextPane={handleServiceContextDrop}
+          onTogglePin={() => setServiceCustomerPinned((current) => !current)}
+        />
+      </section>
+    </>
+  );
+  const serviceContextBlocks = serviceContextPaneOrder.map((pane) => (
+    <Fragment key={pane}>
+      {pane === "assistant" ? serviceAssistantBlock : serviceCustomerBlock}
+    </Fragment>
+  ));
 
   return (
     <section
-      className="h-flagship-shell"
+      ref={shellRef}
+      className={[
+        "h-flagship-shell",
+        `layout-${serviceLayoutMode}`,
+        effectiveServiceAssistantPane ? "service-assistant-open" : "",
+        effectiveServiceCustomerPaneCollapsed ? "service-customer-collapsed" : "",
+        effectiveServiceListPaneCollapsed ? "service-list-collapsed" : "",
+        serviceCustomerFirst ? "service-context-order-customer-first" : "",
+      ].filter(Boolean).join(" ")}
       style={
         {
+          "--service-assistant-pane-width": `${serviceAssistantPaneWidth}px`,
+          "--service-customer-rail-width": `${serviceLayoutMetrics.customerRail}px`,
+          "--service-queue-rail-width": `${serviceLayoutMetrics.listRail}px`,
           "--service-list-pane-width": `${serviceListPaneWidth}px`,
           "--service-profile-pane-width": `${serviceProfilePaneWidth}px`,
         } as CSSProperties
       }
     >
-      <header className="h-flagship-topbar">
-        <div className="h-metric-strip">
-          {metrics.map((item) => (
-            <div className="h-metric-item" key={item.label}>
-              <span>{item.label}</span>
-              <div className="h-metric-value">
-                <strong>{item.value}</strong>
-                {item.trend && <em>{item.trend}</em>}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="h-top-actions">
-          <button type="button" disabled>
-            <Route size={16} />
-            接入模式：{queueEnabled === undefined ? "--" : queueEnabled ? "自动分配" : "手动接入"}
-            <ChevronDown size={14} />
-          </button>
-          <button type="button" disabled>
-            <Gauge size={16} />
-            接入上限：{activeSessions}/{maxSessions ?? "--"}
-          </button>
-        </div>
-      </header>
+      <ServiceCommandBar
+        disabled={!client}
+        layoutMode={serviceLayoutMode}
+        metrics={commandMetrics}
+        onSetQueueMode={(mode) => queueAcceptMutation.mutate(mode)}
+        onSetStatus={(status) => receptionStatusMutation.mutate(status)}
+        pending={receptionStatusMutation.isPending || queueAcceptMutation.isPending}
+      />
 
       <div className="h-flagship-grid">
-        <ThreadList />
-        <div
-          className="resizer service-list-resizer"
-          role="separator"
-          aria-label="调整在线客服列表宽度"
-          onPointerDown={(event) =>
-            startHorizontalPaneResize(event, {
-              initialWidth: serviceListPaneWidth,
-              onResize: setServiceListPaneWidth,
-            })
-          }
+        {effectiveServiceListPaneHidden ? null : effectiveServiceListPaneCollapsed ? (
+          <ServiceQueueRail
+            activeCount={activeCount}
+            onFilter={(filter) => {
+              setServiceListPaneCollapsed(false);
+              if (filter) {
+                setServiceThreadFilter(filter);
+                setQueueRadarHint(null);
+              } else {
+                setQueueRadarHint("未读待处理已展开，请优先查看带红点的会话；专用未读筛选等待后端能力接入。");
+              }
+            }}
+            queuedCount={queuedCount}
+            slaRiskCount={slaRiskCount}
+            unreadCount={activeUnreadCount}
+            onExpand={() => setServiceListPaneCollapsed(false)}
+          />
+        ) : (
+          <ThreadList />
+        )}
+        {!effectiveServiceListPaneHidden && !effectiveServiceListPaneCollapsed && (
+          <div
+            className="resizer service-list-resizer"
+            role="separator"
+            aria-label="调整在线客服列表宽度"
+            onPointerDown={(event) =>
+              startHorizontalPaneResize(event, {
+                initialWidth: serviceListPaneWidth,
+                onResize: (width) =>
+                  setServiceListPaneWidth(resizeServicePane("list", width)),
+              })
+            }
+          />
+        )}
+        <ChatWorkspace
+          onOpenCustomerContext={() => setServiceCustomerPaneCollapsed(false)}
+          onToggleAssistantPane={toggleAssistantPane}
         />
-        <ChatWorkspace />
-        <div
-          className="resizer service-profile-resizer"
-          role="separator"
-          aria-label="调整客户资料宽度"
-          onPointerDown={(event) =>
-            startHorizontalPaneResize(event, {
-              initialWidth: serviceProfilePaneWidth,
-              onResize: setServiceProfilePaneWidth,
-              direction: -1,
-            })
+        {serviceContextBlocks}
+        <CustomerContextRail
+          activeAssistantPane={serviceAssistantPane}
+          customerPaneCollapsed={effectiveServiceCustomerPaneCollapsed}
+          onToggleCustomerPane={() =>
+            setServiceCustomerPaneCollapsed(!effectiveServiceCustomerPaneCollapsed)
           }
+          onToggleAssistantPane={toggleAssistantPane}
         />
-        <CustomerContextPanel />
       </div>
+
+      {(queueRadarHint || hiddenAssistantHint) && (
+        <div className="service-queue-radar-hint" role="status">
+          {queueRadarHint ?? hiddenAssistantHint}
+        </div>
+      )}
 
       <div className="h-flagship-corner" aria-hidden="true">
         <UsersRound size={16} />
@@ -140,5 +707,258 @@ export function OnlineServicePage() {
         <SmilePlus size={16} />
       </div>
     </section>
+  );
+}
+
+function ServiceCommandBar({
+  disabled,
+  layoutMode,
+  metrics,
+  onSetQueueMode,
+  onSetStatus,
+  pending,
+}: {
+  disabled: boolean;
+  layoutMode: ServiceLayoutMode;
+  metrics: ServiceCommandMetrics;
+  onSetQueueMode: (mode: ReceptionQueueMode) => void;
+  onSetStatus: (status: CustomerServiceStatus) => void;
+  pending: boolean;
+}) {
+  return (
+    <header className="h-flagship-topbar service-command-bar">
+      <div className="h-topbar-summary service-command-summary">
+        <span className={`service-command-status ${metrics.serviceStatus}`}>
+          {metrics.serviceStatusLabel}
+        </span>
+        <span className="service-command-copy">
+          <strong>在线客服指挥台</strong>
+          <span>
+            会话 {metrics.hasThreadData ? metrics.totalCount : "--"} ·{" "}
+            {typeof metrics.queueEnabled === "boolean"
+              ? metrics.queueEnabled
+                ? "自动接入"
+                : "手动接入"
+              : "接入模式未同步"}{" "}
+            · 容量{" "}
+            {metrics.capacityText}
+          </span>
+        </span>
+      </div>
+
+      <div className="h-metric-strip service-command-metrics">
+        {metrics.metrics.map((item) => (
+          <div className={`h-metric-item tone-${item.tone ?? "normal"}`} key={item.label}>
+            <span>{item.label}</span>
+            <div className="h-metric-value">
+              <strong>{item.value}</strong>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="h-top-actions service-command-actions">
+        <ServiceReceptionControl
+          activeSessions={metrics.activeSessions}
+          disabled={disabled}
+          layout={getReceptionControlLayout(layoutMode)}
+          maxSessions={metrics.maxSessions}
+          onSetQueueMode={onSetQueueMode}
+          onSetStatus={onSetStatus}
+          pending={pending}
+          queuedCount={metrics.queuedCount}
+          queueAcceptEnabled={metrics.queueEnabled}
+          serviceStatus={metrics.serviceStatus}
+          slaRiskCount={metrics.slaRiskCount}
+        />
+      </div>
+    </header>
+  );
+}
+
+function ServiceQueueRail({
+  activeCount,
+  onFilter,
+  onExpand,
+  queuedCount,
+  slaRiskCount,
+  unreadCount,
+}: {
+  activeCount: number;
+  onFilter: (filter: "queued" | "serving" | "sla" | null) => void;
+  onExpand: () => void;
+  queuedCount: number;
+  slaRiskCount: number;
+  unreadCount: number;
+}) {
+  return renderServiceQueueRail({
+    activeCount,
+    onExpand,
+    onFilter,
+    queuedCount,
+    slaRiskCount,
+    unreadCount,
+  });
+
+}
+
+function renderServiceQueueRail({
+  activeCount,
+  onExpand,
+  onFilter,
+  queuedCount,
+  slaRiskCount,
+  unreadCount,
+}: {
+  activeCount: number;
+  onExpand: () => void;
+  onFilter: (filter: "queued" | "serving" | "sla" | null) => void;
+  queuedCount: number;
+  slaRiskCount: number;
+  unreadCount: number;
+}) {
+  return (
+    <aside className="service-queue-rail" aria-label="在线客服队列雷达">
+      <button type="button" aria-label="展开接待队列" onClick={onExpand}>
+        <UsersRound size={18} />
+      </button>
+      <button
+        className="service-queue-rail-metric"
+        type="button"
+        title={`展开排队会话，当前 ${queuedCount} 个`}
+        onClick={() => onFilter("queued")}
+      >
+        <span>
+          <b>Q</b>
+          <small>排队</small>
+          <em>{queuedCount}</em>
+        </span>
+      </button>
+      <button
+        className="service-queue-rail-metric"
+        type="button"
+        title={`展开进行中会话，当前 ${activeCount} 个`}
+        onClick={() => onFilter("serving")}
+      >
+        <span>
+          <b>A</b>
+          <small>进行中</small>
+          <em>{activeCount}</em>
+        </span>
+      </button>
+      <button
+        className="service-queue-rail-metric"
+        type="button"
+        title={`展开未读会话，当前 ${unreadCount} 条`}
+        onClick={() => onFilter(null)}
+      >
+        <span>
+          <b>未读</b>
+          <em>{unreadCount}</em>
+        </span>
+      </button>
+      <button
+        className="service-queue-rail-metric danger"
+        type="button"
+        title={`展开查看 SLA 风险会话，当前 ${slaRiskCount} 个`}
+        onClick={() => onFilter("sla")}
+      >
+        <span>
+          <b>SLA</b>
+          <em>{slaRiskCount}</em>
+        </span>
+      </button>
+    </aside>
+  );
+}
+
+function ServiceAssistantShell({
+  aiReplyTarget,
+  onDragOverContextPane,
+  onDragStartContextPane,
+  onDropContextPane,
+  onClose,
+  pane,
+}: {
+  aiReplyTarget: AiReplyThreadTarget;
+  onDragOverContextPane: (event: DragEvent<HTMLElement>) => void;
+  onDragStartContextPane: (
+    event: DragEvent<HTMLElement>,
+    pane: ServiceContextPaneOrder,
+  ) => void;
+  onDropContextPane: (
+    event: DragEvent<HTMLElement>,
+    pane: ServiceContextPaneOrder,
+  ) => void;
+  onClose: () => void;
+  pane: Exclude<ServiceAssistantPane, null>;
+}) {
+  const isAiDraft = pane === "aiDraft";
+  const isQuickReply = pane === "quickReply";
+  const session = useAuthSession();
+  const [notice, setNotice] = useState<string | null>(null);
+  return (
+    <aside
+      className="service-assistant-pane"
+      aria-label={isAiDraft ? "AI 起草" : isQuickReply ? "快捷话术" : "知识库"}
+      onDragOver={onDragOverContextPane}
+      onDrop={(event) => onDropContextPane(event, "assistant")}
+    >
+      <header className="context-pane-controlbar service-context-pane-controlbar">
+        <button
+          className="context-pane-drag"
+          type="button"
+          draggable
+          title="拖拽排序"
+          aria-label="拖拽排序"
+          onDragStart={(event) => onDragStartContextPane(event, "assistant")}
+        >
+          <GripVertical size={15} />
+        </button>
+        <strong>{serviceAssistantPaneLabel(pane)}</strong>
+      </header>
+      {notice && <div className="service-assistant-notice">{notice}</div>}
+      <div className="context-pane-body">
+        {isAiDraft ? (
+          <AiReplySuggestionPanel
+            disabledReason={aiReplyTarget.disabledReason}
+            session={session}
+            subtitle="客服会话"
+            threadId={aiReplyTarget.threadId}
+            threadTitle={aiReplyTarget.threadTitle}
+            threadType={aiReplyTarget.threadType}
+            variant="panel"
+            onClose={onClose}
+            onInsert={(text) => {
+              emitCustomerServiceAssistantInsert(text);
+              onClose();
+            }}
+            onNotice={setNotice}
+          />
+        ) : isQuickReply ? (
+          <CustomerServiceQuickReplyPanel
+            session={session}
+            threadType={aiReplyTarget.threadType}
+            variant="panel"
+            onClose={onClose}
+            onInsert={(payload) => {
+              emitCustomerServiceAssistantInsert(payload.text);
+            }}
+            onNotice={setNotice}
+          />
+        ) : (
+          <CustomerServiceKnowledgePanel
+            session={session}
+            variant="panel"
+            onClose={onClose}
+            onInsert={(payload) => {
+              emitCustomerServiceAssistantInsert(payload.text);
+              onClose();
+            }}
+            onNotice={setNotice}
+          />
+        )}
+      </div>
+    </aside>
   );
 }

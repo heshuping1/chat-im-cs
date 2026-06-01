@@ -18,7 +18,6 @@ import { ContactsInviteQrCard } from "./ContactsInviteQrCard";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
 import {
-  type DepartmentDto,
   type FriendInviteQrDto,
   type FriendRequestDto,
 } from "../data/api-client";
@@ -30,6 +29,7 @@ import {
   contactRowHint,
   contactRowSubtitle,
   createContactDirectoryEntries,
+  groupOrganizationContactsByRole,
   requestStatusLabel,
 } from "../data/contact-directory";
 import type { ContactFilter, ContactItem } from "../data/types";
@@ -58,7 +58,6 @@ export function ContactsPage() {
     createDirectChatPending,
     createInviteQrPending,
     deleteFriend,
-    departments,
     directoryContacts,
     directoryError,
     directoryLoading,
@@ -201,7 +200,6 @@ export function ContactsPage() {
         <div className="contacts-list" aria-label="通讯录列表">
           {effectiveFilter === "organization" ? (
             <OrganizationList
-              departments={departments}
               contacts={visibleContacts}
               activeContactId={activeContact?.id}
               onSelect={setActiveContact}
@@ -410,84 +408,35 @@ function ContactAvatar({
 }
 
 function OrganizationList({
-  departments,
   contacts,
   activeContactId,
   onSelect,
 }: {
-  departments: DepartmentDto[];
   contacts: ContactItem[];
   activeContactId?: string;
   onSelect: (id: string) => void;
 }) {
-  const { contactsByDepartmentId, contactsWithoutDepartment } = useMemo(() => {
-    const grouped = new Map<string, ContactItem[]>();
-    const withoutDepartment: ContactItem[] = [];
-    for (const contact of contacts) {
-      if (!contact.departmentId) {
-        withoutDepartment.push(contact);
-        continue;
-      }
-      const group = grouped.get(contact.departmentId);
-      if (group) {
-        group.push(contact);
-      } else {
-        grouped.set(contact.departmentId, [contact]);
-      }
-    }
-    return {
-      contactsByDepartmentId: grouped,
-      contactsWithoutDepartment: withoutDepartment,
-    };
-  }, [contacts]);
+  const roleGroups = useMemo(() => groupOrganizationContactsByRole(contacts), [contacts]);
 
-  if (departments.length === 0) {
-    return contacts.map((contact) => (
-      <ContactRow
-        active={activeContactId === contact.id}
-        compact
-        contact={contact}
-        key={contact.id}
-        onClick={() => onSelect(contact.id)}
-      />
-    ));
-  }
   return (
     <>
-      {departments.map((department) => {
-        const departmentContacts =
-          contactsByDepartmentId.get(department.departmentId) ?? [];
-        return (
-          <section className="org-section" key={department.departmentId}>
-            <div className="org-section-head">
-              <Building2 size={15} />
-              <strong>{department.departmentName}</strong>
-              <em>{department.memberCount ?? departmentContacts.length} 人</em>
-            </div>
-            {departmentContacts.length > 0 ? (
-              departmentContacts.map((contact) => (
-                <ContactRow
-                  active={activeContactId === contact.id}
-                  compact
-                  contact={contact}
-                  key={contact.id}
-                  onClick={() => onSelect(contact.id)}
-                />
-              ))
-            ) : (
-              <PanelState text="暂无成员" />
-            )}
-          </section>
-        );
-      })}
-      {contactsWithoutDepartment.map((contact) => (
-        <ContactRow
-          active={activeContactId === contact.id}
-          compact
-          contact={contact}
-          key={contact.id}
-          onClick={() => onSelect(contact.id)}
-        />
+      {roleGroups.map((group) => (
+        <section className="org-section" key={group.key}>
+          <div className="org-section-head">
+            <UsersRound size={15} />
+            <strong>{group.label}</strong>
+            <em>{group.count} 人</em>
+          </div>
+          {group.contacts.map((contact) => (
+            <ContactRow
+              active={activeContactId === contact.id}
+              compact
+              contact={contact}
+              key={contact.id}
+              onClick={() => onSelect(contact.id)}
+            />
+          ))}
+        </section>
       ))}
     </>
   );

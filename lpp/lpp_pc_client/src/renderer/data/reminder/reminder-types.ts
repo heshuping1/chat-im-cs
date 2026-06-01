@@ -23,7 +23,10 @@ export type PcRealtimeReminderInput = Omit<PcRealtimeReminder, "createdAt">;
 export type ReminderPolicySettings = Pick<
   PcSettings,
   | "desktopNotifications"
+  | "doNotDisturb"
   | "imNotifications"
+  | "notificationPreview"
+  | "notificationSound"
   | "serviceQueueNotifications"
   | "slaTimeoutNotifications"
 >;

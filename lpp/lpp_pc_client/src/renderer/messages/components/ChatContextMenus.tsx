@@ -10,7 +10,6 @@ import {
   Forward,
   Languages,
   Reply,
-  Sparkles,
   Star,
   TextCursorInput,
   Trash2,
@@ -114,7 +113,6 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
     ...(actions.copy
       ? [
           { action: "copy" as const, label: "复制", icon: <Copy size={15} /> },
-          { action: "ai_reply" as const, label: "AI 回复", icon: <Sparkles size={15} /> },
           { action: "translate" as const, label: "翻译", icon: <Languages size={15} /> },
         ]
       : []),

@@ -11,6 +11,7 @@ import {
 import { ServiceMessageBubble } from "./ServiceMessageBubble";
 
 type ServiceMessageMenuState = {
+  canAiDraft?: boolean;
   message: MessageItemDto;
   x: number;
   y: number;
@@ -95,6 +96,7 @@ export function CustomerServiceMessageStage({
 
       {messageMenu && (
         <ServiceMessageContextMenu
+          canAiDraft={messageMenu.canAiDraft}
           message={messageMenu.message}
           onAction={(action) => onMenuAction(action, messageMenu.message)}
           position={{ x: messageMenu.x, y: messageMenu.y }}

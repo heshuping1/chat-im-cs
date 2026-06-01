@@ -675,6 +675,7 @@ APP 端"退出登录"。撤销当前 `deviceId` 下该 APP 账号的**所有 ses
 | `/invitations/{code}` | GET | 预览邀请对应的租户信息，平台 Token 可选 |
 | `/invitations/{code}/accept` | POST | 接受邀请码加入租户 |
 | `/tenants/{tenantId}/join-request` | POST | 提交加入申请 |
+| `/tenants/by-code/{code}` | GET | 凭企业码预览企业信息(只读),用于"输码→确认→加入" |
 | `/tenants/join-by-code` | POST | 通过企业码申请加入租户 |
 | `/my/join-requests` | GET | 查询我提交过的加入申请 |
 | `/my/join-requests/{requestId}` | DELETE | 撤销尚未处理的加入申请 |
@@ -731,6 +732,37 @@ APP 端"退出登录"。撤销当前 `deviceId` 下该 APP 账号的**所有 ses
 - 如果该租户配置了 `joinApprovalMode = "manual"`（默认），则创建待审批申请，返回 `{ "status": "pending", "message": "join request submitted, awaiting approval" }`
 - 自动通过时，系统会自动建立默认官方账号关系、客服分配关系及对应服务会话；后台后续可再改绑当前负责客服
 - 企业码即 `tenant_code`，可在管理后台租户详情页查看和复制
+
+> ⚠️ **`join-by-code` 是"加入动作",不是"查询"。** `manual` 审批的租户返回的 `data` 是 `{status:"pending",...}`,**不包含企业名/Logo**——这是正常的待审批响应,不是"查询为空"。若要在加入前展示企业信息,请先调下面的 `GET /tenants/by-code/{code}` 预览。
+
+#### `GET /tenants/by-code/{code}`
+
+凭企业码**预览**企业信息(只读,不写库、不创建申请),用于"用户输企业码 → 展示企业信息确认 → 再调 `join-by-code`"的流程。需要平台 Token。
+
+- 企业码 `tenant_code` **精确匹配、大小写不敏感**;
+- **不受 `isListed` 限制**——与 `join-by-code` 对齐:能用企业码加入的企业,就能用企业码预览(即便它没设为公开展示);
+- 不存在或非 `Active` → `404 TENANT_NOT_FOUND`;企业码留空 → `400 TENANT_CODE_REQUIRED`;无 Token → `401`。
+
+响应 `data`(`TenantCodePreviewDto`):
+
+```json
+{
+  "tenantId": "租户 ID",
+  "tenantCode": "mouse-corp",
+  "tenantName": "Mouse 测试企业",
+  "logoUrl": "https://.../media/xxxx",
+  "tenantDescription": "企业简介",
+  "industry": "tech",
+  "memberCount": 48,
+  "joinApprovalMode": "manual",
+  "alreadyMember": false
+}
+```
+
+- `joinApprovalMode`:`auto` = 加入即生效;`manual` = 加入后需管理员/客服审批。客户端可据此提示用户"申请后需等待审批"还是"可直接加入"。
+- `alreadyMember`:当前登录账号是否已是该企业成员。为 `true` 时,客户端应把按钮从"申请加入"改为"进入企业"。
+
+推荐流程:`GET /tenants/by-code/{code}`(展示确认)→ 用户点确认 → `POST /tenants/join-by-code`(提交)。
 
 #### `POST /invitations/{code}/accept`
 
@@ -1320,10 +1352,10 @@ Base URL：`/api/client/v1`，需要租户级 Token。
 
 说明：
 
-- 邀请管理接口仅管理员或所有者可调用
+- 邀请管理接口(创建/列表/撤销)需 **客服 / 管理员 / 所有者** 角色(`membershipRole >= 2`)。**2026-05-31 起放宽**:原为仅管理员/所有者(`>= 3`),现客服(2)也可管理邀请码;技术(1)、普通成员(0)仍不可,调用返回 `403 TENANT_PERMISSION_DENIED`("only customer service, admin or owner can manage invitations")
 - `targetIdentifier` 为空时为通用邀请
 - 非空时服务端会将邀请标记为定向邀请
-- `GET /tenant/invitations` 与 `DELETE /tenant/invitations/{invitationId}` 仅管理员或所有者可调用
+- `GET /tenant/invitations` 与 `DELETE /tenant/invitations/{invitationId}` 同样为客服/管理员/所有者可调用
 
 ### 4.4 加入申请审批
 

@@ -3,7 +3,6 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
-import type { ModuleKey } from "../../data/types";
 import { formatError } from "../../lib/format";
 import {
   messageMediaFileName,
@@ -44,7 +43,6 @@ export function useMessageMenuActionController({
   deleteMessage,
   favoriteMessage,
   session,
-  setActiveModule,
   setForwardTargetMessages,
   setMessageAnnotations,
   setMessageMenu,
@@ -61,7 +59,6 @@ export function useMessageMenuActionController({
   favoriteMessage: (message: MessageItemDto) => void;
   recallMessage: (messageId: string) => void;
   session: AuthSession | null;
-  setActiveModule: (module: ModuleKey) => void;
   setForwardTargetMessages: Dispatch<SetStateAction<MessageItemDto[]>>;
   setMessageAnnotations: Dispatch<SetStateAction<MessageAnnotationMap>>;
   setMessageMenu: Dispatch<SetStateAction<MessageMenuState>>;
@@ -128,11 +125,6 @@ export function useMessageMenuActionController({
             : message.senderDisplayName || activeConversation?.title || "对方",
           preview: messageActionPreview(message),
         });
-        return;
-      }
-      if (action === "ai_reply") {
-        setActiveModule("aiAssistant");
-        setNotice("AI 助手已打开，可以基于当前消息起草回复。");
         return;
       }
       if (action === "translate") {
@@ -223,7 +215,6 @@ export function useMessageMenuActionController({
       favoriteMessage,
       recallMessage,
       session,
-      setActiveModule,
       setForwardTargetMessages,
       setMessageAnnotations,
       setMessageMenu,

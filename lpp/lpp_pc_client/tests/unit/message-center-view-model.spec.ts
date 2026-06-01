@@ -81,8 +81,35 @@ describe("message center view model", () => {
       id: "friend-u2",
       kind: "customer",
       name: "Alice Friend",
-      source: "客户通讯录",
     });
+    expect(viewModel.activeConversationContact).not.toHaveProperty("source");
+  });
+
+  it("does not inject fake source channel for direct conversation fallback contacts", () => {
+    const direct = conversation({
+      conversationId: "c1",
+      conversationType: "direct",
+      peerUserId: "u2",
+      peerUserType: 1,
+      title: "Alice",
+    });
+
+    const viewModel = createMessageCenterViewModel({
+      activeConversationId: "c1",
+      conversations: [direct],
+      draftsByConversation: {},
+      friends: [],
+      groupMembers: [],
+      imReadStateByConversation: {},
+      unreadIdentity: null,
+      visibleConversations: [direct],
+    });
+
+    expect(viewModel.activeConversationContact).toMatchObject({
+      kind: "customer",
+      name: "Alice",
+    });
+    expect(viewModel.activeConversationContact).not.toHaveProperty("source");
   });
 
   it("derives loading, error and empty state text for the page shell", () => {

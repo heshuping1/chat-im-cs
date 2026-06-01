@@ -11,13 +11,24 @@ import {
   Video,
 } from "lucide-react";
 import type {
+  CSSProperties,
   MouseEvent as ReactMouseEvent,
   MutableRefObject,
   PointerEvent as ReactPointerEvent,
   ReactElement,
   ReactNode,
 } from "react";
-import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
+import {
+  cloneElement,
+  forwardRef,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { formatError } from "../lib/format";
 import {
   type WechatEmojiItem,
@@ -50,39 +61,26 @@ import {
 
 export type { ScreenshotShortcut };
 
-export function MessageComposer({
-  placeholder,
-  disabled = false,
-  dense = false,
-  attachmentUi = "stacked",
-  attachmentScopeKey,
-  combinedAttachmentTool = false,
-  enableScreenshot = false,
-  screenshotShortcut = "Alt+A",
-  leadingTools,
-  extraTools,
-  draftValue,
-  draftEditorState,
-  mentionOptions = [],
-  onResizeStart,
-  onDraftChange,
-  onDraftPreviewChange,
-  onDraftEditorStateChange,
-  onTranslateDraft,
-  onOpenContactCardPicker,
-  onSendText,
-  onSendMedia,
-}: {
+export type MessageComposerHandle = {
+  focus: () => void;
+  insertText: (text: string) => void;
+};
+
+type MessageComposerProps = {
   placeholder: string;
   disabled?: boolean;
   dense?: boolean;
   attachmentUi?: "stacked" | "compact";
   attachmentScopeKey?: string;
   combinedAttachmentTool?: boolean;
+  enterToSend?: boolean;
+  dragUpload?: boolean;
+  shortcutHints?: boolean;
   enableScreenshot?: boolean;
   screenshotShortcut?: ScreenshotShortcut;
   leadingTools?: ReactNode;
   extraTools?: ReactNode;
+  showDefaultQuickReplyTool?: boolean;
   draftValue?: string;
   draftEditorState?: string;
   mentionOptions?: Array<{ id: string; label: string }>;
@@ -94,7 +92,41 @@ export function MessageComposer({
   onOpenContactCardPicker?: () => void;
   onSendText: (content: string) => void | Promise<void>;
   onSendMedia: (file: File, kind: ComposerMediaKind) => void | Promise<void>;
-}) {
+};
+
+type FloatingPanelPosition = {
+  left: number;
+  top: number;
+};
+
+export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposerProps>(
+  function MessageComposer({
+  placeholder,
+  disabled = false,
+  dense = false,
+  attachmentUi = "stacked",
+  attachmentScopeKey,
+  combinedAttachmentTool = false,
+  enterToSend = true,
+  dragUpload = true,
+  shortcutHints = true,
+  enableScreenshot = false,
+  screenshotShortcut = "Alt+A",
+  leadingTools,
+  extraTools,
+  showDefaultQuickReplyTool = true,
+  draftValue,
+  draftEditorState,
+  mentionOptions = [],
+  onResizeStart,
+  onDraftChange,
+  onDraftPreviewChange,
+  onDraftEditorStateChange,
+  onTranslateDraft,
+  onOpenContactCardPicker,
+  onSendText,
+  onSendMedia,
+}, ref) {
   const [internalDraft, setInternalDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [attachmentsByScope, setAttachmentsByScope] = useState<
@@ -108,6 +140,7 @@ export function MessageComposer({
     null,
   );
   const [moreOpen, setMoreOpen] = useState(false);
+  const [morePanelPosition, setMorePanelPosition] = useState<FloatingPanelPosition | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [recentEmojis, setRecentEmojis] = useState<WechatEmojiItem[]>([]);
   const [draftTranslation, setDraftTranslation] = useState<{
@@ -121,6 +154,8 @@ export function MessageComposer({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lexicalInputRef = useRef<LexicalChatInputHandle | null>(null);
   const composerRef = useRef<HTMLElement | null>(null);
+  const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const morePanelRef = useRef<HTMLDivElement | null>(null);
   const previewUrlsRef = useRef<string[]>([]);
 
   const draft = draftValue ?? internalDraft;
@@ -136,12 +171,67 @@ export function MessageComposer({
         .filter((item) => item.label.toLowerCase().includes(mentionMatch[1].toLowerCase()))
         .slice(0, 6)
     : [];
-  const updateDraft = (value: string) => {
+  const updateDraft = useCallback((value: string) => {
     if (draftValue === undefined) {
       setInternalDraft(value);
     }
     onDraftChange?.(value);
-  };
+  }, [draftValue, onDraftChange]);
+
+  const updateMorePanelPosition = useCallback(() => {
+    const button = moreButtonRef.current;
+    if (!button) return;
+    const buttonRect = button.getBoundingClientRect();
+    const panelWidth = Math.min(320, Math.max(280, window.innerWidth - 24));
+    const panelHeight = morePanelRef.current?.getBoundingClientRect().height ?? 152;
+    const margin = 12;
+    const gap = 10;
+    const maxLeft = Math.max(margin, window.innerWidth - panelWidth - margin);
+    const left = Math.min(
+      maxLeft,
+      Math.max(margin, buttonRect.left + buttonRect.width / 2 - panelWidth / 2),
+    );
+    const topAbove = buttonRect.top - panelHeight - gap;
+    const topBelow = buttonRect.bottom + gap;
+    const top =
+      topAbove >= margin
+        ? topAbove
+        : Math.min(
+            Math.max(margin, topBelow),
+            Math.max(margin, window.innerHeight - panelHeight - margin),
+          );
+    setMorePanelPosition({ left, top });
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => focusComposerInput(textareaRef, compactComposer, lexicalInputRef),
+      insertText: (text) => {
+        if (disabled || !text) return;
+        setDraftTranslation(null);
+        if (compactComposer) {
+          lexicalInputRef.current?.insertText(text);
+          return;
+        }
+        const textarea = textareaRef.current;
+        const current = draft;
+        const start = textarea?.selectionStart ?? current.length;
+        const end = textarea?.selectionEnd ?? start;
+        const prefix = start > 0 && !/\s$/.test(current.slice(0, start)) ? "\n" : "";
+        const suffix =
+          end < current.length && !/^\s/.test(current.slice(end)) ? "\n" : "";
+        const next = `${current.slice(0, start)}${prefix}${text}${suffix}${current.slice(end)}`;
+        const nextCursor = start + prefix.length + text.length;
+        updateDraft(next);
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus();
+          textareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+        });
+      },
+    }),
+    [compactComposer, disabled, draft, updateDraft],
+  );
 
   const updateAttachments = (
     updater: (current: PendingAttachment[]) => PendingAttachment[],
@@ -200,12 +290,38 @@ export function MessageComposer({
     const closeFloatingPanels = (event: globalThis.PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && composerRef.current?.contains(target)) return;
+      if (target instanceof Node && morePanelRef.current?.contains(target)) return;
+      setEmojiOpen(false);
+      setMoreOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
       setEmojiOpen(false);
       setMoreOpen(false);
     };
     window.addEventListener("pointerdown", closeFloatingPanels);
-    return () => window.removeEventListener("pointerdown", closeFloatingPanels);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeFloatingPanels);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
   }, [emojiOpen, moreOpen]);
+
+  useEffect(() => {
+    if (!moreOpen) {
+      setMorePanelPosition(null);
+      return undefined;
+    }
+    updateMorePanelPosition();
+    const raf = window.requestAnimationFrame(updateMorePanelPosition);
+    window.addEventListener("resize", updateMorePanelPosition);
+    window.addEventListener("scroll", updateMorePanelPosition, true);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateMorePanelPosition);
+      window.removeEventListener("scroll", updateMorePanelPosition, true);
+    };
+  }, [moreOpen, updateMorePanelPosition]);
 
   const sendDraft = async () => {
     if (compactComposer) {
@@ -285,6 +401,10 @@ export function MessageComposer({
     }
     updateAttachments((current) => [...current, ...nextItems]);
     setMoreOpen(false);
+  };
+
+  const rejectDragUpload = () => {
+    setError("文件拖拽上传已在设置中关闭，可使用文件按钮选择上传。");
   };
 
   const captureScreenshot = async () => {
@@ -381,11 +501,17 @@ export function MessageComposer({
     <footer
       ref={composerRef}
       className={`composer ${dense ? "e-composer" : ""}`}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+      }}
       onDrop={(event) => {
         event.preventDefault();
         if (event.dataTransfer.files.length) {
-          addFiles(event.dataTransfer.files);
+          if (dragUpload) {
+            addFiles(event.dataTransfer.files);
+          } else {
+            rejectDragUpload();
+          }
         }
       }}
     >
@@ -453,27 +579,33 @@ export function MessageComposer({
           type="button"
           disabled={disabled}
           aria-label="截图"
-          title={screenshotShortcut === "None" ? "截图" : `截图 ${screenshotShortcut}`}
+          title={
+            shortcutHints && screenshotShortcut !== "None"
+              ? `截图 ${screenshotShortcut}`
+              : "截图"
+          }
           onClick={() => void captureScreenshot()}
         >
           <Scissors size={16} />
           <span className={dense ? "tool-label" : ""}>
-            {enableScreenshot && screenshotShortcut !== "None" && (
+            {shortcutHints && enableScreenshot && screenshotShortcut !== "None" && (
               <em className="tool-shortcut">{screenshotShortcut}</em>
             )}
           </span>
         </button>
         <span className="composer-tool-separator" aria-hidden="true" />
         {leadingTools}
-        <button
-          type="button"
-          disabled={disabled}
-          aria-label="话术"
-          title="话术"
-        >
-          <MessageSquareQuote size={16} />
-          <span className={dense ? "tool-label" : ""}>话术</span>
-        </button>
+        {showDefaultQuickReplyTool && (
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label="话术"
+            title="话术"
+          >
+            <MessageSquareQuote size={16} />
+            <span className={dense ? "tool-label" : ""}>话术</span>
+          </button>
+        )}
         {renderComposerExtraTools({
           extraTools,
           disabled: disabled || translatingDraft || !draft.trim(),
@@ -481,6 +613,7 @@ export function MessageComposer({
           title: translatingDraft ? "翻译中" : undefined,
         })}
         <button
+          ref={moreButtonRef}
           type="button"
           disabled={disabled}
           className={moreOpen ? "active" : ""}
@@ -503,36 +636,49 @@ export function MessageComposer({
         />
       )}
       {moreOpen && (
-        <div className="composer-plus-panel composer-plus-note" role="menu" aria-label="更多发送功能">
-          <strong>更多发送能力</strong>
-          <div className="composer-plus-grid">
-            <button className="composer-plus-item" type="button" disabled>
-              <Mic size={17} />
-              <span>语音</span>
-              <em>待接入</em>
-            </button>
-            <button className="composer-plus-item" type="button" disabled>
-              <Video size={17} />
-              <span>视频</span>
-              <em>待接入</em>
-            </button>
-            <button
-              className="composer-plus-item"
-              type="button"
-              aria-label="名片"
-              disabled={disabled}
-              onClick={() => {
-                setMoreOpen(false);
-                onOpenContactCardPicker?.();
-              }}
-            >
-              <UserRound size={17} />
-              <span>名片</span>
-              <em>联系人</em>
-            </button>
-          </div>
-          <p>选择联系人后发送个人名片。</p>
-        </div>
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={morePanelRef}
+            className="composer-plus-panel composer-plus-note"
+            role="menu"
+            aria-label="发送内容"
+            style={{
+              left: morePanelPosition?.left ?? 0,
+              top: morePanelPosition?.top ?? 0,
+              visibility: morePanelPosition ? "visible" : "hidden",
+            } satisfies CSSProperties}
+          >
+            <strong>发送内容</strong>
+            <div className="composer-plus-grid">
+              <button className="composer-plus-item is-disabled" type="button" disabled>
+                <Mic size={17} />
+                <span>语音</span>
+                <em>待接入</em>
+              </button>
+              <button className="composer-plus-item is-disabled" type="button" disabled>
+                <Video size={17} />
+                <span>视频</span>
+                <em>待接入</em>
+              </button>
+              <button
+                className="composer-plus-item is-primary"
+                type="button"
+                aria-label="发送联系人名片"
+                disabled={disabled}
+                onClick={() => {
+                  setMoreOpen(false);
+                  onOpenContactCardPicker?.();
+                }}
+              >
+                <UserRound size={17} />
+                <span>名片</span>
+                <em>发送联系人名片</em>
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )
       )}
       {mentionCandidates.length > 0 && (
         <div className="composer-mention-panel" role="listbox" aria-label="选择提醒对象">
@@ -591,6 +737,8 @@ export function MessageComposer({
             placeholder={placeholder}
             disabled={disabled}
             editorState={draftEditorState}
+            enterToSend={enterToSend}
+            dragUpload={dragUpload}
             attachments={lexicalAttachments}
             onDraftChange={({ editorState: nextEditorState, text, preview }) => {
               setRichHasText(text.trim().length > 0);
@@ -640,7 +788,12 @@ export function MessageComposer({
             }}
             onKeyDown={(event) => {
               if (event.key !== "Enter" || event.shiftKey) return;
-              if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+              if (!enterToSend && (event.ctrlKey || event.metaKey) && !event.altKey) {
+                event.preventDefault();
+                void sendDraft();
+                return;
+              }
+              if (enterToSend && !event.ctrlKey && !event.metaKey && !event.altKey) {
                 event.preventDefault();
                 void sendDraft();
               }
@@ -654,7 +807,7 @@ export function MessageComposer({
       />
     </footer>
   );
-}
+});
 
 function renderComposerExtraTools({
   extraTools,

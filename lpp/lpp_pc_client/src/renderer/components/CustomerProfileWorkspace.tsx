@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { DragEvent, ReactNode } from "react";
 import type {
   ConversationListItem,
   CustomerProfileCard,
@@ -70,9 +70,12 @@ export function CustomerProfileWorkspace({
   contact,
   error,
   errorMode = "blocking",
+  headerActions,
   loading = false,
   onUpdateRemark,
   onUpdateTags,
+  onDragOver,
+  onDrop,
   profileActionPending = false,
   profileExtra,
   profile,
@@ -85,9 +88,12 @@ export function CustomerProfileWorkspace({
   contact?: ContactItem | null;
   error?: unknown;
   errorMode?: CustomerProfileErrorMode;
+  headerActions?: ReactNode;
   loading?: boolean;
   onUpdateRemark?: (remarkName: string) => Promise<void> | void;
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
+  onDragOver?: (event: DragEvent<HTMLElement>) => void;
+  onDrop?: (event: DragEvent<HTMLElement>) => void;
   profileActionPending?: boolean;
   profileExtra?: FriendProfileExtraDto;
   profile?: CustomerProfileCard;
@@ -114,9 +120,14 @@ export function CustomerProfileWorkspace({
     <aside
       className={`customer-profile-workspace customer-info-panel ${className}`.trim()}
       data-customer-profile-variant={variant}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       <header className="customer-info-head">
         <h2>{title}</h2>
+        {headerActions && (
+          <div className="customer-info-head-actions">{headerActions}</div>
+        )}
       </header>
 
       <section className="customer-profile-hero">

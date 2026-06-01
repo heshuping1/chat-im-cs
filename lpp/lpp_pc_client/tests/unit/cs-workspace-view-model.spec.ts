@@ -13,7 +13,7 @@ import {
 } from "../../src/renderer/data/customer-service/cs-workspace-view-model";
 
 describe("customer service workspace view model", () => {
-  it("selects current live temp sessions before history", () => {
+  it("does not select a thread without an explicit selected id", () => {
     const live = thread({ threadId: "live", status: "serving" });
     const closed = thread({ threadId: "closed", status: "closed_by_staff" });
     const history: StaffServiceHistoryItem = {
@@ -30,8 +30,8 @@ describe("customer service workspace view model", () => {
           activeItems: [live],
           queueItems: [closed],
         },
-      })?.threadId,
-    ).toBe("live");
+      }),
+    ).toBeUndefined();
   });
 
   it("selects explicit history thread when requested", () => {
@@ -86,7 +86,7 @@ describe("customer service workspace view model", () => {
   it("centralizes no-thread, loading, error and empty states", () => {
     expect(createCustomerServiceNoThreadState()).toMatchObject({
       kind: "empty",
-      text: "请选择一个在线客服会话",
+      text: "选择排队、进行中或历史会话后开始处理。",
       tone: "muted",
     });
     expect(createCustomerServiceMessageStageState({ loading: true, messageCount: 0 })).toMatchObject({
@@ -106,7 +106,7 @@ describe("customer service workspace view model", () => {
     });
     expect(createCustomerServiceMessageStageState({ messageCount: 0 })).toMatchObject({
       kind: "empty",
-      text: "暂无消息记录",
+      text: "暂无消息记录，可先查看客户资料或等待访客发起对话。",
       tone: "muted",
     });
     expect(createCustomerServiceMessageStageState({ messageCount: 1 })).toBeUndefined();

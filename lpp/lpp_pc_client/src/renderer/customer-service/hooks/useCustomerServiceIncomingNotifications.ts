@@ -119,7 +119,7 @@ function notifyIncomingCustomerServiceMessage({
         body,
         conversationId: targetId,
       },
-      { channel: "serviceQueue" },
+      { channel: "serviceQueue", settings: pcSettings },
     );
   }
 }

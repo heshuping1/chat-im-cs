@@ -1,11 +1,11 @@
 {
   "event": "msg.new",
-  "traceId": "019e5a709e99777bb45dacc525e41ef1",
-  "sentAt": "2026-05-24T14:43:10.6174166\u002B00:00",
+  "traceId": "019e71c13092739ba49af245676dab8f",
+  "sentAt": "2026-05-29T03:22:26.8347143\u002B00:00",
   "data": {
     "tenantId": "11111111-1111-1111-1111-111111111111",
-    "messageId": "019e5a70-9dff-7b38-9eb0-07f6ffc53d6f",
-    "conversationId": "019e5a70-9d05-7d24-8889-9bb9bc1f8ecb",
+    "messageId": "019e71c1-2faf-7d9a-bac1-2460ecf30284",
+    "conversationId": "019e71c1-2ef9-72fc-a037-6d02de0a1605",
     "conversationSeq": 3,
     "messageType": "text",
     "body": {
@@ -20,20 +20,20 @@
       "event": null,
       "kind": null
     },
-    "senderUserId": "019e5a70-9b73-7070-b4ca-73a42d2a5489",
-    "deviceId": "019e5a70-9b78-7a9c-9f6a-0a1731d0f192",
+    "senderUserId": "019e71c1-2d49-7d5d-af17-19bf81c735a6",
+    "deviceId": "019e71c1-2d50-7bcf-ab4a-4baab190c606",
     "appId": null,
-    "replyToMessageId": "019e5a70-9d1b-7fa2-b9e0-9c6783855432",
+    "replyToMessageId": "019e71c1-2f34-775a-bc24-5c73143e1c38",
     "forwardFromMessageId": null,
     "mentions": [
       {
-        "userId": "019e5a70-9bb8-7750-9ac5-c9e0f55721ff",
+        "userId": "019e71c1-2da2-7399-a765-9509a808c5d1",
         "offset": 0,
         "length": 4
       }
     ],
     "clientMsgId": "alice-reply-001",
-    "sentAt": "2026-05-24T14:43:10.4634627\u002B00:00",
+    "sentAt": "2026-05-29T03:22:26.6074539\u002B00:00",
     "isRecalled": false
   }
 }

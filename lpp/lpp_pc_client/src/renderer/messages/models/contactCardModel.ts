@@ -14,7 +14,13 @@ export type ContactCardRelationStatus =
   | "none";
 
 export interface NormalizedContactCard extends ContactCardDto {
+  lppId?: string | null;
   subtitle?: string;
+}
+
+export interface AnchoredContactCardProfile extends NormalizedContactCard {
+  x: number;
+  y: number;
 }
 
 export type ContactCardRelation =
@@ -45,7 +51,7 @@ export function normalizeContactCard(value: unknown): NormalizedContactCard {
   const mobile = stringField(record, "mobile", "phone", "phoneNumber", "phone_number");
   const email = stringField(record, "email", "mail");
   const lppId = stringField(record, "lppId", "lpp_id", "userNo", "user_no");
-  return {
+  const normalized = {
     userId:
       stringField(
         record,
@@ -58,10 +64,12 @@ export function normalizeContactCard(value: unknown): NormalizedContactCard {
       ) || "",
     displayName,
     avatarUrl: stringField(record, "avatarUrl", "avatar_url", "avatar", "photoUrl") ?? null,
+    lppId,
     mobile,
     email,
-    subtitle: lppId || mobile || email || "个人名片",
+    subtitle: lppId || "个人名片",
   };
+  return normalized;
 }
 
 export function contactCardMessageBody(card: NormalizedContactCard | ContactCardDto) {

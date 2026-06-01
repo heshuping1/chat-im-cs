@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type DragEvent, type ReactNode } from "react";
 
 import { CustomerProfileWorkspace } from "../../components/CustomerProfileWorkspace";
 import { PanelState } from "../../components/PanelState";
@@ -20,9 +20,12 @@ export function ConversationInfoPanel({
   conversation,
   groupAvatar,
   groupMembers,
+  headerActions,
   loadingGroupMembers: _loadingGroupMembers = false,
   onUpdateRemark,
   onUpdateTags,
+  onDragOver,
+  onDrop,
   profile,
   profileActionPending = false,
   profileError,
@@ -35,9 +38,12 @@ export function ConversationInfoPanel({
   conversation?: ConversationListItem;
   groupAvatar?: GroupConversationAvatar;
   groupMembers?: GroupMemberDto[];
+  headerActions?: ReactNode;
   loadingGroupMembers?: boolean;
   onUpdateRemark?: (remarkName: string) => Promise<void> | void;
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
+  onDragOver?: (event: DragEvent<HTMLElement>) => void;
+  onDrop?: (event: DragEvent<HTMLElement>) => void;
   profile?: CustomerProfileCard;
   profileActionPending?: boolean;
   profileError?: unknown;
@@ -72,9 +78,12 @@ export function ConversationInfoPanel({
         conversation={conversation}
         errorMode="silent"
         error={profileError}
+        headerActions={headerActions}
         loading={profileLoading || profileExtraLoading}
         onUpdateRemark={onUpdateRemark}
         onUpdateTags={onUpdateTags}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         profile={profile}
         profileActionPending={profileActionPending}
         profileExtra={profileExtra}
@@ -87,9 +96,16 @@ export function ConversationInfoPanel({
   const unread = effectiveConversationUnreadCount(conversation, userIdentity);
   const selectedTab = tabs.includes(activeTab) ? activeTab : "资料";
   return (
-    <aside className="e-profile-panel customer-info-panel message-info-panel">
+    <aside
+      className="e-profile-panel customer-info-panel message-info-panel"
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <header className="customer-info-head">
         <h2>群聊资料</h2>
+        {headerActions && (
+          <div className="customer-info-head-actions">{headerActions}</div>
+        )}
       </header>
       <section className="customer-info-card">
         <div className="customer-info-identity">

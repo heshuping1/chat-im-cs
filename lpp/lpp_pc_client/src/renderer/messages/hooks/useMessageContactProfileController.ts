@@ -12,7 +12,7 @@ import { requireApiClient } from "../../data/runtime";
 import {
   resolveContactCardRelation,
   contactCardActionErrorText,
-  type NormalizedContactCard,
+  type AnchoredContactCardProfile,
 } from "../models/contactCardModel";
 
 export function useMessageContactProfileController({
@@ -27,11 +27,11 @@ export function useMessageContactProfileController({
 }: {
   activeConversation?: ConversationListItem;
   activeConversationType?: "direct" | "group";
-  contactCardProfile: NormalizedContactCard | null;
+  contactCardProfile: AnchoredContactCardProfile | null;
   friends: FriendDto[];
   queryClient: QueryClient;
   session: AuthSession | null;
-  setContactCardProfile: (profile: NormalizedContactCard | null) => void;
+  setContactCardProfile: (profile: AnchoredContactCardProfile | null) => void;
   setNotice: (notice: string | null) => void;
 }) {
   const [localOutgoingContactRequestIds, setLocalOutgoingContactRequestIds] =

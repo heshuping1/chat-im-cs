@@ -16,7 +16,9 @@ import {
   getClearAuthSessionAction,
   useAuthSession,
   useRestoreDesktopAuthSession,
+  useSetAuthSession,
 } from './data/auth/auth-store';
+import { siteLineManager } from './data/network/site-line-manager';
 import { markFirstInteractive } from './data/performance/startup-performance';
 import type { PcSettings } from './data/settings/pc-settings';
 import { usePcSettings } from './data/settings/settings-store';
@@ -32,6 +34,7 @@ import {
   useMessageLayoutMode,
   useMessageProfileVisible,
   useProfilePaneWidth,
+  useServiceLayoutMode,
   useSetActiveModule,
 } from './data/workspace-ui/workspace-ui-store';
 import './styles/theme.css';
@@ -56,11 +59,6 @@ import './styles/messages/message-center.css';
 import './styles/messages/context-menu.css';
 import './styles/messages/toast.css';
 
-const AiAssistantPage = lazy(() =>
-  import('./components/AiAssistantPage').then((module) => ({
-    default: module.AiAssistantPage,
-  })),
-);
 const GatewayBridge = lazy(() =>
   import('./components/GatewayBridge').then((module) => ({
     default: module.GatewayBridge,
@@ -150,9 +148,11 @@ export default function App() {
   const profilePaneWidth = useProfilePaneWidth();
   const authSession = useAuthSession();
   const restoreDesktopAuthSession = useRestoreDesktopAuthSession();
+  const setAuthSession = useSetAuthSession();
   const pcSettings = usePcSettings();
   const messageProfileVisible = useMessageProfileVisible();
   const messageLayoutMode = useMessageLayoutMode();
+  const serviceLayoutMode = useServiceLayoutMode();
   const workspaceAccess = derivePcWorkspaceAccess(authSession);
   const safeKnownModule = normalizeActiveModule(activeModule);
   const safeActiveModule = normalizeActiveModuleForAccess(
@@ -168,6 +168,26 @@ export default function App() {
   useEffect(() => {
     void restoreDesktopAuthSession?.();
   }, [restoreDesktopAuthSession]);
+  useEffect(() => {
+    let cancelled = false;
+    void siteLineManager.bootstrap().then((result) => {
+      if (cancelled) return;
+      const latestSession = getAuthSessionSnapshot();
+      if (!latestSession || latestSession.apiBaseUrl === result.currentSite.apiBaseUrl) return;
+      queryClient.clear();
+      setAuthSession({ ...latestSession, apiBaseUrl: result.currentSite.apiBaseUrl });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [setAuthSession]);
+  useEffect(() => {
+    const lineState = siteLineManager.getSnapshot();
+    if (!authSession || !lineState.initialized) return;
+    if (authSession.apiBaseUrl === lineState.currentSite.apiBaseUrl) return;
+    queryClient.clear();
+    setAuthSession({ ...authSession, apiBaseUrl: lineState.currentSite.apiBaseUrl });
+  }, [authSession, setAuthSession]);
   useEffect(() => {
     markFirstInteractive(authSession ? 'authenticated-shell' : 'login');
   }, [authSession]);
@@ -185,7 +205,9 @@ export default function App() {
             className={`app-shell ${
               safeActiveModule === 'messages'
                 ? `messages-layout layout-${messageLayoutMode} ${messageProfileVisible ? '' : 'profile-collapsed'}`
-                : 'page-layout'
+                : safeActiveModule === 'onlineService'
+                  ? `service-layout layout-${serviceLayoutMode}`
+                  : 'page-layout'
             } ${pcSettings.highDensityContext ? 'is-density-compact' : ''} ${
               pcSettings.highContrastBoundary ? 'is-boundary-strong' : ''
             }`}
@@ -235,8 +257,6 @@ function ActiveModulePage({
       return <ContactsPage />;
     case 'knowledgeBase':
       return <KnowledgeBasePage />;
-    case 'aiAssistant':
-      return <AiAssistantPage />;
     case 'enterpriseSwitch':
       return <EnterpriseSwitchPage />;
     case 'favorites':
@@ -262,7 +282,6 @@ const knownModuleKeys = new Set<ModuleKey>([
   'messages',
   'onlineService',
   'knowledgeBase',
-  'aiAssistant',
   'contacts',
   'ticketCenter',
   'dataCenter',

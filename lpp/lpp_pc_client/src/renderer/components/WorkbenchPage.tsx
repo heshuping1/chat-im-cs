@@ -22,6 +22,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
+import { normalizeKnowledgeBasesResponse } from "../data/api/knowledge-normalizers";
 import { createApiClient } from "../data/runtime";
 import { customerServiceReceptionStatusLabel } from "../data/customer-service-display";
 import {
@@ -145,6 +146,7 @@ export function WorkbenchPage() {
   const summary = threadsQuery.data?.summary;
   const announcementCount = announcementsQuery.data?.length;
   const receptionStatus = receptionQuery.data?.serviceStatus;
+  const knowledgeBases = normalizeKnowledgeBasesResponse(knowledgeBasesQuery.data);
 
   function handleShortcutAction(item: WorkbenchShortcut) {
     setSelectedShortcutId(item.id);
@@ -250,7 +252,7 @@ export function WorkbenchPage() {
               }
               item={selectedShortcut}
               markRead={(id) => readMutation.mutate(id)}
-              knowledgeBases={knowledgeBasesQuery.data ?? []}
+              knowledgeBases={knowledgeBases}
               knowledgeError={
                 knowledgeBasesQuery.isError
                   ? formatError(knowledgeBasesQuery.error)

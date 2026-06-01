@@ -21,9 +21,15 @@ describe("workspace ui store selectors", () => {
       activeImConversationId: "conversation-1",
       activeContactId: "contact-1",
       listPaneWidth: 220,
-      profilePaneWidth: 330,
+      profilePaneWidth: 400,
       serviceListPaneWidth: 340,
-      serviceProfilePaneWidth: 330,
+      serviceProfilePaneWidth: 400,
+      serviceAssistantPaneWidth: 400,
+      serviceCustomerPaneCollapsed: false,
+      serviceListPaneCollapsed: false,
+      serviceAssistantPane: null,
+      serviceLayoutMode: "full" as const,
+      sidebarCollapsed: false,
       messageProfileVisible: true,
       messageLayoutMode: "full" as const,
       filter: "all" as const,
@@ -38,6 +44,12 @@ describe("workspace ui store selectors", () => {
       setProfilePaneWidth: vi.fn(),
       setServiceListPaneWidth: vi.fn(),
       setServiceProfilePaneWidth: vi.fn(),
+      setServiceAssistantPaneWidth: vi.fn(),
+      setServiceCustomerPaneCollapsed: vi.fn(),
+      setServiceListPaneCollapsed: vi.fn(),
+      setServiceAssistantPane: vi.fn(),
+      setServiceLayoutMode: vi.fn(),
+      setSidebarCollapsed: vi.fn(),
       setMessageProfileVisible: vi.fn(),
       setMessageLayoutMode: vi.fn(),
       setFilter,
@@ -53,11 +65,15 @@ describe("workspace ui store selectors", () => {
     expect(selectMessageLayoutState(state)).toMatchObject({
       listPaneWidth: 220,
       messageLayoutMode: "full",
-      profilePaneWidth: 330,
+      profilePaneWidth: 400,
     });
     expect(selectServiceLayoutState(state)).toMatchObject({
+      serviceAssistantPane: null,
+      serviceAssistantPaneWidth: 400,
+      serviceCustomerPaneCollapsed: false,
+      serviceListPaneCollapsed: false,
       serviceListPaneWidth: 340,
-      serviceProfilePaneWidth: 330,
+      serviceProfilePaneWidth: 400,
     });
   });
 });

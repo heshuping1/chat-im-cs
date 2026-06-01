@@ -70,7 +70,102 @@ export {
 // Compatibility export only. New code should import reminder types from data/reminder/reminder-types.
 export type { PcRealtimeReminder } from '../reminder/reminder-types';
 
-export type MessageLayoutMode = 'full' | 'no-profile' | 'chat-focus' | 'rail-focus';
+export type MessageLayoutMode =
+  | 'full'
+  | 'no-assistant'
+  | 'no-profile'
+  | 'compact-sidebar'
+  | 'no-sidebar'
+  | 'chat-focus';
+export type ServiceLayoutMode =
+  | 'full'
+  | 'no-assistant'
+  | 'no-customer'
+  | 'compact-sidebar'
+  | 'no-sidebar'
+  | 'queue-focus'
+  | 'chat-focus';
+export type ServiceAssistantPane = 'aiDraft' | 'knowledge' | 'quickReply' | null;
+
+const serviceLayoutStorageKey = 'lpp.pc.service-layout';
+const serviceLayoutDefaults = {
+  assistantPane: null as ServiceAssistantPane,
+  assistantPaneWidth: 400,
+  customerPaneCollapsed: false,
+  listPaneCollapsed: false,
+  listPaneWidth: 340,
+  profilePaneWidth: 400,
+};
+const legacyServiceLayoutDefaults = {
+  assistantPaneWidth: 360,
+  profilePaneWidth: 330,
+};
+
+type StoredServiceLayout = Partial<typeof serviceLayoutDefaults> & {
+  customerPaneUserCollapsed?: boolean;
+  listPaneUserCollapsed?: boolean;
+};
+
+function clampPaneWidth(width: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, Math.round(width)));
+}
+
+function readStoredServiceLayout(): StoredServiceLayout {
+  try {
+    const storage = typeof window === 'undefined' ? null : window.localStorage;
+    const raw = storage?.getItem(serviceLayoutStorageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      assistantPane:
+        parsed.assistantPane === 'aiDraft' ||
+        parsed.assistantPane === 'knowledge' ||
+        parsed.assistantPane === 'quickReply'
+          ? parsed.assistantPane
+          : null,
+      assistantPaneWidth:
+        typeof parsed.assistantPaneWidth === 'number'
+          ? parsed.assistantPaneWidth === legacyServiceLayoutDefaults.assistantPaneWidth
+            ? serviceLayoutDefaults.assistantPaneWidth
+            : clampPaneWidth(parsed.assistantPaneWidth, 320, 420)
+          : undefined,
+      customerPaneCollapsed:
+        typeof parsed.customerPaneUserCollapsed === 'boolean'
+          ? parsed.customerPaneUserCollapsed
+          : undefined,
+      listPaneCollapsed:
+        typeof parsed.listPaneUserCollapsed === 'boolean'
+          ? parsed.listPaneUserCollapsed
+          : undefined,
+      listPaneWidth:
+        typeof parsed.listPaneWidth === 'number'
+          ? clampPaneWidth(parsed.listPaneWidth, 260, 420)
+          : undefined,
+      profilePaneWidth:
+        typeof parsed.profilePaneWidth === 'number'
+          ? parsed.profilePaneWidth === legacyServiceLayoutDefaults.profilePaneWidth
+            ? serviceLayoutDefaults.profilePaneWidth
+            : clampPaneWidth(parsed.profilePaneWidth, 300, 440)
+          : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function persistServiceLayoutPatch(patch: StoredServiceLayout) {
+  try {
+    const storage = typeof window === 'undefined' ? null : window.localStorage;
+    if (!storage) return;
+    const current = readStoredServiceLayout();
+    storage.setItem(
+      serviceLayoutStorageKey,
+      JSON.stringify({ ...current, ...patch }),
+    );
+  } catch {
+    // Layout persistence is best-effort; UI state still works in memory.
+  }
+}
 
 function readStoredAuth(): AuthSession | null {
   return readStoredAuthSession();
@@ -90,9 +185,15 @@ interface WorkspaceState {
   profilePaneWidth: number;
   serviceListPaneWidth: number;
   serviceProfilePaneWidth: number;
+  serviceAssistantPaneWidth: number;
+  serviceCustomerPaneCollapsed: boolean;
+  serviceListPaneCollapsed: boolean;
+  serviceAssistantPane: ServiceAssistantPane;
+  serviceLayoutMode: ServiceLayoutMode;
+  sidebarCollapsed: boolean;
   messageProfileVisible: boolean;
   messageLayoutMode: MessageLayoutMode;
-  filter: 'all' | 'queued' | 'serving' | 'vip';
+  filter: 'all' | 'queued' | 'serving' | 'sla';
   messageFilter: 'all' | 'friends' | 'groups' | 'unread';
   contactFilter: ContactFilter;
   imPresenceStatus: TrayStatus;
@@ -120,6 +221,12 @@ interface WorkspaceState {
   setProfilePaneWidth: (width: number) => void;
   setServiceListPaneWidth: (width: number) => void;
   setServiceProfilePaneWidth: (width: number) => void;
+  setServiceAssistantPaneWidth: (width: number) => void;
+  setServiceCustomerPaneCollapsed: (collapsed: boolean) => void;
+  setServiceListPaneCollapsed: (collapsed: boolean) => void;
+  setServiceAssistantPane: (pane: ServiceAssistantPane) => void;
+  setServiceLayoutMode: (mode: ServiceLayoutMode) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   setMessageProfileVisible: (visible: boolean) => void;
   setMessageLayoutMode: (mode: MessageLayoutMode) => void;
   setFilter: (filter: WorkspaceState['filter']) => void;
@@ -137,6 +244,7 @@ interface WorkspaceState {
 }
 
 const initialAuthSession = readStoredAuth();
+const initialServiceLayout = readStoredServiceLayout();
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   authSession: initialAuthSession,
@@ -149,9 +257,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   imReadStateByConversation: readStoredImReadState(initialAuthSession),
   activeContactId: '',
   listPaneWidth: 220,
-  profilePaneWidth: 330,
-  serviceListPaneWidth: 340,
-  serviceProfilePaneWidth: 330,
+  profilePaneWidth: 400,
+  serviceListPaneWidth: initialServiceLayout.listPaneWidth ?? serviceLayoutDefaults.listPaneWidth,
+  serviceProfilePaneWidth:
+    initialServiceLayout.profilePaneWidth ?? serviceLayoutDefaults.profilePaneWidth,
+  serviceAssistantPaneWidth:
+    initialServiceLayout.assistantPaneWidth ?? serviceLayoutDefaults.assistantPaneWidth,
+  serviceCustomerPaneCollapsed:
+    initialServiceLayout.customerPaneCollapsed ?? serviceLayoutDefaults.customerPaneCollapsed,
+  serviceListPaneCollapsed:
+    initialServiceLayout.listPaneCollapsed ?? serviceLayoutDefaults.listPaneCollapsed,
+  serviceAssistantPane:
+    initialServiceLayout.assistantPane ?? serviceLayoutDefaults.assistantPane,
+  serviceLayoutMode: 'full',
+  sidebarCollapsed: false,
   messageProfileVisible: true,
   messageLayoutMode: 'full',
   filter: 'all',
@@ -344,9 +463,43 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setProfilePaneWidth: (width) =>
     set({ profilePaneWidth: Math.min(440, Math.max(280, Math.round(width))) }),
   setServiceListPaneWidth: (width) =>
-    set({ serviceListPaneWidth: Math.min(430, Math.max(300, Math.round(width))) }),
+    set(() => {
+      const serviceListPaneWidth = clampPaneWidth(width, 260, 420);
+      persistServiceLayoutPatch({ listPaneWidth: serviceListPaneWidth });
+      return { serviceListPaneWidth };
+    }),
   setServiceProfilePaneWidth: (width) =>
-    set({ serviceProfilePaneWidth: Math.min(440, Math.max(300, Math.round(width))) }),
+    set(() => {
+      const serviceProfilePaneWidth = clampPaneWidth(width, 300, 440);
+      persistServiceLayoutPatch({ profilePaneWidth: serviceProfilePaneWidth });
+      return { serviceProfilePaneWidth };
+    }),
+  setServiceAssistantPaneWidth: (width) =>
+    set(() => {
+      const serviceAssistantPaneWidth = clampPaneWidth(width, 320, 420);
+      persistServiceLayoutPatch({ assistantPaneWidth: serviceAssistantPaneWidth });
+      return { serviceAssistantPaneWidth };
+    }),
+  setServiceCustomerPaneCollapsed: (serviceCustomerPaneCollapsed) =>
+    set(() => {
+      persistServiceLayoutPatch({ customerPaneUserCollapsed: serviceCustomerPaneCollapsed });
+      return { serviceCustomerPaneCollapsed };
+    }),
+  setServiceListPaneCollapsed: (serviceListPaneCollapsed) =>
+    set(() => {
+      persistServiceLayoutPatch({ listPaneUserCollapsed: serviceListPaneCollapsed });
+      return { serviceListPaneCollapsed };
+    }),
+  setServiceAssistantPane: (serviceAssistantPane) =>
+    set(() => {
+      persistServiceLayoutPatch({ assistantPane: serviceAssistantPane });
+      return { serviceAssistantPane };
+    }),
+  setServiceLayoutMode: (serviceLayoutMode) =>
+    set((state) =>
+      state.serviceLayoutMode === serviceLayoutMode ? state : { serviceLayoutMode },
+    ),
+  setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
   setMessageProfileVisible: (messageProfileVisible) => set({ messageProfileVisible }),
   setMessageLayoutMode: (messageLayoutMode) =>
     set((state) =>

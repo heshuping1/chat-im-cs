@@ -150,7 +150,7 @@ export function createCustomerServiceWorkspaceViewModel(
 export function createCustomerServiceNoThreadState(): CustomerServiceWorkspaceInlineState {
   return {
     kind: "empty",
-    text: "请选择一个在线客服会话",
+    text: "选择排队、进行中或历史会话后开始处理。",
     tone: "muted",
   };
 }
@@ -177,7 +177,7 @@ export function createCustomerServiceMessageStageState(input: {
   if (input.messageCount === 0) {
     return {
       kind: "empty",
-      text: "暂无消息记录",
+      text: "暂无消息记录，可先查看客户资料或等待访客发起对话。",
       tone: "muted",
     };
   }
@@ -192,12 +192,11 @@ export function selectCustomerServiceThread(input: {
     queueItems?: CustomerServiceThread[];
   };
 }) {
+  const selectedThreadId = input.selectedThreadId?.trim();
+  if (!selectedThreadId) return undefined;
   const selectableThreads = listCustomerServiceSelectableThreads(input);
 
-  return (
-    selectableThreads.find((thread) => thread.threadId === input.selectedThreadId) ??
-    selectableThreads[0]
-  );
+  return selectableThreads.find((thread) => thread.threadId === selectedThreadId);
 }
 
 export function listCustomerServiceSelectableThreads(input: {

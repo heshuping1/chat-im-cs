@@ -249,6 +249,22 @@
 | `industry` | string? | 行业 |
 | `memberCount` | int | 成员数 |
 
+### 3.10B `TenantCodePreviewDto`
+
+凭企业码预览(`GET /api/platform/v1/tenants/by-code/{code}`)的返回。不受 `isListed` 限制,用于"输企业码→展示确认→再 `join-by-code`"。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `tenantId` | GUID | 租户 ID |
+| `tenantCode` | string | 企业码(规范化小写) |
+| `tenantName` | string | 企业名称 |
+| `logoUrl` | string? | Logo |
+| `tenantDescription` | string? | 企业简介 |
+| `industry` | string? | 行业 |
+| `memberCount` | int | 活跃成员数 |
+| `joinApprovalMode` | string | `auto`=加入即生效;`manual`=加入后需审批 |
+| `alreadyMember` | bool | 当前登录账号是否已是该企业成员 |
+
 ### 3.11 `InvitationDto`
 
 | 字段 | 类型 | 说明 |

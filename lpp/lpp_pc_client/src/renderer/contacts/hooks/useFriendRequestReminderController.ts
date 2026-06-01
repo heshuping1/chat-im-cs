@@ -99,7 +99,7 @@ export function useFriendRequestReminderController() {
           body: reminder.body,
           conversationId: reminder.id,
         },
-        { channel: "im" },
+        { channel: "im", settings: pcSettings },
       );
     }
   }, [

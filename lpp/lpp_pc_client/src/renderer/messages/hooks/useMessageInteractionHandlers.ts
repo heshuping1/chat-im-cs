@@ -1,7 +1,12 @@
 import { useCallback } from "react";
 import type { Dispatch, MouseEvent, SetStateAction } from "react";
 
-import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
+import type {
+  ConversationListItem,
+  CustomerProfileCard,
+  FriendProfileExtraDto,
+  MessageItemDto,
+} from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
 import {
   buildAvatarProfilePopover,
@@ -10,7 +15,7 @@ import {
 } from "../models/messageDisplayModel";
 import {
   normalizeContactCard,
-  type NormalizedContactCard,
+  type AnchoredContactCardProfile,
 } from "../models/contactCardModel";
 import { requestMessageDangerConfirmation } from "../runtime/messageConfirm";
 
@@ -26,12 +31,19 @@ type ConversationMenuState = {
   y: number;
 } | null;
 
+const PROFILE_POPOVER_GAP = 12;
+const PROFILE_POPOVER_VIEWPORT_PADDING = 16;
+const AVATAR_PROFILE_POPOVER_SIZE = { width: 320, height: 244 };
+const CONTACT_CARD_PROFILE_POPOVER_SIZE = { width: 340, height: 372 };
+
 export function useMessageInteractionHandlers({
   activeConversation,
   activeConversationId,
   deleteMessage,
   groupMemberMap,
   messageListScrollRegistry,
+  profile,
+  profileExtra,
   selectedMessageIds,
   session,
   setActiveConversation,
@@ -52,11 +64,13 @@ export function useMessageInteractionHandlers({
   messageListScrollRegistry: {
     scrollToMessage: (messageId: string, onMissing?: () => void) => void;
   };
+  profile?: CustomerProfileCard;
+  profileExtra?: FriendProfileExtraDto;
   selectedMessageIds: Set<string>;
   session: AuthSession | null;
   setActiveConversation: (conversationId: string) => void;
   setAvatarProfilePopover: Dispatch<SetStateAction<AvatarProfilePopoverState | null>>;
-  setContactCardProfile: Dispatch<SetStateAction<NormalizedContactCard | null>>;
+  setContactCardProfile: Dispatch<SetStateAction<AnchoredContactCardProfile | null>>;
   setConversationMenu: Dispatch<SetStateAction<ConversationMenuState>>;
   setLocalHiddenConversationIds: Dispatch<SetStateAction<Set<string>>>;
   setLocalMutedConversationIds: Dispatch<SetStateAction<Set<string>>>;
@@ -155,17 +169,22 @@ export function useMessageInteractionHandlers({
           groupMembers: groupMemberMap,
           message,
           mine,
+          profile,
+          profileExtra,
           session,
-          x: mine
-            ? Math.max(16, Math.min(rect.right - 300, window.innerWidth - 332))
-            : Math.min(rect.left + 44, window.innerWidth - 332),
-          y: Math.max(12, Math.min(rect.top, window.innerHeight - 244)),
+          ...resolveFloatingProfilePosition(rect, {
+            panelHeight: AVATAR_PROFILE_POPOVER_SIZE.height,
+            panelWidth: AVATAR_PROFILE_POPOVER_SIZE.width,
+            preferSide: mine ? "left" : "right",
+          }),
         }),
       );
     },
     [
       activeConversation,
       groupMemberMap,
+      profile,
+      profileExtra,
       session,
       setAvatarProfilePopover,
       setMessageMenu,
@@ -179,7 +198,14 @@ export function useMessageInteractionHandlers({
       event.stopPropagation();
       setMessageMenu(null);
       setNotice(null);
-      setContactCardProfile(normalizeContactCard(value));
+      const rect = event.currentTarget.getBoundingClientRect();
+      setContactCardProfile({
+        ...normalizeContactCard(value),
+        ...resolveFloatingProfilePosition(rect, {
+          panelHeight: CONTACT_CARD_PROFILE_POPOVER_SIZE.height,
+          panelWidth: CONTACT_CARD_PROFILE_POPOVER_SIZE.width,
+        }),
+      });
     },
     [setContactCardProfile, setMessageMenu, setNotice],
   );
@@ -232,4 +258,50 @@ export function useMessageInteractionHandlers({
     openMessageMenu,
     scrollToMessage,
   };
+}
+
+function resolveFloatingProfilePosition(
+  anchor: DOMRect,
+  {
+    panelHeight,
+    panelWidth,
+    preferSide,
+  }: {
+    panelHeight: number;
+    panelWidth: number;
+    preferSide?: "left" | "right";
+  },
+) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const spaceRight = viewportWidth - anchor.right - PROFILE_POPOVER_VIEWPORT_PADDING;
+  const spaceLeft = anchor.left - PROFILE_POPOVER_VIEWPORT_PADDING;
+  const side =
+    preferSide && (preferSide === "right" ? spaceRight : spaceLeft) >= panelWidth
+      ? preferSide
+      : spaceRight >= panelWidth || spaceRight >= spaceLeft
+        ? "right"
+        : "left";
+  const rawX =
+    side === "right"
+      ? anchor.right + PROFILE_POPOVER_GAP
+      : anchor.left - panelWidth - PROFILE_POPOVER_GAP;
+  const rawY = anchor.top + anchor.height / 2 - panelHeight / 2;
+  return {
+    x: clamp(
+      rawX,
+      PROFILE_POPOVER_VIEWPORT_PADDING,
+      viewportWidth - panelWidth - PROFILE_POPOVER_VIEWPORT_PADDING,
+    ),
+    y: clamp(
+      rawY,
+      PROFILE_POPOVER_VIEWPORT_PADDING,
+      viewportHeight - panelHeight - PROFILE_POPOVER_VIEWPORT_PADDING,
+    ),
+  };
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (max < min) return min;
+  return Math.max(min, Math.min(value, max));
 }

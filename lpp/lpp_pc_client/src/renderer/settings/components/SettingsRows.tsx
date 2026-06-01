@@ -16,7 +16,7 @@ export function InlineSettingsState({
 
 export function SwitchRow({
   checked,
-  capability = "active",
+  capability = "available",
   desc,
   disabledReason,
   enabled = true,
@@ -65,7 +65,7 @@ export function SwitchRow({
 }
 
 export function SelectRow<T extends string>({
-  capability = "active",
+  capability = "available",
   desc,
   disabledReason,
   enabled = true,
@@ -120,7 +120,7 @@ export function SelectRow<T extends string>({
 
 export function ActionRow({
   action,
-  capability = "active",
+  capability = "available",
   desc,
   disabledReason,
   enabled = true,
@@ -169,7 +169,7 @@ export function ActionRow({
 }
 
 export function InfoRow({
-  capability = "active",
+  capability = "available",
   desc,
   disabledReason,
   label,
@@ -233,7 +233,10 @@ function SettingsRowCopy({
 }
 
 function statusText(capability: SettingCapability) {
-  if (capability === "pending" || capability === "recordOnly") return "暂未支持";
-  if (capability === "readonly") return "只读";
+  if (capability === "localEffective") return "本机生效";
+  if (capability === "recordOnly") return "状态展示";
+  if (capability === "missingBackendApi") return "缺少接口";
+  if (capability === "missingDesktopApi") return "缺少桌面能力";
+  if (capability === "missingRuntimeWiring") return "待接入流程";
   return "";
 }

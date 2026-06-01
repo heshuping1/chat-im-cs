@@ -2,6 +2,7 @@ import type {
   ComponentProps,
   CSSProperties,
   Dispatch,
+  DragEvent,
   Ref,
   SetStateAction,
 } from "react";
@@ -13,11 +14,12 @@ import type {
   GroupMemberDto,
   MessageItemDto,
 } from "../../data/api-client";
+import type { MessageComposerHandle } from "../../components/MessageComposer";
 import type { AuthSession } from "../../data/auth/auth-session";
 import type { ConversationReadState } from "../../data/im-read-model";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import type { PcSettings } from "../../data/settings/pc-settings";
-import type { ContactItem, ModuleKey } from "../../data/types";
+import type { ContactItem } from "../../data/types";
 import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
 import { requireApiClient } from "../../data/runtime";
 import { extractActionResultText, type ReplyTarget } from "../models/messageComposerModel";
@@ -42,6 +44,7 @@ import { MessageChatHeader } from "./MessageChatHeader";
 import { MessageComposerDock } from "./MessageComposerDock";
 import { MessageDialogsLayer } from "./MessageDialogsLayer";
 import { MessageListPanel } from "./MessageListPanel";
+import { MessageContextRail, type MessageContextPane } from "./MessageContextRail";
 import { MessageOverlayLayer } from "./MessageOverlayLayer";
 import { MessageProfileDock } from "./MessageProfileDock";
 import type { ContactPickerItem } from "./MessageStartDialogs";
@@ -65,6 +68,7 @@ export function MessageCenterConversationStage({
   contactCardProfileLoading,
   contactCardRelation,
   chatPanelRef,
+  composerRef,
   canOpenAiAssistant,
   canOpenKnowledgeBase,
   composerDialog,
@@ -91,6 +95,7 @@ export function MessageCenterConversationStage({
   historyCounts,
   historyFilter,
   historyOpen,
+  activeAssistantPane,
   inviteQrError,
   inviteQrLoading,
   inviteQrs,
@@ -104,6 +109,7 @@ export function MessageCenterConversationStage({
   messageMenu,
   messageMenuMediaStatus,
   messageProfileVisible,
+  messageProfilePinned,
   messageSearchKeyword,
   messageSearchOpen,
   messageStageRef,
@@ -130,8 +136,15 @@ export function MessageCenterConversationStage({
   onSendContactCard,
   onForwardToConversation,
   onFailedMessageClick,
+  onMessageContextDragOver,
+  onMessageContextDragStart,
+  onMessageContextDrop,
   onMessageElementRef,
+  onAiDraft,
+  onKnowledgeBase,
+  onQuickReply,
   onResendMessage,
+  onToggleMessageProfilePin,
   openMessageMenu,
   pcSettings,
   pendingNewMessageCount,
@@ -150,7 +163,6 @@ export function MessageCenterConversationStage({
   selectedConversationEmptyText,
   selectedMessageIds,
   session,
-  setActiveModule,
   setComposerHeight,
   setConversationDrawerOpen,
   setDraftEditorStatesByConversation,
@@ -186,6 +198,7 @@ export function MessageCenterConversationStage({
   contactCardProfileLoading: MessageOverlayProps["contactCardProfileLoading"];
   contactCardRelation: MessageOverlayProps["contactCardRelation"];
   chatPanelRef: Ref<HTMLElement>;
+  composerRef?: Ref<MessageComposerHandle>;
   canOpenAiAssistant: boolean;
   canOpenKnowledgeBase: boolean;
   composerDialog: "direct" | "group" | "qr" | "card" | null;
@@ -214,6 +227,7 @@ export function MessageCenterConversationStage({
   historyCounts: Record<HistoryFilterKey, number>;
   historyFilter: HistoryFilterKey;
   historyOpen: boolean;
+  activeAssistantPane: MessageContextPane;
   inviteQrError: unknown;
   inviteQrLoading: boolean;
   inviteQrs: ComponentProps<typeof MessageDialogsLayer>["inviteQrs"];
@@ -227,6 +241,7 @@ export function MessageCenterConversationStage({
   messageMenu: MessageOverlayProps["messageMenu"];
   messageMenuMediaStatus: MessageOverlayProps["messageMenuMediaStatus"];
   messageProfileVisible: boolean;
+  messageProfilePinned: boolean;
   messageSearchKeyword: string;
   messageSearchOpen: boolean;
   messageStageRef: Ref<HTMLElement>;
@@ -253,8 +268,21 @@ export function MessageCenterConversationStage({
   onSendContactCard: ComponentProps<typeof MessageDialogsLayer>["onSendContactCard"];
   onForwardToConversation: (targetConversationId: string) => void;
   onFailedMessageClick: (message: MessageItemDto) => void;
+  onMessageContextDragOver: (event: DragEvent<HTMLElement>) => void;
+  onMessageContextDragStart: (
+    event: DragEvent<HTMLElement>,
+    pane: "assistant" | "profile",
+  ) => void;
+  onMessageContextDrop: (
+    event: DragEvent<HTMLElement>,
+    pane: "assistant" | "profile",
+  ) => void;
   onMessageElementRef: (messageId: string, element: HTMLDivElement | null) => void;
+  onAiDraft: () => void;
+  onKnowledgeBase: () => void;
+  onQuickReply: () => void;
   onResendMessage: () => void;
+  onToggleMessageProfilePin: () => void;
   openMessageMenu: ComponentProps<typeof MessageListPanel>["onContextMenu"];
   pcSettings: PcSettings;
   pendingNewMessageCount: number;
@@ -273,7 +301,6 @@ export function MessageCenterConversationStage({
   selectedConversationEmptyText: string;
   selectedMessageIds: Set<string>;
   session: AuthSession | null;
-  setActiveModule: (module: ModuleKey) => void;
   setComposerHeight: Dispatch<SetStateAction<number>>;
   setConversationDrawerOpen: Dispatch<SetStateAction<boolean>>;
   setDraftEditorStatesByConversation: Dispatch<SetStateAction<Record<string, string>>>;
@@ -306,6 +333,19 @@ export function MessageCenterConversationStage({
     activeConversationIsGroup ? "group-chat-mode" : "",
     profileStandaloneOpen ? "profile-standalone-open" : "",
   ].filter(Boolean).join(" ");
+  const toggleProfileFromRail = () => {
+    if (profileStandaloneOpen) {
+      setProfileStandaloneOpen(false);
+      return;
+    }
+    if (messageLayoutMode === "full") {
+      setMessageProfileVisible(!messageProfileVisible);
+      return;
+    }
+    setHistoryOpen(false);
+    setMessageSearchOpen(false);
+    setProfileStandaloneOpen(true);
+  };
 
   return (
     <>
@@ -323,17 +363,9 @@ export function MessageCenterConversationStage({
               customerSource={directCustomerHeaderMeta.source}
               headerTitle={activeConversationHeaderTitle}
               historyOpen={historyOpen}
-              layoutMode={messageLayoutMode}
-              messageProfileVisible={messageProfileVisible}
               messageSearchOpen={messageSearchOpen}
-              profileStandaloneOpen={profileStandaloneOpen}
               unreadIdentity={unreadIdentity}
               onOpenConversationDrawer={() => setConversationDrawerOpen(true)}
-              onOpenStandaloneProfile={() => {
-                setHistoryOpen(false);
-                setMessageSearchOpen(false);
-                setProfileStandaloneOpen(true);
-              }}
               onToggleLookup={() => {
                 const nextOpen = profileStandaloneOpen ? true : !(messageSearchOpen || historyOpen);
                 setProfileStandaloneOpen(false);
@@ -341,7 +373,6 @@ export function MessageCenterConversationStage({
                 setMessageSearchOpen(nextOpen);
                 if (nextOpen) setHistoryFilter("all");
               }}
-              onToggleProfileVisible={() => setMessageProfileVisible(!messageProfileVisible)}
             />
 
             {notice && <ChatToastNotice text={notice} />}
@@ -486,12 +517,16 @@ export function MessageCenterConversationStage({
                 messages={messages}
                 multiSelectMode={multiSelectMode}
                 replyTarget={replyTarget}
+                composerRef={composerRef}
                 screenshotShortcut={pcSettings.screenshotShortcut}
+                dragUpload={pcSettings.dragUpload}
+                enterToSend={pcSettings.enterToSend}
+                shortcutHints={pcSettings.shortcutHints}
                 selectedMessageIds={selectedMessageIds}
                 showAiTools={canOpenAiAssistant}
                 showKnowledgeTools={canOpenKnowledgeBase}
                 getChatPanelHeight={getChatPanelHeight}
-                onAiDraft={() => setActiveModule("aiAssistant")}
+                onAiDraft={onAiDraft}
                 onDraftChange={(conversationId, value) => {
                   setDraftsByConversation((current) => ({
                     ...current,
@@ -510,7 +545,8 @@ export function MessageCenterConversationStage({
                     [conversationId]: value,
                   }));
                 }}
-                onKnowledgeBase={() => setActiveModule("knowledgeBase")}
+                onKnowledgeBase={onKnowledgeBase}
+                onQuickReply={onQuickReply}
                 onTranslateDraft={async (content) =>
                   extractActionResultText(
                     await requireApiClient(session).translateText(content),
@@ -573,16 +609,49 @@ export function MessageCenterConversationStage({
           )}
           groupMembers={groupMembers}
           loadingGroupMembers={loadingGroupMembers}
+          pinned={messageProfilePinned}
           profilePaneWidth={profilePaneWidth}
           userIdentity={unreadIdentity}
+          onDragOverContextPane={onMessageContextDragOver}
+          onDragStartContextPane={onMessageContextDragStart}
+          onDropContextPane={onMessageContextDrop}
+          onTogglePin={onToggleMessageProfilePin}
           onResize={setProfilePaneWidth}
         />
       )}
+
+      <MessageContextRail
+        activeAssistantPane={activeAssistantPane}
+        conversation={activeConversation}
+        groupAvatar={
+          activeConversation
+            ? resolveGroupConversationAvatar(
+                activeConversation,
+                groupMembers,
+                groupAvatarSnapshotFor(activeConversation),
+              )
+            : undefined
+        }
+        isGroup={activeConversationIsGroup}
+        profileOpen={dockProfile || profileStandaloneOpen}
+        showAiTools={canOpenAiAssistant}
+        onToggleAssistantPane={(pane) => {
+          if (pane === "aiDraft") {
+            if (!canOpenAiAssistant) return;
+            onAiDraft();
+            return;
+          }
+          if (pane === "knowledge") {
+            onKnowledgeBase();
+            return;
+          }
+          onQuickReply();
+        }}
+        onToggleProfile={toggleProfileFromRail}
+      />
     </>
   );
 }
-
-const excludedHeaderSources = new Set(["客户通讯录", "好友通讯录", "好友私聊"]);
 
 function readCustomerHeaderApplicationName(profile?: StandaloneProfileProps["profile"]) {
   return profileValue(profile, [
@@ -616,9 +685,8 @@ function readCustomerHeaderSource(
         "from",
         "platform",
         "provider",
-      ], excludedHeaderSources),
+      ]),
     ],
-    excludedHeaderSources,
   );
 }
 

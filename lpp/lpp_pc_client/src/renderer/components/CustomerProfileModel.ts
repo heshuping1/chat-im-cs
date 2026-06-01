@@ -85,7 +85,7 @@ export function buildCustomerModel({
   const tags = profileExtraTags.length > 0 ? profileExtraTags : profile?.tags ?? [];
   const categorizedExternal = categorizeSections(external);
   const profileSource = sourceLabel(profile);
-  const source = textValue(firstKnownValue(profileExtra?.source, profileSource, contact?.source));
+  const source = textValue(firstKnownValue(profileExtra?.source, profileSource));
   const lppId = firstKnownValue(
     profileValue(profile, [
       "lppId",

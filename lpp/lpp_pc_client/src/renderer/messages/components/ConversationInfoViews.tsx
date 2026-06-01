@@ -11,10 +11,13 @@ import type {
 } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
-import type { AvatarProfilePopoverState } from "../models/messageDisplayModel";
+import {
+  buildContactCardProfilePopover,
+  type AvatarProfilePopoverState,
+} from "../models/messageDisplayModel";
 import type {
+  AnchoredContactCardProfile,
   ContactCardRelation,
-  NormalizedContactCard,
 } from "../models/contactCardModel";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
 import { ConversationInfoPanel } from "./ConversationInfoPanel";
@@ -127,16 +130,14 @@ export function AvatarProfilePopover({
           </div>
         ))}
       </div>
+      {profile.tags && profile.tags.length > 0 && (
+        <div className="pc-avatar-profile-tags" aria-label="标签">
+          {profile.tags.map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
+        </div>
+      )}
     </aside>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value || "--"}</strong>
-    </div>
   );
 }
 
@@ -156,7 +157,7 @@ export function ContactCardProfileDialog({
   relation,
 }: {
   actionPending?: boolean;
-  card: NormalizedContactCard;
+  card: AnchoredContactCardProfile;
   onAccept: () => void;
   onBlock: () => void;
   onClose: () => void;
@@ -170,15 +171,19 @@ export function ContactCardProfileDialog({
   relation: ContactCardRelation;
 }) {
   const [requestMessage, setRequestMessage] = useState("你好，我想添加你为好友");
-  const title = profile?.displayName || card.displayName;
-  const subtitle = profile?.lppId || card.subtitle || "个人名片";
+  const cardProfile = buildContactCardProfilePopover({
+    profile,
+    value: card as unknown as Record<string, unknown>,
+    x: card.x,
+    y: card.y,
+  });
+  const title = cardProfile.title;
   return (
-    <div className="pc-modal-backdrop contact-card-profile-backdrop" role="presentation" onClick={onClose}>
-      <section
+    <aside
         aria-label="名片资料"
-        aria-modal="true"
-        className="contact-card-profile-dialog"
+        className="pc-avatar-profile-popover contact-card-profile-dialog"
         role="dialog"
+        style={{ left: cardProfile.x, top: cardProfile.y }}
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -189,22 +194,24 @@ export function ContactCardProfileDialog({
         >
           <X size={15} />
         </button>
-        <header>
+        <header className="pc-avatar-profile-head">
           <PcAvatar
-            avatarUrl={profile?.avatarUrl ?? card.avatarUrl}
-            className="contact-card-profile-avatar"
+            avatarUrl={cardProfile.avatarUrl}
+            className="pc-avatar-profile-image"
             name={title}
           />
           <div>
             <strong>{title}</strong>
-            <span>{subtitle}</span>
+            <span>{cardProfile.subtitle}</span>
           </div>
         </header>
-        <div className="contact-card-profile-rows">
-          <InfoRow label="账号" value={profile?.lppId || card.userId} />
-          <InfoRow label="手机" value={profile?.mobile || card.mobile || "--"} />
-          <InfoRow label="邮箱" value={profile?.email || card.email || "--"} />
-          {profile?.signature && <InfoRow label="签名" value={profile.signature} />}
+        <div className="pc-avatar-profile-rows contact-card-profile-rows">
+          {cardProfile.rows.map((row) => (
+            <div key={row.label}>
+              <span>{row.label}</span>
+              <strong>{row.value || "--"}</strong>
+            </div>
+          ))}
         </div>
         {profileLoading && <p className="contact-card-profile-hint">正在读取资料...</p>}
         {!profileLoading && Boolean(profileError) && (
@@ -261,7 +268,6 @@ export function ContactCardProfileDialog({
             </>
           )}
         </footer>
-      </section>
-    </div>
+    </aside>
   );
 }

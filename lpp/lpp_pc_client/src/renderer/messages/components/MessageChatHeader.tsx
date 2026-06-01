@@ -1,9 +1,8 @@
-import { AppWindow, ChevronLeft, PanelRight, Search } from "lucide-react";
+import { AppWindow, ChevronLeft, Search } from "lucide-react";
 
 import { ChannelBadge, channelLabel } from "../../components/ChannelBadge";
 import type { ConversationListItem } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
-import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
 import { effectiveConversationUnreadCount } from "../../data/message-display";
 import { ConversationAvatar } from "./ConversationListParts";
 
@@ -14,15 +13,10 @@ export function MessageChatHeader({
   customerSource,
   headerTitle,
   historyOpen,
-  layoutMode,
-  messageProfileVisible,
   messageSearchOpen,
-  profileStandaloneOpen,
   unreadIdentity,
   onOpenConversationDrawer,
-  onOpenStandaloneProfile,
   onToggleLookup,
-  onToggleProfileVisible,
 }: {
   conversation: ConversationListItem;
   conversationIsGroup: boolean;
@@ -30,15 +24,10 @@ export function MessageChatHeader({
   customerSource?: string;
   headerTitle: string;
   historyOpen: boolean;
-  layoutMode: MessageLayoutMode;
-  messageProfileVisible: boolean;
   messageSearchOpen: boolean;
-  profileStandaloneOpen: boolean;
   unreadIdentity?: CurrentUserIdentity | null;
   onOpenConversationDrawer: () => void;
-  onOpenStandaloneProfile: () => void;
   onToggleLookup: () => void;
-  onToggleProfileVisible: () => void;
 }) {
   const lookupOpen = messageSearchOpen || historyOpen;
   const hasApplication = Boolean(customerApplicationName?.trim());
@@ -98,27 +87,18 @@ export function MessageChatHeader({
           aria-label="查找聊天内容"
           title="查找聊天内容"
           aria-pressed={lookupOpen}
-          onClick={onToggleLookup}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            onToggleLookup();
+          }}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            onToggleLookup();
+          }}
         >
           <Search size={18} />
-        </button>
-        <button
-          className={`e-icon-button ${
-            layoutMode === "full"
-              ? messageProfileVisible
-                ? "active"
-                : ""
-              : profileStandaloneOpen
-                ? "active"
-                : ""
-          }`}
-          type="button"
-          aria-label={conversationIsGroup ? "群聊资料" : "客户信息"}
-          title={conversationIsGroup ? "群聊资料" : "客户信息"}
-          aria-pressed={layoutMode === "full" ? messageProfileVisible : profileStandaloneOpen}
-          onClick={layoutMode === "full" ? onToggleProfileVisible : onOpenStandaloneProfile}
-        >
-          <PanelRight size={18} />
         </button>
       </div>
     </header>

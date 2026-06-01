@@ -35,7 +35,8 @@ Base URL：`/api/platform/v1`
 | `/invitations/{code}` | GET | 路径参数：`code` | `InvitationPreviewDto` | 平台 Token 可选；带 Token 时可返回是否已加入/是否匹配 |
 | `/invitations/{code}/accept` | POST | 路径参数：`code` | `tenantId` `userId` `platformUserId` `lppId` `displayName` `accessToken` `refreshToken` `expiresIn` `spaceContext` | 当前直接完成加入并换取租户级 Token |
 | `/tenants/{tenantId}/join-request` | POST | `message?` | `tenantId` | 路径上的 `tenantId` 即目标租户；提交后默认待审批；若租户配置了 `joinApprovalMode=auto` 则自动通过 |
-| `/tenants/join-by-code` | POST | `tenantCode` `message?` | 自动通过时返回 `tenantId` `userId` `platformUserId` `lppId` `displayName` `accessToken` `refreshToken` `expiresIn` `spaceContext`；人工审核时返回 `status` `message` | 通过企业码申请加入租户；`spaceContext.spaceType=2` |
+| `/tenants/by-code/{code}` | GET | 路径参数：`code` | `TenantCodePreviewDto`：`tenantId` `tenantCode` `tenantName` `logoUrl?` `tenantDescription?` `industry?` `memberCount` `joinApprovalMode(auto\|manual)` `alreadyMember` | 凭企业码**预览**企业信息(只读,不写库),用于"输码→展示确认→再申请"。企业码**精确匹配、大小写不敏感、不受 `isListed` 限制**;需平台 Token;不存在/非 Active 返回 `404 TENANT_NOT_FOUND` |
+| `/tenants/join-by-code` | POST | `tenantCode` `message?` | 自动通过时返回 `tenantId` `userId` `platformUserId` `lppId` `displayName` `accessToken` `refreshToken` `expiresIn` `spaceContext`；人工审核时返回 `status` `message` | 通过企业码**加入**租户(注意是加入动作不是查询);`joinApprovalMode=auto` 直接加入并返回租户 Token,`=manual` 仅创建待审申请并返回 `{status:"pending",...}`;`spaceContext.spaceType=2`。预览请用上面的 `/tenants/by-code/{code}` |
 | `/my/join-requests` | GET | 无 | `JoinRequestDto[]`，每项包含 `requestId` `tenantId` `platformUserId` `displayName?` `message?` `status` `createdAt` `reviewedAt?` `rejectReason?` | `displayName` 当前通常为 `null` |
 | `/my/join-requests/{requestId}` | DELETE | 路径参数：`requestId` | `requestId` | 仅能撤销当前账号自己仍处于 `pending` 的申请 |
 | `/account/deactivate` | POST | `verificationCode` `reason?` | `deactivatedAt` | 需要平台 Token；7 天冷静期 |
@@ -187,9 +188,9 @@ Base URL：`/api/client/v1`
 | `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户 |
 | `/tenant/members/{userId}` | DELETE | 路径参数：`userId` | `userId` | 当前实现返回被移除用户 ID |
 | `/tenant/members/{userId}/role` | PUT | `membershipRole` | `userId` | 仅所有者可修改角色 |
-| `/tenant/invitations` | POST | `maxUses` `expireHours` `targetIdentifier?` | `InvitationDto` | 仅管理员/所有者可调用；`inviteType=0(public)`、`1(targeted)`；`status=0(revoked)`、`1(active)`、`3(exhausted)` |
-| `/tenant/invitations` | GET | 无 | `InvitationDto[]` | 仅管理员/所有者可调用；最多返回最近 100 条 |
-| `/tenant/invitations/{invitationId}` | DELETE | 路径参数：`invitationId` | `invitationId` | 仅管理员/所有者可调用；删除动作本质是把状态改为 `0=revoked` |
+| `/tenant/invitations` | POST | `maxUses` `expireHours` `targetIdentifier?` | `InvitationDto` | **客服/管理员/所有者**可调用(2026-05-31 起放宽,原为仅管理员/所有者);`inviteType=0(public)`、`1(targeted)`；`status=0(revoked)`、`1(active)`、`3(exhausted)`；权限不足返回 `403 TENANT_PERMISSION_DENIED` |
+| `/tenant/invitations` | GET | 无 | `InvitationDto[]` | **客服/管理员/所有者**可调用(2026-05-31 起放宽);最多返回最近 100 条 |
+| `/tenant/invitations/{invitationId}` | DELETE | 路径参数：`invitationId` | `invitationId` | **客服/管理员/所有者**可调用(2026-05-31 起放宽);删除动作本质是把状态改为 `0=revoked` |
 | `/tenant/join-requests` | GET | 无 | `JoinRequestDto[]` | 仅管理员/所有者可调用；最多返回最近 100 条 |
 | `/tenant/join-requests/{requestId}/approve` | POST | 无 | `requestId` | 仅管理员/所有者可调用；把申请状态改为 `1=approved` |
 | `/tenant/join-requests/{requestId}/reject` | POST | `rejectReason?` | `requestId` | 仅管理员/所有者可调用；把申请状态改为 `2=rejected` |

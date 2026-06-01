@@ -46,6 +46,7 @@ function normalizeSuite(value) {
 function buildCommandPlans(targetSuite) {
   const daily = [
     command('typecheck', ['run', 'typecheck'], { stopOnFailure: true }),
+    command('build', ['run', 'build'], { stopOnFailure: true }),
     command('lint:boundaries', ['run', 'lint:boundaries'], { stopOnFailure: true }),
     command('test:core', ['run', 'test:core'], { stopOnFailure: true }),
     command('test:browser', ['run', 'test:browser'], { stopOnFailure: false }),
@@ -55,7 +56,6 @@ function buildCommandPlans(targetSuite) {
   ];
   const weekly = [
     ...daily,
-    command('build', ['run', 'build'], { stopOnFailure: false }),
     command('lint:core', ['run', 'lint:core'], { stopOnFailure: false }),
     command('lint:hooks', ['run', 'lint:hooks'], { stopOnFailure: false }),
     command('lint:shape', ['run', 'lint:shape'], { stopOnFailure: false }),
@@ -130,8 +130,9 @@ async function runCommandPlan(plan) {
     });
     child.on('close', (code) => resolve(code ?? 1));
   });
+  let timeoutId;
   const timeoutPromise = new Promise((resolve) => {
-    setTimeout(async () => {
+    timeoutId = setTimeout(async () => {
       timedOut = true;
       output += `\n[timeout] ${plan.name} exceeded ${plan.timeoutMs}ms; killing process tree.\n`;
       await killProcessTree(child);
@@ -139,6 +140,7 @@ async function runCommandPlan(plan) {
     }, plan.timeoutMs);
   });
   const exitCode = await Promise.race([closePromise, timeoutPromise]);
+  if (timeoutId) clearTimeout(timeoutId);
   await writeFile(logPath, output);
   const endedAt = new Date();
   return {

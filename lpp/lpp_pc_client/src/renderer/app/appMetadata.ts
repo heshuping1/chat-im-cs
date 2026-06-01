@@ -7,3 +7,5 @@ function normalizeProductName(value: unknown) {
 export const appProductName = normalizeProductName(
   typeof __LPP_PC_PRODUCT_NAME__ === "undefined" ? undefined : __LPP_PC_PRODUCT_NAME__,
 );
+
+export const appIconSrc = `${import.meta.env.BASE_URL}app-icon-green-bubble.png`;

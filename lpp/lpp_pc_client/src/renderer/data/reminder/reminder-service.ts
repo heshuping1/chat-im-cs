@@ -22,6 +22,7 @@ export interface DesktopNotificationPayload {
 
 export interface DesktopNotificationOptions {
   channel?: ReminderDesktopChannel;
+  settings?: ReminderPolicySettings;
 }
 
 export type DesktopNotificationResult =
@@ -82,6 +83,7 @@ export function shouldPushRealtimeReminder(
   settings: ReminderPolicySettings,
   channel: ReminderDesktopChannel,
 ) {
+  if (settings.doNotDisturb && channel === "im") return false;
   if (channel === "im") return settings.imNotifications;
   if (channel === "sla") return settings.slaTimeoutNotifications;
   return settings.serviceQueueNotifications;
@@ -111,7 +113,7 @@ export async function notifyDesktopOrBrowser(
 
   if (window.desktopApi?.notify) {
     try {
-      await window.desktopApi.notify(payload);
+      await window.desktopApi.notify(notificationPayloadForPolicy(payload, options.settings));
       logReminderDiagnostic({
         event: "reminder.desktop-notify",
         phase: "notify",
@@ -173,9 +175,11 @@ export async function notifyDesktopOrBrowser(
   }
 
   try {
-    new window.Notification(payload.title, {
-      body: payload.body,
+    const notificationPayload = notificationPayloadForPolicy(payload, options.settings);
+    new window.Notification(notificationPayload.title, {
+      body: notificationPayload.body,
       tag: payload.conversationId,
+      silent: options.settings ? !options.settings.notificationSound : undefined,
     });
     logReminderDiagnostic({
       event: "reminder.desktop-notify",
@@ -199,6 +203,19 @@ export async function notifyDesktopOrBrowser(
     });
     return { result: "failed", reason: "browser_failed", error };
   }
+}
+
+export function notificationPayloadForPolicy(
+  payload: DesktopNotificationPayload,
+  settings?: ReminderPolicySettings,
+): DesktopNotificationPayload {
+  if (settings?.notificationPreview === false) {
+    return {
+      ...payload,
+      body: "你有一条新提醒，内容已按隐私设置隐藏。",
+    };
+  }
+  return payload;
 }
 
 function desktopNotificationContext(

@@ -4,10 +4,11 @@ import {
   Building2,
   Check,
   ChartSpline,
+  ChevronRight,
   ClipboardCheck,
-  Bot,
   BookOpenText,
   Headset,
+  Info,
   LogOut,
   LayoutDashboard,
   Menu,
@@ -21,7 +22,6 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { TrayStatus } from "../../shared/desktop-api";
-import type { ConversationListItem } from "../data/api-client";
 import { normalizeCustomerServiceThreadType } from "../data/api-client";
 import {
   effectiveConversationUnreadCount,
@@ -56,12 +56,22 @@ import { usePcSettings } from "../data/settings/settings-store";
 import {
   useActiveModule,
   useImPresenceStatus,
+  useSetSidebarCollapsed,
+  useSidebarCollapsed,
   useSetActiveModule,
+  useSetCustomerServiceStatus,
   useSetImPresenceStatus,
 } from "../data/workspace-ui/workspace-ui-store";
+import { appIconSrc, appProductName } from "../app/appMetadata";
 import { requireApiClient } from "../data/runtime";
 import { imPresenceStatuses } from "../data/static-config";
-import type { ModuleKey } from "../data/types";
+import type { CustomerServiceStatus, ModuleKey } from "../data/types";
+import {
+  getReceptionControlSummary,
+  getReceptionStatusOption,
+  normalizeReceptionStatus,
+  receptionControlStatusOptions,
+} from "../customer-service/models/serviceReceptionControlModel";
 import { derivePcWorkspaceAccess } from "../data/workspace-access";
 import { formatBadgeCount, formatError } from "../lib/format";
 import { useFriendRequestReminderController } from "../contacts/hooks/useFriendRequestReminderController";
@@ -81,7 +91,6 @@ const primaryNavItems = [
   { key: "ticketCenter", label: "工单中心", icon: ClipboardCheck },
   { key: "dataCenter", label: "数据中心", icon: ChartSpline },
   { key: "knowledgeBase", label: "知识库", icon: BookOpenText },
-  { key: "aiAssistant", label: "AI 助手", icon: Bot },
 ] satisfies Array<{ key: ModuleKey; label: string; icon: typeof MessageCircleMore }>;
 
 const settingsNavItem = { key: "settings", label: "设置", icon: Settings } satisfies {
@@ -99,13 +108,41 @@ const accountNavItems = [
   icon: typeof Building2;
 }>;
 
+const sidebarReceptionStatusLabels: Record<CustomerServiceStatus, string> = {
+  online: "客服在线",
+  busy: "客服忙碌",
+  break: "短暂离开",
+  offline: "客服离线",
+};
+
+function accountAvatarDisplayUrl(value?: string | null, version?: number) {
+  const trimmed = value?.trim();
+  if (!trimmed || !version || /^(blob:|data:)/i.test(trimmed)) return trimmed;
+  if (/[?&]t=/.test(trimmed)) return trimmed;
+  return `${trimmed}${trimmed.includes("?") ? "&" : "?"}t=${version}`;
+}
+
+type SidebarServiceCounter = {
+  label: string;
+  name: string;
+  value: number | string;
+  tone: "active" | "warning" | "muted" | "danger";
+};
+
 export function Sidebar() {
   const queryClient = useQueryClient();
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
   const [accountPanel, setAccountPanel] = useState<AccountPanel>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [brandInfoOpen, setBrandInfoOpen] = useState(false);
+  const [serviceStatusOpen, setServiceStatusOpen] = useState(false);
+  const [spaceStatusOpen, setSpaceStatusOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState("0.1.0");
+  const [confirmedServiceStatus, setConfirmedServiceStatus] =
+    useState<CustomerServiceStatus | null>(null);
   const activeModule = useActiveModule();
+  const sidebarCollapsed = useSidebarCollapsed();
+  const setSidebarCollapsed = useSetSidebarCollapsed();
   const locallyReadConversationReads = useLocalImConversationReads();
   const imReadStateByConversation = useImReadStateByConversation();
   const authSession = useAuthSession();
@@ -113,6 +150,7 @@ export function Sidebar() {
   const clearAuthSession = useClearAuthSession();
   const setActiveModule = useSetActiveModule();
   const imPresenceStatus = useImPresenceStatus();
+  const setCustomerServiceStatus = useSetCustomerServiceStatus();
   const setImPresenceStatus = useSetImPresenceStatus();
   const pcSettings = usePcSettings();
   const pushRealtimeReminder = usePushRealtimeReminder();
@@ -144,15 +182,25 @@ export function Sidebar() {
     refetchIntervalInBackground: true,
     queryFn: async () => requireApiClient(authSession).getWorkbenchThreads(),
   });
+  const receptionStatusQuery = useQuery({
+    queryKey: pcQueryKeys.customerServiceReception(
+      authSession?.apiBaseUrl,
+      authSession?.tenantToken,
+    ),
+    enabled: Boolean(authSession && workspaceAccess.canReadServiceWorkbench),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: true,
+    queryFn: async () => requireApiClient(authSession).getReceptionStatus(),
+  });
   const profileQuery = useQuery({
     queryKey: pcQueryKeys.accountProfile(authSession?.apiBaseUrl, authSession?.tenantToken),
-    enabled: Boolean(authSession && accountOpen),
+    enabled: Boolean(authSession),
     staleTime: 60_000,
     queryFn: async () => requireApiClient(authSession).getMyProfile(),
   });
   const tenantInfoQuery = useQuery({
     queryKey: pcQueryKeys.accountTenant(authSession?.apiBaseUrl, authSession?.tenantToken),
-    enabled: Boolean(authSession && accountOpen),
+    enabled: Boolean(authSession),
     staleTime: 60_000,
     queryFn: async () => requireApiClient(authSession).getTenantInfo(),
   });
@@ -168,6 +216,35 @@ export function Sidebar() {
     },
     onSuccess: () => setAccountNotice("已打开新的 PC 客户端"),
     onError: (error) => setAccountNotice(`打开新客户端失败：${formatError(error)}`),
+  });
+  const receptionStatusMutation = useMutation({
+    mutationFn: async (serviceStatus: CustomerServiceStatus) => {
+      const currentReception = receptionStatusQuery.data;
+      return requireApiClient(authSession).updateReceptionStatus({
+        serviceStatus,
+        queueAcceptEnabled:
+          serviceStatus === "online"
+            ? (currentReception?.queueAcceptEnabled ?? false)
+            : false,
+      });
+    },
+    onSuccess: async (status) => {
+      const nextStatus = normalizeReceptionStatus(status.serviceStatus);
+      setConfirmedServiceStatus(nextStatus);
+      setCustomerServiceStatus(nextStatus);
+      await queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.customerServiceReception(
+          authSession?.apiBaseUrl,
+          authSession?.tenantToken,
+        ),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.customerServiceThreads(
+          authSession?.apiBaseUrl,
+          authSession?.tenantToken,
+        ),
+      });
+    },
   });
   const inviteQrsQuery = useQuery({
     queryKey: pcQueryKeys.accountInviteQrs(
@@ -218,13 +295,15 @@ export function Sidebar() {
   const activeTempSessions = (serviceQuery.data?.activeItems ?? []).filter(
     (item) => normalizeCustomerServiceThreadType(item.threadType) === "temp_session",
   );
-  const queuedServiceCount = Math.max(
-    serviceQuery.data?.summary?.queuedCount ?? 0,
-    queuedTempSessions.length,
-  );
-  const activeServiceUnreadCount = (serviceQuery.data?.activeItems ?? [])
-    .filter((item) => normalizeCustomerServiceThreadType(item.threadType) === "temp_session")
-    .reduce((sum, item) => sum + Math.max(0, item.unreadCount ?? 0), 0);
+  const hasServiceThreadData = Boolean(serviceQuery.data);
+  const queuedServiceCount = hasServiceThreadData
+    ? Math.max(serviceQuery.data?.summary?.queuedCount ?? 0, queuedTempSessions.length)
+    : 0;
+  const activeServiceUnreadCount = hasServiceThreadData
+    ? (serviceQuery.data?.activeItems ?? [])
+        .filter((item) => normalizeCustomerServiceThreadType(item.threadType) === "temp_session")
+        .reduce((sum, item) => sum + Math.max(0, item.unreadCount ?? 0), 0)
+    : 0;
   const serviceAlertCount = queuedServiceCount + activeServiceUnreadCount;
   const realtimeServiceAlertCount = realtimeReminders.filter(
     (item) => item.targetModule === "onlineService",
@@ -235,7 +314,10 @@ export function Sidebar() {
   const profile = profileQuery.data;
   const tenantInfo = tenantInfoQuery.data;
   const displayName = profile?.displayName || authSession?.displayName || "PC 用户";
-  const avatarUrl = profile?.avatarUrl ?? authSession?.avatarUrl;
+  const avatarUrl = accountAvatarDisplayUrl(
+    profile?.avatarUrl ?? authSession?.avatarUrl,
+    profile?.avatarUrl ? profileQuery.dataUpdatedAt : undefined,
+  );
   const shortName = displayName.slice(0, 1).toUpperCase();
   const tenantCode =
     tenantInfo?.tenantCode ||
@@ -245,11 +327,67 @@ export function Sidebar() {
     "--";
   const roleLabel = authSession?.roleLabel ?? "成员";
   const signature = profile?.signature || profile?.bio || "暂无签名";
+  const spaceCode =
+    tenantInfo?.tenantCode || authSession?.tenantCode || authSession?.tenantId || "--";
+  const spaceName = tenantInfo?.tenantName || authSession?.tenantName || spaceCode;
+  const spaceMeta = "企业空间";
+  const tenantLogoUrl = tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl ?? null;
+  const accountMeta = profile?.lppId ?? authSession?.lppId ?? spaceCode;
   const appInstance = appInstanceQuery.data;
   const appInstanceLabel = appInstance
     ? formatAppInstanceLabel(appInstance)
     : "正在识别客户端";
   const appInstanceShortId = appInstance?.clientInstanceId.slice(0, 8) ?? "--";
+  const productVersionLabel = `专业版 · v${appVersion}`;
+  const receptionStatus = receptionStatusQuery.data;
+  const effectiveReceptionStatus = confirmedServiceStatus;
+  const receptionSummary = getReceptionControlSummary({
+    activeSessions: receptionStatus?.activeSessionCount ?? null,
+    maxSessions: receptionStatus?.maxConcurrentSessions,
+    queueAcceptEnabled: receptionStatus?.queueAcceptEnabled,
+    serviceStatus: effectiveReceptionStatus ?? undefined,
+  });
+  const serviceStatusOption = effectiveReceptionStatus
+    ? getReceptionStatusOption(effectiveReceptionStatus)
+    : null;
+  const serviceStatusTone = serviceStatusOption?.tone ?? "offline";
+  const serviceStatusLabel = effectiveReceptionStatus
+    ? sidebarReceptionStatusLabels[effectiveReceptionStatus]
+    : "状态未同步";
+  const activeReceptionCount = receptionStatus?.activeSessionCount ?? null;
+  const serviceStatusCounters: SidebarServiceCounter[] = [
+    {
+      label: "接",
+      name: "接待中",
+      value: activeReceptionCount ?? "--",
+      tone: "active",
+    },
+    {
+      label: "排",
+      name: "排队",
+      value: hasServiceThreadData ? queuedServiceCount : "--",
+      tone: queuedServiceCount > 0 ? "warning" : "muted",
+    },
+    activeServiceUnreadCount > 0
+      ? {
+          label: "未",
+          name: "未读",
+          value: activeServiceUnreadCount,
+          tone: "danger",
+        }
+      : null,
+  ].filter((item): item is SidebarServiceCounter => item !== null);
+  const serviceStatusCompactDetail = serviceStatusCounters
+    .map((item) => `${item.name} ${item.value}`)
+    .join(" · ");
+  const serviceStatusFullDetail = `${
+    typeof receptionStatus?.queueAcceptEnabled === "boolean"
+      ? receptionSummary.queueModeLabel
+      : "接入模式未同步"
+  } · 接待 ${receptionSummary.sessionText} · 排队 ${
+    hasServiceThreadData ? queuedServiceCount : "--"
+  } · 未读 ${hasServiceThreadData ? activeServiceUnreadCount : "--"}`;
+  const collapsed = sidebarCollapsed;
   const visiblePrimaryNavItems = primaryNavItems.filter((item) =>
     workspaceAccess.visibleModules.includes(item.key),
   );
@@ -259,6 +397,71 @@ export function Sidebar() {
   const queueReminderSessionKey = authSession
     ? `${authSession.apiBaseUrl}|${authSession.tenantToken}`
     : "";
+
+  useEffect(() => {
+    let mounted = true;
+    void window.desktopApi?.getAppVersion?.()
+      .then((version) => {
+        if (mounted && version) setAppVersion(version);
+      })
+      .catch(() => {
+        if (mounted) setAppVersion("0.1.0");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const nextStatus = receptionStatus?.serviceStatus;
+    if (
+      nextStatus === "online" ||
+      nextStatus === "busy" ||
+      nextStatus === "break" ||
+      nextStatus === "offline"
+    ) {
+      setConfirmedServiceStatus(nextStatus);
+      setCustomerServiceStatus(nextStatus);
+    }
+  }, [receptionStatus?.serviceStatus, setCustomerServiceStatus]);
+
+  useEffect(() => {
+    const hasOpenPopover =
+      brandInfoOpen || accountOpen || serviceStatusOpen || spaceStatusOpen;
+    if (!hasOpenPopover) return;
+
+    const closePopovers = () => {
+      setBrandInfoOpen(false);
+      setAccountOpen(false);
+      setServiceStatusOpen(false);
+      setSpaceStatusOpen(false);
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-sidebar-popover-trigger]")) return;
+      if (
+        target.closest(
+          ".sidebar-brand-popover, .account-popover, .sidebar-status-popover",
+        )
+      ) {
+        return;
+      }
+      closePopovers();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closePopovers();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [accountOpen, brandInfoOpen, serviceStatusOpen, spaceStatusOpen]);
 
   useEffect(() => {
     if (!queueReminderSessionKey || !workspaceAccess.canReadServiceWorkbench) {
@@ -381,7 +584,7 @@ export function Sidebar() {
       if (shouldShowDesktopNotification(pcSettings, "serviceQueue")) {
         void notifyDesktopOrBrowser(
           { title, body: fallbackBody || body, conversationId: id },
-          { channel: "serviceQueue" },
+          { channel: "serviceQueue", settings: pcSettings },
         );
       }
     };
@@ -423,13 +626,18 @@ export function Sidebar() {
         icon: "service",
       });
       if (shouldShowDesktopNotification(pcSettings, "serviceQueue")) {
-        void notifyDesktopOrBrowser({ title, body }, { channel: "serviceQueue" });
+        void notifyDesktopOrBrowser(
+          { title, body },
+          { channel: "serviceQueue", settings: pcSettings },
+        );
       }
     }
   }, [
     activeModule,
     activeTempSessions,
     pcSettings.desktopNotifications,
+    pcSettings.notificationPreview,
+    pcSettings.notificationSound,
     pcSettings.serviceQueueNotifications,
     pushRealtimeReminder,
     activeServiceUnreadCount,
@@ -442,146 +650,51 @@ export function Sidebar() {
 
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
-      <div className="account-entry">
+      <div className="sidebar-brand">
         <button
-          className="account-button"
+          className="sidebar-brand-button"
           type="button"
-          aria-expanded={accountOpen}
-          aria-label={`${displayName}，企业${tenantCode}，IM状态${imStatusLabel}`}
-          data-sidebar-tooltip="我的账号"
-          data-testid="account-entry-button"
-          title="打开我的账号"
+          aria-expanded={brandInfoOpen}
+          aria-label={`${appProductName}，${productVersionLabel}`}
+          data-sidebar-popover-trigger="brand"
+          data-sidebar-tooltip={`${appProductName} ${productVersionLabel}`}
           onClick={() => {
-            setAccountOpen((opened) => !opened);
-            setAccountNotice(null);
-            setAccountPanel(null);
+            setBrandInfoOpen((opened) => !opened);
+            setAccountOpen(false);
+            setServiceStatusOpen(false);
+            setSpaceStatusOpen(false);
           }}
         >
-          <PcAvatar
-            avatarUrl={avatarUrl}
-            className="account-avatar"
-            name={displayName}
-            data-testid="account-entry-avatar"
-          >
-            <span className={`status-dot account-status-dot ${imPresenceStatus}`} />
-          </PcAvatar>
-          <span className="account-identity">
-            <strong>{shortName.length > 0 ? displayName : "PC 用户"}</strong>
-            <em>{tenantCode}</em>
+          <span className="sidebar-brand-logo" aria-hidden="true">
+            <img alt="" src={appIconSrc} />
+          </span>
+          <span className="sidebar-brand-copy">
+            <strong>LPP</strong>
+            <em>{productVersionLabel}</em>
           </span>
         </button>
-        {accountOpen && (
-          <div className="account-popover" role="dialog" aria-label="我的账号">
-            <div className="account-profile-card">
-              <PcAvatar
-                avatarUrl={avatarUrl}
-                className="account-popover-avatar"
-                name={displayName}
-              >
-                <span className={`status-dot account-status-dot ${imPresenceStatus}`} />
-              </PcAvatar>
-              <div>
-                <strong>{displayName}</strong>
-                <span>{profile?.lppId ?? authSession?.lppId ?? authSession?.userId ?? "--"}</span>
-                <span className="account-profile-meta">
-                  <b>{roleLabel}</b>
-                  <em>{tenantCode}</em>
-                </span>
-                <small className="account-profile-signature">{signature}</small>
-              </div>
+        {brandInfoOpen && (
+          <div className="sidebar-brand-popover" role="dialog" aria-label="关于 LPP">
+            <div className="sidebar-brand-popover-title">
+              <span className="sidebar-brand-logo small" aria-hidden="true">
+                <img alt="" src={appIconSrc} />
+              </span>
+              <span>
+                <strong>{appProductName}</strong>
+                <em>{productVersionLabel}</em>
+              </span>
             </div>
-
-            <section className="account-popover-section">
-              <span className="account-section-label">账号与客户端</span>
-              <div className="account-client-card">
-                <span>
-                  <MonitorCog size={15} />
-                  <strong>{appInstanceLabel}</strong>
-                </span>
-                <em>实例 {appInstanceShortId}</em>
-              </div>
-              <div className="account-action-list">
-                <AccountAction
-                  icon={<Plus size={15} />}
-                  label={openAppProfileMutation.isPending ? "正在打开" : "打开新客户端"}
-                  onClick={() => openAppProfileMutation.mutate()}
-                />
-                <AccountAction
-                  icon={<ShieldCheck size={15} />}
-                  label="管理登录设备"
-                  onClick={() => {
-                    setActiveModule("settings");
-                    setAccountOpen(false);
-                    setAccountPanel(null);
-                  }}
-                />
-              </div>
-            </section>
-
-            <section className="account-popover-section">
-              <span className="account-section-label">IM 在线状态</span>
-              <div className="presence-options">
-                {imPresenceStatuses.map((item) => (
-                  <button
-                    className={`presence-option ${
-                      imPresenceStatus === item.value ? "selected" : ""
-                    }`}
-                    type="button"
-                    key={item.value}
-                    aria-label={`设置 IM 状态为${item.label}`}
-                    onClick={() => {
-                      setImPresenceStatus(item.value as TrayStatus);
-                      setAccountOpen(false);
-                      setAccountNotice(null);
-                    }}
-                  >
-                    <span className={`status-dot ${item.value}`} />
-                    <span>{item.label}</span>
-                    {imPresenceStatus === item.value && <Check size={14} />}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="account-popover-section">
-              <span className="account-section-label">我的入口</span>
-              <div className="account-action-list">
-                <AccountAction
-                  icon={<QrCode size={15} />}
-                  label="我的二维码"
-                  onClick={() => setAccountPanel("qrcode")}
-                />
-              </div>
-            </section>
-
-            {accountPanel && (
-              <AccountDetailPanel
-                panel={accountPanel}
-                inviteQrs={inviteQrsQuery.data ?? []}
-                inviteQrsLoading={inviteQrsQuery.isLoading}
-                inviteQrsError={inviteQrsQuery.error}
-                onCreateInviteQr={() => createInviteQrMutation.mutate()}
-                creatingInviteQr={createInviteQrMutation.isPending}
-                onCopy={(text) => {
-                  void copyToClipboard(text);
-                  setAccountNotice("已复制");
-                }}
-                onClose={() => setAccountPanel(null)}
-              />
-            )}
-
-            <div className="account-actions">
-              <button type="button" onClick={() => clearAuthSession()}>
-                <LogOut size={14} />
-                退出登录
-              </button>
-            </div>
-
-            {accountNotice && (
-              <p className="account-notice" role="status">
-                {accountNotice}
-              </p>
-            )}
+            <button
+              className="sidebar-status-action"
+              type="button"
+              onClick={() => {
+                setActiveModule("settings");
+                setBrandInfoOpen(false);
+              }}
+            >
+              <Info size={15} />
+              帮助与关于 / 检查更新
+            </button>
           </div>
         )}
       </div>
@@ -608,7 +721,13 @@ export function Sidebar() {
               key={item.label}
               aria-label={`${item.label}${badgeLabel}`}
               data-sidebar-tooltip={item.label}
-              onClick={() => setActiveModule(item.key)}
+              onClick={() => {
+                setActiveModule(item.key);
+                setBrandInfoOpen(false);
+                setAccountOpen(false);
+                setServiceStatusOpen(false);
+                setSpaceStatusOpen(false);
+              }}
             >
               <span className="nav-icon">
                 <Icon size={19} />
@@ -632,7 +751,10 @@ export function Sidebar() {
               data-sidebar-tooltip={item.label}
               onClick={() => {
                 setActiveModule(item.key);
+                setBrandInfoOpen(false);
                 setAccountOpen(false);
+                setServiceStatusOpen(false);
+                setSpaceStatusOpen(false);
                 setAccountPanel(null);
                 setAccountNotice(null);
               }}
@@ -648,7 +770,13 @@ export function Sidebar() {
           className={`nav-item ${activeModule === settingsNavItem.key ? "active" : ""}`}
           aria-label={settingsNavItem.label}
           data-sidebar-tooltip={settingsNavItem.label}
-          onClick={() => setActiveModule(settingsNavItem.key)}
+          onClick={() => {
+            setActiveModule(settingsNavItem.key);
+            setBrandInfoOpen(false);
+            setAccountOpen(false);
+            setServiceStatusOpen(false);
+            setSpaceStatusOpen(false);
+          }}
         >
           <span className="nav-icon">
             <Settings size={19} />
@@ -657,14 +785,326 @@ export function Sidebar() {
         </button>
       </nav>
       <div className="sidebar-footer">
-        <div className="sidebar-footer-control">
+        <div className="sidebar-status-center" aria-label="状态中心">
+          <div className="account-entry sidebar-footer-account-entry">
+            <button
+              className="account-button"
+              type="button"
+              aria-expanded={accountOpen}
+              aria-label={`${displayName}，${accountMeta}，状态：${imStatusLabel}`}
+              data-sidebar-popover-trigger="account"
+              data-sidebar-tooltip={`${displayName} · ${accountMeta}`}
+              data-testid="account-entry-button"
+              title="打开账号资料"
+              onClick={() => {
+                setAccountOpen((opened) => !opened);
+                setBrandInfoOpen(false);
+                setServiceStatusOpen(false);
+                setSpaceStatusOpen(false);
+                setAccountNotice(null);
+                setAccountPanel(null);
+              }}
+            >
+              <PcAvatar
+                avatarUrl={avatarUrl}
+                className="account-avatar"
+                name={displayName}
+                data-testid="account-entry-avatar"
+              >
+                <span className={`status-dot account-status-dot ${imPresenceStatus}`} />
+              </PcAvatar>
+              <span className="account-identity">
+                <strong>{shortName.length > 0 ? displayName : "PC 用户"}</strong>
+                <em>
+                  <span
+                    className={`sidebar-status-dot ${imPresenceStatus}`}
+                    aria-hidden="true"
+                  />
+                  {imStatusLabel}
+                </em>
+              </span>
+              <ChevronRight className="account-chevron" size={15} aria-hidden="true" />
+            </button>
+            {accountOpen && (
+              <div className="account-popover" role="dialog" aria-label="我的账号">
+                <div className="account-profile-card">
+                  <PcAvatar
+                    avatarUrl={avatarUrl}
+                    className="account-popover-avatar"
+                    name={displayName}
+                  >
+                    <span className={`status-dot account-status-dot ${imPresenceStatus}`} />
+                  </PcAvatar>
+                  <div>
+                    <strong>{displayName}</strong>
+                    <span>
+                      {profile?.lppId ?? authSession?.lppId ?? authSession?.userId ?? "--"}
+                    </span>
+                    <span className="account-profile-meta">
+                      <b>{roleLabel}</b>
+                      <em>{tenantCode}</em>
+                    </span>
+                    <small className="account-profile-signature">{signature}</small>
+                  </div>
+                </div>
+
+                <section className="account-popover-section">
+                  <span className="account-section-label">账号与客户端</span>
+                  <div className="account-client-card">
+                    <span>
+                      <MonitorCog size={15} />
+                      <strong>{appInstanceLabel}</strong>
+                    </span>
+                    <em>实例 {appInstanceShortId}</em>
+                  </div>
+                  <div className="account-action-list">
+                    <AccountAction
+                      icon={<Plus size={15} />}
+                      label={openAppProfileMutation.isPending ? "正在打开" : "打开新客户端"}
+                      onClick={() => openAppProfileMutation.mutate()}
+                    />
+                    <AccountAction
+                      icon={<ShieldCheck size={15} />}
+                      label="管理登录设备"
+                      onClick={() => {
+                        setActiveModule("settings");
+                        setAccountOpen(false);
+                        setAccountPanel(null);
+                      }}
+                    />
+                  </div>
+                </section>
+
+                <section className="account-popover-section">
+                  <span className="account-section-label">IM 状态</span>
+                  <div className="presence-options">
+                    {imPresenceStatuses.map((item) => (
+                      <button
+                        className={`presence-option ${
+                          imPresenceStatus === item.value ? "selected" : ""
+                        }`}
+                        type="button"
+                        key={item.value}
+                        aria-label={`设置 IM 状态为${item.label}`}
+                        onClick={() => {
+                          setImPresenceStatus(item.value as TrayStatus);
+                          setAccountNotice(null);
+                        }}
+                      >
+                        <span className={`status-dot ${item.value}`} />
+                        <span>{item.label}</span>
+                        {imPresenceStatus === item.value && <Check size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="account-popover-section">
+                  <span className="account-section-label">我的入口</span>
+                  <div className="account-action-list">
+                    <AccountAction
+                      icon={<QrCode size={15} />}
+                      label="我的二维码"
+                      onClick={() => setAccountPanel("qrcode")}
+                    />
+                  </div>
+                </section>
+
+                {accountPanel && (
+                  <AccountDetailPanel
+                    panel={accountPanel}
+                    inviteQrs={inviteQrsQuery.data ?? []}
+                    inviteQrsLoading={inviteQrsQuery.isLoading}
+                    inviteQrsError={inviteQrsQuery.error}
+                    onCreateInviteQr={() => createInviteQrMutation.mutate()}
+                    creatingInviteQr={createInviteQrMutation.isPending}
+                    onCopy={(text) => {
+                      void copyToClipboard(text);
+                      setAccountNotice("已复制");
+                    }}
+                    onClose={() => setAccountPanel(null)}
+                  />
+                )}
+
+                <div className="account-actions">
+                  <button type="button" onClick={() => clearAuthSession()}>
+                    <LogOut size={14} />
+                    退出登录
+                  </button>
+                </div>
+
+                {accountNotice && (
+                  <p className="account-notice" role="status">
+                    {accountNotice}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          {workspaceAccess.canReadServiceWorkbench && (
+            <div className="sidebar-status-row-wrap">
+              <button
+                className={`sidebar-status-row sidebar-service-status-row ${serviceStatusTone}`}
+                type="button"
+                aria-expanded={serviceStatusOpen}
+                aria-label={`在线客服：${serviceStatusLabel}`}
+                data-sidebar-popover-trigger="service"
+                data-sidebar-tooltip={`在线客服 · ${serviceStatusLabel}`}
+                onClick={() => {
+                  setServiceStatusOpen((opened) => !opened);
+                  setBrandInfoOpen(false);
+                  setAccountOpen(false);
+                  setSpaceStatusOpen(false);
+                }}
+              >
+                <Headset size={16} aria-hidden="true" />
+                <span className="sidebar-status-copy">
+                  <strong>{serviceStatusLabel}</strong>
+                  <span
+                    className="sidebar-service-counters"
+                    aria-label={serviceStatusCompactDetail}
+                    title={serviceStatusCompactDetail}
+                  >
+                    {serviceStatusCounters.map((item) => (
+                      <span
+                        className={`sidebar-service-counter ${item.tone}`}
+                        key={item.label}
+                      >
+                        <span>{item.label}</span>
+                        <b>{item.value}</b>
+                      </span>
+                    ))}
+                  </span>
+                </span>
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+              {serviceStatusOpen && (
+                <div
+                  className="sidebar-status-popover sidebar-service-status-popover"
+                  role="dialog"
+                  aria-label="在线客服状态"
+                >
+                  <strong>{serviceStatusLabel}</strong>
+                  <span>{serviceStatusFullDetail}</span>
+                  {receptionStatusQuery.error && (
+                    <span className="sidebar-status-error">
+                      接待状态同步失败：{formatError(receptionStatusQuery.error)}
+                    </span>
+                  )}
+                  <div
+                    className="sidebar-service-status-options"
+                    role="radiogroup"
+                    aria-label="客服接待状态"
+                  >
+                    {receptionControlStatusOptions.map((item) => (
+                      <button
+                        className={`sidebar-status-option service-${item.tone} ${
+                          effectiveReceptionStatus === item.value ? "selected" : ""
+                        }`}
+                        type="button"
+                        role="radio"
+                        aria-checked={effectiveReceptionStatus === item.value}
+                        disabled={receptionStatusMutation.isPending}
+                        key={item.value}
+                        onClick={() => receptionStatusMutation.mutate(item.value)}
+                      >
+                        <span
+                          className={`sidebar-status-dot service-${item.tone}`}
+                          aria-hidden="true"
+                        />
+                        <span>{sidebarReceptionStatusLabels[item.value]}</span>
+                        {effectiveReceptionStatus === item.value && <Check size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="sidebar-service-metrics">
+                    <b>接待 {receptionSummary.sessionText}</b>
+                    <b>{receptionSummary.queueModeLabel}</b>
+                    <b>排队 {hasServiceThreadData ? queuedServiceCount : "--"}</b>
+                    <b>未读 {hasServiceThreadData ? activeServiceUnreadCount : "--"}</b>
+                  </div>
+                  <button
+                    className="sidebar-status-action"
+                    type="button"
+                    onClick={() => {
+                      setActiveModule("onlineService");
+                      setServiceStatusOpen(false);
+                    }}
+                  >
+                    <Headset size={15} />
+                    进入在线客服
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="sidebar-status-row-wrap">
+            <button
+              className="sidebar-status-row sidebar-space-status-row"
+              type="button"
+              aria-expanded={spaceStatusOpen}
+              aria-label={`当前空间：${spaceName}，企业码 ${spaceCode}`}
+              data-sidebar-popover-trigger="space"
+              data-sidebar-tooltip={`空间 · ${spaceName} · ${spaceCode}`}
+              onClick={() => {
+                setSpaceStatusOpen((opened) => !opened);
+                setBrandInfoOpen(false);
+                setAccountOpen(false);
+                setServiceStatusOpen(false);
+              }}
+            >
+              {tenantLogoUrl || spaceCode !== "--" ? (
+                <PcAvatar
+                  avatarUrl={tenantLogoUrl}
+                  className="sidebar-space-logo"
+                  iconSize={16}
+                  kind="tenant"
+                  name={spaceCode !== "--" ? spaceCode : spaceName}
+                />
+              ) : (
+                <span className="sidebar-space-logo sidebar-space-logo-empty" aria-hidden="true">
+                  <Building2 size={16} />
+                </span>
+              )}
+              <span className="sidebar-status-copy">
+                <strong>{spaceCode}</strong>
+                <em>{spaceMeta}</em>
+              </span>
+              <ChevronRight size={14} aria-hidden="true" />
+            </button>
+            {spaceStatusOpen && (
+              <div
+                className="sidebar-status-popover sidebar-space-status-popover"
+                role="dialog"
+                aria-label="当前空间"
+              >
+                <strong>{spaceName}</strong>
+                <span>企业码：{spaceCode}</span>
+                <span>空间类型：{spaceMeta}</span>
+                <span>角色：{roleLabel}</span>
+                <button
+                  className="sidebar-status-action"
+                  type="button"
+                  onClick={() => {
+                    setActiveModule("enterpriseSwitch");
+                    setSpaceStatusOpen(false);
+                  }}
+                >
+                  <Building2 size={15} />
+                  空间切换
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
-            className="footer-menu-button"
+            className="sidebar-collapse-button"
             type="button"
             aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
             data-sidebar-tooltip={collapsed ? "展开侧边栏" : "收起侧边栏"}
             title={collapsed ? "展开" : "收起"}
-            onClick={() => setCollapsed((value) => !value)}
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           >
             <Menu size={19} />
           </button>

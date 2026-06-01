@@ -39,32 +39,28 @@
 }
 
 .composer-plus-panel {
-  position: absolute;
-  z-index: 30;
-  left: 14px;
-  bottom: calc(100% - 4px);
-  display: flex;
-  max-width: calc(100% - 28px);
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 7px;
+  position: fixed;
+  z-index: 130;
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 24px));
   border: 1px solid rgba(216, 226, 237, 0.96);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 42px rgba(20, 35, 55, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.99);
+  box-shadow:
+    0 18px 42px rgba(20, 35, 55, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.92) inset;
 }
 
 .composer-plus-note {
   display: grid;
-  width: min(360px, calc(100% - 28px));
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .composer-plus-note strong {
   color: #102033;
-  font-size: 13px;
-  font-weight: 900;
+  font-size: 12px;
+  font-weight: 860;
 }
 
 .composer-plus-note p {
@@ -77,8 +73,8 @@
 
 .composer-plus-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .composer-emoji-panel {
@@ -134,20 +130,22 @@
 }
 
 .composer-plus-item {
-  display: inline-flex;
-  height: 32px;
-  min-height: 32px;
+  display: grid;
+  min-height: 76px;
+  grid-template-rows: 24px 16px 14px;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
+  justify-items: center;
+  gap: 4px;
+  padding: 9px 8px 8px;
   border: 1px solid rgba(216, 226, 237, 0.92);
   border-radius: 9px;
   background: rgba(248, 251, 253, 0.96);
   color: #40546c;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 760;
   box-shadow: none;
+  text-align: center;
 }
 
 .composer-plus-item:hover:not(:disabled) {
@@ -158,11 +156,30 @@
 
 .composer-plus-item:disabled {
   cursor: not-allowed;
-  opacity: 0.42;
+  opacity: 0.52;
+}
+
+.composer-plus-item.is-primary {
+  border-color: rgba(16, 185, 129, 0.32);
+  background: #f5fffb;
+  color: #057a5f;
 }
 
 .composer-plus-item em {
-  display: none;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #7a8ba0;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-plus-item.is-primary em {
+  color: #188269;
 }
 
 .hidden-file-input {

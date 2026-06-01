@@ -93,7 +93,7 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
         body,
         conversationId: normalizedThreadId,
       },
-      { channel: "serviceQueue" },
+      { channel: "serviceQueue", settings },
     );
   }
 }
@@ -135,7 +135,7 @@ function notifyCustomerServiceMessage(
           : message.preview || "收到一条在线客服消息",
         conversationId: targetId,
       },
-      { channel: "serviceQueue" },
+      { channel: "serviceQueue", settings },
     );
   }
 }

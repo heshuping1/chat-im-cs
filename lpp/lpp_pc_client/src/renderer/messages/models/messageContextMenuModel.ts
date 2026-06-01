@@ -10,7 +10,6 @@ import { timestampFromDateValue } from "../../lib/format";
 export type MessageContextAction =
   | "multi_select"
   | "reply"
-  | "ai_reply"
   | "copy"
   | "copy_image"
   | "copy_media"
@@ -79,7 +78,6 @@ export function getMessageContextActionAvailability(
 ): MessageContextActionAvailability {
   const videoReadyForFileActions = !state.isVideo || state.mediaCacheStatus === "cached";
   return {
-    ai_reply: state.isText,
     copy: state.isText,
     copy_image: state.hasMedia && state.isImage && videoReadyForFileActions,
     copy_media: state.hasMedia && state.canCopyMediaFile && !state.isImage && videoReadyForFileActions,

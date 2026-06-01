@@ -9,6 +9,7 @@ import {
 import type { DepartmentMemberDto, FriendRequestDto } from "../../data/api-client";
 import { useAuthSession } from "../../data/auth/auth-store";
 import {
+  contactMatchesDirectoryFilter,
   type ContactDirectoryViewMode,
   filterContacts,
   filterRequests,
@@ -184,9 +185,9 @@ export function useContactsDirectoryController({
     const base =
       effectiveContactFilter === "all"
         ? directoryContacts
-        : effectiveContactFilter === "organization"
-          ? directoryContacts.filter((item) => item.kind === "staff")
-          : directoryContacts.filter((item) => item.kind === effectiveContactFilter);
+        : directoryContacts.filter((item) =>
+            contactMatchesDirectoryFilter(item, effectiveContactFilter),
+          );
     return filterContacts(base, keyword);
   }, [directoryContacts, effectiveContactFilter, keyword]);
 

@@ -14,7 +14,6 @@ const businessModules: ModuleKey[] = [
   "ticketCenter",
   "dataCenter",
   "knowledgeBase",
-  "aiAssistant",
 ];
 
 describe("pc workspace access model", () => {
@@ -76,6 +75,7 @@ describe("pc workspace access model", () => {
     for (const module of businessModules) {
       expect(serviceAccess.visibleModules).toContain(module);
     }
+    expect(serviceAccess.visibleModules).not.toContain("aiAssistant");
   });
 
   it("assigns admin and owner data center views", () => {
@@ -108,6 +108,7 @@ describe("pc workspace access model", () => {
     });
 
     expect(normalizeActiveModuleForAccess("knowledgeBase", customerAccess)).toBe("messages");
+    expect(normalizeActiveModuleForAccess("aiAssistant", customerAccess)).toBe("messages");
     expect(normalizeActiveModuleForAccess("messages", customerAccess)).toBe("messages");
   });
 });
@@ -116,6 +117,10 @@ describe("workspace access integration closure", () => {
   const appSource = readFileSync(resolve(process.cwd(), "src/renderer/App.tsx"), "utf8");
   const sidebarSource = readFileSync(
     resolve(process.cwd(), "src/renderer/components/Sidebar.tsx"),
+    "utf8",
+  );
+  const porcelainShellSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/shared/porcelain-shell.css"),
     "utf8",
   );
   const mePageSource = readFileSync(
@@ -129,23 +134,228 @@ describe("workspace access integration closure", () => {
     ),
     "utf8",
   );
+  const serviceWorkspaceSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/ChatWorkspace.tsx"),
+    "utf8",
+  );
+  const messageCenterSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
+    "utf8",
+  );
+  const aiReplyDrawerSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/AiReplySuggestionDrawer.tsx"),
+    "utf8",
+  );
+  const customerServiceComposerSurfaceSource = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/renderer/customer-service/components/CustomerServiceComposerSurface.tsx",
+    ),
+    "utf8",
+  );
+  const serviceKnowledgeDrawerSource = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/renderer/customer-service/components/CustomerServiceKnowledgeDrawer.tsx",
+    ),
+    "utf8",
+  );
+  const serviceQuickReplyDrawerSource = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/renderer/customer-service/components/CustomerServiceQuickReplyDrawer.tsx",
+    ),
+    "utf8",
+  );
+  const composerSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/MessageComposer.tsx"),
+    "utf8",
+  );
+  const pcAgentsSource = readFileSync(resolve(process.cwd(), "AGENTS.md"), "utf8");
 
   it("guards active modules and service workbench queries behind workspace access", () => {
     expect(appSource).toContain("normalizeActiveModuleForAccess");
+    expect(appSource).not.toContain("AiAssistantPage");
     expect(sidebarSource).toContain("workspaceAccess.canReadServiceWorkbench");
     expect(sidebarSource).toContain("visiblePrimaryNavItems");
+    expect(sidebarSource).not.toContain('label: "AI 助手"');
   });
 
-  it("uses customer settings copy without customer-service-only reminders", () => {
-    expect(mePageSource).toContain("settingsProfile");
-    expect(mePageSource).toContain("客户设置");
-    expect(mePageSource).toContain("visibleSettingSections");
+  it("renders the light sidebar brand and bottom status center without cyclic status toggles", () => {
+    expect(sidebarSource).toContain("sidebar-brand");
+    expect(sidebarSource).toContain("appProductName");
+    expect(sidebarSource).toContain("专业版 · v");
+    expect(sidebarSource).toContain("sidebar-status-center");
+    expect(sidebarSource).toContain("sidebar-footer-account-entry");
+    expect(sidebarSource).toContain(
+      '<div className="sidebar-footer">\n        <div className="sidebar-status-center" aria-label="状态中心">\n          <div className="account-entry sidebar-footer-account-entry">',
+    );
+    expect(sidebarSource).toContain("imPresenceStatuses.map");
+    expect(sidebarSource).toContain("accountAvatarDisplayUrl");
+    expect(sidebarSource).toContain("profileQuery.dataUpdatedAt");
+    expect(sidebarSource).toContain("enabled: Boolean(authSession)");
+    expect(sidebarSource).toContain("状态：${imStatusLabel}");
+    expect(sidebarSource).not.toContain("IM ${imStatusLabel}");
+    expect(sidebarSource).toContain("account-chevron");
+    expect(sidebarSource).toContain("tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl");
+    expect(sidebarSource).toContain("spaceCode");
+    expect(sidebarSource).toContain('const spaceMeta = "企业空间"');
+    expect(sidebarSource).toContain("data-sidebar-popover-trigger");
+    expect(sidebarSource).toContain('document.addEventListener("pointerdown"');
+    expect(sidebarSource).toContain('event.key === "Escape"');
+    expect(sidebarSource).toContain(".sidebar-brand-popover, .account-popover, .sidebar-status-popover");
+    expect(sidebarSource).not.toContain("IM {imStatusLabel}");
+    expect(sidebarSource).not.toContain("IM 在线状态");
+    expect(sidebarSource).not.toContain("<strong>{spaceName}</strong>\n                <em>{spaceMeta}</em>");
+    expect(sidebarSource).toContain("useSetCustomerServiceStatus");
+    expect(sidebarSource).toContain("confirmedServiceStatus");
+    expect(sidebarSource).toContain("状态未同步");
+    expect(sidebarSource).not.toContain("serviceAutoSidebarCollapsed");
+    expect(sidebarSource).not.toContain("sidebarCollapsed || serviceAutoSidebarCollapsed");
+    expect(sidebarSource).not.toContain("useServiceLayoutMode");
+    expect(sidebarSource).toContain("pcQueryKeys.customerServiceReception");
+    expect(sidebarSource).toContain("getReceptionStatusOption");
+    expect(sidebarSource).toContain("getReceptionControlSummary");
+    expect(sidebarSource).toContain("receptionControlStatusOptions.map");
+    expect(sidebarSource).toContain("updateReceptionStatus");
+    expect(sidebarSource).toContain("workspaceAccess.canReadServiceWorkbench &&");
+    expect(sidebarSource).toContain("serviceStatusCounters");
+    expect(sidebarSource).toContain("serviceStatusCompactDetail");
+    expect(sidebarSource).toContain("serviceStatusFullDetail");
+    expect(sidebarSource).not.toContain("receptionStatus?.activeSessionCount ??\n      (hasServiceThreadData ? activeTempSessions.length : null)");
+    expect(sidebarSource).toContain("const activeReceptionCount = receptionStatus?.activeSessionCount ?? null");
+    expect(sidebarSource).toContain('label: "接"');
+    expect(sidebarSource).toContain('value: activeReceptionCount ?? "--"');
+    expect(sidebarSource).toContain('label: "排"');
+    expect(sidebarSource).toContain('label: "未"');
+    expect(sidebarSource).toContain("name: \"接待中\"");
+    expect(sidebarSource).toContain("name: \"排队\"");
+    expect(sidebarSource).toContain("activeServiceUnreadCount > 0");
+    expect(sidebarSource).toContain("sidebar-service-counters");
+    expect(sidebarSource).toContain("sidebar-service-counter");
+    expect(sidebarSource).not.toContain("<em>{serviceStatusCompactDetail}</em>");
+    expect(sidebarSource).not.toContain("<em>{serviceStatusFullDetail}</em>");
+    expect(sidebarSource).not.toContain("<em>{serviceStatusDetail}</em>");
+    expect(sidebarSource).not.toContain("deriveSidebarServiceStatus");
+    expect(sidebarSource).not.toContain("客服空闲");
+    expect(sidebarSource).not.toContain("无客服权限");
+    expect(sidebarSource).not.toContain("客服读取中");
+    expect(sidebarSource).not.toContain("客服状态异常");
+    expect(sidebarSource).not.toContain("setServicePresence");
+    expect(sidebarSource).toContain('setActiveModule("enterpriseSwitch")');
+    expect(sidebarSource).toContain('setActiveModule("onlineService")');
+    expect(porcelainShellSource).toContain(".sidebar-brand");
+    expect(porcelainShellSource).toContain(".sidebar-footer-account-entry");
+    expect(porcelainShellSource).toContain("align-items: start");
+    expect(porcelainShellSource).toContain("margin-bottom: auto");
+    expect(porcelainShellSource).toContain(".sidebar-status-center");
+    expect(porcelainShellSource).toContain("gap: 4px");
+    expect(porcelainShellSource).toContain("order: 3");
+    expect(porcelainShellSource).toContain("border-top: 1px solid rgba(217, 226, 236, 0.72)");
+    expect(porcelainShellSource).not.toMatch(/\.account-entry\s*\{[^}]*order:\s*3/s);
+    expect(porcelainShellSource).not.toMatch(/\.sidebar-footer\s*\{[^}]*order:\s*4/s);
+    expect(porcelainShellSource).not.toMatch(
+      /\.sidebar-footer-account-entry\s*\{[^}]*padding-top:\s*8px !important/s,
+    );
+    expect(porcelainShellSource).toContain("padding-top: 6px");
+    expect(porcelainShellSource).toContain(".sidebar.collapsed .sidebar-status-row");
+    expect(porcelainShellSource).toContain(".account-chevron");
+    expect(porcelainShellSource).toContain(".sidebar-service-counters");
+    expect(porcelainShellSource).toContain(".sidebar-service-counter");
+    expect(porcelainShellSource).toContain(".sidebar-service-status-row > svg:last-child");
+    expect(porcelainShellSource).toContain(".sidebar-service-status-row.online > svg:first-child");
+    expect(porcelainShellSource).not.toContain(".sidebar-service-status-row.online svg,");
+    expect(porcelainShellSource).toContain(".sidebar-service-status-options");
+    expect(porcelainShellSource).toContain(".sidebar-status-error");
+    expect(porcelainShellSource).toContain(".sidebar-space-status-row");
+    expect(porcelainShellSource).toContain(".sidebar-space-logo");
+    expect(porcelainShellSource).toContain("height: 42px");
+    expect(porcelainShellSource).toContain("height: var(--sidebar-footer-account-height, 42px) !important");
+    expect(porcelainShellSource).toContain("border: 1px solid transparent !important");
+    expect(porcelainShellSource).toContain("background: transparent !important");
+    expect(porcelainShellSource).toContain(".account-button:focus-visible");
+    expect(porcelainShellSource).not.toContain("border: 1px solid rgba(216, 226, 237, 0.74) !important");
+    expect(porcelainShellSource).not.toContain("background: rgba(255, 255, 255, 0.78) !important");
+    expect(porcelainShellSource).toContain(".sidebar.collapsed .account-button");
+    expect(porcelainShellSource).toContain("height: 38px !important");
+    expect(porcelainShellSource).toContain("min-height: 38px !important");
+    expect(porcelainShellSource).toContain(".sidebar.collapsed .account-avatar");
+    expect(porcelainShellSource).toContain("width: 30px !important");
+    expect(porcelainShellSource).toContain("height: 30px !important");
+    expect(porcelainShellSource).toContain("0 0 0 1px rgba(216, 226, 237, 0.74)");
+    expect(porcelainShellSource).toContain(".sidebar.collapsed .account-status-dot");
+    expect(porcelainShellSource).toContain("border-width: 1.5px");
+    expect(porcelainShellSource).not.toMatch(
+      /\.sidebar\.collapsed \.account-button\s*\{[^}]*min-height:\s*46px !important/s,
+    );
+    expect(porcelainShellSource).toContain("grid-template-columns: var(--sidebar-footer-icon-size, 30px) minmax(0, 1fr) 12px !important");
+    expect(porcelainShellSource).toContain(".sidebar-service-status-row .sidebar-status-copy strong");
+    expect(porcelainShellSource).toContain("white-space: nowrap");
+    expect(porcelainShellSource).toContain(".app-shell.service-layout.layout-compact-sidebar");
+    expect(porcelainShellSource).toContain(".app-shell.service-layout.layout-no-sidebar");
+    expect(porcelainShellSource).toContain(".app-shell.service-layout.layout-queue-focus");
+    expect(porcelainShellSource).toContain(".app-shell.service-layout.layout-chat-focus");
+    expect(porcelainShellSource).not.toContain("background: #0f172a");
+    expect(pcAgentsSource).toContain("真实数据硬规则");
+    expect(pcAgentsSource).toContain("数据一定是真实的数据，禁止 mock 兜底数据。要务实。");
+    expect(pcAgentsSource).toContain("不得用 mock、sample、demo、fake、硬编码业务数据");
+  });
+
+  it("uses shared settings copy without customer-service-only reminders", () => {
+    expect(mePageSource).toContain("设置中心");
+    expect(mePageSource).toContain("settingsSections");
+    expect(mePageSource).toContain("NotificationSettingsSection");
     expect(mePageSource).not.toContain('label="在线客服排队提醒"');
     expect(mePageSource).not.toContain('label="SLA 超时提醒"');
   });
 
-  it("hides knowledge and AI composer tools when modules are not visible", () => {
+  it("hides IM composer AI tools while keeping knowledge visibility controlled", () => {
     expect(composerSurfaceSource).toContain("showKnowledgeTools");
     expect(composerSurfaceSource).toContain("showAiTools");
+    expect(composerSurfaceSource).toContain(
+      "showDefaultQuickReplyTool={!showKnowledgeTools}",
+    );
+    expect(messageCenterSource).toContain("canOpenAiAssistant={false}");
+    expect(messageCenterSource).toContain("openAiDraftDrawer");
+  });
+
+  it("keeps AI reply suggestions in online service but removes them from ordinary IM", () => {
+    expect(serviceWorkspaceSource).toContain("AiReplySuggestionDrawer");
+    expect(serviceWorkspaceSource).toContain("setServiceAssistantPane");
+    expect(messageCenterSource).not.toContain("AiReplySuggestionPanel");
+    expect(messageCenterSource).not.toContain("onAiReplyRequest");
+    expect(serviceWorkspaceSource).toContain(
+      "setAiDraftDrawer({ customerMessageId: message.messageId })",
+    );
+    expect(messageCenterSource).not.toContain("aiReplyTargetForDirectConversation");
+    expect(messageCenterSource).not.toContain("pc-cs-staff-service-history");
+    expect(messageCenterSource).not.toContain('setActiveModule("aiAssistant")');
+    expect(aiReplyDrawerSource).toContain("generateAiSuggestion");
+    expect(aiReplyDrawerSource).toContain("adoptAiSuggestion");
+    expect(aiReplyDrawerSource).toContain("插入回复");
+  });
+
+  it("opens customer-service knowledge as an in-chat drawer and inserts into composer draft", () => {
+    expect(serviceWorkspaceSource).toContain("CustomerServiceKnowledgeDrawer");
+    expect(serviceWorkspaceSource).toContain("setServiceAssistantPane");
+    expect(serviceWorkspaceSource).toContain("composerRef.current?.insertText");
+    expect(serviceWorkspaceSource).not.toContain(
+      'onKnowledgeBase={() => setActiveModule("knowledgeBase")}',
+    );
+    expect(serviceKnowledgeDrawerSource).toContain("插入回复");
+    expect(serviceKnowledgeDrawerSource).toContain("searchKnowledge");
+    expect(serviceQuickReplyDrawerSource).toContain("getQuickReplies");
+    expect(serviceQuickReplyDrawerSource).toContain("filterQuickRepliesForScope");
+    expect(customerServiceComposerSurfaceSource).toContain("onQuickReply");
+    expect(messageCenterSource).toContain("CustomerServiceQuickReplyPanel");
+    expect(messageCenterSource).toContain("insertQuickReply");
+    expect(composerSource).toContain("export type MessageComposerHandle");
+    expect(composerSource).toContain("useImperativeHandle");
+    expect(composerSource).toContain("insertText:");
+    expect(composerSource).toContain("showDefaultQuickReplyTool = true");
+    expect(composerSource).toContain("showDefaultQuickReplyTool &&");
+    expect(customerServiceComposerSurfaceSource).toContain(
+      "showDefaultQuickReplyTool={false}",
+    );
   });
 });

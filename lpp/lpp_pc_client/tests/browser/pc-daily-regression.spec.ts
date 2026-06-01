@@ -27,7 +27,6 @@ test.describe("PC daily full regression", () => {
       { name: /工单中心/, label: "工单中心" },
       { name: /数据中心/, label: "数据中心" },
       { name: /知识库/, label: "知识库" },
-      { name: /AI 助手/, label: "AI 助手" },
       { name: /设置/, label: "设置" },
     ]) {
       await visitSidebarModule(page, module.name, module.label);

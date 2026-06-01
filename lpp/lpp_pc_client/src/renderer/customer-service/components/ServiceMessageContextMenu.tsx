@@ -5,6 +5,7 @@ import {
   FileImage,
   FileText,
   FolderOpen,
+  Sparkles,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -14,6 +15,7 @@ import { getCurrentMediaActionCapabilities } from "../../messages/runtime/mediaA
 import { revealInFolderLabel } from "../../messages/runtime/messageMediaActions";
 
 export type ServiceMessageContextAction =
+  | "ai_reply"
   | "copy_image"
   | "copy_media"
   | "open_media"
@@ -24,8 +26,10 @@ export type ServiceMessageContextAction =
 export function ServiceMessageContextMenu({
   message,
   onAction,
+  canAiDraft = false,
   position,
 }: {
+  canAiDraft?: boolean;
   message: MessageItemDto;
   onAction: (action: ServiceMessageContextAction) => void;
   position: { x: number; y: number };
@@ -38,6 +42,15 @@ export function ServiceMessageContextMenu({
     label: string;
     icon: ReactNode;
   }> = [
+    ...(canAiDraft && isTextMessage(message)
+      ? [
+          {
+            action: "ai_reply" as const,
+            label: "AI 起草",
+            icon: <Sparkles size={15} />,
+          },
+        ]
+      : []),
     ...(isImage || canCopyMediaFile
       ? [
           {
@@ -100,4 +113,18 @@ function isImageMessage(message: MessageItemDto) {
 function isVideoMessage(message: MessageItemDto) {
   const type = normalizeMessageType(message);
   return type.includes("video") || Boolean(message.body?.video);
+}
+
+export function isServiceAiDraftableMessage(message: MessageItemDto) {
+  return isTextMessage(message);
+}
+
+function isTextMessage(message: MessageItemDto) {
+  const type = normalizeMessageType(message);
+  return (
+    type.includes("text") ||
+    typeof message.body?.text === "string" ||
+    typeof message.body?.content === "string" ||
+    typeof message.preview === "string"
+  );
 }

@@ -83,6 +83,8 @@ export const pcQueryKeys = {
     ] as const,
   accountPrivacy: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-account-privacy", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  accountNotificationSettings: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-account-notification-settings", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountBlocklist: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-account-blocklist", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountSpaces: (apiBaseUrl?: string, platformToken?: string) =>
@@ -91,6 +93,8 @@ export const pcQueryKeys = {
     ["pc-account-devices", apiBaseUrl ?? "", platformToken ?? ""] as const,
   workbenchAnnouncements: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-workbench-announcements", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  quickReplies: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-cs-quick-replies", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   knowledgeBases: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-knowledge-bases", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   knowledgeDocuments: (
@@ -114,5 +118,19 @@ export const pcQueryKeys = {
       ...sessionKey(apiBaseUrl, tenantToken),
       query ?? "",
       knowledgeBaseId ?? "",
+    ] as const,
+  aiSuggestions: (
+    apiBaseUrl?: string,
+    tenantToken?: string,
+    threadType?: string,
+    threadId?: string,
+    limit = 20,
+  ) =>
+    [
+      "pc-ai-suggestions",
+      ...sessionKey(apiBaseUrl, tenantToken),
+      threadType ?? "",
+      threadId ?? "",
+      limit,
     ] as const,
 };

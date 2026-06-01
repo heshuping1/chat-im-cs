@@ -83,6 +83,16 @@ export interface UserProfileDto {
   createdAt?: string | null;
 }
 
+export interface UserProfileUpdateDto {
+  displayName?: string;
+  avatarUrl?: string | null;
+  signature?: string | null;
+  gender?: string | null;
+  birthday?: string | null;
+  location?: string | null;
+  bio?: string | null;
+}
+
 export interface TenantInfoDto {
   tenantId?: string;
   tenantCode?: string;
@@ -152,6 +162,41 @@ export interface ProfilePrivacySettingsDto {
   profileVisibility?: "everyone" | "friends" | "nobody" | string;
 }
 
+export interface NotificationSettingsDto {
+  globalMute?: boolean;
+  dndStartTime?: string | null;
+  dndEndTime?: string | null;
+  soundEnabled?: boolean;
+  vibrationEnabled?: boolean;
+  previewEnabled?: boolean;
+  imEnabled?: boolean;
+  serviceQueueEnabled?: boolean;
+  slaEnabled?: boolean;
+  desktopEnabled?: boolean;
+}
+
+export type FeedbackTypeDto =
+  | "complaint"
+  | "suggestion"
+  | "bug"
+  | "experience"
+  | string;
+
+export interface FeedbackSubmitRequestDto {
+  type: FeedbackTypeDto;
+  title: string;
+  content: string;
+  contact?: string | null;
+  diagnosticsIncluded?: boolean;
+  clientContext?: Record<string, unknown>;
+}
+
+export interface FeedbackSubmitResultDto {
+  feedbackId?: string;
+  requestId?: string;
+  createdAt?: string | null;
+}
+
 export interface BlockedUserDto {
   blockedUserId: string;
   displayName?: string;
@@ -169,6 +214,18 @@ export interface JoinableTenantDto {
   description?: string | null;
   alreadyMember?: boolean;
   canJoinByTenantId?: boolean;
+}
+
+export interface TenantCodePreviewDto {
+  tenantId: string;
+  tenantCode: string;
+  tenantName: string;
+  logoUrl?: string | null;
+  tenantDescription?: string | null;
+  industry?: string | null;
+  memberCount?: number | null;
+  joinApprovalMode: "auto" | "manual" | string;
+  alreadyMember: boolean;
 }
 
 export interface PlatformJoinResultDto {
@@ -224,6 +281,47 @@ export interface KnowledgeSearchResultDto {
 
 export interface KnowledgeSearchResponseDto {
   items?: KnowledgeSearchResultDto[];
+}
+
+export type CustomerServiceQuickReplyScope =
+  | "all"
+  | "temp_session"
+  | "direct_customer"
+  | string;
+
+export interface CustomerServiceQuickReplyDto {
+  quickReplyId: string;
+  scope: CustomerServiceQuickReplyScope;
+  locale?: string | null;
+  category?: string | null;
+  title: string;
+  content: string;
+  tags?: string[];
+  sortOrder?: number | null;
+  enabled?: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+}
+
+export interface QuickReplyInsertPayload {
+  quickReplyId: string;
+  title: string;
+  text: string;
+  category?: string | null;
+  tags?: string[];
+  scope?: CustomerServiceQuickReplyScope;
+}
+
+export interface KnowledgeInsertPayload {
+  title: string;
+  text: string;
+  sourceLabel?: string;
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+  documentId?: string;
+  documentTitle?: string;
+  chunkId?: string;
 }
 
 export interface AiSuggestionSourceDto {
@@ -408,6 +506,9 @@ export interface FriendRequestDto {
 export interface TenantMemberDto {
   userId: string;
   platformUserId?: string;
+  lppId?: string | null;
+  lppNo?: string | null;
+  lppNumber?: string | null;
   displayName: string;
   avatarUrl?: string | null;
   membershipRole?: number;

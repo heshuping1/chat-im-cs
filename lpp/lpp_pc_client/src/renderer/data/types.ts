@@ -23,6 +23,7 @@ export type CustomerServiceStatus =
 export interface ContactItem {
   id: string;
   kind: ContactKind;
+  directoryFilters?: Array<Exclude<ContactFilter, "all" | "requests" | "staff">>;
   name: string;
   subtitle: string;
   remark: string;
@@ -39,6 +40,7 @@ export interface ContactItem {
   source?: string;
   groupName?: string | null;
   roleLabel?: string;
+  roleRank?: number;
   joinedAt?: string | null;
   createdAt?: string | null;
   lastMessagePreview?: string | null;

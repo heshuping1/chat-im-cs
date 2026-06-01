@@ -36,7 +36,6 @@ export const fullBusinessModules: ModuleKey[] = [
   "ticketCenter",
   "dataCenter",
   "knowledgeBase",
-  "aiAssistant",
   "enterpriseSwitch",
   "favorites",
   "settings",

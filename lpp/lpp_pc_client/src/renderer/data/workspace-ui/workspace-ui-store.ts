@@ -1,11 +1,20 @@
-import { useWorkspaceStore, type MessageLayoutMode } from "./workspace-store-core";
+import {
+  useWorkspaceStore,
+  type MessageLayoutMode,
+  type ServiceLayoutMode,
+  type ServiceAssistantPane,
+} from "./workspace-store-core";
 import type { TrayStatus } from "../../../shared/desktop-api";
 import type { ContactFilter, ModuleKey } from "../types";
 import type { CustomerServiceStatus } from "../types";
 
-export type { MessageLayoutMode } from "./workspace-store-core";
+export type {
+  MessageLayoutMode,
+  ServiceAssistantPane,
+  ServiceLayoutMode,
+} from "./workspace-store-core";
 
-export type ServiceThreadFilter = "all" | "queued" | "serving" | "vip";
+export type ServiceThreadFilter = "all" | "queued" | "serving" | "sla";
 export type MessageConversationFilter = "all" | "friends" | "groups" | "unread";
 
 // UI state is still backed by workspace store during P2.
@@ -20,6 +29,12 @@ export interface WorkspaceUiCompatibleState {
   profilePaneWidth: number;
   serviceListPaneWidth: number;
   serviceProfilePaneWidth: number;
+  serviceAssistantPaneWidth: number;
+  serviceCustomerPaneCollapsed: boolean;
+  serviceListPaneCollapsed: boolean;
+  serviceAssistantPane: ServiceAssistantPane;
+  serviceLayoutMode: ServiceLayoutMode;
+  sidebarCollapsed: boolean;
   messageProfileVisible: boolean;
   messageLayoutMode: MessageLayoutMode;
   filter: ServiceThreadFilter;
@@ -36,6 +51,12 @@ export interface WorkspaceUiCompatibleState {
   setProfilePaneWidth: (width: number) => void;
   setServiceListPaneWidth: (width: number) => void;
   setServiceProfilePaneWidth: (width: number) => void;
+  setServiceAssistantPaneWidth: (width: number) => void;
+  setServiceCustomerPaneCollapsed: (collapsed: boolean) => void;
+  setServiceListPaneCollapsed: (collapsed: boolean) => void;
+  setServiceAssistantPane: (pane: ServiceAssistantPane) => void;
+  setServiceLayoutMode: (mode: ServiceLayoutMode) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   setMessageProfileVisible: (visible: boolean) => void;
   setMessageLayoutMode: (mode: MessageLayoutMode) => void;
   setFilter: (filter: ServiceThreadFilter) => void;
@@ -132,8 +153,18 @@ export function selectSetMessageLayoutMode(state: WorkspaceUiCompatibleState) {
 
 export function selectServiceLayoutState(state: WorkspaceUiCompatibleState) {
   return {
+    serviceAssistantPane: state.serviceAssistantPane,
+    serviceAssistantPaneWidth: state.serviceAssistantPaneWidth,
+    serviceCustomerPaneCollapsed: state.serviceCustomerPaneCollapsed,
+    serviceListPaneCollapsed: state.serviceListPaneCollapsed,
     serviceListPaneWidth: state.serviceListPaneWidth,
     serviceProfilePaneWidth: state.serviceProfilePaneWidth,
+    serviceLayoutMode: state.serviceLayoutMode,
+    setServiceAssistantPane: state.setServiceAssistantPane,
+    setServiceAssistantPaneWidth: state.setServiceAssistantPaneWidth,
+    setServiceCustomerPaneCollapsed: state.setServiceCustomerPaneCollapsed,
+    setServiceLayoutMode: state.setServiceLayoutMode,
+    setServiceListPaneCollapsed: state.setServiceListPaneCollapsed,
     setServiceListPaneWidth: state.setServiceListPaneWidth,
     setServiceProfilePaneWidth: state.setServiceProfilePaneWidth,
   };
@@ -153,6 +184,54 @@ export function selectServiceProfilePaneWidth(state: WorkspaceUiCompatibleState)
 
 export function selectSetServiceProfilePaneWidth(state: WorkspaceUiCompatibleState) {
   return state.setServiceProfilePaneWidth;
+}
+
+export function selectServiceAssistantPaneWidth(state: WorkspaceUiCompatibleState) {
+  return state.serviceAssistantPaneWidth;
+}
+
+export function selectSetServiceAssistantPaneWidth(state: WorkspaceUiCompatibleState) {
+  return state.setServiceAssistantPaneWidth;
+}
+
+export function selectServiceCustomerPaneCollapsed(state: WorkspaceUiCompatibleState) {
+  return state.serviceCustomerPaneCollapsed;
+}
+
+export function selectSetServiceCustomerPaneCollapsed(state: WorkspaceUiCompatibleState) {
+  return state.setServiceCustomerPaneCollapsed;
+}
+
+export function selectServiceListPaneCollapsed(state: WorkspaceUiCompatibleState) {
+  return state.serviceListPaneCollapsed;
+}
+
+export function selectSetServiceListPaneCollapsed(state: WorkspaceUiCompatibleState) {
+  return state.setServiceListPaneCollapsed;
+}
+
+export function selectServiceAssistantPane(state: WorkspaceUiCompatibleState) {
+  return state.serviceAssistantPane;
+}
+
+export function selectSetServiceAssistantPane(state: WorkspaceUiCompatibleState) {
+  return state.setServiceAssistantPane;
+}
+
+export function selectServiceLayoutMode(state: WorkspaceUiCompatibleState) {
+  return state.serviceLayoutMode;
+}
+
+export function selectSetServiceLayoutMode(state: WorkspaceUiCompatibleState) {
+  return state.setServiceLayoutMode;
+}
+
+export function selectSidebarCollapsed(state: WorkspaceUiCompatibleState) {
+  return state.sidebarCollapsed;
+}
+
+export function selectSetSidebarCollapsed(state: WorkspaceUiCompatibleState) {
+  return state.setSidebarCollapsed;
 }
 
 export function selectServiceThreadFilter(state: WorkspaceUiCompatibleState) {
@@ -289,6 +368,54 @@ export function useServiceProfilePaneWidth() {
 
 export function useSetServiceProfilePaneWidth() {
   return useWorkspaceStore(selectSetServiceProfilePaneWidth);
+}
+
+export function useServiceAssistantPaneWidth() {
+  return useWorkspaceStore(selectServiceAssistantPaneWidth);
+}
+
+export function useSetServiceAssistantPaneWidth() {
+  return useWorkspaceStore(selectSetServiceAssistantPaneWidth);
+}
+
+export function useServiceCustomerPaneCollapsed() {
+  return useWorkspaceStore(selectServiceCustomerPaneCollapsed);
+}
+
+export function useSetServiceCustomerPaneCollapsed() {
+  return useWorkspaceStore(selectSetServiceCustomerPaneCollapsed);
+}
+
+export function useServiceListPaneCollapsed() {
+  return useWorkspaceStore(selectServiceListPaneCollapsed);
+}
+
+export function useSetServiceListPaneCollapsed() {
+  return useWorkspaceStore(selectSetServiceListPaneCollapsed);
+}
+
+export function useServiceAssistantPane() {
+  return useWorkspaceStore(selectServiceAssistantPane);
+}
+
+export function useSetServiceAssistantPane() {
+  return useWorkspaceStore(selectSetServiceAssistantPane);
+}
+
+export function useServiceLayoutMode() {
+  return useWorkspaceStore(selectServiceLayoutMode);
+}
+
+export function useSetServiceLayoutMode() {
+  return useWorkspaceStore(selectSetServiceLayoutMode);
+}
+
+export function useSidebarCollapsed() {
+  return useWorkspaceStore(selectSidebarCollapsed);
+}
+
+export function useSetSidebarCollapsed() {
+  return useWorkspaceStore(selectSetSidebarCollapsed);
 }
 
 export function useServiceThreadFilter() {

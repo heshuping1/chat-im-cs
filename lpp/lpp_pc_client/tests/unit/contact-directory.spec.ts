@@ -10,9 +10,12 @@ import type {
 } from "../../src/renderer/data/api/types";
 import { deriveContactDirectoryAccess } from "../../src/renderer/data/contact-directory-permissions";
 import {
+  contactMatchesDirectoryFilter,
   contactDirectoryEmptyText,
   contactDirectorySearchPlaceholder,
   createContactDirectoryEntries,
+  groupOrganizationContactsByRole,
+  contactRowSubtitle,
   mapContacts,
   normalizeContactDirectoryFilter,
   resolveContactDirectoryFilter,
@@ -67,6 +70,7 @@ describe("contact directory model", () => {
       members: [
         {
           userId: "u1",
+          lppId: "lpp-u1",
           displayName: "小周",
           membershipRole: 2,
         } satisfies TenantMemberDto,
@@ -77,12 +81,52 @@ describe("contact directory model", () => {
       expect.objectContaining({
         departmentName: "客服部",
         kind: "staff",
+        lppId: "lpp-u1",
         name: "小周",
         position: "一线客服",
         roleLabel: "客服",
+        roleRank: 30,
         source: "企业组织",
       }),
     ]);
+  });
+
+  it("shows public LPP numbers instead of internal user ids in contact details", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/renderer/components/ContactDetailViews.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain('InfoLine label="绿泡泡号" value={contact.lppId || "--"}');
+    expect(source).not.toContain('InfoLine label="用户 ID"');
+  });
+
+  it("groups organization contacts by role for the organization list", () => {
+    const contacts = mapContacts({
+      conversations: [],
+      currentUserId: "me",
+      departmentMembersById: {},
+      departments: [],
+      friends: [],
+      members: [
+        { userId: "u1", displayName: "普通成员", membershipRole: 0 },
+        { userId: "u2", displayName: "客服", membershipRole: 2 },
+        { userId: "u3", displayName: "管理员", membershipRole: 3 },
+        { userId: "u4", displayName: "技术支持", membershipRole: 1 },
+        { userId: "me", displayName: "自己", membershipRole: 4 },
+      ],
+    });
+
+    const groups = groupOrganizationContactsByRole(contacts);
+
+    expect(groups.map((group) => group.label)).toEqual([
+      "管理员",
+      "客服",
+      "技术支持",
+      "成员",
+    ]);
+    expect(groups.map((group) => group.count)).toEqual([1, 1, 1, 1]);
+    expect(groups.find((group) => group.label === "客服")?.contacts[0].name).toBe("客服");
   });
 
   it("keeps customer friends as customers for staff but displays them as friends for customer users", () => {
@@ -99,15 +143,63 @@ describe("contact directory model", () => {
     };
 
     expect(mapContacts({ ...shared, viewMode: "staff" })[0]).toMatchObject({
+      directoryFilters: ["customer", "friend"],
       kind: "customer",
-      source: "客户通讯录",
       subtitle: "客户",
     });
+    expect(mapContacts({ ...shared, viewMode: "staff" })[0]).not.toHaveProperty("source");
     expect(mapContacts({ ...shared, viewMode: "customer" })[0]).toMatchObject({
       kind: "friend",
-      source: "好友通讯录",
       subtitle: "好友",
     });
+    expect(mapContacts({ ...shared, viewMode: "customer" })[0]).not.toHaveProperty("source");
+  });
+
+  it("shows API contact groups only when groupName exists", () => {
+    const [withoutGroup, withGroup] = mapContacts({
+      conversations: [],
+      currentUserId: "me",
+      departmentMembersById: {},
+      departments: [],
+      friends: [
+        { friendUserId: "customer-1", displayName: "customer", userType: 1 },
+        { friendUserId: "customer-2", displayName: "vip customer", groupName: "VIP", userType: 1 },
+      ],
+      members: [],
+      viewMode: "staff",
+    });
+
+    expect(contactRowSubtitle(withoutGroup)).toBe("客户");
+    expect(contactRowSubtitle(withGroup)).toBe("客户 · VIP");
+    expect(withoutGroup.subtitle).toBe("客户");
+    expect(withGroup.subtitle).toBe("客户 · VIP");
+  });
+
+  it("counts customer friends in both customer and friend shortcuts without duplicating all contacts", () => {
+    const contacts = mapContacts({
+      conversations: [],
+      currentUserId: "me",
+      departmentMembersById: {},
+      departments: [],
+      friends: [
+        { friendUserId: "customer-1", displayName: "customer", userType: 1 },
+      ],
+      members: [],
+      viewMode: "staff",
+    });
+
+    const entries = createContactDirectoryEntries({
+      contacts,
+      requestCount: 0,
+      viewMode: "staff",
+      canReadOrganization: true,
+    });
+    const allEntries = [...entries.fixed, ...entries.shortcuts];
+    expect(allEntries.find((item) => item.key === "all")?.count).toBe(1);
+    expect(allEntries.find((item) => item.key === "customer")?.count).toBe(1);
+    expect(allEntries.find((item) => item.key === "friend")?.count).toBe(1);
+    expect(contactMatchesDirectoryFilter(contacts[0], "customer")).toBe(true);
+    expect(contactMatchesDirectoryFilter(contacts[0], "friend")).toBe(true);
   });
 
   it("creates customer and staff entry models without leaking staff-only categories", () => {
@@ -210,6 +302,12 @@ describe("contacts page closure", () => {
     expect(contactsPage).toContain("onDeleteFriend");
     expect(contactsPage).toContain("onBlockContact");
     expect(contactsPage).toContain("contacts-role-chip");
+  });
+
+  it("renders organization members by role groups instead of department groups", () => {
+    expect(contactsPage).toContain("groupOrganizationContactsByRole");
+    expect(contactsPage).toContain("roleGroups.map");
+    expect(contactsPage).not.toContain("contactsByDepartmentId");
   });
 
   it("hides organization affordances for customer tenant members", () => {

@@ -43,7 +43,7 @@
 .pc-avatar-profile-popover {
   position: fixed;
   z-index: 72;
-  width: 300px;
+  width: 320px;
   padding: 14px;
   border: 1px solid rgba(211, 222, 234, 0.96);
   border-radius: 14px;
@@ -133,6 +133,26 @@
   overflow: hidden;
   color: #2f4056;
   font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-avatar-profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pc-avatar-profile-tags span {
+  max-width: 92px;
+  overflow: hidden;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: rgba(236, 246, 242, 0.95);
+  color: #08775c;
+  font-size: 11px;
+  font-weight: 760;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -297,4 +317,37 @@
 .contact-card-profile-dialog footer button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.pc-avatar-profile-popover.contact-card-profile-dialog {
+  position: fixed;
+  width: 340px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  gap: 11px;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.pc-avatar-profile-popover.contact-card-profile-dialog .pc-avatar-profile-head {
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
+  padding-right: 28px;
+}
+
+.pc-avatar-profile-popover.contact-card-profile-dialog .pc-avatar-profile-image {
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 12px !important;
+  font-size: 18px !important;
+}
+
+.pc-avatar-profile-popover.contact-card-profile-dialog .contact-card-profile-rows {
+  margin-top: 0;
+}
+
+.pc-avatar-profile-popover.contact-card-profile-dialog footer {
+  padding-top: 11px;
+  border-top: 1px solid rgba(223, 230, 239, 0.9);
 }

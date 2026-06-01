@@ -117,6 +117,7 @@ try {
 if (results.some((item) => item.status === 'failed')) {
   process.exitCode = 1;
 }
+process.exit(process.exitCode || 0);
 
 function readRegressionEnv() {
   const seed = discoverQuickLoginSeed();
@@ -726,14 +727,7 @@ async function loginAccount(env, item) {
   const loginVisible = await page.locator('.login-page').isVisible({ timeout: 5_000 }).catch(() => false);
   if (!loginVisible) return;
 
-  const inputs = page.locator('input');
-  await inputs.nth(0).fill(env.apiBaseUrl);
-  await inputs.nth(1).fill(account.identifier);
-  await inputs.nth(2).fill(env.password);
-  const tenantInputCount = await inputs.count();
-  if (tenantInputCount >= 4 && (account.tenantId || env.tenantId)) {
-    await inputs.nth(3).fill(account.tenantId || env.tenantId);
-  }
+  await fillAuthLoginForm(page, account, env);
   await page.locator('.login-submit').click();
 
   const captchaVisible = await page.locator('.captcha-inline').isVisible({ timeout: 2_000 }).catch(() => false);
@@ -745,6 +739,25 @@ async function loginAccount(env, item) {
     const errorText = await page.locator('.form-error').textContent().catch(() => '');
     throw new Error(`Login did not complete for ${account.profileId}${errorText ? `: ${errorText}` : ''}`);
   });
+}
+
+async function fillAuthLoginForm(page, account, env) {
+  const loginInputs = page.locator('.login-panel > label input');
+  if ((await loginInputs.count()) < 2) {
+    throw new Error(`Login form did not expose identifier/password inputs for ${account.profileId}.`);
+  }
+  await loginInputs.nth(0).fill(account.identifier);
+  await loginInputs.nth(1).fill(env.password);
+
+  const advanced = page.locator('.auth-advanced');
+  if ((await advanced.count()) < 1) return;
+  const isOpen = await advanced.evaluate((node) => node.hasAttribute('open')).catch(() => false);
+  if (!isOpen) await advanced.locator('summary').click();
+  const advancedInputs = advanced.locator('input');
+  if ((await advancedInputs.count()) >= 1) await advancedInputs.nth(0).fill(env.apiBaseUrl);
+  if ((account.tenantId || env.tenantId) && (await advancedInputs.count()) >= 2) {
+    await advancedInputs.nth(1).fill(account.tenantId || env.tenantId);
+  }
 }
 
 async function assertAccountIsolation(launched) {

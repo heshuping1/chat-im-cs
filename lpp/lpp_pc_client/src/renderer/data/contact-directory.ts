@@ -10,12 +10,20 @@ import type { ContactFilter, ContactItem, ContactKind } from "./types";
 import { formatShortDate } from "../lib/format";
 
 export type ContactDirectoryViewMode = "staff" | "customer";
+type ContactDirectoryBucket = Exclude<ContactFilter, "all" | "requests" | "staff">;
 
 export interface ContactDirectoryEntry {
   key: ContactFilter;
   label: string;
   count?: number;
   kind: "fixed" | "shortcut";
+}
+
+export interface OrganizationRoleGroup {
+  key: string;
+  label: string;
+  count: number;
+  contacts: ContactItem[];
 }
 
 export const contactKindLabels: Record<ContactKind, string> = {
@@ -156,6 +164,19 @@ export function filterRequests(requests: FriendRequestDto[], keyword: string) {
   );
 }
 
+export function contactMatchesDirectoryFilter(
+  contact: ContactItem,
+  filter: ContactFilter,
+) {
+  const normalized = normalizeContactDirectoryFilter(filter);
+  if (normalized === "all") return true;
+  if (normalized === "requests") return false;
+  if (normalized === "staff") {
+    return contactDirectoryFilters(contact).includes("organization");
+  }
+  return contactDirectoryFilters(contact).includes(normalized);
+}
+
 export function mapContacts({
   friends,
   members,
@@ -198,13 +219,13 @@ export function mapContacts({
       id: `group-${item.conversationId}`,
       conversationId: item.conversationId,
       kind: "group",
+      directoryFilters: ["group"],
       name: item.title || "未命名群聊",
       subtitle: `群聊 · ${item.memberCount ?? "--"} 人`,
       remark: item.lastMessage?.preview ?? "群聊会话",
       tags: ["群聊", item.isMuted ? "免打扰" : "正常提醒"],
       members: item.memberCount ?? undefined,
       avatarUrl: item.avatarUrl,
-      source: "普通群聊",
       lastMessagePreview: item.lastMessage?.preview,
       lastMessageAt: item.lastMessage?.sentAt,
       muted: item.isMuted,
@@ -213,6 +234,12 @@ export function mapContacts({
   const friendContacts: ContactItem[] = friends.map((friend) => {
     const kind: ContactKind =
       viewMode === "customer" ? "friend" : friend.userType === 1 ? "customer" : "friend";
+    const directoryFilters: ContactDirectoryBucket[] =
+      viewMode === "customer"
+        ? ["friend"]
+        : friend.userType === 1
+          ? ["customer", "friend"]
+          : ["friend"];
     const lppId = friend.lppId || friend.lppNo || friend.lppNumber;
     return {
       id: `friend-${friend.friendUserId}`,
@@ -220,6 +247,7 @@ export function mapContacts({
       lppId,
       conversationId: directByPeer.get(friend.friendUserId),
       kind,
+      directoryFilters,
       name: friend.remarkName || friend.displayName || "好友",
       subtitle: `${kind === "customer" ? "客户" : "好友"}${friend.groupName ? ` · ${friend.groupName}` : ""}`,
       remark: friend.createdAt ? `添加于 ${formatShortDate(friend.createdAt)}` : "好友关系",
@@ -227,7 +255,6 @@ export function mapContacts({
       avatarUrl: friend.avatarUrl,
       groupName: friend.groupName,
       createdAt: friend.createdAt,
-      source: kind === "customer" ? "客户通讯录" : "好友通讯录",
     };
   });
 
@@ -235,11 +262,14 @@ export function mapContacts({
     .filter((member) => member.userId !== currentUserId)
     .map((member) => {
       const department = departmentByMember.get(member.userId);
+      const lppId = member.lppId || member.lppNo || member.lppNumber || undefined;
       return {
         id: `staff-${member.userId}`,
         userId: member.userId,
+        lppId,
         conversationId: directByPeer.get(member.userId),
         kind: "staff",
+        directoryFilters: ["organization"],
         name: member.displayName || "企业成员",
         subtitle: `员工 · ${membershipRoleLabel(member.membershipRole)}`,
         remark: member.joinedAt ? `加入于 ${formatShortDate(member.joinedAt)}` : "企业成员",
@@ -249,6 +279,7 @@ export function mapContacts({
         departmentName: department?.name,
         position: department?.position,
         roleLabel: membershipRoleLabel(member.membershipRole),
+        roleRank: membershipRoleRank(member.membershipRole),
         joinedAt: member.joinedAt,
         source: "企业组织",
       };
@@ -261,10 +292,8 @@ function countContactsByFilter(contacts: ContactItem[]) {
   return contacts.reduce(
     (result, contact) => {
       result.all += 1;
-      if (contact.kind === "staff") {
-        result.organization += 1;
-      } else {
-        result[contact.kind] += 1;
+      for (const filter of contactDirectoryFilters(contact)) {
+        result[filter] += 1;
       }
       return result;
     },
@@ -272,22 +301,24 @@ function countContactsByFilter(contacts: ContactItem[]) {
   );
 }
 
+function contactDirectoryFilters(contact: ContactItem): ContactDirectoryBucket[] {
+  if (contact.directoryFilters?.length) return contact.directoryFilters;
+  return [contact.kind === "staff" ? "organization" : contact.kind];
+}
+
 export function sourceLabel(contact: ContactItem) {
-  if (contact.kind === "customer") return "客户通讯录";
-  if (contact.kind === "group") return "群聊";
-  if (contact.kind === "staff") return "企业组织";
-  return "好友";
+  return contact.source || "--";
 }
 
 export function contactRowSubtitle(contact: ContactItem) {
-  if (contact.kind === "customer") return `客户 · ${contact.groupName || "默认分组"}`;
+  if (contact.kind === "customer") return ["客户", contact.groupName].filter(Boolean).join(" · ");
   if (contact.kind === "staff") {
     return [contact.departmentName || "企业成员", contact.position].filter(Boolean).join(" · ");
   }
   if (contact.kind === "group") {
     return `${contact.members ?? "--"} 人 · ${contact.muted ? "免打扰" : "正常提醒"}`;
   }
-  return `好友 · ${contact.groupName || "默认分组"}`;
+  return ["好友", contact.groupName].filter(Boolean).join(" · ");
 }
 
 export function contactRowHint(contact: ContactItem) {
@@ -295,7 +326,7 @@ export function contactRowHint(contact: ContactItem) {
     return contact.createdAt ? `添加于 ${formatShortDate(contact.createdAt)}` : "客户好友";
   }
   if (contact.kind === "staff") {
-    return [contact.position, contact.userId].filter(Boolean).join(" · ") || "企业成员";
+    return [contact.position, contact.lppId].filter(Boolean).join(" · ") || "企业成员";
   }
   if (contact.kind === "group") return contact.lastMessagePreview || "暂无最近消息";
   return contact.remark || "好友关系";
@@ -307,10 +338,65 @@ export function contactKindBadge(contact: ContactItem) {
   return contactKindLabels[contact.kind];
 }
 
+export function groupOrganizationContactsByRole(
+  contacts: ContactItem[],
+): OrganizationRoleGroup[] {
+  const roleGroups = new Map<
+    string,
+    { rank: number; label: string; contacts: ContactItem[] }
+  >();
+  for (const contact of contacts) {
+    const label = contact.roleLabel || "成员";
+    const group = roleGroups.get(label);
+    if (group) {
+      group.contacts.push(contact);
+      group.rank = Math.min(group.rank, contact.roleRank ?? roleLabelRank(label));
+    } else {
+      roleGroups.set(label, {
+        rank: contact.roleRank ?? roleLabelRank(label),
+        label,
+        contacts: [contact],
+      });
+    }
+  }
+  return [...roleGroups.entries()]
+    .map(([key, group]) => ({
+      key,
+      label: group.label,
+      count: group.contacts.length,
+      contacts: group.contacts,
+      rank: group.rank,
+    }))
+    .sort((left, right) => left.rank - right.rank || left.label.localeCompare(right.label, "zh-CN"))
+    .map((group) => ({
+      key: group.key,
+      label: group.label,
+      count: group.count,
+      contacts: group.contacts,
+    }));
+}
+
 function membershipRoleLabel(role?: number) {
   if (role === 4) return "所有者";
   if (role === 3) return "管理员";
   if (role === 2) return "客服";
   if (role === 1) return "技术支持";
   return "成员";
+}
+
+function membershipRoleRank(role?: number) {
+  if (role === 4) return 10;
+  if (role === 3) return 20;
+  if (role === 2) return 30;
+  if (role === 1) return 40;
+  return 50;
+}
+
+function roleLabelRank(label: string) {
+  if (label === "所有者") return 10;
+  if (label === "管理员") return 20;
+  if (label === "客服") return 30;
+  if (label === "技术支持") return 40;
+  if (label === "成员") return 50;
+  return 90;
 }

@@ -18,6 +18,8 @@ describe("app brand assets", () => {
   };
   const indexHtml = readFileSync(resolve(root, "index.html"), "utf8");
   const mainSource = readFileSync(resolve(root, "src/main/main.ts"), "utf8");
+  const appMetadataSource = readFileSync(resolve(root, "src/renderer/app/appMetadata.ts"), "utf8");
+  const sidebarSource = readFileSync(resolve(root, "src/renderer/components/Sidebar.tsx"), "utf8");
   const readPngMetadata = (file: string) => {
     const bytes = readFileSync(resolve(root, file));
     return {
@@ -48,9 +50,17 @@ describe("app brand assets", () => {
 
   it("exposes the app icon to browser tabs and macOS development dock", () => {
     expect(indexHtml).toContain('rel="icon"');
-    expect(indexHtml).toContain("/app-icon-green-bubble.png");
+    expect(indexHtml).toContain("%BASE_URL%app-icon-green-bubble.png");
     expect(mainSource).toContain("app.dock?.setIcon");
     expect(mainSource).toContain("app-icon-green-bubble.png");
+  });
+
+  it("uses the app icon in the PC sidebar brand instead of a letter fallback", () => {
+    expect(appMetadataSource).toContain("import.meta.env.BASE_URL");
+    expect(appMetadataSource).toContain("app-icon-green-bubble.png");
+    expect(sidebarSource).toContain("appIconSrc");
+    expect(sidebarSource).not.toContain('src="/app-icon-green-bubble.png"');
+    expect(sidebarSource).not.toContain('className="sidebar-brand-logo" aria-hidden="true">\n            L');
   });
 
   it("keeps a small-size visual acceptance board for the app icon", () => {

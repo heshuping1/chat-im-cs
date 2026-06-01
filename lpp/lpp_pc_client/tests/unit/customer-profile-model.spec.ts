@@ -19,6 +19,40 @@ describe("customer profile model business ownership", () => {
     expect(model.appName).toBe("--");
   });
 
+  it("does not use contact source fallback as the customer source channel", () => {
+    const model = buildCustomerModel({
+      contact: {
+        id: "contact-1",
+        kind: "customer",
+        name: "测试客户",
+        remark: "",
+        source: "客户通讯录",
+        subtitle: "",
+        tags: [],
+      },
+    });
+
+    expect(model.source).toBe("--");
+  });
+
+  it("uses only real profile source fields for the customer source channel", () => {
+    expect(
+      buildCustomerModel({
+        profileExtra: {
+          friendUserId: "u2",
+          source: "小程序",
+        },
+      }).source,
+    ).toBe("小程序");
+    expect(
+      buildCustomerModel({
+        profile: {
+          sourceChannel: "web",
+        },
+      }).source,
+    ).toBe("网页");
+  });
+
   it("uses profile extra note as the private customer handling remark", () => {
     const model = buildCustomerModel({
       contact: {

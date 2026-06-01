@@ -1,6 +1,12 @@
-import type { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction } from "react";
+import type {
+  Dispatch,
+  PointerEvent as ReactPointerEvent,
+  Ref,
+  SetStateAction,
+} from "react";
 
 import type { ConversationListItem, GroupMemberDto, MessageItemDto } from "../../data/api-client";
+import type { MessageComposerHandle } from "../../components/MessageComposer";
 import type { PcSettings } from "../../data/settings/pc-settings";
 import { startVerticalPaneResize } from "../../lib/paneResize";
 import type { MessageCenterCommandModel } from "../hooks/useMessageCenterCommandModel";
@@ -24,7 +30,11 @@ export function MessageComposerDock({
   messages,
   multiSelectMode,
   replyTarget,
+  composerRef,
   screenshotShortcut,
+  dragUpload,
+  enterToSend,
+  shortcutHints,
   selectedMessageIds,
   showAiTools,
   showKnowledgeTools,
@@ -34,6 +44,7 @@ export function MessageComposerDock({
   onDraftEditorStateChange,
   onDraftPreviewChange,
   onKnowledgeBase,
+  onQuickReply,
   onTranslateDraft,
   scrollMessagesToBottom,
   setComposerHeight,
@@ -53,7 +64,11 @@ export function MessageComposerDock({
   messages: MessageItemDto[];
   multiSelectMode: boolean;
   replyTarget: ReplyTarget;
+  composerRef?: Ref<MessageComposerHandle>;
   screenshotShortcut: PcSettings["screenshotShortcut"];
+  dragUpload: PcSettings["dragUpload"];
+  enterToSend: PcSettings["enterToSend"];
+  shortcutHints: PcSettings["shortcutHints"];
   selectedMessageIds: Set<string>;
   showAiTools: boolean;
   showKnowledgeTools: boolean;
@@ -63,6 +78,7 @@ export function MessageComposerDock({
   onDraftEditorStateChange: (conversationId: string, value: string) => void;
   onDraftPreviewChange: (conversationId: string, value: string) => void;
   onKnowledgeBase: () => void;
+  onQuickReply: () => void;
   onTranslateDraft: (content: string) => Promise<string | undefined>;
   scrollMessagesToBottom: (behavior?: ScrollBehavior) => void;
   setComposerHeight: Dispatch<SetStateAction<number>>;
@@ -95,13 +111,17 @@ export function MessageComposerDock({
       )}
 
       <MessageComposerSurface
+        ref={composerRef}
         attachmentScopeKey={conversationId}
         draftValue={activeConversationDraft}
+        dragUpload={dragUpload}
+        enterToSend={enterToSend}
         draftEditorState={draftEditorState}
         mentionOptions={
           activeConversationType === "group" ? buildMentionOptions(groupMembers) : []
         }
         screenshotShortcut={screenshotShortcut}
+        shortcutHints={shortcutHints}
         onAiDraft={onAiDraft}
         onDraftChange={(value) => onDraftChange(conversationId, value)}
         onDraftPreviewChange={(value) => onDraftPreviewChange(conversationId, value)}
@@ -109,6 +129,7 @@ export function MessageComposerDock({
           onDraftEditorStateChange(conversationId, value)
         }
         onKnowledgeBase={onKnowledgeBase}
+        onQuickReply={onQuickReply}
         onOpenContactCardPicker={messageCenterCommands.openContactCardPicker}
         onResizeStart={(event) =>
           resizeComposerFromPointer({

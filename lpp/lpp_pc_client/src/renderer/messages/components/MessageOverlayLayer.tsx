@@ -16,8 +16,8 @@ import {
 } from "./ConversationInfoViews";
 import type { AvatarProfilePopoverState } from "../models/messageDisplayModel";
 import type {
+  AnchoredContactCardProfile,
   ContactCardRelation,
-  NormalizedContactCard,
 } from "../models/contactCardModel";
 import type { UserProfileDto } from "../../data/api-client";
 
@@ -60,7 +60,7 @@ export function MessageOverlayLayer({
   onMessageAction,
 }: {
   avatarProfilePopover: AvatarProfilePopoverState | null;
-  contactCardProfile: NormalizedContactCard | null;
+  contactCardProfile: AnchoredContactCardProfile | null;
   contactCardProfileData?: UserProfileDto;
   contactCardProfileError?: unknown;
   contactCardProfileLoading?: boolean;

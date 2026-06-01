@@ -1,13 +1,11 @@
-import { ActionRow, SwitchRow } from "./SettingsRows";
+import { ActionRow } from "./SettingsRows";
 import type { PcSettings } from "../../data/settings/pc-settings";
 import { settingRowProps } from "../models/settingsCatalog";
 
 type SettingKey = keyof PcSettings;
 
 export function ChatArchiveSection({
-  pcSettings,
   setNotice,
-  setSetting,
 }: {
   pcSettings: PcSettings;
   setNotice: (notice: string) => void;
@@ -15,11 +13,6 @@ export function ChatArchiveSection({
 }) {
   return (
     <>
-      <SwitchRow
-        {...settingRowProps("localMessageCache")}
-        checked={pcSettings.localMessageCache}
-        onChange={(value) => setSetting("localMessageCache", value)}
-      />
       <ActionRow
         {...settingRowProps("chatExport")}
         action="待接入"
@@ -34,14 +27,6 @@ export function ChatArchiveSection({
         {...settingRowProps("chatRestore")}
         action="待接入"
         onClick={() => setNotice("聊天记录恢复能力待接入")}
-      />
-      <ActionRow
-        {...settingRowProps("clearLocalCache")}
-        action="清理"
-        onClick={() => {
-          localStorage.removeItem("lpp.pc.message-cache");
-          setNotice("已清理聊天缓存");
-        }}
       />
     </>
   );

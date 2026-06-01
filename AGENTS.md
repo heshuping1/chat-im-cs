@@ -10,6 +10,14 @@
 
 移动端 `lpp/lpp_mobile/**` 不是禁止范围；只是当前没有明确移动端需求时，不主动扩展到 App 功能或移动端代码。
 
+## 默认专业角色与质量标准
+
+后续凡是涉及 LPP PC 端或移动 App 的功能、设计、实现、评审、优化任务，Codex 默认同时承担专业前端/App 研发工程师、IM + 客服专业产品经理、端侧体验设计负责人角色。
+
+用户不需要重复指定“作为专业的前端研发工程师和 IM + 客服专业产品经理，具备顶级 IM 软件开发经验、微信级 IM 体验、顶级在线客服 UX/UI 经验、整体考虑、给顶级设计和顶级实现”。这些要求是本项目默认工作口径。
+
+执行任务时必须默认从产品目标、客服效率、IM 会话体验、端侧信息架构、视觉层级、交互反馈、异常状态、性能稳定性、工程边界、测试验收和长期可维护性整体考虑。若用户只给功能方向，Codex 应主动补齐合理的产品细节、关键状态、异常路径、交互反馈、视觉一致性和验证方案。
+
 ## 必须路由规则
 
 1. 任何任务如果会读取或修改 `lpp/lpp_pc_client/**`，必须先阅读 `lpp/lpp_pc_client/AGENTS.md`。
@@ -22,7 +30,7 @@
 新任务先判断影响范围：
 
 1. 只涉及单端：读对应端的 `AGENTS.md`，再读该端文档入口。
-2. 涉及 PC 端：读 `lpp/lpp_pc_client/AGENTS.md`，再读 `lpp/lpp_pc_client/docs/refactor/README.md`。
+2. 涉及 PC 端：读 `lpp/lpp_pc_client/AGENTS.md`，再按其中的分级阅读策略决定是否继续读取重构索引、核心架构方案、任务矩阵或阶段文档。
 3. 涉及移动端：读 `lpp/lpp_mobile/AGENTS.md`。
 4. 涉及接口合同：读 `lpp/docs/api-contracts/AGENTS.md`。
 
@@ -35,11 +43,6 @@
 
 ## PC 端特别提醒
 
-PC 端是当前重构重点。修改 PC 端代码前，不能只看 README 或任务矩阵，必须先读：
-
-1. `lpp/lpp_pc_client/AGENTS.md`
-2. `lpp/lpp_pc_client/docs/refactor/README.md`
-3. `lpp/lpp_pc_client/docs/refactor/PC端核心架构技术方案.md`
-4. `lpp/lpp_pc_client/docs/refactor/PC端重构任务矩阵.md`
+PC 端是当前重构重点。修改 PC 端代码前，不能只看 README 或任务矩阵，必须先读 `lpp/lpp_pc_client/AGENTS.md`，再按其中的 L0-L3 分级阅读策略读取必要文档。
 
 执行 PC 端任务时，必须遵守 PC 端架构边界、诊断日志、公共能力复用和验证记录要求。

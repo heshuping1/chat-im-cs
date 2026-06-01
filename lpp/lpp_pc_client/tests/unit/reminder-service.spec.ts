@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dismissRealtimeReminderById,
   dismissRealtimeRemindersForTarget,
+  notificationPayloadForPolicy,
   reduceRealtimeReminders,
   shouldPushRealtimeReminder,
   shouldShowDesktopNotification,
@@ -77,6 +78,37 @@ describe("reminder service", () => {
         "im",
       ),
     ).toBe(false);
+    expect(
+      shouldPushRealtimeReminder(
+        {
+          ...defaultPcSettings,
+          doNotDisturb: true,
+        },
+        "im",
+      ),
+    ).toBe(false);
+    expect(
+      shouldPushRealtimeReminder(
+        {
+          ...defaultPcSettings,
+          doNotDisturb: true,
+        },
+        "serviceQueue",
+      ),
+    ).toBe(true);
+  });
+
+  it("hides desktop notification content when preview is disabled", () => {
+    expect(
+      notificationPayloadForPolicy(
+        { title: "客户消息", body: "银行卡 1234", conversationId: "c1" },
+        { ...defaultPcSettings, notificationPreview: false },
+      ),
+    ).toEqual({
+      title: "客户消息",
+      body: "你有一条新提醒，内容已按隐私设置隐藏。",
+      conversationId: "c1",
+    });
   });
 });
 

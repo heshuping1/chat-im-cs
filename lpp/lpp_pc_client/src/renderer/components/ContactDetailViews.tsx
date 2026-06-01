@@ -28,8 +28,7 @@ function CustomerContactDetail({ contact }: { contact: ContactItem }) {
   return (
     <>
       <div className="contacts-info-grid">
-        <InfoCard label="客户分组" value={contact.groupName || "--"} />
-        <InfoCard label="客户来源" value={contact.source || "客户通讯录"} />
+        <InfoCard label="来源渠道" value={contact.source || "--"} />
         <InfoCard label="添加时间" value={formatShortDate(contact.createdAt)} />
         <InfoCard label="关联会话" value={contact.conversationId ? "已建立" : "未建立"} />
       </div>
@@ -47,8 +46,9 @@ function CustomerContactDetail({ contact }: { contact: ContactItem }) {
         </h3>
         <div className="contacts-mini-rows">
           <InfoLine label="关系类型" value="客户好友" />
+          <InfoLine label="通讯录分组" value={contact.groupName || "--"} />
           <InfoLine label="备注" value={contact.remark || "--"} />
-          <InfoLine label="用户 ID" value={contact.userId || "--"} />
+          <InfoLine label="绿泡泡号" value={contact.lppId || "--"} />
         </div>
       </section>
     </>
@@ -59,11 +59,21 @@ function FriendContactDetail({ contact }: { contact: ContactItem }) {
   return (
     <>
       <div className="contacts-info-grid">
-        <InfoCard label="好友分组" value={contact.groupName || "--"} />
-        <InfoCard label="来源" value={contact.source || "好友通讯录"} />
+        <InfoCard label="来源渠道" value={contact.source || "--"} />
         <InfoCard label="添加时间" value={formatShortDate(contact.createdAt)} />
         <InfoCard label="关联会话" value={contact.conversationId ? "已建立" : "未建立"} />
       </div>
+      <section className="contacts-section-card">
+        <h3>
+          <ClipboardList size={16} />
+          好友关系
+        </h3>
+        <div className="contacts-mini-rows">
+          <InfoLine label="通讯录分组" value={contact.groupName || "--"} />
+          <InfoLine label="备注" value={contact.remark || "--"} />
+          <InfoLine label="绿泡泡号" value={contact.lppId || "--"} />
+        </div>
+      </section>
       <section className="contacts-section-card">
         <h3>
           <ShieldCheck size={16} />
@@ -91,7 +101,7 @@ function StaffContactDetail({ contact }: { contact: ContactItem }) {
         </h3>
         <div className="contacts-mini-rows">
           <InfoLine label="组织路径" value={contact.departmentName || "企业成员"} />
-          <InfoLine label="用户 ID" value={contact.userId || "--"} />
+          <InfoLine label="绿泡泡号" value={contact.lppId || "--"} />
           <InfoLine label="关联会话" value={contact.conversationId ? "已建立" : "未建立"} />
         </div>
       </section>
@@ -121,7 +131,7 @@ function GroupContactDetail({ contact }: { contact: ContactItem }) {
           群聊信息
         </h3>
         <div className="contacts-mini-rows">
-          <InfoLine label="群类型" value={contact.source || "普通群聊"} />
+          <InfoLine label="群类型" value={contact.source || "--"} />
           <InfoLine label="会话 ID" value={contact.conversationId || "--"} />
           <InfoLine label="备注" value={contact.remark || "--"} />
         </div>

@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
+import { AiReplySuggestionDrawer } from "./AiReplySuggestionDrawer";
 import { channelLabel as formatChannelLabel } from "./ChannelBadge";
 import { PanelState } from "./PanelState";
 import {
   type MessageItemDto,
+  type KnowledgeInsertPayload,
 } from "../data/api-client";
 import { usePcSettings } from "../data/settings/settings-store";
 import {
@@ -11,11 +13,10 @@ import {
   usePushRealtimeReminder,
 } from "../data/reminder/reminder-store";
 import {
-  useCloseOpenServiceThread,
+  type ServiceAssistantPane,
   useActiveThreadId,
-  useOpenServiceThreadIds,
-  useSetActiveModule,
-  useSetActiveThread,
+  useServiceAssistantPane,
+  useSetServiceAssistantPane,
 } from "../data/workspace-ui/workspace-ui-store";
 import { type CurrentUserIdentity, isSelfSender } from "../data/message-display";
 import {
@@ -33,7 +34,6 @@ import {
   editMessageMediaFile,
   isMacPlatform,
   openMessageMediaFile,
-  revealInFolderLabel,
   revealMessageMediaInFolder,
   saveMessageMediaAs,
 } from "../messages/runtime/messageMediaActions";
@@ -43,10 +43,15 @@ import {
 import { ChatToastNotice, isNoticeErrorText } from "../messages/components/ChatToastNotice";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
 import {
+  isServiceAiDraftableMessage,
   type ServiceMessageContextAction,
 } from "../customer-service/components/ServiceMessageContextMenu";
 import { CustomerServiceComposerSurface } from "../customer-service/components/CustomerServiceComposerSurface";
-import { CustomerServiceMultiOpenBar } from "../customer-service/components/CustomerServiceMultiOpenBar";
+import { CustomerServiceKnowledgeDrawer } from "../customer-service/components/CustomerServiceKnowledgeDrawer";
+import {
+  customerServiceAssistantInsertEvent,
+  readCustomerServiceAssistantInsertText,
+} from "../customer-service/runtime/customer-service-assistant-events";
 import { CustomerServiceWorkspaceHeader } from "../customer-service/components/CustomerServiceWorkspaceHeader";
 import { CustomerServiceReceptionStrip } from "../customer-service/components/CustomerServiceReceptionStrip";
 import { CustomerServiceMessageStage } from "../customer-service/components/CustomerServiceMessageStage";
@@ -56,7 +61,8 @@ import { useCustomerServiceSendController } from "../customer-service/hooks/useC
 import { useCustomerServiceWorkspaceController } from "../customer-service/hooks/useCustomerServiceWorkspaceController";
 import { startVerticalPaneResize } from "../lib/paneResize";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
-import { maxOpenServiceThreads } from "../data/customer-service/cs-multi-open";
+import { isRiskyCustomerServiceThread } from "../customer-service/models/serviceWorkbenchModel";
+import type { MessageComposerHandle } from "./MessageComposer";
 
 const composerHeightBounds = {
   min: 176,
@@ -64,9 +70,14 @@ const composerHeightBounds = {
 };
 
 type ServiceMessageMenuState = {
+  canAiDraft?: boolean;
   message: MessageItemDto;
   x: number;
   y: number;
+} | null;
+
+type AiDraftDrawerState = {
+  customerMessageId?: string | null;
 } | null;
 
 function clampComposerHeight(height: number) {
@@ -76,14 +87,21 @@ function clampComposerHeight(height: number) {
   );
 }
 
-export function ChatWorkspace() {
+export function ChatWorkspace({
+  onOpenCustomerContext,
+  onToggleAssistantPane,
+}: {
+  onOpenCustomerContext?: () => void;
+  onToggleAssistantPane?: (pane: Exclude<ServiceAssistantPane, null>) => void;
+}) {
   const selectedThreadId = useActiveThreadId();
-  const openServiceThreadIds = useOpenServiceThreadIds();
   const [notice, setNotice] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<ServiceMessageMenuState>(null);
-  const setActiveModule = useSetActiveModule();
-  const setActiveThread = useSetActiveThread();
-  const closeOpenServiceThread = useCloseOpenServiceThread();
+  const [knowledgeDrawerOpen, setKnowledgeDrawerOpen] = useState(false);
+  const [aiDraftDrawer, setAiDraftDrawer] = useState<AiDraftDrawerState>(null);
+  const composerRef = useRef<MessageComposerHandle | null>(null);
+  const serviceAssistantPane = useServiceAssistantPane();
+  const setServiceAssistantPane = useSetServiceAssistantPane();
   const pcSettings = usePcSettings();
   const [composerHeight, setComposerHeight] = useState(176);
   const pushRealtimeReminder = usePushRealtimeReminder();
@@ -94,7 +112,6 @@ export function ChatWorkspace() {
     detailLoading,
     queryClient,
     selectedThread,
-    selectableThreads,
     session,
     threadActionMutation,
     workspaceViewModel,
@@ -112,23 +129,12 @@ export function ChatWorkspace() {
     messages,
     readOnly,
     receptionText,
+    replyGate,
     source,
     status,
     threadState,
     title,
   } = workspaceViewModel;
-  const openThreads = useMemo(() => {
-    const threadsById = new Map(
-      selectableThreads.map((thread) => [thread.threadId, thread]),
-    );
-    const opened = openServiceThreadIds
-      .map((threadId) => threadsById.get(threadId))
-      .filter((thread): thread is NonNullable<typeof thread> => Boolean(thread));
-    if (selectedThread && !opened.some((thread) => thread.threadId === selectedThread.threadId)) {
-      return [...opened, selectedThread].slice(-maxOpenServiceThreads);
-    }
-    return opened;
-  }, [openServiceThreadIds, selectableThreads, selectedThread]);
   useCustomerServiceThreadLifecycle({
     detail,
     dismissRealtimeRemindersForTarget,
@@ -176,24 +182,75 @@ export function ChatWorkspace() {
 
   useWindowDismiss(Boolean(messageMenu), () => setMessageMenu(null));
 
+  const insertKnowledgeReply = useCallback((payload: KnowledgeInsertPayload) => {
+    const text = payload.text.trim();
+    if (!text) {
+      setNotice("这条知识内容暂无可插入文本。");
+      return;
+    }
+    composerRef.current?.insertText(text);
+    setKnowledgeDrawerOpen(false);
+    setNotice("已插入输入框，确认后可发送给客户。");
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }, []);
+
+  const insertAiDraftReply = useCallback((text: string) => {
+    const next = text.trim();
+    if (!next) {
+      setNotice("这条 AI 回复建议暂无可插入文本。");
+      return;
+    }
+    composerRef.current?.insertText(next);
+    setAiDraftDrawer(null);
+    setNotice("AI 回复建议已插入输入框，确认后可发送给客户。");
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    const handleAssistantInsert = (event: Event) => {
+      const text = readCustomerServiceAssistantInsertText(event);
+      if (!text) {
+        setNotice("这条辅助内容暂无可插入文本。");
+        return;
+      }
+      composerRef.current?.insertText(text);
+      setKnowledgeDrawerOpen(false);
+      setAiDraftDrawer(null);
+      setNotice("已插入输入框，确认后可发送给客户。");
+      requestAnimationFrame(() => composerRef.current?.focus());
+    };
+    window.addEventListener(customerServiceAssistantInsertEvent, handleAssistantInsert);
+    return () =>
+      window.removeEventListener(customerServiceAssistantInsertEvent, handleAssistantInsert);
+  }, []);
+
   const openServiceMessageMenu = useCallback(
     (event: MouseEvent<HTMLElement>, message: MessageItemDto) => {
-      if (!hasOpenableMessageMedia(message)) return;
+      const canAiDraftMessage =
+        canReply &&
+        !isMineMessage(message, session) &&
+        isServiceAiDraftableMessage(message);
+      if (!hasOpenableMessageMedia(message) && !canAiDraftMessage) return;
       event.preventDefault();
       event.stopPropagation();
       setMessageMenu({
+        canAiDraft: canAiDraftMessage,
         message,
         x: Math.min(event.clientX, window.innerWidth - 240),
         y: Math.min(event.clientY, window.innerHeight - 220),
       });
     },
-    [],
+    [canReply, session],
   );
 
   const handleServiceMessageMenuAction = useCallback(
     async (action: ServiceMessageContextAction, message: MessageItemDto) => {
       setMessageMenu(null);
       setNotice(null);
+      if (action === "ai_reply") {
+        setAiDraftDrawer({ customerMessageId: message.messageId });
+        return;
+      }
       const url = resolveMessageMediaUrl(message, session?.apiBaseUrl);
       if (!url) {
         setNotice("这条媒体消息没有可处理的地址。");
@@ -291,19 +348,16 @@ export function ChatWorkspace() {
       className="h-chat-workspace"
       style={{ "--composer-height": `${composerHeight}px` } as CSSProperties}
     >
-      <CustomerServiceMultiOpenBar
-        activeThreadId={selectedThread.threadId}
-        maxOpenCount={maxOpenServiceThreads}
-        openThreads={openThreads}
-        onClose={closeOpenServiceThread}
-        onSelect={setActiveThread}
-      />
-
       <CustomerServiceWorkspaceHeader
         identity={identity}
         modeLabel={modeLabel}
+        readOnly={readOnly}
+        replyGate={replyGate}
+        risky={isRiskyCustomerServiceThread(selectedThread)}
         source={source}
         title={title}
+        unreadCount={selectedThread.unreadCount}
+        onOpenCustomerContext={onOpenCustomerContext}
       />
 
       <CustomerServiceReceptionStrip
@@ -346,19 +400,42 @@ export function ChatWorkspace() {
 
       {canReply && (
         <CustomerServiceComposerSurface
+          ref={composerRef}
           disabled={
             detailLoading ||
             sendTextMutation.isPending ||
             sendMediaMutation.isPending
           }
+          dragUpload={pcSettings.dragUpload}
+          enterToSend={pcSettings.enterToSend}
+          shortcutHints={pcSettings.shortcutHints}
           onResizeStart={(event) =>
             startVerticalPaneResize(event, {
               initialHeight: composerHeight,
               onResize: (height) => setComposerHeight(clampComposerHeight(height)),
             })
           }
-          onAiDraft={() => setActiveModule("aiAssistant")}
-          onKnowledgeBase={() => setActiveModule("knowledgeBase")}
+          onAiDraft={() =>
+            onToggleAssistantPane
+              ? onToggleAssistantPane("aiDraft")
+              : setServiceAssistantPane(
+                  serviceAssistantPane === "aiDraft" ? null : "aiDraft",
+                )
+          }
+          onQuickReply={() =>
+            onToggleAssistantPane
+              ? onToggleAssistantPane("quickReply")
+              : setServiceAssistantPane(
+                  serviceAssistantPane === "quickReply" ? null : "quickReply",
+                )
+          }
+          onKnowledgeBase={() =>
+            onToggleAssistantPane
+              ? onToggleAssistantPane("knowledge")
+              : setServiceAssistantPane(
+                  serviceAssistantPane === "knowledge" ? null : "knowledge",
+                )
+          }
           onSendText={async (content) => {
             await sendTextMutation.mutateAsync(content);
           }}
@@ -367,6 +444,34 @@ export function ChatWorkspace() {
             return extractActionResultText(await client.translateText(content));
           }}
           onSendMedia={sendServiceMediaOptimistically}
+        />
+      )}
+      {knowledgeDrawerOpen && canReply && (
+        <CustomerServiceKnowledgeDrawer
+          session={session}
+          onClose={() => {
+            setKnowledgeDrawerOpen(false);
+            requestAnimationFrame(() => composerRef.current?.focus());
+          }}
+          onInsert={insertKnowledgeReply}
+          onNotice={setNotice}
+        />
+      )}
+      {aiDraftDrawer && canReply && selectedThread && (
+        <AiReplySuggestionDrawer
+          customerMessageId={aiDraftDrawer.customerMessageId}
+          disabledReason={composerDisabledText || undefined}
+          session={session}
+          threadId={selectedThread.threadId}
+          threadTitle={selectedThread.title || title}
+          threadType={selectedThread.threadType}
+          subtitle="客服会话"
+          onClose={() => {
+            setAiDraftDrawer(null);
+            requestAnimationFrame(() => composerRef.current?.focus());
+          }}
+          onInsert={insertAiDraftReply}
+          onNotice={setNotice}
         />
       )}
       {!readOnly && composerDisabledText && (

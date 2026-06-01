@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiClient,
   type CaptchaChallenge,
@@ -28,6 +28,7 @@ import {
 } from "../data/auth/auth-flow-model";
 import { useSetAuthSession } from "../data/auth/auth-store";
 import { defaultApiBaseUrl, createTraceId } from "../data/runtime";
+import { primarySiteBaseUrl, primarySiteLine, siteLineManager } from "../data/network/site-line-manager";
 
 type PendingLogin = {
   baseUrl: string;
@@ -38,8 +39,11 @@ type PendingLogin = {
 export function LoginPage() {
   const setAuthSession = useSetAuthSession();
   const defaultTenantId = (import.meta.env.VITE_TENANT_ID as string | undefined) || "";
+  const apiBaseUrlTouched = useRef(false);
   const [mode, setMode] = useState<AuthMode>("login");
-  const [apiBaseUrl, setApiBaseUrl] = useState(defaultApiBaseUrl);
+  const [apiBaseUrl, setApiBaseUrl] = useState(
+    () => siteLineManager.getSnapshot().currentSite.apiBaseUrl || defaultApiBaseUrl,
+  );
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
@@ -84,6 +88,16 @@ export function LoginPage() {
     () => (pendingLogin ? createAuthSpaceChoices(pendingLogin.login) : []),
     [pendingLogin],
   );
+
+  useEffect(() => {
+    const unsubscribe = siteLineManager.subscribe(() => {
+        if (apiBaseUrlTouched.current) return;
+        setApiBaseUrl(siteLineManager.getSnapshot().currentSite.apiBaseUrl || defaultApiBaseUrl);
+      });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
@@ -309,6 +323,7 @@ export function LoginPage() {
       fetchTenantInfo(baseUrl, login.accessToken ?? ""),
     ]);
     const isPersonal = login.spaceContext?.spaceType === 1;
+    rememberLoginSite(baseUrl);
     setAuthSession({
       apiBaseUrl: baseUrl,
       tenantToken: login.accessToken ?? "",
@@ -343,6 +358,7 @@ export function LoginPage() {
       fetchSessionProfile(baseUrl, tenant.accessToken),
       isPersonal ? Promise.resolve(null) : fetchTenantInfo(baseUrl, tenant.accessToken),
     ]);
+    rememberLoginSite(baseUrl);
     setAuthSession({
       apiBaseUrl: baseUrl,
       tenantToken: tenant.accessToken,
@@ -431,7 +447,10 @@ export function LoginPage() {
         <AuthAdvancedSettings
           apiBaseUrl={apiBaseUrl}
           defaultOpen={Boolean(defaultTenantId)}
-          onApiBaseUrlChange={setApiBaseUrl}
+          onApiBaseUrlChange={(value) => {
+            apiBaseUrlTouched.current = true;
+            setApiBaseUrl(value);
+          }}
           onTenantIdChange={setTenantId}
           tenantId={tenantId}
         />
@@ -448,6 +467,18 @@ export function LoginPage() {
       </section>
     </main>
   );
+}
+
+function rememberLoginSite(baseUrl: string) {
+  if (baseUrl.replace(/\/$/, "") === primarySiteBaseUrl) {
+    siteLineManager.selectSite(primarySiteLine);
+    return;
+  }
+  siteLineManager.selectSite({
+    id: baseUrl,
+    name: "当前登录线路",
+    apiBaseUrl: baseUrl,
+  });
 }
 
 async function fetchSessionProfile(baseUrl: string, tenantToken: string) {

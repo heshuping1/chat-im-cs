@@ -146,6 +146,7 @@ X-Tenant-Id: {tenantId}
 - `POST /api/platform/v1/auth/login-by-code`
 - `GET /api/platform/v1/my/tenants`
 - `GET /api/platform/v1/tenants/search`
+- `GET /api/platform/v1/tenants/by-code/{code}`
 - `POST /api/platform/v1/tenants/join-by-code`
 - `POST /api/platform/v1/tenants/{tenantId}/join-request`
 - `GET /api/platform/v1/invitations/{code}`

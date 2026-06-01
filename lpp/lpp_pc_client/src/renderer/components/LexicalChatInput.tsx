@@ -77,6 +77,8 @@ export const LexicalChatInput = forwardRef<
     placeholder: string;
     disabled?: boolean;
     editorState?: string;
+    enterToSend?: boolean;
+    dragUpload?: boolean;
     attachments: LexicalPendingAttachment[];
     onDraftChange: (snapshot: {
       editorState: string;
@@ -97,6 +99,8 @@ export const LexicalChatInput = forwardRef<
     placeholder,
     disabled = false,
     editorState,
+    enterToSend = true,
+    dragUpload = true,
     attachments,
     onDraftChange,
     onSend,
@@ -233,7 +237,12 @@ export const LexicalChatInput = forwardRef<
           onAttachmentIdsChange(snapshot.attachmentIds);
         }}
       />
-      <ComposerCommandPlugin onSend={onSend} onFiles={onFiles} />
+      <ComposerCommandPlugin
+        dragUpload={dragUpload}
+        enterToSend={enterToSend}
+        onSend={onSend}
+        onFiles={onFiles}
+      />
       <AttachmentEventPlugin
         onPreviewAttachment={onPreviewAttachment}
         onRemoveAttachment={onRemoveAttachment}
@@ -292,9 +301,13 @@ function insertComposerLineBreak(editor: LexicalEditor) {
 }
 
 function ComposerCommandPlugin({
+  dragUpload,
+  enterToSend,
   onSend,
   onFiles,
 }: {
+  dragUpload: boolean;
+  enterToSend: boolean;
   onSend: () => void;
   onFiles: (files: FileList | File[]) => void | Promise<void>;
 }) {
@@ -318,6 +331,12 @@ function ComposerCommandPlugin({
             event.preventDefault();
             return insertLineBreakAtSelection();
           }
+          if (!enterToSend && (event.ctrlKey || event.metaKey) && !event.altKey) {
+            event.preventDefault();
+            onSend();
+            return true;
+          }
+          if (!enterToSend) return false;
           if (event.ctrlKey || event.metaKey || event.altKey) return false;
           event.preventDefault();
           onSend();
@@ -325,7 +344,7 @@ function ComposerCommandPlugin({
         },
         COMMAND_PRIORITY_HIGH,
       ),
-    [editor, onSend],
+    [editor, enterToSend, onSend],
   );
   useEffect(
     () =>
@@ -349,13 +368,14 @@ function ComposerCommandPlugin({
         DROP_COMMAND,
         (event) => {
           if (!event.dataTransfer?.files.length) return false;
+          if (!dragUpload) return false;
           event.preventDefault();
           onFiles(event.dataTransfer.files);
           return true;
         },
         COMMAND_PRIORITY_LOW,
       ),
-    [editor, onFiles],
+    [editor, dragUpload, onFiles],
   );
   return null;
 }

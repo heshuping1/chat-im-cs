@@ -5,6 +5,9 @@ export interface PcSettings {
   serviceQueueNotifications: boolean;
   slaTimeoutNotifications: boolean;
   desktopNotifications: boolean;
+  notificationPreview: boolean;
+  notificationSound: boolean;
+  doNotDisturb: boolean;
   minimizeToTray: boolean;
   launchAtStartup: boolean;
   autoReconnect: boolean;
@@ -16,6 +19,7 @@ export interface PcSettings {
   language: "简体中文" | "English" | "العربية";
   timezone: "系统默认" | "Asia/Shanghai" | "UTC";
   autoTranslate: boolean;
+  enterToSend: boolean;
   screenshotShortcut: "Alt+A" | "Ctrl+Alt+A" | "Ctrl+Shift+A" | "None";
   dragUpload: boolean;
   localMessageCache: boolean;
@@ -50,6 +54,9 @@ export const defaultPcSettings: PcSettings = {
   serviceQueueNotifications: true,
   slaTimeoutNotifications: true,
   desktopNotifications: true,
+  notificationPreview: true,
+  notificationSound: true,
+  doNotDisturb: false,
   minimizeToTray: true,
   launchAtStartup: false,
   autoReconnect: true,
@@ -61,6 +68,7 @@ export const defaultPcSettings: PcSettings = {
   language: "简体中文",
   timezone: "系统默认",
   autoTranslate: false,
+  enterToSend: true,
   screenshotShortcut: "Alt+A",
   dragUpload: true,
   localMessageCache: true,

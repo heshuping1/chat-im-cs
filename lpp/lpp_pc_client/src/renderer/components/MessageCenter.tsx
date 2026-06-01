@@ -1,8 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent } from "react";
+import { GripVertical } from "lucide-react";
 import type {
   ConversationListItem,
+  KnowledgeInsertPayload,
   MessageItemDto,
+  QuickReplyInsertPayload,
 } from "../data/api-client";
 import type { CurrentUserIdentity } from "../data/message-display";
 import { pcQueryKeys } from "../data/query-keys";
@@ -76,7 +80,7 @@ import type { ReplyTarget } from "../messages/models/messageComposerModel";
 import {
   contactCardActionErrorText,
   normalizeContactCard,
-  type NormalizedContactCard,
+  type AnchoredContactCardProfile,
 } from "../messages/models/contactCardModel";
 import { clampComposerHeight } from "../messages/models/messageComposerLayoutModel";
 import {
@@ -87,12 +91,18 @@ import {
 } from "../messages/models/messageDisplayModel";
 import type { HistoryFilterKey } from "../messages/models/messageListModel";
 import { useMessageCenterCommandModel } from "../messages/hooks/useMessageCenterCommandModel";
-import { useMessageResponsiveLayout } from "../messages/hooks/useMessageResponsiveLayout";
+import {
+  calculateMessageResizeWidth,
+  useMessageResponsiveLayout,
+} from "../messages/hooks/useMessageResponsiveLayout";
 import { useSerialTaskQueue } from "../messages/hooks/useSerialTaskQueue";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
 import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
 import { useContactAddFriendController } from "../contacts/hooks/useContactAddFriendController";
 import { ContactAddFriendDialog } from "./ContactAddFriendDialog";
+import { CustomerServiceKnowledgePanel } from "../customer-service/components/CustomerServiceKnowledgeDrawer";
+import { CustomerServiceQuickReplyPanel } from "../customer-service/components/CustomerServiceQuickReplyDrawer";
+import type { MessageComposerHandle } from "./MessageComposer";
 
 type MessageMenuState = {
   message: MessageItemDto;
@@ -105,6 +115,36 @@ type ConversationMenuState = {
   x: number;
   y: number;
 } | null;
+
+type MessageAssistantPane = "knowledge" | "quickReply" | null;
+type MessageContextPaneOrder = "assistant" | "profile";
+const messageProfilePinStorageKey = "lpp_pc_message_profile_pinned";
+const messageContextOrderStorageKey = "lpp_pc_message_context_order";
+
+function messageAssistantPaneLabel(pane: Exclude<MessageAssistantPane, null>) {
+  if (pane === "quickReply") return "快捷话术";
+  return "知识库";
+}
+
+function readMessageContextOrder(): MessageContextPaneOrder[] {
+  if (typeof window === "undefined") return ["assistant", "profile"];
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(messageContextOrderStorageKey) ?? "[]",
+    );
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 2 &&
+      parsed.includes("assistant") &&
+      parsed.includes("profile")
+    ) {
+      return parsed as MessageContextPaneOrder[];
+    }
+  } catch {
+    // Ignore invalid persisted layout and fall back to default order.
+  }
+  return ["assistant", "profile"];
+}
 
 export function MessageCenter() {
   const session = useAuthSession();
@@ -140,11 +180,20 @@ export function MessageCenter() {
   const [historyFilter, setHistoryFilter] = useState<HistoryFilterKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<MessageMenuState>(null);
+  const [assistantPane, setAssistantPane] = useState<MessageAssistantPane>(null);
+  const [messageProfilePinned, setMessageProfilePinned] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(messageProfilePinStorageKey) === "1",
+  );
+  const [messageContextPaneOrder, setMessageContextPaneOrder] = useState<
+    MessageContextPaneOrder[]
+  >(readMessageContextOrder);
   const [conversationMenu, setConversationMenu] = useState<ConversationMenuState>(null);
   const [avatarProfilePopover, setAvatarProfilePopover] =
     useState<AvatarProfilePopoverState | null>(null);
   const [contactCardProfile, setContactCardProfile] =
-    useState<NormalizedContactCard | null>(null);
+    useState<AnchoredContactCardProfile | null>(null);
   const [contactCardSendPending, setContactCardSendPending] = useState(false);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(
@@ -177,6 +226,7 @@ export function MessageCenter() {
     () => new Set(),
   );
   const chatPanelRef = useRef<HTMLElement | null>(null);
+  const composerRef = useRef<MessageComposerHandle | null>(null);
   const localImagePreviewByMessageIdRef = useRef(new Map<string, string>());
   const mediaUploadTasks = useMediaUploadTaskRegistry();
   const messageListScrollRegistry = useMessageListScrollRegistry();
@@ -186,6 +236,7 @@ export function MessageCenter() {
     [],
   );
   useMessageResponsiveLayout({
+    assistantPaneOpen: Boolean(assistantPane),
     chatPanelRef,
     listPaneWidth,
     messageLayoutMode,
@@ -194,6 +245,18 @@ export function MessageCenter() {
     setMessageLayoutMode,
     setProfileStandaloneOpen,
   });
+  useEffect(() => {
+    window.localStorage.setItem(
+      messageProfilePinStorageKey,
+      messageProfilePinned ? "1" : "0",
+    );
+  }, [messageProfilePinned]);
+  useEffect(() => {
+    window.localStorage.setItem(
+      messageContextOrderStorageKey,
+      JSON.stringify(messageContextPaneOrder),
+    );
+  }, [messageContextPaneOrder]);
 
   const conversationsQuery = useQuery({
     queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
@@ -459,6 +522,90 @@ export function MessageCenter() {
   useWindowDismiss(Boolean(avatarProfilePopover), () => setAvatarProfilePopover(null));
   useWindowDismiss(Boolean(contactCardProfile), () => setContactCardProfile(null));
 
+  const replaceMessageProfileIfUnpinned = useCallback(() => {
+    if (messageProfilePinned) {
+      if (messageLayoutMode === "full") setMessageProfileVisible(true);
+      return;
+    }
+    setMessageProfileVisible(false);
+    setProfileStandaloneOpen(false);
+  }, [
+    messageLayoutMode,
+    messageProfilePinned,
+    setMessageProfileVisible,
+    setProfileStandaloneOpen,
+  ]);
+
+  const handleMessageContextDragStart = useCallback(
+    (event: DragEvent<HTMLElement>, pane: MessageContextPaneOrder) => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("application/x-lpp-context-pane", pane);
+    },
+    [],
+  );
+
+  const handleMessageContextDragOver = useCallback((event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const handleMessageContextDrop = useCallback(
+    (event: DragEvent<HTMLElement>, targetPane: MessageContextPaneOrder) => {
+      event.preventDefault();
+      const draggedPane = event.dataTransfer.getData("application/x-lpp-context-pane");
+      if (
+        draggedPane !== "assistant" &&
+        draggedPane !== "profile"
+      ) {
+        return;
+      }
+      if (draggedPane === targetPane) return;
+      setMessageContextPaneOrder([
+        draggedPane,
+        draggedPane === "assistant" ? "profile" : "assistant",
+      ]);
+    },
+    [],
+  );
+
+  const openAiDraftDrawer = useCallback(() => {
+    setAssistantPane(null);
+    setNotice("IM 聊天不开放 AI 起草，请在在线客服工作台使用。");
+  }, []);
+
+  const openKnowledgePanel = useCallback(() => {
+    if (assistantPane !== "knowledge") replaceMessageProfileIfUnpinned();
+    setAssistantPane((current) => (current === "knowledge" ? null : "knowledge"));
+  }, [assistantPane, replaceMessageProfileIfUnpinned]);
+
+  const openQuickReplyPanel = useCallback(() => {
+    if (assistantPane !== "quickReply") replaceMessageProfileIfUnpinned();
+    setAssistantPane((current) => (current === "quickReply" ? null : "quickReply"));
+  }, [assistantPane, replaceMessageProfileIfUnpinned]);
+
+  const insertKnowledgeReply = useCallback((payload: KnowledgeInsertPayload) => {
+    const text = payload.text.trim();
+    if (!text) {
+      setNotice("这条知识内容暂无可插入文本。");
+      return;
+    }
+    composerRef.current?.insertText(text);
+    setAssistantPane(null);
+    setNotice("已插入输入框，确认后可发送。");
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }, []);
+
+  const insertQuickReply = useCallback((payload: QuickReplyInsertPayload) => {
+    const text = payload.text.trim();
+    if (!text) {
+      setNotice("这条话术暂无可插入文本。");
+      return;
+    }
+    composerRef.current?.insertText(text);
+    setNotice("话术已插入输入框，确认后可发送。");
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }, []);
+
   const {
     handleAvatarClick,
     handleBatchDeleteSelected,
@@ -473,6 +620,8 @@ export function MessageCenter() {
     deleteMessage: deleteMutation.mutateAsync,
     groupMemberMap,
     messageListScrollRegistry,
+    profile: contactProfileController.profileQuery.data,
+    profileExtra: contactProfileController.profileExtraQuery.data,
     selectedMessageIds,
     session,
     setActiveConversation,
@@ -493,7 +642,6 @@ export function MessageCenter() {
     favoriteMessage: favoriteMutation.mutate,
     recallMessage: recallMutation.mutate,
     session,
-    setActiveModule,
     setForwardTargetMessages,
     setMessageAnnotations,
     setMessageMenu,
@@ -555,10 +703,39 @@ export function MessageCenter() {
     }
   }, [messageCenterCommands, resendConfirmMessage, retryTextMessage]);
 
+  const assistantPaneVisible =
+    Boolean(assistantPane) &&
+    (messageLayoutMode === "full" || messageLayoutMode === "no-profile");
   const dockProfile = messageProfileVisible && messageLayoutMode === "full";
+  const messageProfileFirst =
+    assistantPaneVisible && dockProfile && messageContextPaneOrder[0] === "profile";
+  const resizeMessageProfilePane = useCallback(
+    (requestedWidth: number) => {
+      const shell = chatPanelRef.current?.closest(".app-shell.messages-layout");
+      if (!shell) {
+        setProfilePaneWidth(requestedWidth);
+        return;
+      }
+      setProfilePaneWidth(
+        calculateMessageResizeWidth({
+          requestedWidth,
+          shellWidth: Math.round(shell.getBoundingClientRect().width),
+          snapshot: {
+            assistantPaneOpen: assistantPaneVisible,
+            listPaneWidth,
+            profilePaneWidth,
+          },
+        }),
+      );
+    },
+    [assistantPaneVisible, listPaneWidth, profilePaneWidth, setProfilePaneWidth],
+  );
 
   return (
     <>
+      {messageProfileFirst && (
+        <span className="message-context-order-profile-first" hidden />
+      )}
       <MessageConversationSidebar
         activeConversation={activeConversation}
         activeGroupMembers={groupMembersQuery.data}
@@ -614,7 +791,8 @@ export function MessageCenter() {
         contactCardProfileLoading={contactProfileController.contactCardProfileQuery.isLoading}
         contactCardRelation={contactProfileController.contactCardRelation}
         chatPanelRef={chatPanelRef}
-        canOpenAiAssistant={isModuleVisibleForAccess("aiAssistant", workspaceAccess)}
+        composerRef={composerRef}
+        canOpenAiAssistant={false}
         canOpenKnowledgeBase={isModuleVisibleForAccess("knowledgeBase", workspaceAccess)}
         composerDialog={composerDialog}
         composerHeight={composerHeight}
@@ -640,6 +818,7 @@ export function MessageCenter() {
         historyCounts={historyCounts}
         historyFilter={historyFilter}
         historyOpen={historyOpen}
+        activeAssistantPane={assistantPaneVisible ? assistantPane : null}
         inviteQrError={inviteQrsQuery.error}
         inviteQrLoading={inviteQrsQuery.isLoading}
         inviteQrs={inviteQrsQuery.data ?? []}
@@ -653,6 +832,7 @@ export function MessageCenter() {
         messageMenu={messageMenu}
         messageMenuMediaStatus={messageMenuMediaStatus}
         messageProfileVisible={messageProfileVisible}
+        messageProfilePinned={messageProfilePinned}
         messageSearchKeyword={messageSearchKeyword}
         messageSearchOpen={messageSearchOpen}
         messageStageRef={messageStageRef}
@@ -725,6 +905,9 @@ export function MessageCenter() {
         }
         onResendMessage={handleConfirmResendMessage}
         onMessageElementRef={messageListScrollRegistry.registerMessageElement}
+        onAiDraft={() => openAiDraftDrawer()}
+        onKnowledgeBase={openKnowledgePanel}
+        onQuickReply={openQuickReplyPanel}
         openMessageMenu={openMessageMenu}
         pcSettings={pcSettings}
         pendingNewMessageCount={pendingNewMessageCount}
@@ -743,7 +926,6 @@ export function MessageCenter() {
         selectedMessageIds={selectedMessageIds}
         session={session}
         resendMessage={resendConfirmMessage}
-        setActiveModule={setActiveModule}
         setComposerHeight={setComposerHeight}
         setConversationDrawerOpen={setConversationDrawerOpen}
         setDraftEditorStatesByConversation={setDraftEditorStatesByConversation}
@@ -756,14 +938,69 @@ export function MessageCenter() {
         setMessageSearchKeyword={setMessageSearchKeyword}
         setMessageSearchOpen={setMessageSearchOpen}
         setMultiSelectMode={setMultiSelectMode}
-        setProfilePaneWidth={setProfilePaneWidth}
+        setProfilePaneWidth={resizeMessageProfilePane}
         setProfileStandaloneOpen={setProfileStandaloneOpen}
+        onMessageContextDragOver={handleMessageContextDragOver}
+        onMessageContextDragStart={handleMessageContextDragStart}
+        onMessageContextDrop={handleMessageContextDrop}
+        onToggleMessageProfilePin={() =>
+          setMessageProfilePinned((current) => !current)
+        }
         setReplyTarget={setReplyTarget}
         setSelectedMessageIds={setSelectedMessageIds}
         unreadIdentity={unreadIdentity}
         unreadJump={unreadJump}
         visibleMessages={visibleMessages}
       />
+
+      {assistantPane && activeConversation && (
+        <aside
+          className="message-assistant-pane"
+          aria-label="消息辅助工作区"
+          onDragOver={handleMessageContextDragOver}
+          onDrop={(event) => handleMessageContextDrop(event, "assistant")}
+        >
+          <header className="context-pane-controlbar">
+            <button
+              className="context-pane-drag"
+              type="button"
+              draggable
+              title="拖拽排序"
+              aria-label="拖拽排序"
+              onDragStart={(event) => handleMessageContextDragStart(event, "assistant")}
+            >
+              <GripVertical size={15} />
+            </button>
+            <strong>{messageAssistantPaneLabel(assistantPane)}</strong>
+          </header>
+          <div className="context-pane-body">
+            {assistantPane === "quickReply" ? (
+              <CustomerServiceQuickReplyPanel
+                session={session}
+                threadType={activeConversationType === "direct" ? "im_direct" : null}
+                variant="panel"
+                onClose={() => {
+                  setAssistantPane(null);
+                  requestAnimationFrame(() => composerRef.current?.focus());
+                }}
+                onInsert={insertQuickReply}
+                onNotice={setNotice}
+              />
+            ) : (
+              <CustomerServiceKnowledgePanel
+                session={session}
+                variant="panel"
+                onClose={() => {
+                  setAssistantPane(null);
+                  requestAnimationFrame(() => composerRef.current?.focus());
+                }}
+                onInsert={insertKnowledgeReply}
+                onNotice={setNotice}
+              />
+            )}
+          </div>
+        </aside>
+      )}
 
       {addFriendDialogOpen && (
         <ContactAddFriendDialog

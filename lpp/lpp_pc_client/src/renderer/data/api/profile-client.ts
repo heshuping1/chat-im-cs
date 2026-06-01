@@ -5,24 +5,39 @@ import type {
   EnterpriseAnnouncementDto,
   FavoriteItemDto,
   FavoriteSummaryDto,
+  FeedbackSubmitRequestDto,
+  FeedbackSubmitResultDto,
   FriendInviteQrDto,
   BlockedUserDto,
   JoinableTenantDto,
-  KnowledgeBaseDto,
-  KnowledgeDocumentDto,
-  KnowledgeSearchResponseDto,
+  NotificationSettingsDto,
   PlatformJoinResultDto,
   TenantInfoDto,
+  TenantCodePreviewDto,
   PlatformTenant,
   ProfilePrivacySettingsDto,
   RevokeAccountDeviceResultDto,
+  UserProfileUpdateDto,
   UserProfileDto,
 } from "./types";
 import type { PagedResult } from "./base";
+import {
+  normalizeKnowledgeBasesResponse,
+  normalizeKnowledgeDocumentsResponse,
+  normalizeKnowledgeSearchResponse,
+} from "./knowledge-normalizers";
+import { normalizeQuickRepliesResponse } from "./quick-reply-normalizers";
 
 export class ProfileApiClient extends AuthApiClient {
   getMyProfile() {
     return this.request<UserProfileDto>(endpointPlan.profileMe);
+  }
+
+  updateMyProfile(body: UserProfileUpdateDto) {
+    return this.request<UserProfileDto>(endpointPlan.profileMe, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
   }
 
   getTenantInfo() {
@@ -49,6 +64,12 @@ export class ProfileApiClient extends AuthApiClient {
     search.set("keyword", keyword.trim());
     return this.platformRequest<JoinableTenantDto[]>(
       `${endpointPlan.tenantSearch}?${search.toString()}`,
+    );
+  }
+
+  previewTenantByCode(code: string) {
+    return this.platformRequest<TenantCodePreviewDto>(
+      endpointPlan.tenantByCode.replace("{code}", encodeURIComponent(code.trim())),
     );
   }
 
@@ -127,6 +148,17 @@ export class ProfileApiClient extends AuthApiClient {
     });
   }
 
+  getNotificationSettings() {
+    return this.request<NotificationSettingsDto>(endpointPlan.notificationSettings);
+  }
+
+  updateNotificationSettings(body: Partial<NotificationSettingsDto>) {
+    return this.request<NotificationSettingsDto>(endpointPlan.notificationSettings, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
   getBlocklist() {
     return this.request<BlockedUserDto[]>(endpointPlan.blocklist);
   }
@@ -171,6 +203,18 @@ export class ProfileApiClient extends AuthApiClient {
     );
   }
 
+  submitFeedback(body: FeedbackSubmitRequestDto) {
+    return this.request<FeedbackSubmitResultDto>(endpointPlan.feedback, {
+      method: "POST",
+      body: JSON.stringify({
+        ...body,
+        title: body.title.trim(),
+        content: body.content.trim(),
+        contact: body.contact?.trim() || null,
+      }),
+    });
+  }
+
   getEnterpriseAnnouncements() {
     return this.request<EnterpriseAnnouncementDto[]>(
       endpointPlan.enterpriseAnnouncements,
@@ -187,14 +231,22 @@ export class ProfileApiClient extends AuthApiClient {
     );
   }
 
+  getQuickReplies() {
+    return this.request<unknown>(endpointPlan.quickReplies).then(
+      normalizeQuickRepliesResponse,
+    );
+  }
+
   getKnowledgeBases() {
-    return this.request<KnowledgeBaseDto[]>(endpointPlan.knowledgeBases);
+    return this.request<unknown>(endpointPlan.knowledgeBases).then(
+      normalizeKnowledgeBasesResponse,
+    );
   }
 
   getKnowledgeDocuments(knowledgeBaseId: string) {
-    return this.request<KnowledgeDocumentDto[] | { items?: KnowledgeDocumentDto[] }>(
+    return this.request<unknown>(
       endpointPlan.knowledgeDocuments.replace("{knowledgeBaseId}", knowledgeBaseId),
-    );
+    ).then(normalizeKnowledgeDocumentsResponse);
   }
 
   searchKnowledge(params: {
@@ -208,8 +260,8 @@ export class ProfileApiClient extends AuthApiClient {
     if (params.knowledgeBaseId) {
       search.set("knowledgeBaseId", params.knowledgeBaseId);
     }
-    return this.request<KnowledgeSearchResponseDto>(
+    return this.request<unknown>(
       `${endpointPlan.knowledgeSearch}?${search.toString()}`,
-    );
+    ).then((payload) => ({ items: normalizeKnowledgeSearchResponse(payload) }));
   }
 }

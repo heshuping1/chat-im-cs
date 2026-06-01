@@ -16,6 +16,11 @@ import type {
   KnowledgeSearchResultDto,
 } from "../data/api-client";
 import { useAuthSession } from "../data/auth/auth-store";
+import {
+  normalizeKnowledgeBasesResponse,
+  normalizeKnowledgeDocumentsResponse,
+  normalizeKnowledgeSearchResponse,
+} from "../data/api/knowledge-normalizers";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { formatError, formatShortDate } from "../lib/format";
@@ -43,7 +48,7 @@ export function KnowledgeBasePage() {
     queryFn: async () => client!.getKnowledgeBases(),
   });
 
-  const bases = normalizeBases(basesQuery.data ?? []);
+  const bases = normalizeKnowledgeBasesResponse(basesQuery.data);
   const effectiveBaseId =
     bases.find((base) => base.knowledgeBaseId === selectedBaseId)?.knowledgeBaseId ||
     bases[0]?.knowledgeBaseId ||
@@ -56,7 +61,7 @@ export function KnowledgeBasePage() {
       effectiveBaseId,
     ),
     enabled: Boolean(client && effectiveBaseId),
-    queryFn: async () => normalizeDocuments(await client!.getKnowledgeDocuments(effectiveBaseId)),
+    queryFn: async () => client!.getKnowledgeDocuments(effectiveBaseId),
   });
 
   const trimmedKeyword = submittedKeyword.trim();
@@ -74,14 +79,15 @@ export function KnowledgeBasePage() {
         knowledgeBaseId: selectedBaseId || undefined,
       }),
   });
-  const searchResults = normalizeSearchResults(searchQuery.data?.items ?? []);
+  const searchResults = normalizeKnowledgeSearchResponse(searchQuery.data);
+  const documents = normalizeKnowledgeDocumentsResponse(documentsQuery.data);
 
   const currentSelection =
     selection ??
     (searchResults[0]
       ? { type: "search" as const, item: searchResults[0] }
-      : documentsQuery.data?.[0]
-        ? { type: "document" as const, item: documentsQuery.data[0] }
+      : documents[0]
+        ? { type: "document" as const, item: documents[0] }
         : null);
 
   const submitSearch = () => {
@@ -168,7 +174,7 @@ export function KnowledgeBasePage() {
           <span>
             {trimmedKeyword
               ? `${searchResults.length} 条`
-              : `${documentsQuery.data?.length ?? 0} 篇`}
+              : `${documents.length} 篇`}
           </span>
         </header>
 
@@ -184,7 +190,7 @@ export function KnowledgeBasePage() {
           <DocumentList
             loading={documentsQuery.isLoading}
             error={documentsQuery.error}
-            documents={documentsQuery.data ?? []}
+            documents={documents}
             selection={currentSelection}
             onSelect={(item) => setSelection({ type: "document", item })}
           />
@@ -367,31 +373,6 @@ function KnowledgeState({ text, error = false }: { text: string; error?: boolean
       <span>{text}</span>
     </div>
   );
-}
-
-function normalizeBases(items: KnowledgeBaseDto[]) {
-  return items
-    .map((item) => ({
-      ...item,
-      knowledgeBaseId: item.knowledgeBaseId || item.id || "",
-    }))
-    .filter((item) => item.knowledgeBaseId);
-}
-
-function normalizeDocuments(
-  payload: KnowledgeDocumentDto[] | { items?: KnowledgeDocumentDto[] },
-) {
-  const items = Array.isArray(payload) ? payload : payload.items ?? [];
-  return items
-    .map((item) => ({
-      ...item,
-      documentId: item.documentId || item.id || "",
-    }))
-    .filter((item) => item.documentId || item.title || item.name);
-}
-
-function normalizeSearchResults(items: KnowledgeSearchResultDto[]) {
-  return items.filter((item) => item.documentId || item.documentTitle || item.title || item.snippet);
 }
 
 function baseTitle(base: KnowledgeBaseDto) {

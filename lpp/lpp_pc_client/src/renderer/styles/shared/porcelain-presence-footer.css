@@ -146,3 +146,8 @@
 .sidebar.collapsed .footer-status-select svg {
   display: none !important;
 }
+
+.sidebar-footer:has(.sidebar-status-center) {
+  margin-top: 0 !important;
+  padding-top: 6px !important;
+}

@@ -13,6 +13,10 @@ import type {
 } from "./types";
 import { logApiContractDiagnostic } from "../api-contract/contract-diagnostics";
 import {
+  normalizeAiSuggestion,
+  normalizeAiSuggestionsResponse,
+} from "./ai-suggestion-normalizers";
+import {
   customerProfileEntityToDto,
   customerServiceThreadEntityToDto,
   normalizeCustomerProfileDto,
@@ -183,9 +187,9 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     threadId: string,
     customerMessageId?: string | null,
   ) {
-    return this.request<AiSuggestionDto>(
+    return this.request<unknown>(
       endpointPlan.aiSuggestion
-        .replace("{threadType}", threadRoutePathType(threadType))
+        .replace("{threadType}", aiSuggestionPathType(threadType))
         .replace("{threadId}", threadId),
       {
         method: "POST",
@@ -193,7 +197,7 @@ export class CustomerServiceApiClient extends MessagesApiClient {
           customerMessageId ? { customerMessageId } : {},
         ),
       },
-    );
+    ).then((payload) => normalizeAiSuggestion(payload) ?? emptyAiSuggestion());
   }
 
   getAiSuggestions(
@@ -201,18 +205,18 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     threadId: string,
     limit = 20,
   ) {
-    return this.request<{ items?: AiSuggestionDto[] } | AiSuggestionDto[]>(
+    return this.request<unknown>(
       `${endpointPlan.aiSuggestions
-        .replace("{threadType}", threadRoutePathType(threadType))
+        .replace("{threadType}", aiSuggestionPathType(threadType))
         .replace("{threadId}", threadId)}?limit=${limit}`,
-    );
+    ).then(normalizeAiSuggestionsResponse);
   }
 
   adoptAiSuggestion(suggestionId: string) {
-    return this.request<AiSuggestionDto>(
+    return this.request<unknown>(
       endpointPlan.aiSuggestionAdopt.replace("{suggestionId}", suggestionId),
       { method: "POST" },
-    );
+    ).then((payload) => normalizeAiSuggestion(payload) ?? emptyAiSuggestion(suggestionId));
   }
 
   private customerServiceThreadAction(
@@ -235,6 +239,14 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     );
   }
 
+}
+
+function emptyAiSuggestion(suggestionId = ""): AiSuggestionDto {
+  return {
+    suggestionId,
+    sources: [],
+    text: null,
+  };
 }
 
 type NestedThreadPayload = {
@@ -461,6 +473,10 @@ function normalizeCustomerServiceMessagesFromContract(
 
 function threadRoutePathType(threadType: CustomerServiceThreadType) {
   return threadType === "temp_session" ? "temp-session" : "direct-customer";
+}
+
+function aiSuggestionPathType(threadType: CustomerServiceThreadType) {
+  return threadType === "temp_session" ? "temp_session" : "im_direct";
 }
 
 function threadActionPathType(threadType: CustomerServiceThreadType) {

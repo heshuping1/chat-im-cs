@@ -1,17 +1,17 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNLPKAG7V1DG",
+  "requestId": "0HNLT65F7GCAM",
   "data": {
-    "mediaId": "019e5a70-898d-76ed-8c8e-a6f1a5699b30",
+    "mediaId": "019e71c1-22e3-7470-b9b7-1a901628ff8f",
     "mediaKind": "image",
-    "url": "/media/019e5a70-898d-76ed-8c8e-a6f1a5699b30",
-    "relativePath": "11111111111111111111111111111111/2026/05/24/image/019e5a70898d76ed8c8ea6f1a5699b30.png",
+    "url": "/media/019e71c1-22e3-7470-b9b7-1a901628ff8f",
+    "relativePath": "11111111111111111111111111111111/2026/05/29/image/019e71c122e37470b9b71a901628ff8f.png",
     "fileName": "bot-card.png",
     "mimeType": "image/png",
     "sizeBytes": 12,
     "thumbnailUrl": null,
-    "signedUrl": "/media/019e5a70-898d-76ed-8c8e-a6f1a5699b30?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637385\u0026sig=wrNsfunws9dx9LXzw3uEj2nH3vG6w1t1qq2QQFS3EHU",
-    "downloadUrl": "/media/019e5a70-898d-76ed-8c8e-a6f1a5699b30?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1779637385\u0026sig=wrNsfunws9dx9LXzw3uEj2nH3vG6w1t1qq2QQFS3EHU\u0026download=1"
+    "signedUrl": "/media/019e71c1-22e3-7470-b9b7-1a901628ff8f?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780028543\u0026sig=vwx_wqQoJAYWZPGrcixn5XO2VayC4y0i7q6TpCsJCjs",
+    "downloadUrl": "/media/019e71c1-22e3-7470-b9b7-1a901628ff8f?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780028543\u0026sig=vwx_wqQoJAYWZPGrcixn5XO2VayC4y0i7q6TpCsJCjs\u0026download=1"
   }
 }

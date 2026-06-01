@@ -1,7 +1,10 @@
 import type {
   ConversationListItem,
+  CustomerProfileCard,
+  FriendProfileExtraDto,
   GroupMemberDto,
   MessageItemDto,
+  UserProfileDto,
 } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
 import {
@@ -23,6 +26,7 @@ export type AvatarProfilePopoverState = {
   subtitle: string;
   avatarUrl?: string | null;
   rows: Array<{ label: string; value: string }>;
+  tags?: string[];
 };
 
 export type UnreadJumpState = {
@@ -94,6 +98,8 @@ export function buildAvatarProfilePopover({
   groupMembers,
   message,
   mine,
+  profile,
+  profileExtra,
   session,
   x,
   y,
@@ -102,69 +108,144 @@ export function buildAvatarProfilePopover({
   groupMembers: Map<string, GroupMemberDto>;
   message: MessageItemDto;
   mine: boolean;
+  profile?: CustomerProfileCard;
+  profileExtra?: FriendProfileExtraDto;
   session?: AuthSession | null;
   x: number;
   y: number;
 }): AvatarProfilePopoverState {
   if (mine) {
+    const title = session?.displayName || "我";
     return {
       x,
       y,
-      title: session?.displayName || "我",
+      title,
       subtitle: "当前账号",
       avatarUrl: session?.avatarUrl,
       rows: compactProfileRows([
+        ["昵称", title],
         ["绿泡泡号", session?.lppId],
-        ["用户 ID", session?.userId],
-        ["身份", "我"],
-      ]),
+      ], { keepEmpty: true }),
     };
   }
   const member = resolveGroupMember(message, groupMembers);
   const isGroup = conversation.conversationType === "group";
-  const displayName =
+  const displayName = firstProfileText(
+    !isGroup
+      ? profileValue(profile, [
+          "displayName",
+          "customerDisplayName",
+          "customerName",
+          "nickname",
+        ])
+      : undefined,
+    !isGroup ? profileExtra?.displayName : undefined,
     member?.displayName ||
-    message.senderDisplayName ||
-    (isGroup ? "群成员" : conversation.title || "联系人");
-  const lppId = member?.lppId || message.senderLppId || message.lppId;
-  const userId =
-    member?.userId ||
-    message.senderUserId ||
-    message.senderId ||
-    message.fromUserId ||
-    conversation.peerUserId;
-  const platformUserId = member?.platformUserId || message.senderPlatformUserId;
+      message.senderDisplayName ||
+      (isGroup ? "群成员" : conversation.peerDisplayName || conversation.title || "联系人"),
+  ) || (isGroup ? "群成员" : "联系人");
+  const lppId = firstProfileText(
+    !isGroup
+      ? profileValue(profile, [
+          "lppId",
+          "lppNo",
+          "lppNumber",
+          "customerLppId",
+          "customerLppNo",
+          "greenBubbleId",
+          "greenBubbleNo",
+          "userNo",
+        ])
+      : undefined,
+    !isGroup ? profileExtra?.lppId : undefined,
+    member?.lppId,
+    message.senderLppId,
+    message.lppId,
+    conversation.peerLppId,
+    conversation.peerLppNo,
+    conversation.peerLppNumber,
+    conversation.peerUserNo,
+  );
+  const remark = firstProfileText(
+    !isGroup ? profileExtra?.note : undefined,
+    !isGroup ? profileExtra?.remarkName : undefined,
+  );
+  const applicationName = firstProfileText(
+    !isGroup
+      ? profileValue(profile, [
+          "appDisplayName",
+          "appName",
+          "tenantAppName",
+          "brandName",
+          "packageName",
+        ])
+      : undefined,
+  );
+  const source = firstProfileText(
+    !isGroup ? profileExtra?.source : undefined,
+    !isGroup
+      ? profileValue(profile, [
+          "sourceChannel",
+          "entryChannel",
+          "channel",
+          "source",
+          "from",
+          "platform",
+          "provider",
+        ])
+      : undefined,
+  );
+  const tags = compactProfileTags(
+    !isGroup && Array.isArray(profileExtra?.tags) && profileExtra.tags.length > 0
+      ? profileExtra.tags
+      : !isGroup
+        ? profile?.tags
+        : undefined,
+  );
   const role = member?.role || member?.memberRole || (isGroup ? "群成员" : "好友");
   return {
     x,
     y,
     title: displayName,
-    subtitle: isGroup ? role : "好友私聊",
+    subtitle: isGroup ? role : "好友",
     avatarUrl:
+      (!isGroup ? profile?.avatarUrl || profileExtra?.avatarUrl : undefined) ||
       member?.avatarUrl ||
       message.senderAvatarUrl ||
       message.avatarUrl ||
       conversation.avatarUrl,
-    rows: compactProfileRows([
-      ["绿泡泡号", lppId || conversation.peerLppId],
-      ["用户 ID", userId],
-      ["平台 ID", platformUserId],
-      ["角色", role],
-      ["会话", isGroup ? conversation.title : "好友私聊"],
-    ]),
+    rows: compactProfileRows(
+      isGroup
+        ? [
+            ["昵称", displayName],
+            ["绿泡泡号", lppId],
+          ]
+        : [
+            ["昵称", displayName],
+            ["备注", remark],
+            ["绿泡泡号", lppId],
+            ["渠道应用", applicationName],
+            ["来源渠道", source],
+          ],
+      { keepEmpty: true },
+    ),
+    tags,
   };
 }
 
 export function buildContactCardProfilePopover({
+  profile,
   value,
   x,
   y,
 }: {
+  profile?: UserProfileDto;
   value: Record<string, unknown>;
   x: number;
   y: number;
 }): AvatarProfilePopoverState {
   const title =
+    profile?.displayName ||
     stringField(
       value,
       "displayName",
@@ -179,27 +260,20 @@ export function buildContactCardProfilePopover({
       "nick_name",
     ) ||
     "个人名片";
-  const userId = stringField(value, "userId", "user_id", "friendUserId", "customerUserId", "id");
-  const platformUserId = stringField(value, "platformUserId", "platform_user_id");
-  const lppId = stringField(value, "lppId", "lpp_id", "lppNo", "lppNumber");
-  const mobile = stringField(value, "mobile", "phone", "phoneMasked", "mobileMasked");
-  const email = stringField(value, "email", "emailMasked");
+  const lppId = profile?.lppId || stringField(value, "lppId", "lpp_id", "lppNo", "lppNumber");
   const source = stringField(value, "source", "sourceChannel", "channel", "from");
-  const avatarUrl = stringField(value, "avatarUrl", "avatar_url", "avatar", "photoUrl");
+  const avatarUrl = profile?.avatarUrl || stringField(value, "avatarUrl", "avatar_url", "avatar", "photoUrl");
   return {
     x,
     y,
     title,
-    subtitle: lppId || mobile || email || "个人名片",
+    subtitle: lppId || "个人名片",
     avatarUrl,
     rows: compactProfileRows([
+      ["昵称", title],
       ["绿泡泡号", lppId],
-      ["用户 ID", userId],
-      ["平台 ID", platformUserId],
-      ["手机", mobile],
-      ["邮箱", email],
       ["来源", source],
-    ]),
+    ], { keepEmpty: true }),
   };
 }
 
@@ -419,13 +493,63 @@ function resolveGroupMember(
   return undefined;
 }
 
-function compactProfileRows(rows: Array<[string, string | number | null | undefined]>) {
+function compactProfileRows(
+  rows: Array<[string, string | number | null | undefined]>,
+  options: { keepEmpty?: boolean } = {},
+) {
   return rows
     .map(([label, value]) => ({
       label,
       value: value === null || value === undefined || value === "" ? "--" : String(value),
     }))
-    .filter((row, index) => row.value !== "--" || index < 3);
+    .filter((row) => !hiddenProfileRowLabels.has(row.label) && !row.label.includes("ID"))
+    .filter((row, index) => options.keepEmpty || row.value !== "--" || index < 3);
+}
+
+const hiddenProfileRowLabels = new Set(["账号", "手机", "邮箱"]);
+
+function profileValue(
+  profile: CustomerProfileCard | undefined,
+  keys: string[],
+  excludedValues = new Set<string>(),
+) {
+  if (!profile) return undefined;
+  const record = profile as Record<string, unknown>;
+  for (const key of keys) {
+    const text = profileTextValue(record[key]);
+    if (text && !excludedValues.has(text)) return text;
+  }
+  return undefined;
+}
+
+function firstProfileText(...values: unknown[]) {
+  for (const value of values) {
+    const text = profileTextValue(value);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function profileTextValue(value: unknown) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : undefined;
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  return text && text !== "--" ? text : undefined;
+}
+
+function compactProfileTags(tags?: Array<string | null | undefined> | null) {
+  if (!Array.isArray(tags)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const tag of tags) {
+    const text = profileTextValue(tag);
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    result.push(text);
+    if (result.length >= 5) break;
+  }
+  return result;
 }
 
 function isEventLikeMessage(message: MessageItemDto) {
