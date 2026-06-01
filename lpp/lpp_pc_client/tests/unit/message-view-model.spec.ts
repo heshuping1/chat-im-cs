@@ -173,6 +173,28 @@ describe("message view model", () => {
     });
   });
 
+  it("uses resolved current sender avatar before the message snapshot avatar", () => {
+    const message = {
+      messageId: "m-avatar",
+      senderAvatarUrl: "snapshot.png",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Bob",
+        message,
+        mine: false,
+        senderAvatarUrl: "current.png",
+        senderFallback: "Bob",
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      sender: {
+        avatarUrl: "current.png",
+      },
+    });
+  });
+
   it("marks failed media with local task id as retryable upload action", () => {
     const message = {
       messageId: "m4",

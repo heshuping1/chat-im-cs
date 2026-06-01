@@ -8,6 +8,7 @@ import { ConversationAvatar } from "./ConversationListParts";
 
 export function MessageChatHeader({
   conversation,
+  conversationAvatarUrl,
   conversationIsGroup,
   customerApplicationName,
   customerSource,
@@ -19,6 +20,7 @@ export function MessageChatHeader({
   onToggleLookup,
 }: {
   conversation: ConversationListItem;
+  conversationAvatarUrl?: string | null;
   conversationIsGroup: boolean;
   customerApplicationName?: string;
   customerSource?: string;
@@ -46,7 +48,7 @@ export function MessageChatHeader({
         </button>
         {!conversationIsGroup && (
           <ConversationAvatar
-            avatarUrl={conversation.avatarUrl}
+            avatarUrl={conversationAvatarUrl ?? conversation.avatarUrl}
             groupAvatar={undefined}
             isGroup={false}
             title={conversation.title}

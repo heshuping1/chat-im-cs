@@ -27,7 +27,6 @@ import {
   eventMessageText,
   isMineMessage,
   modelBackedMessageReadStatusText,
-  resolveSenderAvatarUrl,
   resolveSenderDisplayName,
   shouldShowFileInlineStatus,
   type AvatarProfilePopoverState,
@@ -36,7 +35,9 @@ import {
 import { messageActionPreview, type HistoryFilterKey } from "../models/messageListModel";
 import type { MessageCenterCommandModel } from "../hooks/useMessageCenterCommandModel";
 import { getImConversationType } from "../hooks/useMessageCenterViewModel";
+import type { MessageGroupManagement } from "../hooks/useMessageGroupManagement";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
+import type { UserAvatarRegistry } from "../models/userAvatarRegistry";
 import type { CreateGroupChatPayload } from "../models/groupCreateModel";
 import { ChatToastNotice } from "./ChatToastNotice";
 import { StandaloneConversationInfoView } from "./ConversationInfoViews";
@@ -86,6 +87,7 @@ export function MessageCenterConversationStage({
   forwardPending,
   getChatPanelHeight,
   groupAvatarSnapshotFor,
+  groupManagement,
   groupMemberMap,
   groupMembers,
   handleAvatarClick,
@@ -181,6 +183,7 @@ export function MessageCenterConversationStage({
   setSelectedMessageIds,
   unreadIdentity,
   unreadJump,
+  userAvatarRegistry,
   visibleMessages,
 }: {
   activeConversation?: ConversationListItem;
@@ -218,6 +221,7 @@ export function MessageCenterConversationStage({
   groupAvatarSnapshotFor: (
     conversation: ConversationListItem,
   ) => StandaloneProfileProps["groupAvatarSnapshot"];
+  groupManagement?: MessageGroupManagement;
   groupMemberMap: Map<string, GroupMemberDto>;
   groupMembers: GroupMemberDto[];
   handleAvatarClick: ComponentProps<typeof MessageListPanel>["onAvatarClick"];
@@ -319,6 +323,7 @@ export function MessageCenterConversationStage({
   setSelectedMessageIds: Dispatch<SetStateAction<Set<string>>>;
   unreadIdentity?: CurrentUserIdentity | null;
   unreadJump: UnreadJumpState | null;
+  userAvatarRegistry: UserAvatarRegistry;
   visibleMessages: MessageItemDto[];
 }) {
   const directCustomerHeaderMeta =
@@ -358,6 +363,7 @@ export function MessageCenterConversationStage({
           <>
             <MessageChatHeader
               conversation={activeConversation}
+              conversationAvatarUrl={userAvatarRegistry.resolveConversationAvatar(activeConversation)}
               conversationIsGroup={activeConversationIsGroup}
               customerApplicationName={directCustomerHeaderMeta.applicationName}
               customerSource={directCustomerHeaderMeta.source}
@@ -382,7 +388,9 @@ export function MessageCenterConversationStage({
                 contact={activeConversationContact}
                 conversation={activeConversation}
                 groupAvatarSnapshot={groupAvatarSnapshotFor(activeConversation)}
+                groupManagement={groupManagement}
                 groupMembers={groupMembers}
+                avatarUrl={userAvatarRegistry.resolveConversationAvatar(activeConversation)}
                 loadingGroupMembers={loadingGroupMembers}
                 profile={profileData}
                 profileActionPending={profileActionPending}
@@ -458,7 +466,7 @@ export function MessageCenterConversationStage({
                 onUnreadJump={messageCenterCommands.unreadJump}
                 onUploadAction={messageCenterCommands.uploadAction}
                 resolveSenderAvatarUrl={(message) =>
-                  resolveSenderAvatarUrl(message, groupMemberMap)
+                  userAvatarRegistry.resolveMessageSenderAvatar(message, activeConversation)
                 }
                 resolveSenderDisplayName={(message) =>
                   resolveSenderDisplayName(message, activeConversation, groupMemberMap)
@@ -600,6 +608,7 @@ export function MessageCenterConversationStage({
 
       {dockProfile && activeConversation && (
         <MessageProfileDock
+          avatarUrl={userAvatarRegistry.resolveConversationAvatar(activeConversation)}
           contact={activeConversationContact}
           conversation={activeConversation}
           groupAvatar={resolveGroupConversationAvatar(
@@ -607,6 +616,7 @@ export function MessageCenterConversationStage({
             groupMembers,
             groupAvatarSnapshotFor(activeConversation),
           )}
+          groupManagement={groupManagement}
           groupMembers={groupMembers}
           loadingGroupMembers={loadingGroupMembers}
           pinned={messageProfilePinned}

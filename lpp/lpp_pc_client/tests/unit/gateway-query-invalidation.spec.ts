@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   hasGatewayMessageQuery,
   invalidateCustomerServiceGatewayQueries,
+  invalidateImAvatarGatewayQueries,
   invalidateImGatewayQueries,
 } from "../../src/renderer/data/gateway/gateway-query-invalidation";
 
@@ -15,12 +16,10 @@ describe("gateway query invalidation", () => {
 
     invalidateImGatewayQueries(queryClient, "conversation-1");
 
-    expect(queryClient.invalidateQueries).toHaveBeenCalledTimes(2);
     expect(queryClient.invalidateQueries).toHaveBeenNthCalledWith(1, {
       queryKey: ["pc-im-conversations"],
     });
-    expect(queryClient.invalidateQueries).toHaveBeenNthCalledWith(
-      2,
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith(
       expect.objectContaining({
         predicate: expect.any(Function),
       }),
@@ -51,5 +50,19 @@ describe("gateway query invalidation", () => {
 
     expect(hasGatewayMessageQuery(queryClient, "conversation-1")).toBe(true);
     expect(hasGatewayMessageQuery(queryClient, "conversation-2")).toBe(false);
+  });
+
+  it("invalidates current avatar sources for IM profile updates", () => {
+    const queryClient = {
+      invalidateQueries: vi.fn(),
+    } as unknown as QueryClient;
+
+    invalidateImAvatarGatewayQueries(queryClient);
+
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["pc-friends"] });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["pc-tenant-members"] });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["pc-user-profile"] });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["pc-friend-profile-extra"] });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["pc-group-members"] });
   });
 });

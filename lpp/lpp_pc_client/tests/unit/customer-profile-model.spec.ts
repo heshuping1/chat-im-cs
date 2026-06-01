@@ -112,4 +112,134 @@ describe("customer profile model business ownership", () => {
     expect(model.appName).toBe("真实渠道应用");
     expect(model.assignedStaff).toBe("客服 A");
   });
+
+  it("keeps fixed customer 360 layout slots when profile data is sparse", () => {
+    const model = buildCustomerModel({
+      profile: {
+        customerUserId: "u1",
+        displayName: "测试客户A",
+      },
+    });
+
+    expect(model.registrationStatus).toBe("未注册");
+    expect(model.activationStatus).toBe("未激活");
+    expect(model.verificationStatus).toBe("未认证");
+    expect(model.statusChips).toHaveLength(3);
+    expect(model.statusChips.map((chip) => chip.label)).toEqual([
+      "未注册",
+      "未激活",
+      "未认证",
+    ]);
+    expect(model.assetRows).toHaveLength(4);
+    expect(model.assetRows.every((row) => row.empty)).toBe(true);
+    expect(model.assetRows.map((row) => row.amount)).toEqual(["--", "--", "--", "--"]);
+    expect(model.recent7dTrading.bars).toHaveLength(7);
+    expect(model.recent7dTrading.bars.every((bar) => bar.empty)).toBe(true);
+    expect(model.recent7dTrading.latest).toBe("--");
+  });
+
+  it("keeps VIP as identity level and removes duplicate VIP tags", () => {
+    const model = buildCustomerModel({
+      profile: {
+        isVip: true,
+        tags: ["VIP", "活跃用户", "黄金客户"],
+      },
+    });
+
+    expect(model.vipLevel).toBe("VIP");
+    expect(model.tags).toEqual(["活跃用户", "黄金客户"]);
+  });
+
+  it("separates IB relationship from VIP level", () => {
+    const model = buildCustomerModel({
+      profile: {
+        ib: "IB-008",
+        customerLevel: "VIP",
+      },
+    });
+
+    expect(model.hasAgentRelationship).toBe(true);
+    expect(model.vipLevel).toBe("VIP");
+  });
+
+  it("normalizes activation and verification status for customer status chips", () => {
+    const model = buildCustomerModel({
+      profile: {
+        accountStatus: "active",
+        kycStatus: "verified",
+      },
+    });
+
+    expect(model.activationStatus).toBe("已激活");
+    expect(model.verificationStatus).toBe("已认证");
+  });
+
+  it("falls back missing IM presence to offline instead of an empty marker", () => {
+    const model = buildCustomerModel({
+      profile: {
+        displayName: "测试客户A",
+      },
+    });
+
+    expect(model.onlineStatus).toBe("离线");
+  });
+
+  it("derives registered status from registration time", () => {
+    const model = buildCustomerModel({
+      profile: {
+        registeredAt: "2026-05-31T10:20:00Z",
+      },
+    });
+
+    expect(model.registrationStatus).toBe("已注册");
+    expect(model.statusChips.map((chip) => chip.label)).toEqual([
+      "已注册",
+      "未激活",
+      "未认证",
+    ]);
+  });
+
+  it("normalizes asset structure and recent seven day trading summaries", () => {
+    const model = buildCustomerModel({
+      profile: {
+        assetMix: [
+          { name: "黄金", percent: 45, amount: "$12,852" },
+          { name: "外汇", percent: "35%", amount: "$9,996" },
+        ],
+        tradingSummary: {
+          recent7dTrading: {
+            deposit: "$5,200",
+            withdrawal: "$2,300",
+            volume: "$18,650",
+            days: [
+              { label: "5/12", value: 100 },
+              { label: "5/13", value: 200 },
+            ],
+          },
+          latestTrade: {
+            symbol: "XAUUSD",
+            lot: 0.8,
+            profit: "盈利 $326",
+          },
+        },
+      } as never,
+    });
+
+    expect(model.assetMix).toHaveLength(2);
+    expect(model.assetRows).toHaveLength(4);
+    expect(model.assetRows[0]).toMatchObject({
+      amount: "$12,852",
+      empty: false,
+      name: "黄金",
+      percentLabel: "45%",
+    });
+    expect(model.assetRows[2]).toMatchObject({ empty: true, name: "指数" });
+    expect(model.assetMix[0]).toMatchObject({ name: "黄金", percent: 45 });
+    expect(model.recent7dTrading.deposit).toBe("$5,200");
+    expect(model.recent7dTrading.days).toHaveLength(2);
+    expect(model.recent7dTrading.bars).toHaveLength(7);
+    expect(model.recent7dTrading.bars[0]).toMatchObject({ empty: false, label: "5/12" });
+    expect(model.recent7dTrading.bars[2]).toMatchObject({ empty: true });
+    expect(model.recent7dTrading.latest).toContain("XAUUSD");
+  });
 });

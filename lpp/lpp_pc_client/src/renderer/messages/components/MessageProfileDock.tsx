@@ -6,11 +6,14 @@ import type { ContactItem } from "../../data/types";
 import { startHorizontalPaneResize } from "../../lib/paneResize";
 import { ConversationInfoPanel } from "./ConversationInfoPanel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
+import type { MessageGroupManagement } from "../hooks/useMessageGroupManagement";
 
 export function MessageProfileDock({
+  avatarUrl,
   contact,
   conversation,
   groupAvatar,
+  groupManagement,
   groupMembers,
   loadingGroupMembers,
   pinned,
@@ -22,9 +25,11 @@ export function MessageProfileDock({
   onResize,
   onTogglePin,
 }: {
+  avatarUrl?: string | null;
   contact?: ContactItem | null;
   conversation?: ConversationListItem;
   groupAvatar?: GroupConversationAvatar;
+  groupManagement?: MessageGroupManagement;
   groupMembers: GroupMemberDto[];
   loadingGroupMembers: boolean;
   pinned: boolean;
@@ -58,9 +63,11 @@ export function MessageProfileDock({
       />
 
       <ConversationInfoPanel
+        avatarUrl={avatarUrl}
         contact={contact}
         conversation={conversation}
         groupAvatar={groupAvatar}
+        groupManagement={groupManagement}
         groupMembers={groupMembers}
         headerActions={
           <>

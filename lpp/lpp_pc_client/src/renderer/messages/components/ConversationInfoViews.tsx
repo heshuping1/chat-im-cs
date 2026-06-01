@@ -15,6 +15,7 @@ import {
   buildContactCardProfilePopover,
   type AvatarProfilePopoverState,
 } from "../models/messageDisplayModel";
+import type { MessageGroupManagement } from "../hooks/useMessageGroupManagement";
 import type {
   AnchoredContactCardProfile,
   ContactCardRelation,
@@ -23,9 +24,11 @@ import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
 import { ConversationInfoPanel } from "./ConversationInfoPanel";
 
 export function StandaloneConversationInfoView({
+  avatarUrl,
   contact,
   conversation,
   groupAvatarSnapshot,
+  groupManagement,
   groupMembers,
   loadingGroupMembers,
   onUpdateRemark,
@@ -39,9 +42,11 @@ export function StandaloneConversationInfoView({
   profileLoading = false,
   userIdentity,
 }: {
+  avatarUrl?: string | null;
   contact?: ContactItem | null;
   conversation?: ConversationListItem;
   groupAvatarSnapshot?: string;
+  groupManagement?: MessageGroupManagement;
   groupMembers: GroupMemberDto[];
   loadingGroupMembers: boolean;
   onUpdateRemark?: (remarkName: string) => Promise<void> | void;
@@ -65,6 +70,7 @@ export function StandaloneConversationInfoView({
         <strong>客户信息</strong>
       </header>
       <ConversationInfoPanel
+        avatarUrl={avatarUrl}
         contact={contact}
         conversation={conversation}
         groupAvatar={
@@ -73,6 +79,7 @@ export function StandaloneConversationInfoView({
             : undefined
         }
         groupMembers={groupMembers}
+        groupManagement={groupManagement}
         loadingGroupMembers={loadingGroupMembers}
         onUpdateRemark={onUpdateRemark}
         onUpdateTags={onUpdateTags}

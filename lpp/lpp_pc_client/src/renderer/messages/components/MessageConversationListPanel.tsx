@@ -37,6 +37,7 @@ export interface MessageConversationListPanelProps {
   resolveConversationGroupAvatar: (
     conversation: ConversationListItem,
   ) => GroupConversationAvatar | undefined;
+  resolveConversationAvatar: (conversation: ConversationListItem) => string | null | undefined;
   resolveConversationIsGroup: (conversation: ConversationListItem) => boolean;
   resolveConversationUnread: (conversation: ConversationListItem) => number;
 }
@@ -72,6 +73,7 @@ export function MessageConversationListPanel({
   onPlusAction,
   onTogglePlusMenu,
   resolveConversationGroupAvatar,
+  resolveConversationAvatar,
   resolveConversationIsGroup,
   resolveConversationUnread,
 }: MessageConversationListPanelProps) {
@@ -139,6 +141,7 @@ export function MessageConversationListPanel({
           conversations.map((item) => (
             <ConversationRow
               active={item.conversationId === activeConversationId}
+              avatarUrl={resolveConversationAvatar(item)}
               conversation={item}
               draft={draftsByConversation[item.conversationId]}
               groupAvatar={resolveConversationGroupAvatar(item)}

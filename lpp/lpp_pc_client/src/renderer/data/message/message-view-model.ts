@@ -102,7 +102,7 @@ export function createChatMessageViewModel(
       name: senderName,
       avatarUrl: input.mine
         ? input.mineAvatarUrl
-        : message.senderAvatarUrl || message.avatarUrl || input.senderAvatarUrl,
+        : input.senderAvatarUrl || message.senderAvatarUrl || message.avatarUrl,
       fallbackName: input.mine ? senderName : senderName || input.conversationFallbackName,
       mine: input.mine,
     },

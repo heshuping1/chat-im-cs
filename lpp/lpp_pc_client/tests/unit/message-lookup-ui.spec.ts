@@ -51,6 +51,10 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/messages/components/MessageComposerSurface.tsx"),
     "utf8",
   );
+  const chatMessageBubble = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/ChatMessageBubble.tsx"),
+    "utf8",
+  );
   const chatContextMenus = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/components/ChatContextMenus.tsx"),
     "utf8",
@@ -106,6 +110,13 @@ describe("message lookup UI", () => {
     expect(listPanel).toContain("关闭查找");
     expect(listPanel).toContain("没有匹配的聊天记录");
     expect(listPanel).not.toContain("chat-inline-panel");
+  });
+
+  it("renders an empty message list as a centered event notice instead of a regular panel state", () => {
+    expect(listPanel).toContain("pc-chat-empty-event");
+    expect(listPanel).toContain('<span className="pc-chat-event-pill">{emptyText}</span>');
+    expect(listPanel).not.toContain('<PanelState className="e-panel-state" text={emptyText} tone={false} />');
+    expect(messageCenterCss).toContain(".pc-chat-empty-event");
   });
 
   it("loads im_direct profile-card for ordinary IM customer info and refreshes existing caches after edits", () => {
@@ -206,6 +217,14 @@ describe("message lookup UI", () => {
     expect(messageCenter).toContain("addFriendDialogOpen");
     expect(messageCenter).toContain("ContactAddFriendDialog");
     expect(messageCenter).toContain("useContactAddFriendController");
+  });
+
+  it("marks direct read receipts with a green check without changing unread receipts", () => {
+    expect(chatMessageBubble).toContain('model.status.receipt === "read"');
+    expect(chatMessageBubble).toContain("pc-chat-receipt-icon");
+    expect(chatMessageBubble).toContain('className={`pc-chat-receipt${readReceipt ? " read" : ""}`}');
+    expect(messageCenterCss).toContain(".pc-chat-receipt.read");
+    expect(messageCenterCss).toContain("color: #10b981");
   });
 
   it("surfaces incoming friend requests across navigation, message plus and reminders", () => {

@@ -8,6 +8,7 @@ import {
   selectSetActiveModule,
   selectSetServiceThreadFilter,
 } from "../../src/renderer/data/workspace-ui/workspace-ui-store";
+import { useWorkspaceStore } from "../../src/renderer/data/workspace-ui/workspace-store-core";
 
 describe("workspace ui store selectors", () => {
   it("selects navigation and layout state from compatible workspace state", () => {
@@ -75,5 +76,21 @@ describe("workspace ui store selectors", () => {
       serviceListPaneWidth: 340,
       serviceProfilePaneWidth: 400,
     });
+  });
+
+  it("allows the IM profile pane to persist widths above the old 440px cap", () => {
+    const previousWidth = useWorkspaceStore.getState().profilePaneWidth;
+    try {
+      useWorkspaceStore.getState().setProfilePaneWidth(720);
+      expect(useWorkspaceStore.getState().profilePaneWidth).toBe(720);
+
+      useWorkspaceStore.getState().setProfilePaneWidth(1200);
+      expect(useWorkspaceStore.getState().profilePaneWidth).toBe(960);
+
+      useWorkspaceStore.getState().setProfilePaneWidth(120);
+      expect(useWorkspaceStore.getState().profilePaneWidth).toBe(280);
+    } finally {
+      useWorkspaceStore.setState({ profilePaneWidth: previousWidth });
+    }
   });
 });

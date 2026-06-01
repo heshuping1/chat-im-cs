@@ -361,7 +361,9 @@ export function MessageListPanel({
         })}
       <div ref={messagesBottomRef} className="pc-chat-bottom-sentinel" />
       {!loading && messages.length === 0 && (
-        <PanelState className="e-panel-state" text={emptyText} tone={false} />
+        <div className="pc-chat-empty-event" role="status">
+          <span className="pc-chat-event-pill">{emptyText}</span>
+        </div>
       )}
     </section>
   );

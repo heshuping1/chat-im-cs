@@ -528,6 +528,65 @@ export interface GroupMemberDto {
   joinedAt?: string | null;
 }
 
+export interface GroupDetailDto {
+  groupId?: string;
+  conversationId?: string;
+  title: string;
+  avatarUrl?: string | null;
+  ownerUserId?: string | null;
+  ownerDisplayName?: string | null;
+  memberCount?: number | null;
+  muteMode?: "normal" | "all_muted" | 0 | 1 | string | null;
+  settings?: GroupSettingsDto | null;
+  isPinned?: boolean;
+  isMuted?: boolean;
+  myRole?: "owner" | "admin" | "member" | string | null;
+  unreadCount?: number;
+  lastMessageSeq?: number;
+  lastReadSeq?: number;
+  createdAt?: string | null;
+}
+
+export interface GroupSettingsDto {
+  allowMemberInvite?: boolean;
+  allowMemberModifyTitle?: boolean;
+  allowMemberAtAll?: boolean;
+  allowMemberViewMemberList?: boolean;
+  allowQrCodeJoin?: boolean;
+  requireApproval?: boolean;
+  allowMemberAddFriend?: boolean;
+}
+
+export interface GroupAnnouncementDto {
+  announcementId: string;
+  title?: string | null;
+  content: string;
+  isPinned?: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  creatorDisplayName?: string | null;
+}
+
+export interface GroupJoinRequestDto {
+  requestId: string;
+  applicantUserId?: string;
+  applicantDisplayName?: string;
+  applicantAvatarUrl?: string | null;
+  message?: string | null;
+  status?: string;
+  createdAt?: string | null;
+}
+
+export interface ChatFileDto {
+  mediaId: string;
+  mediaKind: "image" | "video" | "voice" | "file" | string;
+  fileName: string;
+  mimeType?: string | null;
+  sizeBytes?: number;
+  url: string;
+  createdAt?: string | null;
+}
+
 export interface DepartmentDto {
   departmentId: string;
   parentId?: string | null;

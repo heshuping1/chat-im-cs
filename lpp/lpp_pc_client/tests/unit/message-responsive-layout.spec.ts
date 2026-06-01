@@ -85,7 +85,7 @@ describe("message responsive layout", () => {
     ).toBe("no-profile");
   });
 
-  it("limits profile pane resizing so the chat keeps its minimum width", () => {
+  it("lets the profile pane expand until the chat reaches its minimum width", () => {
     const snapshot = {
       assistantPaneOpen: false,
       listPaneWidth: 220,
@@ -97,16 +97,24 @@ describe("message responsive layout", () => {
       messageLayoutMetrics.resizer +
       messageLayoutMetrics.chat +
       messageLayoutMetrics.resizer +
-      440 +
+      900 +
       messageLayoutMetrics.contextRail;
 
     expect(
       calculateMessageResizeWidth({
-        requestedWidth: 520,
+        requestedWidth: 700,
         shellWidth: roomyShellWidth,
         snapshot,
       }),
-    ).toBe(440);
+    ).toBe(700);
+
+    expect(
+      calculateMessageResizeWidth({
+        requestedWidth: 900,
+        shellWidth: roomyShellWidth,
+        snapshot,
+      }),
+    ).toBe(900);
 
     expect(
       calculateMessageResizeWidth({
@@ -118,11 +126,11 @@ describe("message responsive layout", () => {
 
     expect(
       calculateMessageResizeWidth({
-        requestedWidth: 440,
-        shellWidth: roomyShellWidth - 60,
+        requestedWidth: 960,
+        shellWidth: roomyShellWidth - 120,
         snapshot,
       }),
-    ).toBe(380);
+    ).toBe(780);
   });
 
   it("includes the assistant pane when limiting profile pane resizing", () => {
@@ -143,10 +151,35 @@ describe("message responsive layout", () => {
 
     expect(
       calculateMessageResizeWidth({
-        requestedWidth: 440,
+        requestedWidth: 700,
         shellWidth,
         snapshot,
       }),
     ).toBe(400);
+  });
+
+  it("uses the actual sidebar width when limiting profile pane resizing", () => {
+    const snapshot = {
+      assistantPaneOpen: false,
+      listPaneWidth: 220,
+      profilePaneWidth: 400,
+      sidebarWidth: messageLayoutMetrics.sidebarCollapsed,
+    };
+    const shellWidth =
+      messageLayoutMetrics.sidebarCollapsed +
+      snapshot.listPaneWidth +
+      messageLayoutMetrics.resizer +
+      messageLayoutMetrics.chat +
+      messageLayoutMetrics.resizer +
+      620 +
+      messageLayoutMetrics.contextRail;
+
+    expect(
+      calculateMessageResizeWidth({
+        requestedWidth: 700,
+        shellWidth,
+        snapshot,
+      }),
+    ).toBe(620);
   });
 });

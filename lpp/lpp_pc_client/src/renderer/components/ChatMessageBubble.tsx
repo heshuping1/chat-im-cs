@@ -1,5 +1,6 @@
 import { MessageBodyView, type UploadActionHandler } from "./MessageBodyView";
 import { PcAvatar } from "./PcAvatar";
+import { Check } from "lucide-react";
 import type { MessageItemDto } from "../data/api-client";
 import {
   createChatMessageViewModel,
@@ -84,6 +85,20 @@ export function ChatMessageBubble({
     : computedModel;
   const senderName = model.sender.name;
   const reply = model.bubble.reply;
+  const readReceipt = model.status.receipt === "read";
+  const statusReceipt = model.status.statusText ? (
+    <span className={`pc-chat-receipt${readReceipt ? " read" : ""}`}>
+      {readReceipt && (
+        <Check
+          aria-hidden="true"
+          className="pc-chat-receipt-icon"
+          size={12}
+          strokeWidth={3}
+        />
+      )}
+      <span>{model.status.statusText}</span>
+    </span>
+  ) : null;
   const sendStatusSlot = mine && model.status.sendStatusSlot !== "none" ? (
     <MessageSendStatusSlot
       failed={model.status.showFailureMarker}
@@ -143,8 +158,15 @@ export function ChatMessageBubble({
           <div className="pc-message-translation">{model.content.translationText}</div>
         )}
         <time className="pc-chat-time">
-          {model.status.timeText}
-          {model.status.statusText ? ` · ${model.status.statusText}` : ""}
+          <span>{model.status.timeText}</span>
+          {statusReceipt && (
+            <>
+              <span className="pc-chat-time-separator" aria-hidden="true">
+                ·
+              </span>
+              {statusReceipt}
+            </>
+          )}
         </time>
       </div>
       {mine && avatar}

@@ -94,7 +94,7 @@ const serviceLayoutDefaults = {
   customerPaneCollapsed: false,
   listPaneCollapsed: false,
   listPaneWidth: 340,
-  profilePaneWidth: 400,
+  profilePaneWidth: 420,
 };
 const legacyServiceLayoutDefaults = {
   assistantPaneWidth: 360,
@@ -461,7 +461,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setListPaneWidth: (width) =>
     set({ listPaneWidth: Math.min(560, Math.max(220, Math.round(width))) }),
   setProfilePaneWidth: (width) =>
-    set({ profilePaneWidth: Math.min(440, Math.max(280, Math.round(width))) }),
+    set({ profilePaneWidth: Math.min(960, Math.max(280, Math.round(width))) }),
   setServiceListPaneWidth: (width) =>
     set(() => {
       const serviceListPaneWidth = clampPaneWidth(width, 260, 420);

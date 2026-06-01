@@ -13,14 +13,16 @@ export const messageLayoutMetrics = {
 };
 
 const profilePaneWidthBounds = {
-  max: 440,
+  max: 960,
   min: 280,
 };
 
 type MessageResizeSnapshot = {
+  assistantPaneWidth?: number;
   assistantPaneOpen?: boolean;
   listPaneWidth: number;
   profilePaneWidth: number;
+  sidebarWidth?: number;
 };
 
 type UseMessageResponsiveLayoutOptions = {
@@ -42,16 +44,18 @@ function clampProfilePaneWidth(width: number) {
 }
 
 function calculateMessageFullRequiredWidth({
+  assistantPaneWidth = messageLayoutMetrics.assistant,
   assistantPaneOpen = false,
   listPaneWidth,
   profilePaneWidth,
+  sidebarWidth = messageLayoutMetrics.sidebarExpanded,
 }: MessageResizeSnapshot) {
   return (
-    messageLayoutMetrics.sidebarExpanded +
+    sidebarWidth +
     listPaneWidth +
     messageLayoutMetrics.resizer +
     messageLayoutMetrics.chat +
-    (assistantPaneOpen ? messageLayoutMetrics.assistant : 0) +
+    (assistantPaneOpen ? assistantPaneWidth : 0) +
     messageLayoutMetrics.resizer +
     profilePaneWidth +
     messageLayoutMetrics.contextRail
@@ -68,13 +72,17 @@ export function calculateMessageResizeWidth({
   snapshot: MessageResizeSnapshot;
 }) {
   const nextWidth = clampProfilePaneWidth(requestedWidth);
-  const nextSnapshot = {
-    ...snapshot,
-    profilePaneWidth: nextWidth,
-  };
-  const overflow = calculateMessageFullRequiredWidth(nextSnapshot) - shellWidth;
-  if (overflow <= 0) return nextWidth;
-  return clampProfilePaneWidth(nextWidth - overflow);
+  const availableProfileWidth =
+    shellWidth -
+    calculateMessageFullRequiredWidth({
+      ...snapshot,
+      profilePaneWidth: 0,
+    });
+  const maxAllowedWidth = Math.min(
+    profilePaneWidthBounds.max,
+    Math.max(profilePaneWidthBounds.min, availableProfileWidth),
+  );
+  return Math.min(nextWidth, maxAllowedWidth);
 }
 
 export function calculateMessageLayoutMode({

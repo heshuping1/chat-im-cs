@@ -5,6 +5,7 @@ export type ModuleKey =
   | "aiAssistant"
   | "contacts"
   | "ticketCenter"
+  | "customerDetail"
   | "dataCenter"
   | "workbench"
   | "enterpriseSwitch"

@@ -6,6 +6,7 @@ import { startHorizontalPaneResize } from "../../lib/paneResize";
 import { getImConversationType } from "../hooks/useMessageCenterViewModel";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
+import type { UserAvatarRegistry } from "../models/userAvatarRegistry";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import {
   MessageConversationListPanel,
@@ -32,6 +33,7 @@ export function MessageConversationSidebar({
   plusMenuOpen,
   unreadCount,
   unreadIdentity,
+  userAvatarRegistry,
   visibleConversations,
   activeGroupMembers,
   onAddFriend,
@@ -61,6 +63,7 @@ export function MessageConversationSidebar({
   plusMenuOpen: boolean;
   unreadCount: number;
   unreadIdentity: CurrentUserIdentity;
+  userAvatarRegistry: UserAvatarRegistry;
   visibleConversations: ConversationListItem[];
   activeGroupMembers?: GroupMemberDto[];
   onAddFriend: () => void;
@@ -108,6 +111,7 @@ export function MessageConversationSidebar({
           })
         }
         onTogglePlusMenu={() => setPlusMenuOpen((value) => !value)}
+        resolveConversationAvatar={userAvatarRegistry.resolveConversationAvatar}
         resolveConversationGroupAvatar={(item) =>
           resolveGroupConversationAvatar(
             item,

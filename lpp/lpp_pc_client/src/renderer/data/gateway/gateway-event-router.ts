@@ -12,6 +12,7 @@ import {
   isImMessageEventName,
 } from "./gateway-event-registry";
 import {
+  invalidateImAvatarGatewayQueries,
   invalidateCustomerServiceGatewayQueries,
   invalidateImGatewayQueries,
 } from "./gateway-query-invalidation";
@@ -169,13 +170,13 @@ export function createGatewayEventRouter(options: {
       void queryClient.invalidateQueries({ queryKey: ["pc-friends"] });
       void queryClient.invalidateQueries({ queryKey: ["pc-friend-requests"] });
       void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+      invalidateImAvatarGatewayQueries(queryClient);
       return;
     }
 
     if (eventName === "friend.profile.updated" || eventName === "presence.changed") {
-      void queryClient.invalidateQueries({ queryKey: ["pc-friends"] });
-      void queryClient.invalidateQueries({ queryKey: ["pc-tenant-members"] });
       void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+      invalidateImAvatarGatewayQueries(queryClient);
     }
   };
 

@@ -84,6 +84,11 @@ const DataCenterPage = lazy(() =>
     default: module.DataCenterPage,
   })),
 );
+const CustomerDetailPage = lazy(() =>
+  import('./components/CustomerDetailPage').then((module) => ({
+    default: module.CustomerDetailPage,
+  })),
+);
 const KnowledgeBasePage = lazy(() =>
   import('./components/KnowledgeBasePage').then((module) => ({
     default: module.KnowledgeBasePage,
@@ -263,6 +268,8 @@ function ActiveModulePage({
       return <FavoritesPage />;
     case 'ticketCenter':
       return <TicketCenterPage />;
+    case 'customerDetail':
+      return <CustomerDetailPage />;
     case 'dataCenter':
       return <DataCenterPage dataCenterView={workspaceAccess.dataCenterView} />;
     case 'workbench':
@@ -284,6 +291,7 @@ const knownModuleKeys = new Set<ModuleKey>([
   'knowledgeBase',
   'contacts',
   'ticketCenter',
+  'customerDetail',
   'dataCenter',
   'workbench',
   'enterpriseSwitch',

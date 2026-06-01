@@ -55,6 +55,7 @@ export function ConversationAvatar({
 
 export function ConversationRow({
   active,
+  avatarUrl,
   conversation,
   draft,
   groupAvatar,
@@ -64,6 +65,7 @@ export function ConversationRow({
   unread,
 }: {
   active: boolean;
+  avatarUrl?: string | null;
   conversation: ConversationListItem;
   draft?: string;
   groupAvatar?: GroupConversationAvatar;
@@ -81,7 +83,7 @@ export function ConversationRow({
       onContextMenu={onContextMenu}
     >
       <ConversationAvatar
-        avatarUrl={conversation.avatarUrl}
+        avatarUrl={avatarUrl ?? conversation.avatarUrl}
         badge
         groupAvatar={groupAvatar}
         isGroup={isGroup}

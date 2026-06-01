@@ -69,6 +69,10 @@ import { useMessageListScrollRegistry } from "../messages/hooks/useMessageListSc
 import { useMessageContactPickerData } from "../messages/hooks/useMessageContactPickerData";
 import { useMessageContactProfileController } from "../messages/hooks/useMessageContactProfileController";
 import {
+  useMessageGroupManagement,
+  type GroupFileFilter,
+} from "../messages/hooks/useMessageGroupManagement";
+import {
   getImConversationType,
   useMessageCenterViewModel,
 } from "../messages/hooks/useMessageCenterViewModel";
@@ -76,6 +80,7 @@ import {
   groupCompositeAvatarAllowed,
   groupCompositeAvatarCells,
 } from "../messages/models/groupAvatarModel";
+import { buildUserAvatarRegistry } from "../messages/models/userAvatarRegistry";
 import type { ReplyTarget } from "../messages/models/messageComposerModel";
 import {
   contactCardActionErrorText,
@@ -176,6 +181,7 @@ export function MessageCenter() {
   const [keyword, setKeyword] = useState("");
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [messageSearchKeyword, setMessageSearchKeyword] = useState("");
+  const [groupFileFilter, setGroupFileFilter] = useState<GroupFileFilter>("all");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilterKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
@@ -322,6 +328,15 @@ export function MessageCenter() {
     () => buildGroupMemberMap(groupMembersQuery.data ?? []),
     [groupMembersQuery.data],
   );
+  const groupManagement = useMessageGroupManagement({
+    activeConversation,
+    fileFilter: groupFileFilter,
+    groupMembers: groupMembersQuery.data ?? [],
+    queryClient,
+    session,
+    setFileFilter: setGroupFileFilter,
+    setNotice,
+  });
   const { groupAvatarSnapshotFor } = useGroupAvatarSnapshots({
     activeConversation,
     activeConversationType,
@@ -336,6 +351,7 @@ export function MessageCenter() {
     contactPickerItems,
     friendsQuery,
     inviteQrsQuery,
+    tenantMembersQuery,
   } = useMessageContactPickerData(session, composerDialog);
   const addFriendController = useContactAddFriendController({
     onDirectChatCreated: () => setAddFriendDialogOpen(false),
@@ -428,6 +444,36 @@ export function MessageCenter() {
     messages,
     session,
   });
+  const userAvatarRegistry = useMemo(
+    () =>
+      buildUserAvatarRegistry({
+        activeProfiles: [
+          contactProfileController.profileQuery.data,
+          contactProfileController.profileExtraQuery.data,
+          contactProfileController.contactCardProfileQuery.data,
+        ],
+        conversations,
+        friends: friendsQuery.data ?? [],
+        groupMembersByConversation: {
+          ...groupMembersByConversation,
+          ...(activeConversation?.conversationId
+            ? { [activeConversation.conversationId]: groupMembersQuery.data ?? [] }
+            : {}),
+        },
+        tenantMembers: tenantMembersQuery.data ?? [],
+      }),
+    [
+      activeConversation?.conversationId,
+      contactProfileController.contactCardProfileQuery.data,
+      contactProfileController.profileExtraQuery.data,
+      contactProfileController.profileQuery.data,
+      conversations,
+      friendsQuery.data,
+      groupMembersByConversation,
+      groupMembersQuery.data,
+      tenantMembersQuery.data,
+    ],
+  );
   const messageCenterViewModel = useMessageCenterViewModel({
     activeConversationId,
     conversationListError: conversationsQuery.error,
@@ -716,6 +762,10 @@ export function MessageCenter() {
         setProfilePaneWidth(requestedWidth);
         return;
       }
+      const sidebarWidth = Math.round(
+        shell.querySelector(".sidebar")?.getBoundingClientRect().width ??
+          0,
+      );
       setProfilePaneWidth(
         calculateMessageResizeWidth({
           requestedWidth,
@@ -724,6 +774,7 @@ export function MessageCenter() {
             assistantPaneOpen: assistantPaneVisible,
             listPaneWidth,
             profilePaneWidth,
+            sidebarWidth,
           },
         }),
       );
@@ -757,6 +808,7 @@ export function MessageCenter() {
         plusMenuOpen={plusMenuOpen}
         unreadCount={counts.unread}
         unreadIdentity={unreadIdentity as CurrentUserIdentity}
+        userAvatarRegistry={userAvatarRegistry}
         visibleConversations={visibleConversations}
         onAddFriend={() => {
           setAddFriendDialogOpen(true);
@@ -809,6 +861,7 @@ export function MessageCenter() {
         forwardPending={forwardMutation.isPending}
         getChatPanelHeight={getChatPanelHeight}
         groupAvatarSnapshotFor={groupAvatarSnapshotFor}
+        groupManagement={activeConversationIsGroup ? groupManagement : undefined}
         groupMemberMap={groupMemberMap}
         groupMembers={groupMembersQuery.data ?? []}
         handleAvatarClick={handleAvatarClick}
@@ -950,6 +1003,7 @@ export function MessageCenter() {
         setSelectedMessageIds={setSelectedMessageIds}
         unreadIdentity={unreadIdentity}
         unreadJump={unreadJump}
+        userAvatarRegistry={userAvatarRegistry}
         visibleMessages={visibleMessages}
       />
 

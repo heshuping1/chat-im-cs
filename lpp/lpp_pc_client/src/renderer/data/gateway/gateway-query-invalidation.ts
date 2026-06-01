@@ -5,6 +5,7 @@ export function invalidateImGatewayQueries(
   conversationId?: string,
 ) {
   void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+  invalidateImAvatarGatewayQueries(queryClient);
   if (conversationId) {
     void queryClient.invalidateQueries({
       predicate: (query) =>
@@ -14,6 +15,15 @@ export function invalidateImGatewayQueries(
     return;
   }
   void queryClient.invalidateQueries({ queryKey: ["pc-im-messages"] });
+}
+
+export function invalidateImAvatarGatewayQueries(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: ["pc-friends"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-tenant-members"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-user-profile"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-friend-profile-extra"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-group-members"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-message-department-members"] });
 }
 
 export function invalidateCustomerServiceGatewayQueries(
