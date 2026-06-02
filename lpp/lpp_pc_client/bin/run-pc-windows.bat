@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal
 
-pushd "%~dp0"
+pushd "%~dp0.."
 
 echo [LPP PC] Starting PC client in dev mode...
 echo [LPP PC] If port 5173 is already in use, close the existing dev instance or Electron window first.

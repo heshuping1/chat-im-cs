@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal
 
-pushd "%~dp0"
+pushd "%~dp0.."
 
 echo [LPP PC] Building Windows executable installer...
 call npm.cmd run dist:win
