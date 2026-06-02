@@ -77,6 +77,9 @@ describe("createCustomerServiceGatewayDispatchHandlers", () => {
         args: [
           {
             data: {
+              tempSession: {
+                sessionId: "thread-2",
+              },
               message: {
                 conversationId: "thread-2",
                 conversationType: "temp_session",

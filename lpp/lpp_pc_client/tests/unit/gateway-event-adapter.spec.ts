@@ -35,7 +35,7 @@ describe("adaptGatewayEvent", () => {
           conversationId: "group-1",
           conversationType: "group",
           readSeq: 11,
-          readerUserId: "user-3",
+          userId: "user-3",
         },
       ],
     });
@@ -107,5 +107,47 @@ describe("adaptGatewayEvent", () => {
     if (event.kind !== "im.message.received") return;
     expect(event.conversationId).toBe("thread-direct-customer");
     expect(event.conversationType).toBe("direct");
+  });
+
+  it("rejects non-standard IM alias fields instead of guessing PC-side compatibility", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 6,
+      args: [
+        {
+          data: {
+            conversation_id: "legacy-direct-1",
+            conversation_type: "direct",
+            conversation_seq: 10,
+            fromUserId: "legacy-user",
+            message_id: "legacy-message",
+            message_type: "text",
+          },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("invalid");
+    if (event.kind !== "invalid") return;
+    expect(event.reason).toBe("missing_conversation_id");
+  });
+
+  it("does not accept read receipt alias fields", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.read",
+      receivedAt: 7,
+      args: [
+        {
+          chatId: "legacy-group-1",
+          conversation_type: "group",
+          read_seq: 11,
+          readerUserId: "user-3",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("invalid");
+    if (event.kind !== "invalid") return;
+    expect(event.reason).toBe("missing_conversation_id");
   });
 });

@@ -78,6 +78,38 @@ describe("send state machine", () => {
     });
   });
 
+  it("creates send diagnostics with stable routing fields and sanitized context", () => {
+    const record = createChatSendDiagnosticRecord({
+      taskId: "P4-MSG-005D",
+      channel: "customer_service",
+      phase: "upload",
+      result: "ok",
+      action: "upload_progress",
+      context: {
+        authToken: "raw-token",
+        filePath: "C:/Users/hesp/Desktop/customer.png",
+        localTaskId: "task-1",
+        threadId: "thread-1",
+      },
+    });
+
+    expect(record).toMatchObject({
+      module: "send",
+      taskId: "P4-MSG-005D",
+      channel: "customer_service",
+      phase: "upload",
+      result: "ok",
+      action: "upload_progress",
+      context: {
+        authToken: "[redacted]",
+        filePath: "[local-path]",
+        localTaskId: "task-1",
+        threadId: "thread-1",
+      },
+    });
+    expect(record.traceId).toMatch(/^send-customer_service-upload-/);
+  });
+
   it("persists a bounded sanitized diagnostics buffer for later export", () => {
     const values = new Map<string, string>();
     const originalWindow = globalThis.window;

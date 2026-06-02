@@ -88,6 +88,7 @@ export function mergeCustomerServiceGatewayMessage(
     message,
     read,
     scopeKey,
+    selfMessage: self,
     threadId,
     threadType,
   });

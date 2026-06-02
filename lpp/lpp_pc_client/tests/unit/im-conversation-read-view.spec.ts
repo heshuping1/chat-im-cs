@@ -69,6 +69,20 @@ describe("im conversation read view", () => {
     expect(view.shouldShowBadge).toBe(true);
   });
 
+  it("does not clear unread for default active selection without a loaded pane", () => {
+    const view = resolveImConversationReadView({
+      activeConversationId: "direct-1",
+      conversation: incomingConversation,
+      identity: { userId: "current-user" },
+      messagesLoaded: false,
+      visibility: "listOnly",
+    });
+
+    expect(view.effectiveUnread).toBe(1);
+    expect(view.reason).toBe("server-unread");
+    expect(view.shouldShowBadge).toBe(true);
+  });
+
   it("preserves self last-message suppression", () => {
     expect(
       imConversationEffectiveUnreadCount(
@@ -84,5 +98,44 @@ describe("im conversation read view", () => {
         { userId: "current-user" },
       ),
     ).toBe(0);
+  });
+
+  it("treats current-user read coverage as unread clearing evidence", () => {
+    const view = resolveImConversationReadView({
+      activeConversationId: "other",
+      conversation: {
+        ...incomingConversation,
+        lastMessageSeq: 2,
+        lastReadSeq: 2,
+        unreadCount: 1,
+      },
+      identity: { userId: "current-user" },
+      visibility: "hidden",
+    });
+
+    expect(view.effectiveUnread).toBe(0);
+    expect(view.reason).toBe("none");
+    expect(view.shouldNotify).toBe(false);
+    expect(view.shouldShowBadge).toBe(false);
+  });
+
+  it("does not use peer read coverage to clear current-user unread", () => {
+    const view = resolveImConversationReadView({
+      activeConversationId: "other",
+      conversation: {
+        ...incomingConversation,
+        lastMessageSeq: 2,
+        lastReadSeq: 1,
+        peerReadSeq: 2,
+        unreadCount: 1,
+      },
+      identity: { userId: "current-user" },
+      visibility: "hidden",
+    });
+
+    expect(view.effectiveUnread).toBe(1);
+    expect(view.reason).toBe("server-unread");
+    expect(view.shouldNotify).toBe(true);
+    expect(view.shouldShowBadge).toBe(true);
   });
 });

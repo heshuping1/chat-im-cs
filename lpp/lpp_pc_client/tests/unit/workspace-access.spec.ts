@@ -358,7 +358,9 @@ describe("workspace access integration closure", () => {
     expect(gatewayCustomerServiceSideEffectsSource).toContain("consumeCustomerServiceMessageReminder");
     expect(serviceWorkspaceSource).toContain("isMineCustomerServiceMessage");
     expect(sidebarSource).toContain("resolveCustomerServiceBadgeView");
+    expect(sidebarSource).toContain("serviceUnreadCount: taskbarServiceUnreadCount");
     expect(serviceBadgeViewSource).toContain("taskbarServiceUnreadCount: activeServiceUnreadCount");
+    expect(sidebarSource).not.toContain("realtimeServiceAlertCount");
     expect(serviceBadgeViewSource).not.toContain("realtimeServiceAlertCount");
     expect(sidebarSource).not.toContain("previousServiceMessageRef");
   });

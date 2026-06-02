@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/renderer/data/auth/auth-store", () => ({
-  getAuthSessionSnapshot: () => ({ tenantToken: "tenant-token" }),
+  getAuthSessionSnapshot: () => ({ tenantToken: "tenant-token", userId: "staff-1" }),
 }));
 
 vi.mock("../../src/renderer/data/reminder/reminder-store", () => ({
@@ -114,5 +114,52 @@ describe("gateway customer service side effects", () => {
         channel: "serviceQueue",
       }),
     );
+  });
+
+  it("does not notify or increment unread for current staff gateway echoes", async () => {
+    const { mergeCustomerServiceGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+    const queryClient = {
+      setQueriesData: vi.fn(),
+    };
+
+    mergeCustomerServiceGatewayMessage(
+      queryClient as never,
+      {
+        conversationId: "im-conversation-cs-1",
+        messageId: "staff-message-1",
+        messageType: "text",
+        senderRole: "staff",
+        senderUserId: "staff-1",
+        body: { text: "agent reply" },
+      },
+      "temp-session-1",
+    );
+
+    expect(mocks.pushRealtimeReminder).not.toHaveBeenCalled();
+    expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+    expect(queryClient.setQueriesData).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(Function),
+    );
+    const update = queryClient.setQueriesData.mock.calls.at(-1)?.[1] as
+      | ((old: unknown) => unknown)
+      | undefined;
+    expect(
+      update?.({
+        activeItems: [],
+        queueItems: [
+          {
+            conversationId: "temp-session-1",
+            threadId: "temp-session-1",
+            threadType: "temp_session",
+            unreadCount: 3,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      queueItems: [{ unreadCount: 3 }],
+    });
   });
 });

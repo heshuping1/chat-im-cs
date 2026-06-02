@@ -171,6 +171,35 @@ describe("message center view model", () => {
     ).toBe(2);
   });
 
+  it("counts IM unread through effective view instead of raw unread", () => {
+    const staleSelfUnread = conversation({
+      conversationId: "stale-self",
+      lastMessageSeq: 9,
+      lastReadSeq: 9,
+      unreadCount: 4,
+    });
+    const peerUnread = conversation({
+      conversationId: "peer-unread",
+      lastMessageSeq: 8,
+      lastReadSeq: 7,
+      peerReadSeq: 8,
+      unreadCount: 1,
+    });
+
+    expect(
+      createMessageCenterViewModel({
+        activeConversationId: "missing",
+        conversations: [staleSelfUnread, peerUnread],
+        draftsByConversation: {},
+        friends: [],
+        groupMembers: [],
+        imReadStateByConversation: {},
+        unreadIdentity: { userId: "current-user" },
+        visibleConversations: [staleSelfUnread, peerUnread],
+      }).counts.unread,
+    ).toBe(1);
+  });
+
   it("derives loading, error and empty state text for the page shell", () => {
     expect(
       createMessageCenterViewModel({

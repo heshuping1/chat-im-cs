@@ -114,6 +114,113 @@ describe("MessageDeliveryService", () => {
     }));
   });
 
+  it("deduplicates the same IM message across push, refetch compensation and detail routes", () => {
+    const queryClient = new QueryClient();
+    const service = createTestDeliveryService(queryClient);
+    const payload = {
+      conversationId: "direct-multi-source",
+      conversationSeq: 10,
+      message: { messageId: "m-multi-source" },
+    };
+
+    service.deliverImMessage({
+      conversationId: "direct-multi-source",
+      conversationType: "direct",
+      payload,
+      route: "gateway-push",
+      source: "gateway-router",
+    });
+    service.deliverImMessage({
+      conversationId: "direct-multi-source",
+      conversationType: "direct",
+      payload,
+      route: "refetch-compensation",
+      source: "message-gap-sync",
+    });
+    service.deliverImMessage({
+      conversationId: "direct-multi-source",
+      conversationType: "direct",
+      payload,
+      route: "detail-history",
+      source: "message-detail",
+    });
+
+    expect(mocks.mergeImGatewayMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      phase: "skip",
+      classification: expect.objectContaining({
+        reason: "duplicate-message-id",
+      }),
+    }));
+  });
+
+  it("uses conversationId plus seq as weak idempotency when messageId is missing", () => {
+    const queryClient = new QueryClient();
+    const service = createTestDeliveryService(queryClient);
+    const input = {
+      conversationId: "direct-weak-id",
+      conversationType: "direct",
+      payload: {
+        conversationId: "direct-weak-id",
+        conversationSeq: 15,
+        message: { messageType: "text" },
+      },
+      route: "gateway-push",
+      source: "gateway-router",
+    };
+
+    service.deliverImMessage(input);
+    service.deliverImMessage({ ...input, route: "refetch-compensation" });
+
+    expect(mocks.mergeImGatewayMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      phase: "skip",
+      classification: expect.objectContaining({
+        reason: "duplicate-or-stale-seq",
+        seq: 15,
+      }),
+    }));
+  });
+
+  it("does not deduplicate through legacy message id aliases", () => {
+    const queryClient = new QueryClient();
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverImMessage({
+      conversationId: "direct-legacy-alias",
+      conversationType: "direct",
+      payload: {
+        conversationId: "direct-legacy-alias",
+        conversationSeq: 1,
+        message: { message_id: "legacy-message-id" },
+      },
+      route: "gateway-push",
+      source: "gateway-router",
+    });
+    service.deliverImMessage({
+      conversationId: "direct-legacy-alias",
+      conversationType: "direct",
+      payload: {
+        conversationId: "direct-legacy-alias",
+        conversationSeq: 2,
+        message: { message_id: "legacy-message-id" },
+      },
+      route: "refetch-compensation",
+      source: "message-gap-sync",
+    });
+
+    expect(mocks.mergeImGatewayMessage).toHaveBeenCalledTimes(2);
+    expect(mocks.record).not.toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      classification: expect.objectContaining({
+        messageId: "legacy-message-id",
+        reason: "duplicate-message-id",
+      }),
+    }));
+  });
+
   it("skips stale IM sequence updates so older push cannot overwrite newer cache", () => {
     const queryClient = new QueryClient();
     const service = createTestDeliveryService(queryClient);
@@ -220,6 +327,45 @@ describe("MessageDeliveryService", () => {
       classification: expect.objectContaining({
         owner: "customerService",
         reason: "duplicate-message-id",
+      }),
+    }));
+  });
+
+  it("detects customer-service sequence gaps and triggers refetch compensation", () => {
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverCustomerServiceMessage({
+      payload: {
+        conversationId: "cs-conversation-gap",
+        conversationSeq: 100,
+        message: { messageId: "cs-100" },
+      },
+      route: "customer-service-first-stage",
+      source: "gateway-router",
+      threadId: "thread-gap",
+    });
+    service.deliverCustomerServiceMessage({
+      payload: {
+        conversationId: "cs-conversation-gap",
+        conversationSeq: 105,
+        message: { messageId: "cs-105" },
+      },
+      route: "customer-service-first-stage",
+      source: "gateway-router",
+      threadId: "thread-gap",
+    });
+
+    expect(mocks.mergeCustomerServiceGatewayMessage).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pc-cs-workbench-threads"] });
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      phase: "gap",
+      classification: expect.objectContaining({
+        gapSize: 4,
+        owner: "customerService",
+        reason: "seq-gap",
       }),
     }));
   });

@@ -84,6 +84,7 @@ describe("CustomerServiceApiClient", () => {
       activeItems: [
         {
           conversationId: "im-conversation-cs-1",
+          lastMessageSeq: 1,
           lastMessagePreview: "server visitor text",
           status: "active",
           threadId: "temp-session-1",
@@ -102,6 +103,72 @@ describe("CustomerServiceApiClient", () => {
           unreadCount: 3,
         },
       ],
+    });
+  });
+
+  it("does not let stale workbench unread overwrite newer gateway visitor unread", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "im-conversation-cs-stale",
+      lastMessageId: "gateway-5",
+      lastMessagePreview: "gateway visitor text",
+      lastMessageSeq: 5,
+      overlayUnreadCount: 2,
+      scopeKey: testScopeKey,
+      threadId: "temp-session-stale",
+      threadType: "temp_session",
+    });
+    const client = new TestCustomerServiceApiClient({
+      activeItems: [
+        {
+          conversationId: "im-conversation-cs-stale",
+          lastMessagePreview: "old server text",
+          lastMessageSeq: 4,
+          status: "active",
+          threadId: "temp-session-stale",
+          threadType: "temp_session",
+          title: "Visitor",
+          unreadCount: 10,
+        } as never,
+      ],
+      queueItems: [],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          lastMessagePreview: "old server text",
+          unreadCount: 2,
+        },
+      ],
+    });
+  });
+
+  it("accepts newer workbench unread when snapshot seq is ahead of local gateway state", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "im-conversation-cs-newer",
+      lastMessageSeq: 5,
+      overlayUnreadCount: 2,
+      scopeKey: testScopeKey,
+      threadId: "temp-session-newer",
+      threadType: "temp_session",
+    });
+    const client = new TestCustomerServiceApiClient({
+      activeItems: [
+        {
+          conversationId: "im-conversation-cs-newer",
+          lastMessageSeq: 6,
+          status: "active",
+          threadId: "temp-session-newer",
+          threadType: "temp_session",
+          title: "Visitor",
+          unreadCount: 10,
+        } as never,
+      ],
+      queueItems: [],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [{ unreadCount: 10 }],
     });
   });
 

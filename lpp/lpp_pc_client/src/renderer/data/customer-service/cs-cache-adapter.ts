@@ -340,6 +340,7 @@ export function applyCustomerServiceGatewayMessageCache(
     scopeKey?: string;
     message: MessageItemDto;
     read: boolean;
+    selfMessage?: boolean;
     threadId: string;
     threadType: CustomerServiceThread["threadType"];
   },
@@ -347,9 +348,9 @@ export function applyCustomerServiceGatewayMessageCache(
   const overlayDecision = rememberCustomerServiceConversationMessageOverlay({
     conversationId: params.conversationId || params.message.conversationId,
     message: params.message,
-    read: params.read,
+    read: params.selfMessage ? false : params.read,
     scopeKey: params.scopeKey,
-    source: "gateway",
+    source: params.selfMessage ? "send" : "gateway",
     threadId: params.threadId,
     threadType: params.threadType,
   });
@@ -362,9 +363,9 @@ export function applyCustomerServiceGatewayMessageCache(
   };
   appendCustomerServiceMessageToDetail(queryClient, thread, params.message);
   updateCustomerServiceThreadPreviewInList(queryClient, {
-    incrementUnread: !overlayDecision.sameMessage,
+    incrementUnread: !params.selfMessage && !overlayDecision.sameMessage,
     message: params.message,
-    read: params.read,
+    read: params.selfMessage ? false : params.read,
     threadId: params.threadId,
   });
   recordMessageReminderDiagnostic({
@@ -374,12 +375,13 @@ export function applyCustomerServiceGatewayMessageCache(
     route: "onlineService",
     classification: {
       conversationId: params.conversationId || params.message.conversationId,
-      incrementUnread: !overlayDecision.sameMessage,
+      incrementUnread: !params.selfMessage && !overlayDecision.sameMessage,
       messageId: params.message.messageId,
       nextOverlayUnread: overlayDecision.nextUnread,
       previousOverlayUnread: overlayDecision.previousUnread,
       read: params.read,
       sameMessage: overlayDecision.sameMessage,
+      selfMessage: params.selfMessage === true,
       scopeKey: params.scopeKey,
       threadId: params.threadId,
       threadType: params.threadType,

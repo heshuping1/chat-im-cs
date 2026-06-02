@@ -4,7 +4,10 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
-import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
+import {
+  imConversationEffectiveUnreadCount,
+  resolveImConversationReadView,
+} from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { pcQueryKeys } from "../../data/query-keys";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
@@ -66,6 +69,12 @@ export function useMessageUnreadJumpController({
       activeConversationId !== activeConversation.conversationId
     ) {
       if (!activeConversationId) {
+        const readView = resolveImConversationReadView({
+          activeConversationId,
+          conversation: activeConversation,
+          identity: unreadIdentity,
+          visibility: "listOnly",
+        });
         autoSelectedConversationIdsRef.current.add(activeConversation.conversationId);
         setSelectionSources((current) => ({
           ...current,
@@ -80,9 +89,10 @@ export function useMessageUnreadJumpController({
             activeConversationId,
             activeConversationSource: "auto",
             conversationId: activeConversation.conversationId,
+            effectiveUnread: readView.effectiveUnread,
             lastMessageSeq: activeConversation.lastMessageSeq,
             lastReadSeq: activeConversation.lastReadSeq,
-            unreadCount: activeConversation.unreadCount,
+            readViewReason: readView.reason,
           },
           summary: {
             activeConversation,
@@ -96,6 +106,12 @@ export function useMessageUnreadJumpController({
   const openConversationFromUserClick = useCallback(
     (conversation: ConversationListItem) => {
       autoSelectedConversationIdsRef.current.delete(conversation.conversationId);
+      const readView = resolveImConversationReadView({
+        activeConversationId: conversation.conversationId,
+        conversation,
+        identity: unreadIdentity,
+        visibility: "listOnly",
+      });
       setSelectionSources((current) => ({
         ...current,
         [conversation.conversationId]: "user",
@@ -109,9 +125,10 @@ export function useMessageUnreadJumpController({
           activeConversationId,
           activeConversationSource: "user",
           conversationId: conversation.conversationId,
+          effectiveUnread: readView.effectiveUnread,
           lastMessageSeq: conversation.lastMessageSeq,
           lastReadSeq: conversation.lastReadSeq,
-          unreadCount: conversation.unreadCount,
+          readViewReason: readView.reason,
         },
         summary: {
           conversation,
@@ -182,7 +199,6 @@ export function useMessageUnreadJumpController({
     activeConversation?.lastMessage?.messageId,
     activeConversation?.lastMessageSeq,
     activeConversation?.lastReadSeq,
-    activeConversation?.unreadCount,
     activeConversationId,
     session,
     setUnreadJump,

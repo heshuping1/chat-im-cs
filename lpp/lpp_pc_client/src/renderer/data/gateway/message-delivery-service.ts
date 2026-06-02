@@ -261,14 +261,14 @@ function deliveryMetadata(input: DeliveryGuardInput) {
   const message = messageRecord(input.payload);
   const conversationId =
     input.conversationId ||
-    stringField(message, "conversationId", "conversation_id", "threadId", "thread_id", "sessionId", "session_id") ||
-    stringField(input.payload, "conversationId", "conversation_id", "threadId", "thread_id", "sessionId", "session_id");
+    stringField(message, "conversationId", "threadId") ||
+    stringField(input.payload, "conversationId", "threadId");
   const messageId =
-    stringField(message, "messageId", "message_id", "id", "msgId", "msg_id", "clientMsgId", "client_msg_id") ||
-    stringField(input.payload, "messageId", "message_id", "id", "msgId", "msg_id", "clientMsgId", "client_msg_id");
+    stringField(message, "messageId", "clientMsgId") ||
+    stringField(input.payload, "messageId", "clientMsgId");
   const seq =
-    numberField(message, "conversationSeq", "conversation_seq", "seq", "messageSeq", "message_seq", "cursor") ||
-    numberField(input.payload, "conversationSeq", "conversation_seq", "seq", "messageSeq", "message_seq", "cursor");
+    numberField(message, "conversationSeq", "seq") ||
+    numberField(input.payload, "conversationSeq", "seq");
   return { conversationId, messageId, seq };
 }
 

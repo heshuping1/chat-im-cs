@@ -53,7 +53,7 @@ function adaptImMessageEvent(
   const payload = envelope.rawPayload;
   const conversationId =
     imConversationId(payload) ||
-    stringField(messageRecord(payload), "conversationId", "conversation_id", "chatId", "chat_id");
+    stringField(messageRecord(payload), "conversationId");
   if (!conversationId) {
     return invalid(envelope, "missing_conversation_id", ["gateway.im.missing_conversation_id"]);
   }
@@ -83,12 +83,12 @@ function adaptImReadEvent(
   envelope: GatewayEnvelope,
 ): GatewayTypedEvent {
   const payload = envelope.rawPayload;
-  const conversationId = stringField(payload, "conversationId", "conversation_id", "chatId", "chat_id");
+  const conversationId = stringField(payload, "conversationId");
   if (!conversationId) {
     return invalid(envelope, "missing_conversation_id", ["gateway.read.missing_conversation_id"]);
   }
   const readSeq =
-    numberField(payload, "readSeq", "read_seq", "lastReadSeq", "last_read_seq", "conversationSeq", "conversation_seq") ??
+    numberField(payload, "readSeq", "conversationSeq") ??
     0;
   if (readSeq <= 0) {
     return invalid(envelope, "missing_read_seq", ["gateway.read.missing_read_seq"]);
@@ -100,16 +100,16 @@ function adaptImReadEvent(
     conversationType: inferImConversationType(payload) || "direct",
     readerIdentity: {
       userId:
-        stringField(payload, "userId", "user_id", "readerUserId", "reader_user_id", "readUserId", "read_user_id") ||
+        stringField(payload, "userId") ||
         undefined,
       platformUserId:
-        stringField(payload, "platformUserId", "platform_user_id", "readerPlatformUserId", "reader_platform_user_id") ||
+        stringField(payload, "platformUserId") ||
         undefined,
       lppId:
-        stringField(payload, "lppId", "lpp_id", "readerLppId", "reader_lpp_id") ||
+        stringField(payload, "lppId") ||
         undefined,
       displayName:
-        stringField(payload, "displayName", "display_name", "readerDisplayName", "reader_display_name") ||
+        stringField(payload, "displayName") ||
         undefined,
     },
     readSeq,
@@ -140,49 +140,44 @@ function eventPayload(args: unknown[]) {
 function gatewayMessageContractInput(payload: Record<string, unknown>) {
   const raw = messageRecord(payload);
   return {
-    ...raw,
+    messageId:
+      stringField(raw, "messageId") ||
+      stringField(payload, "messageId"),
     conversationId:
-      stringField(raw, "conversationId", "conversation_id", "chatId", "chat_id") ||
-      stringField(payload, "conversationId", "conversation_id", "chatId", "chat_id"),
+      stringField(raw, "conversationId") ||
+      stringField(payload, "conversationId"),
     conversationSeq:
-      numberField(raw, "conversationSeq", "conversation_seq", "seq", "messageSeq", "message_seq") ??
-      numberField(payload, "conversationSeq", "conversation_seq", "seq", "messageSeq", "message_seq"),
+      numberField(raw, "conversationSeq", "seq") ??
+      numberField(payload, "conversationSeq", "seq"),
     senderUserId:
-      stringField(raw, "senderUserId", "sender_user_id", "userId", "user_id") ||
-      stringField(payload, "senderUserId", "sender_user_id", "userId", "user_id"),
+      stringField(raw, "senderUserId", "userId") ||
+      stringField(payload, "senderUserId", "userId"),
     senderId:
-      stringField(raw, "senderId", "sender_id") ||
-      stringField(payload, "senderId", "sender_id"),
-    fromUserId:
-      stringField(raw, "fromUserId", "from_user_id") ||
-      stringField(payload, "fromUserId", "from_user_id"),
+      stringField(raw, "senderId") ||
+      stringField(payload, "senderId"),
     senderPlatformUserId:
       stringField(
         raw,
         "senderPlatformUserId",
-        "sender_platform_user_id",
         "platformUserId",
-        "platform_user_id",
       ) ||
       stringField(
         payload,
         "senderPlatformUserId",
-        "sender_platform_user_id",
         "platformUserId",
-        "platform_user_id",
       ),
     senderLppId:
-      stringField(raw, "senderLppId", "sender_lpp_id", "lppId", "lpp_id") ||
-      stringField(payload, "senderLppId", "sender_lpp_id", "lppId", "lpp_id"),
+      stringField(raw, "senderLppId", "lppId") ||
+      stringField(payload, "senderLppId", "lppId"),
     direction: stringField(raw, "direction") || stringField(payload, "direction"),
-    isSelf: booleanField(raw, "isSelf", "is_self", "isMine", "is_mine"),
-    isMine: booleanField(raw, "isMine", "is_mine"),
+    isSelf: booleanField(raw, "isSelf", "isMine"),
+    isMine: booleanField(raw, "isMine"),
     messageType:
-      stringField(raw, "messageType", "message_type", "type") ||
-      stringField(payload, "messageType", "message_type", "type"),
+      stringField(raw, "messageType", "type") ||
+      stringField(payload, "messageType", "type"),
     sentAt:
-      stringField(raw, "sentAt", "sent_at", "createdAt", "created_at") ||
-      stringField(payload, "sentAt", "sent_at", "createdAt", "created_at"),
+      stringField(raw, "sentAt", "serverTime") ||
+      stringField(payload, "sentAt", "serverTime"),
   };
 }
 
@@ -290,9 +285,9 @@ function imConversationId(payload: Record<string, unknown>, fallbackConversation
   const raw = messageRecord(payload);
   const conversation = conversationRecord(payload);
   return (
-    stringField(raw, "conversationId", "conversation_id", "chatId", "chat_id", "directChatId", "direct_chat_id", "directId", "direct_id", "groupChatId", "group_chat_id", "groupId", "group_id") ||
-    stringField(payload, "conversationId", "conversation_id", "chatId", "chat_id", "directChatId", "direct_chat_id", "directId", "direct_id", "groupChatId", "group_chat_id", "groupId", "group_id") ||
-    stringField(conversation, "conversationId", "conversation_id", "chatId", "chat_id", "directChatId", "direct_chat_id", "directId", "direct_id", "groupChatId", "group_chat_id", "groupId", "group_id") ||
+    stringField(raw, "conversationId") ||
+    stringField(payload, "conversationId") ||
+    stringField(conversation, "conversationId") ||
     fallbackConversationId
   );
 }
@@ -301,22 +296,22 @@ function inferImConversationType(payload: Record<string, unknown>): ImConversati
   const raw = messageRecord(payload);
   const conversation = conversationRecord(payload);
   const explicit = normalizeImConversationType(
-    stringField(raw, "conversationType", "conversation_type", "chatType", "chat_type", "type") ||
-      stringField(payload, "conversationType", "conversation_type", "chatType", "chat_type", "type") ||
-      stringField(conversation, "conversationType", "conversation_type", "chatType", "chat_type", "type"),
+    stringField(raw, "conversationType", "type") ||
+      stringField(payload, "conversationType", "type") ||
+      stringField(conversation, "conversationType", "type"),
   );
   if (explicit) return explicit;
 
   const groupMarker =
-    stringField(raw, "groupChatId", "group_chat_id", "groupId", "group_id") ||
-    stringField(payload, "groupChatId", "group_chat_id", "groupId", "group_id") ||
-    stringField(conversation, "groupChatId", "group_chat_id", "groupId", "group_id");
+    stringField(raw, "groupId") ||
+    stringField(payload, "groupId") ||
+    stringField(conversation, "groupId");
   if (groupMarker) return "group";
 
   const directMarker =
-    stringField(raw, "directChatId", "direct_chat_id", "directId", "direct_id", "peerUserId", "peer_user_id", "targetUserId", "target_user_id", "receiverUserId", "receiver_user_id", "toUserId", "to_user_id") ||
-    stringField(payload, "directChatId", "direct_chat_id", "directId", "direct_id", "peerUserId", "peer_user_id", "targetUserId", "target_user_id", "receiverUserId", "receiver_user_id", "toUserId", "to_user_id") ||
-    stringField(conversation, "directChatId", "direct_chat_id", "directId", "direct_id", "peerUserId", "peer_user_id", "targetUserId", "target_user_id", "receiverUserId", "receiver_user_id", "toUserId", "to_user_id");
+    stringField(raw, "peerUserId", "targetUserId", "receiverUserId", "toUserId") ||
+    stringField(payload, "peerUserId", "targetUserId", "receiverUserId", "toUserId") ||
+    stringField(conversation, "peerUserId", "targetUserId", "receiverUserId", "toUserId");
   if (directMarker) return "direct";
 
   return imConversationId(payload, fallbackConversationIdFromPeer(payload)) ? "direct" : "";
@@ -326,9 +321,9 @@ function fallbackConversationIdFromPeer(payload: Record<string, unknown>) {
   const raw = messageRecord(payload);
   const conversation = conversationRecord(payload);
   return (
-    stringField(raw, "peerUserId", "peer_user_id", "targetUserId", "target_user_id", "receiverUserId", "receiver_user_id", "toUserId", "to_user_id", "fromUserId", "from_user_id", "senderUserId", "sender_user_id") ||
-    stringField(payload, "peerUserId", "peer_user_id", "targetUserId", "target_user_id", "receiverUserId", "receiver_user_id", "toUserId", "to_user_id", "fromUserId", "from_user_id", "senderUserId", "sender_user_id") ||
-    stringField(conversation, "peerUserId", "peer_user_id", "targetUserId", "target_user_id", "receiverUserId", "receiver_user_id", "toUserId", "to_user_id")
+    stringField(raw, "peerUserId", "targetUserId", "receiverUserId", "toUserId", "senderUserId") ||
+    stringField(payload, "peerUserId", "targetUserId", "receiverUserId", "toUserId", "senderUserId") ||
+    stringField(conversation, "peerUserId", "targetUserId", "receiverUserId", "toUserId")
   );
 }
 

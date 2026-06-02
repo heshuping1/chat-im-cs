@@ -31,7 +31,6 @@ import {
 import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
 import {
   getSendOutboxStorage,
-  sendOutboxBlobId,
   sendOutboxScopeKey,
   sendOutboxTargetKey,
   type SendOutboxStatus,
@@ -603,11 +602,15 @@ export function useCustomerServiceSendController({
   const sendServiceMediaOptimistically = useCallback(
     async (file: File, kind: ComposerMediaKind) => {
       if (!selectedThread || !session) throw new Error("请选择在线客服会话");
-      const localMessageId = `pc-cs-local-media-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const runtime = createChatSendRuntime({
+        channel: "customer_service",
+        session,
+        taskId: "P4-MSG-005D",
+      });
+      const { clientMsgId, createdAt, localMessageId } =
+        runtime.createLocalIdentity("pc-cs-local-media");
       const localTaskId = `pc-cs-upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const clientMsgId = localMessageId;
-      const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
+      const storage = runtime.storage;
       const localPreviewUrl =
         kind === "image" || kind === "video" ? URL.createObjectURL(file) : undefined;
       const localCachedMediaPromise = cacheLocalSentMediaForDesktop({
@@ -665,9 +668,7 @@ export function useCustomerServiceSendController({
         ...(posterError ? { localError: posterError } : {}),
       } as MessageItemDto;
       appendCustomerServiceLocalMessage(queryClient, selectedThread, localMessage);
-      logChatSendDiagnostic({
-        taskId: "P4-MSG-005D",
-        channel: "customer_service",
+      runtime.log({
         phase: "local_echo",
         result: posterError ? "failed" : "ok",
         action: "enqueue_media",
@@ -681,17 +682,14 @@ export function useCustomerServiceSendController({
           ...(posterError ? { reason: posterError } : {}),
         },
       });
-      const fileBlobId = sendOutboxBlobId(scopeKey, localMessageId, "file");
-      const posterBlobId = videoPoster
-        ? sendOutboxBlobId(scopeKey, localMessageId, "poster")
-        : undefined;
+      const fileBlobId = runtime.blobId(localMessageId, "file");
+      const posterBlobId = videoPoster ? runtime.blobId(localMessageId, "poster") : undefined;
       void storage.putBlob(fileBlobId, file);
       if (posterBlobId && videoPoster) void storage.putBlob(posterBlobId, videoPoster.file);
-      void storage.upsertRecord({
+      void runtime.upsertOutboxRecord({
         body,
-        channel: "customer_service",
         clientMsgId,
-        createdAt: Date.now(),
+        createdAt,
         fileBlobId,
         fileName: file.name,
         localError: posterError || undefined,
@@ -700,11 +698,10 @@ export function useCustomerServiceSendController({
         messageType: kind,
         mimeType: file.type,
         posterBlobId,
-        scopeKey,
         status: initialStatus as SendOutboxStatus,
         targetId: selectedThread.threadId,
         targetType: selectedThread.threadType,
-        updatedAt: Date.now(),
+        updatedAt: createdAt,
         uploadPhase: posterError ? "failed" : "preparing",
         uploadProgress: 0,
       });
@@ -741,7 +738,7 @@ export function useCustomerServiceSendController({
             localMessageId,
             { body: task.body },
           );
-          void storage.patchRecord(scopeKey, localMessageId, {
+          void runtime.patchOutboxRecord(localMessageId, {
             body: task.body,
             updatedAt: Date.now(),
           });

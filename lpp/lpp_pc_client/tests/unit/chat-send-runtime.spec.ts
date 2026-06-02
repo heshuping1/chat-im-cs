@@ -87,6 +87,64 @@ describe("chat send runtime", () => {
     expect(await storage.listRecords({ scopeKey: runtime.scopeKey })).toEqual([]);
   });
 
+  it("stores media upload records with runtime blob ids and target isolation", async () => {
+    const storage = createMemorySendOutboxStorage();
+    const runtime = createChatSendRuntime({
+      channel: "im",
+      session,
+      storage,
+      taskId: "P4-MSG-005C",
+    });
+    const identity = runtime.createLocalIdentity("pc-local-media");
+    const fileBlobId = runtime.blobId(identity.localMessageId, "file");
+    const posterBlobId = runtime.blobId(identity.localMessageId, "poster");
+
+    await runtime.upsertOutboxRecord({
+      body: { image: { url: "blob:local" } },
+      clientMsgId: identity.clientMsgId,
+      createdAt: identity.createdAt,
+      fileBlobId,
+      fileName: "photo.png",
+      localMessageId: identity.localMessageId,
+      localTaskId: "pc-upload-1",
+      messageType: "image",
+      mimeType: "image/png",
+      posterBlobId,
+      status: "uploading",
+      targetId: "conversation-1",
+      targetType: "direct",
+      uploadPhase: "uploading_media",
+      uploadProgress: 42,
+    });
+
+    expect(fileBlobId).toContain(runtime.scopeKey);
+    expect(await storage.listRecords({ scopeKey: runtime.scopeKey })).toEqual([
+      expect.objectContaining({
+        channel: "im",
+        fileBlobId,
+        localTaskId: "pc-upload-1",
+        messageType: "image",
+        posterBlobId,
+        targetId: "conversation-1",
+        targetType: "direct",
+        uploadPhase: "uploading_media",
+        uploadProgress: 42,
+      }),
+    ]);
+    expect(
+      await storage.listRecords({
+        scopeKey: runtime.scopeKey,
+        targetKey: "im:direct:conversation-1",
+      }),
+    ).toHaveLength(1);
+    expect(
+      await storage.listRecords({
+        scopeKey: runtime.scopeKey,
+        targetKey: "customer_service:temp_session:conversation-1",
+      }),
+    ).toEqual([]);
+  });
+
   it("binds diagnostics to the runtime channel and task", () => {
     const runtime = createChatSendRuntime({
       channel: "im",

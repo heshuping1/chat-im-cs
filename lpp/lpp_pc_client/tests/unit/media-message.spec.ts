@@ -492,6 +492,15 @@ describe("message media upload presentation", () => {
     }
   });
 
+  it("queues IM and customer-service media through the shared chat send runtime", () => {
+    expect(imMediaSendController).toContain("createChatSendRuntime");
+    expect(imMediaSendController).toContain("runtime.upsertOutboxRecord");
+    expect(imMediaSendController).toContain('channel: "im"');
+    expect(csMediaSendController).toContain("createChatSendRuntime");
+    expect(csMediaSendController).toContain("runtime.upsertOutboxRecord");
+    expect(csMediaSendController).toContain('channel: "customer_service"');
+  });
+
   it("drives video upload display progress locally instead of jumping from 0 to 100", () => {
     for (const source of [imMediaSendController, csMediaSendController]) {
       expect(source).toContain("createVideoUploadDisplayProgressTicker");

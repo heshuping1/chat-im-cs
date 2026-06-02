@@ -338,6 +338,16 @@ function sanitizeSendDiagnosticEntry(key: string, value: unknown): unknown {
 function sanitizeSendDiagnosticText(key: string, value: string) {
   const normalizedKey = key.toLowerCase();
   if (
+    normalizedKey.includes("token") ||
+    normalizedKey.includes("secret") ||
+    normalizedKey.includes("password") ||
+    normalizedKey.includes("authorization") ||
+    normalizedKey.includes("apikey") ||
+    normalizedKey.includes("api_key")
+  ) {
+    return "[redacted]";
+  }
+  if (
     normalizedKey.includes("filename") ||
     normalizedKey === "filepath" ||
     normalizedKey === "localpath" ||

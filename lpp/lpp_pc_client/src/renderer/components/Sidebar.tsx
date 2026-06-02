@@ -49,10 +49,7 @@ import {
   shouldShowDesktopNotificationForTarget,
 } from "../data/reminder/reminder-service";
 import type { PcRealtimeReminderInput } from "../data/reminder/reminder-types";
-import {
-  usePushRealtimeReminder,
-  useRealtimeReminders,
-} from "../data/reminder/reminder-store";
+import { usePushRealtimeReminder } from "../data/reminder/reminder-store";
 import { pcQueryKeys } from "../data/query-keys";
 import {
   formatAppInstanceLabel,
@@ -176,7 +173,6 @@ export function Sidebar() {
   const setImPresenceStatus = useSetImPresenceStatus();
   const pcSettings = usePcSettings();
   const pushRealtimeReminder = usePushRealtimeReminder();
-  const realtimeReminders = useRealtimeReminders();
   const { pendingIncomingRequestCount } = useFriendRequestReminderController();
   const queueReminderReadyRef = useRef(false);
   const queueReminderSessionRef = useRef("");
@@ -321,9 +317,6 @@ export function Sidebar() {
     serviceAlertCount,
     taskbarServiceUnreadCount,
   } = serviceBadgeView;
-  const realtimeServiceAlertCount = realtimeReminders.filter(
-    (item) => item.targetModule === "onlineService",
-  ).length;
   const imStatusLabel =
     imPresenceStatuses.find((item) => item.value === imPresenceStatus)?.label ??
     "在线";
@@ -441,7 +434,6 @@ export function Sidebar() {
   }, [
     pendingIncomingRequestCount,
     queuedServiceCount,
-    realtimeServiceAlertCount,
     taskbarServiceUnreadCount,
     unreadCount,
   ]);
@@ -458,7 +450,6 @@ export function Sidebar() {
         activeThreadOpenSource,
         activeServiceUnreadCount,
         queuedServiceCount,
-        realtimeServiceAlertCount,
         serviceAlertCount,
         taskbarServiceUnreadCount,
         resolvedAtMs: Date.now(),
@@ -476,7 +467,6 @@ export function Sidebar() {
     activeThreadOpenSource,
     queuedServiceCount,
     queuedTempSessions,
-    realtimeServiceAlertCount,
     serviceAlertCount,
     taskbarServiceUnreadCount,
   ]);

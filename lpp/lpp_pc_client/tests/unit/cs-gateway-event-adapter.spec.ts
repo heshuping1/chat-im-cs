@@ -50,9 +50,9 @@ describe("adaptCustomerServiceGatewayEvent", () => {
           data: {
             thread: { threadId: "thread-2", threadType: "temp_session" },
             message: {
-              id: "m2",
-              type: "text",
-              content: { text: "queued hello" },
+              messageId: "m2",
+              messageType: "text",
+              body: { text: "queued hello" },
             },
           },
         },
@@ -156,5 +156,48 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     });
 
     expect(event.kind).toBe("ignored");
+  });
+
+  it("rejects customer service messages that only provide non-standard thread aliases", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "customer_service.message.new",
+      receivedAt: 8,
+      args: [
+        {
+          sessionId: "legacy-session-1",
+          thread_id: "legacy-thread-1",
+          messageId: "m-legacy",
+          messageType: "text",
+          body: { text: "legacy" },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("invalid");
+    if (event.kind !== "invalid") return;
+    expect(event.reason).toBe("missing_thread_id");
+  });
+
+  it("does not read legacy message id aliases as a valid customer service message id", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "customer_service.message.new",
+      receivedAt: 9,
+      args: [
+        {
+          threadId: "thread-legacy-message",
+          threadType: "temp_session",
+          id: "legacy-id",
+          type: "text",
+          content: { text: "legacy" },
+          senderUserId: "visitor-1",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.message.received");
+    if (event.kind !== "cs.message.received") return;
+    expect(event.contractStatus).toBe("degraded");
+    expect(event.diagnostics).toContain("cs.message.generated_id");
+    expect(event.message.messageId).not.toBe("legacy-id");
   });
 });

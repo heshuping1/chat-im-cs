@@ -89,6 +89,37 @@ describe("message reminder diagnostics", () => {
     expect(JSON.stringify(classification)).not.toContain("haishibuxinga");
   });
 
+  it("keeps gateway diagnostic reason and scope searchable without raw content", () => {
+    const classification = gatewayReminderDiagnosticClassification({
+      args: [
+        {
+          conversationId: "conversation-abcdef",
+          conversationType: "temp_session",
+          message: {
+            body: { text: "visitor raw text" },
+            conversationSeq: 12,
+            messageId: "message-abcdef",
+            messageType: "text",
+          },
+          tempSession: {
+            sessionId: "thread-abcdef",
+          },
+        },
+      ],
+      eventName: "customer_service.message.created",
+      route: "customer-service",
+      scopeKey: "scope-1",
+    });
+
+    expect(classification).toMatchObject({
+      reason: "explicit-temp-session",
+      route: "customer-service",
+      scopeKey: "scope-1",
+      threadId: "thread-abcdef",
+    });
+    expect(JSON.stringify(classification)).not.toContain("visitor raw text");
+  });
+
   it("routes IM read diagnostics into the dedicated IM log file", () => {
     expect(reminderDiagnosticsTarget({
       event: "im.gateway.received",

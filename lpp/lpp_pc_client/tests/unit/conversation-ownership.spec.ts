@@ -11,6 +11,25 @@ describe("resolveConversationOwnership", () => {
     resetCustomerServiceConversationIndexForTest();
   });
 
+  it("routes direct and group IM conversation types to IM", () => {
+    for (const conversationType of ["direct", "group", "im_direct", "im_group"]) {
+      expect(
+        resolveConversationOwnership({
+          payload: {
+            conversationId: `conversation-${conversationType}`,
+            conversationType,
+          },
+          scopeKey: "scope-a",
+          source: "gateway",
+        }),
+      ).toMatchObject({
+        confidence: "explicit",
+        owner: "im",
+        reason: "explicit-im",
+      });
+    }
+  });
+
   it("routes explicit temp-session payloads to customer service without indexed lookup", () => {
     const ownership = resolveConversationOwnership({
       payload: {
@@ -32,20 +51,22 @@ describe("resolveConversationOwnership", () => {
   });
 
   it("protects direct_customer conversations as IM unless tempSession is explicit", () => {
-    const ownership = resolveConversationOwnership({
-      payload: {
-        conversationId: "direct-customer-1",
-        conversationType: "direct_customer",
-      },
-      scopeKey: "scope-a",
-      source: "gateway",
-    });
+    for (const conversationType of ["direct_customer", "customer_direct"]) {
+      const ownership = resolveConversationOwnership({
+        payload: {
+          conversationId: `conversation-${conversationType}`,
+          conversationType,
+        },
+        scopeKey: "scope-a",
+        source: "gateway",
+      });
 
-    expect(ownership).toMatchObject({
-      confidence: "explicit",
-      owner: "im",
-      reason: "explicit-im",
-    });
+      expect(ownership).toMatchObject({
+        confidence: "explicit",
+        owner: "im",
+        reason: "explicit-im",
+      });
+    }
   });
 
   it("routes unmarked messages to customer service only when the same scope indexed them", () => {
@@ -78,12 +99,12 @@ describe("resolveConversationOwnership", () => {
       }),
     ).toMatchObject({
       confidence: "unknown",
-      owner: "unknown",
-      reason: "unknown-default-im",
+      owner: "im",
+      reason: "default-im",
     });
   });
 
-  it("does not use indexed ownership when scope is missing", () => {
+  it("defaults to IM and does not use indexed ownership when scope is missing", () => {
     rememberCustomerServiceConversationIndex({
       conversationId: "conversation-indexed",
       scopeKey: "scope-a",
@@ -100,8 +121,28 @@ describe("resolveConversationOwnership", () => {
       }),
     ).toMatchObject({
       confidence: "unknown",
-      owner: "unknown",
-      reason: "blocking-missing-scope",
+      owner: "im",
+      reason: "default-im-missing-scope",
+    });
+  });
+
+  it("does not guess customer service ownership from legacy fields, paths or preview text", () => {
+    const ownership = resolveConversationOwnership({
+      payload: {
+        chatId: "legacy-chat",
+        conversation_id: "legacy-conversation",
+        preview: "visitor temp_session support message",
+        temp_session: { sessionId: "legacy-session" },
+        thread_id: "legacy-thread",
+      },
+      scopeKey: "scope-a",
+      source: "gateway",
+    });
+
+    expect(ownership).toMatchObject({
+      confidence: "unknown",
+      owner: "im",
+      reason: "default-im",
     });
   });
 });

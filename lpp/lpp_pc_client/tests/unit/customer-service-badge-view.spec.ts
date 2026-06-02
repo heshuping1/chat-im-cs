@@ -41,6 +41,27 @@ describe("customer service badge view", () => {
       taskbarServiceUnreadCount: 0,
     });
   });
+
+  it("counts only temp-session active unread for service badges", () => {
+    const view = resolveCustomerServiceBadgeView({
+      activeItems: [
+        thread({ threadId: "temp-active", threadType: "temp_session", unreadCount: 2 }),
+        thread({ threadId: "im-direct-active", threadType: "im_direct", unreadCount: 9 }),
+      ],
+      queueItems: [
+        thread({ status: "queued", threadId: "temp-queue", threadType: "temp_session" }),
+        thread({ status: "queued", threadId: "im-direct-queue", threadType: "im_direct" }),
+      ],
+      summaryQueuedCount: 0,
+      threadDataLoaded: true,
+    });
+
+    expect(view.activeTempSessions.map((item) => item.threadId)).toEqual(["temp-active"]);
+    expect(view.queuedTempSessions.map((item) => item.threadId)).toEqual(["temp-queue"]);
+    expect(view.activeServiceUnreadCount).toBe(2);
+    expect(view.taskbarServiceUnreadCount).toBe(2);
+    expect(view.serviceAlertCount).toBe(3);
+  });
 });
 
 function thread(overrides: Partial<CustomerServiceThread> = {}): CustomerServiceThread {

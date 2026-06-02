@@ -4,9 +4,11 @@ import {
 } from "../customer-service/cs-message-contract";
 import { createGatewayTraceId } from "./gateway-diagnostics";
 import {
+  getCustomerServiceConversationIndex,
+} from "../customer-service/cs-conversation-index";
+import {
   customerServiceConversationRecord,
   customerServiceMessageRecord,
-  customerServiceThreadId,
   isCustomerServiceGatewayPayload,
   normalizeThreadType,
 } from "./gateway-cs-payload-utils";
@@ -52,15 +54,12 @@ function adaptCustomerServiceMessageEvent(
   scopeKey?: string,
 ): GatewayTypedEvent {
   const payload = envelope.rawPayload;
-  const threadId = customerServiceThreadId(payload, scopeKey);
+  const threadId = customerServiceStandardThreadId(payload, scopeKey);
   if (!threadId) {
     return invalid(envelope, "missing_thread_id", ["gateway.cs.missing_thread_id"]);
   }
   const threadType = customerServiceThreadType(payload);
-  const rawMessage = {
-    ...payload,
-    ...messageRecord(payload),
-  };
+  const rawMessage = customerServiceStandardMessageInput(payload);
   const normalized = normalizeCustomerServiceMessageDto(rawMessage, {
     threadId,
     threadType,
@@ -96,9 +95,9 @@ function adaptCustomerServiceThreadChangedEvent(
     ...envelope,
     kind: "cs.thread.changed",
     changeKind,
-    threadId: customerServiceThreadId(payload, scopeKey),
-    serviceStatus: stringField(payload, "serviceStatus", "service_status", "staffStatus", "staff_status", "status"),
-    threadStatus: stringField(payload, "threadStatus", "thread_status", "status"),
+    threadId: customerServiceStandardThreadId(payload, scopeKey),
+    serviceStatus: stringField(payload, "serviceStatus", "staffStatus", "status"),
+    threadStatus: stringField(payload, "threadStatus", "status"),
     shouldNotifyQueue:
       changeKind === "queue_created" ||
       changeKind === "thread_created" ||
@@ -125,11 +124,87 @@ function customerServiceThreadType(payload: Record<string, unknown>) {
   const message = customerServiceMessageRecord(payload);
   const conversation = customerServiceConversationRecord(payload);
   return normalizeThreadType(
-    stringField(payload, "threadType", "thread_type", "conversationType", "conversation_type") ||
-      stringField(message, "threadType", "thread_type", "conversationType", "conversation_type", "chatType", "chat_type", "type") ||
-      stringField(conversation, "threadType", "thread_type", "conversationType", "conversation_type", "chatType", "chat_type", "type") ||
-      stringField(asRecord(payload.thread), "threadType", "thread_type", "conversationType", "conversation_type"),
+    stringField(payload, "threadType", "conversationType") ||
+      stringField(message, "threadType", "conversationType", "type") ||
+      stringField(conversation, "threadType", "conversationType", "type") ||
+      stringField(asRecord(payload.thread), "threadType", "conversationType"),
   );
+}
+
+function customerServiceStandardThreadId(payload: Record<string, unknown>, scopeKey?: string) {
+  const message = customerServiceMessageRecord(payload);
+  const conversation = customerServiceConversationRecord(payload);
+  const thread = asRecord(payload.thread);
+  const tempSession = asRecord(payload.tempSession);
+  return (
+    stringField(payload, "threadId") ||
+    stringField(message, "threadId") ||
+    stringField(thread, "threadId") ||
+    stringField(conversation, "threadId") ||
+    stringField(tempSession, "sessionId") ||
+    indexedThreadId(payload, scopeKey)
+  );
+}
+
+function indexedThreadId(payload: Record<string, unknown>, scopeKey?: string) {
+  if (!scopeKey) return "";
+  const conversationId =
+    stringField(payload, "conversationId") ||
+    stringField(customerServiceMessageRecord(payload), "conversationId");
+  if (!conversationId || !isCustomerServiceGatewayPayload(payload, scopeKey)) return "";
+  return getCustomerServiceConversationIndex(conversationId, scopeKey)?.threadId ?? "";
+}
+
+function customerServiceStandardMessageInput(payload: Record<string, unknown>) {
+  const message = messageRecord(payload);
+  return {
+    conversationId:
+      stringField(message, "conversationId") ||
+      stringField(payload, "conversationId"),
+    conversationSeq:
+      numberField(message, "conversationSeq", "seq") ??
+      numberField(payload, "conversationSeq", "seq"),
+    messageId:
+      stringField(message, "messageId") ||
+      stringField(payload, "messageId"),
+    senderUserId:
+      stringField(message, "senderUserId", "userId") ||
+      stringField(payload, "senderUserId", "userId"),
+    senderId:
+      stringField(message, "senderId") ||
+      stringField(payload, "senderId"),
+    senderPlatformUserId:
+      stringField(message, "senderPlatformUserId", "platformUserId") ||
+      stringField(payload, "senderPlatformUserId", "platformUserId"),
+    senderLppId:
+      stringField(message, "senderLppId", "lppId") ||
+      stringField(payload, "senderLppId", "lppId"),
+    senderRole:
+      stringField(message, "senderRole") ||
+      stringField(payload, "senderRole"),
+    direction:
+      stringField(message, "direction") ||
+      stringField(payload, "direction"),
+    isSelf:
+      booleanField(message, "isSelf", "isMine") ??
+      booleanField(payload, "isSelf", "isMine"),
+    isMine:
+      booleanField(message, "isMine") ??
+      booleanField(payload, "isMine"),
+    messageType:
+      stringField(message, "messageType", "type") ||
+      stringField(payload, "messageType", "type"),
+    body:
+      asNullableRecord(message.body) ||
+      asNullableRecord(payload.body) ||
+      {},
+    sentAt:
+      stringField(message, "sentAt", "serverTime") ||
+      stringField(payload, "sentAt", "serverTime"),
+    threadType:
+      stringField(message, "threadType") ||
+      stringField(payload, "threadType"),
+  };
 }
 
 function eventPayload(args: unknown[]) {
@@ -155,4 +230,35 @@ function stringField(record: Record<string, unknown>, ...keys: string[]) {
     if (typeof value === "number") return String(value);
   }
   return "";
+}
+
+function numberField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
+}
+
+function booleanField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "true") return true;
+      if (normalized === "false") return false;
+    }
+  }
+  return undefined;
+}
+
+function asNullableRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }

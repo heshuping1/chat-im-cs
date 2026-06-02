@@ -42,13 +42,15 @@ export const gatewayContractFixtures: GatewayContractFixture[] = [
       args: [
         {
           payload: {
-            groupChatId: "group-1",
+            conversationId: "group-1",
+            conversationType: "group",
             message: {
               conversationSeq: "8",
+              messageType: "image",
               sender: {
                 platformUserId: "platform-user-3",
               },
-              type: "image",
+              senderPlatformUserId: "platform-user-3",
             },
           },
         },

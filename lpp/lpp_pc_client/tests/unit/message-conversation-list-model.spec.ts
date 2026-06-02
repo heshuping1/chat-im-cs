@@ -50,6 +50,38 @@ describe("message conversation list model", () => {
     expect(filterMessageConversations([direct, group], "groups", "", null)).toEqual([group]);
     expect(filterMessageConversations([direct, group], "all", "refund", null)).toEqual([direct]);
   });
+
+  it("uses effective unread view for unread sorting and filtering", () => {
+    const rawUnreadButRead = conversation({
+      conversationId: "raw-unread-but-read",
+      lastMessageSeq: 10,
+      lastReadSeq: 10,
+      lastMessage: { preview: "read", sentAt: "2026-05-29T12:00:00.000Z" },
+      unreadCount: 5,
+    });
+    const effectiveUnread = conversation({
+      conversationId: "effective-unread",
+      lastMessageSeq: 11,
+      lastReadSeq: 10,
+      lastMessage: { preview: "unread", sentAt: "2026-05-29T11:00:00.000Z" },
+      unreadCount: 1,
+    });
+
+    expect(
+      filterMessageConversations(
+        [rawUnreadButRead, effectiveUnread],
+        "unread",
+        "",
+        { userId: "current-user" },
+      ).map((item) => item.conversationId),
+    ).toEqual(["effective-unread"]);
+    expect(
+      sortMessageConversations(
+        [rawUnreadButRead, effectiveUnread],
+        { userId: "current-user" },
+      ).map((item) => item.conversationId),
+    ).toEqual(["effective-unread", "raw-unread-but-read"]);
+  });
 });
 
 function conversation(

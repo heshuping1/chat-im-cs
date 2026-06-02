@@ -1,5 +1,6 @@
 import type { CustomerServiceThread, CustomerServiceThreadType, MessageItemDto } from "../api/types";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import { reconcileSnapshot } from "../gateway/snapshot-reconcile-service";
 import {
   resolveCustomerServiceCompatUnreadCandidate,
   resolveCustomerServiceEffectiveCompatUnread,
@@ -20,6 +21,7 @@ export interface CustomerServiceConversationIndexEntry {
   lastMessageAt?: string | null;
   lastMessageId?: string;
   lastMessagePreview?: string;
+  lastMessageSeq?: number;
   localStaffSentMessageIds?: string[];
   localStaffSentSeqs?: number[];
   overlayUnreadCount?: number;
@@ -84,6 +86,8 @@ export function rememberCustomerServiceConversationIndex(
     lastMessageAt: entry.lastMessageAt || previous?.lastMessageAt,
     lastMessageId: entry.lastMessageId || previous?.lastMessageId,
     lastMessagePreview: entry.lastMessagePreview || previous?.lastMessagePreview,
+    lastMessageSeq:
+      typeof entry.lastMessageSeq === "number" ? entry.lastMessageSeq : previous?.lastMessageSeq,
     localStaffSentMessageIds: mergeStringList(
       previous?.localStaffSentMessageIds,
       entry.localStaffSentMessageIds,
@@ -255,11 +259,19 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
   const lastMessageAt = thread.lastMessageAt || overlay.lastMessageAt;
   const serverUnread = Math.max(0, Number(thread.unreadCount ?? 0));
   const overlayUnread = Math.max(0, Number(overlay.overlayUnreadCount ?? 0));
+  const reconcile = reconcileSnapshot({
+    incomingSeq: snapshotSeq(thread),
+    localSeq: overlay.lastMessageSeq ?? overlay.compatLastMessageSeq,
+    owner: "customerService",
+    scopeKey: scopeKey ?? overlay.scopeKey ?? "",
+    source: "workbench-snapshot",
+    targetId: thread.threadId,
+  });
   const compatUnreadCandidate = effectiveCompatUnreadCandidate(overlay);
   const threadUnread = resolveCustomerServiceThreadUnread({
     compatUnreadCandidate,
     overlayUnread,
-    serverUnread,
+    serverUnread: reconcile.canUpdateStrongFields ? serverUnread : 0,
   });
   const overlayMergeReason = threadUnread.reason;
   const unreadCount = threadUnread.unreadCount;
@@ -280,6 +292,8 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
       finalThreadUnread: unreadCount,
       overlayMergeReason,
       overlayUnread,
+      reconcileDecision: reconcile.decision,
+      reconcileReason: reconcile.reason,
       scopeKey,
       serverUnread,
       threadId: thread.threadId,
@@ -302,6 +316,8 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
       finalThreadUnread: unreadCount,
       localStaffSentSeqs: overlay.localStaffSentSeqs,
       overlayUnread,
+      reconcileDecision: reconcile.decision,
+      reconcileReason: reconcile.reason,
       reason: overlayMergeReason,
       scopeKey,
       serverUnread,
@@ -329,6 +345,11 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
     lastMessagePreview,
     unreadCount,
   };
+}
+
+function snapshotSeq(thread: CustomerServiceThread) {
+  const record = thread as unknown as Record<string, unknown>;
+  return numberField(record, "lastMessageSeq", "statusVersion");
 }
 
 export function resetCustomerServiceConversationIndexForTest() {
@@ -422,6 +443,18 @@ function matchingCustomerServiceIndexEntries(threadIdOrConversationId: string) {
 
 function indexKey(id: string, scopeKey: string) {
   return `${scopeKey}\u0000${id}`;
+}
+
+function numberField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
 }
 
 function mergeStringList(previous: string[] | undefined, next: string[] | undefined) {

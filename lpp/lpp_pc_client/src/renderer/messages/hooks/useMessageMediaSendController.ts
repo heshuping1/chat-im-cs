@@ -16,9 +16,9 @@ import {
   logChatSendDiagnostic,
   logUploadProgressDiagnosticFromTracker,
 } from "../../data/send/send-state-machine";
+import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
 import {
   getSendOutboxStorage,
-  sendOutboxBlobId,
   sendOutboxScopeKey,
   type SendOutboxStatus,
 } from "../../data/send/send-outbox";
@@ -486,11 +486,15 @@ export function useMessageMediaSendController({
       const conversation = activeConversation;
       const conversationType = activeConversationType;
       const reply = replyTarget;
-      const localMessageId = `pc-local-media-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const runtime = createChatSendRuntime({
+        channel: "im",
+        session,
+        taskId: "P4-MSG-005C",
+      });
+      const { clientMsgId, createdAt, localMessageId } =
+        runtime.createLocalIdentity("pc-local-media");
       const localTaskId = `pc-upload-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const clientMsgId = localMessageId;
-      const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
+      const storage = runtime.storage;
       const localPreviewUrl =
         kind === "image" || kind === "video" ? URL.createObjectURL(file) : undefined;
       const localCachedMediaPromise = cacheLocalSentMediaForDesktop({
@@ -551,9 +555,7 @@ export function useMessageMediaSendController({
           localError: posterError,
         },
       );
-      logChatSendDiagnostic({
-        taskId: "P4-MSG-005C",
-        channel: "im",
+      runtime.log({
         phase: "local_echo",
         result: posterError ? "failed" : "ok",
         action: "enqueue_media",
@@ -575,17 +577,14 @@ export function useMessageMediaSendController({
           localMessage,
         ),
       );
-      const fileBlobId = sendOutboxBlobId(scopeKey, localMessageId, "file");
-      const posterBlobId = videoPoster
-        ? sendOutboxBlobId(scopeKey, localMessageId, "poster")
-        : undefined;
+      const fileBlobId = runtime.blobId(localMessageId, "file");
+      const posterBlobId = videoPoster ? runtime.blobId(localMessageId, "poster") : undefined;
       void storage.putBlob(fileBlobId, file);
       if (posterBlobId && videoPoster) void storage.putBlob(posterBlobId, videoPoster.file);
-      void storage.upsertRecord({
+      void runtime.upsertOutboxRecord({
         body,
-        channel: "im",
         clientMsgId,
-        createdAt: Date.now(),
+        createdAt,
         fileBlobId,
         fileName: file.name,
         localError: posterError || undefined,
@@ -595,11 +594,10 @@ export function useMessageMediaSendController({
         mimeType: file.type,
         posterBlobId,
         reply,
-        scopeKey,
         status: initialStatus as SendOutboxStatus,
         targetId: conversation.conversationId,
         targetType: conversationType,
-        updatedAt: Date.now(),
+        updatedAt: createdAt,
         uploadPhase: posterError ? "failed" : "preparing",
         uploadProgress: 0,
       });
@@ -644,7 +642,7 @@ export function useMessageMediaSendController({
             { body: task.body },
             setLocalOutgoingMessagesByConversation,
           );
-          void storage.patchRecord(scopeKey, localMessageId, {
+          void runtime.patchOutboxRecord(localMessageId, {
             body: task.body,
             updatedAt: Date.now(),
           });

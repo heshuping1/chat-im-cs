@@ -243,6 +243,282 @@ describe("architecture boundaries", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps GatewayConnectionManager independent from business state owners", () => {
+    const gatewayManagerPath =
+      "src/renderer/data/gateway/gateway-connection-manager.ts";
+    const forbiddenTargets = [
+      "src/renderer/data/customer-service",
+      "src/renderer/data/im-read",
+      "src/renderer/data/send",
+      "src/renderer/data/workspace-ui",
+      "src/renderer/messages",
+      "src/renderer/customer-service",
+      "src/renderer/components",
+    ];
+    const managerFile = files.find((file) => relative(file) === gatewayManagerPath);
+    const violations = managerFile
+      ? importsOf(managerFile).flatMap((specifier) => {
+          const resolvedImport = resolveImport(managerFile, specifier);
+          return resolvedImport &&
+            forbiddenTargets.some((target) => isUnder(resolvedImport, target))
+            ? [`${gatewayManagerPath} imports business state owner ${relative(resolvedImport)}`]
+            : [];
+        })
+      : [`${gatewayManagerPath} is missing`];
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps GatewayBridge away from direct read, ledger, badge and outbox owners", () => {
+    const gatewayBridgePath = "src/renderer/components/GatewayBridge.tsx";
+    const forbiddenTargets = [
+      "src/renderer/data/customer-service/customer-service-badge-view.ts",
+      "src/renderer/data/customer-service/customer-service-read-visibility.ts",
+      "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+      "src/renderer/data/im-read/im-conversation-read-view.ts",
+      "src/renderer/data/send/chat-send-runtime.ts",
+      "src/renderer/messages/models/messageCacheMutationModel.ts",
+    ];
+    const bridgeFile = files.find((file) => relative(file) === gatewayBridgePath);
+    const violations = bridgeFile
+      ? importsOf(bridgeFile).flatMap((specifier) => {
+          const resolvedImport = resolveImport(bridgeFile, specifier);
+          return resolvedImport &&
+            forbiddenTargets.some((target) => relative(resolvedImport) === target)
+            ? [`${gatewayBridgePath} imports direct business owner ${relative(resolvedImport)}`]
+            : [];
+        })
+      : [`${gatewayBridgePath} is missing`];
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps gateway anti-corruption mappers from accepting legacy field aliases", () => {
+    const mapperFiles = [
+      "src/renderer/data/gateway/gateway-event-adapter.ts",
+      "src/renderer/data/gateway/cs-gateway-event-adapter.ts",
+    ];
+    const forbiddenAliasPatterns = [
+      /['"]conversation_id['"]/,
+      /['"]chatId['"]/,
+      /['"]chat_id['"]/,
+      /['"]thread_id['"]/,
+      /['"]message_id['"]/,
+      /['"]msgId['"]/,
+      /['"]msg_id['"]/,
+      /['"]fromUserId['"]/,
+      /['"]from_user_id['"]/,
+      /['"]sender_id['"]/,
+      /['"]is_mine['"]/,
+      /['"]message_type['"]/,
+    ];
+    const violations = mapperFiles.flatMap((relativeFile) => {
+      const file = join(repoRoot, relativeFile);
+      const source = readFileSync(file, "utf8");
+      return forbiddenAliasPatterns.flatMap((pattern) =>
+        pattern.test(source)
+          ? [`${relativeFile} accepts legacy alias matching ${pattern.source}`]
+          : [],
+      );
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps conversation ownership resolver from guessing legacy aliases or business state", () => {
+    const resolverPath = "src/renderer/data/gateway/conversation-ownership-resolver.ts";
+    const resolverFile = join(repoRoot, resolverPath);
+    const source = readFileSync(resolverFile, "utf8");
+    const forbiddenAliasPatterns = [
+      /['"]conversation_id['"]/,
+      /['"]chatId['"]/,
+      /['"]thread_id['"]/,
+      /['"]session_id['"]/,
+      /\bpayload\.temp_session\b/,
+      /['"]message_info['"]/,
+      /['"]direct_chat['"]/,
+      /['"]group_chat['"]/,
+    ];
+    const aliasViolations = forbiddenAliasPatterns.flatMap((pattern) =>
+      pattern.test(source)
+        ? [`${resolverPath} guesses ownership through alias ${pattern.source}`]
+        : [],
+    );
+    const importViolations = importsOf(resolverFile).flatMap((specifier) => {
+      const resolvedImport = resolveImport(resolverFile, specifier);
+      return resolvedImport &&
+        [
+          "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+          "src/renderer/data/im-read/im-conversation-read-view.ts",
+          "src/renderer/data/workspace-ui",
+          "src/renderer/components",
+        ].some((target) => isUnder(resolvedImport, target))
+        ? [`${resolverPath} imports business state owner ${relative(resolvedImport)}`]
+        : [];
+    });
+
+    expect([...aliasViolations, ...importViolations]).toEqual([]);
+  });
+
+  it("keeps MessageDeliveryService from accepting legacy aliases or direct read state owners", () => {
+    const deliveryPath = "src/renderer/data/gateway/message-delivery-service.ts";
+    const deliveryFile = join(repoRoot, deliveryPath);
+    const source = readFileSync(deliveryFile, "utf8");
+    const forbiddenAliasPatterns = [
+      /['"]conversation_id['"]/,
+      /['"]thread_id['"]/,
+      /['"]sessionId['"]/,
+      /['"]session_id['"]/,
+      /['"]message_id['"]/,
+      /['"]msgId['"]/,
+      /['"]msg_id['"]/,
+      /['"]messageSeq['"]/,
+      /['"]message_seq['"]/,
+    ];
+    const aliasViolations = forbiddenAliasPatterns.flatMap((pattern) =>
+      pattern.test(source)
+        ? [`${deliveryPath} accepts legacy alias matching ${pattern.source}`]
+        : [],
+    );
+    const importViolations = importsOf(deliveryFile).flatMap((specifier) => {
+      const resolvedImport = resolveImport(deliveryFile, specifier);
+      return resolvedImport &&
+        [
+          "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+          "src/renderer/data/customer-service/customer-service-badge-view.ts",
+          "src/renderer/data/im-read/im-conversation-read-view.ts",
+          "src/renderer/data/workspace-ui",
+          "src/renderer/components",
+        ].some((target) => isUnder(resolvedImport, target))
+        ? [`${deliveryPath} imports direct state owner ${relative(resolvedImport)}`]
+        : [];
+    });
+
+    expect([...aliasViolations, ...importViolations]).toEqual([]);
+  });
+
+  it("keeps IM read view and customer-service unread ledger isolated", () => {
+    const governedFiles = [
+      "src/renderer/data/im-read/im-conversation-read-view.ts",
+      "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+      "src/renderer/data/customer-service/customer-service-read-visibility.ts",
+      "src/renderer/data/customer-service/customer-service-badge-view.ts",
+    ];
+    const forbiddenByFile = new Map([
+      [
+        "src/renderer/data/im-read/im-conversation-read-view.ts",
+        [
+          "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+          "src/renderer/data/customer-service/customer-service-read-visibility.ts",
+          "src/renderer/data/customer-service/customer-service-badge-view.ts",
+        ],
+      ],
+      [
+        "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+        ["src/renderer/data/im-read/im-conversation-read-view.ts"],
+      ],
+      [
+        "src/renderer/data/customer-service/customer-service-read-visibility.ts",
+        ["src/renderer/data/im-read/im-conversation-read-view.ts"],
+      ],
+      [
+        "src/renderer/data/customer-service/customer-service-badge-view.ts",
+        ["src/renderer/data/im-read/im-conversation-read-view.ts"],
+      ],
+    ]);
+    const violations = governedFiles.flatMap((relativeFile) => {
+      const file = join(repoRoot, relativeFile);
+      return importsOf(file).flatMap((specifier) => {
+        const resolvedImport = resolveImport(file, specifier);
+        return resolvedImport &&
+          (forbiddenByFile.get(relativeFile) ?? []).some(
+            (target) => relative(resolvedImport) === target,
+          )
+          ? [`${relativeFile} imports isolated unread owner ${relative(resolvedImport)}`]
+          : [];
+      });
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps ChatSendRuntime independent from read, reminder, delivery and UI owners", () => {
+    const runtimePath = "src/renderer/data/send/chat-send-runtime.ts";
+    const runtimeFile = join(repoRoot, runtimePath);
+    const forbiddenTargets = [
+      "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+      "src/renderer/data/customer-service/customer-service-badge-view.ts",
+      "src/renderer/data/customer-service/customer-service-read-visibility.ts",
+      "src/renderer/data/gateway/message-delivery-service.ts",
+      "src/renderer/data/im-read/im-conversation-read-view.ts",
+      "src/renderer/data/reminder",
+      "src/renderer/components",
+      "src/renderer/messages",
+    ];
+    const violations = importsOf(runtimeFile).flatMap((specifier) => {
+      const resolvedImport = resolveImport(runtimeFile, specifier);
+      return resolvedImport &&
+        forbiddenTargets.some((target) => isUnder(resolvedImport, target))
+        ? [`${runtimePath} imports forbidden send-side owner ${relative(resolvedImport)}`]
+        : [];
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps GatewayEventRouter from writing IM or customer-service caches directly", () => {
+    const routerPath = "src/renderer/data/gateway/gateway-event-router.ts";
+    const routerFile = join(repoRoot, routerPath);
+    const forbiddenTargets = [
+      "src/renderer/data/customer-service/cs-cache-adapter.ts",
+      "src/renderer/data/gateway/im-gateway-cache.ts",
+      "src/renderer/messages/models/messageCacheMutationModel.ts",
+    ];
+    const violations = importsOf(routerFile).flatMap((specifier) => {
+      const resolvedImport = resolveImport(routerFile, specifier);
+      return resolvedImport &&
+        forbiddenTargets.some((target) => relative(resolvedImport) === target)
+        ? [`${routerPath} writes cache directly through ${relative(resolvedImport)}`]
+        : [];
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps page components from directly writing read, ledger or send outbox state", () => {
+    const componentRoots = [
+      "src/renderer/App.tsx",
+      "src/renderer/main.tsx",
+      "src/renderer/components",
+    ];
+    const forbiddenTargets = [
+      "src/renderer/data/customer-service/customer-service-unread-ledger.ts",
+      "src/renderer/data/send/send-outbox.ts",
+      "src/renderer/data/send/chat-send-runtime.ts",
+      "src/renderer/messages/models/messageCacheMutationModel.ts",
+    ];
+    const forbiddenReadStoreImportPattern =
+      /\bimport\s+\{[^}]*\b(?:getImReadActions|selectMarkImConversationReadLocally|markImPeerReadReceipt)\b[^}]*\}\s+from\s+['"][^'"]*im-read-store['"]/;
+    const violations = files
+      .filter((file) => componentRoots.some((root) => isUnder(file, root)))
+      .flatMap((file) => {
+        const source = readFileSync(file, "utf8");
+        const readStoreViolations = forbiddenReadStoreImportPattern.test(source)
+          ? [`${relative(file)} imports IM read write actions directly`]
+          : [];
+        const importViolations = importsOf(file).flatMap((specifier) => {
+          const resolvedImport = resolveImport(file, specifier);
+          return resolvedImport &&
+            forbiddenTargets.some((target) => relative(resolvedImport) === target)
+            ? [`${relative(file)} imports direct state owner ${relative(resolvedImport)}`]
+            : [];
+        });
+        return [...readStoreViolations, ...importViolations];
+      });
+
+    expect(violations).toEqual([]);
+  });
+
   it("keeps message models independent from hooks and components", () => {
     const violations = files
       .filter((file) => isUnder(file, "src/renderer/messages/models"))
