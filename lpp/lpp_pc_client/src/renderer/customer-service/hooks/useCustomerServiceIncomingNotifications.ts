@@ -2,18 +2,21 @@ import { useEffect, useRef } from "react";
 
 import type { AuthSession } from "../../data/auth/auth-session";
 import type { CustomerServiceThread, MessageItemDto } from "../../data/api-client";
-import type { PcSettings } from "../../data/settings/pc-settings";
-import {
-  notifyDesktopOrBrowser,
-  shouldPushRealtimeReminder,
-  shouldShowDesktopNotification,
-} from "../../data/reminder/reminder-service";
-import type { PcRealtimeReminderInput } from "../../data/reminder/reminder-types";
 import {
   customerServiceMessageIdentity,
   latestCustomerServiceMessage,
-  previewFromCustomerServiceMessage,
 } from "../../data/customer-service/cs-cache-adapter";
+import { buildCustomerServiceNotificationPresentation } from "../../data/customer-service/cs-notification-presentation";
+import { consumeCustomerServiceMessageReminder } from "../../data/customer-service/cs-reminder-model";
+import {
+  isRendererWindowFocused,
+  notifyDesktopOrBrowser,
+  shouldPushRealtimeReminder,
+  shouldShowDesktopNotificationForTarget,
+} from "../../data/reminder/reminder-service";
+import type { PcRealtimeReminderInput } from "../../data/reminder/reminder-types";
+import type { PcSettings } from "../../data/settings/pc-settings";
+import { getWorkspaceUiSnapshot } from "../../data/workspace-ui/workspace-ui-store";
 
 export function useCustomerServiceIncomingNotifications({
   detailLoaded,
@@ -73,6 +76,7 @@ export function useCustomerServiceIncomingNotifications({
       pushRealtimeReminder,
       thread: selectedThread,
       title,
+      session,
     });
   }, [
     detailLoaded,
@@ -91,35 +95,66 @@ function notifyIncomingCustomerServiceMessage({
   message,
   pcSettings,
   pushRealtimeReminder,
+  session,
   thread,
   title,
 }: {
   message: MessageItemDto;
   pcSettings: PcSettings;
   pushRealtimeReminder: (reminder: PcRealtimeReminderInput) => void;
+  session: AuthSession | null;
   thread: CustomerServiceThread;
   title: string;
 }) {
   if (!shouldPushRealtimeReminder(pcSettings, "serviceQueue")) return;
-  const body = previewFromCustomerServiceMessage(message) || "当前在线客服会话有新消息";
-  const targetId = thread.threadId || thread.conversationId || message.conversationId;
+  const presentation = buildCustomerServiceNotificationPresentation({
+    fallbackTitle: title,
+    message,
+    thread,
+  });
+  const targetId = presentation.targetId || thread.threadId || thread.conversationId || message.conversationId;
+  const reminderDecision = consumeCustomerServiceMessageReminder({
+    identity: session,
+    message,
+    source: "detail",
+    targetId,
+  });
+  if (!reminderDecision.shouldNotify) return;
   pushRealtimeReminder({
-    id: `cs-detail-message-${targetId}-${customerServiceMessageIdentity(message)}`,
-    title: title || thread.title || "在线客服新消息",
-    body,
+    id: reminderDecision.reminderId,
+    title: presentation.title,
+    body: presentation.body,
+    avatarLabel: presentation.avatarLabel,
+    avatarUrl: presentation.avatarUrl,
     targetModule: "onlineService",
     targetId,
     severity: "warning",
     icon: "service",
   });
-  if (shouldShowDesktopNotification(pcSettings, "serviceQueue")) {
+  const uiState = getWorkspaceUiSnapshot();
+  if (
+    shouldShowDesktopNotificationForTarget(pcSettings, "serviceQueue", {
+      activeModule: uiState.activeModule,
+      activeTargetId: uiState.activeThreadId,
+      targetId,
+      targetModule: "onlineService",
+      windowFocused: isRendererWindowFocused(),
+    })
+  ) {
     void notifyDesktopOrBrowser(
       {
-        title: title || thread.title || "在线客服新消息",
-        body,
+        title: presentation.title,
+        body: presentation.body,
         conversationId: targetId,
+        targetId,
+        targetModule: "onlineService",
       },
-      { channel: "serviceQueue", settings: pcSettings },
+      {
+        authToken: session?.tenantToken,
+        channel: "serviceQueue",
+        iconUrl: presentation.avatarUrl,
+        settings: pcSettings,
+      },
     );
   }
 }

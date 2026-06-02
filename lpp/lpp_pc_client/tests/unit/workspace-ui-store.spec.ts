@@ -11,6 +11,10 @@ import {
 import { useWorkspaceStore } from "../../src/renderer/data/workspace-ui/workspace-store-core";
 
 describe("workspace ui store selectors", () => {
+  it("defaults customer service reception to busy before server sync", () => {
+    expect(useWorkspaceStore.getState().customerServiceStatus).toBe("busy");
+  });
+
   it("selects navigation and layout state from compatible workspace state", () => {
     const setActiveModule = vi.fn();
     const closeOpenServiceThread = vi.fn();

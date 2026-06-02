@@ -23,6 +23,9 @@
     "lint:boundaries": "vitest run tests/unit/architecture-boundaries.spec.ts",
     "check:quick": "tsc --noEmit --pretty false --skipLibCheck && tsc -p tsconfig.electron.json --noEmit --pretty false && npm run lint:core && npm run lint:hooks && vitest run tests/unit/architecture-boundaries.spec.ts tests/unit/desktop-api-validation.spec.ts && npm run docs:check && npm run p19:audit && npm run lint:shape",
     "build": "tsc --noEmit && vite build && tsc -p tsconfig.electron.json",
+    "icon:fix-taskbar": "node scripts/fix-taskbar-icon.mjs",
+    "icon:sync": "node scripts/sync-app-icon.mjs",
+    "icon:verify": "node scripts/verify-packaged-icon.mjs",
     "test:unit": "vitest run tests/unit",
     "test:core": "vitest run tests/unit/gateway-*.spec.ts tests/unit/im-*.spec.ts tests/unit/message-*.spec.ts tests/unit/cs-*.spec.ts tests/unit/auth-*.spec.ts tests/unit/*contract*.spec.ts tests/unit/*diagnostics*.spec.ts tests/unit/desktop-api-validation.spec.ts tests/unit/architecture-boundaries.spec.ts",
     "test:coverage:core": "vitest run tests/unit/gateway-*.spec.ts tests/unit/im-*.spec.ts tests/unit/message-*.spec.ts tests/unit/cs-*.spec.ts tests/unit/auth-*.spec.ts tests/unit/*contract*.spec.ts tests/unit/*diagnostics*.spec.ts tests/unit/*performance*.spec.ts tests/unit/*windowing.spec.ts tests/unit/desktop-api-validation.spec.ts tests/unit/architecture-boundaries.spec.ts --coverage.enabled true --coverage.provider v8 --coverage.reporter text --coverage.include \"src/main/runtime-diagnostics.ts\" --coverage.include \"src/renderer/data/api-contract/**/*.ts\" --coverage.include \"src/renderer/data/auth/auth-session.ts\" --coverage.include \"src/renderer/data/auth/*diagnostics.ts\" --coverage.include \"src/renderer/data/conversation/**/*.ts\" --coverage.include \"src/renderer/data/customer-service/**/*.ts\" --coverage.include \"src/renderer/data/diagnostics/**/*.ts\" --coverage.include \"src/renderer/data/gateway/**/*.ts\" --coverage.include \"src/renderer/data/im/**/*.ts\" --coverage.include \"src/renderer/data/im-read/*diagnostics.ts\" --coverage.include \"src/renderer/data/im-read/*service.ts\" --coverage.include \"src/renderer/data/im-read/*storage.ts\" --coverage.include \"src/renderer/data/im-read/*view-model.ts\" --coverage.include \"src/renderer/data/message/**/*.ts\" --coverage.include \"src/renderer/data/message-core/**/*.ts\" --coverage.include \"src/renderer/data/performance/**/*.ts\" --coverage.include \"src/renderer/messages/diagnostics/**/*.ts\" --coverage.include \"src/renderer/messages/models/**/*.ts\" --coverage.include \"src/renderer/customer-service/models/**/*.ts\" --coverage.thresholds.lines 65 --coverage.thresholds.functions 70 --coverage.thresholds.branches 55 --coverage.thresholds.statements 63",
@@ -37,6 +40,7 @@
     "test:electron:group-chat:full": "npm run build:electron && node scripts/pc-group-chat-full.mjs",
     "test:full": "npm run typecheck && npm run build && npm run test:browser",
     "start": "electron .",
+    "start:packaged": "node scripts/start-packaged.mjs",
     "start:profile:a": "electron . --profile=agent-a",
     "start:profile:b": "electron . --profile=agent-b",
     "dist:win": "npm run build && electron-builder --win nsis"

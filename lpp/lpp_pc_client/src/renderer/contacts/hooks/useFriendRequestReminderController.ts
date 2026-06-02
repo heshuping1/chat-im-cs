@@ -98,6 +98,8 @@ export function useFriendRequestReminderController() {
           title: reminder.title,
           body: reminder.body,
           conversationId: reminder.id,
+          targetId: reminder.id,
+          targetModule: "contacts",
         },
         { channel: "im", settings: pcSettings },
       );

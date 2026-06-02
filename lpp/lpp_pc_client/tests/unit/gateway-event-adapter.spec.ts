@@ -58,4 +58,54 @@ describe("adaptGatewayEvent", () => {
     if (event.kind !== "ignored") return;
     expect(event.reason).toBe("customer_service_event");
   });
+
+  it("does not classify msg.new customer-service payloads nested in message as plain IM", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 4,
+      args: [
+        {
+          data: {
+            message: {
+              threadId: "thread-2",
+              conversationId: "thread-2",
+              conversationType: "temp_session",
+              conversationSeq: 8,
+              senderUserId: "visitor-1",
+              messageType: "text",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("ignored");
+    if (event.kind !== "ignored") return;
+    expect(event.reason).toBe("customer_service_event");
+  });
+
+  it("classifies direct-customer compatibility messages as plain IM unless temp-session evidence exists", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 5,
+      args: [
+        {
+          data: {
+            message: {
+              conversationId: "thread-direct-customer",
+              conversationType: "direct_customer",
+              conversationSeq: 9,
+              senderRole: "visitor",
+              messageType: "text",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("im.message.received");
+    if (event.kind !== "im.message.received") return;
+    expect(event.conversationId).toBe("thread-direct-customer");
+    expect(event.conversationType).toBe("direct");
+  });
 });

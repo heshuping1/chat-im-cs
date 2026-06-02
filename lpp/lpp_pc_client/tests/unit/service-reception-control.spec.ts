@@ -37,12 +37,12 @@ describe("service reception control model", () => {
     expect(getReceptionStatusOption("busy").label).toBe("忙碌");
   });
 
-  it("keeps unknown reception status visibly unsynced instead of pretending offline", () => {
+  it("keeps unknown reception status visibly busy instead of accepting sessions", () => {
     expect(getReceptionControlSummary({ serviceStatus: undefined })).toMatchObject({
       sessionText: "--",
-      status: { label: "未同步", tone: "offline" },
+      status: { label: "忙碌", tone: "busy", value: "busy" },
       statusSynced: false,
-      summaryText: "未同步 · 手动接入 · --",
+      summaryText: "忙碌 · 手动接入 · --",
     });
   });
 

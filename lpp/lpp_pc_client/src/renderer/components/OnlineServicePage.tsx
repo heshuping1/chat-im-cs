@@ -23,6 +23,7 @@ import {
   type AiReplyThreadTarget,
 } from "../data/ai/ai-reply-thread-target";
 import { useAuthSession } from "../data/auth/auth-store";
+import { customerServiceRealtimePollIntervalMs } from "../data/customer-service/cs-realtime-config";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import type { CustomerServiceStatus } from "../data/types";
@@ -267,7 +268,7 @@ export function OnlineServicePage() {
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
     enabled: Boolean(client),
     queryFn: async () => client!.getWorkbenchThreads(),
-    refetchInterval: 4_000,
+    refetchInterval: customerServiceRealtimePollIntervalMs,
     refetchIntervalInBackground: true,
   });
   const receptionStatusQuery = useQuery({

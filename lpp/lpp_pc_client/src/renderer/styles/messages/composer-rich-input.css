@@ -2,9 +2,9 @@
 .h-service-composer {
   position: relative !important;
   display: flex !important;
-  height: var(--composer-height, 176px) !important;
+  height: var(--composer-height, 220px) !important;
   min-width: 0 !important;
-  min-height: 176px !important;
+  min-height: 190px !important;
   max-width: 100% !important;
   max-height: 360px !important;
   flex-direction: column !important;

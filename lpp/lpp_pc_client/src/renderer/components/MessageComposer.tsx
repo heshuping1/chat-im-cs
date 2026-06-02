@@ -90,6 +90,7 @@ type MessageComposerProps = {
   onDraftEditorStateChange?: (value: string) => void;
   onTranslateDraft?: (content: string) => Promise<string | undefined>;
   onOpenContactCardPicker?: () => void;
+  showContactCardTool?: boolean;
   onSendText: (content: string) => void | Promise<void>;
   onSendMedia: (file: File, kind: ComposerMediaKind) => void | Promise<void>;
 };
@@ -124,6 +125,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   onDraftEditorStateChange,
   onTranslateDraft,
   onOpenContactCardPicker,
+  showContactCardTool,
   onSendText,
   onSendMedia,
 }, ref) {
@@ -163,6 +165,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   const attachments = attachmentsByScope[attachmentScope] ?? [];
   const lexicalAttachments = lexicalAttachmentsByScope[attachmentScope] ?? [];
   const compactComposer = attachmentUi === "compact";
+  const contactCardToolVisible = showContactCardTool ?? Boolean(onOpenContactCardPicker);
   const mentionMatch = /(?:^|\s)@([^\s@]*)$/.exec(
     draft.slice(0, textareaRef.current?.selectionStart ?? draft.length),
   );
@@ -661,20 +664,22 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
                 <span>视频</span>
                 <em>待接入</em>
               </button>
-              <button
-                className="composer-plus-item is-primary"
-                type="button"
-                aria-label="发送联系人名片"
-                disabled={disabled}
-                onClick={() => {
-                  setMoreOpen(false);
-                  onOpenContactCardPicker?.();
-                }}
-              >
-                <UserRound size={17} />
-                <span>名片</span>
-                <em>发送联系人名片</em>
-              </button>
+              {contactCardToolVisible && (
+                <button
+                  className="composer-plus-item is-primary"
+                  type="button"
+                  aria-label="发送联系人名片"
+                  disabled={disabled}
+                  onClick={() => {
+                    setMoreOpen(false);
+                    onOpenContactCardPicker?.();
+                  }}
+                >
+                  <UserRound size={17} />
+                  <span>名片</span>
+                  <em>发送联系人名片</em>
+                </button>
+              )}
             </div>
           </div>,
           document.body,

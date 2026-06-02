@@ -4,6 +4,7 @@ import {
   desktopCapturer,
   dialog,
   ipcMain,
+  nativeImage,
   screen,
   shell,
   systemPreferences,
@@ -18,8 +19,11 @@ import { spawn } from 'node:child_process';
 import type {
   DesktopAuthSessionPayload,
   DesktopApiMethod,
+  CsRoutingDiagnosticPayload,
   DiagnosticsPayload,
+  MessageReminderDiagnosticPayload,
   NotifyPayload,
+  TaskbarBadgePayload,
   TrayStatus,
 } from '../shared/desktop-api.js';
 import { desktopIpcChannelByMethod } from '../shared/desktop-api.js';
@@ -30,7 +34,9 @@ import {
   saveSecureAuthSession,
 } from './auth-session-storage.js';
 import { registerDesktopFileHandlers } from './desktop-file-handlers.js';
+import { DiagnosticsJsonlWriter } from './diagnostics-jsonl-writer.js';
 import { showDesktopNotification } from './desktop-notification.js';
+import { reminderDiagnosticsTarget } from './message-reminder-diagnostics-routing.js';
 import {
   installElectronAppDiagnostics,
   installElectronProcessDiagnostics,
@@ -45,6 +51,7 @@ import {
 } from './screenshot-capture.js';
 import {
   buildAppProfileLaunchArgs,
+  appUserModelIdForProfile,
   createNextProfileId,
   configureAppInstanceProfile,
   formatProfileWindowTitle,
@@ -58,12 +65,18 @@ const appIconPath = app.isPackaged
   ? join(process.resourcesPath, 'app-icon.ico')
   : join(__dirname, '../../assets/app-icon-green-bubble.ico');
 const devDockIconPath = join(__dirname, '../../assets/app-icon-green-bubble.png');
+const appDisplayName = 'LPP 客服客户端';
+app.setName(appDisplayName);
+if (process.platform === 'win32') {
+  app.setAppUserModelId(appUserModelIdForProfile(null));
+}
 const appInstanceProfile = configureAppInstanceProfile(app);
 const appTitle = formatProfileWindowTitle(
-  'LPP \u5ba2\u670d\u5ba2\u6237\u7aef',
+  appDisplayName,
   appInstanceProfile.profileId,
 );
 let profileLockPath: string | null = null;
+const diagnosticsWriters = new Map<string, DiagnosticsJsonlWriter>();
 const singleInstanceLock = appInstanceProfile.profileId
   ? acquireProfileInstanceLock()
   : app.requestSingleInstanceLock({
@@ -74,6 +87,8 @@ const appInstanceIdentityPromise = readOrCreateAppInstanceIdentity(appInstancePr
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let trayStatus: TrayStatus = 'online';
+let taskbarBadgeCount = 0;
+let taskbarBadgeUrgent = false;
 const registeredDesktopIpcChannels = new Set<string>();
 
 installElectronProcessDiagnostics();
@@ -142,6 +157,9 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+  mainWindow.on('focus', () => {
+    mainWindow?.flashFrame(false);
+  });
 }
 
 function ensureTray() {
@@ -156,8 +174,52 @@ function ensureTray() {
   }
 }
 
+function updateTrayTooltip() {
+  if (!tray) return;
+  const badgeText = taskbarBadgeCount > 0 ? ` - ${taskbarBadgeCount} 条待处理` : '';
+  tray.setToolTip(`${appTitle} - ${trayStatus}${badgeText}`);
+}
+
+function taskbarBadgeLabel(count: number) {
+  if (count <= 0) return '';
+  return count > 99 ? '99+' : String(count);
+}
+
+function createTaskbarBadgeIcon(count: number, urgent: boolean) {
+  const label = taskbarBadgeLabel(count);
+  if (!label) return null;
+  const fontSize = label.length >= 3 ? 24 : label.length === 2 ? 28 : 32;
+  const fill = urgent ? '#ef4444' : '#f97316';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="30" fill="${fill}"/>
+  <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="3"/>
+  <text x="32" y="41" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="${fontSize}" font-weight="700" fill="#fff">${label}</text>
+</svg>`;
+  return nativeImage.createFromDataURL(
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+  );
+}
+
+function applyTaskbarBadge(payload: TaskbarBadgePayload) {
+  taskbarBadgeCount = payload.count;
+  taskbarBadgeUrgent = Boolean(payload.urgent);
+  ensureTray();
+  updateTrayTooltip();
+  if (!mainWindow || process.platform !== 'win32') return;
+  if (payload.count <= 0) {
+    mainWindow.setOverlayIcon(null, '');
+    mainWindow.flashFrame(false);
+    return;
+  }
+  const icon = createTaskbarBadgeIcon(payload.count, taskbarBadgeUrgent);
+  mainWindow.setOverlayIcon(icon, `${payload.count} 条待处理`);
+  if (taskbarBadgeUrgent && (!mainWindow.isFocused() || mainWindow.isMinimized())) {
+    mainWindow.flashFrame(true);
+  }
+}
+
 handleDesktopIpc('notify', async (_event, payload: NotifyPayload) => {
-  showDesktopNotification({ mainWindow, payload });
+  showDesktopNotification({ appIconPath, mainWindow, payload });
 });
 
 registerDesktopFileHandlers({
@@ -221,11 +283,45 @@ handleDesktopIpc('exportDiagnostics', async (_event, payload: DiagnosticsPayload
   return result.filePath;
 });
 
+handleDesktopIpc('recordCsRoutingDiagnostic', async (_event, payload: CsRoutingDiagnosticPayload) => {
+  await recordCsRoutingDiagnostic(payload);
+});
+
+handleDesktopIpc(
+  'recordMessageReminderDiagnostic',
+  async (_event, payload: MessageReminderDiagnosticPayload) => {
+    await recordMessageReminderDiagnostic(payload);
+  },
+);
+
+handleDesktopIpc('setTaskbarBadge', async (_event, payload: TaskbarBadgePayload) => {
+  applyTaskbarBadge(payload);
+});
+
 handleDesktopIpc('setTrayStatus', async (_event, status: TrayStatus) => {
   trayStatus = status;
   ensureTray();
-  tray?.setToolTip(`${appTitle} - ${trayStatus}`);
+  updateTrayTooltip();
 });
+
+async function recordCsRoutingDiagnostic(payload: CsRoutingDiagnosticPayload) {
+  await diagnosticsWriter('cs-routing.jsonl', 500).write(payload);
+}
+
+async function recordMessageReminderDiagnostic(payload: MessageReminderDiagnosticPayload) {
+  const target = reminderDiagnosticsTarget(payload);
+  await diagnosticsWriter(target.fileName, target.maxLines).write(payload);
+}
+
+function diagnosticsWriter(fileName: string, maxLines: number) {
+  const diagnosticsDir = join(app.getPath('userData'), 'diagnostics');
+  const filePath = join(diagnosticsDir, fileName);
+  const existing = diagnosticsWriters.get(fileName);
+  if (existing) return existing;
+  const writer = new DiagnosticsJsonlWriter({ filePath, maxLines });
+  diagnosticsWriters.set(fileName, writer);
+  return writer;
+}
 
 app.whenReady().then(() => {
   if (!singleInstanceLock) return;

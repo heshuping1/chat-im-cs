@@ -1,7 +1,11 @@
 import type { CustomerServiceThreadType, MessageItemDto } from "../api-client";
 import { isSelfSenderAny } from "../message-display";
-import { conversationRecord } from "./gateway-im-payload-utils";
-import { asRecord, normalizeType, stringField } from "./gateway-record-utils";
+import {
+  conversationRecord as ownershipConversationRecord,
+  messageRecord as ownershipMessageRecord,
+  resolveConversationOwnership,
+} from "./conversation-ownership-resolver";
+import { asRecord, firstRecord, normalizeType, stringField } from "./gateway-record-utils";
 
 type GatewayIdentity = {
   userId?: string | null;
@@ -17,29 +21,35 @@ export function isCustomerServiceStatus(
 }
 
 export function isCustomerServiceGatewayPayload(payload: Record<string, unknown>) {
-  const conversation = conversationRecord(payload);
-  const thread = asRecord(payload.thread);
-  const markers = [
-    stringField(payload, "threadType", "thread_type", "conversationType", "conversation_type"),
-    stringField(conversation, "threadType", "thread_type", "conversationType", "conversation_type"),
-    stringField(thread, "threadType", "thread_type", "conversationType", "conversation_type"),
-  ].map(normalizeType);
-  if (markers.some((value) => value === "temp_session")) {
-    return true;
-  }
-  if (asRecord(payload.tempSession).sessionId || asRecord(payload.temp_session).sessionId) {
-    return true;
-  }
-  const sessionId = stringField(payload, "sessionId", "visitorSessionId", "tempSessionId");
-  return Boolean(sessionId && (stringField(payload, "visitorId", "visitorUserId") || stringField(thread, "threadId")));
+  return classifyCustomerServiceGatewayPayload(payload).isCustomerService;
+}
+
+export function classifyCustomerServiceGatewayPayload(payload: Record<string, unknown>) {
+  const ownership = resolveConversationOwnership(payload, "gateway");
+  return {
+    isCustomerService: ownership.owner === "customerService",
+    reason: ownership.reason,
+    threadId: ownership.threadId || (ownership.owner === "customerService" ? customerServiceThreadId(payload) : ""),
+    threadType: ownership.threadType,
+    owner: ownership.owner,
+    confidence: ownership.confidence,
+    conversationId: ownership.conversationId,
+  };
 }
 
 export function customerServiceThreadId(payload: Record<string, unknown>) {
+  const message = customerServiceMessageRecord(payload);
+  const ownership = resolveConversationOwnership(payload, "gateway");
   return (
-    stringField(payload, "threadId", "sessionId", "visitorSessionId", "tempSessionId") ||
-    stringField(asRecord(payload.thread), "threadId", "sessionId") ||
-    stringField(asRecord(payload.tempSession), "sessionId", "threadId") ||
-    stringField(asRecord(payload.temp_session), "sessionId", "threadId")
+    ownership.threadId ||
+    stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||
+    stringField(message, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||
+    stringField(asRecord(payload.thread), "threadId", "thread_id", "sessionId", "session_id") ||
+    stringField(asRecord(payload.tempSession), "sessionId", "session_id", "threadId", "thread_id") ||
+    stringField(asRecord(payload.temp_session), "sessionId", "session_id", "threadId", "thread_id") ||
+    stringField(message, "conversationId", "conversation_id", "chatId", "chat_id") ||
+    stringField(asRecord(payload.thread), "conversationId", "conversation_id", "chatId", "chat_id") ||
+    ""
   );
 }
 
@@ -52,7 +62,8 @@ export function isSelfCustomerServiceGatewayMessage(
   message: MessageItemDto,
   identity: GatewayIdentity,
 ) {
-  const raw = asRecord(payload.message ?? payload.msg) ?? payload;
+  const messageRecord = customerServiceMessageRecord(payload);
+  const raw = Object.keys(messageRecord).length ? messageRecord : payload;
   const roleText = [
     stringField(raw, "senderRole", "senderType", "authorType", "fromType", "role", "sourceType"),
     stringField(payload, "senderRole", "senderType", "authorType", "fromType", "role", "sourceType"),
@@ -100,6 +111,21 @@ export function isSelfCustomerServiceGatewayMessage(
     return true;
   }
   return Boolean(message.isSelf || message.isMine);
+}
+
+export function customerServiceMessageRecord(payload: Record<string, unknown>) {
+  return ownershipMessageRecord(payload);
+}
+
+export function customerServiceConversationRecord(payload: Record<string, unknown>) {
+  return firstRecord(
+    ownershipConversationRecord(payload),
+    payload.conversation,
+    payload.chat,
+    payload.thread,
+    payload.tempSession,
+    payload.temp_session,
+  );
 }
 
 function isSelfGatewayMessage(message: MessageItemDto, identity: GatewayIdentity) {

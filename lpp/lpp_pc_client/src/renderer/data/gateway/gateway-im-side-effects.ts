@@ -1,6 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AuthSession } from "../auth/auth-session";
 import type { CurrentUserIdentity } from "../message-display";
+import { isSelfSenderAny } from "../message-display";
+import type { MessageItemDto } from "../api-client";
 import { readReceiptReaderIsCurrentUser } from "../read-receipts";
 import { getAuthSessionSnapshot } from "../auth/auth-store";
 import {
@@ -12,7 +14,6 @@ import {
   applyImGatewayReadCache,
   isImEventMessage,
 } from "./im-gateway-cache";
-import { hasGatewayMessageQuery } from "./gateway-query-invalidation";
 import {
   fallbackConversationIdFromPeer,
   gatewayMessage,
@@ -20,7 +21,6 @@ import {
   imCoreEventFromGatewayMessageForTest,
   imCoreEventFromGatewayReadForTest,
   inferImConversationType,
-  isCustomerServiceGatewayPayload,
   readReceiptReaderIds,
 } from "./gateway-payload-utils";
 import {
@@ -31,6 +31,7 @@ import {
 import { requireApiClient } from "../runtime";
 import { getReminderActions } from "../reminder/reminder-store";
 import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
+import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 
 export function mergeImGatewayMessage(
   queryClient: QueryClient,
@@ -38,7 +39,6 @@ export function mergeImGatewayMessage(
   fallbackConversationId: string,
   fallbackConversationType: string,
 ) {
-  if (isCustomerServiceGatewayPayload(payload)) return;
   const fallbackId =
     fallbackConversationId || imConversationId(payload) || fallbackConversationIdFromPeer(payload);
   const message = gatewayMessage(payload, fallbackId);
@@ -46,6 +46,7 @@ export function mergeImGatewayMessage(
   const readSnapshot = getImReadSnapshot();
   const readActions = getImReadActions();
   const eventMessage = isImEventMessage(message);
+  const selfMessage = isSelfGatewayImMessage(message, identity);
   if (!message.conversationId) {
     return;
   }
@@ -54,9 +55,34 @@ export function mergeImGatewayMessage(
   const uiState = getWorkspaceUiSnapshot();
   const active =
     uiState.activeModule === "messages" &&
-    (uiState.activeImConversationId
-      ? uiState.activeImConversationId === message.conversationId
-      : hasGatewayMessageQuery(queryClient, message.conversationId));
+    uiState.activeImConversationId === message.conversationId;
+  const previousKey = conversationKey(
+    imConversationType === "group" ? "group" : "direct",
+    message.conversationId,
+  );
+  const previousState = readSnapshot.imReadStateByConversation[previousKey];
+  recordMessageReminderDiagnostic({
+    event: "im.gateway.received",
+    source: "gateway-im-side-effects",
+    phase: "received",
+    route: "messages",
+    classification: {
+      activeDecision: active,
+      activeImConversationId: uiState.activeImConversationId,
+      activeModule: uiState.activeModule,
+      conversationId: message.conversationId,
+      conversationType: imConversationType,
+      eventMessage,
+      currentIdentity: identityDiagnostic(identity),
+      messageSeq: message.conversationSeq,
+      senderIdentity: messageSenderDiagnostic(message),
+      selfMessage,
+    },
+    summary: {
+      payload,
+      previousState,
+    },
+  });
   const modelEvent = eventMessage
     ? undefined
     : imCoreEventFromGatewayMessageForTest({
@@ -77,9 +103,48 @@ export function mergeImGatewayMessage(
     : "";
   const modelState = modelKey ? modelResult?.stateByConversation[modelKey] : undefined;
   const modelView = modelKey ? modelResult?.viewByConversation[modelKey] : undefined;
+  if (modelEvent && modelResult) {
+    recordMessageReminderDiagnostic({
+      event: "im.read.reduce",
+      source: "gateway-im-side-effects",
+      phase: "reduce",
+      route: active ? "active_conversation" : "background_conversation",
+      classification: {
+        activeDecision: active,
+        commands: modelResult.commands.map((command) => command.type),
+        conversationId: modelEvent.conversationId,
+        conversationType: modelEvent.conversationType,
+        messageSeq:
+          modelEvent.type === "gateway.message_received"
+            ? modelEvent.message.conversationSeq
+            : undefined,
+        myReadSeqAfter: modelState?.myReadSeq,
+        myReadSeqBefore: previousState?.myReadSeq,
+        selfMessage,
+        unreadAfter: modelView?.unreadCount,
+        unreadBefore: previousState?.unreadCount,
+      },
+      summary: {
+        commands: modelResult.commands,
+      },
+    });
+  }
 
-  if (modelState) {
-    readActions.upsertImReadState(modelState);
+  const effectiveReadSeq = selfMessage
+    ? Math.max(modelState?.myReadSeq ?? 0, normalizedGatewaySeq(message))
+    : modelState?.myReadSeq;
+  const effectiveUnreadCount = selfMessage ? 0 : modelView?.unreadCount;
+  const effectiveModelState =
+    selfMessage && modelState
+      ? {
+          ...modelState,
+          myReadSeq: effectiveReadSeq ?? modelState.myReadSeq,
+          unreadCount: 0,
+        }
+      : modelState;
+
+  if (effectiveModelState) {
+    readActions.upsertImReadState(effectiveModelState);
   }
   if (modelResult) {
     executeImCoreCommands(modelResult.commands, identity, queryClient);
@@ -89,9 +154,26 @@ export function mergeImGatewayMessage(
     conversationId: message.conversationId,
     conversationType: imConversationType,
     message,
-    unreadCount: modelView?.unreadCount,
-    readSeq: modelState ? modelState.myReadSeq : undefined,
+    unreadCount: effectiveUnreadCount,
+    readSeq: effectiveReadSeq,
     payload,
+  });
+  recordMessageReminderDiagnostic({
+    event: "im.cache.write",
+    source: "gateway-im-side-effects",
+    phase: "write",
+    route: "messages",
+    classification: {
+      conversationId: message.conversationId,
+      conversationType: imConversationType,
+      messageSeq: message.conversationSeq,
+      readSeq: effectiveReadSeq,
+      selfMessage,
+      unreadCount: effectiveUnreadCount,
+    },
+    summary: {
+      message,
+    },
   });
 }
 
@@ -120,6 +202,30 @@ export function mergeReadEvent(
 
   const readerIds = readReceiptReaderIds(payload);
   const readerIsCurrentUser = readReceiptReaderIsCurrentUser(readerIds, identity);
+  recordMessageReminderDiagnostic({
+    event: "im.read.received",
+    source: "gateway-im-side-effects",
+    phase: "received",
+    route: readerIsCurrentUser ? "current_user" : "peer_or_unknown",
+    classification: {
+      conversationId: event.conversationId,
+      conversationType: event.conversationType,
+      myReadSeqAfter: nextState.myReadSeq,
+      myReadSeqBefore: previousState?.myReadSeq,
+      peerReadSeqAfter: nextState.peerReadSeq,
+      peerReadSeqBefore: previousState?.peerReadSeq,
+      readSeq: event.readSeq,
+      readerIds,
+      readerIdentity: event.readerIdentity,
+      readerIsCurrentUser,
+      currentIdentity: identityDiagnostic(identity),
+      unreadAfter: nextView?.unreadCount,
+      unreadBefore: previousState?.unreadCount,
+    },
+    summary: {
+      payload,
+    },
+  });
   const peerReadSeq = nextState.peerReadSeq;
   const previousPeerReadSeq = previousState?.peerReadSeq ?? 0;
   const hasPeerReadUpdate = peerReadSeq > previousPeerReadSeq;
@@ -138,6 +244,58 @@ export function mergeReadEvent(
   });
 }
 
+function identityDiagnostic(identity: CurrentUserIdentity | null) {
+  return {
+    displayName: identity?.displayName,
+    lppId: identity?.lppId,
+    platformUserId: identity?.platformUserId,
+    userId: identity?.userId,
+  };
+}
+
+function messageSenderDiagnostic(message: MessageItemDto) {
+  return {
+    direction: message.direction,
+    fromUserId: message.fromUserId,
+    isMine: message.isMine,
+    isSelf: message.isSelf,
+    lppId: message.lppId,
+    platformUserId: message.platformUserId,
+    senderDisplayName: message.senderDisplayName,
+    senderId: message.senderId,
+    senderLppId: message.senderLppId,
+    senderPlatformUserId: message.senderPlatformUserId,
+    senderUserId: message.senderUserId,
+  };
+}
+
+function isSelfGatewayImMessage(
+  message: MessageItemDto,
+  identity: CurrentUserIdentity | null,
+) {
+  if (message.isSelf || message.isMine) return true;
+  const direction = (message.direction ?? "").trim().toLowerCase();
+  if (["out", "outgoing", "sent", "self"].includes(direction)) return true;
+  return isSelfSenderAny(
+    [
+      message.senderUserId,
+      message.senderId,
+      message.fromUserId,
+      message.senderPlatformUserId,
+      message.platformUserId,
+      message.senderLppId,
+      message.lppId,
+    ],
+    message.senderDisplayName,
+    identity,
+  );
+}
+
+function normalizedGatewaySeq(message: MessageItemDto) {
+  const seq = Number(message.conversationSeq ?? 0);
+  return Number.isFinite(seq) && seq > 0 ? Math.floor(seq) : 0;
+}
+
 function executeImCoreCommands(
   commands: ImCoreCommand[],
   identity: AuthSession | null,
@@ -146,6 +304,18 @@ function executeImCoreCommands(
   const readActions = getImReadActions();
   for (const command of commands) {
     if (command.type === "mark_read" || command.type === "retry_pending_read") {
+      recordMessageReminderDiagnostic({
+        event: "im.read.command",
+        source: "gateway-im-side-effects",
+        phase: "execute",
+        route: command.type,
+        classification: {
+          conversationId: command.conversationId,
+          conversationType: command.conversationType,
+          readSeq: command.readSeq,
+        },
+        summary: command,
+      });
       readActions.markImConversationReadLocally(command.conversationId, command.readSeq);
       if (identity) {
         void requireApiClient(identity)

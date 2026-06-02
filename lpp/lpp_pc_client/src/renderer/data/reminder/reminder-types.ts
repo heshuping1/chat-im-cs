@@ -7,10 +7,14 @@ export type ReminderIcon = "contacts" | "im" | "service" | "sla";
 
 export type ReminderDesktopChannel = "im" | "serviceQueue" | "sla";
 
+export type DesktopNotificationTargetModule = "contacts" | "messages" | "onlineService";
+
 export interface PcRealtimeReminder {
   id: string;
   title: string;
   body: string;
+  avatarLabel?: string;
+  avatarUrl?: string | null;
   targetModule: ModuleKey;
   targetId?: string;
   severity?: ReminderSeverity;

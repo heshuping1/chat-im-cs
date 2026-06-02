@@ -18,6 +18,8 @@ import {
 } from "../data/gateway/gateway-event-registry";
 import { createGatewayEventRouter } from "../data/gateway/gateway-event-router";
 import { getAppInstanceProfile } from "../data/app-instance/app-instance";
+import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
+import { recordGatewayReminderDiagnostic } from "../data/gateway/gateway-message-reminder-diagnostics";
 
 export function GatewayBridge() {
   const session = useAuthSession();
@@ -34,6 +36,18 @@ export function GatewayBridge() {
   );
 
   useEffect(() => {
+    recordMessageReminderDiagnostic({
+      event: "gateway.bridge.lifecycle",
+      source: "gateway-bridge",
+      phase: "effect-start",
+      route: session ? "session-present" : "no-session",
+      classification: {
+        apiHost: session ? safeUrlHost(session.apiBaseUrl) : "",
+        hasSession: Boolean(session),
+        sessionKeyPresent: Boolean(sessionKey),
+        tenantTokenPresent: Boolean(session?.tenantToken),
+      },
+    });
     let disposed = false;
     const previous = connectionRef.current;
     connectionRef.current = null;
@@ -60,6 +74,17 @@ export function GatewayBridge() {
           .build();
 
         connectionRef.current = connection;
+        recordMessageReminderDiagnostic({
+          event: "gateway.bridge.lifecycle",
+          source: "gateway-bridge",
+          phase: "connection-created",
+          route: "gateway",
+          classification: {
+            apiHost: safeUrlHost(session.apiBaseUrl),
+            gatewayHost: gatewayUrl.host,
+            state: connection.state,
+          },
+        });
 
         const eventRouter = createGatewayEventRouter({
           clearAuthSession,
@@ -69,18 +94,45 @@ export function GatewayBridge() {
         });
 
         gatewayEvents.forEach((eventName) => {
-          connection.on(eventName, (...args: unknown[]) =>
-            eventRouter.handleEvent(eventName, args),
-          );
+          connection.on(eventName, (...args: unknown[]) => {
+            recordGatewayReminderDiagnostic({
+              args,
+              eventName,
+              phase: "received",
+              route: "gateway",
+              source: "gateway-bridge",
+            });
+            eventRouter.handleEvent(eventName, args);
+          });
         });
 
         connection.onreconnected(() => {
+          recordMessageReminderDiagnostic({
+            event: "gateway.bridge.lifecycle",
+            source: "gateway-bridge",
+            phase: "reconnected",
+            route: "gateway",
+            classification: {
+              gatewayHost: gatewayUrl.host,
+              state: connection.state,
+            },
+          });
           eventRouter.invalidateIm();
           eventRouter.invalidateCustomerService();
           void heartbeat(connection);
         });
 
         connection.onclose(() => {
+          recordMessageReminderDiagnostic({
+            event: "gateway.bridge.lifecycle",
+            source: "gateway-bridge",
+            phase: "closed",
+            route: "gateway",
+            classification: {
+              gatewayHost: gatewayUrl.host,
+              state: connection.state,
+            },
+          });
           if (disposed) return;
           // SignalR automatic reconnect handles transient drops; the next successful
           // reconnect performs a full query refresh to compensate for missed events.
@@ -90,9 +142,32 @@ export function GatewayBridge() {
           .start()
           .then(() => {
             if (disposed) return;
+            recordMessageReminderDiagnostic({
+              event: "gateway.bridge.lifecycle",
+              source: "gateway-bridge",
+              phase: "started",
+              route: "gateway",
+              classification: {
+                gatewayHost: gatewayUrl.host,
+                state: connection.state,
+              },
+            });
             void heartbeat(connection);
           })
-          .catch(() => {
+          .catch((error) => {
+            recordMessageReminderDiagnostic({
+              event: "gateway.bridge.lifecycle",
+              source: "gateway-bridge",
+              phase: "start-failed",
+              route: "gateway",
+              classification: {
+                gatewayHost: gatewayUrl.host,
+                state: connection.state,
+              },
+              summary: {
+                errorName: error instanceof Error ? error.name : typeof error,
+              },
+            });
             // Gateway is an accelerator, not a blocker. Query pages remain usable and
             // manual refresh/refetch still works if the websocket endpoint is down.
           });
@@ -109,7 +184,19 @@ export function GatewayBridge() {
           };
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        recordMessageReminderDiagnostic({
+          event: "gateway.bridge.lifecycle",
+          source: "gateway-bridge",
+          phase: "profile-failed",
+          route: "gateway",
+          classification: {
+            apiHost: safeUrlHost(session.apiBaseUrl),
+          },
+          summary: {
+            errorName: error instanceof Error ? error.name : typeof error,
+          },
+        });
         // Profile identity is local metadata; if it is unavailable the gateway
         // should fail soft and let polling keep the app usable.
       });
@@ -130,6 +217,14 @@ export function GatewayBridge() {
   }, [clearAuthSession, queryClient, session, sessionKey, setCustomerServiceStatus]);
 
   return null;
+}
+
+function safeUrlHost(value: string) {
+  try {
+    return new URL(value).host;
+  } catch {
+    return "";
+  }
 }
 
 async function heartbeat(connection: HubConnection) {

@@ -1,7 +1,11 @@
 import type {
   DesktopApi,
   DesktopApiMethod,
+  CsRoutingDiagnosticPayload,
   DiagnosticsPayload,
+  MessageReminderDiagnosticPayload,
+  NotificationClickedPayload,
+  TaskbarBadgePayload,
   NotifyPayload,
   TrayStatus,
 } from '../shared/desktop-api.js';
@@ -29,6 +33,15 @@ async function validateDesktopApiCall(method: DesktopApiMethod, args: unknown[])
 
 const desktopApi: DesktopApi = {
   notify: (payload: NotifyPayload) => validatedInvoke('notify', 'desktop:notify', payload),
+  onNotificationClicked: (callback: (payload: NotificationClickedPayload) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: NotificationClickedPayload) => {
+      callback(payload);
+    };
+    ipcRenderer.on('desktop:notification-clicked', handler);
+    return () => {
+      ipcRenderer.removeListener('desktop:notification-clicked', handler);
+    };
+  },
   openFile: (path: string) => validatedInvoke('openFile', 'desktop:open-file', path),
   cacheMediaFile: (payload) => validatedInvoke('cacheMediaFile', 'desktop:cache-media-file', payload),
   cacheLocalMediaFile: async (payload, file) => {
@@ -85,6 +98,16 @@ const desktopApi: DesktopApi = {
   getAppVersion: () => validatedInvoke('getAppVersion', 'desktop:get-app-version'),
   exportDiagnostics: (payload: DiagnosticsPayload) =>
     validatedInvoke('exportDiagnostics', 'desktop:export-diagnostics', payload),
+  recordCsRoutingDiagnostic: (payload: CsRoutingDiagnosticPayload) =>
+    validatedInvoke('recordCsRoutingDiagnostic', 'desktop:record-cs-routing-diagnostic', payload),
+  recordMessageReminderDiagnostic: (payload: MessageReminderDiagnosticPayload) =>
+    validatedInvoke(
+      'recordMessageReminderDiagnostic',
+      'desktop:record-message-reminder-diagnostic',
+      payload,
+    ),
+  setTaskbarBadge: (payload: TaskbarBadgePayload) =>
+    validatedInvoke('setTaskbarBadge', 'desktop:set-taskbar-badge', payload),
   setTrayStatus: (status: TrayStatus) =>
     validatedInvoke('setTrayStatus', 'desktop:set-tray-status', status),
 };

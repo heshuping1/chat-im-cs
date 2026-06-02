@@ -1,6 +1,8 @@
 import type { ConversationListItem } from "./api-client";
 import {
   isLocalReadCoversLastMessage,
+  localReadCoverReason,
+  type LocalReadCoverReason,
   resolveEffectiveImUnreadCount,
 } from "./im-read/im-read-service";
 import type { LocalImConversationRead } from "./im-read/im-read-storage";
@@ -11,6 +13,20 @@ export interface CurrentUserIdentity {
   lppId?: string | null;
   displayName?: string | null;
   locallyReadConversationReads?: Record<string, LocalImConversationRead>;
+}
+
+export interface ConversationUnreadDiagnostic {
+  conversationId: string;
+  effectiveUnread: number;
+  lastMessageSeq?: number | null;
+  lastReadSeq?: number | null;
+  lastMessageAt?: string | null;
+  localReadCoversLastMessage: boolean;
+  localReadAt?: number;
+  localReadCoverReason: LocalReadCoverReason;
+  localReadSeq?: number;
+  selfLastMessage: boolean;
+  serverUnread: number;
 }
 
 export function isImConversation(item: ConversationListItem) {
@@ -163,7 +179,6 @@ export function isSelfLastMessage(
   if (["out", "outgoing", "sent", "self"].includes(direction)) {
     return true;
   }
-  if (isSelfDirectConversation(item, identity)) return true;
   if (senderIds.length > 0) {
     return senderIds.some((id) => currentIds.includes(id));
   }
@@ -179,19 +194,52 @@ export function effectiveConversationUnreadCount(
   currentUserId?: string | CurrentUserIdentity | null,
   currentDisplayName?: string | null,
 ) {
+  return conversationUnreadDiagnostic(
+    item,
+    currentUserId,
+    currentDisplayName,
+  ).effectiveUnread;
+}
+
+export function conversationUnreadDiagnostic(
+  item: ConversationListItem,
+  currentUserId?: string | CurrentUserIdentity | null,
+  currentDisplayName?: string | null,
+): ConversationUnreadDiagnostic {
   const identity = normalizeIdentity(currentUserId, currentDisplayName);
   const localRead =
     identity.locallyReadConversationReads?.[conversationReadStateKey(item)] ??
     identity.locallyReadConversationReads?.[item.conversationId];
-  return resolveEffectiveImUnreadCount({
-    serverUnreadCount: item.unreadCount,
+  const selfLastMessage = isSelfLastMessage(item, identity);
+  const serverUnread = Math.max(0, Math.floor(Number(item.unreadCount ?? 0) || 0));
+  const localReadCoverReasonValue = localReadCoverReasonForConversation(
+    item,
+    identity,
+    selfLastMessage,
+    serverUnread,
+  );
+  const localReadCoversLastMessage = localReadCoverReasonValue !== "none";
+  const effectiveUnread = resolveEffectiveImUnreadCount({
+    serverUnreadCount: serverUnread,
     lastMessageSeq: item.lastMessageSeq,
     lastReadSeq: item.lastReadSeq,
     localReadSeq: localRead?.readSeq,
-    localReadCoversLastMessage: isLocallyReadConversation(item, identity),
-    selfConversation: isSelfDirectConversation(item, identity),
-    selfLastMessage: isSelfLastMessage(item, identity),
+    localReadCoversLastMessage,
+    selfLastMessage,
   });
+  return {
+    conversationId: item.conversationId,
+    effectiveUnread,
+    lastMessageAt: item.lastMessage?.sentAt,
+    lastMessageSeq: item.lastMessageSeq,
+    lastReadSeq: item.lastReadSeq,
+    localReadAt: localRead?.readAt,
+    localReadCoversLastMessage,
+    localReadCoverReason: localReadCoverReasonValue,
+    localReadSeq: localRead?.readSeq,
+    selfLastMessage,
+    serverUnread,
+  };
 }
 
 export function conversationMetaText(
@@ -250,59 +298,30 @@ function normalizeIdentity(
 function isLocallyReadConversation(
   item: ConversationListItem,
   identity: CurrentUserIdentity,
+  selfLastMessage = isSelfLastMessage(item, identity),
+) {
+  return localReadCoverReasonForConversation(item, identity, selfLastMessage) !== "none";
+}
+
+function localReadCoverReasonForConversation(
+  item: ConversationListItem,
+  identity: CurrentUserIdentity,
+  selfLastMessage = isSelfLastMessage(item, identity),
+  serverUnreadCount = Math.max(0, Math.floor(Number(item.unreadCount ?? 0) || 0)),
 ) {
   const localRead =
     identity.locallyReadConversationReads?.[conversationReadStateKey(item)] ??
     identity.locallyReadConversationReads?.[item.conversationId];
-  return isLocalReadCoversLastMessage({
+  return localReadCoverReason({
     localRead,
     lastMessageSeq: item.lastMessageSeq,
     lastMessageAt: item.lastMessage?.sentAt,
     messageKeyMatches: Boolean(
       localRead?.messageKey && localRead.messageKey === conversationReadKey(item),
     ),
-    selfLastMessage: isSelfLastMessage(item, identity),
+    selfLastMessage,
+    serverUnreadCount,
   });
-}
-
-function isSelfDirectConversation(
-  item: ConversationListItem,
-  identity: CurrentUserIdentity,
-) {
-  const conversationType = item.conversationType.trim().toLowerCase().replace(/-/g, "_");
-  if (
-    conversationType !== "direct" &&
-    conversationType !== "im_direct" &&
-    conversationType !== "direct_chat" &&
-    conversationType !== "direct_customer" &&
-    conversationType !== "customer_direct"
-  ) {
-    return false;
-  }
-  const currentIds = compactIdentityValues([
-    identity.userId,
-    identity.platformUserId,
-    identity.lppId,
-  ]);
-  if (currentIds.length === 0) return false;
-  const itemRecord = item as unknown as Record<string, unknown>;
-  const peerIds = compactIdentityValues([
-    item.peerUserId,
-    item.peerLppId,
-    stringValue(itemRecord.peerId),
-    stringValue(itemRecord.peer_id),
-    stringValue(itemRecord.peerUserId),
-    stringValue(itemRecord.peer_user_id),
-    stringValue(itemRecord.peerPlatformUserId),
-    stringValue(itemRecord.peer_platform_user_id),
-    stringValue(itemRecord.peerLppId),
-    stringValue(itemRecord.peer_lpp_id),
-    stringValue(itemRecord.targetUserId),
-    stringValue(itemRecord.target_user_id),
-    stringValue(itemRecord.toUserId),
-    stringValue(itemRecord.to_user_id),
-  ]);
-  return peerIds.some((id) => currentIds.includes(id));
 }
 
 function compactIdentityValues(values: Array<string | null | undefined>) {

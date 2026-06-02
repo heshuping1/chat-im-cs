@@ -1,19 +1,17 @@
-import {
-  ClipboardList,
-  Languages,
-  MessageSquareQuote,
-  Sparkles,
-} from "lucide-react";
 import { forwardRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-import { MessageComposer } from "../../components/MessageComposer";
-import type { MessageComposerHandle } from "../../components/MessageComposer";
+import {
+  ChatComposerSurface,
+  type MessageComposerHandle,
+} from "../../components/ChatComposerSurface";
+import type { ScreenshotShortcut } from "../../components/MessageComposer";
 import type { ComposerMediaKind } from "../../composer/domain/detectComposerMediaKind";
 
 export const CustomerServiceComposerSurface = forwardRef<
   MessageComposerHandle,
   {
+    attachmentScopeKey: string;
     disabled: boolean;
     dragUpload: boolean;
     enterToSend: boolean;
@@ -24,9 +22,11 @@ export const CustomerServiceComposerSurface = forwardRef<
     onSendMedia: (file: File, kind: ComposerMediaKind) => void | Promise<void>;
     onSendText: (content: string) => void | Promise<void>;
     onTranslateDraft: (content: string) => Promise<string | undefined>;
+    screenshotShortcut: ScreenshotShortcut;
     shortcutHints: boolean;
   }
 >(function CustomerServiceComposerSurface({
+  attachmentScopeKey,
   disabled,
   dragUpload,
   enterToSend,
@@ -37,64 +37,23 @@ export const CustomerServiceComposerSurface = forwardRef<
   onSendMedia,
   onSendText,
   onTranslateDraft,
+  screenshotShortcut,
   shortcutHints,
 }, ref) {
   return (
-    <MessageComposer
+    <ChatComposerSurface
       ref={ref}
-      dense
-      placeholder="输入回复..."
+      attachmentScopeKey={attachmentScopeKey}
       disabled={disabled}
       dragUpload={dragUpload}
       enterToSend={enterToSend}
+      screenshotShortcut={screenshotShortcut}
       shortcutHints={shortcutHints}
-      showDefaultQuickReplyTool={false}
+      toolMode="customerService"
       onResizeStart={onResizeStart}
-      leadingTools={
-        <>
-          <button
-            className="composer-advanced-tool"
-            type="button"
-            aria-label="快捷话术"
-            title="快捷话术"
-            onClick={onQuickReply}
-          >
-            <MessageSquareQuote size={16} />
-            <span>话术</span>
-          </button>
-          <button
-            className="composer-advanced-tool"
-            type="button"
-            aria-label="知识库"
-            title="知识库"
-            onClick={onKnowledgeBase}
-          >
-            <ClipboardList size={16} />
-            <span>知识库</span>
-          </button>
-          <button
-            className="composer-advanced-tool"
-            type="button"
-            aria-label="AI 起草"
-            title="AI 起草"
-            onClick={onAiDraft}
-          >
-            <Sparkles size={16} />
-            <span>AI起草</span>
-          </button>
-        </>
-      }
-      extraTools={
-        <button
-          className="composer-advanced-tool"
-          type="button"
-          aria-label="翻译"
-          title="翻译"
-        >
-          <Languages size={16} />
-          <span>翻译</span>
-        </button>
-      }
+      onAiDraft={onAiDraft}
+      onKnowledgeBase={onKnowledgeBase}
+      onQuickReply={onQuickReply}
       onSendText={onSendText}
       onTranslateDraft={onTranslateDraft}
       onSendMedia={onSendMedia}

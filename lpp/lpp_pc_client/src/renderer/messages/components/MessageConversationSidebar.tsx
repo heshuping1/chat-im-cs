@@ -8,6 +8,7 @@ import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
 import type { UserAvatarRegistry } from "../models/userAvatarRegistry";
 import type { CurrentUserIdentity } from "../../data/message-display";
+import type { ActiveImConversationVisibility } from "../hooks/useImReadCommandExecutor";
 import {
   MessageConversationListPanel,
   type MessageConversationFilterKey,
@@ -18,6 +19,7 @@ type ComposerDialog = "direct" | "group" | "qr" | "card" | null;
 
 export function MessageConversationSidebar({
   activeConversation,
+  activeConversationVisibility,
   conversationDrawerOpen,
   conversationFilter,
   draftsByConversation,
@@ -48,6 +50,7 @@ export function MessageConversationSidebar({
   setPlusMenuOpen,
 }: {
   activeConversation?: ConversationListItem;
+  activeConversationVisibility: ActiveImConversationVisibility;
   conversationDrawerOpen: boolean;
   conversationFilter: MessageConversationFilterKey;
   draftsByConversation: Record<string, string | undefined>;
@@ -122,7 +125,10 @@ export function MessageConversationSidebar({
         }
         resolveConversationIsGroup={(item) => getImConversationType(item) === "group"}
         resolveConversationUnread={(item) =>
-          effectiveConversationUnreadCount(item, unreadIdentity)
+          item.conversationId === activeConversation?.conversationId &&
+          activeConversationVisibility === "paneVisible"
+            ? 0
+            : effectiveConversationUnreadCount(item, unreadIdentity)
         }
       />
 

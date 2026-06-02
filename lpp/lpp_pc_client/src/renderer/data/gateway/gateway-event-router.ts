@@ -20,6 +20,7 @@ import {
   asRecord,
   conversationRecord,
   customerServiceThreadId,
+  classifyCustomerServiceGatewayPayload,
   eventPayload,
   fallbackConversationIdFromPeer,
   imConversationId,
@@ -28,6 +29,7 @@ import {
   normalizeType,
   stringField,
 } from "./gateway-payload-utils";
+import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
 import { handleFirstStageImGatewayEvent } from "./im-gateway-handler";
 import {
   mergeCustomerServiceGatewayMessage,
@@ -37,6 +39,7 @@ import {
   mergeImGatewayMessage,
   mergeReadEvent,
 } from "./gateway-im-side-effects";
+import { recordGatewayReminderDiagnostic } from "./gateway-message-reminder-diagnostics";
 
 export function createGatewayEventRouter(options: {
   clearAuthSession: () => void;
@@ -79,9 +82,6 @@ export function createGatewayEventRouter(options: {
         onMessageReceived: (event) => {
           mergeCustomerServiceGatewayMessage(queryClient, event.rawPayload, event.threadId);
           invalidateCustomerService(event.threadId);
-          if (isImMessageEventName(eventName)) {
-            invalidateIm(event.message.conversationId || event.threadId);
-          }
         },
         onThreadChanged: (event) => {
           if (event.serviceStatus && isCustomerServiceStatus(event.serviceStatus)) {
@@ -99,14 +99,79 @@ export function createGatewayEventRouter(options: {
 
   const handleEvent = (eventName: string, args: unknown[]) => {
     const payload = eventPayload(args);
+    const classification = classifyCustomerServiceGatewayPayload(payload);
+    if (
+      isImMessageEventName(eventName) ||
+      isCustomerServiceMessageEventName(eventName) ||
+      isCustomerServiceQueueEventName(eventName)
+    ) {
+      recordCsRoutingDiagnostic({
+        event: eventName,
+        source: "gateway-router",
+        phase: "received",
+        classification,
+        summary: payload,
+      });
+      if (isImMessageEventName(eventName)) {
+        recordCsRoutingDiagnostic({
+          event: "cs-conversation-index",
+          source: "gateway-router",
+          phase: classification.reason === "indexed-temp-session" ? "cs-index-hit" : "cs-index-miss",
+          route: classification.isCustomerService ? "customer-service" : "im",
+          classification,
+          summary: payload,
+        });
+      }
+    }
     if (isForceLogoutEventName(eventName)) {
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: "ignored-force-logout",
+        source: "gateway-router",
+      });
       queryClient.clear();
       clearAuthSession();
       return;
     }
 
-    if (handleFirstStageGatewayEvent(eventName, args)) return;
-    if (handleFirstStageCustomerServiceEvent(eventName, args)) return;
+    if (handleFirstStageCustomerServiceEvent(eventName, args)) {
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: "customer-service-first-stage",
+        source: "gateway-router",
+      });
+      recordCsRoutingDiagnostic({
+        event: eventName,
+        source: "gateway-router",
+        phase: "routed",
+        route: "customer-service-first-stage",
+        classification,
+        summary: payload,
+      });
+      return;
+    }
+    if (handleFirstStageGatewayEvent(eventName, args)) {
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: "im-first-stage",
+        source: "gateway-router",
+      });
+      recordCsRoutingDiagnostic({
+        event: eventName,
+        source: "gateway-router",
+        phase: "routed",
+        route: "im-first-stage",
+        classification,
+        summary: payload,
+      });
+      return;
+    }
 
     if (isImMessageEventName(eventName)) {
       const isCustomerServiceMessage = isCustomerServiceGatewayPayload(payload);
@@ -120,10 +185,39 @@ export function createGatewayEventRouter(options: {
         stringField(conversationRecord(payload), "conversationId", "conversation_id", "chatId", "chat_id");
       if (isCustomerServiceMessage) {
         const threadId = customerServiceThreadId(payload) || conversationId;
+        recordGatewayReminderDiagnostic({
+          eventName,
+          payload,
+          phase: "routed",
+          route: "customer-service",
+          source: "gateway-router",
+        });
+        recordCsRoutingDiagnostic({
+          event: eventName,
+          source: "gateway-router",
+          phase: "fallback-route",
+          route: "customer-service",
+          classification,
+          summary: payload,
+        });
         mergeCustomerServiceGatewayMessage(queryClient, payload, threadId);
         invalidateCustomerService(threadId);
-        invalidateIm(conversationId);
       } else {
+        recordGatewayReminderDiagnostic({
+          eventName,
+          payload,
+          phase: "routed",
+          route: "im",
+          source: "gateway-router",
+        });
+        recordCsRoutingDiagnostic({
+          event: eventName,
+          source: "gateway-router",
+          phase: "fallback-route",
+          route: "im",
+          classification,
+          summary: payload,
+        });
         mergeImGatewayMessage(queryClient, payload, conversationId, conversationType);
         void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
       }
@@ -134,6 +228,13 @@ export function createGatewayEventRouter(options: {
       const threadId =
         customerServiceThreadId(payload) ||
         stringField(payload, "conversationId", "chatId", "threadId", "sessionId");
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: "customer-service",
+        source: "gateway-router",
+      });
       mergeCustomerServiceGatewayMessage(queryClient, payload, threadId);
       invalidateCustomerService(threadId);
       return;
@@ -143,6 +244,13 @@ export function createGatewayEventRouter(options: {
       const threadId =
         customerServiceThreadId(payload) ||
         stringField(payload, "conversationId", "chatId", "threadId", "sessionId");
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: "customer-service-queue",
+        source: "gateway-router",
+      });
       invalidateCustomerService(threadId);
       notifyCustomerServiceQueue(payload, threadId);
       return;
@@ -150,12 +258,26 @@ export function createGatewayEventRouter(options: {
 
     if (eventName === "msg.read" || eventName === "msg.recalled" || eventName === "space.notice") {
       if (eventName === "msg.read") {
+        recordGatewayReminderDiagnostic({
+          eventName,
+          payload,
+          phase: "routed",
+          route: "im-read",
+          source: "gateway-router",
+        });
         mergeReadEvent(queryClient, payload, session);
         void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
         return;
       }
       invalidateIm(stringField(payload, "conversationId", "chatId"));
       if (eventName === "space.notice") invalidateCustomerService();
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: eventName === "space.notice" ? "im-and-customer-service-refresh" : "im-refresh",
+        source: "gateway-router",
+      });
       return;
     }
 
@@ -163,6 +285,13 @@ export function createGatewayEventRouter(options: {
       const nextStatus = stringField(payload, "serviceStatus", "status", "staffStatus");
       if (isCustomerServiceStatus(nextStatus)) setCustomerServiceStatus(nextStatus);
       invalidateCustomerService(stringField(payload, "threadId", "sessionId"));
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: "customer-service-lifecycle",
+        source: "gateway-router",
+      });
       return;
     }
 

@@ -16,15 +16,23 @@ import {
   getImReadSnapshot,
 } from "../../data/im-read/im-read-store";
 import { readStateMeaningfullyChanged } from "../../data/im-read/im-read-view-model";
+import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
+import { useActiveModule } from "../../data/workspace-ui/workspace-ui-store";
+import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
 import { requireApiClient } from "../../data/runtime";
 import { formatError } from "../../lib/format";
 import { applyConversationReadToCache } from "../models/messageCacheMutationModel";
 import type { UnreadJumpState } from "../models/messageDisplayModel";
 import { getImConversationType } from "./useMessageCenterViewModel";
+import type { ActiveImConversationSource } from "./useMessageUnreadJumpController";
+
+export type ActiveImConversationVisibility = "hidden" | "listOnly" | "paneVisible";
 
 export function useImReadCommandExecutor({
   activeConversation,
   activeConversationId,
+  activeConversationSource,
+  activeConversationVisibility,
   activeConversationType,
   clearPendingImRead,
   conversationItems,
@@ -40,6 +48,8 @@ export function useImReadCommandExecutor({
 }: {
   activeConversation: ConversationListItem | undefined;
   activeConversationId: string | null;
+  activeConversationSource: ActiveImConversationSource;
+  activeConversationVisibility: ActiveImConversationVisibility;
   activeConversationType: ReturnType<typeof getImConversationType>;
   clearPendingImRead: (
     conversationType: ImConversationType,
@@ -57,8 +67,9 @@ export function useImReadCommandExecutor({
   unreadIdentity: CurrentUserIdentity | null;
   upsertImReadState: (state: ConversationReadState) => void;
 }) {
+  const activeModule = useActiveModule();
   const executeImCoreCommands = useCallback(
-    (commands: ImCoreCommand[]) => {
+    (commands: ImCoreCommand[], reason: string) => {
       commands.forEach((command) => {
         if (command.type === "log_diagnostic") return;
         if (command.type === "clear_new_message_jump") {
@@ -71,6 +82,23 @@ export function useImReadCommandExecutor({
 
         const nextReadSeq = Math.max(0, Math.floor(command.readSeq));
         if (nextReadSeq <= 0) return;
+        recordMessageReminderDiagnostic({
+          event: "im.ui.read.command",
+          source: "use-im-read-command-executor",
+          phase: "execute",
+          route: command.type,
+          classification: {
+            activeConversationId,
+            activeConversationSource,
+            activeConversationVisibility,
+            activeModule,
+            commandReason: reason,
+            conversationId: command.conversationId,
+            conversationType: command.conversationType,
+            readSeq: nextReadSeq,
+          },
+          summary: command,
+        });
         const key = imConversationKey(command.conversationType, command.conversationId);
         const currentReadState = getImReadSnapshot().imReadStateByConversation[key];
         upsertImReadState({
@@ -117,6 +145,10 @@ export function useImReadCommandExecutor({
       });
     },
     [
+      activeConversationId,
+      activeConversationSource,
+      activeConversationVisibility,
+      activeModule,
       clearPendingImRead,
       dismissRealtimeRemindersForTarget,
       markConversationReadLocally,
@@ -129,9 +161,55 @@ export function useImReadCommandExecutor({
   );
 
   useEffect(() => {
+    const canAutoRead = canAutoReadImConversation({
+      activeConversationId,
+      activeConversationSource,
+      activeConversationVisibility,
+      conversationId: activeConversation?.conversationId,
+      messagesLength: messages.length,
+    });
+    recordMessageReminderDiagnostic({
+      event: "im.ui.visibility.resolve",
+      source: "use-im-read-command-executor",
+      phase: "resolve",
+      route: activeConversationVisibility,
+      classification: {
+        activeConversationId,
+        activeConversationSource,
+        activeConversationVisibility,
+        activeModule,
+        conversationId: activeConversation?.conversationId,
+        markReadAllowed: canAutoRead,
+        messagesLoaded: messages.length > 0,
+      },
+      summary: {
+        activeConversation,
+      },
+    });
+    recordMessageReminderDiagnostic({
+      event: "im.ui.read.evaluate",
+      source: "use-im-read-command-executor",
+      phase: "evaluate",
+      route: canAutoRead ? "allow" : "skip",
+      classification: {
+      activeConversationId,
+      activeConversationSource,
+      activeConversationVisibility,
+      activeModule,
+        conversationId: activeConversation?.conversationId,
+        conversationType: activeConversationType,
+        lastMessageSeq: activeConversation?.lastMessageSeq,
+        lastReadSeq: activeConversation?.lastReadSeq,
+        messagesLength: messages.length,
+        visibility: activeConversationVisibility,
+        reason: canAutoRead ? "user-visible-conversation" : "not-user-visible-conversation",
+      },
+      summary: {
+        activeConversation,
+      },
+    });
     if (!activeConversation || !session || !activeConversationType) return;
-    if (activeConversationId !== activeConversation.conversationId) return;
-    if (messages.length === 0) return;
+    if (!canAutoRead) return;
     const key = imConversationKey(
       activeConversationType,
       activeConversation.conversationId,
@@ -156,11 +234,14 @@ export function useImReadCommandExecutor({
       upsertImReadState(nextState);
     }
     if (result.commands.length > 0) {
-      executeImCoreCommands(result.commands);
+      executeImCoreCommands(result.commands, "ui.conversation_opened");
     }
   }, [
     activeConversation,
     activeConversationId,
+    activeConversationSource,
+    activeConversationVisibility,
+    activeModule,
     activeConversationType,
     executeImCoreCommands,
     messages,
@@ -194,21 +275,87 @@ export function useImReadCommandExecutor({
         },
       });
       const nextState = result.stateByConversation[key];
+      recordMessageReminderDiagnostic({
+        event: "im.api.snapshot.reduce",
+        source: "use-im-read-command-executor",
+        phase: "reduce",
+        route: "conversation-list",
+        classification: {
+          activeConversationId,
+          activeConversationSource,
+          activeConversationVisibility,
+          activeModule,
+          commands: result.commands.map((command) => command.type),
+          conversationId: conversation.conversationId,
+          conversationType,
+          lastMessageSeq: conversation.lastMessageSeq,
+          lastReadSeq: conversation.lastReadSeq,
+          myReadSeqAfter: nextState?.myReadSeq,
+          myReadSeqBefore: stateByConversation[key]?.myReadSeq,
+          unreadAfter: result.viewByConversation[key]?.unreadCount,
+          unreadBefore: stateByConversation[key]?.unreadCount,
+          serverUnread: conversation.unreadCount ?? 0,
+        },
+        summary: {
+          conversation,
+        },
+      });
       if (nextState && readStateMeaningfullyChanged(stateByConversation[key], nextState)) {
         upsertImReadState(nextState);
       }
       if (result.commands.length > 0) {
-        executeImCoreCommands(result.commands);
+        executeImCoreCommands(result.commands, "api.conversation_snapshot");
       }
       stateByConversation = result.stateByConversation;
     }
   }, [
     conversationItems,
     executeImCoreCommands,
+    activeConversationId,
+    activeConversationSource,
+    activeConversationVisibility,
+    activeModule,
     session,
     unreadIdentity,
     upsertImReadState,
   ]);
 
   return executeImCoreCommands;
+}
+
+export function canAutoReadImConversation(input: {
+  activeConversationId: string | null | undefined;
+  activeConversationSource: ActiveImConversationSource;
+  activeConversationVisibility: ActiveImConversationVisibility;
+  conversationId?: string | null;
+  messagesLength: number;
+}) {
+  return Boolean(
+    input.activeConversationVisibility === "paneVisible" &&
+      input.activeConversationId &&
+      input.conversationId &&
+      input.activeConversationId === input.conversationId &&
+      input.messagesLength > 0,
+  );
+}
+
+export function resolveActiveImConversationVisibility(input: {
+  activeConversationId?: string | null;
+  activeModule?: string | null;
+  conversationDrawerOpen: boolean;
+  conversationId?: string | null;
+  messageLayoutMode: MessageLayoutMode;
+}): ActiveImConversationVisibility {
+  if (
+    input.activeModule !== "messages" ||
+    !input.activeConversationId ||
+    !input.conversationId ||
+    input.activeConversationId !== input.conversationId
+  ) {
+    return "hidden";
+  }
+  if (input.messageLayoutMode === "chat-focus" && input.conversationDrawerOpen) {
+    return "listOnly";
+  }
+  return "paneVisible";
 }

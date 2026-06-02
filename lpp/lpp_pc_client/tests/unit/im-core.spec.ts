@@ -37,6 +37,8 @@ import {
   readReceiptReaderIsCurrentUser,
   viewedConversationReadSeq,
 } from "../../src/renderer/data/read-receipts";
+import { filterMessageConversations } from "../../src/renderer/messages/models/messageConversationListModel";
+import { createMessageCenterViewModel } from "../../src/renderer/messages/hooks/useMessageCenterViewModel";
 
 const expectedScenarioMatrixIds = new Set([
   "D-01",
@@ -248,6 +250,7 @@ describe("IM unread rules", () => {
       lastMessage: {
         messageId: "server-last",
         preview: "123213",
+        direction: "out",
         sentAt: "2026-05-28T01:30:00.000Z",
       },
     });
@@ -311,6 +314,31 @@ describe("IM unread rules", () => {
     });
 
     expect(effectiveConversationUnreadCount(item, identity)).toBe(0);
+  });
+
+  it("does not let a local readAt timestamp clear newer server unread when read seq is behind", () => {
+    const identity: CurrentUserIdentity = {
+      ...currentUser,
+      locallyReadConversationReads: {
+        "direct:chat-1": {
+          readSeq: 300,
+          readAt: Date.parse("2026-06-02T04:00:00.000Z"),
+        },
+      },
+    };
+    const item = conversation({
+      unreadCount: 2,
+      lastMessageSeq: 302,
+      lastReadSeq: 300,
+      lastMessage: {
+        messageId: "m302",
+        preview: "codex-unread",
+        sentAt: "2026-06-02T03:56:14.925Z",
+        senderUserId: "peer-user",
+      },
+    });
+
+    expect(effectiveConversationUnreadCount(item, identity)).toBe(2);
   });
 
   it("does not restore list unread when unified local readSeq covers a stale server snapshot", () => {
@@ -443,6 +471,36 @@ describe("IM unread rules", () => {
     });
 
     expect(effectiveConversationUnreadCount(item, currentUser)).toBe(4);
+  });
+
+  it("keeps unread when direct peer id matches current user without message-level self evidence", () => {
+    const item = conversation({
+      conversationId: "chat-current-peer",
+      peerUserId: "pc-user",
+      unreadCount: 2,
+      lastMessageSeq: 302,
+      lastReadSeq: 300,
+      lastMessage: {
+        messageId: "m302",
+        preview: "codex-unread",
+        sentAt: "2026-06-02T03:56:14.925Z",
+      },
+    });
+
+    expect(effectiveConversationUnreadCount(item, currentUser)).toBe(2);
+    expect(filterMessageConversations([item], "unread", "", currentUser)).toEqual([
+      item,
+    ]);
+    expect(createMessageCenterViewModel({
+      activeConversationId: null,
+      conversations: [item],
+      draftsByConversation: {},
+      friends: [],
+      groupMembers: [],
+      imReadStateByConversation: {},
+      unreadIdentity: currentUser,
+      visibleConversations: [item],
+    }).counts.unread).toBe(1);
   });
 
   it("applies self-last-message protection to group conversations too", () => {
@@ -1220,6 +1278,7 @@ describe("IM read model state machine", () => {
       unreadCount: 2,
     });
     expect(result.viewByConversation["direct:chat-1"].unreadCount).toBe(2);
+    expect(result.commands).toEqual([]);
   });
 
   it("retries pending reads when the server snapshot has not acknowledged them", () => {
@@ -1447,6 +1506,107 @@ describe("IM read model state machine", () => {
         senderUserId: "pc-user",
       },
     }).bubbleStatusText).toBe("已发送");
+  });
+
+  it("keeps current unread when a peer read receipt follows a peer message", () => {
+    const afterMessage = reduceImCoreEvent({
+      identity,
+      stateByConversation: {
+        "direct:chat-1": createInitialImReadState("direct", "chat-1", {
+          myReadSeq: 300,
+          lastMessageSeq: 300,
+          unreadCount: 0,
+        }),
+      },
+      event: {
+        type: "gateway.message_received",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        isActiveConversation: false,
+        message: {
+          messageId: "m301",
+          conversationId: "chat-1",
+          conversationSeq: 301,
+          senderUserId: "peer-user",
+          direction: "in",
+        },
+      },
+    });
+
+    const afterPeerRead = reduceImCoreEvent({
+      identity,
+      stateByConversation: afterMessage.stateByConversation,
+      event: {
+        type: "gateway.read_received",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        readerIdentity: { userId: "peer-user" },
+        readSeq: 301,
+      },
+    });
+
+    expect(afterPeerRead.stateByConversation["direct:chat-1"]).toMatchObject({
+      myReadSeq: 300,
+      peerReadSeq: 301,
+      unreadCount: 1,
+    });
+    expect(afterPeerRead.viewByConversation["direct:chat-1"].unreadCount).toBe(1);
+  });
+
+  it("clears current unread only when a current-user read receipt catches up", () => {
+    const result = reduceImCoreEvent({
+      identity,
+      stateByConversation: {
+        "direct:chat-1": createInitialImReadState("direct", "chat-1", {
+          myReadSeq: 300,
+          lastMessageSeq: 301,
+          unreadCount: 1,
+        }),
+      },
+      event: {
+        type: "gateway.read_received",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        readerIdentity: { platformUserId: "pc-platform" },
+        readSeq: 301,
+      },
+    });
+
+    expect(result.stateByConversation["direct:chat-1"]).toMatchObject({
+      myReadSeq: 301,
+      unreadCount: 0,
+    });
+    expect(result.viewByConversation["direct:chat-1"].unreadCount).toBe(0);
+  });
+
+  it("does not let a zero-unread snapshot erase local peer unread without local read evidence", () => {
+    const result = reduceImCoreEvent({
+      identity,
+      stateByConversation: {
+        "direct:chat-1": createInitialImReadState("direct", "chat-1", {
+          myReadSeq: 300,
+          lastMessageSeq: 301,
+          unreadCount: 1,
+        }),
+      },
+      event: {
+        type: "api.conversation_snapshot",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        conversation: {
+          myReadSeq: 301,
+          lastMessageSeq: 301,
+          unreadCount: 0,
+        },
+      },
+    });
+
+    expect(result.stateByConversation["direct:chat-1"]).toMatchObject({
+      myReadSeq: 300,
+      lastMessageSeq: 301,
+      unreadCount: 1,
+    });
+    expect(result.viewByConversation["direct:chat-1"].unreadCount).toBe(1);
   });
 
   it("does not treat read receipts without reader identity as peer reads", () => {

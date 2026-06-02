@@ -1,13 +1,19 @@
 import type {
+  DesktopNotificationTargetModule,
   PcRealtimeReminder,
   PcRealtimeReminderInput,
   ReminderDesktopChannel,
   ReminderPolicySettings,
 } from "./reminder-types";
+import type { NotificationClickedPayload } from "../../../shared/desktop-api";
 import { logReminderDiagnostic } from "./reminder-diagnostics";
+import { resolveNotificationIconDataUrl } from "./notification-avatar";
 
 export const realtimeReminderLimit = 6;
 export const realtimeReminderTtlMs = 30 * 60 * 1000;
+export const desktopNotificationDedupeWindowMs = 2_000;
+
+const recentDesktopNotificationKeys = new Map<string, number>();
 
 export interface ReminderReduceOptions {
   limit?: number;
@@ -18,16 +24,37 @@ export interface DesktopNotificationPayload {
   title: string;
   body: string;
   conversationId?: string;
+  channel?: ReminderDesktopChannel;
+  iconDataUrl?: string | null;
+  silent?: boolean;
+  targetId?: string;
+  targetModule?: DesktopNotificationTargetModule;
 }
 
 export interface DesktopNotificationOptions {
+  authToken?: string | null;
   channel?: ReminderDesktopChannel;
+  iconUrl?: string | null;
   settings?: ReminderPolicySettings;
+}
+
+export interface TaskbarBadgeInput {
+  contactRequestCount?: number;
+  imUnreadCount?: number;
+  serviceQueueCount?: number;
+  serviceUnreadCount?: number;
 }
 
 export type DesktopNotificationResult =
   | { result: "sent"; channel: "electron" | "browser" }
-  | { result: "skipped"; reason: "window_unavailable" | "notification_unavailable" | "permission_denied" }
+  | {
+      result: "skipped";
+      reason:
+        | "deduplicated"
+        | "window_unavailable"
+        | "notification_unavailable"
+        | "permission_denied";
+    }
   | { result: "failed"; reason: "electron_failed" | "browser_failed"; error: unknown };
 
 export function createRealtimeReminder(
@@ -96,6 +123,66 @@ export function shouldShowDesktopNotification(
   return settings.desktopNotifications && shouldPushRealtimeReminder(settings, channel);
 }
 
+export interface DesktopNotificationVisibilityInput {
+  activeModule?: PcRealtimeReminder["targetModule"];
+  activeTargetId?: string;
+  targetModule?: PcRealtimeReminder["targetModule"];
+  targetId?: string;
+  windowFocused?: boolean;
+}
+
+export function shouldShowDesktopNotificationForTarget(
+  settings: ReminderPolicySettings,
+  channel: ReminderDesktopChannel,
+  input: DesktopNotificationVisibilityInput = {},
+) {
+  if (!shouldShowDesktopNotification(settings, channel)) return false;
+  if (channel !== "serviceQueue") return true;
+  if (!input.windowFocused) return true;
+  if (input.targetModule !== "onlineService") return true;
+  if (input.activeModule !== "onlineService") return true;
+  return !input.targetId || input.activeTargetId !== input.targetId;
+}
+
+export function isRendererWindowFocused() {
+  if (typeof document === "undefined") return false;
+  return document.hasFocus();
+}
+
+export function subscribeDesktopNotificationClicks(
+  callback: (payload: NotificationClickedPayload) => void,
+) {
+  if (typeof window === "undefined" || !window.desktopApi?.onNotificationClicked) {
+    return undefined;
+  }
+  return window.desktopApi.onNotificationClicked(callback);
+}
+
+export function taskbarBadgeLabel(count: number) {
+  const normalizedCount = Math.max(0, Math.floor(Number(count) || 0));
+  if (normalizedCount <= 0) return "";
+  return normalizedCount > 99 ? "99+" : String(normalizedCount);
+}
+
+export function deriveTaskbarBadge(input: TaskbarBadgeInput) {
+  const serviceQueueCount = normalizedBadgeCount(input.serviceQueueCount);
+  const serviceUnreadCount = normalizedBadgeCount(input.serviceUnreadCount);
+  const count =
+    normalizedBadgeCount(input.imUnreadCount) +
+    normalizedBadgeCount(input.contactRequestCount) +
+    serviceQueueCount +
+    serviceUnreadCount;
+  return {
+    count,
+    urgent: serviceQueueCount + serviceUnreadCount > 0,
+  };
+}
+
+export async function applyTaskbarBadge(input: TaskbarBadgeInput) {
+  if (typeof window === "undefined" || !window.desktopApi?.setTaskbarBadge) return;
+  await window.desktopApi.setTaskbarBadge(deriveTaskbarBadge(input));
+}
+
 export async function notifyDesktopOrBrowser(
   payload: DesktopNotificationPayload,
   options: DesktopNotificationOptions = {},
@@ -111,9 +198,34 @@ export async function notifyDesktopOrBrowser(
     return { result: "skipped", reason: "window_unavailable" };
   }
 
+  const notificationPayload = notificationPayloadForPolicy(
+    {
+      ...payload,
+      channel: payload.channel ?? options.channel,
+      iconDataUrl:
+        payload.iconDataUrl ??
+        (await resolveNotificationIconDataUrl({
+          token: options.authToken,
+          url: options.iconUrl,
+        })),
+      silent: options.settings ? !options.settings.notificationSound : payload.silent,
+    },
+    options.settings,
+  );
+  if (consumeDesktopNotificationDedupe(notificationPayload, options)) {
+    logReminderDiagnostic({
+      event: "reminder.desktop-notify",
+      phase: "notify",
+      result: "skipped",
+      reason: "deduplicated",
+      context: desktopNotificationContext(notificationPayload, options),
+    });
+    return { result: "skipped", reason: "deduplicated" };
+  }
+
   if (window.desktopApi?.notify) {
     try {
-      await window.desktopApi.notify(notificationPayloadForPolicy(payload, options.settings));
+      await window.desktopApi.notify(notificationPayload);
       logReminderDiagnostic({
         event: "reminder.desktop-notify",
         phase: "notify",
@@ -175,10 +287,10 @@ export async function notifyDesktopOrBrowser(
   }
 
   try {
-    const notificationPayload = notificationPayloadForPolicy(payload, options.settings);
     new window.Notification(notificationPayload.title, {
       body: notificationPayload.body,
-      tag: payload.conversationId,
+      icon: notificationPayload.iconDataUrl ?? undefined,
+      tag: payload.targetId || payload.conversationId,
       silent: options.settings ? !options.settings.notificationSound : undefined,
     });
     logReminderDiagnostic({
@@ -212,10 +324,43 @@ export function notificationPayloadForPolicy(
   if (settings?.notificationPreview === false) {
     return {
       ...payload,
-      body: "你有一条新提醒，内容已按隐私设置隐藏。",
+      body:
+        payload.channel === "serviceQueue"
+          ? "收到一条在线客服消息"
+          : "你有一条新提醒，内容已按隐私设置隐藏。",
     };
   }
   return payload;
+}
+
+export function desktopNotificationDedupeKey(
+  payload: DesktopNotificationPayload,
+  options: DesktopNotificationOptions = {},
+) {
+  const channel = payload.channel ?? options.channel ?? "";
+  const targetModule = payload.targetModule ?? "";
+  const targetId = payload.targetId || payload.conversationId || "";
+  return [channel, targetModule, targetId, payload.title, payload.body].join("\u001f");
+}
+
+export function consumeDesktopNotificationDedupe(
+  payload: DesktopNotificationPayload,
+  options: DesktopNotificationOptions = {},
+  now = Date.now(),
+  windowMs = desktopNotificationDedupeWindowMs,
+) {
+  const key = desktopNotificationDedupeKey(payload, options);
+  for (const [itemKey, timestamp] of recentDesktopNotificationKeys) {
+    if (now - timestamp > windowMs) recentDesktopNotificationKeys.delete(itemKey);
+  }
+  const previous = recentDesktopNotificationKeys.get(key);
+  if (previous !== undefined && now - previous <= windowMs) return true;
+  recentDesktopNotificationKeys.set(key, now);
+  return false;
+}
+
+export function resetDesktopNotificationDedupeForTest() {
+  recentDesktopNotificationKeys.clear();
 }
 
 function desktopNotificationContext(
@@ -223,7 +368,15 @@ function desktopNotificationContext(
   options: DesktopNotificationOptions,
 ) {
   return {
-    channel: options.channel,
+    channel: payload.channel ?? options.channel,
     conversationId: payload.conversationId,
+    targetId: payload.targetId,
+    targetModule: payload.targetModule,
   };
+}
+
+function normalizedBadgeCount(value: unknown) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return 0;
+  return Math.max(0, Math.floor(numberValue));
 }

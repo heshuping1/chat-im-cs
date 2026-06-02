@@ -25,6 +25,10 @@ import {
   imMessageEntityToDto,
   normalizeImMessageDto,
 } from "../im/im-message-contract";
+import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
+import { rememberCustomerServiceConversationFromImList } from "../customer-service/cs-compatibility-bridge";
+import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
+import { resolveConversationOwnership } from "../gateway/conversation-ownership-resolver";
 import {
   normalizeCreateGroupChatPayload,
   type CreateGroupChatInput,
@@ -39,13 +43,37 @@ export class MessagesApiClient extends ContactsApiClient {
     if (params.cursor) search.set("cursor", params.cursor);
     return this.request<ConversationListResponse>(
       `${endpointPlan.conversations}?${search.toString()}`,
-    ).then((page) => ({
-      ...page,
-      items: (page.items ?? [])
-        .filter(isPlainImConversation)
-        .map(normalizeConversationSummaryFromContract)
-        .filter((item): item is ConversationListItem => Boolean(item)),
-    }));
+    ).then((page) => {
+      const items = page.items ?? [];
+      const filtered = items.filter(isPlainImConversation);
+      const scopeKey = customerServiceIndexScopeKey({
+        apiBaseUrl: this.options.baseUrl,
+        tenantToken: this.options.tenantToken,
+      });
+      items.forEach((item) => rememberCustomerServiceConversationFromImList(item, scopeKey));
+      const dropped = items.filter((item) => !isPlainImConversation(item));
+      recordCsRoutingDiagnostic({
+        event: "pc-im-conversations",
+        source: "messages-client",
+        phase: "filter",
+        route: "conversation-list",
+        classification: {
+          total: items.length,
+          kept: filtered.length,
+          dropped: items.length - filtered.length,
+        },
+        summary: dropped.slice(0, 20).map((item) => ({
+          ...item,
+          ownership: resolveConversationOwnership(item as unknown as Record<string, unknown>, "imList"),
+        })),
+      });
+      return {
+        ...page,
+        items: filtered
+          .map(normalizeConversationSummaryFromContract)
+          .filter((item): item is ConversationListItem => Boolean(item)),
+      };
+    });
   }
 
   createDirectChat(peerUserId: string) {
@@ -270,6 +298,8 @@ export class MessagesApiClient extends ContactsApiClient {
 
 function isPlainImConversation(item: ConversationListItem) {
   const record = item as unknown as Record<string, unknown>;
+  const ownership = resolveConversationOwnership(record, "imList");
+  if (ownership.owner === "customerService" && ownership.confidence === "explicit") return false;
   const conversationType = normalizeGatewayType(
     stringField(record, "conversationType", "type"),
   );
@@ -279,11 +309,7 @@ function isPlainImConversation(item: ConversationListItem) {
   if (conversationType === "temp_session" || threadType === "temp_session") {
     return false;
   }
-  if (
-    record.tempSession ||
-    record.temp_session ||
-    stringField(record, "sessionId", "visitorSessionId", "tempSessionId")
-  ) {
+  if (record.tempSession || record.temp_session) {
     return false;
   }
   return [

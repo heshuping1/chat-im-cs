@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
@@ -9,11 +9,14 @@ import {
   type CurrentUserIdentity,
 } from "../../data/message-display";
 import { pcQueryKeys } from "../../data/query-keys";
+import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
 import {
   findFirstUnreadLoadedMessage,
   type UnreadJumpState,
 } from "../models/messageDisplayModel";
 import { getImConversationType } from "./useMessageCenterViewModel";
+
+export type ActiveImConversationSource = "user" | "auto" | "none";
 
 export function useMessageUnreadJumpController({
   activeConversation,
@@ -51,6 +54,13 @@ export function useMessageUnreadJumpController({
   unreadJump: UnreadJumpState | null;
 }) {
   const autoSelectedConversationIdsRef = useRef(new Set<string>());
+  const [selectionSources, setSelectionSources] = useState<
+    Record<string, ActiveImConversationSource>
+  >({});
+  const activeConversationSource: ActiveImConversationSource = activeConversation
+    ? selectionSources[activeConversation.conversationId] ??
+      (activeConversationId === activeConversation.conversationId ? "user" : "auto")
+    : "none";
 
   useEffect(() => {
     if (
@@ -59,6 +69,27 @@ export function useMessageUnreadJumpController({
     ) {
       if (!activeConversationId) {
         autoSelectedConversationIdsRef.current.add(activeConversation.conversationId);
+        setSelectionSources((current) => ({
+          ...current,
+          [activeConversation.conversationId]: "auto",
+        }));
+        recordMessageReminderDiagnostic({
+          event: "im.ui.selection",
+          source: "use-message-unread-jump-controller",
+          phase: "selection",
+          route: "auto",
+          classification: {
+            activeConversationId,
+            activeConversationSource: "auto",
+            conversationId: activeConversation.conversationId,
+            lastMessageSeq: activeConversation.lastMessageSeq,
+            lastReadSeq: activeConversation.lastReadSeq,
+            unreadCount: activeConversation.unreadCount,
+          },
+          summary: {
+            activeConversation,
+          },
+        });
       }
       setActiveConversation(activeConversation.conversationId);
     }
@@ -67,6 +98,27 @@ export function useMessageUnreadJumpController({
   const openConversationFromUserClick = useCallback(
     (conversation: ConversationListItem) => {
       autoSelectedConversationIdsRef.current.delete(conversation.conversationId);
+      setSelectionSources((current) => ({
+        ...current,
+        [conversation.conversationId]: "user",
+      }));
+      recordMessageReminderDiagnostic({
+        event: "im.ui.selection",
+        source: "use-message-unread-jump-controller",
+        phase: "selection",
+        route: "user",
+        classification: {
+          activeConversationId,
+          activeConversationSource: "user",
+          conversationId: conversation.conversationId,
+          lastMessageSeq: conversation.lastMessageSeq,
+          lastReadSeq: conversation.lastReadSeq,
+          unreadCount: conversation.unreadCount,
+        },
+        summary: {
+          conversation,
+        },
+      });
       setConversationDrawerOpen(false);
       setActiveConversation(conversation.conversationId);
 
@@ -170,6 +222,7 @@ export function useMessageUnreadJumpController({
   ]);
 
   return {
+    activeConversationSource,
     handleUnreadJump,
     openConversationFromUserClick,
   };

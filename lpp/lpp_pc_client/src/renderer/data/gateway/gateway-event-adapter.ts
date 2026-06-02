@@ -3,6 +3,7 @@ import {
   type NormalizedImMessage,
 } from "../im-api-contract";
 import type { ImConversationType } from "../im-read-model";
+import { isCustomerServiceGatewayPayload } from "./gateway-cs-payload-utils";
 import { createGatewayTraceId } from "./gateway-diagnostics";
 import type {
   GatewayIgnoredEvent,
@@ -328,20 +329,3 @@ function fallbackConversationIdFromPeer(payload: Record<string, unknown>) {
   );
 }
 
-function isCustomerServiceGatewayPayload(payload: Record<string, unknown>) {
-  const conversation = conversationRecord(payload);
-  const thread = asRecord(payload.thread);
-  const markers = [
-    stringField(payload, "threadType", "thread_type", "conversationType", "conversation_type"),
-    stringField(conversation, "threadType", "thread_type", "conversationType", "conversation_type"),
-    stringField(thread, "threadType", "thread_type", "conversationType", "conversation_type"),
-  ].map(normalizeType);
-  if (markers.some((value) => value === "temp_session")) {
-    return true;
-  }
-  if (asRecord(payload.tempSession).sessionId || asRecord(payload.temp_session).sessionId) {
-    return true;
-  }
-  const sessionId = stringField(payload, "sessionId", "visitorSessionId", "tempSessionId");
-  return Boolean(sessionId && (stringField(payload, "visitorId", "visitorUserId") || stringField(thread, "threadId")));
-}

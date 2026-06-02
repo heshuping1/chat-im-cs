@@ -8,7 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 
 import type {
   CustomerServiceQuickReplyDto,
@@ -37,9 +37,19 @@ export interface QuickReplyPickerEmptyState {
   tone?: "error" | "muted";
 }
 
+export interface QuickReplyFilterItem {
+  count: number;
+  disabled?: boolean;
+  key: QuickReplyFilter;
+  label: string;
+}
+
 export interface QuickReplyPickerViewModel {
   categories: string[];
+  categoryCounts: Record<string, number>;
   emptyState?: QuickReplyPickerEmptyState;
+  filterItems: QuickReplyFilterItem[];
+  filterLabel: string;
   scopedReplies: CustomerServiceQuickReplyDto[];
   selectedReply?: CustomerServiceQuickReplyDto;
   totalCount: number;
@@ -89,9 +99,11 @@ export function CustomerServiceQuickReplyPanel({
   const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
   const [keyword, setKeyword] = useState("");
+  const deferredKeyword = useDeferredValue(keyword);
   const [filter, setFilter] = useState<QuickReplyFilter>("all");
   const [selectedId, setSelectedId] = useState("");
   const [recentIds, setRecentIds] = useState(() => readRecentQuickReplyIds());
+  const listRef = useRef<HTMLDivElement | null>(null);
   const scope = quickReplyScopeForThreadType(threadType);
 
   const repliesQuery = useQuery({
@@ -105,7 +117,7 @@ export function CustomerServiceQuickReplyPanel({
       createQuickReplyPickerViewModel({
         errorText: repliesQuery.error ? formatError(repliesQuery.error) : undefined,
         filter,
-        keyword,
+        keyword: deferredKeyword,
         loading: repliesQuery.isLoading,
         recentIds,
         replies: repliesQuery.data ?? [],
@@ -114,7 +126,7 @@ export function CustomerServiceQuickReplyPanel({
       }),
     [
       filter,
-      keyword,
+      deferredKeyword,
       recentIds,
       repliesQuery.data,
       repliesQuery.error,
@@ -123,11 +135,13 @@ export function CustomerServiceQuickReplyPanel({
       selectedId,
     ],
   );
-  const { categories, emptyState, selectedReply, totalCount, visibleReplies } = viewModel;
+  const { emptyState, filterItems, filterLabel, selectedReply, totalCount, visibleReplies } =
+    viewModel;
 
   const selectFilter = (nextFilter: QuickReplyFilter) => {
     setFilter(nextFilter);
     setSelectedId("");
+    listRef.current?.scrollTo({ top: 0 });
   };
 
   const insertReply = (reply: CustomerServiceQuickReplyDto) => {
@@ -187,51 +201,43 @@ export function CustomerServiceQuickReplyPanel({
           </button>
         </form>
 
-        <section className="cs-quick-reply-filters" aria-label="话术筛选">
-          <FilterButton active={filter === "all"} label="全部" onClick={() => selectFilter("all")} />
-          <FilterButton
-            active={filter === "current"}
-            disabled={!scope}
-            label="当前场景"
-            onClick={() => selectFilter("current")}
-          />
-          <FilterButton
-            active={filter === "recent"}
-            disabled={recentIds.length === 0}
-            label="最近使用"
-            onClick={() => selectFilter("recent")}
-          />
-          {categories.map((category) => (
-            <FilterButton
-              key={category}
-              active={filter === categoryFilter(category)}
-              label={category}
-              onClick={() => selectFilter(categoryFilter(category))}
-            />
-          ))}
-        </section>
       </div>
 
-      <section className="cs-quick-reply-list-zone">
-        <div className="cs-quick-reply-section-head">
-          <strong>话术列表</strong>
-          <span>{visibleReplies.length} / {totalCount} 条</span>
-        </div>
-        {emptyState ? (
-          <QuickReplyState text={emptyState.text} error={emptyState.tone === "error"} />
-        ) : (
-          <div className="cs-quick-reply-list">
-            {visibleReplies.map((reply) => (
-              <QuickReplyCard
-                key={reply.quickReplyId}
-                active={selectedReply?.quickReplyId === reply.quickReplyId}
-                reply={reply}
-                onSelect={() => setSelectedId(reply.quickReplyId)}
-              />
-            ))}
+      <div className="cs-quick-reply-workbench">
+        <nav className="cs-quick-reply-filter-rail" aria-label="话术分类">
+          {filterItems.map((item) => (
+            <FilterButton
+              key={item.key}
+              active={filter === item.key}
+              count={item.count}
+              disabled={item.disabled}
+              label={item.label}
+              onClick={() => selectFilter(item.key)}
+            />
+          ))}
+        </nav>
+
+        <section className="cs-quick-reply-list-zone">
+          <div className="cs-quick-reply-section-head">
+            <strong>{filterLabel}</strong>
+            <span>{visibleReplies.length} / {totalCount} 条</span>
           </div>
-        )}
-      </section>
+          {emptyState ? (
+            <QuickReplyState text={emptyState.text} error={emptyState.tone === "error"} />
+          ) : (
+            <div className="cs-quick-reply-list" ref={listRef}>
+              {visibleReplies.map((reply) => (
+                <QuickReplyCard
+                  key={reply.quickReplyId}
+                  active={selectedReply?.quickReplyId === reply.quickReplyId}
+                  reply={reply}
+                  onSelect={() => setSelectedId(reply.quickReplyId)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
       <section className="cs-quick-reply-preview">
         {selectedReply ? (
@@ -288,7 +294,8 @@ export function createQuickReplyPickerViewModel({
   selectedId?: string;
 }): QuickReplyPickerViewModel {
   const scopedReplies = filterQuickRepliesForScope(replies, scope);
-  const categories = Array.from(new Set(scopedReplies.map(quickReplyCategory))).filter(Boolean);
+  const categoryCounts = countQuickReplyCategories(scopedReplies);
+  const categories = Object.keys(categoryCounts);
   const normalizedKeyword = keyword.trim();
   const searchedReplies = scopedReplies.filter((reply) =>
     quickReplyMatchesKeyword(reply, normalizedKeyword),
@@ -301,9 +308,18 @@ export function createQuickReplyPickerViewModel({
   });
   const selectedReply =
     visibleReplies.find((reply) => reply.quickReplyId === selectedId) ?? visibleReplies[0];
+  const filterItems = createQuickReplyFilterItems({
+    categories,
+    categoryCounts,
+    recentIds,
+    scope,
+    scopedReplies,
+  });
+  const filterLabel = filterItems.find((item) => item.key === filter)?.label ?? "话术列表";
 
   return {
     categories,
+    categoryCounts,
     emptyState: createQuickReplyEmptyState({
       errorText,
       filter,
@@ -312,6 +328,8 @@ export function createQuickReplyPickerViewModel({
       scopedCount: scopedReplies.length,
       visibleCount: visibleReplies.length,
     }),
+    filterItems,
+    filterLabel,
     scopedReplies,
     selectedReply,
     totalCount: scopedReplies.length,
@@ -360,11 +378,13 @@ function QuickReplyCard({
 
 function FilterButton({
   active,
+  count,
   disabled = false,
   label,
   onClick,
 }: {
   active: boolean;
+  count: number;
   disabled?: boolean;
   label: string;
   onClick: () => void;
@@ -377,8 +397,8 @@ function FilterButton({
       title={label}
       onClick={onClick}
     >
-      <MessageSquareQuote size={14} />
       <span>{label}</span>
+      <em>{count > 99 ? "99+" : count}</em>
     </button>
   );
 }
@@ -413,6 +433,46 @@ function filterVisibleReplies({
     return replies.filter((reply) => quickReplyCategory(reply) === category);
   }
   return replies;
+}
+
+function countQuickReplyCategories(replies: CustomerServiceQuickReplyDto[]) {
+  return replies.reduce<Record<string, number>>((counts, reply) => {
+    const category = quickReplyCategory(reply);
+    if (!category) return counts;
+    counts[category] = (counts[category] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function createQuickReplyFilterItems({
+  categories,
+  categoryCounts,
+  recentIds,
+  scope,
+  scopedReplies,
+}: {
+  categories: string[];
+  categoryCounts: Record<string, number>;
+  recentIds: string[];
+  scope?: QuickReplyFilterScope | null;
+  scopedReplies: CustomerServiceQuickReplyDto[];
+}): QuickReplyFilterItem[] {
+  const currentCount = scope
+    ? scopedReplies.filter((reply) => reply.scope === scope || reply.scope === "all").length
+    : 0;
+  const availableIds = new Set(scopedReplies.map((reply) => reply.quickReplyId));
+  const recentCount = recentIds.filter((id) => availableIds.has(id)).length;
+
+  return [
+    { count: scopedReplies.length, key: "all", label: "全部" },
+    { count: currentCount, disabled: !scope, key: "current", label: "当前场景" },
+    { count: recentCount, disabled: recentCount === 0, key: "recent", label: "最近使用" },
+    ...categories.map((category) => ({
+      count: categoryCounts[category] ?? 0,
+      key: categoryFilter(category),
+      label: category,
+    })),
+  ];
 }
 
 function createQuickReplyEmptyState({

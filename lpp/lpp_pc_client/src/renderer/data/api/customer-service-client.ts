@@ -23,6 +23,11 @@ import {
   normalizeCustomerServiceThreadDto,
 } from "../customer-service/cs-contract";
 import {
+  applyCustomerServiceThreadOverlay,
+  customerServiceIndexScopeKey,
+} from "../customer-service/cs-conversation-index";
+import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
+import {
   customerServiceMessageEntityToDto,
   normalizeCustomerServiceMessageDto,
 } from "../customer-service/cs-message-contract";
@@ -31,7 +36,15 @@ export class CustomerServiceApiClient extends MessagesApiClient {
   getWorkbenchThreads() {
     return this.request<CustomerServiceThreadsResponse>(
       endpointPlan.customerServiceThreads,
-    ).then(normalizeCustomerServiceThreadsResponse);
+    ).then((response) =>
+      normalizeCustomerServiceThreadsResponse(
+        response,
+        customerServiceIndexScopeKey({
+          apiBaseUrl: this.options.baseUrl,
+          tenantToken: this.options.tenantToken,
+        }),
+      ),
+    );
   }
 
   getStaffServiceHistory(params: {
@@ -293,15 +306,50 @@ type CustomerServiceThreadDetailResponse = NestedThreadPayload & {
 
 function normalizeCustomerServiceThreadsResponse(
   response: CustomerServiceThreadsResponse,
+  scopeKey?: string,
 ): CustomerServiceThreadsResponse {
+  recordCsRoutingDiagnostic({
+    event: "pc-cs-workbench-threads",
+    source: "customer-service-client",
+    phase: "raw",
+    route: "thread-list",
+    classification: {
+      active: response.activeItems?.length ?? 0,
+      queue: response.queueItems?.length ?? 0,
+    },
+    summary: {
+      activeItems: (response.activeItems ?? []).slice(0, 20),
+      queueItems: (response.queueItems ?? []).slice(0, 20),
+      summary: response.summary,
+    },
+  });
+  const queueItems = (response.queueItems ?? [])
+    .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
+    .filter((item): item is CustomerServiceThread => Boolean(item))
+    .map((item) => applyCustomerServiceThreadOverlay(item, scopeKey));
+  const activeItems = (response.activeItems ?? [])
+    .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
+    .filter((item): item is CustomerServiceThread => Boolean(item))
+    .map((item) => applyCustomerServiceThreadOverlay(item, scopeKey));
+  recordCsRoutingDiagnostic({
+    event: "pc-cs-workbench-threads",
+    source: "customer-service-client",
+    phase: "overlay",
+    route: "thread-list",
+    classification: {
+      active: activeItems.length,
+      queue: queueItems.length,
+    },
+    summary: {
+      activeItems: activeItems.slice(0, 20),
+      queueItems: queueItems.slice(0, 20),
+      summary: response.summary,
+    },
+  });
   return {
     ...response,
-    queueItems: (response.queueItems ?? [])
-      .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
-      .filter((item): item is CustomerServiceThread => Boolean(item)),
-    activeItems: (response.activeItems ?? [])
-      .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
-      .filter((item): item is CustomerServiceThread => Boolean(item)),
+    activeItems,
+    queueItems,
   };
 }
 

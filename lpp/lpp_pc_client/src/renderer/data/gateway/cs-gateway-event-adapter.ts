@@ -2,11 +2,14 @@ import {
   customerServiceMessageEntityToDto,
   normalizeCustomerServiceMessageDto,
 } from "../customer-service/cs-message-contract";
-import {
-  normalizeCustomerServiceThreadType,
-  type CustomerServiceThreadType,
-} from "../api/types";
 import { createGatewayTraceId } from "./gateway-diagnostics";
+import {
+  customerServiceConversationRecord,
+  customerServiceMessageRecord,
+  customerServiceThreadId,
+  isCustomerServiceGatewayPayload,
+  normalizeThreadType,
+} from "./gateway-cs-payload-utils";
 import type {
   CustomerServiceGatewayChangeKind,
   GatewayIgnoredEvent,
@@ -111,35 +114,15 @@ function invalid(
   return { ...envelope, kind: "invalid", reason, diagnostics };
 }
 
-function customerServiceThreadType(payload: Record<string, unknown>): CustomerServiceThreadType {
-  return normalizeCustomerServiceThreadType(
+function customerServiceThreadType(payload: Record<string, unknown>) {
+  const message = customerServiceMessageRecord(payload);
+  const conversation = customerServiceConversationRecord(payload);
+  return normalizeThreadType(
     stringField(payload, "threadType", "thread_type", "conversationType", "conversation_type") ||
-      stringField(asRecord(payload.thread), "threadType", "thread_type", "conversationType", "conversation_type") ||
-      stringField(asRecord(payload.tempSession), "threadType", "thread_type", "conversationType", "conversation_type") ||
-      stringField(asRecord(payload.temp_session), "threadType", "thread_type", "conversationType", "conversation_type"),
+      stringField(message, "threadType", "thread_type", "conversationType", "conversation_type", "chatType", "chat_type", "type") ||
+      stringField(conversation, "threadType", "thread_type", "conversationType", "conversation_type", "chatType", "chat_type", "type") ||
+      stringField(asRecord(payload.thread), "threadType", "thread_type", "conversationType", "conversation_type"),
   );
-}
-
-function customerServiceThreadId(payload: Record<string, unknown>) {
-  return (
-    stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||
-    stringField(asRecord(payload.thread), "threadId", "thread_id", "sessionId", "session_id") ||
-    stringField(asRecord(payload.tempSession), "sessionId", "session_id", "threadId", "thread_id") ||
-    stringField(asRecord(payload.temp_session), "sessionId", "session_id", "threadId", "thread_id")
-  );
-}
-
-function isCustomerServiceGatewayPayload(payload: Record<string, unknown>) {
-  const conversation = conversationRecord(payload);
-  const thread = asRecord(payload.thread);
-  const type = normalizeType(
-    stringField(payload, "threadType", "thread_type", "conversationType", "conversation_type") ||
-      stringField(conversation, "threadType", "thread_type", "conversationType", "conversation_type") ||
-      stringField(thread, "threadType", "thread_type", "conversationType", "conversation_type"),
-  );
-  if (type === "temp_session" || type === "customer_service" || type === "service") return true;
-  const threadId = customerServiceThreadId(payload);
-  return Boolean(threadId && (stringField(payload, "visitorId", "visitorUserId") || stringField(thread, "threadId")));
 }
 
 function eventPayload(args: unknown[]) {
@@ -149,29 +132,7 @@ function eventPayload(args: unknown[]) {
 }
 
 function messageRecord(payload: Record<string, unknown>) {
-  return firstRecord(
-    payload.message,
-    payload.msg,
-    payload.messageInfo,
-    payload.message_info,
-    payload.messageDto,
-    payload.message_dto,
-    payload.item,
-  );
-}
-
-function conversationRecord(payload: Record<string, unknown>) {
-  return firstRecord(
-    payload.conversation,
-    payload.chat,
-    payload.thread,
-    payload.tempSession,
-    payload.temp_session,
-  );
-}
-
-function firstRecord(...values: unknown[]) {
-  return values.map(asRecord).find((record) => Object.keys(record).length > 0) ?? {};
+  return customerServiceMessageRecord(payload);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -186,9 +147,5 @@ function stringField(record: Record<string, unknown>, ...keys: string[]) {
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number") return String(value);
   }
-  return undefined;
-}
-
-function normalizeType(value?: string) {
-  return value?.trim().toLowerCase().replace(/-/g, "_");
+  return "";
 }

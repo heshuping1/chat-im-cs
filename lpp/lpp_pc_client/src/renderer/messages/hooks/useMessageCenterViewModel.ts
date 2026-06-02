@@ -20,6 +20,7 @@ import {
   getImConversationType,
   type MessageCenterConversationType,
 } from "../models/messageConversationTypeModel";
+import type { ActiveImConversationVisibility } from "./useImReadCommandExecutor";
 
 export { getImConversationType };
 
@@ -50,6 +51,7 @@ export interface MessageCenterViewModel {
 
 export interface CreateMessageCenterViewModelInput {
   activeConversationId?: string | null;
+  activeConversationVisibility?: ActiveImConversationVisibility;
   conversations: ConversationListItem[];
   visibleConversations: ConversationListItem[];
   draftsByConversation: Record<string, string>;
@@ -71,6 +73,7 @@ export function useMessageCenterViewModel(input: CreateMessageCenterViewModelInp
     () => createMessageCenterViewModel(input),
     [
       input.activeConversationId,
+      input.activeConversationVisibility,
       input.conversationListError,
       input.conversationListLoading,
       input.conversations,
@@ -129,7 +132,12 @@ export function createMessageCenterViewModel(
       emptyText: input.keyword?.trim() ? "没有匹配的会话" : "暂无会话",
       loading: Boolean(input.conversationListLoading),
     },
-    counts: getConversationCounts(input.conversations, input.unreadIdentity),
+    counts: getConversationCounts(
+      input.conversations,
+      input.unreadIdentity,
+      input.activeConversationId,
+      input.activeConversationVisibility,
+    ),
     errorText: messageCenterErrorText(input),
     messageList: {
       emptyText: input.messageSearchKeyword?.trim()
@@ -205,10 +213,16 @@ function buildDirectConversationContact(
 function getConversationCounts(
   conversations: ConversationListItem[],
   userIdentity?: CurrentUserIdentity | null,
+  activeConversationId?: string | null,
+  activeConversationVisibility?: ActiveImConversationVisibility,
 ) {
   return {
     unread: conversations.filter(
-      (item) => effectiveConversationUnreadCount(item, userIdentity) > 0,
+      (item) =>
+        !(
+          activeConversationVisibility === "paneVisible" &&
+          item.conversationId === activeConversationId
+        ) && effectiveConversationUnreadCount(item, userIdentity) > 0,
     ).length,
   };
 }

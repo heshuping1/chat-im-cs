@@ -6,7 +6,6 @@ export interface ResolveEffectiveImUnreadInput {
   lastReadSeq?: number | null;
   localReadSeq?: number | null;
   localReadCoversLastMessage?: boolean;
-  selfConversation?: boolean;
   selfLastMessage?: boolean;
 }
 
@@ -15,6 +14,8 @@ export interface ApplyImReadSeqInput {
   lastMessageSeq?: number | null;
   unreadCount?: number | null;
 }
+
+export type LocalReadCoverReason = "message-key" | "read-seq" | "read-at" | "none";
 
 export function resolveEffectiveImUnreadCount(input: ResolveEffectiveImUnreadInput) {
   const lastMessageSeq = normalizedSeq(input.lastMessageSeq);
@@ -25,7 +26,6 @@ export function resolveEffectiveImUnreadCount(input: ResolveEffectiveImUnreadInp
 
   if (lastMessageSeq > 0 && readSeq >= lastMessageSeq) return 0;
   if (input.localReadCoversLastMessage) return 0;
-  if (input.selfConversation) return 0;
   if (input.selfLastMessage) return 0;
 
   const serverUnread = normalizedSeq(input.serverUnreadCount);
@@ -41,26 +41,45 @@ export function isLocalReadCoversLastMessage(input: {
   lastMessageAt?: string | null;
   messageKeyMatches?: boolean;
   selfLastMessage?: boolean;
+  serverUnreadCount?: number | null;
 }) {
+  return localReadCoverReason(input) !== "none";
+}
+
+export function localReadCoverReason(input: {
+  localRead?: LocalImConversationRead;
+  lastMessageSeq?: number | null;
+  lastMessageAt?: string | null;
+  messageKeyMatches?: boolean;
+  selfLastMessage?: boolean;
+  serverUnreadCount?: number | null;
+}): LocalReadCoverReason {
   const localRead = input.localRead;
-  if (!localRead) return false;
-  if (input.messageKeyMatches) return true;
-  if (localRead.messageKey && input.selfLastMessage) return true;
+  if (!localRead) return "none";
+  if (input.messageKeyMatches) return "message-key";
+  if (localRead.messageKey && input.selfLastMessage) return "message-key";
+
+  const localReadSeq = normalizedSeq(localRead.readSeq);
+  const lastMessageSeq = normalizedSeq(input.lastMessageSeq);
+  if (lastMessageSeq > 0 && localReadSeq >= lastMessageSeq) return "read-seq";
 
   const localReadAt = Number(localRead.readAt ?? 0);
   const lastMessageAt = input.lastMessageAt ? Date.parse(input.lastMessageAt) : 0;
+  const serverUnread = normalizedSeq(input.serverUnreadCount);
+  const hasReliableSeqGap = lastMessageSeq > 0 && localReadSeq < lastMessageSeq;
+  const allowReadAtFallback =
+    Boolean(input.selfLastMessage) || (serverUnread <= 0 && !hasReliableSeqGap);
   if (
+    allowReadAtFallback &&
     localReadAt > 0 &&
     Number.isFinite(lastMessageAt) &&
     lastMessageAt > 0 &&
     lastMessageAt <= localReadAt
   ) {
-    return true;
+    return "read-at";
   }
 
-  const localReadSeq = normalizedSeq(localRead.readSeq);
-  const lastMessageSeq = normalizedSeq(input.lastMessageSeq);
-  return lastMessageSeq > 0 && localReadSeq >= lastMessageSeq;
+  return "none";
 }
 
 export function applyImReadSeqToConversationSnapshot(

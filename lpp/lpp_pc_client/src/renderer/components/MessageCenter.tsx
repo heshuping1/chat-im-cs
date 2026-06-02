@@ -29,6 +29,7 @@ import {
   isModuleVisibleForAccess,
 } from "../data/workspace-access";
 import {
+  useActiveModule,
   useActiveImConversationId,
   useListPaneWidth,
   useMessageConversationFilter,
@@ -44,7 +45,9 @@ import {
   useSetMessageProfileVisible,
   useSetProfilePaneWidth,
 } from "../data/workspace-ui/workspace-ui-store";
+import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
+import { useMessageDetailSync } from "../lib/useMessageDetailSync";
 import { MessageConversationSidebar } from "../messages/components/MessageConversationSidebar";
 import { MessageCenterConversationStage } from "../messages/components/MessageCenterConversationStage";
 import { useActiveImConversationQueries } from "../messages/hooks/useActiveImConversationQueries";
@@ -55,7 +58,10 @@ import { useMessageMediaSendController } from "../messages/hooks/useMessageMedia
 import { useMessageTextSendController } from "../messages/hooks/useMessageTextSendController";
 import { useMessageStartConversationController } from "../messages/hooks/useMessageStartConversationController";
 import { useMessageActionMutations } from "../messages/hooks/useMessageActionMutations";
-import { useImReadCommandExecutor } from "../messages/hooks/useImReadCommandExecutor";
+import {
+  resolveActiveImConversationVisibility,
+  useImReadCommandExecutor,
+} from "../messages/hooks/useImReadCommandExecutor";
 import { useMessageUnreadJumpController } from "../messages/hooks/useMessageUnreadJumpController";
 import { useMessageMenuMediaStatus } from "../messages/hooks/useMessageMenuMediaStatus";
 import { useMessageCenterPageEffects } from "../messages/hooks/useMessageCenterPageEffects";
@@ -153,6 +159,7 @@ function readMessageContextOrder(): MessageContextPaneOrder[] {
 
 export function MessageCenter() {
   const session = useAuthSession();
+  const activeModule = useActiveModule();
   const activeConversationId = useActiveImConversationId();
   const setActiveConversation = useSetActiveImConversation();
   const locallyReadConversationReads = useLocalImConversationReads();
@@ -324,6 +331,20 @@ export function MessageCenter() {
     activeConversationType,
     session,
   });
+  useMessageDetailSync({
+    enabled: Boolean(session && activeConversation && activeConversationType),
+    isFetching: messagesQuery.isFetching,
+    messages: messagesQuery.data ?? [],
+    refetch: messagesQuery.refetch,
+    target: activeConversation
+      ? {
+          targetId: activeConversation.conversationId,
+          targetType: activeConversationType,
+          lastMessageId: activeConversation.lastMessage?.messageId,
+          lastMessageSeq: activeConversation.lastMessageSeq,
+        }
+      : null,
+  });
   const groupMemberMap = useMemo(
     () => buildGroupMemberMap(groupMembersQuery.data ?? []),
     [groupMembersQuery.data],
@@ -421,9 +442,67 @@ export function MessageCenter() {
     session,
     setLocalOutgoingMessagesByConversation,
   });
+  const {
+    activeConversationSource,
+    handleUnreadJump,
+    openConversationFromUserClick,
+  } = useMessageUnreadJumpController({
+    activeConversation,
+    activeConversationId,
+    messageListScrollRegistry,
+    messageSearchOpen,
+    messages,
+    queryClient,
+    session,
+    setActiveConversation,
+    setConversationDrawerOpen,
+    setMessageSearchKeyword,
+    setMessageSearchOpen,
+    setNotice,
+    setUnreadJump,
+    unreadIdentity,
+    unreadJump,
+  });
+  const activeConversationVisibility = resolveActiveImConversationVisibility({
+    activeConversationId,
+    activeModule,
+    conversationDrawerOpen,
+    conversationId: activeConversation?.conversationId,
+    messageLayoutMode,
+  });
+  useEffect(() => {
+    recordMessageReminderDiagnostic({
+      event: "im.message-center.mounted",
+      source: "message-center",
+      phase: "mounted",
+      route: activeModule,
+      classification: {
+        activeConversationId,
+        activeConversationSource,
+        activeConversationVisibility,
+        activeModule,
+        conversationId: activeConversation?.conversationId,
+        conversationCount: conversations.length,
+        visibleConversationCount: visibleConversations.length,
+      },
+      summary: {
+        activeConversation,
+      },
+    });
+  }, [
+    activeConversation?.conversationId,
+    activeConversationId,
+    activeConversationSource,
+    activeConversationVisibility,
+    activeModule,
+    conversations.length,
+    visibleConversations.length,
+  ]);
   useImReadCommandExecutor({
     activeConversation,
     activeConversationId,
+    activeConversationSource,
+    activeConversationVisibility,
     activeConversationType,
     clearPendingImRead,
     conversationItems: conversationsQuery.data?.items ?? [],
@@ -476,6 +555,7 @@ export function MessageCenter() {
   );
   const messageCenterViewModel = useMessageCenterViewModel({
     activeConversationId,
+    activeConversationVisibility,
     conversationListError: conversationsQuery.error,
     conversationListLoading: conversationsQuery.isLoading,
     conversations,
@@ -699,25 +779,6 @@ export function MessageCenter() {
     voiceToTextMessage: voiceToTextMutation.mutate,
   });
 
-  const { handleUnreadJump, openConversationFromUserClick } =
-    useMessageUnreadJumpController({
-      activeConversation,
-      activeConversationId,
-      messageListScrollRegistry,
-      messageSearchOpen,
-      messages,
-      queryClient,
-      session,
-      setActiveConversation,
-      setConversationDrawerOpen,
-      setMessageSearchKeyword,
-      setMessageSearchOpen,
-      setNotice,
-      setUnreadJump,
-      unreadIdentity,
-      unreadJump,
-    });
-
   const messageCenterCommands = useMessageCenterCommandModel({
     deleteSelectedMessages: handleBatchDeleteSelected,
     menuAction: handleMenuAction,
@@ -808,6 +869,7 @@ export function MessageCenter() {
         plusMenuOpen={plusMenuOpen}
         unreadCount={counts.unread}
         unreadIdentity={unreadIdentity as CurrentUserIdentity}
+        activeConversationVisibility={activeConversationVisibility}
         userAvatarRegistry={userAvatarRegistry}
         visibleConversations={visibleConversations}
         onAddFriend={() => {

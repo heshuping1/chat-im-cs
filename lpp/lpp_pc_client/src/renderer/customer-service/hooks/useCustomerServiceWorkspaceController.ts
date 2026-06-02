@@ -8,6 +8,7 @@ import {
   invalidateCustomerServiceQueries,
   markCustomerServiceThreadClosed,
 } from "../../data/customer-service/cs-cache-adapter";
+import { customerServiceRealtimePollIntervalMs } from "../../data/customer-service/cs-realtime-config";
 import { createCustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
 import {
   createCustomerServiceWorkspaceViewModel,
@@ -19,6 +20,7 @@ import {
   type CustomerServiceThreadAction,
 } from "../../data/customer-service/cs-action-service";
 import { formatError } from "../../lib/format";
+import { useMessageDetailSync } from "../../lib/useMessageDetailSync";
 
 export function useCustomerServiceWorkspaceController({
   selectedThreadId,
@@ -41,6 +43,8 @@ export function useCustomerServiceWorkspaceController({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
     enabled: Boolean(client),
     queryFn: async () => client!.getWorkbenchThreads(),
+    refetchInterval: customerServiceRealtimePollIntervalMs,
+    refetchIntervalInBackground: true,
   });
   const historyQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
@@ -78,6 +82,21 @@ export function useCustomerServiceWorkspaceController({
     queryFn: async () => client!.getWorkbenchThreadDetail(threadType, threadId),
     refetchInterval: selectedThreadIsLive ? 2_500 : false,
     refetchIntervalInBackground: true,
+  });
+  useMessageDetailSync({
+    enabled: Boolean(client && selectedThread && selectedThreadIsLive),
+    isFetching: detailQuery.isFetching,
+    messages: detailQuery.data?.messages ?? [],
+    refetch: detailQuery.refetch,
+    target: selectedThread
+      ? {
+          targetId: selectedThread.threadId,
+          targetType: selectedThread.threadType,
+          alternateTargetIds: [selectedThread.conversationId],
+          lastMessageAt: selectedThread.lastMessageAt,
+          lastMessagePreview: selectedThread.lastMessagePreview,
+        }
+      : null,
   });
   const profileQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreadProfile(

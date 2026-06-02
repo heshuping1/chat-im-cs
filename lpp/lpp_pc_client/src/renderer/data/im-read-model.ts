@@ -223,6 +223,9 @@ export function reduceImCoreEvent(input: ReduceImCoreInput): ImCoreResult {
     const readSeq = normalizedSeq(input.event.readSeq);
     if (identityMatches(input.event.readerIdentity, input.identity)) {
       next = advanceMyReadSeq(next, readSeq);
+      if (readSeq >= next.lastMessageSeq) {
+        next = clearUnread(next);
+      }
     } else if (!hasIdentityEvidence(input.event.readerIdentity)) {
       commands.push({
         type: "log_diagnostic",
@@ -408,21 +411,48 @@ function mergeConversationPatch(
   const conversation = event.conversation;
   if (!conversation) return { ...current };
 
+  const preserveLocalUnread = shouldPreserveLocalUnreadFromSnapshot(current, event);
+  const snapshotMyReadSeq = normalizedSeq(conversation.myReadSeq);
+  const snapshotUnreadCount =
+    conversation.unreadCount === undefined
+      ? current.unreadCount
+      : Math.max(0, Math.floor(Number(conversation.unreadCount) || 0));
   const merged = {
     ...current,
-    myReadSeq: Math.max(current.myReadSeq, normalizedSeq(conversation.myReadSeq)),
+    myReadSeq: preserveLocalUnread
+      ? current.myReadSeq
+      : Math.max(current.myReadSeq, snapshotMyReadSeq),
     peerReadSeq: Math.max(current.peerReadSeq, normalizedSeq(conversation.peerReadSeq)),
     lastMessageSeq: Math.max(current.lastMessageSeq, normalizedSeq(conversation.lastMessageSeq)),
-    unreadCount:
-      conversation.unreadCount === undefined
-        ? current.unreadCount
-        : Math.max(0, Math.floor(Number(conversation.unreadCount) || 0)),
+    unreadCount: preserveLocalUnread ? current.unreadCount : snapshotUnreadCount,
     pendingReadSeq:
       conversation.pendingReadSeq === undefined
         ? current.pendingReadSeq
         : Math.max(normalizedSeq(current.pendingReadSeq), normalizedSeq(conversation.pendingReadSeq)),
   };
   return merged.myReadSeq >= merged.lastMessageSeq ? clearUnread(merged) : merged;
+}
+
+function shouldPreserveLocalUnreadFromSnapshot(
+  current: ConversationReadState,
+  event: ImCoreEvent,
+) {
+  if (event.type !== "api.conversation_snapshot") return false;
+  const conversation = event.conversation;
+  if (!conversation) return false;
+  const currentLastMessageSeq = normalizedSeq(current.lastMessageSeq);
+  const currentMyReadSeq = normalizedSeq(current.myReadSeq);
+  const currentUnreadCount = Math.max(0, Math.floor(Number(current.unreadCount) || 0));
+  const pendingReadSeq = normalizedSeq(current.pendingReadSeq);
+  const snapshotMyReadSeq = normalizedSeq(conversation.myReadSeq);
+  const snapshotUnreadCount =
+    conversation.unreadCount === undefined
+      ? currentUnreadCount
+      : Math.max(0, Math.floor(Number(conversation.unreadCount) || 0));
+  if (currentUnreadCount <= 0) return false;
+  if (currentLastMessageSeq <= 0 || currentMyReadSeq >= currentLastMessageSeq) return false;
+  if (pendingReadSeq >= currentLastMessageSeq) return false;
+  return snapshotUnreadCount === 0 && snapshotMyReadSeq >= currentLastMessageSeq;
 }
 
 function advanceMyReadSeq(state: ConversationReadState, readSeq: number) {

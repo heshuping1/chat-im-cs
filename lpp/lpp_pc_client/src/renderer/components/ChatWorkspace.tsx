@@ -18,10 +18,11 @@ import {
   useServiceAssistantPane,
   useSetServiceAssistantPane,
 } from "../data/workspace-ui/workspace-ui-store";
-import { type CurrentUserIdentity, isSelfSender } from "../data/message-display";
+import type { CurrentUserIdentity } from "../data/message-display";
 import {
   createCustomerServiceNoThreadState,
 } from "../data/customer-service/cs-workspace-view-model";
+import { isMineCustomerServiceMessage } from "../data/customer-service/cs-reminder-model";
 import { formatError } from "../lib/format";
 import {
   hasOpenableMessageMedia,
@@ -46,7 +47,7 @@ import {
   isServiceAiDraftableMessage,
   type ServiceMessageContextAction,
 } from "../customer-service/components/ServiceMessageContextMenu";
-import { CustomerServiceComposerSurface } from "../customer-service/components/CustomerServiceComposerSurface";
+import { ChatComposerSurface } from "./ChatComposerSurface";
 import { CustomerServiceKnowledgeDrawer } from "../customer-service/components/CustomerServiceKnowledgeDrawer";
 import {
   customerServiceAssistantInsertEvent,
@@ -63,11 +64,9 @@ import { startVerticalPaneResize } from "../lib/paneResize";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
 import { isRiskyCustomerServiceThread } from "../customer-service/models/serviceWorkbenchModel";
 import type { MessageComposerHandle } from "./MessageComposer";
+import { clampComposerHeight } from "../messages/models/messageComposerLayoutModel";
 
-const composerHeightBounds = {
-  min: 176,
-  max: 360,
-};
+const defaultCustomerServiceComposerHeight = 220;
 
 type ServiceMessageMenuState = {
   canAiDraft?: boolean;
@@ -79,13 +78,6 @@ type ServiceMessageMenuState = {
 type AiDraftDrawerState = {
   customerMessageId?: string | null;
 } | null;
-
-function clampComposerHeight(height: number) {
-  return Math.min(
-    composerHeightBounds.max,
-    Math.max(composerHeightBounds.min, Math.round(height)),
-  );
-}
 
 export function ChatWorkspace({
   onOpenCustomerContext,
@@ -103,7 +95,7 @@ export function ChatWorkspace({
   const serviceAssistantPane = useServiceAssistantPane();
   const setServiceAssistantPane = useSetServiceAssistantPane();
   const pcSettings = usePcSettings();
-  const [composerHeight, setComposerHeight] = useState(176);
+  const [composerHeight, setComposerHeight] = useState(defaultCustomerServiceComposerHeight);
   const pushRealtimeReminder = usePushRealtimeReminder();
   const dismissRealtimeRemindersForTarget = useDismissRealtimeRemindersForTarget();
   const {
@@ -399,8 +391,9 @@ export function ChatWorkspace({
       />
 
       {canReply && (
-        <CustomerServiceComposerSurface
+        <ChatComposerSurface
           ref={composerRef}
+          attachmentScopeKey={selectedThread.threadId}
           disabled={
             detailLoading ||
             sendTextMutation.isPending ||
@@ -408,7 +401,9 @@ export function ChatWorkspace({
           }
           dragUpload={pcSettings.dragUpload}
           enterToSend={pcSettings.enterToSend}
+          screenshotShortcut={pcSettings.screenshotShortcut}
           shortcutHints={pcSettings.shortcutHints}
+          toolMode="customerService"
           onResizeStart={(event) =>
             startVerticalPaneResize(event, {
               initialHeight: composerHeight,
@@ -482,27 +477,5 @@ export function ChatWorkspace({
 }
 
 function isMineMessage(message: MessageItemDto, identity?: CurrentUserIdentity | null) {
-  const record = message as unknown as Record<string, unknown>;
-  return Boolean(
-    record.isSelf === true ||
-      record.isMine === true ||
-      ["out", "outgoing", "sent", "self"].includes(
-        String(record.direction ?? "").trim().toLowerCase(),
-      ) ||
-      isSelfSender(message.senderUserId, message.senderDisplayName, identity) ||
-      isSelfSender(message.senderId, message.senderDisplayName, identity) ||
-      isSelfSender(message.fromUserId, message.senderDisplayName, identity) ||
-      isSelfSender(
-        typeof record.senderPlatformUserId === "string"
-          ? record.senderPlatformUserId
-          : undefined,
-        message.senderDisplayName,
-        identity,
-      ) ||
-      isSelfSender(
-        typeof record.senderLppId === "string" ? record.senderLppId : undefined,
-        message.senderDisplayName,
-        identity,
-      ),
-  );
+  return isMineCustomerServiceMessage(message, identity);
 }

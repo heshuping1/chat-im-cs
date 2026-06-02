@@ -1035,7 +1035,7 @@
 .cs-quick-reply-picker {
   display: grid;
   min-width: 340px;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(206px, 0.46fr);
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(178px, 0.4fr);
   gap: 10px;
   padding: 12px;
   border-left: 1px solid rgba(210, 222, 235, 0.94);
@@ -1050,7 +1050,7 @@
   right: 0;
   bottom: 0;
   z-index: 12;
-  width: min(420px, 44vw);
+  width: min(500px, 48vw);
   box-shadow: -22px 0 44px rgba(30, 45, 65, 0.12);
 }
 
@@ -1167,41 +1167,84 @@
   opacity: 0.55;
 }
 
-.cs-quick-reply-filters {
-  display: flex;
-  gap: 7px;
-  min-width: 0;
-  min-height: 34px;
-  overflow-x: auto;
-  overflow-y: hidden;
+.cs-quick-reply-workbench {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 10px;
 }
 
-.cs-quick-reply-filters button {
-  display: inline-flex;
-  flex: 0 0 auto;
-  max-width: 168px;
-  height: 32px;
+.cs-quick-reply-filter-rail {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid rgba(222, 231, 241, 0.94);
+  border-radius: 12px;
+  background: rgba(248, 251, 253, 0.92);
+}
+
+.cs-quick-reply-filter-rail button {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 34px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 1px solid rgba(216, 226, 237, 0.95);
-  border-radius: 999px;
-  background: #fff;
+  gap: 7px;
+  padding: 0 8px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: #52647a;
   font-size: 12px;
   font-weight: 850;
+  text-align: left;
 }
 
-.cs-quick-reply-filters button.active {
-  border-color: rgba(16, 185, 129, 0.46);
+.cs-quick-reply-filter-rail button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.86);
+  color: #111827;
+}
+
+.cs-quick-reply-filter-rail button.active {
+  border-color: rgba(16, 185, 129, 0.34);
   background: #ecfff7;
   color: #047857;
+  box-shadow: inset 3px 0 0 #10b981;
 }
 
-.cs-quick-reply-filters button span {
+.cs-quick-reply-filter-rail button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.cs-quick-reply-filter-rail button span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cs-quick-reply-filter-rail button em {
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.88);
+  color: #64748b;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 18px;
+  text-align: center;
+}
+
+.cs-quick-reply-filter-rail button.active em {
+  background: #10b981;
+  color: #fff;
 }
 
 .cs-quick-reply-list-zone,
@@ -1252,13 +1295,13 @@
 .cs-quick-reply-item {
   display: grid;
   width: 100%;
-  min-height: 104px;
+  min-height: 76px;
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: start;
   gap: 9px;
-  padding: 11px 12px;
+  padding: 10px 11px;
   border: 1px solid rgba(218, 228, 240, 0.96);
-  border-radius: 12px;
+  border-radius: 10px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 251, 253, 0.96)),
     #fff;
@@ -1287,7 +1330,7 @@
 .cs-quick-reply-copy {
   display: grid;
   min-width: 0;
-  gap: 5px;
+  gap: 4px;
 }
 
 .cs-quick-reply-title-row {
@@ -1343,7 +1386,7 @@
 }
 
 .cs-quick-reply-tags {
-  display: flex;
+  display: none;
   min-width: 0;
   gap: 5px;
   overflow: hidden;
@@ -1367,7 +1410,7 @@
 
 .cs-quick-reply-preview {
   display: grid;
-  grid-template-rows: auto minmax(104px, 1fr) auto;
+  grid-template-rows: auto minmax(78px, 1fr) auto;
   gap: 9px;
   overflow: hidden;
   padding: 12px;

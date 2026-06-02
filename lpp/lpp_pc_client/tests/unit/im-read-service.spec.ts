@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyImReadSeqToConversationSnapshot,
   isLocalReadCoversLastMessage,
+  localReadCoverReason,
   resolveEffectiveImUnreadCount,
 } from "../../src/renderer/data/im-read/im-read-service";
 
@@ -27,28 +28,64 @@ describe("im read service", () => {
     ).toBe(3);
   });
 
-  it("clears unread for self conversation and self last message", () => {
-    expect(resolveEffectiveImUnreadCount({ serverUnreadCount: 3, selfConversation: true })).toBe(0);
+  it("clears unread for self last message", () => {
     expect(resolveEffectiveImUnreadCount({ serverUnreadCount: 3, selfLastMessage: true })).toBe(0);
   });
 
   it("detects local read coverage by message key, timestamp, and seq", () => {
     expect(
-      isLocalReadCoversLastMessage({
+      localReadCoverReason({
         localRead: { readSeq: 1, messageKey: "m1" },
         messageKeyMatches: true,
       }),
-    ).toBe(true);
+    ).toBe("message-key");
     expect(
-      isLocalReadCoversLastMessage({
+      localReadCoverReason({
         localRead: { readSeq: 1, readAt: Date.parse("2026-05-29T10:00:00Z") },
         lastMessageAt: "2026-05-29T09:59:00Z",
       }),
-    ).toBe(true);
+    ).toBe("read-at");
     expect(
-      isLocalReadCoversLastMessage({
+      localReadCoverReason({
         localRead: { readSeq: 8 },
         lastMessageSeq: 8,
+      }),
+    ).toBe("read-seq");
+  });
+
+  it("does not let readAt cover explicit unread when local read seq is behind", () => {
+    expect(
+      isLocalReadCoversLastMessage({
+        localRead: {
+          readSeq: 300,
+          readAt: Date.parse("2026-06-02T04:00:00Z"),
+        },
+        lastMessageAt: "2026-06-02T03:56:14Z",
+        lastMessageSeq: 302,
+        serverUnreadCount: 2,
+      }),
+    ).toBe(false);
+    expect(
+      localReadCoverReason({
+        localRead: {
+          readSeq: 300,
+          readAt: Date.parse("2026-06-02T04:00:00Z"),
+        },
+        lastMessageAt: "2026-06-02T03:56:14Z",
+        lastMessageSeq: 302,
+        serverUnreadCount: 2,
+      }),
+    ).toBe("none");
+    expect(
+      isLocalReadCoversLastMessage({
+        localRead: {
+          readSeq: 300,
+          readAt: Date.parse("2026-06-02T04:00:00Z"),
+        },
+        lastMessageAt: "2026-06-02T03:56:14Z",
+        lastMessageSeq: 302,
+        selfLastMessage: true,
+        serverUnreadCount: 2,
       }),
     ).toBe(true);
   });

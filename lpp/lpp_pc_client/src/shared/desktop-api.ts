@@ -1,9 +1,33 @@
 export type TrayStatus = 'online' | 'busy' | 'away' | 'invisible';
 
+export type DesktopNotificationTargetModule =
+  | 'messages'
+  | 'onlineService'
+  | 'contacts';
+
+export type DesktopNotificationChannel = 'im' | 'serviceQueue' | 'sla';
+
 export interface NotifyPayload {
   title: string;
   body: string;
   conversationId?: string;
+  channel?: DesktopNotificationChannel;
+  iconDataUrl?: string | null;
+  silent?: boolean;
+  targetId?: string;
+  targetModule?: DesktopNotificationTargetModule;
+}
+
+export interface NotificationClickedPayload {
+  conversationId?: string;
+  channel?: DesktopNotificationChannel;
+  targetId?: string;
+  targetModule?: DesktopNotificationTargetModule;
+}
+
+export interface TaskbarBadgePayload {
+  count: number;
+  urgent?: boolean;
 }
 
 export type DiagnosticsJsonValue =
@@ -31,6 +55,26 @@ export interface DiagnosticsPayload {
     requestId?: string;
   }>;
   diagnostics?: Record<string, DiagnosticsModuleSnapshot>;
+}
+
+export interface CsRoutingDiagnosticPayload {
+  at: string;
+  event: string;
+  source: string;
+  phase: string;
+  route?: string;
+  classification?: DiagnosticsJsonValue;
+  summary?: DiagnosticsJsonValue;
+}
+
+export interface MessageReminderDiagnosticPayload {
+  at: string;
+  event: string;
+  source: string;
+  phase: string;
+  route?: string;
+  classification?: DiagnosticsJsonValue;
+  summary?: DiagnosticsJsonValue;
 }
 
 export interface DesktopAuthSessionPayload {
@@ -102,6 +146,7 @@ export interface VideoPlayerPayload extends CacheMediaFilePayload {
 
 export interface DesktopApi {
   notify(payload: NotifyPayload): Promise<void>;
+  onNotificationClicked(callback: (payload: NotificationClickedPayload) => void): () => void;
   openFile(path: string): Promise<void>;
   cacheMediaFile(payload: CacheMediaFilePayload): Promise<CachedMediaFileResult>;
   cacheLocalMediaFile(payload: CacheMediaFilePayload, file: unknown): Promise<CachedMediaFileResult>;
@@ -132,10 +177,13 @@ export interface DesktopApi {
   captureScreenshot(): Promise<ScreenshotCaptureResult>;
   getAppVersion(): Promise<string>;
   exportDiagnostics(payload: DiagnosticsPayload): Promise<string | null>;
+  recordCsRoutingDiagnostic(payload: CsRoutingDiagnosticPayload): Promise<void>;
+  recordMessageReminderDiagnostic(payload: MessageReminderDiagnosticPayload): Promise<void>;
+  setTaskbarBadge(payload: TaskbarBadgePayload): Promise<void>;
   setTrayStatus(status: TrayStatus): Promise<void>;
 }
 
-export type DesktopApiMethod = keyof DesktopApi;
+export type DesktopApiMethod = Exclude<keyof DesktopApi, 'onNotificationClicked'>;
 
 export const desktopIpcChannelByMethod = {
   cacheLocalMediaFile: 'desktop:cache-local-media-file',
@@ -159,10 +207,13 @@ export const desktopIpcChannelByMethod = {
   openMediaFile: 'desktop:open-media-file',
   openVideoPlayer: 'desktop:open-video-player',
   readAuthSession: 'desktop:read-auth-session',
+  recordCsRoutingDiagnostic: 'desktop:record-cs-routing-diagnostic',
+  recordMessageReminderDiagnostic: 'desktop:record-message-reminder-diagnostic',
   revealMediaInFolder: 'desktop:reveal-media-in-folder',
   saveAuthSession: 'desktop:save-auth-session',
   saveFile: 'desktop:save-file',
   saveMediaAs: 'desktop:save-media-as',
+  setTaskbarBadge: 'desktop:set-taskbar-badge',
   setTrayStatus: 'desktop:set-tray-status',
 } as const satisfies Record<DesktopApiMethod, `desktop:${string}`>;
 

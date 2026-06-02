@@ -2,10 +2,15 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { MessageItemDto } from "../api-client";
 import { getAuthSessionSnapshot } from "../auth/auth-store";
 import { applyCustomerServiceGatewayMessageCache } from "../customer-service/cs-cache-adapter";
+import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
+import { buildCustomerServiceNotificationPresentation } from "../customer-service/cs-notification-presentation";
+import { consumeCustomerServiceMessageReminder } from "../customer-service/cs-reminder-model";
 import {
+  isRendererWindowFocused,
   notifyDesktopOrBrowser,
   shouldPushRealtimeReminder,
   shouldShowDesktopNotification,
+  shouldShowDesktopNotificationForTarget,
 } from "../reminder/reminder-service";
 import { getReminderActions } from "../reminder/reminder-store";
 import { getPcSettingsSnapshot } from "../settings/settings-store";
@@ -14,6 +19,7 @@ import {
   asRecord,
   customerServiceThreadId,
   gatewayMessage,
+  imConversationId,
   isSelfCustomerServiceGatewayMessage,
   normalizeThreadType,
   stringField,
@@ -36,23 +42,24 @@ export function mergeCustomerServiceGatewayMessage(
       stringField(asRecord(payload.thread), "threadType"),
   );
   const message = gatewayMessage(payload, threadId);
-  const self = isSelfCustomerServiceGatewayMessage(
-    payload,
-    message,
-    getAuthSessionSnapshot(),
-  );
+  const session = getAuthSessionSnapshot();
+  const scopeKey = customerServiceIndexScopeKey(session ?? undefined);
+  const self = isSelfCustomerServiceGatewayMessage(payload, message, session);
   const uiState = getWorkspaceUiSnapshot();
   const active = uiState.activeModule === "onlineService" && uiState.activeThreadId === threadId;
+  const read = self || active;
 
   applyCustomerServiceGatewayMessageCache(queryClient, {
+    conversationId: imConversationId(payload) || message.conversationId,
     message,
-    read: self || active,
+    read,
+    scopeKey,
     threadId,
     threadType,
   });
 
   if (!self) {
-    notifyCustomerServiceMessage(payload, message, { active });
+    notifyCustomerServiceMessage(payload, message, { active, identity: session, targetId: threadId });
   }
 }
 
@@ -60,6 +67,7 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
   const reminderActions = getReminderActions();
   const settings = getPcSettingsSnapshot();
   if (!shouldPushRealtimeReminder(settings, "serviceQueue")) return;
+  const session = getAuthSessionSnapshot();
   const normalizedThreadId = threadId || customerServiceThreadId(payload);
   if (!normalizedThreadId) return;
   const reminderId = `cs-queue-${normalizedThreadId}`;
@@ -76,11 +84,17 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
   const body = source
     ? `来自 ${source} 的访客正在排队，等待接入`
     : "有访客正在排队，等待接入";
+  const presentation = buildCustomerServiceNotificationPresentation({
+    fallbackTitle: title,
+    payload,
+  });
 
   reminderActions.pushRealtimeReminder({
     id: reminderId,
-    title,
+    title: presentation.title,
     body,
+    avatarLabel: presentation.avatarLabel,
+    avatarUrl: presentation.avatarUrl,
     targetModule: "onlineService",
     targetId: normalizedThreadId,
     severity: "warning",
@@ -89,11 +103,18 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
   if (shouldShowDesktopNotification(settings, "serviceQueue")) {
     void notifyDesktopOrBrowser(
       {
-        title,
+        title: presentation.title,
         body,
         conversationId: normalizedThreadId,
+        targetId: normalizedThreadId,
+        targetModule: "onlineService",
       },
-      { channel: "serviceQueue", settings },
+      {
+        authToken: session?.tenantToken,
+        channel: "serviceQueue",
+        iconUrl: presentation.avatarUrl,
+        settings,
+      },
     );
   }
 }
@@ -101,41 +122,71 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
 function notifyCustomerServiceMessage(
   payload: Record<string, unknown>,
   message: MessageItemDto,
-  options: { active?: boolean } = {},
+  options: {
+    active?: boolean;
+    identity?: ReturnType<typeof getAuthSessionSnapshot>;
+    targetId?: string;
+  } = {},
 ) {
   const reminderActions = getReminderActions();
   const settings = getPcSettingsSnapshot();
   if (!shouldPushRealtimeReminder(settings, "serviceQueue")) return;
-  const title =
-    stringField(asRecord(payload.thread), "title", "customerName", "visitorName") ||
-    stringField(payload, "threadTitle", "customerName", "visitorName") ||
-    message.senderDisplayName ||
-    "在线客服新消息";
   const targetId =
+    options.targetId ||
     customerServiceThreadId(payload) ||
     stringField(payload, "threadId", "sessionId") ||
     message.conversationId;
+  const presentation = buildCustomerServiceNotificationPresentation({
+    message,
+    payload,
+  });
+  const body = options.active && presentation.preview === "[消息]"
+    ? "当前在线客服会话有新消息"
+    : presentation.body;
+  const nextTargetId = targetId || presentation.targetId;
+  const reminderDecision = consumeCustomerServiceMessageReminder({
+    identity: options.identity,
+    message,
+    source: "gateway",
+    targetId: nextTargetId,
+  });
+  if (!reminderDecision.shouldNotify) return;
+
   reminderActions.pushRealtimeReminder({
-    id: `cs-${message.messageId}`,
-    title,
-    body: options.active
-      ? message.preview || "当前在线客服会话有新消息"
-      : message.preview || "收到一条在线客服消息",
+    id: reminderDecision.reminderId,
+    title: presentation.title,
+    body,
+    avatarLabel: presentation.avatarLabel,
+    avatarUrl: presentation.avatarUrl,
     targetModule: "onlineService",
-    targetId,
+    targetId: nextTargetId,
     severity: "warning",
     icon: "service",
   });
-  if (shouldShowDesktopNotification(settings, "serviceQueue")) {
+  const uiState = getWorkspaceUiSnapshot();
+  if (
+    shouldShowDesktopNotificationForTarget(settings, "serviceQueue", {
+      activeModule: uiState.activeModule,
+      activeTargetId: uiState.activeThreadId,
+      targetId: nextTargetId,
+      targetModule: "onlineService",
+      windowFocused: isRendererWindowFocused(),
+    })
+  ) {
     void notifyDesktopOrBrowser(
       {
-        title,
-        body: options.active
-          ? message.preview || "当前在线客服会话有新消息"
-          : message.preview || "收到一条在线客服消息",
-        conversationId: targetId,
+        title: presentation.title,
+        body,
+        conversationId: nextTargetId,
+        targetId: nextTargetId,
+        targetModule: "onlineService",
       },
-      { channel: "serviceQueue", settings },
+      {
+        authToken: options.identity?.tenantToken,
+        channel: "serviceQueue",
+        iconUrl: presentation.avatarUrl,
+        settings,
+      },
     );
   }
 }

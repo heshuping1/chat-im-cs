@@ -21,6 +21,16 @@ describe("quick reply picker view model", () => {
       "direct-2",
     ]);
     expect(vm.categories).toEqual(["通用", "售后", "开场"]);
+    expect(vm.categoryCounts).toEqual({ 开场: 1, 售后: 1, 通用: 1 });
+    expect(vm.filterItems).toEqual([
+      { count: 3, key: "all", label: "全部" },
+      { count: 3, disabled: false, key: "current", label: "当前场景" },
+      { count: 0, disabled: true, key: "recent", label: "最近使用" },
+      { count: 1, key: "category:通用", label: "通用" },
+      { count: 1, key: "category:售后", label: "售后" },
+      { count: 1, key: "category:开场", label: "开场" },
+    ]);
+    expect(vm.filterLabel).toBe("全部");
     expect(vm.selectedReply?.quickReplyId).toBe("direct-1");
     expect(vm.emptyState).toBeUndefined();
   });
@@ -43,8 +53,11 @@ describe("quick reply picker view model", () => {
         recentIds: [],
         replies: replies(),
         scope: "direct_customer",
-      }).visibleReplies.map((reply) => reply.quickReplyId),
-    ).toEqual(["direct-1"]);
+      }),
+    ).toMatchObject({
+      filterLabel: "售后",
+      visibleReplies: [{ quickReplyId: "direct-1" }],
+    });
 
     expect(
       createQuickReplyPickerViewModel({
@@ -53,8 +66,14 @@ describe("quick reply picker view model", () => {
         recentIds: ["missing", "direct-2", "all-1"],
         replies: replies(),
         scope: "direct_customer",
-      }).visibleReplies.map((reply) => reply.quickReplyId),
-    ).toEqual(["direct-2", "all-1"]);
+      }),
+    ).toMatchObject({
+      filterItems: expect.arrayContaining([
+        { count: 2, disabled: false, key: "recent", label: "最近使用" },
+      ]),
+      filterLabel: "最近使用",
+      visibleReplies: [{ quickReplyId: "direct-2" }, { quickReplyId: "all-1" }],
+    });
 
     expect(
       createQuickReplyPickerViewModel({

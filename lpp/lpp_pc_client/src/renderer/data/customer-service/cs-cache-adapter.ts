@@ -6,6 +6,13 @@ import type {
 } from "../api/types";
 import type { CurrentUserIdentity } from "../message-display";
 import {
+  clearCustomerServiceConversationUnread,
+  customerServiceIndexScopeKey,
+  rememberCustomerServiceConversationMessageOverlay,
+  rememberCustomerServiceStaffSentMessage,
+} from "./cs-conversation-index";
+import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import {
   customerServiceMessageFromSendResult,
   latestCustomerServiceMessage,
   previewFromCustomerServiceMessage,
@@ -67,11 +74,46 @@ export function mergeSentCustomerServiceMessage(
   },
 ) {
   const message = customerServiceMessageFromSendResult(params);
+  const scopeKey = customerServiceIndexScopeKey(params.identity as never);
+  rememberCustomerServiceConversationMessageOverlay({
+    conversationId: params.thread.conversationId,
+    message,
+    read: true,
+    scopeKey,
+    source: "send",
+    threadId: params.thread.threadId,
+    threadType: params.thread.threadType,
+  });
+  rememberCustomerServiceStaffSentMessage({
+    conversationId: params.thread.conversationId,
+    message,
+    scopeKey,
+    threadId: params.thread.threadId,
+    threadType: params.thread.threadType,
+  });
   appendCustomerServiceMessageToDetail(queryClient, params.thread, message);
   updateCustomerServiceThreadPreviewInList(queryClient, {
     message,
-    read: true,
+    read: false,
+    incrementUnread: false,
     threadId: params.thread.threadId,
+  });
+  recordMessageReminderDiagnostic({
+    event: "cs.self-message.suppress",
+    source: "cs-cache-adapter",
+    phase: "send",
+    route: "send",
+    classification: {
+      conversationId: params.thread.conversationId,
+      messageId: message.messageId,
+      messageType: message.messageType,
+      threadId: params.thread.threadId,
+      threadType: params.thread.threadType,
+    },
+    summary: {
+      message,
+      thread: params.thread,
+    },
   });
   logCustomerServiceCacheDiagnostic({
     event: "cache.message.merge",
@@ -233,6 +275,7 @@ export function markCustomerServiceThreadReadInCache(
   queryClient: QueryClient,
   threadId: string,
 ) {
+  clearCustomerServiceConversationUnread(threadId);
   queryClient.setQueriesData<CustomerServiceThreadsCache>(
     { queryKey: ["pc-cs-workbench-threads"] },
     (old) => {
@@ -284,12 +327,23 @@ export function markCustomerServiceThreadClosed(
 export function applyCustomerServiceGatewayMessageCache(
   queryClient: QueryClient,
   params: {
+    conversationId?: string;
+    scopeKey?: string;
     message: MessageItemDto;
     read: boolean;
     threadId: string;
     threadType: CustomerServiceThread["threadType"];
   },
 ) {
+  const overlayDecision = rememberCustomerServiceConversationMessageOverlay({
+    conversationId: params.conversationId || params.message.conversationId,
+    message: params.message,
+    read: params.read,
+    scopeKey: params.scopeKey,
+    source: "gateway",
+    threadId: params.threadId,
+    threadType: params.threadType,
+  });
   const thread = {
     conversationId: params.threadId,
     status: "",
@@ -299,9 +353,31 @@ export function applyCustomerServiceGatewayMessageCache(
   };
   appendCustomerServiceMessageToDetail(queryClient, thread, params.message);
   updateCustomerServiceThreadPreviewInList(queryClient, {
+    incrementUnread: !overlayDecision.sameMessage,
     message: params.message,
     read: params.read,
     threadId: params.threadId,
+  });
+  recordMessageReminderDiagnostic({
+    event: "cs.gateway.received",
+    source: "cs-cache-adapter",
+    phase: "cache",
+    route: "onlineService",
+    classification: {
+      conversationId: params.conversationId || params.message.conversationId,
+      incrementUnread: !overlayDecision.sameMessage,
+      messageId: params.message.messageId,
+      nextOverlayUnread: overlayDecision.nextUnread,
+      previousOverlayUnread: overlayDecision.previousUnread,
+      read: params.read,
+      sameMessage: overlayDecision.sameMessage,
+      scopeKey: params.scopeKey,
+      threadId: params.threadId,
+      threadType: params.threadType,
+    },
+    summary: {
+      message: params.message,
+    },
   });
   logCustomerServiceCacheDiagnostic({
     event: "cache.message.merge",
@@ -357,6 +433,7 @@ function updateCustomerServiceDetailMessages(
 function updateCustomerServiceThreadPreviewInList(
   queryClient: QueryClient,
   params: {
+    incrementUnread?: boolean;
     message: MessageItemDto;
     read: boolean;
     threadId: string;
@@ -369,10 +446,22 @@ function updateCustomerServiceThreadPreviewInList(
         ? {
             ...old,
             queueItems: old.queueItems.map((thread) =>
-              updateThreadPreview(thread, params.threadId, params.message, params.read),
+              updateThreadPreview(
+                thread,
+                params.threadId,
+                params.message,
+                params.read,
+                params.incrementUnread ?? true,
+              ),
             ),
             activeItems: old.activeItems.map((thread) =>
-              updateThreadPreview(thread, params.threadId, params.message, params.read),
+              updateThreadPreview(
+                thread,
+                params.threadId,
+                params.message,
+                params.read,
+                params.incrementUnread ?? true,
+              ),
             ),
           }
         : old,
@@ -397,13 +486,18 @@ function updateThreadPreview(
   threadId: string,
   message: MessageItemDto,
   read: boolean,
+  incrementUnread: boolean,
 ) {
   if (!isCustomerServiceThreadMatch(thread, threadId)) return thread;
   return {
     ...thread,
     lastMessagePreview: message.preview || thread.lastMessagePreview,
     lastMessageAt: message.sentAt || thread.lastMessageAt,
-    unreadCount: read ? 0 : Math.max(0, Number(thread.unreadCount ?? 0) + 1),
+    unreadCount: read
+      ? 0
+      : incrementUnread
+        ? Math.max(0, Number(thread.unreadCount ?? 0) + 1)
+        : Math.max(0, Number(thread.unreadCount ?? 0)),
   };
 }
 

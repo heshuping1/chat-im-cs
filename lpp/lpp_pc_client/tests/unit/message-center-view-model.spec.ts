@@ -112,6 +112,49 @@ describe("message center view model", () => {
     expect(viewModel.activeConversationContact).not.toHaveProperty("source");
   });
 
+  it("suppresses unread count for the currently visible conversation pane only", () => {
+    const current = conversation({
+      conversationId: "current",
+      lastMessageSeq: 11,
+      lastReadSeq: 10,
+      unreadCount: 1,
+    });
+    const other = conversation({
+      conversationId: "other",
+      lastMessageSeq: 4,
+      lastReadSeq: 3,
+      unreadCount: 1,
+    });
+
+    expect(
+      createMessageCenterViewModel({
+        activeConversationId: "current",
+        activeConversationVisibility: "paneVisible",
+        conversations: [current, other],
+        draftsByConversation: {},
+        friends: [],
+        groupMembers: [],
+        imReadStateByConversation: {},
+        unreadIdentity: {},
+        visibleConversations: [current, other],
+      }).counts.unread,
+    ).toBe(1);
+
+    expect(
+      createMessageCenterViewModel({
+        activeConversationId: "current",
+        activeConversationVisibility: "listOnly",
+        conversations: [current, other],
+        draftsByConversation: {},
+        friends: [],
+        groupMembers: [],
+        imReadStateByConversation: {},
+        unreadIdentity: {},
+        visibleConversations: [current, other],
+      }).counts.unread,
+    ).toBe(2);
+  });
+
   it("derives loading, error and empty state text for the page shell", () => {
     expect(
       createMessageCenterViewModel({

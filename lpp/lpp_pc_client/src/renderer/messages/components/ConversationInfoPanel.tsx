@@ -19,7 +19,6 @@ import { CustomerProfileWorkspace } from "../../components/CustomerProfileWorksp
 import { PanelState } from "../../components/PanelState";
 import { PcAvatar } from "../../components/PcAvatar";
 import type {
-  ChatFileDto,
   ConversationListItem,
   CustomerProfileCard,
   FriendProfileExtraDto,

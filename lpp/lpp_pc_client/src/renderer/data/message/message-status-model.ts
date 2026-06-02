@@ -72,11 +72,24 @@ export function deriveChatMessageStatus({
 
   const media = isExternalSlotMediaMessage(messageType);
   if (mine && !media && sendState === "sending") {
+    const showDelayedSendingIndicator = shouldShowDelayedSendingIndicator({
+      message,
+      nowMs,
+    });
+    if (isGroupConversation(conversationType)) {
+      return baseStatus({
+        receiptState: "none",
+        sendState,
+        sendStatusSlot: showDelayedSendingIndicator ? "sending" : "none",
+        showSendingIndicator: showDelayedSendingIndicator,
+      });
+    }
     return baseStatus({
-      receiptState: "none",
+      receiptState: "unread",
       sendState,
-      sendStatusSlot: "sending",
-      showSendingIndicator: true,
+      sendStatusSlot: showDelayedSendingIndicator ? "sending" : "none",
+      showSendingIndicator: showDelayedSendingIndicator,
+      statusLabel: "未读",
     });
   }
 
@@ -216,10 +229,37 @@ export function nextChatMessageStatusRefreshDelay({
 }) {
   const record = message as unknown as Record<string, unknown>;
   const status = String(message.status ?? "").trim().toLowerCase();
-  if (status !== "failed") return undefined;
-  const revealAt = failedMarkerRevealAt(record);
+  const messageType = normalizeMessageType(message);
+  const revealAt =
+    status === "failed"
+      ? failedMarkerRevealAt(record)
+      : status === "sending" && isDelayedSendingIndicatorMessage(messageType)
+        ? delayedSendingIndicatorRevealAt(record)
+        : undefined;
   if (!revealAt || nowMs >= revealAt) return undefined;
   return Math.max(0, revealAt - nowMs + 16);
+}
+
+function shouldShowDelayedSendingIndicator({
+  message,
+  nowMs,
+}: {
+  message: MessageItemDto;
+  nowMs: number;
+}) {
+  const revealAt = delayedSendingIndicatorRevealAt(
+    message as unknown as Record<string, unknown>,
+  );
+  return !revealAt || nowMs >= revealAt;
+}
+
+function delayedSendingIndicatorRevealAt(record: Record<string, unknown>) {
+  const startedAt = numberField(record, "localSendStartedAt", "local_send_started_at");
+  return startedAt ? startedAt + chatTextSendingIndicatorDelayMs : undefined;
+}
+
+function isDelayedSendingIndicatorMessage(type: string) {
+  return !isExternalSlotMediaMessage(type) && !isCardOwnedLocalMediaMessage(type);
 }
 
 function shouldShowFailedMarker({

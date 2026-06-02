@@ -20,6 +20,8 @@ interface ReminderItem {
   title: string;
   body: string;
   actionLabel: string;
+  avatarLabel?: string;
+  avatarUrl?: string | null;
   severity: ReminderSeverity;
   targetModule: ModuleKey;
   targetId?: string;
@@ -38,25 +40,23 @@ export function ReminderCenter() {
 
   const reminders = useMemo(
     () => [
-      ...realtimeReminders
-        .filter((item) => item.targetModule !== "onlineService")
-        .map((item) => ({
-          ...item,
-          actionLabel:
-            item.targetModule === "messages"
-              ? "查看消息"
-              : item.targetModule === "contacts"
-                ? "处理申请"
-                : "查看会话",
-          severity: item.severity ?? "info",
-          icon:
-            item.icon ??
-            (item.targetModule === "messages"
-              ? "im"
-              : item.targetModule === "contacts"
-                ? "contacts"
-                : "service"),
-        })),
+      ...realtimeReminders.map((item) => ({
+        ...item,
+        actionLabel:
+          item.targetModule === "messages"
+            ? "查看消息"
+            : item.targetModule === "contacts"
+              ? "处理申请"
+              : "查看会话",
+        severity: item.severity ?? "info",
+        icon:
+          item.icon ??
+          (item.targetModule === "messages"
+            ? "im"
+            : item.targetModule === "contacts"
+              ? "contacts"
+              : "service"),
+      })),
       ...buildReminders(),
     ] satisfies ReminderItem[],
     [realtimeReminders],
@@ -93,9 +93,20 @@ export function ReminderCenter() {
                 ? UserPlus
                 : Headphones;
         return (
-          <article className={`reminder-card ${item.severity}`} key={item.id}>
+          <article
+            className={`reminder-card ${item.severity} ${item.icon === "service" ? "service" : ""}`}
+            key={item.id}
+          >
             <span className="reminder-icon">
-              <Icon size={15} />
+              {item.icon === "service" && (item.avatarUrl || item.avatarLabel) ? (
+                item.avatarUrl ? (
+                  <img alt="" src={item.avatarUrl} />
+                ) : (
+                  <em>{item.avatarLabel}</em>
+                )
+              ) : (
+                <Icon size={15} />
+              )}
             </span>
             <div>
               <strong>{item.title}</strong>

@@ -134,8 +134,27 @@ describe("workspace access integration closure", () => {
     ),
     "utf8",
   );
+  const sharedComposerSurfaceSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/ChatComposerSurface.tsx"),
+    "utf8",
+  );
   const serviceWorkspaceSource = readFileSync(
     resolve(process.cwd(), "src/renderer/components/ChatWorkspace.tsx"),
+    "utf8",
+  );
+  const serviceIncomingNotificationsSource = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/renderer/customer-service/hooks/useCustomerServiceIncomingNotifications.ts",
+    ),
+    "utf8",
+  );
+  const serviceReminderModelSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/data/customer-service/cs-reminder-model.ts"),
+    "utf8",
+  );
+  const gatewayCustomerServiceSideEffectsSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/data/gateway/gateway-cs-side-effects.ts"),
     "utf8",
   );
   const messageCenterSource = readFileSync(
@@ -144,13 +163,6 @@ describe("workspace access integration closure", () => {
   );
   const aiReplyDrawerSource = readFileSync(
     resolve(process.cwd(), "src/renderer/components/AiReplySuggestionDrawer.tsx"),
-    "utf8",
-  );
-  const customerServiceComposerSurfaceSource = readFileSync(
-    resolve(
-      process.cwd(),
-      "src/renderer/customer-service/components/CustomerServiceComposerSurface.tsx",
-    ),
     "utf8",
   );
   const serviceKnowledgeDrawerSource = readFileSync(
@@ -312,11 +324,34 @@ describe("workspace access integration closure", () => {
   it("hides IM composer AI tools while keeping knowledge visibility controlled", () => {
     expect(composerSurfaceSource).toContain("showKnowledgeTools");
     expect(composerSurfaceSource).toContain("showAiTools");
-    expect(composerSurfaceSource).toContain(
-      "showDefaultQuickReplyTool={!showKnowledgeTools}",
+    expect(composerSurfaceSource).toContain("ChatComposerSurface");
+    expect(sharedComposerSurfaceSource).toContain(
+      "showDefaultQuickReplyTool={!showServiceTools}",
     );
     expect(messageCenterSource).toContain("canOpenAiAssistant={false}");
     expect(messageCenterSource).toContain("openAiDraftDrawer");
+  });
+
+  it("uses one shared composer surface for IM and online customer service", () => {
+    expect(composerSurfaceSource).toContain("ChatComposerSurface");
+    expect(serviceWorkspaceSource).toContain("ChatComposerSurface");
+    expect(serviceWorkspaceSource).not.toContain("CustomerServiceComposerSurface");
+    expect(serviceWorkspaceSource).toContain("attachmentScopeKey={selectedThread.threadId}");
+    expect(serviceWorkspaceSource).toContain("screenshotShortcut={pcSettings.screenshotShortcut}");
+    expect(serviceWorkspaceSource).toContain('toolMode="customerService"');
+    expect(sharedComposerSurfaceSource).toContain('attachmentUi="compact"');
+    expect(sharedComposerSurfaceSource).toContain("combinedAttachmentTool");
+    expect(sharedComposerSurfaceSource).toContain("enableScreenshot");
+  });
+
+  it("keeps online-service message reminders deduped and visitor-only", () => {
+    expect(serviceReminderModelSource).toContain("consumeCustomerServiceMessageReminder");
+    expect(serviceReminderModelSource).toContain("isMineCustomerServiceMessage");
+    expect(serviceIncomingNotificationsSource).toContain("consumeCustomerServiceMessageReminder");
+    expect(gatewayCustomerServiceSideEffectsSource).toContain("consumeCustomerServiceMessageReminder");
+    expect(serviceWorkspaceSource).toContain("isMineCustomerServiceMessage");
+    expect(sidebarSource).toContain("const taskbarServiceUnreadCount = activeServiceUnreadCount");
+    expect(sidebarSource).not.toContain("previousServiceMessageRef");
   });
 
   it("keeps AI reply suggestions in online service but removes them from ordinary IM", () => {
@@ -346,7 +381,7 @@ describe("workspace access integration closure", () => {
     expect(serviceKnowledgeDrawerSource).toContain("searchKnowledge");
     expect(serviceQuickReplyDrawerSource).toContain("getQuickReplies");
     expect(serviceQuickReplyDrawerSource).toContain("filterQuickRepliesForScope");
-    expect(customerServiceComposerSurfaceSource).toContain("onQuickReply");
+    expect(sharedComposerSurfaceSource).toContain("onQuickReply");
     expect(messageCenterSource).toContain("CustomerServiceQuickReplyPanel");
     expect(messageCenterSource).toContain("insertQuickReply");
     expect(composerSource).toContain("export type MessageComposerHandle");
@@ -354,8 +389,6 @@ describe("workspace access integration closure", () => {
     expect(composerSource).toContain("insertText:");
     expect(composerSource).toContain("showDefaultQuickReplyTool = true");
     expect(composerSource).toContain("showDefaultQuickReplyTool &&");
-    expect(customerServiceComposerSurfaceSource).toContain(
-      "showDefaultQuickReplyTool={false}",
-    );
+    expect(sharedComposerSurfaceSource).toContain("toolMode === \"customerService\"");
   });
 });

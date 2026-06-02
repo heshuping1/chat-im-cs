@@ -68,6 +68,69 @@ describe("createCustomerServiceGatewayDispatchHandlers", () => {
     expect(handled).toEqual(["thread-1"]);
   });
 
+  it("claims msg.new events when the nested message belongs to a temp session", () => {
+    const handled: string[] = [];
+    const result = handleFirstStageCustomerServiceGatewayEvent(
+      {
+        eventName: "msg.new",
+        receivedAt: 1,
+        args: [
+          {
+            data: {
+              message: {
+                conversationId: "thread-2",
+                conversationType: "temp_session",
+                conversationSeq: 5,
+                messageId: "m2",
+                messageType: "text",
+                body: { text: "hello" },
+              },
+            },
+          },
+        ],
+      },
+      {
+        onMessageReceived: (event) => handled.push(`${event.threadType}:${event.threadId}`),
+        onThreadChanged: (event) => handled.push(event.changeKind),
+      },
+    );
+
+    expect(result).toBe(true);
+    expect(handled).toEqual(["temp_session:thread-2"]);
+  });
+
+  it("does not claim direct-customer compatibility message events without temp-session evidence", () => {
+    const handled: string[] = [];
+    const result = handleFirstStageCustomerServiceGatewayEvent(
+      {
+        eventName: "msg.new",
+        receivedAt: 1,
+        args: [
+          {
+            data: {
+              message: {
+                conversationId: "thread-direct-customer",
+                conversationType: "direct_customer",
+                conversationSeq: 6,
+                messageId: "m3",
+                messageType: "text",
+                senderRole: "visitor",
+                body: { text: "hello" },
+              },
+            },
+          },
+        ],
+      },
+      {
+        onMessageReceived: (event) => handled.push(`${event.threadType}:${event.threadId}`),
+        onThreadChanged: (event) => handled.push(event.changeKind),
+      },
+    );
+
+    expect(result).toBe(false);
+    expect(handled).toEqual([]);
+  });
+
   it("does not claim unsupported non-customer-service events", () => {
     const result = handleFirstStageCustomerServiceGatewayEvent(
       {

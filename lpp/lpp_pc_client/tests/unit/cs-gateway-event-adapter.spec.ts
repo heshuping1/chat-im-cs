@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { adaptCustomerServiceGatewayEvent } from "../../src/renderer/data/gateway/cs-gateway-event-adapter";
+import {
+  rememberCustomerServiceConversationIndex,
+  resetCustomerServiceConversationIndexForTest,
+} from "../../src/renderer/data/customer-service/cs-conversation-index";
 
 describe("adaptCustomerServiceGatewayEvent", () => {
+  beforeEach(() => {
+    resetCustomerServiceConversationIndexForTest();
+  });
+
   it("adapts explicit customer service message events", () => {
     const event = adaptCustomerServiceGatewayEvent({
       eventName: "customer_service.message.new",
@@ -83,5 +91,35 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.kind).toBe("invalid");
     if (event.kind !== "invalid") return;
     expect(event.reason).toBe("missing_thread_id");
+  });
+
+  it("adapts unmarked msg.new messages when the conversation is indexed as temp-session", () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "im-conversation-cs-1",
+      source: "temp-chat-widget",
+      threadId: "temp-session-1",
+      threadType: "temp_session",
+    });
+
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 6,
+      args: [
+        {
+          conversationId: "im-conversation-cs-1",
+          conversationSeq: 4,
+          messageId: "m-indexed",
+          messageType: "text",
+          senderUserId: "visitor-1",
+          body: { text: "codex-test" },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.message.received");
+    if (event.kind !== "cs.message.received") return;
+    expect(event.threadId).toBe("temp-session-1");
+    expect(event.threadType).toBe("temp_session");
+    expect(event.message.messageId).toBe("m-indexed");
   });
 });

@@ -19,7 +19,9 @@ import {
   useSetAuthSession,
 } from './data/auth/auth-store';
 import { siteLineManager } from './data/network/site-line-manager';
+import { recordMessageReminderDiagnostic } from './data/diagnostics/message-reminder-diagnostics';
 import { markFirstInteractive } from './data/performance/startup-performance';
+import { subscribeDesktopNotificationClicks } from './data/reminder/reminder-service';
 import type { PcSettings } from './data/settings/pc-settings';
 import { usePcSettings } from './data/settings/settings-store';
 import type { ModuleKey } from './data/types';
@@ -36,6 +38,8 @@ import {
   useProfilePaneWidth,
   useServiceLayoutMode,
   useSetActiveModule,
+  useSetActiveImConversation,
+  useSetActiveThread,
 } from './data/workspace-ui/workspace-ui-store';
 import './styles/theme.css';
 import './styles/shared/panel-state.css';
@@ -149,6 +153,8 @@ function handleUnauthorizedError(error: unknown) {
 export default function App() {
   const activeModule = useActiveModule();
   const setActiveModule = useSetActiveModule();
+  const setActiveImConversation = useSetActiveImConversation();
+  const setActiveThread = useSetActiveThread();
   const listPaneWidth = useListPaneWidth();
   const profilePaneWidth = useProfilePaneWidth();
   const authSession = useAuthSession();
@@ -196,6 +202,42 @@ export default function App() {
   useEffect(() => {
     markFirstInteractive(authSession ? 'authenticated-shell' : 'login');
   }, [authSession]);
+  useEffect(() => {
+    if (!authSession) return;
+    recordMessageReminderDiagnostic({
+      event: 'app.renderer.mounted',
+      source: 'app',
+      phase: 'mounted',
+      route: safeActiveModule,
+      classification: {
+        activeModule,
+        desktopApiPresent: Boolean(window.desktopApi),
+        dev: import.meta.env.DEV,
+        href: window.location.href,
+        safeActiveModule,
+      },
+    });
+  }, [activeModule, authSession, safeActiveModule]);
+  useEffect(() => {
+    if (!authSession) return undefined;
+    return subscribeDesktopNotificationClicks((payload) => {
+      const targetId = payload.targetId || payload.conversationId;
+      if (payload.targetModule === 'onlineService' || payload.channel === 'serviceQueue') {
+        if (targetId) setActiveThread(targetId);
+        setActiveModule('onlineService');
+        return;
+      }
+      if (payload.targetModule === 'contacts') {
+        setActiveModule('contacts');
+        return;
+      }
+      if (targetId) {
+        setActiveImConversation(targetId);
+        return;
+      }
+      setActiveModule('messages');
+    });
+  }, [authSession, setActiveImConversation, setActiveModule, setActiveThread]);
 
   return (
     <QueryClientProvider client={queryClient}>

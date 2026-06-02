@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { MessageItemDto } from "../../src/renderer/data/api/types";
 import {
   chatSendStatusFailedRevealDelayMs,
+  chatTextSendingIndicatorDelayMs,
   deriveChatMessageStatus,
+  nextChatMessageStatusRefreshDelay,
 } from "../../src/renderer/data/message/message-status-model";
 
 function message(overrides: Partial<MessageItemDto> = {}): MessageItemDto {
@@ -39,7 +41,7 @@ describe("message status model", () => {
     });
   });
 
-  it("does not show textual sending or sent status for text messages", () => {
+  it("treats direct text sending as optimistic unread by default", () => {
     expect(
       deriveChatMessageStatus({
         conversationType: "direct",
@@ -47,7 +49,7 @@ describe("message status model", () => {
         mine: true,
         nowMs: 1_200,
       }).statusLabel,
-    ).toBeUndefined();
+    ).toBe("未读");
     expect(
       deriveChatMessageStatus({
         conversationType: "direct",
@@ -57,7 +59,7 @@ describe("message status model", () => {
     ).toBe("未读");
   });
 
-  it("shows a WeChat-like sending slot immediately for text sending", () => {
+  it("delays the text sending slot until confirmation is slow", () => {
     expect(
       deriveChatMessageStatus({
         conversationType: "direct",
@@ -66,12 +68,45 @@ describe("message status model", () => {
         nowMs: 1_010,
       }),
     ).toMatchObject({
+      receiptState: "unread",
+      sendStatusSlot: "none",
+      sendState: "sending",
+      showFailureMarker: false,
+      showSendingIndicator: false,
+      statusLabel: "未读",
+    });
+
+    expect(
+      deriveChatMessageStatus({
+        conversationType: "direct",
+        message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
+        mine: true,
+        nowMs: 1_000 + chatTextSendingIndicatorDelayMs,
+      }),
+    ).toMatchObject({
+      receiptState: "unread",
       sendStatusSlot: "sending",
       sendState: "sending",
       showFailureMarker: false,
       showSendingIndicator: true,
-      statusLabel: undefined,
+      statusLabel: "未读",
     });
+  });
+
+  it("schedules a refresh when a text sending indicator is not visible yet", () => {
+    expect(
+      nextChatMessageStatusRefreshDelay({
+        message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
+        nowMs: 1_200,
+      }),
+    ).toBe(chatTextSendingIndicatorDelayMs - 200 + 16);
+
+    expect(
+      nextChatMessageStatusRefreshDelay({
+        message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
+        nowMs: 1_000 + chatTextSendingIndicatorDelayMs,
+      }),
+    ).toBeUndefined();
   });
 
   it("keeps fast failures in the sending slot before revealing the failed marker", () => {

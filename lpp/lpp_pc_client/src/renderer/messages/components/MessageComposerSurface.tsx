@@ -1,16 +1,10 @@
-import {
-  ClipboardList,
-  Languages,
-  MessageSquareQuote,
-  Sparkles,
-} from "lucide-react";
 import { forwardRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
-  MessageComposer,
+  ChatComposerSurface,
   type MessageComposerHandle,
-  type ScreenshotShortcut,
-} from "../../components/MessageComposer";
+} from "../../components/ChatComposerSurface";
+import type { ScreenshotShortcut } from "../../components/MessageComposer";
 import type { ComposerMediaKind } from "../../composer/domain/detectComposerMediaKind";
 
 export const MessageComposerSurface = forwardRef<
@@ -62,20 +56,15 @@ export const MessageComposerSurface = forwardRef<
   showKnowledgeTools,
 }, ref) {
   return (
-    <MessageComposer
+    <ChatComposerSurface
       ref={ref}
-      dense
-      attachmentUi="compact"
       attachmentScopeKey={attachmentScopeKey}
-      combinedAttachmentTool
       dragUpload={dragUpload}
       enterToSend={enterToSend}
-      enableScreenshot
       screenshotShortcut={screenshotShortcut}
       shortcutHints={shortcutHints}
       placeholder="输入消息..."
       disabled={false}
-      showDefaultQuickReplyTool={!showKnowledgeTools}
       draftValue={draftValue}
       draftEditorState={draftEditorState}
       mentionOptions={mentionOptions}
@@ -83,61 +72,15 @@ export const MessageComposerSurface = forwardRef<
       onDraftPreviewChange={onDraftPreviewChange}
       onDraftEditorStateChange={onDraftEditorStateChange}
       onResizeStart={onResizeStart}
-      leadingTools={
-        <>
-          {showKnowledgeTools && (
-            <>
-              <button
-                className="composer-advanced-tool"
-                type="button"
-                aria-label="快捷话术"
-                title="快捷话术"
-                onClick={onQuickReply}
-              >
-                <MessageSquareQuote size={16} />
-                <span>话术</span>
-              </button>
-              <button
-                className="composer-advanced-tool"
-                type="button"
-                aria-label="知识库"
-                title="知识库"
-                onClick={onKnowledgeBase}
-              >
-                <ClipboardList size={16} />
-                <span>知识库</span>
-              </button>
-            </>
-          )}
-          {showAiTools && (
-            <button
-              className="composer-advanced-tool"
-              type="button"
-              aria-label="AI 起草"
-              title="AI 起草"
-              onClick={onAiDraft}
-            >
-              <Sparkles size={16} />
-              <span>AI起草</span>
-            </button>
-          )}
-        </>
-      }
-      extraTools={
-        <button
-          className="composer-advanced-tool"
-          type="button"
-          aria-label="翻译"
-          title="翻译"
-        >
-          <Languages size={16} />
-          <span>翻译</span>
-        </button>
-      }
       onSendText={onSendText}
       onTranslateDraft={onTranslateDraft}
+      onAiDraft={onAiDraft}
+      onKnowledgeBase={onKnowledgeBase}
+      onQuickReply={onQuickReply}
       onOpenContactCardPicker={onOpenContactCardPicker}
       onSendMedia={onSendMedia}
+      showAiTools={showAiTools}
+      showKnowledgeTools={showKnowledgeTools}
     />
   );
 });

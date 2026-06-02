@@ -108,11 +108,11 @@ export function getReceptionControlSummary(input: {
   const status = statusSynced
     ? getReceptionStatusOption(input.serviceStatus)
     : {
-        description: "正在等待真实接待状态同步。",
-        label: "未同步",
+        description: "接待状态正在同步，默认忙碌不接入。",
+        label: getReceptionStatusOption("busy").label,
         primary: false,
-        tone: "offline" as const,
-        value: "offline" as CustomerServiceStatus,
+        tone: "busy" as const,
+        value: "busy" as CustomerServiceStatus,
       };
   const queueMode = getReceptionQueueMode(input.queueAcceptEnabled);
   const sessionText =

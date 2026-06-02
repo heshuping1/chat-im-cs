@@ -1,19 +1,25 @@
 import type {
   CacheMediaFilePayload,
   CacheMediaPosterPayload,
+  DesktopNotificationChannel,
+  DesktopNotificationTargetModule,
   DesktopApiMethod,
   DesktopAuthSessionPayload,
+  CsRoutingDiagnosticPayload,
   DiagnosticsJsonValue,
   DiagnosticsModuleSnapshot,
   DiagnosticsPayload,
   LocalMediaCacheSource,
+  MessageReminderDiagnosticPayload,
   NotifyPayload,
+  TaskbarBadgePayload,
   TrayStatus,
   VideoPlayerPayload,
 } from './desktop-api.js';
 
 const maxShortTextLength = 4_096;
 const maxSavedContentLength = 5 * 1024 * 1024;
+const maxNotificationIconDataUrlLength = 512 * 1024;
 const maxDiagnosticsItems = 200;
 const maxDiagnosticsModules = 30;
 const maxDiagnosticsObjectEntries = 80;
@@ -21,6 +27,12 @@ const maxDiagnosticsDepth = 8;
 const maxDataUrlLength = 25 * 1024 * 1024;
 const trayStatuses = new Set<TrayStatus>(['online', 'busy', 'away', 'invisible']);
 const mediaKinds = new Set<CacheMediaFilePayload['kind']>(['image', 'video', 'file']);
+const notificationChannels = new Set<DesktopNotificationChannel>(['im', 'serviceQueue', 'sla']);
+const notificationTargetModules = new Set<DesktopNotificationTargetModule>([
+  'contacts',
+  'messages',
+  'onlineService',
+]);
 const sensitiveDiagnosticsKeyPattern = /token|password|authorization|secret|credential/i;
 
 export function validateDesktopApiCall(
@@ -73,6 +85,12 @@ export function validateDesktopApiCall(
       return [];
     case 'exportDiagnostics':
       return [validateDiagnosticsPayload(args[0])];
+    case 'recordCsRoutingDiagnostic':
+      return [validateCsRoutingDiagnosticPayload(args[0])];
+    case 'recordMessageReminderDiagnostic':
+      return [validateMessageReminderDiagnosticPayload(args[0])];
+    case 'setTaskbarBadge':
+      return [validateTaskbarBadgePayload(args[0])];
     case 'setTrayStatus':
       return [validateTrayStatus(args[0])];
     default:
@@ -116,7 +134,12 @@ export function validateNotifyPayload(value: unknown): NotifyPayload {
   const record = objectValue(value, 'notify.payload');
   return {
     body: safeString(record.body, 'notify.body'),
+    channel: optionalNotificationChannel(record.channel, 'notify.channel'),
     conversationId: optionalString(record.conversationId, 'notify.conversationId'),
+    iconDataUrl: optionalNotificationIconDataUrl(record.iconDataUrl, 'notify.iconDataUrl'),
+    silent: typeof record.silent === 'boolean' ? record.silent : undefined,
+    targetId: optionalString(record.targetId, 'notify.targetId'),
+    targetModule: optionalNotificationTargetModule(record.targetModule, 'notify.targetModule'),
     title: safeString(record.title, 'notify.title'),
   };
 }
@@ -206,6 +229,54 @@ export function validateTrayStatus(value: unknown): TrayStatus {
   return status;
 }
 
+export function validateCsRoutingDiagnosticPayload(value: unknown): CsRoutingDiagnosticPayload {
+  const record = objectValue(value, 'csRouting.payload');
+  return {
+    at: safeString(record.at, 'csRouting.at', 64),
+    event: safeString(record.event, 'csRouting.event', 128),
+    source: safeString(record.source, 'csRouting.source', 128),
+    phase: safeString(record.phase, 'csRouting.phase', 128),
+    route: optionalString(record.route, 'csRouting.route', 128),
+    classification:
+      record.classification === undefined
+        ? undefined
+        : sanitizeDiagnosticsJsonValue(record.classification, 'csRouting.classification'),
+    summary:
+      record.summary === undefined
+        ? undefined
+        : sanitizeDiagnosticsJsonValue(record.summary, 'csRouting.summary'),
+  };
+}
+
+export function validateMessageReminderDiagnosticPayload(
+  value: unknown,
+): MessageReminderDiagnosticPayload {
+  const record = objectValue(value, 'messageReminder.payload');
+  return {
+    at: safeString(record.at, 'messageReminder.at', 64),
+    event: safeString(record.event, 'messageReminder.event', 128),
+    source: safeString(record.source, 'messageReminder.source', 128),
+    phase: safeString(record.phase, 'messageReminder.phase', 128),
+    route: optionalString(record.route, 'messageReminder.route', 128),
+    classification:
+      record.classification === undefined
+        ? undefined
+        : sanitizeDiagnosticsJsonValue(record.classification, 'messageReminder.classification'),
+    summary:
+      record.summary === undefined
+        ? undefined
+        : sanitizeDiagnosticsJsonValue(record.summary, 'messageReminder.summary'),
+  };
+}
+
+export function validateTaskbarBadgePayload(value: unknown): TaskbarBadgePayload {
+  const record = objectValue(value, 'taskbarBadge.payload');
+  return {
+    count: boundedInteger(record.count, 'taskbarBadge.count', 0, 9999),
+    urgent: typeof record.urgent === 'boolean' ? record.urgent : undefined,
+  };
+}
+
 function validateOpenDownloadedFilePayload(value: unknown): Omit<CacheMediaFilePayload, 'kind'> {
   const record = objectValue(value, 'downloadedFile.payload');
   return {
@@ -270,6 +341,30 @@ function optionalString(value: unknown, label: string, maxLength = maxShortTextL
   return safeString(value, label, maxLength);
 }
 
+function optionalNotificationChannel(value: unknown, label: string) {
+  if (value === undefined || value === null) return undefined;
+  const channel = safeString(value, label, 64) as DesktopNotificationChannel;
+  if (!notificationChannels.has(channel)) throw new Error(`Invalid ${label}: ${channel}`);
+  return channel;
+}
+
+function optionalNotificationTargetModule(value: unknown, label: string) {
+  if (value === undefined || value === null) return undefined;
+  const module = safeString(value, label, 64) as DesktopNotificationTargetModule;
+  if (!notificationTargetModules.has(module)) throw new Error(`Invalid ${label}: ${module}`);
+  return module;
+}
+
+function optionalNotificationIconDataUrl(value: unknown, label: string) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const dataUrl = safeString(value, label, maxNotificationIconDataUrlLength);
+  if (!/^data:image\/[a-z0-9.+-]+;base64,/i.test(dataUrl)) {
+    throw new Error(`${label} must be a base64 image data URL`);
+  }
+  return dataUrl;
+}
+
 function optionalProfileId(value: unknown, label: string) {
   const text = safeString(value, label, 64).trim();
   if (!text) return undefined;
@@ -303,6 +398,14 @@ function optionalPositiveNumber(value: unknown, label: string) {
   const numberValue = Number(value);
   if (!Number.isFinite(numberValue) || numberValue < 0) {
     throw new Error(`${label} must be a positive number`);
+  }
+  return numberValue;
+}
+
+function boundedInteger(value: unknown, label: string, min: number, max: number) {
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue < min || numberValue > max) {
+    throw new Error(`${label} must be an integer between ${min} and ${max}`);
   }
   return numberValue;
 }

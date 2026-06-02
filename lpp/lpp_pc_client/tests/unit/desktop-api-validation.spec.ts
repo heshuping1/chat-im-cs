@@ -6,11 +6,14 @@ import {
 } from "../../src/shared/desktop-api";
 import {
   validateCacheMediaFilePayload,
+  validateCsRoutingDiagnosticPayload,
   validateDesktopApiCall,
   validateDesktopIpcCall,
   validateDesktopAuthSessionPayload,
   validateDiagnosticsPayload,
+  validateMessageReminderDiagnosticPayload,
   validateNotifyPayload,
+  validateTaskbarBadgePayload,
   validateTrayStatus,
   validateVideoPlayerPayload,
 } from "../../src/shared/desktop-api-validation";
@@ -24,26 +27,75 @@ describe("desktop api validation", () => {
     expect(methods).toContain("cacheLocalMediaFile");
     expect(methods).toContain("openAppProfile");
     expect(methods).toContain("getAppInstanceProfile");
+    expect(methods).toContain("recordCsRoutingDiagnostic");
+    expect(methods).toContain("recordMessageReminderDiagnostic");
     expect(desktopIpcChannelByMethod.cacheLocalMediaFile).toBe("desktop:cache-local-media-file");
+    expect(desktopIpcChannelByMethod.recordCsRoutingDiagnostic).toBe(
+      "desktop:record-cs-routing-diagnostic",
+    );
+    expect(desktopIpcChannelByMethod.recordMessageReminderDiagnostic).toBe(
+      "desktop:record-message-reminder-diagnostic",
+    );
     expect(channels.every((channel) => channel.startsWith("desktop:"))).toBe(true);
     expect(new Set(channels).size).toBe(channels.length);
   });
 
   it("validates notification, tray and no-argument calls", () => {
-    expect(validateNotifyPayload({ title: "T", body: "B", conversationId: "c1" })).toEqual({
+    expect(
+      validateNotifyPayload({
+        body: "B",
+        channel: "serviceQueue",
+        conversationId: "c1",
+        iconDataUrl: "data:image/png;base64,abcd",
+        silent: true,
+        targetId: "t1",
+        targetModule: "onlineService",
+        title: "T",
+      }),
+    ).toEqual({
       title: "T",
       body: "B",
+      channel: "serviceQueue",
       conversationId: "c1",
+      iconDataUrl: "data:image/png;base64,abcd",
+      silent: true,
+      targetId: "t1",
+      targetModule: "onlineService",
     });
     expect(validateTrayStatus("busy")).toBe("busy");
     expect(validateDesktopApiCall("captureScreenshot", ["ignored"])).toEqual([]);
     expect(validateDesktopApiCall("getAppInstanceProfile", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("setTaskbarBadge", [{ count: 84, urgent: true }])).toEqual([
+      { count: 84, urgent: true },
+    ]);
+    expect(validateTaskbarBadgePayload({ count: 0 })).toEqual({ count: 0, urgent: undefined });
     expect(validateDesktopApiCall("openAppProfile", ["client-2"])).toEqual(["client-2"]);
     expect(validateDesktopApiCall("openAppProfile", [undefined])).toEqual([]);
     expect(() => validateTrayStatus("root")).toThrow("Invalid tray status");
     expect(() => validateDesktopApiCall("openAppProfile", ["客服二号"])).toThrow(
       "appProfile.profileId",
     );
+    expect(() =>
+      validateNotifyPayload({ title: "T", body: "B", channel: "marketing" }),
+    ).toThrow("notify.channel");
+    expect(() =>
+      validateNotifyPayload({ title: "T", body: "B", targetModule: "dataCenter" }),
+    ).toThrow("notify.targetModule");
+    expect(() =>
+      validateNotifyPayload({ title: "T", body: "B", iconDataUrl: "https://assets.example/a.png" }),
+    ).toThrow("notify.iconDataUrl");
+    expect(() =>
+      validateNotifyPayload({ title: "T", body: "B", iconDataUrl: "data:text/plain;base64,abcd" }),
+    ).toThrow("notify.iconDataUrl");
+    expect(() =>
+      validateNotifyPayload({
+        title: "T",
+        body: "B",
+        iconDataUrl: `data:image/png;base64,${"a".repeat(512 * 1024)}`,
+      }),
+    ).toThrow("notify.iconDataUrl");
+    expect(() => validateTaskbarBadgePayload({ count: -1 })).toThrow("taskbarBadge.count");
+    expect(() => validateTaskbarBadgePayload({ count: 1.5 })).toThrow("taskbarBadge.count");
   });
 
   it("validates media payloads without changing valid fields", () => {
@@ -228,6 +280,108 @@ describe("desktop api validation", () => {
     expect(() => validateDiagnosticsPayload({ breadcrumbs: [], errors: [] })).toThrow(
       "diagnostics.sessionId",
     );
+  });
+
+  it("validates customer-service routing diagnostics and redacts sensitive fields", () => {
+    expect(
+      validateCsRoutingDiagnosticPayload({
+        at: "2026-06-02T01:40:00.000Z",
+        event: "msg.new",
+        source: "gateway-router",
+        phase: "received",
+        route: "im",
+        classification: { tenantToken: "raw-token", route: "im" },
+        summary: { body: { text: "hello" }, conversationId: "conversation-1" },
+      }),
+    ).toEqual({
+      at: "2026-06-02T01:40:00.000Z",
+      event: "msg.new",
+      source: "gateway-router",
+      phase: "received",
+      route: "im",
+      classification: { tenantToken: "[redacted]", route: "im" },
+      summary: { body: { text: "hello" }, conversationId: "conversation-1" },
+    });
+    expect(() =>
+      validateDesktopApiCall("recordCsRoutingDiagnostic", [
+        { event: "msg.new", source: "gateway-router", phase: "received" },
+      ]),
+    ).toThrow("csRouting.at");
+  });
+
+  it("validates message reminder diagnostics and redacts sensitive fields", () => {
+    expect(
+      validateMessageReminderDiagnosticPayload({
+        at: "2026-06-02T01:40:00.000Z",
+        event: "im.read.reduce",
+        source: "gateway-im-side-effects",
+        phase: "reduce",
+        route: "background_conversation",
+        classification: { tenantToken: "raw-token", unreadAfter: 1 },
+        summary: { body: { text: "hello" }, conversationId: "conversation-1" },
+      }),
+    ).toEqual({
+      at: "2026-06-02T01:40:00.000Z",
+      event: "im.read.reduce",
+      source: "gateway-im-side-effects",
+      phase: "reduce",
+      route: "background_conversation",
+      classification: { tenantToken: "[redacted]", unreadAfter: 1 },
+      summary: { body: { text: "hello" }, conversationId: "conversation-1" },
+    });
+    expect(() =>
+      validateDesktopApiCall("recordMessageReminderDiagnostic", [
+        { event: "im.read.reduce", source: "gateway-im-side-effects", phase: "reduce" },
+      ]),
+    ).toThrow("messageReminder.at");
+  });
+
+  it("validates IM unread lifecycle diagnostic payloads", () => {
+    const cases = [
+      {
+        at: "2026-06-02T01:40:00.000Z",
+        event: "app.renderer.mounted",
+        source: "app",
+        phase: "mounted",
+        route: "messages",
+        classification: {
+          activeModule: "messages",
+          desktopApiPresent: true,
+          safeActiveModule: "messages",
+        },
+      },
+      {
+        at: "2026-06-02T01:40:01.000Z",
+        event: "gateway.bridge.lifecycle",
+        source: "gateway-bridge",
+        phase: "started",
+        route: "gateway",
+        classification: {
+          gatewayHost: "api.example.test",
+          state: "Connected",
+        },
+      },
+      {
+        at: "2026-06-02T01:40:02.000Z",
+        event: "im.store.mark-local",
+        source: "workspace-store-core",
+        phase: "mark",
+        route: "local-read",
+        classification: {
+          activeConversationId: "conversation-1",
+          activeModule: "messages",
+          conversationId: "conversation-1",
+          readSeq: 12,
+          unreadAfter: 0,
+        },
+      },
+    ];
+
+    for (const payload of cases) {
+      expect(validateDesktopApiCall("recordMessageReminderDiagnostic", [payload])[0]).toEqual(
+        payload,
+      );
+    }
   });
 
   it("validates auth session payloads before secure storage IPC", () => {

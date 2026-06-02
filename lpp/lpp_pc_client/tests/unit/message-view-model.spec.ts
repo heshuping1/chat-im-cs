@@ -97,7 +97,7 @@ describe("message view model", () => {
     });
   });
 
-  it("shows a text sending slot immediately while preserving quiet status text", () => {
+  it("shows optimistic unread before delayed text sending feedback", () => {
     const message = {
       body: { text: "hello" },
       direction: "out",
@@ -121,9 +121,100 @@ describe("message view model", () => {
       }),
     ).toMatchObject({
       status: {
+        receipt: "unread",
+        sendStatusSlot: "none",
+        showSendingIndicator: false,
+        statusText: "未读",
+        timeText: "12:00",
+      },
+    });
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Alice",
+        conversationType: "direct",
+        message,
+        mine: true,
+        nowMs: 1_700,
+        senderFallback: "Alice",
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      status: {
+        receipt: "unread",
         sendStatusSlot: "sending",
         showSendingIndicator: true,
-        statusText: undefined,
+        statusText: "未读",
+        timeText: "12:00",
+      },
+    });
+  });
+
+  it("keeps text read receipts separate from local sending state", () => {
+    const baseMessage = {
+      body: { text: "123" },
+      direction: "out",
+      isMine: true,
+      messageId: "m-text-status",
+      messageType: "text",
+      sentAt: "2026-05-29T12:00:00.000Z",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Alice",
+        conversationType: "direct",
+        message: { ...baseMessage, status: "sent" },
+        mine: true,
+        senderFallback: "Alice",
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      status: {
+        receipt: "unread",
+        sendStatusSlot: "none",
+        statusText: "未读",
+        timeText: "12:00",
+      },
+    });
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Alice",
+        conversationType: "direct",
+        message: { ...baseMessage, status: "seen" },
+        mine: true,
+        senderFallback: "Alice",
+        timeText: "12:01",
+      }),
+    ).toMatchObject({
+      status: {
+        receipt: "read",
+        sendStatusSlot: "none",
+        statusText: "已读",
+        timeText: "12:01",
+      },
+    });
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Alice",
+        conversationType: "direct",
+        message: {
+          ...baseMessage,
+          readAt: "2026-05-29T12:02:00.000Z",
+          status: "sent",
+        },
+        mine: true,
+        senderFallback: "Alice",
+        timeText: "12:02",
+      }),
+    ).toMatchObject({
+      status: {
+        receipt: "read",
+        sendStatusSlot: "none",
+        statusText: "已读",
+        timeText: "12:02",
       },
     });
   });

@@ -1,5 +1,6 @@
 import {
   customerServiceThreadId,
+  classifyCustomerServiceGatewayPayload,
   isCustomerServiceGatewayPayload,
   isCustomerServiceStatus,
   isSelfCustomerServiceGatewayMessage,
@@ -28,6 +29,7 @@ export {
 } from "./gateway-im-payload-utils";
 export {
   customerServiceThreadId,
+  classifyCustomerServiceGatewayPayload,
   isCustomerServiceGatewayPayload,
   isCustomerServiceStatus,
   isSelfCustomerServiceGatewayMessage,

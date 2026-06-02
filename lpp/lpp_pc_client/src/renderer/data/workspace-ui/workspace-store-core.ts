@@ -14,6 +14,7 @@ import {
 import type { ConversationReadState, ImConversationType } from '../im-read-model';
 import { conversationKey } from '../im-read-model';
 import { logImReadDiagnostic } from '../im-read/im-read-diagnostics';
+import { recordMessageReminderDiagnostic } from '../diagnostics/message-reminder-diagnostics';
 import {
   normalizedStoredSeq,
   persistImReadState,
@@ -277,7 +278,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   messageFilter: 'all',
   contactFilter: 'customer',
   imPresenceStatus: 'online',
-  customerServiceStatus: 'offline',
+  customerServiceStatus: 'busy',
   pcSettings: readStoredPcSettings(),
   realtimeReminders: [],
   setActiveModule: (activeModule) => set({ activeModule }),
@@ -342,6 +343,24 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           conversationId: id,
           conversationType: 'direct',
           readSeq: mergedReadSeq,
+        },
+      });
+      recordMessageReminderDiagnostic({
+        event: 'im.store.mark-local',
+        source: 'workspace-store-core',
+        phase: 'mark',
+        route: 'local-read',
+        classification: {
+          activeConversationId: state.activeImConversationId,
+          activeModule: state.activeModule,
+          commandReason: 'markImConversationReadLocally',
+          conversationId: id,
+          conversationType: 'direct',
+          lastMessageSeq: currentReadState?.lastMessageSeq,
+          lastReadSeq: currentReadState?.myReadSeq,
+          readSeq: mergedReadSeq,
+          unreadAfter: 0,
+          unreadBefore: currentReadState?.unreadCount,
         },
       });
       return { locallyReadImConversationReads, imReadStateByConversation };

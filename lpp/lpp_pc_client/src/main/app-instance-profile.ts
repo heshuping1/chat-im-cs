@@ -15,6 +15,7 @@ export interface ProfileSource {
 
 const profileArgNames = new Set(['--profile', '--lpp-profile', '--pc-profile']);
 const profileEnvNames = ['LPP_PC_PROFILE', 'LPP_PC_INSTANCE_PROFILE'];
+export const appUserModelIdPrefix = 'com.lpp.pcclient';
 
 export function configureAppInstanceProfile(
   app: Pick<typeof ElectronApp, 'getPath' | 'setPath' | 'setAppUserModelId'>,
@@ -34,7 +35,7 @@ export function configureAppInstanceProfile(
   const userDataPath = join(defaultUserDataPath, 'profiles', profileId);
   app.setPath('userData', userDataPath);
   if (process.platform === 'win32') {
-    app.setAppUserModelId(`com.lpp.pcclient.${profileId}`);
+    app.setAppUserModelId(appUserModelIdForProfile(profileId));
   }
   return {
     defaultUserDataPath,
@@ -42,6 +43,10 @@ export function configureAppInstanceProfile(
     profileName: profileId,
     userDataPath,
   };
+}
+
+export function appUserModelIdForProfile(profileId: string | null) {
+  return profileId ? `${appUserModelIdPrefix}.${profileId}` : appUserModelIdPrefix;
 }
 
 export function resolveAppInstanceProfileId(source: ProfileSource): string | null {

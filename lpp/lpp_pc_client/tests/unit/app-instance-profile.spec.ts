@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  appUserModelIdForProfile,
   buildAppProfileLaunchArgs,
   configureAppInstanceProfile,
   createNextProfileId,
@@ -59,6 +60,11 @@ describe("app instance profile", () => {
       userDataPath: join("C:", "Users", "tester", "AppData", "LPP", "profiles", "agent-b"),
     });
     expect(app.setPath).toHaveBeenCalledWith("userData", profile.userDataPath);
+  });
+
+  it("keeps profile app user model ids under the product prefix", () => {
+    expect(appUserModelIdForProfile(null)).toBe("com.lpp.pcclient");
+    expect(appUserModelIdForProfile("agent-a")).toBe("com.lpp.pcclient.agent-a");
   });
 
   it("allocates the next explicit client profile id", () => {

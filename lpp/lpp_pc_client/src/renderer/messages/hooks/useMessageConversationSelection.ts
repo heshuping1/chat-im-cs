@@ -1,11 +1,13 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import type { ConversationListItem } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
 import {
+  conversationUnreadDiagnostic,
   type CurrentUserIdentity,
   isImConversation,
 } from "../../data/message-display";
+import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
 import {
   conversationKey as imConversationKey,
   type ConversationReadState,
@@ -16,6 +18,9 @@ import {
   sortMessageConversations,
 } from "../models/messageConversationListModel";
 import { getImConversationType } from "./useMessageCenterViewModel";
+
+const effectiveUnreadDiagnosticSignatures = new Map<string, string>();
+const maxEffectiveUnreadDiagnosticSignatures = 500;
 
 export function useMessageConversationSelection({
   activeConversationId,
@@ -77,6 +82,59 @@ export function useMessageConversationSelection({
       filterMessageConversations(conversations, messageFilter, keyword, unreadIdentity),
     [conversations, keyword, messageFilter, unreadIdentity],
   );
+
+  useEffect(() => {
+    if (!unreadIdentity) return;
+    for (const conversation of conversations) {
+      const diagnostic = conversationUnreadDiagnostic(conversation, unreadIdentity);
+      const shouldRecord =
+        diagnostic.effectiveUnread > 0 ||
+        diagnostic.serverUnread !== diagnostic.effectiveUnread;
+      if (!shouldRecord) continue;
+      const signature = [
+        diagnostic.serverUnread,
+        diagnostic.effectiveUnread,
+        diagnostic.lastReadSeq ?? "",
+        diagnostic.lastMessageSeq ?? "",
+        diagnostic.localReadSeq ?? "",
+        diagnostic.localReadAt ?? "",
+        diagnostic.localReadCoversLastMessage,
+        diagnostic.localReadCoverReason,
+        diagnostic.selfLastMessage,
+      ].join("|");
+      const logKey = conversation.conversationId;
+      if (effectiveUnreadDiagnosticSignatures.get(logKey) === signature) continue;
+      effectiveUnreadDiagnosticSignatures.set(logKey, signature);
+      if (effectiveUnreadDiagnosticSignatures.size > maxEffectiveUnreadDiagnosticSignatures) {
+        const oldest = effectiveUnreadDiagnosticSignatures.keys().next().value;
+        if (oldest) effectiveUnreadDiagnosticSignatures.delete(oldest);
+      }
+      recordMessageReminderDiagnostic({
+        event: "im.ui.effective-unread",
+        source: "use-message-conversation-selection",
+        phase: "derive",
+        route: "conversation-list",
+        classification: {
+          conversationId: conversation.conversationId,
+          conversationType: conversation.conversationType,
+          effectiveUnread: diagnostic.effectiveUnread,
+          lastMessageAt: diagnostic.lastMessageAt,
+          lastMessageSeq: diagnostic.lastMessageSeq,
+          lastReadSeq: diagnostic.lastReadSeq,
+          localReadAt: diagnostic.localReadAt,
+          localReadCoversLastMessage: diagnostic.localReadCoversLastMessage,
+          localReadCoverReason: diagnostic.localReadCoverReason,
+          localReadSeq: diagnostic.localReadSeq,
+          selfLastMessage: diagnostic.selfLastMessage,
+          serverUnread: diagnostic.serverUnread,
+        },
+        summary: {
+          conversation,
+        },
+      });
+    }
+  }, [conversations, unreadIdentity]);
+
   const activeConversation =
     visibleConversations.find((item) => item.conversationId === activeConversationId) ??
     conversations.find((item) => item.conversationId === activeConversationId) ??
