@@ -7,7 +7,9 @@ export interface ReminderDiagnosticsTarget {
     | 'customer-service-reminder.jsonl'
     | 'gateway-health.jsonl'
     | 'message-delivery.jsonl'
-    | 'message-gap-sync.jsonl';
+    | 'message-gap-sync.jsonl'
+    | 'message-source.jsonl'
+    | 'message-trace.jsonl';
   maxLines: number;
 }
 
@@ -22,6 +24,12 @@ export function reminderDiagnosticsTarget(
   }
   if (payload.event.startsWith('message.gap-sync')) {
     return { fileName: 'message-gap-sync.jsonl', maxLines: 800 };
+  }
+  if (payload.event === 'message.source.observed') {
+    return { fileName: 'message-source.jsonl', maxLines: 2400 };
+  }
+  if (payload.event === 'message.trace') {
+    return { fileName: 'message-trace.jsonl', maxLines: 2400 };
   }
   if (isImReadDiagnostic(payload)) {
     return { fileName: 'im-read.jsonl', maxLines: 1200 };

@@ -8,6 +8,7 @@ import type {
   MessageItemDto,
 } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { recordMessageTraceEvent } from "../../data/diagnostics/message-trace-diagnostics";
 import { requireApiClient } from "../../data/runtime";
 import {
   chatSendFailureContext,
@@ -252,6 +253,17 @@ export function useMessageTextSendController({
       });
       const { clientMsgId, createdAt, localMessageId } =
         runtime.createLocalIdentity("pc-local-text");
+      recordMessageTraceEvent({
+        clientMsgId,
+        conversationId: conversation.conversationId,
+        conversationType,
+        owner: "im",
+        route: "text-message",
+        source: "use-message-text-send-controller",
+        sourceChannel: "send",
+        stage: "send.compose.submit",
+        traceId: clientMsgId,
+      });
       const body = withReplyBody({ text: content }, reply);
       const initialStatus = initialChatSendStatusForKind("text");
       const sendStartedAt = createdAt;
@@ -280,6 +292,18 @@ export function useMessageTextSendController({
           messageKind: "text",
         },
       });
+      recordMessageTraceEvent({
+        clientMsgId,
+        conversationId: conversation.conversationId,
+        conversationType,
+        messageId: localMessageId,
+        owner: "im",
+        route: "text-message",
+        source: "use-message-text-send-controller",
+        sourceChannel: "send",
+        stage: "send.local_echo.written",
+        traceId: clientMsgId,
+      });
       setLocalOutgoingMessagesByConversation((current) =>
         upsertLocalOutgoingMessage(
           current,
@@ -303,6 +327,17 @@ export function useMessageTextSendController({
       });
       enqueueOutgoingTask(async () => {
         try {
+          recordMessageTraceEvent({
+            clientMsgId,
+            conversationId: conversation.conversationId,
+            conversationType,
+            owner: "im",
+            route: "text-message",
+            source: "use-message-text-send-controller",
+            sourceChannel: "send",
+            stage: "send.http.start",
+            traceId: clientMsgId,
+          });
           const result = await requireApiClient(session).sendConversationTextMessage(
             conversationType,
             conversation.conversationId,
@@ -311,6 +346,19 @@ export function useMessageTextSendController({
             conversationType === "group" ? extractMentions(content, groupMembers) : [],
             { clientMsgId },
           );
+          recordMessageTraceEvent({
+            clientMsgId,
+            conversationId: conversation.conversationId,
+            conversationType,
+            messageId: result.messageId,
+            owner: "im",
+            route: "text-message",
+            serverSentAt: result.serverTime,
+            source: "use-message-text-send-controller",
+            sourceChannel: "send",
+            stage: "send.http.done",
+            traceId: clientMsgId,
+          });
           const sentMessage = replaceLocalMessageInCache(
             queryClient,
             session,
@@ -333,6 +381,20 @@ export function useMessageTextSendController({
               messageId: sentMessage.messageId,
               messageKind: "text",
             },
+          });
+          recordMessageTraceEvent({
+            clientMsgId,
+            conversationId: conversation.conversationId,
+            conversationSeq: sentMessage.conversationSeq,
+            conversationType,
+            messageId: sentMessage.messageId,
+            owner: "im",
+            route: "text-message",
+            serverSentAt: sentMessage.sentAt,
+            source: "use-message-text-send-controller",
+            sourceChannel: "send",
+            stage: "send.server_ack.observed",
+            traceId: clientMsgId,
           });
           setLocalOutgoingMessagesByConversation((current) =>
             replaceLocalOutgoingMessage(
@@ -365,6 +427,17 @@ export function useMessageTextSendController({
                 ? "/api/client/v1/groups/{conversationId}/messages"
                 : "/api/client/v1/direct-chats/{conversationId}/messages",
             }),
+          });
+          recordMessageTraceEvent({
+            clientMsgId,
+            conversationId: conversation.conversationId,
+            conversationType,
+            owner: "im",
+            route: "text-message",
+            source: "use-message-text-send-controller",
+            sourceChannel: "send",
+            stage: "send.http.failed",
+            traceId: clientMsgId,
           });
           markLocalMessageFailed(
             queryClient,

@@ -17,6 +17,7 @@ import {
 } from "../../data/im-read/im-read-store";
 import { readStateMeaningfullyChanged } from "../../data/im-read/im-read-view-model";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
+import { recordMessageTraceEvent } from "../../data/diagnostics/message-trace-diagnostics";
 import { triggerMessageGapSync } from "../../data/gateway/message-gap-sync-coordinator";
 import { useActiveModule } from "../../data/workspace-ui/workspace-ui-store";
 import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
@@ -211,6 +212,37 @@ export function useImReadCommandExecutor({
         activeConversation,
       },
     });
+    const latestMessage = messages[messages.length - 1];
+    if (activeConversation?.conversationId && latestMessage?.messageId) {
+      recordMessageTraceEvent({
+        clientMsgId: latestMessage.clientMsgId,
+        conversationId: activeConversation.conversationId,
+        conversationSeq: latestMessage.conversationSeq,
+        conversationType: activeConversationType,
+        messageId: latestMessage.messageId,
+        owner: "im",
+        route: activeConversationVisibility,
+        serverSentAt: latestMessage.sentAt,
+        source: "use-im-read-command-executor",
+        sourceChannel: "gateway",
+        stage: "receive.ui.observed",
+      });
+      window.requestAnimationFrame(() => {
+        recordMessageTraceEvent({
+          clientMsgId: latestMessage.clientMsgId,
+          conversationId: activeConversation.conversationId,
+          conversationSeq: latestMessage.conversationSeq,
+          conversationType: activeConversationType,
+          messageId: latestMessage.messageId,
+          owner: "im",
+          route: activeConversationVisibility,
+          serverSentAt: latestMessage.sentAt,
+          source: "use-im-read-command-executor",
+          sourceChannel: "gateway",
+          stage: "receive.paint.observed",
+        });
+      });
+    }
     if (!activeConversation || !session || !activeConversationType) return;
     if (!canAutoRead) return;
     const key = imConversationKey(

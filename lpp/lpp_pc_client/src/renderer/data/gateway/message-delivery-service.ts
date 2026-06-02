@@ -1,6 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AuthSession } from "../auth/auth-session";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import { recordMessageSourceObserved } from "../diagnostics/message-source-diagnostics";
+import { recordMessageTraceEvent } from "../diagnostics/message-trace-diagnostics";
 import type { CustomerServiceStatus } from "../types";
 import {
   mergeCustomerServiceGatewayMessage,
@@ -83,6 +85,14 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
           threadId: input.threadId,
         },
       });
+      recordDeliveryTraceEvent({
+        owner: "customerService",
+        payload: input.payload,
+        route: input.route,
+        source: input.source,
+        stage: "receive.cache.written",
+        threadId: input.threadId,
+      });
       mergeCustomerServiceGatewayMessage(queryClient, input.payload, input.threadId ?? "");
       invalidateCustomerService(input.threadId);
     },
@@ -139,6 +149,15 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
           latency: deliveryLatencySummary(input.payload),
           payload: input.payload,
         },
+      });
+      recordDeliveryTraceEvent({
+        conversationId: input.conversationId,
+        conversationType: input.conversationType,
+        owner: "im",
+        payload: input.payload,
+        route: input.route,
+        source: input.source,
+        stage: "receive.cache.written",
       });
       mergeImGatewayMessage(
         queryClient,
@@ -258,7 +277,8 @@ function evaluateDeliveryGuard(input: DeliveryGuardInput): DeliveryGuardResult {
 }
 
 function deliveryMetadata(input: DeliveryGuardInput) {
-  const message = messageRecord(input.payload);
+  const payload = input.payload ?? {};
+  const message = messageRecord(payload);
   const conversationId =
     input.conversationId ||
     stringField(message, "conversationId", "threadId") ||
@@ -326,6 +346,53 @@ export function recordGatewayPushReceived(input: {
   scopeKey?: string;
   source: string;
 }) {
+  const payload = input.payload ?? {};
+  const message = messageRecord(payload);
+  const clientMsgId = stringField(message, "clientMsgId", "clientMessageId") || undefined;
+  const conversationId =
+    stringField(message, "conversationId", "threadId") ||
+    stringField(payload, "conversationId", "threadId") ||
+    undefined;
+  const conversationSeq =
+    numberField(message, "conversationSeq", "seq") ||
+    numberField(payload, "conversationSeq", "seq") ||
+    undefined;
+  const messageId =
+    stringField(message, "messageId") ||
+    stringField(payload, "messageId") ||
+    undefined;
+  const messageType =
+    stringField(message, "messageType", "type") ||
+    stringField(payload, "messageType", "type") ||
+    undefined;
+  const serverSentAt =
+    stringField(message, "sentAt", "sendTime", "createdAt", "serverTime", "timestamp") ||
+    stringField(payload, "sentAt", "sendTime", "createdAt", "serverTime", "timestamp") ||
+    undefined;
+  recordMessageSourceObserved({
+    clientMsgId,
+    conversationId,
+    conversationSeq,
+    messageId,
+    messageType:
+      messageType,
+    route: "gateway-push",
+    serverSentAt,
+    source: input.source,
+    sourceChannel: "gateway",
+  });
+  recordMessageTraceEvent({
+    clientMsgId,
+    conversationId,
+    conversationSeq,
+    messageId,
+    owner: "unknown",
+    route: "gateway-push",
+    serverSentAt,
+    source: input.source,
+    sourceChannel: "gateway",
+    stage: "receive.gateway.observed",
+  });
   recordMessageReminderDiagnostic({
     event: "gateway.push.received",
     source: input.source,
@@ -340,6 +407,48 @@ export function recordGatewayPushReceived(input: {
       latency: deliveryLatencySummary(input.payload),
       payload: input.payload,
     },
+  });
+}
+
+function recordDeliveryTraceEvent(input: {
+  conversationId?: string;
+  conversationType?: string;
+  owner: "im" | "customerService";
+  payload: Record<string, unknown>;
+  route: string;
+  source: string;
+  stage: "receive.cache.written";
+  threadId?: string;
+}) {
+  const message = messageRecord(input.payload);
+  const clientMsgId = stringField(message, "clientMsgId", "clientMessageId") || undefined;
+  const messageId =
+    stringField(message, "messageId") ||
+    stringField(input.payload, "messageId") ||
+    undefined;
+  recordMessageTraceEvent({
+    clientMsgId,
+    conversationId:
+      input.conversationId ||
+      stringField(message, "conversationId", "threadId") ||
+      stringField(input.payload, "conversationId", "threadId") ||
+      undefined,
+    conversationSeq:
+      numberField(message, "conversationSeq", "seq") ||
+      numberField(input.payload, "conversationSeq", "seq") ||
+      undefined,
+    conversationType: input.conversationType,
+    messageId,
+    owner: input.owner,
+    route: input.route,
+    serverSentAt:
+      stringField(message, "sentAt", "sendTime", "createdAt", "serverTime", "timestamp") ||
+      stringField(input.payload, "sentAt", "sendTime", "createdAt", "serverTime", "timestamp") ||
+      undefined,
+    source: input.source,
+    sourceChannel: "gateway",
+    stage: input.stage,
+    threadId: input.threadId,
   });
 }
 

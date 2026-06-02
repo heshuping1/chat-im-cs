@@ -28,6 +28,8 @@ import {
 import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
 import { rememberCustomerServiceConversationFromImList } from "../customer-service/cs-compatibility-bridge";
 import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
+import { recordMessageSourceObserved } from "../diagnostics/message-source-diagnostics";
+import { recordMessageTraceEvent } from "../diagnostics/message-trace-diagnostics";
 import { resolveConversationOwnership } from "../gateway/conversation-ownership-resolver";
 import {
   normalizeCreateGroupChatPayload,
@@ -71,6 +73,7 @@ export class MessagesApiClient extends ContactsApiClient {
           }),
         })),
       });
+      recordConversationListSourceDiagnostics(items, scopeKey);
       return {
         ...page,
         items: filtered
@@ -113,7 +116,7 @@ export class MessagesApiClient extends ContactsApiClient {
         items: messages ?? [],
         page: { isLatestPage: true },
       });
-      return (messages ?? [])
+      const normalized = (messages ?? [])
         .map((message, index) =>
           normalizeConversationMessageFromContract(
             message,
@@ -122,6 +125,12 @@ export class MessagesApiClient extends ContactsApiClient {
           ),
         )
         .filter((item): item is MessageItemDto => Boolean(item));
+      recordMessageDetailSourceDiagnostic({
+        conversationId,
+        conversationType,
+        messages: normalized,
+      });
+      return normalized;
     });
   }
 
@@ -389,6 +398,98 @@ function normalizeConversationMessageFromContract(
   });
   if (!result.data) return null;
   return normalizeMessageItem(imMessageEntityToDto(result.data, item));
+}
+
+function recordConversationListSourceDiagnostics(items: ConversationListItem[], scopeKey: string) {
+  items
+    .filter((item) => Boolean(item.lastMessage?.messageId || item.lastMessage?.sentAt))
+    .map((item) => {
+      const ownership = resolveConversationOwnership({
+        payload: item as unknown as Record<string, unknown>,
+        scopeKey,
+        source: "imList",
+      });
+      return { item, ownership };
+    })
+    .sort((left, right) =>
+      Date.parse(right.item.lastMessage?.sentAt ?? "") -
+      Date.parse(left.item.lastMessage?.sentAt ?? ""),
+    )
+    .slice(0, 10)
+    .forEach(({ item, ownership }) => {
+      recordMessageSourceObserved({
+        conversationId: item.conversationId,
+        conversationSeq: item.lastMessageSeq,
+        conversationType: item.conversationType,
+        messageId: item.lastMessage?.messageId,
+        messageType: item.lastMessage?.messageType,
+        owner: ownership.owner === "customerService" ? "customerService" : "im",
+        route: "im-conversation-list",
+        serverSentAt: item.lastMessage?.sentAt,
+        source: "messages-client",
+        sourceChannel: "http-query",
+        threadId: ownership.threadId,
+        threadType: ownership.threadType,
+        unreadCount: item.unreadCount,
+      });
+      recordMessageTraceEvent({
+        conversationId: item.conversationId,
+        conversationSeq: item.lastMessageSeq,
+        conversationType: item.conversationType,
+        messageId: item.lastMessage?.messageId,
+        owner: ownership.owner === "customerService" ? "customerService" : "im",
+        route: "im-conversation-list",
+        serverSentAt: item.lastMessage?.sentAt,
+        source: "messages-client",
+        sourceChannel: "http-query",
+        stage: "query.message.discovered",
+        threadId: ownership.threadId,
+      });
+    });
+}
+
+function recordMessageDetailSourceDiagnostic(input: {
+  conversationId: string;
+  conversationType: "direct" | "group";
+  messages: MessageItemDto[];
+}) {
+  const latest = latestMessage(input.messages);
+  if (!latest) return;
+  recordMessageSourceObserved({
+    clientMsgId: latest.clientMsgId || latest.clientMessageId,
+    conversationId: input.conversationId,
+    conversationSeq: latest.conversationSeq,
+    conversationType: input.conversationType,
+    itemCount: input.messages.length,
+    messageId: latest.messageId,
+    messageType: latest.messageType,
+    owner: "im",
+    route: "im-message-detail",
+    serverSentAt: latest.sentAt,
+    source: "messages-client",
+    sourceChannel: "http-query",
+  });
+  recordMessageTraceEvent({
+    clientMsgId: latest.clientMsgId || latest.clientMessageId,
+    conversationId: input.conversationId,
+    conversationSeq: latest.conversationSeq,
+    conversationType: input.conversationType,
+    messageId: latest.messageId,
+    owner: "im",
+    route: "im-message-detail",
+    serverSentAt: latest.sentAt,
+    source: "messages-client",
+    sourceChannel: "http-query",
+    stage: "query.message.discovered",
+  });
+}
+
+function latestMessage(messages: MessageItemDto[]) {
+  return [...messages].sort((left, right) => {
+    const seqDiff = (right.conversationSeq ?? -1) - (left.conversationSeq ?? -1);
+    if (seqDiff !== 0) return seqDiff;
+    return Date.parse(right.sentAt ?? "") - Date.parse(left.sentAt ?? "");
+  })[0];
 }
 
 function stringField(record: Record<string, unknown>, ...keys: string[]) {

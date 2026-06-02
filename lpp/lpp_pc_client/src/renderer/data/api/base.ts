@@ -187,6 +187,7 @@ export class ApiBaseClient {
     try {
       const response = await fetch(`${this.options.baseUrl}${path}`, {
         ...init,
+        credentials: "omit",
         headers,
       });
       const payload = (await response

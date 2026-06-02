@@ -385,6 +385,7 @@ export const settingsRows = [
   row("clearLocalCache", "storageDiagnostics", "清理缓存", "清理图片、文件缩略图和临时缓存，不删除云端消息。", "local", "action"),
   row("diagnosticsExport", "storageDiagnostics", "导出诊断包", "导出本地日志、traceId、接口错误和关键操作轨迹。", "local", "action"),
   row("developmentDiagnostics", "storageDiagnostics", "开发诊断", "查看环境、版本、构建、接口、实时连接和 profile 状态。", "system", "info", "recordOnly"),
+  row("runtimeStatus", "storageDiagnostics", "运行情况", "抽样显示最近消息发送、长连接接收、缓存写入和窗口展示耗时。", "local", "info", "recordOnly"),
   plannedRow(
     "apiConnectivity",
     "storageDiagnostics",

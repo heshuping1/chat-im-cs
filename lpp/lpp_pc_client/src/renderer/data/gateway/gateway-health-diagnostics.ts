@@ -45,6 +45,7 @@ export function recordGatewayHealthDiagnostic(input: GatewayHealthDiagnosticInpu
     summary: {
       ...input.summary,
       error: summarizeGatewayError(input.error),
+      failureHint: gatewayFailureHint(input.error),
     },
   });
 }
@@ -62,4 +63,17 @@ export function summarizeGatewayError(error: unknown) {
     message: String(error),
     name: typeof error,
   };
+}
+
+export function gatewayFailureHint(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (!message) return undefined;
+  if (/Failed to complete negotiation.*Failed to fetch/i.test(message)) {
+    return {
+      code: "gateway.negotiate_fetch_failed",
+      possibleCause:
+        "Browser blocked the SignalR negotiate request or the gateway was unreachable. Check CORS credentials, token-only transport options, and network reachability.",
+    };
+  }
+  return undefined;
 }

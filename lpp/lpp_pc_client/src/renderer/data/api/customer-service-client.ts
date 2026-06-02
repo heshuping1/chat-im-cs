@@ -27,6 +27,8 @@ import {
   customerServiceIndexScopeKey,
 } from "../customer-service/cs-conversation-index";
 import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
+import { recordMessageSourceObserved } from "../diagnostics/message-source-diagnostics";
+import { recordMessageTraceEvent } from "../diagnostics/message-trace-diagnostics";
 import {
   customerServiceMessageEntityToDto,
   normalizeCustomerServiceMessageDto,
@@ -346,6 +348,7 @@ function normalizeCustomerServiceThreadsResponse(
       summary: response.summary,
     },
   });
+  recordWorkbenchSourceDiagnostics([...activeItems, ...queueItems]);
   return {
     ...response,
     activeItems,
@@ -479,6 +482,11 @@ function normalizeWorkbenchThreadDetail(
     },
     error: result.error,
   });
+  recordThreadDetailSourceDiagnostic({
+    detail: normalizedDetail,
+    latest,
+    messageCount: messages.length,
+  });
   return result.data
     ? {
         ...normalizedDetail,
@@ -556,6 +564,90 @@ function latestMessage(messages: MessageItemDto[]) {
     if (seqA !== seqB) return seqB - seqA;
     return Date.parse(b.sentAt ?? "") - Date.parse(a.sentAt ?? "");
   })[0];
+}
+
+function recordWorkbenchSourceDiagnostics(items: CustomerServiceThread[]) {
+  items
+    .filter((item) => Boolean(item.lastMessageAt || item.lastMessagePreview || item.unreadCount))
+    .sort((left, right) =>
+      Date.parse(right.lastMessageAt ?? right.updatedAt ?? "") -
+      Date.parse(left.lastMessageAt ?? left.updatedAt ?? ""),
+    )
+    .slice(0, 10)
+    .forEach((item) => {
+      recordMessageSourceObserved({
+        conversationId: item.conversationId,
+        messageId: lastMessageId(item),
+        messageType: undefined,
+        owner: "customerService",
+        route: "cs-workbench",
+        serverSentAt: item.lastMessageAt ?? item.updatedAt ?? undefined,
+        source: "customer-service-client",
+        sourceChannel: "http-query",
+        threadId: item.threadId,
+        threadType: item.threadType,
+        unreadCount: item.unreadCount,
+      });
+      recordMessageTraceEvent({
+        conversationId: item.conversationId,
+        messageId: lastMessageId(item),
+        owner: "customerService",
+        route: "cs-workbench",
+        serverSentAt: item.lastMessageAt ?? item.updatedAt ?? undefined,
+        source: "customer-service-client",
+        sourceChannel: "http-query",
+        stage: "query.message.discovered",
+        threadId: item.threadId,
+      });
+    });
+}
+
+function recordThreadDetailSourceDiagnostic(input: {
+  detail: CustomerServiceThreadDetailResponse & {
+    conversationId: string;
+    messages: MessageItemDto[];
+    threadId: string;
+    threadType: CustomerServiceThreadType;
+  };
+  latest?: MessageItemDto;
+  messageCount: number;
+}) {
+  const latest = input.latest;
+  if (!latest) return;
+  recordMessageSourceObserved({
+    clientMsgId: latest.clientMsgId || latest.clientMessageId,
+    conversationId: input.detail.conversationId,
+    conversationSeq: latest.conversationSeq,
+    itemCount: input.messageCount,
+    messageId: latest.messageId,
+    messageType: latest.messageType,
+    owner: "customerService",
+    route: "cs-thread-detail",
+    serverSentAt: latest.sentAt,
+    source: "customer-service-client",
+    sourceChannel: "http-query",
+    threadId: input.detail.threadId,
+    threadType: input.detail.threadType,
+  });
+  recordMessageTraceEvent({
+    clientMsgId: latest.clientMsgId || latest.clientMessageId,
+    conversationId: input.detail.conversationId,
+    conversationSeq: latest.conversationSeq,
+    messageId: latest.messageId,
+    owner: "customerService",
+    route: "cs-thread-detail",
+    serverSentAt: latest.sentAt,
+    source: "customer-service-client",
+    sourceChannel: "http-query",
+    stage: "query.message.discovered",
+    threadId: input.detail.threadId,
+  });
+}
+
+function lastMessageId(item: CustomerServiceThread) {
+  const record = item as unknown as Record<string, unknown>;
+  const value = record.lastMessageId ?? record.messageId;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function readString(value: unknown) {

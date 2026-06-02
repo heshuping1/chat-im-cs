@@ -47,6 +47,7 @@ import { DiagnosticsSettingsSection } from "../settings/components/DiagnosticsSe
 import { HelpAboutSettingsSection } from "../settings/components/HelpAboutSettingsSection";
 import { NetworkLineSettingsSection } from "../settings/components/NetworkLineSettingsSection";
 import { NotificationSettingsSection } from "../settings/components/NotificationSettingsSection";
+import { RuntimeStatusSettingsSection } from "../settings/components/RuntimeStatusSettingsSection";
 import { PrivacySettingsSection } from "./MePrivacySections";
 
 type SettingKey = keyof PcSettings;
@@ -373,6 +374,7 @@ function renderSection(
           <DiagnosticsSettingsSection
             exportDiagnostics={actions.exportDiagnostics}
           />
+          <RuntimeStatusSettingsSection />
           {shouldShowDevelopmentDiagnostics(actions.authSession) && (
             <DevelopmentDiagnosticsSection authSession={actions.authSession} />
           )}

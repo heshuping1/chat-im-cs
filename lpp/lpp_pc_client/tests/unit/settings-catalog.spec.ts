@@ -162,7 +162,7 @@ describe("settings catalog", () => {
   });
 
   it("keeps recorded language, timezone and diagnostics as status display", () => {
-    for (const rowId of ["language", "timezone", "developmentDiagnostics"]) {
+    for (const rowId of ["language", "timezone", "runtimeStatus", "developmentDiagnostics"]) {
       expect(getSettingsRow(rowId)).toMatchObject({
         control: "info",
         capability: "recordOnly",
@@ -218,6 +218,7 @@ describe("settings catalog", () => {
     expect(pageSource).toContain("getAppInstanceProfile");
     expect(pageSource).toContain("NotificationSettingsSection");
     expect(pageSource).toContain("HelpAboutSettingsSection");
+    expect(pageSource).toContain("RuntimeStatusSettingsSection");
     const helpAboutBranch = pageSource.slice(
       pageSource.indexOf('case "helpAbout"'),
       pageSource.indexOf("function PlanningSupportBlock"),

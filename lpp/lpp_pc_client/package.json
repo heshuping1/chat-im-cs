@@ -22,6 +22,8 @@
     "lint:shape": "node scripts/check-code-shape.mjs",
     "lint:boundaries": "vitest run tests/unit/architecture-boundaries.spec.ts",
     "check:quick": "tsc --noEmit --pretty false --skipLibCheck && tsc -p tsconfig.electron.json --noEmit --pretty false && npm run lint:core && npm run lint:hooks && vitest run tests/unit/architecture-boundaries.spec.ts tests/unit/desktop-api-validation.spec.ts && npm run docs:check && npm run p19:audit && npm run lint:shape",
+    "check:message-runtime": "node scripts/check-message-runtime-quality.mjs",
+    "check:message-runtime:live": "node scripts/check-message-runtime-quality.mjs --live-gateway",
     "build": "tsc --noEmit && vite build && tsc -p tsconfig.electron.json",
     "icon:fix-taskbar": "node scripts/fix-taskbar-icon.mjs",
     "icon:sync": "node scripts/sync-app-icon.mjs",

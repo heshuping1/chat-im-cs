@@ -102,6 +102,7 @@ export function GatewayBridge() {
         const connection = new HubConnectionBuilder()
           .withUrl(gatewayUrl.toString(), {
             accessTokenFactory: () => session.tenantToken,
+            withCredentials: false,
           })
           .withAutomaticReconnect([0, 2_000, 5_000, 10_000, 30_000])
           .configureLogging(LogLevel.Warning)

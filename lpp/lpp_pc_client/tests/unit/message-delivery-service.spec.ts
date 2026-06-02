@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMessageDeliveryService,
+  recordGatewayPushReceived,
   resetMessageDeliveryGuardForTest,
 } from "../../src/renderer/data/gateway/message-delivery-service";
 
@@ -112,6 +113,47 @@ describe("MessageDeliveryService", () => {
         reason: "duplicate-message-id",
       }),
     }));
+  });
+
+  it("records gateway push source without message body content", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-02T11:13:22.500Z"));
+
+    recordGatewayPushReceived({
+      eventName: "msg.new",
+      payload: {
+        conversationId: "direct-source",
+        message: {
+          body: { text: "secret body" },
+          messageId: "m-source",
+          messageType: "text",
+          preview: "secret preview",
+          sentAt: "2026-06-02T11:13:21.000Z",
+        },
+      },
+      source: "GatewayBridge",
+    });
+
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.source.observed",
+      phase: "gateway",
+      route: "gateway-push",
+      classification: expect.objectContaining({
+        conversationId: "direct-source",
+        messageId: "m-source",
+        sourceChannel: "gateway",
+      }),
+      summary: expect.objectContaining({
+        latencyMs: 1500,
+        serverSentAt: "2026-06-02T11:13:21.000Z",
+      }),
+    }));
+    const sourceRecord = mocks.record.mock.calls.find(
+      ([payload]) => payload.event === "message.source.observed",
+    )?.[0];
+    expect(JSON.stringify(sourceRecord)).not.toContain("secret body");
+    expect(JSON.stringify(sourceRecord)).not.toContain("secret preview");
+    vi.useRealTimers();
   });
 
   it("deduplicates the same IM message across push, refetch compensation and detail routes", () => {

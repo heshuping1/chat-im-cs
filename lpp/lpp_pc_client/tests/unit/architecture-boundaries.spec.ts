@@ -293,6 +293,38 @@ describe("architecture boundaries", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps SignalR gateway connection token-only without cross-origin credentials", () => {
+    const gatewayBridgePath = "src/renderer/components/GatewayBridge.tsx";
+    const source = readFileSync(join(repoRoot, gatewayBridgePath), "utf8");
+    const withUrlOptions = source.match(
+      /\.withUrl\(\s*gatewayUrl\.toString\(\),\s*\{(?<options>[\s\S]*?)\}\s*\)/,
+    )?.groups?.options;
+
+    expect(withUrlOptions).toBeTruthy();
+    expect(withUrlOptions).toContain("accessTokenFactory");
+    expect(withUrlOptions).toContain("withCredentials: false");
+  });
+
+  it("keeps renderer network requests from opting into cross-origin credentials", () => {
+    const violations = files
+      .filter((file) => isUnder(file, "src/renderer"))
+      .flatMap((file) => {
+        const source = readFileSync(file, "utf8");
+        return /credentials\s*:\s*["']include["']/.test(source)
+          ? [`${relative(file)} opts into cross-origin credentials`]
+          : [];
+      });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps API anti-corruption requests token-only without browser credentials", () => {
+    const apiBasePath = "src/renderer/data/api/base.ts";
+    const source = readFileSync(join(repoRoot, apiBasePath), "utf8");
+
+    expect(source).toContain("credentials: \"omit\"");
+  });
+
   it("keeps gateway anti-corruption mappers from accepting legacy field aliases", () => {
     const mapperFiles = [
       "src/renderer/data/gateway/gateway-event-adapter.ts",

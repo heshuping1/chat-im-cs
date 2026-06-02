@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { reminderDiagnosticsTarget } from "../../src/main/message-reminder-diagnostics-routing";
 import { summarizeMessageReminderDiagnosticValue } from "../../src/renderer/data/diagnostics/message-reminder-diagnostics";
+import {
+  messageTraceStageLabel,
+  summarizeRecentMessageTraceGroups,
+  type MessageTraceSample,
+} from "../../src/renderer/data/diagnostics/message-trace-diagnostics";
+import { gatewayFailureHint } from "../../src/renderer/data/gateway/gateway-health-diagnostics";
 import { gatewayReminderDiagnosticClassification } from "../../src/renderer/data/gateway/gateway-message-reminder-diagnostics";
 
 describe("message reminder diagnostics", () => {
@@ -177,5 +183,59 @@ describe("message reminder diagnostics", () => {
       event: "message.gap-sync.triggered",
       source: "gateway-bridge",
     } as any)).toEqual({ fileName: "message-gap-sync.jsonl", maxLines: 800 });
+
+    expect(reminderDiagnosticsTarget({
+      event: "message.source.observed",
+      source: "messages-client",
+    } as any)).toEqual({ fileName: "message-source.jsonl", maxLines: 2400 });
+
+    expect(reminderDiagnosticsTarget({
+      event: "message.trace",
+      source: "message-trace",
+    } as any)).toEqual({ fileName: "message-trace.jsonl", maxLines: 2400 });
+  });
+
+  it("summarizes message trace stages into PC observable timings", () => {
+    const samples: MessageTraceSample[] = [
+      traceSample("trace-1", "receive.gateway.observed", "2026-06-02T17:13:44.228Z", {
+        latencyMs: 1401,
+      }),
+      traceSample("trace-1", "receive.cache.written", "2026-06-02T17:13:44.233Z"),
+      traceSample("trace-1", "receive.ui.observed", "2026-06-02T17:13:44.253Z"),
+    ];
+
+    expect(summarizeRecentMessageTraceGroups(samples, 1)[0]).toMatchObject({
+      gatewayToCacheMs: 5,
+      gatewayToUiMs: 25,
+      serverToGatewayMs: 1401,
+      traceId: "trace-1",
+    });
+    expect(messageTraceStageLabel("receive.gateway.observed")).toBe("长连接收到");
+    expect(messageTraceStageLabel("send.http.done")).toBe("发送请求完成");
+  });
+
+  it("classifies SignalR negotiate fetch failures for transport triage", () => {
+    expect(gatewayFailureHint(new Error(
+      "Failed to complete negotiation with the server: TypeError: Failed to fetch",
+    ))).toEqual(expect.objectContaining({
+      code: "gateway.negotiate_fetch_failed",
+    }));
   });
 });
+
+function traceSample(
+  traceId: string,
+  stage: MessageTraceSample["stage"],
+  at: string,
+  overrides: Partial<MessageTraceSample> = {},
+): MessageTraceSample {
+  return {
+    at,
+    owner: "im",
+    route: "gateway-push",
+    sourceChannel: "gateway",
+    stage,
+    traceId,
+    ...overrides,
+  };
+}
