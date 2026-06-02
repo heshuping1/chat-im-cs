@@ -43,7 +43,8 @@
     "start:packaged": "node scripts/start-packaged.mjs",
     "start:profile:a": "electron . --profile=agent-a",
     "start:profile:b": "electron . --profile=agent-b",
-    "dist:win": "npm run build && electron-builder --win nsis"
+    "dist:win": "npm run build && electron-builder --win nsis",
+    "dist:mac": "npm run build && electron-builder --mac dmg"
   },
   "dependencies": {
     "@lexical/history": "^0.44.0",
