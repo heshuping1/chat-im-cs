@@ -2,8 +2,9 @@ import { Search, X } from "lucide-react";
 import { useState } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
+import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
-import { conversationMetaText, effectiveConversationUnreadCount } from "../../data/message-display";
+import { conversationMetaText } from "../../data/message-display";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import { ConversationAvatar } from "./ConversationListParts";
 
@@ -76,7 +77,7 @@ export function ForwardDialog({
                 groupAvatar={resolveConversationAvatar(item)}
                 isGroup={resolveConversationType(item) === "group"}
                 title={item.title}
-                unread={effectiveConversationUnreadCount(item, userIdentity)}
+                unread={imConversationEffectiveUnreadCount(item, userIdentity)}
               />
               <span>
                 <strong>{item.title}</strong>

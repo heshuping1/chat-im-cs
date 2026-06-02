@@ -16,6 +16,11 @@ import { getReminderActions } from "../reminder/reminder-store";
 import { getPcSettingsSnapshot } from "../settings/settings-store";
 import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
 import {
+  isExplicitCustomerServiceThreadOpenSource,
+  resolveCustomerServiceThreadReadVisibility,
+} from "../customer-service/customer-service-read-visibility";
+import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import {
   asRecord,
   customerServiceThreadId,
   gatewayMessage,
@@ -46,8 +51,37 @@ export function mergeCustomerServiceGatewayMessage(
   const scopeKey = customerServiceIndexScopeKey(session ?? undefined);
   const self = isSelfCustomerServiceGatewayMessage(payload, message, session);
   const uiState = getWorkspaceUiSnapshot();
-  const active = uiState.activeModule === "onlineService" && uiState.activeThreadId === threadId;
-  const read = self || active;
+  const visibility = resolveCustomerServiceThreadReadVisibility({
+    activeModule: uiState.activeModule,
+    activeThreadId: uiState.activeThreadId,
+    activeThreadOpenSource: uiState.activeThreadOpenSource,
+    conversationId: imConversationId(payload) || message.conversationId,
+    detailLoaded: false,
+    threadId,
+  });
+  const read = self;
+  recordMessageReminderDiagnostic({
+    event: "cs.gateway.read-decision",
+    source: "gateway-cs-side-effects",
+    phase: "evaluate",
+    route: read ? "read" : "unread",
+    classification: {
+      activeModule: uiState.activeModule,
+      activeThreadId: uiState.activeThreadId,
+      activeThreadOpenSource: uiState.activeThreadOpenSource,
+      conversationId: imConversationId(payload) || message.conversationId,
+      detailLoaded: false,
+      messageId: message.messageId,
+      self,
+      threadId,
+      threadType,
+      visibility,
+    },
+    summary: {
+      message,
+      payload,
+    },
+  });
 
   applyCustomerServiceGatewayMessageCache(queryClient, {
     conversationId: imConversationId(payload) || message.conversationId,
@@ -59,7 +93,11 @@ export function mergeCustomerServiceGatewayMessage(
   });
 
   if (!self) {
-    notifyCustomerServiceMessage(payload, message, { active, identity: session, targetId: threadId });
+    notifyCustomerServiceMessage(payload, message, {
+      active: visibility === "detailVisible",
+      identity: session,
+      targetId: threadId,
+    });
   }
 }
 
@@ -68,7 +106,8 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
   const settings = getPcSettingsSnapshot();
   if (!shouldPushRealtimeReminder(settings, "serviceQueue")) return;
   const session = getAuthSessionSnapshot();
-  const normalizedThreadId = threadId || customerServiceThreadId(payload);
+  const scopeKey = customerServiceIndexScopeKey(session ?? undefined);
+  const normalizedThreadId = threadId || customerServiceThreadId(payload, scopeKey);
   if (!normalizedThreadId) return;
   const reminderId = `cs-queue-${normalizedThreadId}`;
   if (notifiedCustomerServiceQueueIds.has(reminderId)) return;
@@ -133,7 +172,7 @@ function notifyCustomerServiceMessage(
   if (!shouldPushRealtimeReminder(settings, "serviceQueue")) return;
   const targetId =
     options.targetId ||
-    customerServiceThreadId(payload) ||
+    customerServiceThreadId(payload, customerServiceIndexScopeKey(options.identity ?? undefined)) ||
     stringField(payload, "threadId", "sessionId") ||
     message.conversationId;
   const presentation = buildCustomerServiceNotificationPresentation({
@@ -164,10 +203,13 @@ function notifyCustomerServiceMessage(
     icon: "service",
   });
   const uiState = getWorkspaceUiSnapshot();
+  const activeTargetId = isExplicitCustomerServiceThreadOpenSource(uiState.activeThreadOpenSource)
+    ? uiState.activeThreadId
+    : undefined;
   if (
     shouldShowDesktopNotificationForTarget(settings, "serviceQueue", {
       activeModule: uiState.activeModule,
-      activeTargetId: uiState.activeThreadId,
+      activeTargetId,
       targetId: nextTargetId,
       targetModule: "onlineService",
       windowFocused: isRendererWindowFocused(),

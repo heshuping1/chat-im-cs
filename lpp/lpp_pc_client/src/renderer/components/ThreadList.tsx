@@ -27,7 +27,7 @@ import { createApiClient } from "../data/runtime";
 import {
   useActiveThreadId,
   useServiceThreadFilter,
-  useSetActiveThread,
+  useOpenCustomerServiceThread,
   useSetServiceThreadFilter,
   type ServiceThreadFilter,
 } from "../data/workspace-ui/workspace-ui-store";
@@ -54,7 +54,7 @@ export function ThreadList() {
   const [expandedThreadCount, setExpandedThreadCount] = useState(0);
   const authSession = useAuthSession();
   const selectedThreadId = useActiveThreadId();
-  const setSelectedThread = useSetActiveThread();
+  const openCustomerServiceThread = useOpenCustomerServiceThread();
   const filter = useServiceThreadFilter();
   const setFilter = useSetServiceThreadFilter();
   const queryClient = useQueryClient();
@@ -84,7 +84,7 @@ export function ThreadList() {
       return client.claimCustomerServiceThread(thread.threadType, thread.threadId);
     },
     onSuccess: (_result, thread) => {
-      setSelectedThread(thread.threadId);
+      openCustomerServiceThread(thread.threadId, "claim");
       void queryClient.invalidateQueries({
         queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
       });
@@ -287,11 +287,11 @@ export function ThreadList() {
                   selectedThreadId === thread.threadId ? "active" : ""
                 } ${risky ? "sla-risk" : ""}`}
                 key={`${thread.threadType}-${thread.threadId}`}
-                onClick={() => setSelectedThread(thread.threadId)}
+                onClick={() => openCustomerServiceThread(thread.threadId, "user")}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
-                  setSelectedThread(thread.threadId);
+                  openCustomerServiceThread(thread.threadId, "user");
                 }}
                 role="button"
                 tabIndex={0}

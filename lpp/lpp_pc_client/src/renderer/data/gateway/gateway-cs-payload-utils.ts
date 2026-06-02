@@ -20,16 +20,28 @@ export function isCustomerServiceStatus(
   return ["online", "busy", "break", "offline"].includes(value);
 }
 
-export function isCustomerServiceGatewayPayload(payload: Record<string, unknown>) {
-  return classifyCustomerServiceGatewayPayload(payload).isCustomerService;
+export function isCustomerServiceGatewayPayload(
+  payload: Record<string, unknown>,
+  scopeKey?: string,
+) {
+  return classifyCustomerServiceGatewayPayload(payload, scopeKey).isCustomerService;
 }
 
-export function classifyCustomerServiceGatewayPayload(payload: Record<string, unknown>) {
-  const ownership = resolveConversationOwnership(payload, "gateway");
+export function classifyCustomerServiceGatewayPayload(
+  payload: Record<string, unknown>,
+  scopeKey?: string,
+) {
+  const ownership = resolveConversationOwnership({
+    payload,
+    scopeKey: scopeKey ?? "",
+    source: "gateway",
+  });
   return {
     isCustomerService: ownership.owner === "customerService",
     reason: ownership.reason,
-    threadId: ownership.threadId || (ownership.owner === "customerService" ? customerServiceThreadId(payload) : ""),
+    threadId:
+      ownership.threadId ||
+      (ownership.owner === "customerService" ? customerServiceThreadId(payload, scopeKey) : ""),
     threadType: ownership.threadType,
     owner: ownership.owner,
     confidence: ownership.confidence,
@@ -37,9 +49,13 @@ export function classifyCustomerServiceGatewayPayload(payload: Record<string, un
   };
 }
 
-export function customerServiceThreadId(payload: Record<string, unknown>) {
+export function customerServiceThreadId(payload: Record<string, unknown>, scopeKey?: string) {
   const message = customerServiceMessageRecord(payload);
-  const ownership = resolveConversationOwnership(payload, "gateway");
+  const ownership = resolveConversationOwnership({
+    payload,
+    scopeKey: scopeKey ?? "",
+    source: "gateway",
+  });
   return (
     ownership.threadId ||
     stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||

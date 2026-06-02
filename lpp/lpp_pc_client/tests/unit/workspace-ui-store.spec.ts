@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   selectCloseOpenServiceThread,
   selectActiveModule,
+  selectGatewayRealtimeState,
+  selectActiveThreadOpenSource,
   selectMessageLayoutState,
   selectOpenServiceThreadIds,
+  selectOpenCustomerServiceThread,
   selectServiceLayoutState,
   selectSetActiveModule,
+  selectSetGatewayRealtimeStatus,
   selectSetServiceThreadFilter,
 } from "../../src/renderer/data/workspace-ui/workspace-ui-store";
 import { useWorkspaceStore } from "../../src/renderer/data/workspace-ui/workspace-store-core";
@@ -22,6 +26,7 @@ describe("workspace ui store selectors", () => {
     const state = {
       activeModule: "messages" as const,
       activeThreadId: "thread-1",
+      activeThreadOpenSource: "user" as const,
       openServiceThreadIds: ["thread-1", "thread-2"],
       activeImConversationId: "conversation-1",
       activeContactId: "contact-1",
@@ -40,8 +45,13 @@ describe("workspace ui store selectors", () => {
       filter: "all" as const,
       messageFilter: "all" as const,
       contactFilter: "customer" as const,
+      gatewayRealtimeStatus: "connected" as const,
+      gatewayRealtimeUpdatedAt: 123,
+      imPresenceStatus: "online" as const,
+      customerServiceStatus: "busy" as const,
       setActiveModule,
       setActiveThread: vi.fn(),
+      openCustomerServiceThread: vi.fn(),
       closeOpenServiceThread,
       setActiveImConversation: vi.fn(),
       setActiveContact: vi.fn(),
@@ -60,13 +70,23 @@ describe("workspace ui store selectors", () => {
       setFilter,
       setMessageFilter: vi.fn(),
       setContactFilter: vi.fn(),
+      setImPresenceStatus: vi.fn(),
+      setCustomerServiceStatus: vi.fn(),
+      setGatewayRealtimeStatus: vi.fn(),
     };
 
     expect(selectActiveModule(state)).toBe("messages");
+    expect(selectActiveThreadOpenSource(state)).toBe("user");
     expect(selectSetActiveModule(state)).toBe(setActiveModule);
     expect(selectOpenServiceThreadIds(state)).toEqual(["thread-1", "thread-2"]);
+    expect(selectOpenCustomerServiceThread(state)).toBe(state.openCustomerServiceThread);
     expect(selectCloseOpenServiceThread(state)).toBe(closeOpenServiceThread);
     expect(selectSetServiceThreadFilter(state)).toBe(setFilter);
+    expect(selectGatewayRealtimeState(state)).toEqual({
+      status: "connected",
+      updatedAt: 123,
+    });
+    expect(selectSetGatewayRealtimeStatus(state)).toBe(state.setGatewayRealtimeStatus);
     expect(selectMessageLayoutState(state)).toMatchObject({
       listPaneWidth: 220,
       messageLayoutMode: "full",
@@ -80,6 +100,63 @@ describe("workspace ui store selectors", () => {
       serviceListPaneWidth: 340,
       serviceProfilePaneWidth: 400,
     });
+  });
+
+  it("tracks gateway realtime connection health", () => {
+    const previousState = useWorkspaceStore.getState();
+    try {
+      useWorkspaceStore.setState({
+        gatewayRealtimeStatus: "idle",
+        gatewayRealtimeUpdatedAt: 0,
+      });
+
+      useWorkspaceStore.getState().setGatewayRealtimeStatus("retrying");
+
+      expect(useWorkspaceStore.getState().gatewayRealtimeStatus).toBe("retrying");
+      expect(useWorkspaceStore.getState().gatewayRealtimeUpdatedAt).toBeGreaterThan(0);
+    } finally {
+      useWorkspaceStore.setState({
+        gatewayRealtimeStatus: previousState.gatewayRealtimeStatus,
+        gatewayRealtimeUpdatedAt: previousState.gatewayRealtimeUpdatedAt,
+      });
+    }
+  });
+
+  it("tracks whether a customer-service thread was explicitly opened", () => {
+    const previousState = useWorkspaceStore.getState();
+    try {
+      useWorkspaceStore.setState({
+        activeThreadId: "",
+        activeThreadOpenSource: "none",
+        openServiceThreadIds: [],
+      });
+
+      useWorkspaceStore.getState().setActiveThread("thread-auto");
+      expect(useWorkspaceStore.getState()).toMatchObject({
+        activeThreadId: "thread-auto",
+        activeThreadOpenSource: "auto",
+        openServiceThreadIds: ["thread-auto"],
+      });
+
+      useWorkspaceStore.getState().openCustomerServiceThread("thread-user", "user");
+      expect(useWorkspaceStore.getState()).toMatchObject({
+        activeThreadId: "thread-user",
+        activeThreadOpenSource: "user",
+        openServiceThreadIds: ["thread-auto", "thread-user"],
+      });
+
+      useWorkspaceStore.getState().setActiveThread("");
+      expect(useWorkspaceStore.getState()).toMatchObject({
+        activeThreadId: "",
+        activeThreadOpenSource: "none",
+      });
+    } finally {
+      useWorkspaceStore.setState({
+        activeThreadId: previousState.activeThreadId,
+        activeThreadOpenSource: previousState.activeThreadOpenSource,
+        openServiceThreadIds: previousState.openServiceThreadIds,
+      });
+    }
   });
 
   it("allows the IM profile pane to persist widths above the old 440px cap", () => {

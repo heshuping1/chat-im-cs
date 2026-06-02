@@ -14,10 +14,13 @@ import {
 } from "../data/reminder/reminder-store";
 import {
   type ServiceAssistantPane,
+  useActiveModule,
   useActiveThreadId,
+  useActiveThreadOpenSource,
   useServiceAssistantPane,
   useSetServiceAssistantPane,
 } from "../data/workspace-ui/workspace-ui-store";
+import { resolveCustomerServiceThreadReadVisibility } from "../data/customer-service/customer-service-read-visibility";
 import type { CurrentUserIdentity } from "../data/message-display";
 import {
   createCustomerServiceNoThreadState,
@@ -87,6 +90,8 @@ export function ChatWorkspace({
   onToggleAssistantPane?: (pane: Exclude<ServiceAssistantPane, null>) => void;
 }) {
   const selectedThreadId = useActiveThreadId();
+  const activeModule = useActiveModule();
+  const activeThreadOpenSource = useActiveThreadOpenSource();
   const [notice, setNotice] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<ServiceMessageMenuState>(null);
   const [knowledgeDrawerOpen, setKnowledgeDrawerOpen] = useState(false);
@@ -127,11 +132,22 @@ export function ChatWorkspace({
     threadState,
     title,
   } = workspaceViewModel;
+  const readVisibility = resolveCustomerServiceThreadReadVisibility({
+    activeModule,
+    activeThreadId: selectedThreadId,
+    activeThreadOpenSource,
+    conversationId: selectedThread?.conversationId,
+    detailLoaded: Boolean(detail),
+    threadId: selectedThread?.threadId,
+  });
   useCustomerServiceThreadLifecycle({
+    activeModule,
+    activeThreadOpenSource,
     detail,
     dismissRealtimeRemindersForTarget,
     messages,
     queryClient,
+    readVisibility,
     selectedThread,
     session,
     status,

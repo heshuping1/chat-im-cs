@@ -129,6 +129,7 @@ describe("message center view model", () => {
     expect(
       createMessageCenterViewModel({
         activeConversationId: "current",
+        activeConversationMessagesLoaded: true,
         activeConversationVisibility: "paneVisible",
         conversations: [current, other],
         draftsByConversation: {},
@@ -139,6 +140,21 @@ describe("message center view model", () => {
         visibleConversations: [current, other],
       }).counts.unread,
     ).toBe(1);
+
+    expect(
+      createMessageCenterViewModel({
+        activeConversationId: "current",
+        activeConversationMessagesLoaded: false,
+        activeConversationVisibility: "paneVisible",
+        conversations: [current, other],
+        draftsByConversation: {},
+        friends: [],
+        groupMembers: [],
+        imReadStateByConversation: {},
+        unreadIdentity: {},
+        visibleConversations: [current, other],
+      }).counts.unread,
+    ).toBe(2);
 
     expect(
       createMessageCenterViewModel({

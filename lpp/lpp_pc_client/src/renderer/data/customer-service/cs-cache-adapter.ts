@@ -274,15 +274,24 @@ export function mergeLoadedCustomerServiceThreadDetail(
 export function markCustomerServiceThreadReadInCache(
   queryClient: QueryClient,
   threadId: string,
+  conversationId?: string | null,
 ) {
   clearCustomerServiceConversationUnread(threadId);
+  if (conversationId && conversationId !== threadId) {
+    clearCustomerServiceConversationUnread(conversationId);
+  }
   queryClient.setQueriesData<CustomerServiceThreadsCache>(
     { queryKey: ["pc-cs-workbench-threads"] },
     (old) => {
       if (!old) return old;
       let changed = false;
       const markRead = (item: CustomerServiceThread) => {
-        if (!isCustomerServiceThreadMatch(item, threadId)) return item;
+        if (
+          !isCustomerServiceThreadMatch(item, threadId) &&
+          (!conversationId || !isCustomerServiceThreadMatch(item, conversationId))
+        ) {
+          return item;
+        }
         if (!item.unreadCount) return item;
         changed = true;
         return { ...item, unreadCount: 0 };
@@ -295,7 +304,7 @@ export function markCustomerServiceThreadReadInCache(
   logCustomerServiceCacheDiagnostic({
     event: "cache.thread.read",
     result: "ok",
-    context: { threadId },
+    context: { conversationId, threadId },
   });
 }
 

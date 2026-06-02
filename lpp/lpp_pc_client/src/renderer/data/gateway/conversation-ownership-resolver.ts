@@ -10,6 +10,13 @@ export type ConversationOwner = "im" | "customerService" | "unknown";
 export type ConversationOwnershipConfidence = "explicit" | "indexed" | "unknown";
 export type ConversationOwnershipSource = "gateway" | "imList" | "csWorkbench" | "csDetail";
 
+export interface ResolveConversationOwnershipInput {
+  eventName?: string;
+  payload: Record<string, unknown>;
+  scopeKey: string;
+  source: ConversationOwnershipSource;
+}
+
 export interface ConversationOwnershipResult {
   owner: ConversationOwner;
   confidence: ConversationOwnershipConfidence;
@@ -17,13 +24,14 @@ export interface ConversationOwnershipResult {
   threadId?: string;
   threadType?: "temp_session" | "im_direct";
   reason: string;
+  scopeKey: string;
   source: ConversationOwnershipSource;
 }
 
 export function resolveConversationOwnership(
-  payload: Record<string, unknown>,
-  source: ConversationOwnershipSource,
+  input: ResolveConversationOwnershipInput,
 ): ConversationOwnershipResult {
+  const { payload, scopeKey, source } = input;
   const message = messageRecord(payload);
   const conversation = conversationRecord(payload);
   const thread = asRecord(payload.thread);
@@ -44,6 +52,7 @@ export function resolveConversationOwnership(
       threadId,
       threadType: "temp_session",
       reason: "explicit-temp-session",
+      scopeKey,
       source,
     };
   }
@@ -54,11 +63,23 @@ export function resolveConversationOwnership(
       confidence: "explicit",
       conversationId,
       reason: "explicit-im",
+      scopeKey,
       source,
     };
   }
 
-  const indexed = getCustomerServiceConversationIndex(conversationId || "");
+  if (!scopeKey) {
+    return {
+      owner: "unknown",
+      confidence: "unknown",
+      conversationId,
+      reason: "blocking-missing-scope",
+      scopeKey,
+      source,
+    };
+  }
+
+  const indexed = getCustomerServiceConversationIndex(conversationId || "", scopeKey);
   if (indexed?.threadType === "temp_session") {
     return {
       owner: "customerService",
@@ -67,6 +88,7 @@ export function resolveConversationOwnership(
       threadId: indexed.threadId,
       threadType: "temp_session",
       reason: "indexed-temp-session",
+      scopeKey,
       source,
     };
   }
@@ -76,6 +98,7 @@ export function resolveConversationOwnership(
     confidence: "unknown",
     conversationId,
     reason: "unknown-default-im",
+    scopeKey,
     source,
   };
 }

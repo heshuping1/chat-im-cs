@@ -14,6 +14,7 @@ import {
   shouldPushRealtimeReminder,
   shouldShowDesktopNotificationForTarget,
 } from "../../data/reminder/reminder-service";
+import { isExplicitCustomerServiceThreadOpenSource } from "../../data/customer-service/customer-service-read-visibility";
 import type { PcRealtimeReminderInput } from "../../data/reminder/reminder-types";
 import type { PcSettings } from "../../data/settings/pc-settings";
 import { getWorkspaceUiSnapshot } from "../../data/workspace-ui/workspace-ui-store";
@@ -132,10 +133,13 @@ function notifyIncomingCustomerServiceMessage({
     icon: "service",
   });
   const uiState = getWorkspaceUiSnapshot();
+  const activeTargetId = isExplicitCustomerServiceThreadOpenSource(uiState.activeThreadOpenSource)
+    ? uiState.activeThreadId
+    : undefined;
   if (
     shouldShowDesktopNotificationForTarget(pcSettings, "serviceQueue", {
       activeModule: uiState.activeModule,
-      activeTargetId: uiState.activeThreadId,
+      activeTargetId,
       targetId,
       targetModule: "onlineService",
       windowFocused: isRendererWindowFocused(),

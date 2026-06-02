@@ -4,10 +4,8 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
-import {
-  effectiveConversationUnreadCount,
-  type CurrentUserIdentity,
-} from "../../data/message-display";
+import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
+import type { CurrentUserIdentity } from "../../data/message-display";
 import { pcQueryKeys } from "../../data/query-keys";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
 import {
@@ -133,7 +131,7 @@ export function useMessageUnreadJumpController({
         ),
       });
 
-      const unread = effectiveConversationUnreadCount(conversation, unreadIdentity);
+      const unread = imConversationEffectiveUnreadCount(conversation, unreadIdentity);
       if (unread <= 0) {
         setUnreadJump(null);
         return;
@@ -161,7 +159,7 @@ export function useMessageUnreadJumpController({
     if (autoSelectedConversationIdsRef.current.has(activeConversation.conversationId)) {
       return;
     }
-    const unread = effectiveConversationUnreadCount(activeConversation, unreadIdentity);
+    const unread = imConversationEffectiveUnreadCount(activeConversation, unreadIdentity);
     if (unread <= 0) return;
     const readSeq =
       typeof activeConversation.lastMessageSeq === "number"

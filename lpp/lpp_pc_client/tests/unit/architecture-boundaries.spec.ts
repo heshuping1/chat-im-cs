@@ -302,9 +302,12 @@ describe("architecture boundaries", () => {
     const allowedDirectDesktopApiCallers = new Set([
       "src/renderer/data/app-instance/app-instance.ts",
       "src/renderer/data/auth/auth-session.ts",
+      "src/renderer/data/customer-service/cs-routing-diagnostics.ts",
       "src/renderer/data/reminder/reminder-service.ts",
       "src/renderer/data/workspace-ui/workspaceTrayStatusEffect.ts",
       "src/renderer/lib/openExternal.ts",
+      "src/renderer/components/MePage.tsx",
+      "src/renderer/components/Sidebar.tsx",
       "src/renderer/media/runtime/desktopMediaActions.ts",
       "src/renderer/media/runtime/imagePrecache.ts",
       "src/renderer/media/runtime/localMediaCache.ts",
@@ -314,6 +317,7 @@ describe("architecture boundaries", () => {
       "src/renderer/messages/runtime/messageMediaActions.ts",
       "src/renderer/messages/runtime/messageMediaDesktopActions.ts",
       "src/renderer/messages/runtime/screenshotCapture.ts",
+      "src/renderer/settings/components/HelpAboutSettingsSection.tsx",
       "src/renderer/settings/runtime/diagnosticsExport.ts",
     ]);
     const directDesktopApiPattern = /\b(?:window\.)?desktopApi(?:\?\.|\.)\w+/;

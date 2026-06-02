@@ -1,5 +1,11 @@
 import type { CustomerServiceThread, CustomerServiceThreadType, MessageItemDto } from "../api/types";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import {
+  resolveCustomerServiceCompatUnreadCandidate,
+  resolveCustomerServiceEffectiveCompatUnread,
+  resolveCustomerServiceOverlayUnread,
+  resolveCustomerServiceThreadUnread,
+} from "./customer-service-unread-ledger";
 
 export interface CustomerServiceConversationIndexEntry {
   compatLastMessageId?: string;
@@ -38,6 +44,7 @@ export function customerServiceIndexScopeKey(input?: {
     input?.apiBaseUrl ?? "",
     input?.tenantToken ?? "",
     input?.tenantId ?? "",
+    input?.userId ?? "",
   ];
   return parts.some((part) => part.trim()) ? parts.join("|") : defaultCustomerServiceIndexScope;
 }
@@ -155,14 +162,12 @@ export function rememberCustomerServiceConversationMessageOverlay(params: {
   const previousUnread = Math.max(0, previous?.overlayUnreadCount ?? 0);
   const sameMessage =
     Boolean(params.message.messageId) && params.message.messageId === previous?.lastMessageId;
-  const nextUnread =
-    params.source === "send"
-      ? previousUnread
-      : params.read
-        ? 0
-        : sameMessage
-          ? Math.max(1, previousUnread)
-          : Math.max(1, previousUnread + 1);
+  const nextUnread = resolveCustomerServiceOverlayUnread({
+    previousUnread,
+    read: params.read,
+    sameMessage,
+    source: params.source,
+  });
   rememberCustomerServiceConversationIndex({
     conversationId: params.conversationId || previous?.conversationId || params.threadId,
     lastMessageAt: params.message.sentAt || previous?.lastMessageAt,
@@ -232,39 +237,13 @@ export function clearCustomerServiceConversationUnread(threadIdOrConversationId:
 export function getCustomerServiceConversationIndex(conversationId: string, scopeKey?: string) {
   if (!conversationId) return undefined;
   const normalizedScopeKey = scopeKey || defaultCustomerServiceIndexScope;
-  if (!scopeKey) {
-    return (
-      customerServiceConversationIndex.get(indexKey(conversationId, defaultCustomerServiceIndexScope)) ||
-      [...customerServiceConversationIndex.values()].find(
-        (entry) => entry.conversationId === conversationId,
-      )
-    );
-  }
-  return (
-    customerServiceConversationIndex.get(indexKey(conversationId, normalizedScopeKey)) ||
-    (normalizedScopeKey === defaultCustomerServiceIndexScope
-      ? undefined
-      : customerServiceConversationIndex.get(
-          indexKey(conversationId, defaultCustomerServiceIndexScope),
-        ))
-  );
+  return customerServiceConversationIndex.get(indexKey(conversationId, normalizedScopeKey));
 }
 
 export function getCustomerServiceThreadIndex(threadId: string, scopeKey?: string) {
   if (!threadId) return undefined;
   const normalizedScopeKey = scopeKey || defaultCustomerServiceIndexScope;
-  if (!scopeKey) {
-    return (
-      customerServiceThreadIndex.get(indexKey(threadId, defaultCustomerServiceIndexScope)) ||
-      [...customerServiceThreadIndex.values()].find((entry) => entry.threadId === threadId)
-    );
-  }
-  return (
-    customerServiceThreadIndex.get(indexKey(threadId, normalizedScopeKey)) ||
-    (normalizedScopeKey === defaultCustomerServiceIndexScope
-      ? undefined
-      : customerServiceThreadIndex.get(indexKey(threadId, defaultCustomerServiceIndexScope)))
-  );
+  return customerServiceThreadIndex.get(indexKey(threadId, normalizedScopeKey));
 }
 
 export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread, scopeKey?: string) {
@@ -277,15 +256,13 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
   const serverUnread = Math.max(0, Number(thread.unreadCount ?? 0));
   const overlayUnread = Math.max(0, Number(overlay.overlayUnreadCount ?? 0));
   const compatUnreadCandidate = effectiveCompatUnreadCandidate(overlay);
-  const overlayMergeReason =
-    serverUnread > 0
-      ? "server"
-      : overlayUnread > 0
-        ? "gatewayOverlay"
-        : compatUnreadCandidate > 0
-          ? "imListCompatCandidate"
-          : "none";
-  const unreadCount = Math.max(serverUnread, overlayUnread, compatUnreadCandidate);
+  const threadUnread = resolveCustomerServiceThreadUnread({
+    compatUnreadCandidate,
+    overlayUnread,
+    serverUnread,
+  });
+  const overlayMergeReason = threadUnread.reason;
+  const unreadCount = threadUnread.unreadCount;
   recordMessageReminderDiagnostic({
     event: "cs.thread.overlay.merge",
     source: "cs-conversation-index",
@@ -378,44 +355,25 @@ export function rememberCustomerServiceCompatUnreadCandidate(params: {
   const previous =
     getCustomerServiceConversationIndex(params.conversationId, params.scopeKey) ||
     getCustomerServiceThreadIndex(params.threadId, params.scopeKey);
-  const lastMessageSeq = Math.max(0, Number(params.lastMessageSeq ?? 0));
-  const lastReadSeq = Math.max(0, Number(params.lastReadSeq ?? 0));
-  const unreadCount = Math.max(0, Number(params.unreadCount ?? 0));
-  const rawUnreadCount = Math.max(0, Number(params.rawUnreadCount ?? params.unreadCount ?? 0));
-  const readClearedSeq = Math.max(0, Number(previous?.compatReadSeq ?? 0));
-  const readClearedMessageId = previous?.compatReadMessageId;
-  const baseReadSeq = Math.max(lastReadSeq, readClearedSeq);
-  const staffSentAfterRead = (previous?.localStaffSentSeqs ?? []).filter(
-    (seq) => seq > baseReadSeq && (!lastMessageSeq || seq <= lastMessageSeq),
-  ).length;
-  const unreadWindow =
-    lastMessageSeq > baseReadSeq ? Math.max(0, lastMessageSeq - baseReadSeq) : 0;
-  const boundedRawUnread =
-    rawUnreadCount > 0 && unreadWindow > 0 ? Math.min(rawUnreadCount, unreadWindow) : 0;
-  const allowUnknownBounded = params.unreadReason === "compat-unknown-suppressed";
-  const candidate =
-    unreadCount > 0 &&
-    lastMessageSeq > baseReadSeq &&
-    (!params.lastMessageId || params.lastMessageId !== readClearedMessageId)
-      ? params.trustedUnread === true
-        ? unreadCount
-        : allowUnknownBounded
-          ? Math.max(0, boundedRawUnread - staffSentAfterRead)
-          : 0
-      : 0;
-  const unreadReason =
-    candidate > 0
-      ? params.trustedUnread === true
-        ? params.unreadReason || "compat-inbound-trusted"
-        : "compat-unknown-bounded"
-      : params.unreadReason || "compat-untrusted";
+  const compatDecision = resolveCustomerServiceCompatUnreadCandidate({
+    compatReadMessageId: previous?.compatReadMessageId,
+    compatReadSeq: previous?.compatReadSeq,
+    lastMessageId: params.lastMessageId,
+    lastMessageSeq: params.lastMessageSeq,
+    lastReadSeq: params.lastReadSeq,
+    localStaffSentSeqs: previous?.localStaffSentSeqs,
+    rawUnreadCount: params.rawUnreadCount,
+    trustedUnread: params.trustedUnread,
+    unreadCount: params.unreadCount,
+    unreadReason: params.unreadReason,
+  });
   rememberCustomerServiceConversationIndex({
     compatLastMessageId: params.lastMessageId,
-    compatLastMessageSeq: lastMessageSeq,
-    compatLastReadSeq: lastReadSeq,
-    compatRawUnreadCount: rawUnreadCount,
-    compatUnreadCandidate: candidate,
-    compatUnreadReason: unreadReason,
+    compatLastMessageSeq: compatDecision.lastMessageSeq,
+    compatLastReadSeq: compatDecision.lastReadSeq,
+    compatRawUnreadCount: compatDecision.rawUnreadCount,
+    compatUnreadCandidate: compatDecision.candidate,
+    compatUnreadReason: compatDecision.unreadReason,
     conversationId: params.conversationId,
     lastMessageAt: params.lastMessageAt,
     lastMessageId: params.lastMessageId,
@@ -426,29 +384,19 @@ export function rememberCustomerServiceCompatUnreadCandidate(params: {
     threadType: params.threadType,
   });
   return {
-    candidate,
-    lastMessageSeq,
-    lastReadSeq,
-    previousReadClearedMessageId: readClearedMessageId,
-    previousReadClearedSeq: readClearedSeq,
-    rawUnreadCount,
-    staffSentAfterRead,
-    trustedUnread: params.trustedUnread === true,
-    unreadWindow,
-    unreadReason,
-    unreadCount,
+    ...compatDecision,
   };
 }
 
 function effectiveCompatUnreadCandidate(entry: CustomerServiceConversationIndexEntry) {
-  const candidate = Math.max(0, Number(entry.compatUnreadCandidate ?? 0));
-  const lastMessageSeq = Math.max(0, Number(entry.compatLastMessageSeq ?? 0));
-  const lastReadSeq = Math.max(0, Number(entry.compatLastReadSeq ?? 0));
-  const readClearedSeq = Math.max(0, Number(entry.compatReadSeq ?? 0));
-  if (candidate <= 0) return 0;
-  if (lastMessageSeq <= Math.max(lastReadSeq, readClearedSeq)) return 0;
-  if (entry.compatLastMessageId && entry.compatLastMessageId === entry.compatReadMessageId) return 0;
-  return candidate;
+  return resolveCustomerServiceEffectiveCompatUnread({
+    candidate: entry.compatUnreadCandidate,
+    lastMessageId: entry.compatLastMessageId,
+    lastMessageSeq: entry.compatLastMessageSeq,
+    lastReadSeq: entry.compatLastReadSeq,
+    readMessageId: entry.compatReadMessageId,
+    readSeq: entry.compatReadSeq,
+  });
 }
 
 function matchingCustomerServiceIndexEntries(threadIdOrConversationId: string) {

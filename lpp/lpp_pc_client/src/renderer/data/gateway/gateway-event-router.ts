@@ -30,16 +30,10 @@ import {
   stringField,
 } from "./gateway-payload-utils";
 import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
+import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
 import { handleFirstStageImGatewayEvent } from "./im-gateway-handler";
-import {
-  mergeCustomerServiceGatewayMessage,
-  notifyCustomerServiceQueue,
-} from "./gateway-cs-side-effects";
-import {
-  mergeImGatewayMessage,
-  mergeReadEvent,
-} from "./gateway-im-side-effects";
 import { recordGatewayReminderDiagnostic } from "./gateway-message-reminder-diagnostics";
+import { createMessageDeliveryService } from "./message-delivery-service";
 
 export function createGatewayEventRouter(options: {
   clearAuthSession: () => void;
@@ -48,27 +42,38 @@ export function createGatewayEventRouter(options: {
   setCustomerServiceStatus: (status: CustomerServiceStatus) => void;
 }) {
   const { clearAuthSession, queryClient, session, setCustomerServiceStatus } = options;
+  const scopeKey = customerServiceIndexScopeKey(session);
   const invalidateIm = (conversationId?: string) =>
     invalidateImGatewayQueries(queryClient, conversationId);
   const invalidateCustomerService = (threadId?: string) =>
     invalidateCustomerServiceGatewayQueries(queryClient, threadId);
+  const delivery = createMessageDeliveryService({
+    queryClient,
+    scopeKey,
+    session,
+    setCustomerServiceStatus,
+  });
 
   const handleFirstStageGatewayEvent = (eventName: string, args: unknown[]) => {
     return handleFirstStageImGatewayEvent(
-      { eventName, args },
+      { eventName, args, scopeKey },
       {
         onMessageReceived: (event) => {
-          mergeImGatewayMessage(
-            queryClient,
-            event.rawPayload,
-            event.conversationId,
-            event.conversationType,
-          );
-          void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+          delivery.deliverImMessage({
+            conversationId: event.conversationId,
+            conversationType: event.conversationType,
+            payload: event.rawPayload,
+            route: "im-first-stage",
+            source: "gateway-router",
+          });
         },
         onReadReceived: (event) => {
-          mergeReadEvent(queryClient, event.rawPayload, session);
-          void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+          delivery.deliverImRead({
+            conversationId: event.conversationId,
+            payload: event.rawPayload,
+            route: "im-read-first-stage",
+            source: "gateway-router",
+          });
         },
         onHandlerError: () => undefined,
       },
@@ -77,11 +82,15 @@ export function createGatewayEventRouter(options: {
 
   const handleFirstStageCustomerServiceEvent = (eventName: string, args: unknown[]) => {
     return handleFirstStageCustomerServiceGatewayEvent(
-      { eventName, args },
+      { eventName, args, scopeKey },
       {
         onMessageReceived: (event) => {
-          mergeCustomerServiceGatewayMessage(queryClient, event.rawPayload, event.threadId);
-          invalidateCustomerService(event.threadId);
+          delivery.deliverCustomerServiceMessage({
+            payload: event.rawPayload,
+            route: "customer-service-first-stage",
+            source: "gateway-router",
+            threadId: event.threadId,
+          });
         },
         onThreadChanged: (event) => {
           if (event.serviceStatus && isCustomerServiceStatus(event.serviceStatus)) {
@@ -89,7 +98,12 @@ export function createGatewayEventRouter(options: {
           }
           invalidateCustomerService(event.threadId);
           if (event.shouldNotifyQueue) {
-            notifyCustomerServiceQueue(event.rawPayload, event.threadId ?? "");
+            delivery.deliverCustomerServiceQueue({
+              payload: event.rawPayload,
+              route: "customer-service-queue-first-stage",
+              source: "gateway-router",
+              threadId: event.threadId,
+            });
           }
         },
         onHandlerError: () => undefined,
@@ -99,7 +113,7 @@ export function createGatewayEventRouter(options: {
 
   const handleEvent = (eventName: string, args: unknown[]) => {
     const payload = eventPayload(args);
-    const classification = classifyCustomerServiceGatewayPayload(payload);
+    const classification = classifyCustomerServiceGatewayPayload(payload, scopeKey);
     if (
       isImMessageEventName(eventName) ||
       isCustomerServiceMessageEventName(eventName) ||
@@ -129,6 +143,7 @@ export function createGatewayEventRouter(options: {
         payload,
         phase: "routed",
         route: "ignored-force-logout",
+        scopeKey,
         source: "gateway-router",
       });
       queryClient.clear();
@@ -142,6 +157,7 @@ export function createGatewayEventRouter(options: {
         payload,
         phase: "routed",
         route: "customer-service-first-stage",
+        scopeKey,
         source: "gateway-router",
       });
       recordCsRoutingDiagnostic({
@@ -160,6 +176,7 @@ export function createGatewayEventRouter(options: {
         payload,
         phase: "routed",
         route: "im-first-stage",
+        scopeKey,
         source: "gateway-router",
       });
       recordCsRoutingDiagnostic({
@@ -174,7 +191,7 @@ export function createGatewayEventRouter(options: {
     }
 
     if (isImMessageEventName(eventName)) {
-      const isCustomerServiceMessage = isCustomerServiceGatewayPayload(payload);
+      const isCustomerServiceMessage = isCustomerServiceGatewayPayload(payload, scopeKey);
       const conversationType = normalizeType(
         stringField(payload, "conversationType", "conversation_type", "threadType", "thread_type") ||
           stringField(conversationRecord(payload), "conversationType", "conversation_type", "threadType", "thread_type"),
@@ -184,12 +201,13 @@ export function createGatewayEventRouter(options: {
         stringField(payload, "threadId", "thread_id", "sessionId", "session_id") ||
         stringField(conversationRecord(payload), "conversationId", "conversation_id", "chatId", "chat_id");
       if (isCustomerServiceMessage) {
-        const threadId = customerServiceThreadId(payload) || conversationId;
+        const threadId = classification.threadId || customerServiceThreadId(payload, scopeKey) || conversationId;
         recordGatewayReminderDiagnostic({
           eventName,
           payload,
           phase: "routed",
           route: "customer-service",
+          scopeKey,
           source: "gateway-router",
         });
         recordCsRoutingDiagnostic({
@@ -200,14 +218,19 @@ export function createGatewayEventRouter(options: {
           classification,
           summary: payload,
         });
-        mergeCustomerServiceGatewayMessage(queryClient, payload, threadId);
-        invalidateCustomerService(threadId);
+        delivery.deliverCustomerServiceMessage({
+          payload,
+          route: "customer-service",
+          source: "gateway-router",
+          threadId,
+        });
       } else {
         recordGatewayReminderDiagnostic({
           eventName,
           payload,
           phase: "routed",
           route: "im",
+          scopeKey,
           source: "gateway-router",
         });
         recordCsRoutingDiagnostic({
@@ -218,41 +241,56 @@ export function createGatewayEventRouter(options: {
           classification,
           summary: payload,
         });
-        mergeImGatewayMessage(queryClient, payload, conversationId, conversationType);
-        void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+        delivery.deliverImMessage({
+          conversationId,
+          conversationType,
+          payload,
+          route: "im",
+          source: "gateway-router",
+        });
       }
       return;
     }
 
     if (isCustomerServiceMessageEventName(eventName)) {
       const threadId =
-        customerServiceThreadId(payload) ||
+        customerServiceThreadId(payload, scopeKey) ||
         stringField(payload, "conversationId", "chatId", "threadId", "sessionId");
       recordGatewayReminderDiagnostic({
         eventName,
         payload,
         phase: "routed",
         route: "customer-service",
+        scopeKey,
         source: "gateway-router",
       });
-      mergeCustomerServiceGatewayMessage(queryClient, payload, threadId);
-      invalidateCustomerService(threadId);
+      delivery.deliverCustomerServiceMessage({
+        payload,
+        route: "customer-service",
+        source: "gateway-router",
+        threadId,
+      });
       return;
     }
 
     if (isCustomerServiceQueueEventName(eventName)) {
       const threadId =
-        customerServiceThreadId(payload) ||
+        customerServiceThreadId(payload, scopeKey) ||
         stringField(payload, "conversationId", "chatId", "threadId", "sessionId");
       recordGatewayReminderDiagnostic({
         eventName,
         payload,
         phase: "routed",
         route: "customer-service-queue",
+        scopeKey,
         source: "gateway-router",
       });
-      invalidateCustomerService(threadId);
-      notifyCustomerServiceQueue(payload, threadId);
+      delivery.deliverCustomerServiceQueue({
+        payload,
+        route: "customer-service-queue",
+        source: "gateway-router",
+        threadId,
+      });
       return;
     }
 
@@ -263,10 +301,15 @@ export function createGatewayEventRouter(options: {
           payload,
           phase: "routed",
           route: "im-read",
+          scopeKey,
           source: "gateway-router",
         });
-        mergeReadEvent(queryClient, payload, session);
-        void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+        delivery.deliverImRead({
+          conversationId: stringField(payload, "conversationId", "chatId"),
+          payload,
+          route: "im-read",
+          source: "gateway-router",
+        });
         return;
       }
       invalidateIm(stringField(payload, "conversationId", "chatId"));
@@ -276,6 +319,7 @@ export function createGatewayEventRouter(options: {
         payload,
         phase: "routed",
         route: eventName === "space.notice" ? "im-and-customer-service-refresh" : "im-refresh",
+        scopeKey,
         source: "gateway-router",
       });
       return;
@@ -290,6 +334,7 @@ export function createGatewayEventRouter(options: {
         payload,
         phase: "routed",
         route: "customer-service-lifecycle",
+        scopeKey,
         source: "gateway-router",
       });
       return;
@@ -312,12 +357,13 @@ export function createGatewayEventRouter(options: {
   const pushDevImMessage = (payload: unknown) => {
     const record = asRecord(payload);
     if (handleFirstStageGatewayEvent("msg.new", [record])) return;
-    mergeImGatewayMessage(
-      queryClient,
-      record,
-      imConversationId(record) || fallbackConversationIdFromPeer(record),
-      normalizeType(stringField(record, "conversationType", "conversation_type", "chatType", "chat_type")),
-    );
+    delivery.deliverImMessage({
+      conversationId: imConversationId(record) || fallbackConversationIdFromPeer(record),
+      conversationType: normalizeType(stringField(record, "conversationType", "conversation_type", "chatType", "chat_type")),
+      payload: record,
+      route: "im-dev-push",
+      source: "gateway-router",
+    });
   };
 
   return {

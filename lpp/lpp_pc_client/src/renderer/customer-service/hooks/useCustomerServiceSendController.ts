@@ -28,6 +28,7 @@ import {
   logChatSendDiagnostic,
   logUploadProgressDiagnosticFromTracker,
 } from "../../data/send/send-state-machine";
+import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
 import {
   getSendOutboxStorage,
   sendOutboxBlobId,
@@ -152,14 +153,15 @@ export function useCustomerServiceSendController({
   const sendTextMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!client || !selectedThread || !session) throw new Error("请选择在线客服会话");
-      const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
-      const localMessageId = `pc-cs-local-text-${Date.now()}-${Math.random()
-        .toString(16)
-        .slice(2)}`;
-      const clientMsgId = localMessageId;
+      const runtime = createChatSendRuntime({
+        channel: "customer_service",
+        session,
+        taskId: "P4-MSG-005D",
+      });
+      const { clientMsgId, createdAt, localMessageId } =
+        runtime.createLocalIdentity("pc-cs-local-text");
       const body = { text: content };
-      const sendStartedAt = Date.now();
+      const sendStartedAt = createdAt;
       const localMessage = {
         ...customerServiceMessageFromSendResult({
           thread: selectedThread,
@@ -172,14 +174,12 @@ export function useCustomerServiceSendController({
         status: "sending",
       } as MessageItemDto;
       appendCustomerServiceLocalMessage(queryClient, selectedThread, localMessage);
-      await storage.upsertRecord({
+      await runtime.upsertOutboxRecord({
         body,
-        channel: "customer_service",
         clientMsgId,
         createdAt: sendStartedAt,
         localMessageId,
         messageType: "text",
-        scopeKey,
         status: "sending",
         targetId: selectedThread.threadId,
         targetType: selectedThread.threadType,
@@ -192,7 +192,7 @@ export function useCustomerServiceSendController({
           content,
           { clientMsgId },
         );
-        return { body, localMessageId, result, scopeKey, thread: selectedThread };
+        return { body, localMessageId, result, runtime, thread: selectedThread };
       } catch (error) {
         const failedAt = Date.now();
         const reason = formatError(error);
@@ -201,7 +201,7 @@ export function useCustomerServiceSendController({
           localError: reason,
           status: "failed",
         });
-        await storage.patchRecord(scopeKey, localMessageId, {
+        await runtime.patchOutboxRecord(localMessageId, {
           localFailedAt: failedAt,
           localError: reason,
           status: "failed",
@@ -210,11 +210,9 @@ export function useCustomerServiceSendController({
         throw error;
       }
     },
-    onSuccess: async ({ body, localMessageId, result, scopeKey, thread }) => {
+    onSuccess: async ({ body, localMessageId, result, runtime, thread }) => {
       if (thread) {
-        logChatSendDiagnostic({
-          taskId: "P4-MSG-005D",
-          channel: "customer_service",
+        runtime.log({
           phase: "send",
           result: "ok",
           action: "send_succeeded",
@@ -235,7 +233,7 @@ export function useCustomerServiceSendController({
           body,
           identity: session,
         });
-        void getSendOutboxStorage().deleteRecord(scopeKey, localMessageId);
+        void runtime.deleteOutboxRecord(localMessageId);
       }
       setNotice(null);
       await invalidateCustomerServiceQueries(queryClient);

@@ -153,6 +153,13 @@ describe("workspace access integration closure", () => {
     resolve(process.cwd(), "src/renderer/data/customer-service/cs-reminder-model.ts"),
     "utf8",
   );
+  const serviceBadgeViewSource = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/renderer/data/customer-service/customer-service-badge-view.ts",
+    ),
+    "utf8",
+  );
   const gatewayCustomerServiceSideEffectsSource = readFileSync(
     resolve(process.cwd(), "src/renderer/data/gateway/gateway-cs-side-effects.ts"),
     "utf8",
@@ -199,9 +206,9 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).toContain("专业版 · v");
     expect(sidebarSource).toContain("sidebar-status-center");
     expect(sidebarSource).toContain("sidebar-footer-account-entry");
-    expect(sidebarSource).toContain(
-      '<div className="sidebar-footer">\n        <div className="sidebar-status-center" aria-label="状态中心">\n          <div className="account-entry sidebar-footer-account-entry">',
-    );
+    expect(sidebarSource).toContain('<div className="sidebar-footer">');
+    expect(sidebarSource).toContain("sidebar-realtime-status");
+    expect(sidebarSource).toContain("gatewayStatusNotice");
     expect(sidebarSource).toContain("imPresenceStatuses.map");
     expect(sidebarSource).toContain("accountAvatarDisplayUrl");
     expect(sidebarSource).toContain("profileQuery.dataUpdatedAt");
@@ -350,7 +357,9 @@ describe("workspace access integration closure", () => {
     expect(serviceIncomingNotificationsSource).toContain("consumeCustomerServiceMessageReminder");
     expect(gatewayCustomerServiceSideEffectsSource).toContain("consumeCustomerServiceMessageReminder");
     expect(serviceWorkspaceSource).toContain("isMineCustomerServiceMessage");
-    expect(sidebarSource).toContain("const taskbarServiceUnreadCount = activeServiceUnreadCount");
+    expect(sidebarSource).toContain("resolveCustomerServiceBadgeView");
+    expect(serviceBadgeViewSource).toContain("taskbarServiceUnreadCount: activeServiceUnreadCount");
+    expect(serviceBadgeViewSource).not.toContain("realtimeServiceAlertCount");
     expect(sidebarSource).not.toContain("previousServiceMessageRef");
   });
 

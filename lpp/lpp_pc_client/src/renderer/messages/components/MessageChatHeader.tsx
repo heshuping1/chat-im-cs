@@ -2,8 +2,8 @@ import { AppWindow, ChevronLeft, Search } from "lucide-react";
 
 import { ChannelBadge, channelLabel } from "../../components/ChannelBadge";
 import type { ConversationListItem } from "../../data/api-client";
+import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
-import { effectiveConversationUnreadCount } from "../../data/message-display";
 import { ConversationAvatar } from "./ConversationListParts";
 
 export function MessageChatHeader({
@@ -15,6 +15,7 @@ export function MessageChatHeader({
   headerTitle,
   historyOpen,
   messageSearchOpen,
+  messagesLoaded,
   unreadIdentity,
   onOpenConversationDrawer,
   onToggleLookup,
@@ -27,6 +28,7 @@ export function MessageChatHeader({
   headerTitle: string;
   historyOpen: boolean;
   messageSearchOpen: boolean;
+  messagesLoaded: boolean;
   unreadIdentity?: CurrentUserIdentity | null;
   onOpenConversationDrawer: () => void;
   onToggleLookup: () => void;
@@ -52,7 +54,11 @@ export function MessageChatHeader({
             groupAvatar={undefined}
             isGroup={false}
             title={conversation.title}
-            unread={effectiveConversationUnreadCount(conversation, unreadIdentity)}
+            unread={imConversationEffectiveUnreadCount(conversation, unreadIdentity, {
+              activeConversationId: conversation.conversationId,
+              messagesLoaded,
+              visibility: "paneVisible",
+            })}
           />
         )}
         <div>

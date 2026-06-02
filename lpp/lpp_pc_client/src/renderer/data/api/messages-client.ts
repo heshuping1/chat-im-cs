@@ -45,13 +45,13 @@ export class MessagesApiClient extends ContactsApiClient {
       `${endpointPlan.conversations}?${search.toString()}`,
     ).then((page) => {
       const items = page.items ?? [];
-      const filtered = items.filter(isPlainImConversation);
       const scopeKey = customerServiceIndexScopeKey({
         apiBaseUrl: this.options.baseUrl,
         tenantToken: this.options.tenantToken,
       });
+      const filtered = items.filter((item) => isPlainImConversation(item, scopeKey));
       items.forEach((item) => rememberCustomerServiceConversationFromImList(item, scopeKey));
-      const dropped = items.filter((item) => !isPlainImConversation(item));
+      const dropped = items.filter((item) => !isPlainImConversation(item, scopeKey));
       recordCsRoutingDiagnostic({
         event: "pc-im-conversations",
         source: "messages-client",
@@ -64,7 +64,11 @@ export class MessagesApiClient extends ContactsApiClient {
         },
         summary: dropped.slice(0, 20).map((item) => ({
           ...item,
-          ownership: resolveConversationOwnership(item as unknown as Record<string, unknown>, "imList"),
+          ownership: resolveConversationOwnership({
+            payload: item as unknown as Record<string, unknown>,
+            scopeKey,
+            source: "imList",
+          }),
         })),
       });
       return {
@@ -296,9 +300,13 @@ export class MessagesApiClient extends ContactsApiClient {
   }
 }
 
-function isPlainImConversation(item: ConversationListItem) {
+function isPlainImConversation(item: ConversationListItem, scopeKey: string) {
   const record = item as unknown as Record<string, unknown>;
-  const ownership = resolveConversationOwnership(record, "imList");
+  const ownership = resolveConversationOwnership({
+    payload: record,
+    scopeKey,
+    source: "imList",
+  });
   if (ownership.owner === "customerService" && ownership.confidence === "explicit") return false;
   const conversationType = normalizeGatewayType(
     stringField(record, "conversationType", "type"),

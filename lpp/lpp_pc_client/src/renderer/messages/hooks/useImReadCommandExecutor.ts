@@ -17,6 +17,7 @@ import {
 } from "../../data/im-read/im-read-store";
 import { readStateMeaningfullyChanged } from "../../data/im-read/im-read-view-model";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
+import { triggerMessageGapSync } from "../../data/gateway/message-gap-sync-coordinator";
 import { useActiveModule } from "../../data/workspace-ui/workspace-ui-store";
 import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
 import { requireApiClient } from "../../data/runtime";
@@ -39,6 +40,7 @@ export function useImReadCommandExecutor({
   dismissRealtimeRemindersForTarget,
   markConversationReadLocally,
   messages,
+  messagesLoaded,
   queryClient,
   session,
   setNotice,
@@ -60,6 +62,7 @@ export function useImReadCommandExecutor({
   dismissRealtimeRemindersForTarget: (targetModule: "messages", targetId?: string) => void;
   markConversationReadLocally: (conversationId: string, readSeq: number) => void;
   messages: MessageItemDto[];
+  messagesLoaded: boolean;
   queryClient: QueryClient;
   session: AuthSession | null;
   setNotice: (notice: string | null) => void;
@@ -166,7 +169,7 @@ export function useImReadCommandExecutor({
       activeConversationSource,
       activeConversationVisibility,
       conversationId: activeConversation?.conversationId,
-      messagesLength: messages.length,
+      messagesLoaded,
     });
     recordMessageReminderDiagnostic({
       event: "im.ui.visibility.resolve",
@@ -180,7 +183,7 @@ export function useImReadCommandExecutor({
         activeModule,
         conversationId: activeConversation?.conversationId,
         markReadAllowed: canAutoRead,
-        messagesLoaded: messages.length > 0,
+        messagesLoaded,
       },
       summary: {
         activeConversation,
@@ -192,10 +195,10 @@ export function useImReadCommandExecutor({
       phase: "evaluate",
       route: canAutoRead ? "allow" : "skip",
       classification: {
-      activeConversationId,
-      activeConversationSource,
-      activeConversationVisibility,
-      activeModule,
+        activeConversationId,
+        activeConversationSource,
+        activeConversationVisibility,
+        activeModule,
         conversationId: activeConversation?.conversationId,
         conversationType: activeConversationType,
         lastMessageSeq: activeConversation?.lastMessageSeq,
@@ -245,6 +248,7 @@ export function useImReadCommandExecutor({
     activeConversationType,
     executeImCoreCommands,
     messages,
+    messagesLoaded,
     session,
     unreadIdentity,
     upsertImReadState,
@@ -259,6 +263,7 @@ export function useImReadCommandExecutor({
       const conversationType = getImConversationType(conversation);
       if (!conversationType) continue;
       const key = imConversationKey(conversationType, conversation.conversationId);
+      const previousReadState = stateByConversation[key];
       const result = reduceImCoreEvent({
         identity: unreadIdentity,
         stateByConversation,
@@ -276,10 +281,10 @@ export function useImReadCommandExecutor({
       });
       const nextState = result.stateByConversation[key];
       recordMessageReminderDiagnostic({
-        event: "im.api.snapshot.reduce",
+        event: "im.snapshot.reconcile",
         source: "use-im-read-command-executor",
-        phase: "reduce",
-        route: "conversation-list",
+        phase: "reconcile",
+        route: "conversation-list-snapshot",
         classification: {
           activeConversationId,
           activeConversationSource,
@@ -291,15 +296,23 @@ export function useImReadCommandExecutor({
           lastMessageSeq: conversation.lastMessageSeq,
           lastReadSeq: conversation.lastReadSeq,
           myReadSeqAfter: nextState?.myReadSeq,
-          myReadSeqBefore: stateByConversation[key]?.myReadSeq,
+          myReadSeqBefore: previousReadState?.myReadSeq,
           unreadAfter: result.viewByConversation[key]?.unreadCount,
-          unreadBefore: stateByConversation[key]?.unreadCount,
+          unreadBefore: previousReadState?.unreadCount,
           serverUnread: conversation.unreadCount ?? 0,
+          snapshotSource: "consistency-check",
         },
         summary: {
           conversation,
         },
       });
+      if (hasSnapshotSeqGap(previousReadState, conversation.lastMessageSeq)) {
+        triggerMessageGapSync(queryClient, {
+          conversationId: conversation.conversationId,
+          reason: "startup-snapshot-gap",
+          source: "use-im-read-command-executor",
+        });
+      }
       if (nextState && readStateMeaningfullyChanged(stateByConversation[key], nextState)) {
         upsertImReadState(nextState);
       }
@@ -315,6 +328,7 @@ export function useImReadCommandExecutor({
     activeConversationSource,
     activeConversationVisibility,
     activeModule,
+    queryClient,
     session,
     unreadIdentity,
     upsertImReadState,
@@ -323,19 +337,29 @@ export function useImReadCommandExecutor({
   return executeImCoreCommands;
 }
 
+function hasSnapshotSeqGap(
+  previousReadState: ConversationReadState | undefined,
+  serverLastMessageSeq: number | null | undefined,
+) {
+  if (!previousReadState) return false;
+  const localLastSeq = Math.max(0, previousReadState.lastMessageSeq ?? 0);
+  const serverLastSeq = Math.max(0, serverLastMessageSeq ?? 0);
+  return localLastSeq > 0 && serverLastSeq > localLastSeq + 1;
+}
+
 export function canAutoReadImConversation(input: {
   activeConversationId: string | null | undefined;
   activeConversationSource: ActiveImConversationSource;
   activeConversationVisibility: ActiveImConversationVisibility;
   conversationId?: string | null;
-  messagesLength: number;
+  messagesLoaded: boolean;
 }) {
   return Boolean(
     input.activeConversationVisibility === "paneVisible" &&
       input.activeConversationId &&
       input.conversationId &&
       input.activeConversationId === input.conversationId &&
-      input.messagesLength > 0,
+      input.messagesLoaded,
   );
 }
 

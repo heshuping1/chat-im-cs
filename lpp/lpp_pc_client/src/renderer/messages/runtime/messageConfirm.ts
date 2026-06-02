@@ -16,6 +16,10 @@ export function requestMessageDangerConfirmation({
   return window.confirm(messageDangerConfirmationText(action, count));
 }
 
+export function requestMessageCustomConfirmation(message: string) {
+  return window.confirm(message);
+}
+
 export function messageDangerConfirmationText(
   action: MessageDangerConfirmAction,
   count?: number,

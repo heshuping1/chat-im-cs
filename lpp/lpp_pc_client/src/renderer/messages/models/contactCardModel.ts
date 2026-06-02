@@ -64,7 +64,7 @@ export function normalizeContactCard(value: unknown): NormalizedContactCard {
       ) || "",
     displayName,
     avatarUrl: stringField(record, "avatarUrl", "avatar_url", "avatar", "photoUrl") ?? null,
-    lppId,
+    ...(lppId ? { lppId } : {}),
     mobile,
     email,
     subtitle: lppId || "个人名片",

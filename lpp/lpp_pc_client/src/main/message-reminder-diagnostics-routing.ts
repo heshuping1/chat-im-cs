@@ -1,13 +1,28 @@
 import type { MessageReminderDiagnosticPayload } from '../shared/desktop-api.js';
 
 export interface ReminderDiagnosticsTarget {
-  fileName: 'message-reminder.jsonl' | 'im-read.jsonl' | 'customer-service-reminder.jsonl';
+  fileName:
+    | 'message-reminder.jsonl'
+    | 'im-read.jsonl'
+    | 'customer-service-reminder.jsonl'
+    | 'gateway-health.jsonl'
+    | 'message-delivery.jsonl'
+    | 'message-gap-sync.jsonl';
   maxLines: number;
 }
 
 export function reminderDiagnosticsTarget(
   payload: MessageReminderDiagnosticPayload,
 ): ReminderDiagnosticsTarget {
+  if (payload.event === 'gateway.health') {
+    return { fileName: 'gateway-health.jsonl', maxLines: 1200 };
+  }
+  if (payload.event === 'gateway.push.received' || payload.event.startsWith('message.delivery')) {
+    return { fileName: 'message-delivery.jsonl', maxLines: 1600 };
+  }
+  if (payload.event.startsWith('message.gap-sync')) {
+    return { fileName: 'message-gap-sync.jsonl', maxLines: 800 };
+  }
   if (isImReadDiagnostic(payload)) {
     return { fileName: 'im-read.jsonl', maxLines: 1200 };
   }

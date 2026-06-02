@@ -37,9 +37,9 @@ import {
   useMessageProfileVisible,
   useProfilePaneWidth,
   useServiceLayoutMode,
+  useOpenCustomerServiceThread,
   useSetActiveModule,
   useSetActiveImConversation,
-  useSetActiveThread,
 } from './data/workspace-ui/workspace-ui-store';
 import './styles/theme.css';
 import './styles/shared/panel-state.css';
@@ -154,7 +154,7 @@ export default function App() {
   const activeModule = useActiveModule();
   const setActiveModule = useSetActiveModule();
   const setActiveImConversation = useSetActiveImConversation();
-  const setActiveThread = useSetActiveThread();
+  const openCustomerServiceThread = useOpenCustomerServiceThread();
   const listPaneWidth = useListPaneWidth();
   const profilePaneWidth = useProfilePaneWidth();
   const authSession = useAuthSession();
@@ -223,7 +223,7 @@ export default function App() {
     return subscribeDesktopNotificationClicks((payload) => {
       const targetId = payload.targetId || payload.conversationId;
       if (payload.targetModule === 'onlineService' || payload.channel === 'serviceQueue') {
-        if (targetId) setActiveThread(targetId);
+        if (targetId) openCustomerServiceThread(targetId, 'reminder');
         setActiveModule('onlineService');
         return;
       }
@@ -237,7 +237,7 @@ export default function App() {
       }
       setActiveModule('messages');
     });
-  }, [authSession, setActiveImConversation, setActiveModule, setActiveThread]);
+  }, [authSession, setActiveImConversation, setActiveModule, openCustomerServiceThread]);
 
   return (
     <QueryClientProvider client={queryClient}>

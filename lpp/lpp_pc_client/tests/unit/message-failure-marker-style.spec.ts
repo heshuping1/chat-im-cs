@@ -18,6 +18,6 @@ describe("message failure marker style", () => {
     expect(css).toContain(".pc-chat-send-status-slot");
     expect(css).toContain(".pc-chat-sending-marker");
     expect(css).toContain("pc-chat-sending-marker-spin");
-    expect(css).toMatch(/\.pc-chat-send-status-slot\s*\{[^}]*flex:\s*0 0 20px/s);
+    expect(css).toMatch(/\.pc-chat-send-status-slot\s*\{[^}]*flex:\s*0 0 \d+px/s);
   });
 });

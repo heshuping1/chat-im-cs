@@ -1,5 +1,7 @@
 import {
   useWorkspaceStore,
+  type CustomerServiceThreadOpenSource,
+  type GatewayRealtimeStatus,
   type MessageLayoutMode,
   type ServiceLayoutMode,
   type ServiceAssistantPane,
@@ -10,6 +12,8 @@ import type { CustomerServiceStatus } from "../types";
 
 export type {
   MessageLayoutMode,
+  CustomerServiceThreadOpenSource,
+  GatewayRealtimeStatus,
   ServiceAssistantPane,
   ServiceLayoutMode,
 } from "./workspace-store-core";
@@ -22,6 +26,7 @@ export type MessageConversationFilter = "all" | "friends" | "groups" | "unread";
 export interface WorkspaceUiCompatibleState {
   activeModule: ModuleKey;
   activeThreadId: string;
+  activeThreadOpenSource: CustomerServiceThreadOpenSource;
   openServiceThreadIds: string[];
   activeImConversationId: string;
   activeContactId: string;
@@ -42,8 +47,14 @@ export interface WorkspaceUiCompatibleState {
   contactFilter: ContactFilter;
   imPresenceStatus: TrayStatus;
   customerServiceStatus: CustomerServiceStatus;
+  gatewayRealtimeStatus: GatewayRealtimeStatus;
+  gatewayRealtimeUpdatedAt: number;
   setActiveModule: (module: ModuleKey) => void;
   setActiveThread: (id: string) => void;
+  openCustomerServiceThread: (
+    id: string,
+    source: Exclude<CustomerServiceThreadOpenSource, "none">,
+  ) => void;
   closeOpenServiceThread: (id: string) => void;
   setActiveImConversation: (id: string) => void;
   setActiveContact: (id: string) => void;
@@ -64,6 +75,7 @@ export interface WorkspaceUiCompatibleState {
   setContactFilter: (filter: ContactFilter) => void;
   setImPresenceStatus: (status: TrayStatus) => void;
   setCustomerServiceStatus: (status: CustomerServiceStatus) => void;
+  setGatewayRealtimeStatus: (status: GatewayRealtimeStatus) => void;
 }
 
 export function selectActiveModule(state: WorkspaceUiCompatibleState) {
@@ -78,12 +90,20 @@ export function selectActiveThreadId(state: WorkspaceUiCompatibleState) {
   return state.activeThreadId;
 }
 
+export function selectActiveThreadOpenSource(state: WorkspaceUiCompatibleState) {
+  return state.activeThreadOpenSource;
+}
+
 export function selectOpenServiceThreadIds(state: WorkspaceUiCompatibleState) {
   return state.openServiceThreadIds;
 }
 
 export function selectSetActiveThread(state: WorkspaceUiCompatibleState) {
   return state.setActiveThread;
+}
+
+export function selectOpenCustomerServiceThread(state: WorkspaceUiCompatibleState) {
+  return state.openCustomerServiceThread;
 }
 
 export function selectCloseOpenServiceThread(state: WorkspaceUiCompatibleState) {
@@ -274,6 +294,17 @@ export function selectSetCustomerServiceStatus(state: WorkspaceUiCompatibleState
   return state.setCustomerServiceStatus;
 }
 
+export function selectGatewayRealtimeState(state: WorkspaceUiCompatibleState) {
+  return {
+    status: state.gatewayRealtimeStatus,
+    updatedAt: state.gatewayRealtimeUpdatedAt,
+  };
+}
+
+export function selectSetGatewayRealtimeStatus(state: WorkspaceUiCompatibleState) {
+  return state.setGatewayRealtimeStatus;
+}
+
 export function useActiveModule() {
   return useWorkspaceStore(selectActiveModule);
 }
@@ -286,12 +317,20 @@ export function useActiveThreadId() {
   return useWorkspaceStore(selectActiveThreadId);
 }
 
+export function useActiveThreadOpenSource() {
+  return useWorkspaceStore(selectActiveThreadOpenSource);
+}
+
 export function useOpenServiceThreadIds() {
   return useWorkspaceStore(selectOpenServiceThreadIds);
 }
 
 export function useSetActiveThread() {
   return useWorkspaceStore(selectSetActiveThread);
+}
+
+export function useOpenCustomerServiceThread() {
+  return useWorkspaceStore(selectOpenCustomerServiceThread);
 }
 
 export function useCloseOpenServiceThread() {
@@ -458,11 +497,21 @@ export function useSetCustomerServiceStatus() {
   return useWorkspaceStore(selectSetCustomerServiceStatus);
 }
 
+export function useGatewayRealtimeState() {
+  return useWorkspaceStore(selectGatewayRealtimeState);
+}
+
+export function useSetGatewayRealtimeStatus() {
+  return useWorkspaceStore(selectSetGatewayRealtimeStatus);
+}
+
 export function getWorkspaceUiSnapshot() {
   const state = useWorkspaceStore.getState();
   return {
     activeImConversationId: state.activeImConversationId,
     activeModule: state.activeModule,
     activeThreadId: state.activeThreadId,
+    activeThreadOpenSource: state.activeThreadOpenSource,
+    gatewayRealtimeStatus: state.gatewayRealtimeStatus,
   };
 }

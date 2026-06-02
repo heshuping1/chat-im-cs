@@ -27,7 +27,7 @@ describe("contact card model", () => {
       avatarUrl: "https://assets/avatar.png",
       mobile: "138****0000",
       email: "z@example.com",
-      subtitle: "138****0000",
+      subtitle: "个人名片",
     });
     expect(contactCardMessageBody(card)).toEqual({
       contactCard: {

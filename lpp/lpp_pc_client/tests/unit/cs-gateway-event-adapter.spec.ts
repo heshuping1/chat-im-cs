@@ -2,9 +2,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { adaptCustomerServiceGatewayEvent } from "../../src/renderer/data/gateway/cs-gateway-event-adapter";
 import {
+  customerServiceIndexScopeKey,
   rememberCustomerServiceConversationIndex,
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
+
+const testScopeKey = customerServiceIndexScopeKey({
+  apiBaseUrl: "https://api.example.test",
+  tenantToken: "tenant-token",
+});
 
 describe("adaptCustomerServiceGatewayEvent", () => {
   beforeEach(() => {
@@ -96,6 +102,7 @@ describe("adaptCustomerServiceGatewayEvent", () => {
   it("adapts unmarked msg.new messages when the conversation is indexed as temp-session", () => {
     rememberCustomerServiceConversationIndex({
       conversationId: "im-conversation-cs-1",
+      scopeKey: testScopeKey,
       source: "temp-chat-widget",
       threadId: "temp-session-1",
       threadType: "temp_session",
@@ -104,6 +111,7 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     const event = adaptCustomerServiceGatewayEvent({
       eventName: "msg.new",
       receivedAt: 6,
+      scopeKey: testScopeKey,
       args: [
         {
           conversationId: "im-conversation-cs-1",
@@ -121,5 +129,32 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.threadId).toBe("temp-session-1");
     expect(event.threadType).toBe("temp_session");
     expect(event.message.messageId).toBe("m-indexed");
+  });
+
+  it("does not adapt unmarked indexed messages without a matching scope", () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "im-conversation-cs-1",
+      scopeKey: testScopeKey,
+      source: "temp-chat-widget",
+      threadId: "temp-session-1",
+      threadType: "temp_session",
+    });
+
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 7,
+      args: [
+        {
+          conversationId: "im-conversation-cs-1",
+          conversationSeq: 4,
+          messageId: "m-indexed",
+          messageType: "text",
+          senderUserId: "visitor-1",
+          body: { text: "codex-test" },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("ignored");
   });
 });

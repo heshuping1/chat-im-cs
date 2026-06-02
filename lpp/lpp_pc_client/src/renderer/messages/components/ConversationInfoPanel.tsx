@@ -26,7 +26,8 @@ import type {
   GroupMemberDto,
   GroupSettingsDto,
 } from "../../data/api-client";
-import { effectiveConversationUnreadCount, type CurrentUserIdentity } from "../../data/message-display";
+import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
+import type { CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
 import { formatChatTime } from "../../lib/format";
 import { renderWechatEmojiText } from "../../lib/wechatEmoji";
@@ -39,6 +40,7 @@ import {
   normalizeGroupRole,
 } from "../models/groupManagementModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
+import { requestMessageCustomConfirmation } from "../runtime/messageConfirm";
 import { ConversationAvatar } from "./ConversationListParts";
 
 const groupInfoTabs = ["资料", "成员", "公告", "文件", "管理"] as const;
@@ -129,7 +131,10 @@ export function ConversationInfoPanel({
   }
 
   const members = groupMembers ?? [];
-  const unread = effectiveConversationUnreadCount(conversation, userIdentity);
+  const unread = imConversationEffectiveUnreadCount(conversation, userIdentity, {
+    activeConversationId: conversation.conversationId,
+    visibility: "paneVisible",
+  });
   return (
     <aside
       className="e-profile-panel customer-info-panel message-info-panel"
@@ -713,6 +718,5 @@ function isAllMuted(groupManagement?: MessageGroupManagement) {
 }
 
 function confirmDanger(message: string) {
-  if (typeof window === "undefined") return true;
-  return window.confirm(message);
+  return requestMessageCustomConfirmation(message);
 }

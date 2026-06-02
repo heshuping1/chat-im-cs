@@ -2210,6 +2210,44 @@ body.is-composer-resizing * {
   display: none !important;
 }
 
+.sidebar-realtime-status {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.sidebar-realtime-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-realtime-status.syncing {
+  color: #8a5c00;
+  background: rgba(255, 246, 219, 0.92);
+}
+
+.sidebar-realtime-status.offline {
+  color: #9b1c1c;
+  background: rgba(254, 226, 226, 0.86);
+}
+
+.sidebar.collapsed .sidebar-realtime-status {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-inline: 4px;
+}
+
+.sidebar.collapsed .sidebar-realtime-status span {
+  display: none;
+}
+
 .sidebar-status-center {
   position: relative;
   display: grid;

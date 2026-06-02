@@ -87,6 +87,14 @@ export type ServiceLayoutMode =
   | 'queue-focus'
   | 'chat-focus';
 export type ServiceAssistantPane = 'aiDraft' | 'knowledge' | 'quickReply' | null;
+export type CustomerServiceThreadOpenSource = 'none' | 'auto' | 'user' | 'reminder' | 'claim';
+export type GatewayRealtimeStatus =
+  | 'idle'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'retrying'
+  | 'stopped';
 
 const serviceLayoutStorageKey = 'lpp.pc.service-layout';
 const serviceLayoutDefaults = {
@@ -176,6 +184,7 @@ interface WorkspaceState {
   authSession: AuthSession | null;
   activeModule: ModuleKey;
   activeThreadId: string;
+  activeThreadOpenSource: CustomerServiceThreadOpenSource;
   openServiceThreadIds: string[];
   activeImConversationId: string;
   locallyReadImConversationReads: Record<string, LocalImConversationRead>;
@@ -199,10 +208,16 @@ interface WorkspaceState {
   contactFilter: ContactFilter;
   imPresenceStatus: TrayStatus;
   customerServiceStatus: CustomerServiceStatus;
+  gatewayRealtimeStatus: GatewayRealtimeStatus;
+  gatewayRealtimeUpdatedAt: number;
   pcSettings: PcSettings;
   realtimeReminders: PcRealtimeReminder[];
   setActiveModule: (module: ModuleKey) => void;
   setActiveThread: (id: string) => void;
+  openCustomerServiceThread: (
+    id: string,
+    source: Exclude<CustomerServiceThreadOpenSource, 'none'>,
+  ) => void;
   closeOpenServiceThread: (id: string) => void;
   setActiveImConversation: (id: string) => void;
   markImConversationReadLocally: (
@@ -235,6 +250,7 @@ interface WorkspaceState {
   setContactFilter: (filter: WorkspaceState['contactFilter']) => void;
   setImPresenceStatus: (status: TrayStatus) => void;
   setCustomerServiceStatus: (status: CustomerServiceStatus) => void;
+  setGatewayRealtimeStatus: (status: GatewayRealtimeStatus) => void;
   updatePcSetting: <K extends keyof PcSettings>(key: K, value: PcSettings[K]) => void;
   pushRealtimeReminder: (reminder: PcRealtimeReminderInput) => void;
   dismissRealtimeReminder: (id: string) => void;
@@ -251,6 +267,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   authSession: initialAuthSession,
   activeModule: 'messages',
   activeThreadId: '',
+  activeThreadOpenSource: 'none',
   openServiceThreadIds: [],
   activeImConversationId: '',
   locallyReadImConversationReads: readStoredLocalImConversationReads(initialAuthSession),
@@ -279,22 +296,35 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   contactFilter: 'customer',
   imPresenceStatus: 'online',
   customerServiceStatus: 'busy',
+  gatewayRealtimeStatus: 'idle',
+  gatewayRealtimeUpdatedAt: 0,
   pcSettings: readStoredPcSettings(),
   realtimeReminders: [],
   setActiveModule: (activeModule) => set({ activeModule }),
   setActiveThread: (id) =>
     set((state) => ({
       activeThreadId: id,
+      activeThreadOpenSource: id ? 'auto' : 'none',
+      openServiceThreadIds: openServiceThread(state.openServiceThreadIds, id),
+    })),
+  openCustomerServiceThread: (id, source) =>
+    set((state) => ({
+      activeThreadId: id,
+      activeThreadOpenSource: id ? source : 'none',
       openServiceThreadIds: openServiceThread(state.openServiceThreadIds, id),
     })),
   closeOpenServiceThread: (id) =>
-    set((state) =>
-      closeServiceThread({
+    set((state) => {
+      const next = closeServiceThread({
         activeThreadId: state.activeThreadId,
         closingThreadId: id,
         openThreadIds: state.openServiceThreadIds,
-      }),
-    ),
+      });
+      return {
+        ...next,
+        activeThreadOpenSource: next.activeThreadId ? 'auto' : 'none',
+      };
+    }),
   setActiveImConversation: (id) =>
     set({ activeImConversationId: id, activeModule: 'messages' }),
   markImConversationReadLocally: (id, readSeq = 0, messageKey) =>
@@ -533,6 +563,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   setCustomerServiceStatus: (customerServiceStatus) =>
     set({ customerServiceStatus }),
+  setGatewayRealtimeStatus: (gatewayRealtimeStatus) =>
+    set({ gatewayRealtimeStatus, gatewayRealtimeUpdatedAt: Date.now() }),
   updatePcSetting: (key, value) =>
     set((state) => {
       const pcSettings = { ...state.pcSettings, [key]: value };

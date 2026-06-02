@@ -114,7 +114,7 @@ describe("createGatewayEventRouter", () => {
       "direct",
     );
     expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({
       queryKey: ["pc-im-conversations"],
     });
   });
@@ -208,7 +208,7 @@ describe("createGatewayEventRouter", () => {
       "direct",
     );
     expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
-    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({
       queryKey: ["pc-im-conversations"],
     });
   });

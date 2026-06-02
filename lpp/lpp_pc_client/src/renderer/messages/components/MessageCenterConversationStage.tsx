@@ -59,6 +59,7 @@ export function MessageCenterConversationStage({
   activeConversationDraft,
   activeConversationHeaderTitle,
   activeConversationIsGroup,
+  activeConversationMessagesLoaded,
   activeConversationReadState,
   activeConversationType,
   avatarProfilePopover,
@@ -191,6 +192,7 @@ export function MessageCenterConversationStage({
   activeConversationDraft?: string;
   activeConversationHeaderTitle: string;
   activeConversationIsGroup: boolean;
+  activeConversationMessagesLoaded: boolean;
   activeConversationReadState?: ConversationReadState;
   activeConversationType?: "direct" | "group";
   avatarProfilePopover: AvatarProfilePopoverState | null;
@@ -370,6 +372,7 @@ export function MessageCenterConversationStage({
               headerTitle={activeConversationHeaderTitle}
               historyOpen={historyOpen}
               messageSearchOpen={messageSearchOpen}
+              messagesLoaded={activeConversationMessagesLoaded}
               unreadIdentity={unreadIdentity}
               onOpenConversationDrawer={() => setConversationDrawerOpen(true)}
               onToggleLookup={() => {

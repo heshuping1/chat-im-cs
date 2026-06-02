@@ -10,10 +10,8 @@ import {
   conversationKey as imConversationKey,
   type ConversationReadState,
 } from "../../data/im-read-model";
-import {
-  effectiveConversationUnreadCount,
-  type CurrentUserIdentity,
-} from "../../data/message-display";
+import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
+import type { CurrentUserIdentity } from "../../data/message-display";
 import { chatConversationEntityFromImConversation } from "../../data/conversation/conversation-domain";
 import { formatChatTime, formatError } from "../../lib/format";
 import {
@@ -51,6 +49,7 @@ export interface MessageCenterViewModel {
 
 export interface CreateMessageCenterViewModelInput {
   activeConversationId?: string | null;
+  activeConversationMessagesLoaded?: boolean;
   activeConversationVisibility?: ActiveImConversationVisibility;
   conversations: ConversationListItem[];
   visibleConversations: ConversationListItem[];
@@ -73,6 +72,7 @@ export function useMessageCenterViewModel(input: CreateMessageCenterViewModelInp
     () => createMessageCenterViewModel(input),
     [
       input.activeConversationId,
+      input.activeConversationMessagesLoaded,
       input.activeConversationVisibility,
       input.conversationListError,
       input.conversationListLoading,
@@ -136,6 +136,7 @@ export function createMessageCenterViewModel(
       input.conversations,
       input.unreadIdentity,
       input.activeConversationId,
+      input.activeConversationMessagesLoaded,
       input.activeConversationVisibility,
     ),
     errorText: messageCenterErrorText(input),
@@ -214,15 +215,17 @@ function getConversationCounts(
   conversations: ConversationListItem[],
   userIdentity?: CurrentUserIdentity | null,
   activeConversationId?: string | null,
+  activeConversationMessagesLoaded?: boolean,
   activeConversationVisibility?: ActiveImConversationVisibility,
 ) {
   return {
     unread: conversations.filter(
       (item) =>
-        !(
-          activeConversationVisibility === "paneVisible" &&
-          item.conversationId === activeConversationId
-        ) && effectiveConversationUnreadCount(item, userIdentity) > 0,
+        imConversationEffectiveUnreadCount(item, userIdentity, {
+          activeConversationId,
+          messagesLoaded: activeConversationMessagesLoaded,
+          visibility: activeConversationVisibility,
+        }) > 0,
     ).length,
   };
 }

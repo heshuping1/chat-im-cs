@@ -29,7 +29,10 @@ export function adaptGatewayEvent(input: GatewayRawEventInput): GatewayTypedEven
     rawPayload: payload,
   };
 
-  if (isCustomerServiceMessageEventName(input.eventName) || isCustomerServiceGatewayPayload(payload)) {
+  if (
+    isCustomerServiceMessageEventName(input.eventName) ||
+    isCustomerServiceGatewayPayload(payload, input.scopeKey)
+  ) {
     return ignored(envelope, "customer_service_event");
   }
 

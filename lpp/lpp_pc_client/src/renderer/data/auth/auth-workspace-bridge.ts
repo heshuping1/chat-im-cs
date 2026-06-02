@@ -22,6 +22,7 @@ export function createAuthSessionClearedState() {
   return {
     authSession: null,
     activeThreadId: "",
+    activeThreadOpenSource: "none" as const,
     openServiceThreadIds: [],
     activeImConversationId: "",
     locallyReadImConversationReads: {},
@@ -29,5 +30,7 @@ export function createAuthSessionClearedState() {
     imReadStateByConversation: {},
     activeContactId: "",
     activeModule: "messages" as const,
+    gatewayRealtimeStatus: "idle" as const,
+    gatewayRealtimeUpdatedAt: 0,
   };
 }

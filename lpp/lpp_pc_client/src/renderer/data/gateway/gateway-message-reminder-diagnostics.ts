@@ -23,6 +23,7 @@ export interface GatewayReminderDiagnosticInput {
   payload?: Record<string, unknown>;
   phase: string;
   route?: string;
+  scopeKey?: string;
   source: string;
 }
 
@@ -37,13 +38,18 @@ export function shouldRecordGatewayReminderEvent(eventName: string) {
 }
 
 export function gatewayReminderDiagnosticClassification(
-  input: Pick<GatewayReminderDiagnosticInput, "args" | "eventName" | "payload" | "route">,
+  input: Pick<GatewayReminderDiagnosticInput, "args" | "eventName" | "payload" | "route" | "scopeKey">,
 ) {
   const payload = input.payload ?? eventPayload(input.args ?? []);
   const rawMessage = messageRecord(payload);
   const conversation = conversationRecord(payload);
   const body = asRecord(rawMessage.body ?? rawMessage.messageBody ?? rawMessage.message_body ?? rawMessage.content);
-  const ownership = resolveConversationOwnership(payload, "gateway");
+  const ownership = resolveConversationOwnership({
+    eventName: input.eventName,
+    payload,
+    scopeKey: input.scopeKey ?? "",
+    source: "gateway",
+  });
   const preview =
     stringField(rawMessage, "preview", "text", "content") ||
     stringField(body, "preview", "text", "content");
@@ -71,7 +77,8 @@ export function gatewayReminderDiagnosticClassification(
     previewLength: preview.length,
     reason: ownership.reason,
     route: input.route,
-    threadId: ownership.threadId || customerServiceThreadId(payload),
+    scopeKey: input.scopeKey,
+    threadId: ownership.threadId || customerServiceThreadId(payload, input.scopeKey),
     threadType: ownership.threadType,
   };
 }
@@ -103,6 +110,7 @@ export function recordGatewayReminderDiagnostic(input: GatewayReminderDiagnostic
       eventName: input.eventName,
       payload,
       route: input.route,
+      scopeKey: input.scopeKey,
     }),
     summary: gatewayReminderDiagnosticSummary(payload),
   });

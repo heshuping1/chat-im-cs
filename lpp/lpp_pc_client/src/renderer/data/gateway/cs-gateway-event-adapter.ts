@@ -34,19 +34,25 @@ export function adaptCustomerServiceGatewayEvent(input: GatewayRawEventInput): G
     rawPayload: payload,
   };
 
-  if (isCustomerServiceMessageEventName(input.eventName) || isCustomerServiceGatewayPayload(payload)) {
-    return adaptCustomerServiceMessageEvent(envelope);
+  if (
+    isCustomerServiceMessageEventName(input.eventName) ||
+    isCustomerServiceGatewayPayload(payload, input.scopeKey)
+  ) {
+    return adaptCustomerServiceMessageEvent(envelope, input.scopeKey);
   }
 
   const changeKind = customerServiceThreadEventKinds.get(input.eventName);
-  if (changeKind) return adaptCustomerServiceThreadChangedEvent(envelope, changeKind);
+  if (changeKind) return adaptCustomerServiceThreadChangedEvent(envelope, changeKind, input.scopeKey);
 
   return ignored(envelope, "non_cs_event");
 }
 
-function adaptCustomerServiceMessageEvent(envelope: GatewayEnvelope): GatewayTypedEvent {
+function adaptCustomerServiceMessageEvent(
+  envelope: GatewayEnvelope,
+  scopeKey?: string,
+): GatewayTypedEvent {
   const payload = envelope.rawPayload;
-  const threadId = customerServiceThreadId(payload);
+  const threadId = customerServiceThreadId(payload, scopeKey);
   if (!threadId) {
     return invalid(envelope, "missing_thread_id", ["gateway.cs.missing_thread_id"]);
   }
@@ -83,13 +89,14 @@ function adaptCustomerServiceMessageEvent(envelope: GatewayEnvelope): GatewayTyp
 function adaptCustomerServiceThreadChangedEvent(
   envelope: GatewayEnvelope,
   changeKind: CustomerServiceGatewayChangeKind,
+  scopeKey?: string,
 ): GatewayTypedEvent {
   const payload = envelope.rawPayload;
   return {
     ...envelope,
     kind: "cs.thread.changed",
     changeKind,
-    threadId: customerServiceThreadId(payload),
+    threadId: customerServiceThreadId(payload, scopeKey),
     serviceStatus: stringField(payload, "serviceStatus", "service_status", "staffStatus", "staff_status", "status"),
     threadStatus: stringField(payload, "threadStatus", "thread_status", "status"),
     shouldNotifyQueue:

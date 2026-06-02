@@ -136,7 +136,7 @@ describe("gateway IM side effects", () => {
         activeConversationSource: "auto",
         activeConversationVisibility: "listOnly",
         conversationId: "direct-1",
-        messagesLength: 5,
+        messagesLoaded: true,
       }),
     ).toBe(false);
     expect(
@@ -145,7 +145,7 @@ describe("gateway IM side effects", () => {
         activeConversationSource: "auto",
         activeConversationVisibility: "paneVisible",
         conversationId: "direct-1",
-        messagesLength: 5,
+        messagesLoaded: true,
       }),
     ).toBe(true);
     expect(
@@ -154,7 +154,7 @@ describe("gateway IM side effects", () => {
         activeConversationSource: "user",
         activeConversationVisibility: "paneVisible",
         conversationId: "direct-1",
-        messagesLength: 0,
+        messagesLoaded: false,
       }),
     ).toBe(false);
     expect(
@@ -163,7 +163,7 @@ describe("gateway IM side effects", () => {
         activeConversationSource: "user",
         activeConversationVisibility: "paneVisible",
         conversationId: "direct-1",
-        messagesLength: 5,
+        messagesLoaded: true,
       }),
     ).toBe(true);
   });

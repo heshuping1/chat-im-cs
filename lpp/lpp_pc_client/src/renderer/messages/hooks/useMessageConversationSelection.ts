@@ -2,8 +2,8 @@ import { useEffect, useMemo } from "react";
 
 import type { ConversationListItem } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { resolveImConversationReadView } from "../../data/im-read/im-conversation-read-view";
 import {
-  conversationUnreadDiagnostic,
   type CurrentUserIdentity,
   isImConversation,
 } from "../../data/message-display";
@@ -86,14 +86,18 @@ export function useMessageConversationSelection({
   useEffect(() => {
     if (!unreadIdentity) return;
     for (const conversation of conversations) {
-      const diagnostic = conversationUnreadDiagnostic(conversation, unreadIdentity);
+      const readView = resolveImConversationReadView({
+        conversation,
+        identity: unreadIdentity,
+      });
+      const diagnostic = readView.diagnostic;
       const shouldRecord =
-        diagnostic.effectiveUnread > 0 ||
-        diagnostic.serverUnread !== diagnostic.effectiveUnread;
+        readView.effectiveUnread > 0 ||
+        diagnostic.serverUnread !== readView.effectiveUnread;
       if (!shouldRecord) continue;
       const signature = [
         diagnostic.serverUnread,
-        diagnostic.effectiveUnread,
+        readView.effectiveUnread,
         diagnostic.lastReadSeq ?? "",
         diagnostic.lastMessageSeq ?? "",
         diagnostic.localReadSeq ?? "",
@@ -117,7 +121,7 @@ export function useMessageConversationSelection({
         classification: {
           conversationId: conversation.conversationId,
           conversationType: conversation.conversationType,
-          effectiveUnread: diagnostic.effectiveUnread,
+          effectiveUnread: readView.effectiveUnread,
           lastMessageAt: diagnostic.lastMessageAt,
           lastMessageSeq: diagnostic.lastMessageSeq,
           lastReadSeq: diagnostic.lastReadSeq,
@@ -127,6 +131,7 @@ export function useMessageConversationSelection({
           localReadSeq: diagnostic.localReadSeq,
           selfLastMessage: diagnostic.selfLastMessage,
           serverUnread: diagnostic.serverUnread,
+          viewReason: readView.reason,
         },
         summary: {
           conversation,

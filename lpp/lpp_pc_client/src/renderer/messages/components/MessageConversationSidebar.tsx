@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
-import { effectiveConversationUnreadCount } from "../../data/message-display";
+import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import { startHorizontalPaneResize } from "../../lib/paneResize";
 import { getImConversationType } from "../hooks/useMessageCenterViewModel";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
@@ -19,6 +19,7 @@ type ComposerDialog = "direct" | "group" | "qr" | "card" | null;
 
 export function MessageConversationSidebar({
   activeConversation,
+  activeConversationMessagesLoaded,
   activeConversationVisibility,
   conversationDrawerOpen,
   conversationFilter,
@@ -50,6 +51,7 @@ export function MessageConversationSidebar({
   setPlusMenuOpen,
 }: {
   activeConversation?: ConversationListItem;
+  activeConversationMessagesLoaded: boolean;
   activeConversationVisibility: ActiveImConversationVisibility;
   conversationDrawerOpen: boolean;
   conversationFilter: MessageConversationFilterKey;
@@ -125,10 +127,11 @@ export function MessageConversationSidebar({
         }
         resolveConversationIsGroup={(item) => getImConversationType(item) === "group"}
         resolveConversationUnread={(item) =>
-          item.conversationId === activeConversation?.conversationId &&
-          activeConversationVisibility === "paneVisible"
-            ? 0
-            : effectiveConversationUnreadCount(item, unreadIdentity)
+          imConversationEffectiveUnreadCount(item, unreadIdentity, {
+            activeConversationId: activeConversation?.conversationId,
+            messagesLoaded: activeConversationMessagesLoaded,
+            visibility: activeConversationVisibility,
+          })
         }
       />
 

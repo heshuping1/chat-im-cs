@@ -12,13 +12,9 @@ import { requireApiClient } from "../../data/runtime";
 import {
   chatSendFailureContext,
   initialChatSendStatusForKind,
-  logChatSendDiagnostic,
 } from "../../data/send/send-state-machine";
-import {
-  getSendOutboxStorage,
-  sendOutboxScopeKey,
-  type SendOutboxStatus,
-} from "../../data/send/send-outbox";
+import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
+import type { SendOutboxStatus } from "../../data/send/send-outbox";
 import { currentIsoTimestamp, formatError } from "../../lib/format";
 import {
   appendLocalMessage,
@@ -87,10 +83,13 @@ export function useMessageTextSendController({
           ? message.body
           : retryAction.type === "text"
             ? { text: retryAction.content }
-            : retryAction.body;
+          : retryAction.body;
       const sendStartedAt = Date.now();
-      const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
+      const runtime = createChatSendRuntime({
+        channel: "im",
+        session,
+        taskId: retryAction.type === "contact_card" ? "P24-CONTACT-001" : "P4-MSG-005C",
+      });
       patchLocalMessageSendState(
         queryClient,
         session,
@@ -100,22 +99,18 @@ export function useMessageTextSendController({
         { status: "sending", localError: undefined, localSendStartedAt: sendStartedAt },
         setLocalOutgoingMessagesByConversation,
       );
-      void storage.upsertRecord({
+      void runtime.upsertOutboxRecord({
         body,
-        channel: "im",
         clientMsgId,
         createdAt: Date.parse(message.sentAt ?? "") || Date.now(),
         localMessageId,
         messageType: retryAction.type,
-        scopeKey,
         status: "sending",
         targetId: conversation.conversationId,
         targetType: conversationType,
         updatedAt: sendStartedAt,
       });
-      logChatSendDiagnostic({
-        taskId: retryAction.type === "contact_card" ? "P24-CONTACT-001" : "P4-MSG-005C",
-        channel: "im",
+      runtime.log({
         phase: "transition",
         result: "ok",
         action: "retry_send",
@@ -157,9 +152,7 @@ export function useMessageTextSendController({
             body,
             result,
           );
-          logChatSendDiagnostic({
-            taskId: "P4-MSG-005C",
-            channel: "im",
+          runtime.log({
             phase: "send",
             result: "ok",
             action: "send_succeeded",
@@ -182,15 +175,13 @@ export function useMessageTextSendController({
               sentMessage,
             ),
           );
-          void storage.deleteRecord(scopeKey, localMessageId);
+          void runtime.deleteOutboxRecord(localMessageId);
           void invalidateMessages(queryClient);
           scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
           const reason = formatError(error);
-          logChatSendDiagnostic({
-            taskId: "P4-MSG-005C",
-            channel: "im",
+          runtime.log({
             phase: "send",
             result: "failed",
             action: "send_failed",
@@ -225,7 +216,7 @@ export function useMessageTextSendController({
               failedAt,
             ),
           );
-          void storage.patchRecord(scopeKey, localMessageId, {
+          void runtime.patchOutboxRecord(localMessageId, {
             localFailedAt: failedAt,
             localError: reason,
             status: "failed",
@@ -254,13 +245,16 @@ export function useMessageTextSendController({
       const conversation = activeConversation;
       const conversationType = activeConversationType;
       const reply = replyTarget;
-      const localMessageId = `pc-local-text-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const clientMsgId = localMessageId;
+      const runtime = createChatSendRuntime({
+        channel: "im",
+        session,
+        taskId: "P4-MSG-005C",
+      });
+      const { clientMsgId, createdAt, localMessageId } =
+        runtime.createLocalIdentity("pc-local-text");
       const body = withReplyBody({ text: content }, reply);
       const initialStatus = initialChatSendStatusForKind("text");
-      const sendStartedAt = Date.now();
-      const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
+      const sendStartedAt = createdAt;
       const localMessage = appendLocalMessage(
         queryClient,
         session,
@@ -274,9 +268,7 @@ export function useMessageTextSendController({
         },
         { status: initialStatus, localSendStartedAt: sendStartedAt },
       );
-      logChatSendDiagnostic({
-        taskId: "P4-MSG-005C",
-        channel: "im",
+      runtime.log({
         phase: "local_echo",
         result: "ok",
         action: "enqueue_text",
@@ -298,14 +290,12 @@ export function useMessageTextSendController({
       );
       setReplyTarget(null);
       scrollMessagesToBottom("smooth");
-      void storage.upsertRecord({
+      void runtime.upsertOutboxRecord({
         body,
-        channel: "im",
         clientMsgId,
         createdAt: sendStartedAt,
         localMessageId,
         messageType: "text",
-        scopeKey,
         status: initialStatus as SendOutboxStatus,
         targetId: conversation.conversationId,
         targetType: conversationType,
@@ -330,9 +320,7 @@ export function useMessageTextSendController({
             body,
             result,
           );
-          logChatSendDiagnostic({
-            taskId: "P4-MSG-005C",
-            channel: "im",
+          runtime.log({
             phase: "send",
             result: "ok",
             action: "send_succeeded",
@@ -355,15 +343,13 @@ export function useMessageTextSendController({
               sentMessage,
             ),
           );
-          void storage.deleteRecord(scopeKey, localMessageId);
+          void runtime.deleteOutboxRecord(localMessageId);
           void invalidateMessages(queryClient);
           scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
           const reason = formatError(error);
-          logChatSendDiagnostic({
-            taskId: "P4-MSG-005C",
-            channel: "im",
+          runtime.log({
             phase: "send",
             result: "failed",
             action: "send_failed",
@@ -398,7 +384,7 @@ export function useMessageTextSendController({
               failedAt,
             ),
           );
-          void storage.patchRecord(scopeKey, localMessageId, {
+          void runtime.patchOutboxRecord(localMessageId, {
             localFailedAt: failedAt,
             localError: reason,
             status: "failed",
@@ -432,13 +418,16 @@ export function useMessageTextSendController({
       const conversation = activeConversation;
       const conversationType = activeConversationType;
       const reply = replyTarget;
-      const localMessageId = `pc-local-card-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const clientMsgId = localMessageId;
+      const runtime = createChatSendRuntime({
+        channel: "im",
+        session,
+        taskId: "P24-CONTACT-001",
+      });
+      const { clientMsgId, createdAt, localMessageId } =
+        runtime.createLocalIdentity("pc-local-card");
       const body = withReplyBody(contactCardMessageBody(card), reply);
       const initialStatus = initialChatSendStatusForKind("text");
-      const sendStartedAt = Date.now();
-      const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
+      const sendStartedAt = createdAt;
       const localMessage = appendLocalMessage(
         queryClient,
         session,
@@ -452,9 +441,7 @@ export function useMessageTextSendController({
         },
         { status: initialStatus, localSendStartedAt: sendStartedAt },
       );
-      logChatSendDiagnostic({
-        taskId: "P24-CONTACT-001",
-        channel: "im",
+      runtime.log({
         phase: "local_echo",
         result: "ok",
         action: "enqueue_contact_card",
@@ -476,14 +463,12 @@ export function useMessageTextSendController({
       );
       setReplyTarget(null);
       scrollMessagesToBottom("smooth");
-      void storage.upsertRecord({
+      void runtime.upsertOutboxRecord({
         body,
-        channel: "im",
         clientMsgId,
         createdAt: sendStartedAt,
         localMessageId,
         messageType: "contact_card",
-        scopeKey,
         status: initialStatus as SendOutboxStatus,
         targetId: conversation.conversationId,
         targetType: conversationType,
@@ -507,9 +492,7 @@ export function useMessageTextSendController({
             body,
             result,
           );
-          logChatSendDiagnostic({
-            taskId: "P24-CONTACT-001",
-            channel: "im",
+          runtime.log({
             phase: "send",
             result: "ok",
             action: "send_succeeded",
@@ -532,15 +515,13 @@ export function useMessageTextSendController({
               sentMessage,
             ),
           );
-          void storage.deleteRecord(scopeKey, localMessageId);
+          void runtime.deleteOutboxRecord(localMessageId);
           void invalidateMessages(queryClient);
           scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
           const reason = formatError(error);
-          logChatSendDiagnostic({
-            taskId: "P24-CONTACT-001",
-            channel: "im",
+          runtime.log({
             phase: "send",
             result: "failed",
             action: "send_failed",
@@ -575,7 +556,7 @@ export function useMessageTextSendController({
               failedAt,
             ),
           );
-          void storage.patchRecord(scopeKey, localMessageId, {
+          void runtime.patchOutboxRecord(localMessageId, {
             localFailedAt: failedAt,
             localError: reason,
             status: "failed",

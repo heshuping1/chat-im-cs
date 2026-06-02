@@ -384,7 +384,7 @@ describe("message media upload presentation", () => {
     expect(plusPanelCss).not.toContain("bottom:");
   });
 
-  it("keeps group avatars available while disabling the group member list view", () => {
+  it("keeps group avatars available with the group info tabs", () => {
     const conversationInfoPanel = readFileSync(
       resolve(process.cwd(), "src/renderer/messages/components/ConversationInfoPanel.tsx"),
       "utf8",
@@ -394,8 +394,10 @@ describe("message media upload presentation", () => {
       "utf8",
     );
 
-    expect(conversationInfoPanel).toContain('const tabs = ["资料", "公告", "文件"];');
-    expect(conversationInfoPanel).not.toContain("group-member-list");
+    expect(conversationInfoPanel).toContain(
+      'const groupInfoTabs = ["资料", "成员", "公告", "文件", "管理"] as const;',
+    );
+    expect(conversationInfoPanel).toContain("group-member-list");
     expect(conversationInfoPanel).toContain("conversation.memberCount");
     expect(interactionHandlers).toContain("if (activeConversation.conversationType === \"group\") return;");
   });

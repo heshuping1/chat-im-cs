@@ -31,6 +31,7 @@ import {
   type ServiceAssistantPane,
   type ServiceLayoutMode,
   useActiveThreadId,
+  useActiveThreadOpenSource,
   useServiceAssistantPane,
   useServiceAssistantPaneWidth,
   useServiceCustomerPaneCollapsed,
@@ -230,6 +231,7 @@ export function OnlineServicePage() {
   const layoutSnapshotRef = useRef<ServiceLayoutSnapshot | null>(null);
   const lastObservedShellWidthRef = useRef<string | null>(null);
   const activeThreadId = useActiveThreadId();
+  const activeThreadOpenSource = useActiveThreadOpenSource();
   const serviceAssistantPane = useServiceAssistantPane();
   const serviceAssistantPaneWidth = useServiceAssistantPaneWidth();
   const serviceCustomerPaneCollapsed = useServiceCustomerPaneCollapsed();
@@ -306,8 +308,9 @@ export function OnlineServicePage() {
     slaRiskCount,
   } = commandMetrics;
   useEffect(() => {
+    if (activeThreadOpenSource !== "auto") return;
     setActiveThread("");
-  }, [setActiveThread]);
+  }, [activeThreadOpenSource, setActiveThread]);
   useEffect(() => {
     window.localStorage.setItem(
       serviceCustomerPinStorageKey,

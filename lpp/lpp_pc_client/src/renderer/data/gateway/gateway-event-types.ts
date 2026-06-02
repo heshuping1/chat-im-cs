@@ -38,6 +38,7 @@ export interface GatewayRawEventInput {
   eventName: string;
   args: unknown[];
   receivedAt?: number;
+  scopeKey?: string;
   traceId?: string;
 }
 

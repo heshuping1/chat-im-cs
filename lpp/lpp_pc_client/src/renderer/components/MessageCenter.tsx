@@ -470,6 +470,7 @@ export function MessageCenter() {
     conversationId: activeConversation?.conversationId,
     messageLayoutMode,
   });
+  const activeConversationMessagesLoaded = messagesQuery.data !== undefined;
   useEffect(() => {
     recordMessageReminderDiagnostic({
       event: "im.message-center.mounted",
@@ -509,6 +510,7 @@ export function MessageCenter() {
     dismissRealtimeRemindersForTarget,
     markConversationReadLocally,
     messages,
+    messagesLoaded: activeConversationMessagesLoaded,
     queryClient,
     session,
     setNotice,
@@ -555,6 +557,7 @@ export function MessageCenter() {
   );
   const messageCenterViewModel = useMessageCenterViewModel({
     activeConversationId,
+    activeConversationMessagesLoaded,
     activeConversationVisibility,
     conversationListError: conversationsQuery.error,
     conversationListLoading: conversationsQuery.isLoading,
@@ -850,6 +853,7 @@ export function MessageCenter() {
       )}
       <MessageConversationSidebar
         activeConversation={activeConversation}
+        activeConversationMessagesLoaded={activeConversationMessagesLoaded}
         activeGroupMembers={groupMembersQuery.data}
         conversationDrawerOpen={conversationDrawerOpen}
         conversationFilter={messageFilter}
@@ -893,6 +897,7 @@ export function MessageCenter() {
         activeConversationDraft={activeConversationDraft}
         activeConversationHeaderTitle={activeConversationHeaderTitle}
         activeConversationIsGroup={activeConversationIsGroup}
+        activeConversationMessagesLoaded={activeConversationMessagesLoaded}
         activeConversationReadState={activeConversationReadState}
         activeConversationType={activeConversationType}
         avatarProfilePopover={avatarProfilePopover}

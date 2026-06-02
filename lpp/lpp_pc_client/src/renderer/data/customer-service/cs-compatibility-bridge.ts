@@ -15,7 +15,11 @@ export function rememberCustomerServiceConversationFromImList(
   scopeKey?: string,
 ) {
   const record = item as unknown as Record<string, unknown>;
-  const ownership = resolveConversationOwnership(record, "imList");
+  const ownership = resolveConversationOwnership({
+    payload: record,
+    scopeKey: scopeKey ?? "",
+    source: "imList",
+  });
   if (ownership.owner !== "customerService" || ownership.confidence !== "explicit") return;
   const tempSession = asRecord(record.tempSession ?? record.temp_session);
   const threadId =

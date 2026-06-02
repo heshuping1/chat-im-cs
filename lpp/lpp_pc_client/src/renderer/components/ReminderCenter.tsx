@@ -9,7 +9,7 @@ import {
   useSetActiveImConversation,
   useSetContactFilter,
   useSetActiveModule,
-  useSetActiveThread,
+  useOpenCustomerServiceThread,
   useSetServiceThreadFilter,
 } from "../data/workspace-ui/workspace-ui-store";
 
@@ -31,7 +31,7 @@ interface ReminderItem {
 export function ReminderCenter() {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const setActiveModule = useSetActiveModule();
-  const setActiveThread = useSetActiveThread();
+  const openCustomerServiceThread = useOpenCustomerServiceThread();
   const setFilter = useSetServiceThreadFilter();
   const setContactFilter = useSetContactFilter();
   const setActiveImConversation = useSetActiveImConversation();
@@ -72,7 +72,7 @@ export function ReminderCenter() {
       setContactFilter("requests");
       setActiveModule("contacts");
     } else {
-      if (item.targetId) setActiveThread(item.targetId);
+      if (item.targetId) openCustomerServiceThread(item.targetId, "reminder");
       if (item.id === "service-queue") setFilter("queued");
       if (item.id === "service-sla") setFilter("serving");
       setActiveModule(item.targetModule);

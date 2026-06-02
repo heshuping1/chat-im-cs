@@ -125,4 +125,26 @@ describe("message reminder diagnostics", () => {
       source: "App",
     } as any)).toEqual({ fileName: "message-reminder.jsonl", maxLines: 800 });
   });
+
+  it("routes gateway health, delivery and gap sync diagnostics into dedicated files", () => {
+    expect(reminderDiagnosticsTarget({
+      event: "gateway.health",
+      source: "GatewayConnectionManager",
+    } as any)).toEqual({ fileName: "gateway-health.jsonl", maxLines: 1200 });
+
+    expect(reminderDiagnosticsTarget({
+      event: "gateway.push.received",
+      source: "gateway-bridge",
+    } as any)).toEqual({ fileName: "message-delivery.jsonl", maxLines: 1600 });
+
+    expect(reminderDiagnosticsTarget({
+      event: "message.delivery",
+      source: "gateway-router",
+    } as any)).toEqual({ fileName: "message-delivery.jsonl", maxLines: 1600 });
+
+    expect(reminderDiagnosticsTarget({
+      event: "message.gap-sync.triggered",
+      source: "gateway-bridge",
+    } as any)).toEqual({ fileName: "message-gap-sync.jsonl", maxLines: 800 });
+  });
 });

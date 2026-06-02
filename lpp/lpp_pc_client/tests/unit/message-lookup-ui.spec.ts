@@ -51,6 +51,10 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/messages/components/MessageComposerSurface.tsx"),
     "utf8",
   );
+  const sharedComposerSurface = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/ChatComposerSurface.tsx"),
+    "utf8",
+  );
   const chatMessageBubble = readFileSync(
     resolve(process.cwd(), "src/renderer/components/ChatMessageBubble.tsx"),
     "utf8",
@@ -192,7 +196,8 @@ describe("message lookup UI", () => {
     expect(messageContextRail).toContain("LibraryBig");
     expect(messageContextRail).toContain('activeAssistantPane === "quickReply"');
     expect(messageContextRail).toContain('activeAssistantPane === "knowledge"');
-    expect(messageComposerSurface).toContain("{showAiTools &&");
+    expect(messageComposerSurface).toContain("showAiTools={showAiTools}");
+    expect(sharedComposerSurface).toContain("const showServiceAiTool = serviceMode || showAiTools");
     expect(messageCenter).toContain("assistantPaneVisible");
     expect(messageCenter).toContain("messageProfilePinned");
     expect(messageCenter).toContain("messageContextPaneOrder");

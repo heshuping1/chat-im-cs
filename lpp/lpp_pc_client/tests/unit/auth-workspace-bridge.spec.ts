@@ -37,6 +37,7 @@ describe("auth workspace bridge", () => {
     expect(createAuthSessionClearedState()).toEqual({
       authSession: null,
       activeThreadId: "",
+      activeThreadOpenSource: "none",
       openServiceThreadIds: [],
       activeImConversationId: "",
       locallyReadImConversationReads: {},
@@ -44,6 +45,8 @@ describe("auth workspace bridge", () => {
       imReadStateByConversation: {},
       activeContactId: "",
       activeModule: "messages",
+      gatewayRealtimeStatus: "idle",
+      gatewayRealtimeUpdatedAt: 0,
     });
   });
 });

@@ -16,6 +16,7 @@ import {
   MonitorCog,
   Plus,
   QrCode,
+  Radio,
   ShieldCheck,
   Star,
   Settings,
@@ -24,17 +25,15 @@ import {
 import type { TrayStatus } from "../../shared/desktop-api";
 import type { AuthSession } from "../data/auth/auth-session";
 import {
-  normalizeCustomerServiceThreadType,
   type CustomerServiceThread,
   type MessageItemDto,
 } from "../data/api-client";
-import {
-  effectiveConversationUnreadCount,
-  isImConversation,
-} from "../data/message-display";
-import { isQueuedCustomerServiceThread } from "../data/customer-service-display";
+import { imConversationEffectiveUnreadCount } from "../data/im-read/im-conversation-read-view";
+import { isImConversation } from "../data/message-display";
+import { resolveCustomerServiceBadgeView } from "../data/customer-service/customer-service-badge-view";
 import { customerServiceRealtimePollIntervalMs } from "../data/customer-service/cs-realtime-config";
 import { consumeCustomerServiceMessageReminder } from "../data/customer-service/cs-reminder-model";
+import { isExplicitCustomerServiceThreadOpenSource } from "../data/customer-service/customer-service-read-visibility";
 import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
 import {
   useImReadStateByConversation,
@@ -68,15 +67,19 @@ import type { PcSettings } from "../data/settings/pc-settings";
 import { usePcSettings } from "../data/settings/settings-store";
 import {
   useActiveThreadId,
+  useActiveThreadOpenSource,
   useActiveImConversationId,
   useActiveModule,
-  useMessageLayoutMode,
   useImPresenceStatus,
   useSetSidebarCollapsed,
   useSidebarCollapsed,
   useSetActiveModule,
+  useSetActiveThread,
   useSetCustomerServiceStatus,
+  useGatewayRealtimeState,
   useSetImPresenceStatus,
+  type CustomerServiceThreadOpenSource,
+  type GatewayRealtimeStatus,
 } from "../data/workspace-ui/workspace-ui-store";
 import { appIconSrc, appProductName } from "../app/appMetadata";
 import { requireApiClient } from "../data/runtime";
@@ -157,10 +160,11 @@ export function Sidebar() {
   const [confirmedServiceStatus, setConfirmedServiceStatus] =
     useState<CustomerServiceStatus | null>(null);
   const activeModule = useActiveModule();
+  const gatewayRealtime = useGatewayRealtimeState();
   const activeImConversationId = useActiveImConversationId();
-  const messageLayoutMode = useMessageLayoutMode();
   const sidebarCollapsed = useSidebarCollapsed();
   const setSidebarCollapsed = useSetSidebarCollapsed();
+  const setActiveThread = useSetActiveThread();
   const locallyReadConversationReads = useLocalImConversationReads();
   const imReadStateByConversation = useImReadStateByConversation();
   const authSession = useAuthSession();
@@ -178,7 +182,6 @@ export function Sidebar() {
   const queueReminderSessionRef = useRef("");
   const previousQueuedThreadIdsRef = useRef<Set<string>>(new Set());
   const previousQueuedCountRef = useRef(0);
-  const previousServiceMessageRef = useRef<Map<string, string>>(new Map());
   const previousServiceUnreadRef = useRef<Map<string, number>>(new Map());
   const conversationsQuery = useQuery({
     queryKey: pcQueryKeys.imConversations(
@@ -294,46 +297,37 @@ export function Sidebar() {
     .reduce(
       (sum, item) =>
         sum +
-        (activeModule === "messages" &&
-        item.conversationId === activeImConversationId &&
-        messageLayoutMode !== "chat-focus"
-          ? 0
-          : effectiveConversationUnreadCount(
-              item,
-              authSession
-                ? { ...authSession, locallyReadConversationReads: unifiedReadStateForIdentity }
-                : null,
-            )),
+         imConversationEffectiveUnreadCount(
+           item,
+           authSession
+             ? { ...authSession, locallyReadConversationReads: unifiedReadStateForIdentity }
+             : null,
+           { activeConversationId: activeImConversationId, visibility: "hidden" },
+         ),
       0,
     );
-  const queuedTempSessions = [
-    ...(serviceQuery.data?.queueItems ?? []),
-    ...(serviceQuery.data?.activeItems ?? []),
-  ].filter(
-    (item) =>
-      normalizeCustomerServiceThreadType(item.threadType) === "temp_session" &&
-      isQueuedCustomerServiceThread(item),
-  );
-  const activeTempSessions = (serviceQuery.data?.activeItems ?? []).filter(
-    (item) => normalizeCustomerServiceThreadType(item.threadType) === "temp_session",
-  );
   const hasServiceThreadData = Boolean(serviceQuery.data);
-  const queuedServiceCount = hasServiceThreadData
-    ? Math.max(serviceQuery.data?.summary?.queuedCount ?? 0, queuedTempSessions.length)
-    : 0;
-  const activeServiceUnreadCount = hasServiceThreadData
-    ? (serviceQuery.data?.activeItems ?? [])
-        .filter((item) => normalizeCustomerServiceThreadType(item.threadType) === "temp_session")
-        .reduce((sum, item) => sum + Math.max(0, item.unreadCount ?? 0), 0)
-    : 0;
-  const taskbarServiceUnreadCount = activeServiceUnreadCount;
-  const serviceAlertCount = queuedServiceCount + activeServiceUnreadCount;
+  const serviceBadgeView = resolveCustomerServiceBadgeView({
+    activeItems: serviceQuery.data?.activeItems,
+    queueItems: serviceQuery.data?.queueItems,
+    summaryQueuedCount: serviceQuery.data?.summary?.queuedCount,
+    threadDataLoaded: hasServiceThreadData,
+  });
+  const {
+    activeServiceUnreadCount,
+    activeTempSessions,
+    queuedServiceCount,
+    queuedTempSessions,
+    serviceAlertCount,
+    taskbarServiceUnreadCount,
+  } = serviceBadgeView;
   const realtimeServiceAlertCount = realtimeReminders.filter(
     (item) => item.targetModule === "onlineService",
   ).length;
   const imStatusLabel =
     imPresenceStatuses.find((item) => item.value === imPresenceStatus)?.label ??
     "在线";
+  const gatewayStatusNotice = gatewayRealtimeStatusNotice(gatewayRealtime.status);
   const profile = profileQuery.data;
   const tenantInfo = tenantInfoQuery.data;
   const displayName = profile?.displayName || authSession?.displayName || "PC 用户";
@@ -412,6 +406,7 @@ export function Sidebar() {
   } · 未读 ${hasServiceThreadData ? activeServiceUnreadCount : "--"}`;
   const collapsed = sidebarCollapsed;
   const activeThreadId = useActiveThreadId();
+  const activeThreadOpenSource = useActiveThreadOpenSource();
   const visiblePrimaryNavItems = primaryNavItems.filter((item) =>
     workspaceAccess.visibleModules.includes(item.key),
   );
@@ -458,11 +453,15 @@ export function Sidebar() {
       phase: "badge",
       route: "onlineService",
       classification: {
+        activeModule,
+        activeThreadId,
+        activeThreadOpenSource,
         activeServiceUnreadCount,
         queuedServiceCount,
         realtimeServiceAlertCount,
         serviceAlertCount,
         taskbarServiceUnreadCount,
+        resolvedAtMs: Date.now(),
       },
       summary: {
         activeItems: activeTempSessions.slice(0, 10),
@@ -471,7 +470,10 @@ export function Sidebar() {
     });
   }, [
     activeServiceUnreadCount,
+    activeModule,
     activeTempSessions,
+    activeThreadId,
+    activeThreadOpenSource,
     queuedServiceCount,
     queuedTempSessions,
     realtimeServiceAlertCount,
@@ -536,7 +538,6 @@ export function Sidebar() {
       queueReminderSessionRef.current = "";
       previousQueuedThreadIdsRef.current = new Set();
       previousQueuedCountRef.current = 0;
-      previousServiceMessageRef.current = new Map();
       previousServiceUnreadRef.current = new Map();
       return;
     }
@@ -545,12 +546,10 @@ export function Sidebar() {
       queueReminderReadyRef.current = false;
       previousQueuedThreadIdsRef.current = new Set();
       previousQueuedCountRef.current = 0;
-      previousServiceMessageRef.current = new Map();
       previousServiceUnreadRef.current = new Map();
     }
     if (!serviceQuery.data) return;
 
-    const allTempSessions = [...queuedTempSessions, ...activeTempSessions];
     const currentIds = new Set(
       queuedTempSessions.map((item) => item.threadId || item.conversationId).filter(Boolean),
     );
@@ -562,25 +561,10 @@ export function Sidebar() {
         ] as const)
         .filter(([id]) => Boolean(id)),
     );
-    const currentMessageStamps = new Map(
-      allTempSessions
-        .map((item) => {
-          const id = item.threadId || item.conversationId;
-          const stamp = [
-            item.lastMessageAt ?? "",
-            item.lastMessagePreview ?? "",
-            item.unreadCount ?? 0,
-            item.status ?? "",
-          ].join("|");
-          return [id, stamp] as const;
-        })
-        .filter(([id]) => Boolean(id)),
-    );
     if (!queueReminderReadyRef.current) {
       queueReminderReadyRef.current = true;
       previousQueuedThreadIdsRef.current = currentIds;
       previousQueuedCountRef.current = queuedServiceCount;
-      previousServiceMessageRef.current = currentMessageStamps;
       previousServiceUnreadRef.current = currentUnread;
       return;
     }
@@ -600,7 +584,6 @@ export function Sidebar() {
       queuedServiceCount > previousQueuedCountRef.current && newQueuedThreads.length === 0;
     previousQueuedThreadIdsRef.current = currentIds;
     previousQueuedCountRef.current = queuedServiceCount;
-    previousServiceMessageRef.current = currentMessageStamps;
     previousServiceUnreadRef.current = currentUnread;
     if (
       newQueuedThreads.length === 0 &&
@@ -655,6 +638,7 @@ export function Sidebar() {
       notifyActiveCustomerServiceThreadMessage({
         activeModule,
         activeThreadId,
+        activeThreadOpenSource,
         authSession,
         pcSettings,
         pushRealtimeReminder,
@@ -682,6 +666,7 @@ export function Sidebar() {
   }, [
     activeModule,
     activeThreadId,
+    activeThreadOpenSource,
     activeTempSessions,
     authSession,
     pcSettings.desktopNotifications,
@@ -771,6 +756,9 @@ export function Sidebar() {
               aria-label={`${item.label}${badgeLabel}`}
               data-sidebar-tooltip={item.label}
               onClick={() => {
+                if (item.key === "onlineService") {
+                  setActiveThread("");
+                }
                 setActiveModule(item.key);
                 setBrandInfoOpen(false);
                 setAccountOpen(false);
@@ -834,6 +822,15 @@ export function Sidebar() {
         </button>
       </nav>
       <div className="sidebar-footer">
+        {gatewayStatusNotice && (
+          <div
+            className={`sidebar-realtime-status ${gatewayStatusNotice.kind}`}
+            title={gatewayStatusNotice.title}
+          >
+            <Radio size={13} aria-hidden="true" />
+            <span>{gatewayStatusNotice.label}</span>
+          </div>
+        )}
         <div className="sidebar-status-center" aria-label="状态中心">
           <div className="account-entry sidebar-footer-account-entry">
             <button
@@ -1076,6 +1073,7 @@ export function Sidebar() {
                     className="sidebar-status-action"
                     type="button"
                     onClick={() => {
+                      setActiveThread("");
                       setActiveModule("onlineService");
                       setServiceStatusOpen(false);
                     }}
@@ -1166,6 +1164,7 @@ export function Sidebar() {
 function notifyActiveCustomerServiceThreadMessage({
   activeModule,
   activeThreadId,
+  activeThreadOpenSource,
   authSession,
   pcSettings,
   pushRealtimeReminder,
@@ -1173,6 +1172,7 @@ function notifyActiveCustomerServiceThreadMessage({
 }: {
   activeModule: ModuleKey;
   activeThreadId?: string | null;
+  activeThreadOpenSource?: CustomerServiceThreadOpenSource;
   authSession: AuthSession | null;
   pcSettings: PcSettings;
   pushRealtimeReminder: (reminder: PcRealtimeReminderInput) => void;
@@ -1224,7 +1224,9 @@ function notifyActiveCustomerServiceThreadMessage({
     "serviceQueue",
     {
       activeModule,
-      activeTargetId: activeThreadId ?? undefined,
+      activeTargetId: isExplicitCustomerServiceThreadOpenSource(activeThreadOpenSource)
+        ? (activeThreadId ?? undefined)
+        : undefined,
       targetId,
       targetModule: "onlineService",
       windowFocused: isRendererWindowFocused(),
@@ -1278,6 +1280,29 @@ function customerServiceThreadReminderMessage(thread: CustomerServiceThread): Me
     messageType: "text",
     preview: thread.lastMessagePreview || "在线客服会话有新消息",
     sentAt: thread.lastMessageAt ?? thread.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+function gatewayRealtimeStatusNotice(status: GatewayRealtimeStatus) {
+  if (status === "connected" || status === "idle") return null;
+  if (status === "connecting") {
+    return {
+      kind: "syncing",
+      label: "实时连接中",
+      title: "正在建立消息长连接",
+    };
+  }
+  if (status === "reconnecting" || status === "retrying") {
+    return {
+      kind: "syncing",
+      label: "实时同步中",
+      title: "消息长连接正在恢复，恢复后会补齐缺失消息",
+    };
+  }
+  return {
+    kind: "offline",
+    label: "实时连接异常",
+    title: "消息长连接不可用，客户端会持续重连",
   };
 }
 

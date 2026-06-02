@@ -5,28 +5,34 @@ import {
   type HubConnection,
 } from "@microsoft/signalr";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import {
   useAuthSession,
   useClearAuthSession,
 } from "../data/auth/auth-store";
 import {
   useSetCustomerServiceStatus,
+  useSetGatewayRealtimeStatus,
 } from "../data/workspace-ui/workspace-ui-store";
 import {
   gatewayEvents,
 } from "../data/gateway/gateway-event-registry";
 import { createGatewayEventRouter } from "../data/gateway/gateway-event-router";
 import { getAppInstanceProfile } from "../data/app-instance/app-instance";
-import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
+import { customerServiceIndexScopeKey } from "../data/customer-service/cs-conversation-index";
 import { recordGatewayReminderDiagnostic } from "../data/gateway/gateway-message-reminder-diagnostics";
+import { GatewayConnectionManager } from "../data/gateway/gateway-connection-manager";
+import { recordGatewayHealthDiagnostic } from "../data/gateway/gateway-health-diagnostics";
+import { eventPayload } from "../data/gateway/gateway-payload-utils";
+import { triggerMessageGapSync } from "../data/gateway/message-gap-sync-coordinator";
+import { recordGatewayPushReceived } from "../data/gateway/message-delivery-service";
 
 export function GatewayBridge() {
   const session = useAuthSession();
   const clearAuthSession = useClearAuthSession();
   const setCustomerServiceStatus = useSetCustomerServiceStatus();
+  const setGatewayRealtimeStatus = useSetGatewayRealtimeStatus();
   const queryClient = useQueryClient();
-  const connectionRef = useRef<HubConnection | null>(null);
   const sessionKey = useMemo(
     () =>
       session
@@ -34,30 +40,58 @@ export function GatewayBridge() {
         : "",
     [session],
   );
+  const scopeKey = useMemo(
+    () => (session ? customerServiceIndexScopeKey(session) : ""),
+    [session],
+  );
 
   useEffect(() => {
-    recordMessageReminderDiagnostic({
-      event: "gateway.bridge.lifecycle",
-      source: "gateway-bridge",
-      phase: "effect-start",
+    let disposed = false;
+    let heartbeatTimer: number | undefined;
+
+    recordGatewayHealthDiagnostic({
+      apiHost: session ? safeUrlHost(session.apiBaseUrl) : "",
+      phase: "start-attempt",
       route: session ? "session-present" : "no-session",
-      classification: {
-        apiHost: session ? safeUrlHost(session.apiBaseUrl) : "",
+      scopeKey,
+      sessionKeyPresent: Boolean(sessionKey),
+      state: session ? "session-present" : "no-session",
+      summary: {
         hasSession: Boolean(session),
-        sessionKeyPresent: Boolean(sessionKey),
         tenantTokenPresent: Boolean(session?.tenantToken),
       },
     });
-    let disposed = false;
-    const previous = connectionRef.current;
-    connectionRef.current = null;
-    void previous?.stop().catch(() => undefined);
 
-    if (!session || !sessionKey) return;
+    if (!session || !sessionKey) {
+      setGatewayRealtimeStatus("idle");
+      return;
+    }
 
-    void getAppInstanceProfile()
-      .then((instance) => {
-        if (disposed) return;
+    const eventRouter = createGatewayEventRouter({
+      clearAuthSession,
+      queryClient,
+      session,
+      setCustomerServiceStatus,
+    });
+
+    const clearHeartbeat = () => {
+      if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
+      heartbeatTimer = undefined;
+    };
+    const startHeartbeat = (connection: HubConnection) => {
+      clearHeartbeat();
+      void heartbeat(connection);
+      heartbeatTimer = window.setInterval(() => {
+        if (connection.state === HubConnectionState.Connected) {
+          void heartbeat(connection);
+        }
+      }, 30_000);
+    };
+
+    let manager: GatewayConnectionManager;
+    manager = new GatewayConnectionManager({
+      createConnection: async () => {
+        const instance = await getAppInstanceProfile();
         const gatewayUrl = new URL(
           `${session.apiBaseUrl.replace(/\/$/, "")}/ws/client`,
         );
@@ -73,148 +107,158 @@ export function GatewayBridge() {
           .configureLogging(LogLevel.Warning)
           .build();
 
-        connectionRef.current = connection;
-        recordMessageReminderDiagnostic({
-          event: "gateway.bridge.lifecycle",
-          source: "gateway-bridge",
-          phase: "connection-created",
-          route: "gateway",
-          classification: {
-            apiHost: safeUrlHost(session.apiBaseUrl),
-            gatewayHost: gatewayUrl.host,
-            state: connection.state,
-          },
-        });
-
-        const eventRouter = createGatewayEventRouter({
-          clearAuthSession,
-          queryClient,
-          session,
-          setCustomerServiceStatus,
-        });
-
         gatewayEvents.forEach((eventName) => {
           connection.on(eventName, (...args: unknown[]) => {
+            const payload = eventPayload(args);
+            recordGatewayPushReceived({
+              args,
+              eventName,
+              payload,
+              scopeKey,
+              source: "gateway-bridge",
+            });
             recordGatewayReminderDiagnostic({
               args,
               eventName,
               phase: "received",
               route: "gateway",
+              scopeKey,
               source: "gateway-bridge",
             });
             eventRouter.handleEvent(eventName, args);
           });
         });
 
+        connection.onreconnecting((error) => {
+          setGatewayRealtimeStatus("reconnecting");
+          recordGatewayHealthDiagnostic({
+            apiHost: safeUrlHost(session.apiBaseUrl),
+            error,
+            gatewayHost: gatewayUrl.host,
+            phase: "reconnecting",
+            scopeKey,
+            state: connection.state,
+          });
+        });
+
         connection.onreconnected(() => {
-          recordMessageReminderDiagnostic({
-            event: "gateway.bridge.lifecycle",
-            source: "gateway-bridge",
+          setGatewayRealtimeStatus("connected");
+          recordGatewayHealthDiagnostic({
+            apiHost: safeUrlHost(session.apiBaseUrl),
+            gatewayHost: gatewayUrl.host,
             phase: "reconnected",
-            route: "gateway",
-            classification: {
-              gatewayHost: gatewayUrl.host,
-              state: connection.state,
-            },
+            scopeKey,
+            state: connection.state,
           });
-          eventRouter.invalidateIm();
           eventRouter.invalidateCustomerService();
-          void heartbeat(connection);
-        });
-
-        connection.onclose(() => {
-          recordMessageReminderDiagnostic({
-            event: "gateway.bridge.lifecycle",
+          triggerMessageGapSync(queryClient, {
+            reason: "gateway-reconnected",
+            scopeKey,
             source: "gateway-bridge",
-            phase: "closed",
-            route: "gateway",
-            classification: {
-              gatewayHost: gatewayUrl.host,
-              state: connection.state,
-            },
           });
-          if (disposed) return;
-          // SignalR automatic reconnect handles transient drops; the next successful
-          // reconnect performs a full query refresh to compensate for missed events.
+          startHeartbeat(connection);
         });
 
-        void connection
-          .start()
-          .then(() => {
-            if (disposed) return;
-            recordMessageReminderDiagnostic({
-              event: "gateway.bridge.lifecycle",
-              source: "gateway-bridge",
-              phase: "started",
-              route: "gateway",
-              classification: {
-                gatewayHost: gatewayUrl.host,
-                state: connection.state,
-              },
-            });
-            void heartbeat(connection);
-          })
-          .catch((error) => {
-            recordMessageReminderDiagnostic({
-              event: "gateway.bridge.lifecycle",
-              source: "gateway-bridge",
-              phase: "start-failed",
-              route: "gateway",
-              classification: {
-                gatewayHost: gatewayUrl.host,
-                state: connection.state,
-              },
-              summary: {
-                errorName: error instanceof Error ? error.name : typeof error,
-              },
-            });
-            // Gateway is an accelerator, not a blocker. Query pages remain usable and
-            // manual refresh/refetch still works if the websocket endpoint is down.
+        connection.onclose((error) => {
+          if (disposed) return;
+          setGatewayRealtimeStatus("retrying");
+          recordGatewayHealthDiagnostic({
+            apiHost: safeUrlHost(session.apiBaseUrl),
+            error,
+            gatewayHost: gatewayUrl.host,
+            phase: "closed",
+            scopeKey,
+            state: connection.state,
           });
-
-        heartbeatTimer = window.setInterval(() => {
-          if (connection.state === HubConnectionState.Connected) {
-            void heartbeat(connection);
-          }
-        }, 30_000);
+          clearHeartbeat();
+          manager.handleConnectionClosed(connection, error);
+        });
 
         if (import.meta.env.DEV) {
           window.__lppTestPushImMessage = (payload) => {
             eventRouter.pushDevImMessage(payload);
           };
         }
-      })
-      .catch((error) => {
-        recordMessageReminderDiagnostic({
-          event: "gateway.bridge.lifecycle",
-          source: "gateway-bridge",
-          phase: "profile-failed",
-          route: "gateway",
-          classification: {
-            apiHost: safeUrlHost(session.apiBaseUrl),
-          },
-          summary: {
-            errorName: error instanceof Error ? error.name : typeof error,
-          },
-        });
-        // Profile identity is local metadata; if it is unavailable the gateway
-        // should fail soft and let polling keep the app usable.
-      });
 
-    let heartbeatTimer: number | undefined;
+        return connection;
+      },
+      onConnected: ({ attempt, connection, elapsedMs }) => {
+        if (disposed) return;
+        setGatewayRealtimeStatus("connected");
+        recordGatewayHealthDiagnostic({
+          apiHost: safeUrlHost(session.apiBaseUrl),
+          attempt,
+          elapsedMs,
+          phase: "started",
+          scopeKey,
+          state: connection.state,
+        });
+        triggerMessageGapSync(queryClient, {
+          reason: "gateway-started",
+          scopeKey,
+          source: "gateway-bridge",
+        });
+        startHeartbeat(connection as HubConnection);
+      },
+      onRetryScheduled: ({ attempt, delayMs }) => {
+        setGatewayRealtimeStatus("retrying");
+        recordGatewayHealthDiagnostic({
+          apiHost: safeUrlHost(session.apiBaseUrl),
+          attempt,
+          phase: "retry-scheduled",
+          retryDelayMs: delayMs,
+          scopeKey,
+          state: "retrying",
+        });
+      },
+      onStartAttempt: ({ attempt }) => {
+        setGatewayRealtimeStatus(attempt === 1 ? "connecting" : "retrying");
+        recordGatewayHealthDiagnostic({
+          apiHost: safeUrlHost(session.apiBaseUrl),
+          attempt,
+          phase: "start-attempt",
+          scopeKey,
+          state: attempt === 1 ? "connecting" : "retrying",
+        });
+      },
+      onStartFailed: ({ attempt, elapsedMs, error }) => {
+        setGatewayRealtimeStatus("retrying");
+        recordGatewayHealthDiagnostic({
+          apiHost: safeUrlHost(session.apiBaseUrl),
+          attempt,
+          elapsedMs,
+          error,
+          phase: "start-failed",
+          scopeKey,
+          state: "retrying",
+        });
+      },
+    });
+
+    manager.start();
 
     return () => {
       disposed = true;
-      if (heartbeatTimer !== undefined) window.clearInterval(heartbeatTimer);
+      clearHeartbeat();
       if (window.__lppTestPushImMessage) delete window.__lppTestPushImMessage;
-      const connection = connectionRef.current;
-      if (connection) {
-        gatewayEvents.forEach((eventName) => connection.off(eventName));
-        void connection.stop().catch(() => undefined);
-        if (connectionRef.current === connection) connectionRef.current = null;
-      }
+      manager.stop();
+      setGatewayRealtimeStatus("stopped");
+      recordGatewayHealthDiagnostic({
+        apiHost: safeUrlHost(session.apiBaseUrl),
+        phase: "stopped",
+        scopeKey,
+        state: "stopped",
+      });
     };
-  }, [clearAuthSession, queryClient, session, sessionKey, setCustomerServiceStatus]);
+  }, [
+    clearAuthSession,
+    queryClient,
+    scopeKey,
+    session,
+    sessionKey,
+    setCustomerServiceStatus,
+    setGatewayRealtimeStatus,
+  ]);
 
   return null;
 }

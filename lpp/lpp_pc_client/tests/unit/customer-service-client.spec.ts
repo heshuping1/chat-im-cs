@@ -3,11 +3,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { CustomerServiceApiClient } from "../../src/renderer/data/api/customer-service-client";
 import type { CustomerServiceThreadsResponse } from "../../src/renderer/data/api/types";
 import {
+  customerServiceIndexScopeKey,
   rememberCustomerServiceCompatUnreadCandidate,
   rememberCustomerServiceConversationIndex,
   rememberCustomerServiceStaffSentMessage,
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
+
+const testScopeKey = customerServiceIndexScopeKey({
+  apiBaseUrl: "https://api.example.test",
+  tenantToken: "tenant-token",
+});
 
 class TestCustomerServiceApiClient extends CustomerServiceApiClient {
   constructor(private readonly response: CustomerServiceThreadsResponse) {
@@ -35,6 +41,7 @@ describe("CustomerServiceApiClient", () => {
       lastMessageId: "m1",
       lastMessagePreview: "visitor text",
       overlayUnreadCount: 6,
+      scopeKey: testScopeKey,
       threadId: "temp-session-1",
       threadType: "temp_session",
     });
@@ -69,6 +76,7 @@ describe("CustomerServiceApiClient", () => {
       conversationId: "im-conversation-cs-1",
       lastMessagePreview: "local visitor text",
       overlayUnreadCount: 1,
+      scopeKey: testScopeKey,
       threadId: "temp-session-1",
       threadType: "temp_session",
     });
@@ -105,6 +113,7 @@ describe("CustomerServiceApiClient", () => {
       lastMessagePreview: "visitor text",
       lastMessageSeq: 5,
       lastReadSeq: 0,
+      scopeKey: testScopeKey,
       threadId: "temp-session-compat",
       threadType: "temp_session",
       rawUnreadCount: 5,
@@ -148,6 +157,7 @@ describe("CustomerServiceApiClient", () => {
         messageType: "text",
         preview: "agent 1",
       },
+      scopeKey: testScopeKey,
       threadId: "temp-session-bounded",
       threadType: "temp_session",
     });
@@ -161,6 +171,7 @@ describe("CustomerServiceApiClient", () => {
         messageType: "text",
         preview: "agent 2",
       },
+      scopeKey: testScopeKey,
       threadId: "temp-session-bounded",
       threadType: "temp_session",
     });
@@ -171,6 +182,7 @@ describe("CustomerServiceApiClient", () => {
       lastMessageSeq: 4,
       lastReadSeq: 0,
       rawUnreadCount: 4,
+      scopeKey: testScopeKey,
       threadId: "temp-session-bounded",
       threadType: "temp_session",
       unreadCount: 4,
@@ -204,6 +216,7 @@ describe("CustomerServiceApiClient", () => {
       lastMessageSeq: 5,
       lastReadSeq: 0,
       rawUnreadCount: 5,
+      scopeKey: testScopeKey,
       threadId: "temp-session-compat-trusted",
       threadType: "temp_session",
       trustedUnread: true,
@@ -243,6 +256,7 @@ describe("CustomerServiceApiClient", () => {
       lastMessagePreview: "visitor text",
       lastMessageSeq: 5,
       lastReadSeq: 0,
+      scopeKey: testScopeKey,
       threadId: "temp-session-read",
       threadType: "temp_session",
       trustedUnread: true,
@@ -253,6 +267,7 @@ describe("CustomerServiceApiClient", () => {
       compatReadSeq: 5,
       conversationId: "im-conversation-cs-read",
       overlayUnreadCount: 0,
+      scopeKey: testScopeKey,
       threadId: "temp-session-read",
       threadType: "temp_session",
     });

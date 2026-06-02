@@ -3,9 +3,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MessagesApiClient } from "../../src/renderer/data/api/messages-client";
 import type { ConversationListResponse } from "../../src/renderer/data/api/types";
 import {
+  customerServiceIndexScopeKey,
   getCustomerServiceConversationIndex,
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
+
+const testScopeKey = customerServiceIndexScopeKey({
+  apiBaseUrl: "https://api.example.test",
+  tenantToken: "tenant-token",
+});
 
 class TestMessagesApiClient extends MessagesApiClient {
   constructor(private readonly page: ConversationListResponse) {
@@ -91,7 +97,7 @@ describe("MessagesApiClient", () => {
     });
 
     await expect(client.getConversations()).resolves.toMatchObject({ items: [] });
-    expect(getCustomerServiceConversationIndex("im-conversation-cs-1")).toMatchObject({
+    expect(getCustomerServiceConversationIndex("im-conversation-cs-1", testScopeKey)).toMatchObject({
       compatLastMessageId: "m-temp-1",
       compatLastMessageSeq: 4,
       compatLastReadSeq: 0,
@@ -107,7 +113,8 @@ describe("MessagesApiClient", () => {
       threadType: "temp_session",
     });
     expect(
-      getCustomerServiceConversationIndex("im-conversation-cs-1")?.overlayUnreadCount,
+      getCustomerServiceConversationIndex("im-conversation-cs-1", testScopeKey)
+        ?.overlayUnreadCount,
     ).toBeUndefined();
   });
 
@@ -137,7 +144,9 @@ describe("MessagesApiClient", () => {
     });
 
     await expect(client.getConversations()).resolves.toMatchObject({ items: [] });
-    expect(getCustomerServiceConversationIndex("im-conversation-cs-inbound")).toMatchObject({
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-inbound", testScopeKey),
+    ).toMatchObject({
       compatRawUnreadCount: 3,
       compatUnreadCandidate: 3,
       compatUnreadReason: "compat-inbound-trusted",
@@ -172,7 +181,9 @@ describe("MessagesApiClient", () => {
     });
 
     await expect(client.getConversations()).resolves.toMatchObject({ items: [] });
-    expect(getCustomerServiceConversationIndex("im-conversation-cs-self")).toMatchObject({
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-self", testScopeKey),
+    ).toMatchObject({
       compatRawUnreadCount: 4,
       compatUnreadCandidate: 0,
       compatUnreadReason: "self-message-suppressed",
