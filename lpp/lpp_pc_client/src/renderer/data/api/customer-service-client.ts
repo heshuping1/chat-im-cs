@@ -9,7 +9,6 @@ import type {
   MediaResourceDto,
   MessageItemDto,
   StaffReceptionStatusDto,
-  StaffServiceHistoryItem,
   StaffServiceHistoryResponse,
 } from "./types";
 import { logApiContractDiagnostic } from "../api-contract/contract-diagnostics";
@@ -23,6 +22,7 @@ import {
   normalizeCustomerProfileDto,
   normalizeCustomerServiceThreadDto,
 } from "../customer-service/cs-contract";
+import { normalizeStaffServiceHistoryResponse } from "../customer-service/cs-history-response";
 import {
   applyCustomerServiceThreadOverlay,
   customerServiceIndexScopeKey,
@@ -113,7 +113,12 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     const query = search.toString();
     return this.request<StaffServiceHistoryResponse>(
       `${endpointPlan.staffServiceHistory}${query ? `?${query}` : ""}`,
-    ).then(normalizeStaffServiceHistoryResponse);
+    ).then((response) =>
+      normalizeStaffServiceHistoryResponse(
+        response,
+        customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
+      ),
+    );
   }
 
   getReceptionStatus() {
@@ -468,7 +473,7 @@ function apiClientIndexScopeInput(options: {
   };
 }
 
-function isCustomerServiceThreadSnapshot(item: CustomerServiceThread | StaffServiceHistoryItem) {
+function isCustomerServiceThreadSnapshot(item: CustomerServiceThread) {
   const record = item as unknown as Record<string, unknown>;
   const type = normalizeResponseWireType(
     readString(record.threadType) ||
@@ -488,32 +493,6 @@ function isCustomerServiceThreadSnapshot(item: CustomerServiceThread | StaffServ
 
 function normalizeResponseWireType(value?: string | null) {
   return String(value ?? "").trim().toLowerCase().replace(/-/g, "_");
-}
-
-function normalizeStaffServiceHistoryResponse(
-  response: StaffServiceHistoryResponse,
-): StaffServiceHistoryResponse {
-  const items = (response.items ?? []).filter(isCustomerServiceThreadSnapshot);
-  recordCsRoutingDiagnostic({
-    event: "pc-cs-service-history",
-    source: "customer-service-client",
-    phase: "filter",
-    route: "service-history",
-    classification: {
-      dropped: (response.items ?? []).length - items.length,
-      kept: items.length,
-      total: response.items?.length ?? 0,
-    },
-    summary: {
-      dropped: (response.items ?? [])
-        .filter((item) => !isCustomerServiceThreadSnapshot(item))
-        .slice(0, 20),
-    },
-  });
-  return {
-    ...response,
-    items,
-  };
 }
 
 function normalizeAdminTempSessionsResponse(

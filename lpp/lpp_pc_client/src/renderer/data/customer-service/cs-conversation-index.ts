@@ -187,6 +187,10 @@ export function rememberCustomerServiceConversationMessageOverlay(params: {
     lastMessageAt: params.message.sentAt || previous?.lastMessageAt,
     lastMessageId: params.message.messageId || previous?.lastMessageId,
     lastMessagePreview: params.message.preview || previous?.lastMessagePreview,
+    lastMessageSeq:
+      typeof params.message.conversationSeq === "number"
+        ? params.message.conversationSeq
+        : previous?.lastMessageSeq,
     overlayUnreadCount: nextUnread,
     scopeKey,
     source: previous?.source,
@@ -261,12 +265,9 @@ export function getCustomerServiceThreadIndex(threadId: string, scopeKey?: strin
 }
 
 export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread, scopeKey?: string) {
-  const overlay =
-    getCustomerServiceThreadIndex(thread.threadId, scopeKey) ||
-    getCustomerServiceConversationIndex(thread.conversationId, scopeKey);
+  const overlay = resolveCustomerServiceThreadOverlay(thread, scopeKey);
   if (!overlay) return thread;
-  const lastMessagePreview = thread.lastMessagePreview || overlay.lastMessagePreview;
-  const lastMessageAt = thread.lastMessageAt || overlay.lastMessageAt;
+  rememberCustomerServiceThreadOverlayAlias(thread, overlay, scopeKey);
   const serverUnread = Math.max(0, Number(thread.unreadCount ?? 0));
   const overlayUnread = Math.max(0, Number(overlay.overlayUnreadCount ?? 0));
   const reconcile = reconcileSnapshot({
@@ -277,6 +278,17 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
     source: "workbench-snapshot",
     targetId: thread.threadId,
   });
+  const canUseSnapshotStrongFields =
+    reconcile.canUpdateStrongFields ||
+    (!overlay.lastMessageId && !overlay.lastMessagePreview && !overlay.lastMessageAt);
+  const threadLastMessageId = stringField(thread as unknown as Record<string, unknown>, "lastMessageId");
+  const lastMessagePreview = canUseSnapshotStrongFields
+    ? thread.lastMessagePreview || overlay.lastMessagePreview
+    : overlay.lastMessagePreview || thread.lastMessagePreview;
+  const lastMessageAt = latestTimestamp(thread.lastMessageAt, overlay.lastMessageAt);
+  const lastMessageId = canUseSnapshotStrongFields
+    ? threadLastMessageId || overlay.lastMessageId || overlay.compatLastMessageId
+    : overlay.lastMessageId || overlay.compatLastMessageId || threadLastMessageId;
   const compatUnreadCandidate = effectiveCompatUnreadCandidate(overlay);
   const threadUnread = resolveCustomerServiceThreadUnread({
     compatUnreadCandidate,
@@ -350,16 +362,59 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
   }
   return {
     ...thread,
-    lastMessageId: overlay.lastMessageId || overlay.compatLastMessageId,
+    lastMessageId,
     lastMessageAt,
     lastMessagePreview,
     unreadCount,
   };
 }
 
+function resolveCustomerServiceThreadOverlay(
+  thread: CustomerServiceThread,
+  scopeKey?: string,
+) {
+  const threadOverlay = getCustomerServiceThreadIndex(thread.threadId, scopeKey);
+  const conversationOverlay = getCustomerServiceConversationIndex(thread.conversationId, scopeKey);
+  return fresherCustomerServiceOverlay(threadOverlay, conversationOverlay);
+}
+
+function fresherCustomerServiceOverlay(
+  first?: CustomerServiceConversationIndexEntry,
+  second?: CustomerServiceConversationIndexEntry,
+) {
+  if (!first) return second;
+  if (!second) return first;
+  const firstSeq = overlayMessageSeq(first);
+  const secondSeq = overlayMessageSeq(second);
+  if (firstSeq !== secondSeq) return secondSeq > firstSeq ? second : first;
+  const firstTime = timestampMs(first.lastMessageAt);
+  const secondTime = timestampMs(second.lastMessageAt);
+  if (firstTime !== secondTime) return secondTime > firstTime ? second : first;
+  return second.updatedAt > first.updatedAt ? second : first;
+}
+
+function rememberCustomerServiceThreadOverlayAlias(
+  thread: CustomerServiceThread,
+  overlay: CustomerServiceConversationIndexEntry,
+  scopeKey?: string,
+) {
+  if (!thread.threadId || overlay.threadId === thread.threadId) return;
+  rememberCustomerServiceConversationIndex({
+    ...overlay,
+    conversationId: thread.conversationId || overlay.conversationId || thread.threadId,
+    scopeKey: scopeKey || overlay.scopeKey,
+    threadId: thread.threadId,
+    threadType: thread.threadType,
+  });
+}
+
 function snapshotSeq(thread: CustomerServiceThread) {
   const record = thread as unknown as Record<string, unknown>;
   return numberField(record, "lastMessageSeq", "statusVersion");
+}
+
+function overlayMessageSeq(entry: CustomerServiceConversationIndexEntry) {
+  return Math.max(0, Number(entry.lastMessageSeq ?? entry.compatLastMessageSeq ?? 0));
 }
 
 export function resetCustomerServiceConversationIndexForTest() {
@@ -465,6 +520,33 @@ function numberField(record: Record<string, unknown>, ...keys: string[]) {
     }
   }
   return undefined;
+}
+
+function stringField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function latestTimestamp(
+  first?: string | null,
+  second?: string | null,
+) {
+  if (!first) return second;
+  if (!second) return first;
+  const firstTime = Date.parse(first);
+  const secondTime = Date.parse(second);
+  if (!Number.isFinite(firstTime)) return second;
+  if (!Number.isFinite(secondTime)) return first;
+  return secondTime > firstTime ? second : first;
+}
+
+function timestampMs(value?: string | null) {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function mergeStringList(previous: string[] | undefined, next: string[] | undefined) {

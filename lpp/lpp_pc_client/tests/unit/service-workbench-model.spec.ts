@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { CustomerServiceThread } from "../../src/renderer/data/api/types";
 import {
   createServiceCommandMetrics,
+  createServiceHistoryTabBadge,
+  createServiceHistoryThreadStatusText,
+  createServiceHistoryUnreadCount,
   createServiceThreadListCounts,
   createServiceThreadListEmptyState,
 } from "../../src/renderer/customer-service/models/serviceWorkbenchModel";
@@ -21,9 +24,13 @@ describe("customer service workbench model", () => {
         activeItems: [
           thread({ threadId: "active-1", status: "serving", unreadCount: 3 }),
           thread({ threadId: "active-2", priority: "urgent", status: "serving" }),
+          thread({ threadId: "closed-1", status: "closed_by_visitor", unreadCount: 7 }),
         ],
-        queueItems: [thread({ threadId: "queued-1", status: "queued" })],
-        summary: { activeCount: 2, allCount: 3, queuedCount: 1, vipCount: 0 },
+        queueItems: [
+          thread({ threadId: "queued-1", status: "queued" }),
+          thread({ threadId: "closed-queue", status: "closed_timeout", unreadCount: 5 }),
+        ],
+        summary: { activeCount: 4, allCount: 5, queuedCount: 2, vipCount: 0 },
       },
     });
 
@@ -111,6 +118,22 @@ describe("customer service workbench model", () => {
       serving: 2,
       sla: 1,
     });
+  });
+
+  it("keeps closed unread as a weak history-list signal", () => {
+    const historyThreads = [
+      thread({ status: "closed_by_visitor", threadId: "history-unread", unreadCount: 3 }),
+      thread({ status: "closed_timeout", threadId: "history-read", unreadCount: 0 }),
+      thread({ status: "serving", threadId: "live-unread", unreadCount: 4 }),
+    ];
+
+    expect(createServiceHistoryUnreadCount(historyThreads)).toBe(3);
+    expect(createServiceHistoryTabBadge(historyThreads)).toEqual({
+      threadCount: 3,
+      unreadCount: 3,
+    });
+    expect(createServiceHistoryThreadStatusText(historyThreads[0])).toBe("已结束 · 未读 3");
+    expect(createServiceHistoryThreadStatusText(historyThreads[1])).toBe("超时关闭");
   });
 
   it("explains why the current filter is empty", () => {

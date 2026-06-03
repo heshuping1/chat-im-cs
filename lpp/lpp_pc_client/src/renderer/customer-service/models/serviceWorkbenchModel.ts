@@ -3,7 +3,11 @@ import type {
   CustomerServiceThreadsResponse,
   StaffReceptionStatusDto,
 } from "../../data/api/types";
-import { isQueuedCustomerServiceThread } from "../../data/customer-service-display";
+import { isTerminalCustomerServiceThreadStatus } from "../../data/customer-service/cs-thread-state";
+import {
+  customerServiceHistoryStatusLabel,
+  isQueuedCustomerServiceThread,
+} from "../../data/customer-service-display";
 import type { CustomerServiceStatus } from "../../data/types";
 
 export type ServiceThreadListMode = "current" | "history";
@@ -56,6 +60,25 @@ export function createServiceThreadListCounts(
     serving: Math.max(0, threads.length - queued),
     sla: threads.filter(isRiskyThread).length,
   };
+}
+
+export function createServiceHistoryUnreadCount(threads: CustomerServiceThread[]) {
+  return threads
+    .filter((thread) => isTerminalCustomerServiceThreadStatus(thread.status))
+    .reduce((sum, thread) => sum + Math.max(0, Number(thread.unreadCount ?? 0)), 0);
+}
+
+export function createServiceHistoryTabBadge(threads: CustomerServiceThread[]) {
+  return {
+    threadCount: threads.length,
+    unreadCount: createServiceHistoryUnreadCount(threads),
+  };
+}
+
+export function createServiceHistoryThreadStatusText(thread: CustomerServiceThread) {
+  const label = customerServiceHistoryStatusLabel(thread.status);
+  const unreadCount = Math.max(0, Number(thread.unreadCount ?? 0));
+  return unreadCount > 0 ? `已结束 · 未读 ${unreadCount}` : label;
 }
 
 export function isRiskyCustomerServiceThread(thread: CustomerServiceThread) {
@@ -173,11 +196,17 @@ export function createServiceCommandMetrics(input: {
   const hasReceptionStatus = Boolean(input.receptionStatus);
   const activeItems = input.threads?.activeItems ?? [];
   const queueItems = input.threads?.queueItems ?? [];
-  const selectableThreads = [...activeItems, ...queueItems];
-  const queuedCount = input.threads?.summary?.queuedCount ?? queueItems.length;
-  const activeCount = input.threads?.summary?.activeCount ?? activeItems.length;
-  const totalCount = input.threads?.summary?.allCount ?? queuedCount + activeCount;
-  const activeUnreadCount = activeItems.reduce(
+  const liveActiveItems = activeItems.filter(
+    (item) => !isTerminalCustomerServiceThreadStatus(item.status),
+  );
+  const liveQueueItems = queueItems.filter(
+    (item) => !isTerminalCustomerServiceThreadStatus(item.status),
+  );
+  const selectableThreads = [...liveActiveItems, ...liveQueueItems];
+  const queuedCount = liveQueueItems.length;
+  const activeCount = liveActiveItems.length;
+  const totalCount = queuedCount + activeCount;
+  const activeUnreadCount = liveActiveItems.reduce(
     (sum, item) => sum + Math.max(0, item.unreadCount ?? 0),
     0,
   );

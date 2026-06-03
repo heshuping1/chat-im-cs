@@ -26,6 +26,7 @@ import {
   validateRegisterForm,
   type AuthMode,
 } from "../data/auth/auth-flow-model";
+import { registerAvatarOptions } from "../data/auth/register-avatar-options";
 import { useSetAuthSession } from "../data/auth/auth-store";
 import { defaultApiBaseUrl, createTraceId } from "../data/runtime";
 import { primarySiteBaseUrl, primarySiteLine, siteLineManager } from "../data/network/site-line-manager";
@@ -38,7 +39,6 @@ type PendingLogin = {
 
 export function LoginPage() {
   const setAuthSession = useSetAuthSession();
-  const defaultTenantId = (import.meta.env.VITE_TENANT_ID as string | undefined) || "";
   const apiBaseUrlTouched = useRef(false);
   const [mode, setMode] = useState<AuthMode>("login");
   const [apiBaseUrl, setApiBaseUrl] = useState(
@@ -50,7 +50,9 @@ export function LoginPage() {
   const [registerContact, setRegisterContact] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirm, setRegisterConfirm] = useState("");
-  const [tenantId, setTenantId] = useState(defaultTenantId);
+  const [selectedRegisterAvatarUrl, setSelectedRegisterAvatarUrl] = useState(
+    () => registerAvatarOptions[0]?.avatarUrl ?? "",
+  );
   const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -179,11 +181,11 @@ export function LoginPage() {
       await client.platformRegister({
         displayName: registerName.trim(),
         password: registerPassword,
+        avatarUrl: selectedRegisterAvatarUrl,
         ...contactPayload,
         captchaToken: captchaInput.captchaToken,
         captchaAnswer: captchaInput.captchaAnswer,
         verificationCode: null,
-        tenantId: tenantId.trim() || null,
       });
       setNotice("注册成功，正在进入账号");
       const login = await new ApiClient({
@@ -221,7 +223,7 @@ export function LoginPage() {
       );
       return;
     }
-    const selectedTenantId = selectAutoTenantId(login, tenantId);
+    const selectedTenantId = selectAutoTenantId(login);
     if (selectedTenantId) {
       await selectTenantSpace({ baseUrl, login, tenantId: selectedTenantId });
       return;
@@ -423,15 +425,18 @@ export function LoginPage() {
           />
         ) : (
           <RegisterFields
+            avatarOptions={registerAvatarOptions}
             confirmPassword={registerConfirm}
             contact={registerContact}
             displayName={registerName}
+            onAvatarChange={setSelectedRegisterAvatarUrl}
             onConfirmPasswordChange={setRegisterConfirm}
             onContactChange={setRegisterContact}
             onDisplayNameChange={setRegisterName}
             onPasswordChange={setRegisterPassword}
             onSubmit={() => void submitForm()}
             password={registerPassword}
+            selectedAvatarUrl={selectedRegisterAvatarUrl}
           />
         )}
 
@@ -448,13 +453,11 @@ export function LoginPage() {
 
         <AuthAdvancedSettings
           apiBaseUrl={apiBaseUrl}
-          defaultOpen={Boolean(defaultTenantId)}
+          defaultOpen={false}
           onApiBaseUrlChange={(value) => {
             apiBaseUrlTouched.current = true;
             setApiBaseUrl(value);
           }}
-          onTenantIdChange={setTenantId}
-          tenantId={tenantId}
         />
 
         {notice && <p className="auth-notice">{notice}</p>}

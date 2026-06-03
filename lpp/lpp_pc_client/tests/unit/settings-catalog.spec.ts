@@ -71,6 +71,7 @@ describe("settings catalog", () => {
       blocklist: "privacy",
       serviceQueueNotifications: "customerService",
       customerServiceMessageNotifications: "customerService",
+      foregroundInAppCustomerServiceReminders: "customerService",
       slaTimeoutNotifications: "customerService",
       highDensityContext: "customerService",
       currentEnvironment: "network",
@@ -164,6 +165,14 @@ describe("settings catalog", () => {
       source: "local",
       control: "switch",
       capability: "available",
+    });
+    expect(getSettingsRow("foregroundInAppCustomerServiceReminders")).toMatchObject({
+      sectionId: "customerService",
+      label: "前台站内消息提醒",
+      desc: "PC 客户端在前台时，收到已接入客服会话新消息显示右上角提醒卡片。",
+      source: "local",
+      control: "switch",
+      capability: "localEffective",
     });
     expect(getSettingsRow("slaTimeoutNotifications")).toMatchObject({
       sectionId: "customerService",

@@ -27,7 +27,8 @@ describe("pc settings service shell", () => {
     const storage = createMemoryStorage();
 
     expect(readStoredPcSettings({ storage })).toEqual(defaultPcSettings);
-    expect(defaultPcSettings.customerServiceMessageNotifications).toBe(false);
+    expect(defaultPcSettings.customerServiceMessageNotifications).toBe(true);
+    expect(defaultPcSettings.foregroundInAppCustomerServiceReminders).toBe(true);
   });
 
   it("merges persisted settings over defaults", () => {
@@ -41,8 +42,38 @@ describe("pc settings service shell", () => {
     expect(readStoredPcSettings({ storage })).toMatchObject({
       theme: "dark",
       desktopNotifications: false,
-      customerServiceMessageNotifications: false,
+      customerServiceMessageNotifications: true,
+      foregroundInAppCustomerServiceReminders: true,
       serviceQueueNotifications: defaultPcSettings.serviceQueueNotifications,
+    });
+  });
+
+  it("migrates the legacy disabled customer-service message reminder default", () => {
+    expect(
+      parseStoredPcSettings(
+        JSON.stringify({
+          customerServiceMessageNotifications: false,
+          theme: "dark",
+        }),
+      ),
+    ).toMatchObject({
+      customerServiceMessageNotifications: true,
+      settingsSchemaVersion: defaultPcSettings.settingsSchemaVersion,
+      theme: "dark",
+    });
+  });
+
+  it("keeps an explicitly disabled customer-service message reminder after migration", () => {
+    expect(
+      parseStoredPcSettings(
+        JSON.stringify({
+          customerServiceMessageNotifications: false,
+          settingsSchemaVersion: defaultPcSettings.settingsSchemaVersion,
+        }),
+      ),
+    ).toMatchObject({
+      customerServiceMessageNotifications: false,
+      settingsSchemaVersion: defaultPcSettings.settingsSchemaVersion,
     });
   });
 

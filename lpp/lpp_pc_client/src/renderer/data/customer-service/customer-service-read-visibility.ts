@@ -25,7 +25,7 @@ export function resolveCustomerServiceThreadReadVisibility(
   ) {
     return "hidden";
   }
-  if (!isExplicitCustomerServiceThreadOpenSource(input.activeThreadOpenSource)) {
+  if (!isReadableCustomerServiceThreadOpenSource(input.activeThreadOpenSource)) {
     return "listOnly";
   }
   return input.detailLoaded ? "detailVisible" : "listOnly";
@@ -40,5 +40,11 @@ export function canMarkCustomerServiceThreadRead(input: {
 export function isExplicitCustomerServiceThreadOpenSource(
   source?: CustomerServiceThreadOpenSource | null,
 ) {
-  return source === "user" || source === "reminder" || source === "claim";
+  return source === "user" || source === "reminder";
+}
+
+export function isReadableCustomerServiceThreadOpenSource(
+  source?: CustomerServiceThreadOpenSource | null,
+) {
+  return isExplicitCustomerServiceThreadOpenSource(source) || source === "claim";
 }

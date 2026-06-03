@@ -41,6 +41,7 @@ export class AuthApiClient extends ApiBaseClient {
       method: "POST",
       body: JSON.stringify({
         displayName: body.displayName.trim(),
+        avatarUrl: optionalText(body.avatarUrl),
         email: optionalText(body.email),
         mobile: optionalText(body.mobile),
         password: body.password,

@@ -5,6 +5,7 @@ import {
   getReceptionControlLayout,
   getReceptionControlSummary,
   getReceptionQueueMode,
+  resolveReceptionQueueModePatch,
   getReceptionStatusOption,
   normalizeReceptionStatus,
 } from "../../src/renderer/customer-service/models/serviceReceptionControlModel";
@@ -77,6 +78,22 @@ describe("service reception control model", () => {
     expect(getQueueAutoDisabledReason(undefined)).toBe(
       "接待状态未同步，暂不能启用自动分配。",
     );
+  });
+
+  it("turns auto assignment clicks into online auto reception patches", () => {
+    expect(resolveReceptionQueueModePatch("auto", "break")).toEqual({
+      queueAcceptEnabled: true,
+      serviceStatus: "online",
+    });
+    expect(resolveReceptionQueueModePatch("auto", "busy")).toEqual({
+      queueAcceptEnabled: true,
+      serviceStatus: "online",
+    });
+    expect(resolveReceptionQueueModePatch("manual", "break")).toEqual({
+      queueAcceptEnabled: false,
+      serviceStatus: "break",
+    });
+    expect(resolveReceptionQueueModePatch("manual", undefined)).toBeNull();
   });
 
   it("maps service layout modes to control density", () => {

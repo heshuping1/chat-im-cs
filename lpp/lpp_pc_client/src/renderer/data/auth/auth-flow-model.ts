@@ -25,15 +25,8 @@ export function inferLoginType(identifier: string) {
   return "auto";
 }
 
-export function selectAutoTenantId(
-  login: PlatformLoginResult,
-  preferredTenantId = "",
-) {
-  const preferred = preferredTenantId.trim();
+export function selectAutoTenantId(login: PlatformLoginResult) {
   const tenants = login.tenants?.filter((tenant) => tenant.tenantId) ?? [];
-  if (preferred && tenants.some((tenant) => tenant.tenantId === preferred)) {
-    return preferred;
-  }
   if (tenants.length === 1) return tenants[0].tenantId;
   if (tenants.length === 0 && login.spaceContext?.spaceType === 2) {
     return login.spaceContext.tenantId ?? null;

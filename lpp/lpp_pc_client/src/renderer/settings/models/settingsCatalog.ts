@@ -179,6 +179,7 @@ export const settingsRows = [
   row("friendRequestNotifications", "messages", "好友申请提醒", "新的好友申请跟随 IM 消息通知策略。", "account", "info", "recordOnly"),
   row("serviceQueueNotifications", "customerService", "访客排队/待接入提醒", "有访客排队、待接入或待接管时提醒客服。", "account", "switch"),
   row("customerServiceMessageNotifications", "customerService", "已接入会话新消息提醒", "已接入或正在处理的客服会话收到访客新消息时提醒。", "local", "switch"),
+  row("foregroundInAppCustomerServiceReminders", "customerService", "前台站内消息提醒", "PC 客户端在前台时，收到已接入客服会话新消息显示右上角提醒卡片。", "local", "switch", "localEffective"),
   row("slaTimeoutNotifications", "customerService", "SLA 超时提醒", "会话接近超时或已经超时时提醒。", "account", "switch"),
   row("desktopNotifications", "common", "桌面系统通知", "允许系统通知中心展示 IM 和客服提醒。", "account", "switch"),
   row("notificationPreview", "common", "通知预览", "桌面通知中显示发送人和摘要，敏感内容仍按脱敏规则处理。", "account", "switch"),

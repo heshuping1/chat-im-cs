@@ -33,6 +33,8 @@ import {
   type ServiceThreadFilter,
 } from "../data/workspace-ui/workspace-ui-store";
 import {
+  createServiceHistoryThreadStatusText,
+  createServiceHistoryTabBadge,
   createServiceThreadListCounts,
   createServiceThreadListEmptyState,
   isRiskyCustomerServiceThread,
@@ -133,6 +135,10 @@ export function ThreadList() {
     () => createServiceThreadListCounts(currentThreads, isRiskyCustomerServiceThread),
     [currentThreads],
   );
+  const historyTabBadge = useMemo(
+    () => createServiceHistoryTabBadge(historyThreads),
+    [historyThreads],
+  );
   const visibleThreads = useMemo(() => {
     const source = mode === "history" ? historyThreads : currentThreads;
     const normalizedQuery = query.trim().toLowerCase();
@@ -217,7 +223,12 @@ export function ThreadList() {
           type="button"
           onClick={() => setMode("history")}
         >
-          历史 <em>{historyThreads.length}</em>
+          历史 <em>{historyTabBadge.threadCount}</em>
+          {historyTabBadge.unreadCount > 0 && (
+            <span className="h-switch-tabs-unread">
+              {formatBadgeCount(historyTabBadge.unreadCount)}
+            </span>
+          )}
         </button>
       </nav>
 
@@ -323,7 +334,7 @@ export function ThreadList() {
                   <small>
                     <Headphones size={12} />
                     {mode === "history"
-                      ? customerServiceHistoryStatusLabel(thread.status)
+                      ? createServiceHistoryThreadStatusText(thread)
                       : customerServiceThreadStatusLabel(thread)}
                     <ChannelBadge source={thread.source ?? thread.sourceChannel} compact />
                   </small>

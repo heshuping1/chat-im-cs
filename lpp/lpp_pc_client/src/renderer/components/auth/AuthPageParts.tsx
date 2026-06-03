@@ -1,6 +1,7 @@
-import type { KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import type { CaptchaChallenge } from "../../data/api-client";
 import type { AuthMode, AuthSpaceChoice } from "../../data/auth/auth-flow-model";
+import type { RegisterAvatarOption } from "../../data/auth/register-avatar-options";
 
 type AuthModeSwitchProps = {
   mode: AuthMode;
@@ -20,8 +21,6 @@ type AuthAdvancedSettingsProps = {
   apiBaseUrl: string;
   defaultOpen: boolean;
   onApiBaseUrlChange: (value: string) => void;
-  onTenantIdChange: (value: string) => void;
-  tenantId: string;
 };
 
 type AuthSpacePickerProps = {
@@ -50,15 +49,18 @@ type LoginFieldsProps = {
 };
 
 type RegisterFieldsProps = {
+  avatarOptions: RegisterAvatarOption[];
   confirmPassword: string;
   contact: string;
   displayName: string;
+  onAvatarChange: (avatarUrl: string) => void;
   onConfirmPasswordChange: (value: string) => void;
   onContactChange: (value: string) => void;
   onDisplayNameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: () => void;
   password: string;
+  selectedAvatarUrl: string;
 };
 
 export function AuthModeSwitch({ mode, onChange }: AuthModeSwitchProps) {
@@ -126,7 +128,7 @@ export function LoginFields({
         <input
           value={identifier}
           onChange={(event) => onIdentifierChange(event.target.value)}
-          placeholder="lpp_gs9fn2c7"
+          placeholder="请输入 LPP 号 / 邮箱 / 手机号"
           autoFocus
         />
       </label>
@@ -145,18 +147,56 @@ export function LoginFields({
 }
 
 export function RegisterFields({
+  avatarOptions,
   confirmPassword,
   contact,
   displayName,
+  onAvatarChange,
   onConfirmPasswordChange,
   onContactChange,
   onDisplayNameChange,
   onPasswordChange,
   onSubmit,
   password,
+  selectedAvatarUrl,
 }: RegisterFieldsProps) {
+  const [showAllAvatarOptions, setShowAllAvatarOptions] = useState(false);
+  const visibleAvatarOptions = showAllAvatarOptions
+    ? avatarOptions
+    : avatarOptions.slice(0, 12);
+  const hiddenAvatarCount = Math.max(avatarOptions.length - visibleAvatarOptions.length, 0);
+
   return (
     <>
+      <fieldset className="auth-avatar-picker">
+        <legend>选择头像</legend>
+        <div className="auth-avatar-grid">
+          {visibleAvatarOptions.map((avatar) => {
+            const selected = avatar.avatarUrl === selectedAvatarUrl;
+            return (
+              <button
+                type="button"
+                className={`auth-avatar-option ${selected ? "selected" : ""}`}
+                aria-label={`选择${avatar.label}`}
+                aria-pressed={selected}
+                key={avatar.id}
+                onClick={() => onAvatarChange(avatar.avatarUrl)}
+              >
+                <img src={avatar.avatarUrl} alt="" />
+              </button>
+            );
+          })}
+        </div>
+        {avatarOptions.length > 12 && (
+          <button
+            type="button"
+            className="auth-avatar-toggle"
+            onClick={() => setShowAllAvatarOptions((value) => !value)}
+          >
+            {showAllAvatarOptions ? "收起头像" : `更多头像 ${hiddenAvatarCount}`}
+          </button>
+        )}
+      </fieldset>
       <label>
         <span>昵称</span>
         <input
@@ -201,8 +241,6 @@ export function AuthAdvancedSettings({
   apiBaseUrl,
   defaultOpen,
   onApiBaseUrlChange,
-  onTenantIdChange,
-  tenantId,
 }: AuthAdvancedSettingsProps) {
   return (
     <details className="auth-advanced" open={defaultOpen}>
@@ -213,14 +251,6 @@ export function AuthAdvancedSettings({
           value={apiBaseUrl}
           onChange={(event) => onApiBaseUrlChange(event.target.value)}
           placeholder="https://chat.hearteasechat.com"
-        />
-      </label>
-      <label>
-        <span>企业 tenantId，可选</span>
-        <input
-          value={tenantId}
-          onChange={(event) => onTenantIdChange(event.target.value)}
-          placeholder="测试或多企业调试时指定"
         />
       </label>
     </details>

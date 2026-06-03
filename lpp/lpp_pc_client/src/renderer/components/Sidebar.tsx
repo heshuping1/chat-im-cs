@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { TrayStatus } from "../../shared/desktop-api";
 import type { AuthSession } from "../data/auth/auth-session";
+import { gatewayRealtimeStatusNotice } from "../shell/models/gatewayRealtimeNoticeModel";
 import { currentSpaceSidebarBadgeCount } from "../spaces/models/spaceRadarModel";
 import {
   type CustomerServiceThread,
@@ -47,6 +48,7 @@ import {
   isRendererWindowFocused,
   notifyDesktopOrBrowser,
   shouldPushCustomerServiceQueueReminder,
+  shouldPushCustomerServiceThreadMessageInAppReminder,
   shouldPushCustomerServiceThreadMessageReminder,
   shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget,
   shouldShowDesktopNotification,
@@ -79,17 +81,21 @@ import {
   useGatewayRealtimeState,
   useSetImPresenceStatus,
   type CustomerServiceThreadOpenSource,
-  type GatewayRealtimeStatus,
 } from "../data/workspace-ui/workspace-ui-store";
 import { appIconSrc, appProductName } from "../app/appMetadata";
 import { requireApiClient } from "../data/runtime";
 import { imPresenceStatuses } from "../data/static-config";
 import type { CustomerServiceStatus, ModuleKey } from "../data/types";
 import {
+  getQueueAutoDisabledReason,
   getReceptionControlSummary,
+  getReceptionQueueModeDescription,
+  getReceptionQueueModeLabel,
   getReceptionStatusOption,
   normalizeReceptionStatus,
   receptionControlStatusOptions,
+  resolveReceptionQueueModePatch,
+  type ReceptionQueueMode,
 } from "../customer-service/models/serviceReceptionControlModel";
 import { isRiskyCustomerServiceThread } from "../customer-service/models/serviceWorkbenchModel";
 import { derivePcWorkspaceAccess } from "../data/workspace-access";
@@ -162,6 +168,8 @@ export function Sidebar() {
   const [appVersion, setAppVersion] = useState("0.1.0");
   const [confirmedServiceStatus, setConfirmedServiceStatus] =
     useState<CustomerServiceStatus | null>(null);
+  const [confirmedQueueAcceptEnabled, setConfirmedQueueAcceptEnabled] =
+    useState<boolean | null>(null);
   const activeModule = useActiveModule();
   const gatewayRealtime = useGatewayRealtimeState();
   const activeImConversationId = useActiveImConversationId();
@@ -243,6 +251,20 @@ export function Sidebar() {
     onSuccess: () => setAccountNotice("已打开新的 PC 客户端"),
     onError: (error) => setAccountNotice(`打开新客户端失败：${formatError(error)}`),
   });
+  const invalidateReceptionAndThreads = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: pcQueryKeys.customerServiceReception(
+        authSession?.apiBaseUrl,
+        authSession?.tenantToken,
+      ),
+    });
+    await queryClient.invalidateQueries({
+      queryKey: pcQueryKeys.customerServiceThreads(
+        authSession?.apiBaseUrl,
+        authSession?.tenantToken,
+      ),
+    });
+  };
   const receptionStatusMutation = useMutation({
     mutationFn: async (serviceStatus: CustomerServiceStatus) => {
       const currentReception = receptionStatusQuery.data;
@@ -250,26 +272,72 @@ export function Sidebar() {
         serviceStatus,
         queueAcceptEnabled:
           serviceStatus === "online"
-            ? (currentReception?.queueAcceptEnabled ?? false)
+            ? (confirmedQueueAcceptEnabled ?? currentReception?.queueAcceptEnabled ?? false)
             : false,
       });
+    },
+    onMutate: (serviceStatus) => {
+      const previous = {
+        queueAcceptEnabled: confirmedQueueAcceptEnabled,
+        serviceStatus: confirmedServiceStatus,
+      };
+      const nextQueueAcceptEnabled =
+        serviceStatus === "online"
+          ? (confirmedQueueAcceptEnabled ??
+            receptionStatusQuery.data?.queueAcceptEnabled ??
+            false)
+          : false;
+      setConfirmedServiceStatus(serviceStatus);
+      setConfirmedQueueAcceptEnabled(nextQueueAcceptEnabled);
+      setCustomerServiceStatus(serviceStatus);
+      return previous;
+    },
+    onError: (_error, _serviceStatus, previous) => {
+      if (!previous) return;
+      setConfirmedServiceStatus(previous.serviceStatus);
+      setConfirmedQueueAcceptEnabled(previous.queueAcceptEnabled);
+      if (previous.serviceStatus) setCustomerServiceStatus(previous.serviceStatus);
     },
     onSuccess: async (status) => {
       const nextStatus = normalizeReceptionStatus(status.serviceStatus);
       setConfirmedServiceStatus(nextStatus);
+      setConfirmedQueueAcceptEnabled(Boolean(status.queueAcceptEnabled));
       setCustomerServiceStatus(nextStatus);
-      await queryClient.invalidateQueries({
-        queryKey: pcQueryKeys.customerServiceReception(
-          authSession?.apiBaseUrl,
-          authSession?.tenantToken,
-        ),
-      });
-      await queryClient.invalidateQueries({
-        queryKey: pcQueryKeys.customerServiceThreads(
-          authSession?.apiBaseUrl,
-          authSession?.tenantToken,
-        ),
-      });
+      await invalidateReceptionAndThreads();
+    },
+  });
+  const queueAcceptMutation = useMutation({
+    mutationFn: async (mode: ReceptionQueueMode) => {
+      const serviceStatus = receptionStatusQuery.data?.serviceStatus ?? confirmedServiceStatus;
+      const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
+      if (!patch) throw new Error("接待状态未同步，暂不能切换接入模式。");
+      return requireApiClient(authSession).updateReceptionStatus(patch);
+    },
+    onMutate: (mode) => {
+      const serviceStatus = confirmedServiceStatus ?? receptionStatusQuery.data?.serviceStatus;
+      const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
+      const previous = {
+        queueAcceptEnabled: confirmedQueueAcceptEnabled,
+        serviceStatus: confirmedServiceStatus,
+      };
+      if (!patch) return previous;
+      setConfirmedServiceStatus(patch.serviceStatus);
+      setConfirmedQueueAcceptEnabled(patch.queueAcceptEnabled);
+      setCustomerServiceStatus(patch.serviceStatus);
+      return previous;
+    },
+    onError: (_error, _mode, previous) => {
+      if (!previous) return;
+      setConfirmedServiceStatus(previous.serviceStatus);
+      setConfirmedQueueAcceptEnabled(previous.queueAcceptEnabled);
+      if (previous.serviceStatus) setCustomerServiceStatus(previous.serviceStatus);
+    },
+    onSuccess: async (status) => {
+      const nextStatus = normalizeReceptionStatus(status.serviceStatus);
+      setConfirmedServiceStatus(nextStatus);
+      setConfirmedQueueAcceptEnabled(Boolean(status.queueAcceptEnabled));
+      setCustomerServiceStatus(nextStatus);
+      await invalidateReceptionAndThreads();
     },
   });
   const inviteQrsQuery = useQuery({
@@ -346,10 +414,18 @@ export function Sidebar() {
     "--";
   const roleLabel = authSession?.roleLabel ?? "成员";
   const signature = profile?.signature || profile?.bio || "暂无签名";
+  const isPersonalSpace =
+    authSession?.spaceType === 1 || authSession?.roleLabel === "个人空间";
   const spaceCode =
     tenantInfo?.tenantCode || authSession?.tenantCode || authSession?.tenantId || "--";
-  const spaceName = tenantInfo?.tenantName || authSession?.tenantName || spaceCode;
-  const spaceMeta = "企业空间";
+  const spaceName = isPersonalSpace
+    ? "个人空间"
+    : tenantInfo?.tenantName || authSession?.tenantName || "企业空间";
+  const spaceMeta = isPersonalSpace
+    ? (profile?.lppId ?? authSession?.lppId ?? "个人账号")
+    : spaceCode !== "--"
+      ? `企业码 ${spaceCode}`
+      : "企业空间";
   const tenantLogoUrl = tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl ?? null;
   const spaceRadar = useSpaceRadarController({
     currentTenant: tenantInfo,
@@ -373,9 +449,10 @@ export function Sidebar() {
   const receptionSummary = getReceptionControlSummary({
     activeSessions: receptionStatus?.activeSessionCount ?? null,
     maxSessions: receptionStatus?.maxConcurrentSessions,
-    queueAcceptEnabled: receptionStatus?.queueAcceptEnabled,
+    queueAcceptEnabled: confirmedQueueAcceptEnabled ?? receptionStatus?.queueAcceptEnabled,
     serviceStatus: effectiveReceptionStatus ?? undefined,
   });
+  const queueAutoDisabledReason = getQueueAutoDisabledReason(effectiveReceptionStatus);
   const serviceStatusOption = effectiveReceptionStatus
     ? getReceptionStatusOption(effectiveReceptionStatus)
     : null;
@@ -409,11 +486,7 @@ export function Sidebar() {
   const serviceStatusCompactDetail = serviceStatusCounters
     .map((item) => `${item.name} ${item.value}`)
     .join(" · ");
-  const serviceStatusFullDetail = `${
-    typeof receptionStatus?.queueAcceptEnabled === "boolean"
-      ? receptionSummary.queueModeLabel
-      : "接入模式未同步"
-  } · 接待 ${receptionSummary.sessionText} · 排队 ${
+  const serviceStatusFullDetail = `接待 ${receptionSummary.sessionText} · 排队 ${
     hasServiceThreadData ? queuedServiceCount : "--"
   } · 未读 ${hasServiceThreadData ? activeServiceUnreadCount : "--"}`;
   const collapsed = sidebarCollapsed;
@@ -502,6 +575,12 @@ export function Sidebar() {
       setCustomerServiceStatus(nextStatus);
     }
   }, [receptionStatus?.serviceStatus, setCustomerServiceStatus]);
+
+  useEffect(() => {
+    if (typeof receptionStatus?.queueAcceptEnabled === "boolean") {
+      setConfirmedQueueAcceptEnabled(receptionStatus.queueAcceptEnabled);
+    }
+  }, [receptionStatus?.queueAcceptEnabled]);
 
   useEffect(() => {
     const hasOpenPopover =
@@ -709,6 +788,7 @@ export function Sidebar() {
     authSession,
     pcSettings.desktopNotifications,
     pcSettings.customerServiceMessageNotifications,
+    pcSettings.foregroundInAppCustomerServiceReminders,
     pcSettings.notificationPreview,
     pcSettings.notificationSound,
     pcSettings.serviceQueueNotifications,
@@ -1090,7 +1170,9 @@ export function Sidebar() {
                         type="button"
                         role="radio"
                         aria-checked={effectiveReceptionStatus === item.value}
-                        disabled={receptionStatusMutation.isPending}
+                        disabled={
+                          receptionStatusMutation.isPending || queueAcceptMutation.isPending
+                        }
                         key={item.value}
                         onClick={() => receptionStatusMutation.mutate(item.value)}
                       >
@@ -1103,9 +1185,44 @@ export function Sidebar() {
                       </button>
                     ))}
                   </div>
+                  <span className="account-section-label">接入模式</span>
+                  <div
+                    className="sidebar-service-status-options"
+                    role="radiogroup"
+                    aria-label="客服接入模式"
+                  >
+                    {(["manual", "auto"] as ReceptionQueueMode[]).map((mode) => {
+                      const selected = receptionSummary.queueMode === mode;
+                      const modeDescription =
+                        mode === "auto" && queueAutoDisabledReason
+                          ? "点击后切换为客服在线，并启用自动分配。"
+                          : getReceptionQueueModeDescription(mode);
+                      return (
+                        <button
+                          className={`sidebar-status-option sidebar-queue-mode-option ${
+                            selected ? "selected" : ""
+                          }`}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          disabled={
+                            receptionStatusMutation.isPending || queueAcceptMutation.isPending
+                          }
+                          title={modeDescription}
+                          key={mode}
+                          onClick={() => queueAcceptMutation.mutate(mode)}
+                        >
+                          <span>
+                            <strong>{getReceptionQueueModeLabel(mode)}</strong>
+                            <small>{modeDescription}</small>
+                          </span>
+                          {selected && <Check size={14} />}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <div className="sidebar-service-metrics">
                     <b>接待 {receptionSummary.sessionText}</b>
-                    <b>{receptionSummary.queueModeLabel}</b>
                     <b>排队 {hasServiceThreadData ? queuedServiceCount : "--"}</b>
                     <b>未读 {hasServiceThreadData ? activeServiceUnreadCount : "--"}</b>
                   </div>
@@ -1133,9 +1250,9 @@ export function Sidebar() {
               }`}
               type="button"
               aria-expanded={spaceStatusOpen}
-              aria-label={`当前空间：${spaceName}，企业码 ${spaceCode}`}
+              aria-label={`当前空间：${spaceName}，${spaceMeta}`}
               data-sidebar-popover-trigger="space"
-              data-sidebar-tooltip={`空间 · ${spaceName} · ${spaceCode}${
+              data-sidebar-tooltip={`空间 · ${spaceName} · ${spaceMeta}${
                 currentSpaceBadgeCount > 0
                   ? ` · ${formatBadgeCount(currentSpaceBadgeCount)} 条未处理`
                   : ""
@@ -1147,13 +1264,13 @@ export function Sidebar() {
                 setServiceStatusOpen(false);
               }}
             >
-              {tenantLogoUrl || spaceCode !== "--" ? (
+              {tenantLogoUrl || isPersonalSpace || spaceCode !== "--" ? (
                 <PcAvatar
                   avatarUrl={tenantLogoUrl}
                   className="sidebar-space-logo"
                   iconSize={16}
-                  kind="tenant"
-                  name={spaceCode !== "--" ? spaceCode : spaceName}
+                  kind={isPersonalSpace ? "person" : "tenant"}
+                  name={spaceName}
                 />
               ) : (
                 <span className="sidebar-space-logo sidebar-space-logo-empty" aria-hidden="true">
@@ -1161,7 +1278,7 @@ export function Sidebar() {
                 </span>
               )}
               <span className="sidebar-status-copy">
-                <strong>{spaceCode}</strong>
+                <strong>{spaceName}</strong>
                 <em>{spaceMeta}</em>
               </span>
               {currentSpaceBadgeCount > 0 && (
@@ -1174,6 +1291,7 @@ export function Sidebar() {
             {spaceStatusOpen && (
               <SpaceRadarPopover
                 canSwitch={Boolean(authSession?.platformToken)}
+                currentSpaceBadgeCount={currentSpaceBadgeCount}
                 onManageSpaces={() => {
                   setActiveModule("enterpriseSwitch");
                   setSpaceStatusOpen(false);
@@ -1256,15 +1374,22 @@ function notifyActiveCustomerServiceThreadMessage({
 
   const title = thread.title || "在线客服新消息";
   const body = thread.lastMessagePreview || "在线客服会话有新消息";
-  pushRealtimeReminder({
-    id: reminderDecision.reminderId,
-    title,
-    body,
-    targetModule: "onlineService",
-    targetId,
-    severity: "warning",
-    icon: "service",
-  });
+  const windowFocused = isRendererWindowFocused();
+  if (
+    shouldPushCustomerServiceThreadMessageInAppReminder(pcSettings, {
+      windowFocused,
+    })
+  ) {
+    pushRealtimeReminder({
+      id: reminderDecision.reminderId,
+      title,
+      body,
+      targetModule: "onlineService",
+      targetId,
+      severity: "warning",
+      icon: "service",
+    });
+  }
   const shouldShowDesktop = shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(
     pcSettings,
     {
@@ -1274,7 +1399,7 @@ function notifyActiveCustomerServiceThreadMessage({
         : undefined,
       targetId,
       targetModule: "onlineService",
-      windowFocused: isRendererWindowFocused(),
+      windowFocused,
     },
   );
   recordMessageReminderDiagnostic({
@@ -1287,7 +1412,7 @@ function notifyActiveCustomerServiceThreadMessage({
       activeThreadId,
       shouldShowDesktop,
       targetId,
-      windowFocused: isRendererWindowFocused(),
+      windowFocused,
     },
   });
   if (!shouldShowDesktop) return;
@@ -1366,29 +1491,6 @@ function customerServiceThreadReminderMessage(thread: CustomerServiceThread): Me
     messageType: "text",
     preview: thread.lastMessagePreview || "在线客服会话有新消息",
     sentAt: thread.lastMessageAt ?? thread.updatedAt ?? new Date().toISOString(),
-  };
-}
-
-function gatewayRealtimeStatusNotice(status: GatewayRealtimeStatus) {
-  if (status === "connected" || status === "idle") return null;
-  if (status === "connecting") {
-    return {
-      kind: "syncing",
-      label: "实时连接中",
-      title: "正在建立消息长连接",
-    };
-  }
-  if (status === "reconnecting" || status === "retrying") {
-    return {
-      kind: "syncing",
-      label: "实时同步中",
-      title: "消息长连接正在恢复，恢复后会补齐缺失消息",
-    };
-  }
-  return {
-    kind: "offline",
-    label: "实时连接异常",
-    title: "消息长连接不可用，客户端会持续重连",
   };
 }
 

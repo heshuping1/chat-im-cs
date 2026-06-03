@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildSpaceRadarViewModel,
   currentSpaceSidebarBadgeCount,
+  spaceRadarItemReminderPresentation,
+  spaceRadarNewReminderSummary,
   spaceRadarIdentityKey,
 } from "../../src/renderer/spaces/models/spaceRadarModel";
 import type {
@@ -114,11 +116,14 @@ describe("space radar model", () => {
     expect(viewModel.totalUnreadMessageCount).toBe(362);
     expect(viewModel.totalNewReminderCount).toBe(0);
     expect(viewModel.items[0]).toMatchObject({
+      attentionLevel: "none",
+      attentionText: "无新提醒",
       backlogUnreadConversationCount: 100,
       backlogUnreadMessageCount: 362,
       hasNewReminder: false,
       newReminderCount: 0,
     });
+    expect(spaceRadarNewReminderSummary(viewModel)).toBeNull();
   });
 
   it("marks cross-space new message reminders as attention targets", () => {
@@ -168,6 +173,10 @@ describe("space radar model", () => {
       hasNewReminder: true,
       newReminderCount: 3,
     });
+    expect(spaceRadarNewReminderSummary(viewModel)).toEqual({
+      reminderSpaceCount: 1,
+      totalNewReminderCount: 3,
+    });
   });
 
   it("builds the current space sidebar badge from visible module counters", () => {
@@ -186,6 +195,36 @@ describe("space radar model", () => {
         serviceAlertCount: "4" as unknown as number,
       }),
     ).toBe(8);
+  });
+
+  it("shows current space local badge as unread messages instead of no reminder", () => {
+    const currentItem = {
+      current: true,
+      hasNewReminder: false,
+      syncState: "synced",
+    };
+    const otherItem = {
+      current: false,
+      hasNewReminder: false,
+      syncState: "synced",
+    };
+
+    expect(
+      spaceRadarItemReminderPresentation(currentItem, {
+        currentSpaceBadgeCount: 3,
+      }),
+    ).toEqual({
+      live: true,
+      text: "3 条未读消息",
+    });
+    expect(
+      spaceRadarItemReminderPresentation(otherItem, {
+        currentSpaceBadgeCount: 3,
+      }),
+    ).toEqual({
+      live: false,
+      text: "无新提醒",
+    });
   });
 
   it("keeps personal space addressable without a tenant id", () => {

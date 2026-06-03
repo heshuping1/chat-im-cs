@@ -8,6 +8,7 @@ import {
   notificationPayloadForPolicy,
   reduceRealtimeReminders,
   shouldPushCustomerServiceQueueReminder,
+  shouldPushCustomerServiceThreadMessageInAppReminder,
   shouldPushCustomerServiceThreadMessageReminder,
   shouldPushRealtimeReminder,
   shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget,
@@ -68,7 +69,7 @@ describe("reminder service", () => {
   it("uses settings policy for realtime and desktop notifications", () => {
     expect(shouldPushRealtimeReminder(defaultPcSettings, "serviceQueue")).toBe(true);
     expect(shouldPushCustomerServiceQueueReminder(defaultPcSettings)).toBe(true);
-    expect(shouldPushCustomerServiceThreadMessageReminder(defaultPcSettings)).toBe(false);
+    expect(shouldPushCustomerServiceThreadMessageReminder(defaultPcSettings)).toBe(true);
     expect(
       shouldPushCustomerServiceThreadMessageReminder({
         ...defaultPcSettings,
@@ -81,6 +82,42 @@ describe("reminder service", () => {
         customerServiceMessageNotifications: true,
         serviceQueueNotifications: false,
       }),
+    ).toBe(true);
+    expect(
+      shouldPushCustomerServiceThreadMessageInAppReminder(
+        {
+          ...defaultPcSettings,
+          customerServiceMessageNotifications: true,
+          foregroundInAppCustomerServiceReminders: false,
+        },
+        { windowFocused: true },
+      ),
+    ).toBe(false);
+    expect(
+      shouldPushCustomerServiceThreadMessageInAppReminder(
+        {
+          ...defaultPcSettings,
+          customerServiceMessageNotifications: true,
+          foregroundInAppCustomerServiceReminders: false,
+        },
+        { windowFocused: false },
+      ),
+    ).toBe(false);
+    expect(
+      shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(
+        {
+          ...defaultPcSettings,
+          customerServiceMessageNotifications: true,
+          foregroundInAppCustomerServiceReminders: false,
+        },
+        {
+          activeModule: "onlineService",
+          activeTargetId: "t1",
+          targetId: "t2",
+          targetModule: "onlineService",
+          windowFocused: false,
+        },
+      ),
     ).toBe(true);
     expect(
       shouldPushCustomerServiceQueueReminder({

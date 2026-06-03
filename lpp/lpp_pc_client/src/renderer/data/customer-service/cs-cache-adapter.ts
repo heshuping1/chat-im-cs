@@ -3,11 +3,15 @@ import type { QueryClient } from "@tanstack/react-query";
 import type {
   CustomerServiceThread,
   MessageItemDto,
+  StaffServiceHistoryItem,
 } from "../api/types";
 import type { CurrentUserIdentity } from "../message-display";
 import {
   clearCustomerServiceConversationUnread,
   customerServiceIndexScopeKey,
+  getCustomerServiceConversationIndex,
+  getCustomerServiceThreadIndex,
+  rememberCustomerServiceConversationIndex,
   rememberCustomerServiceConversationMessageOverlay,
   rememberCustomerServiceStaffSentMessage,
 } from "./cs-conversation-index";
@@ -261,6 +265,19 @@ export function mergeLoadedCustomerServiceThreadDetail(
     previewFromCustomerServiceMessage(latest) ||
     thread.lastMessagePreview;
   const lastMessageAt = detail.lastMessageAt || latest?.sentAt || thread.lastMessageAt;
+  const indexedThread =
+    getCustomerServiceThreadIndex(thread.threadId) ||
+    getCustomerServiceConversationIndex(thread.conversationId ?? "");
+  rememberCustomerServiceConversationIndex({
+    conversationId: thread.conversationId || thread.threadId,
+    lastMessageAt,
+    lastMessageId: latest?.messageId || readNonEmptyString((thread as unknown as Record<string, unknown>).lastMessageId),
+    lastMessagePreview,
+    overlayUnreadCount: Math.max(0, Number(indexedThread?.overlayUnreadCount ?? thread.unreadCount ?? 0)),
+    source: indexedThread?.source,
+    threadId: thread.threadId,
+    threadType: thread.threadType,
+  });
 
   queryClient.setQueriesData<CustomerServiceThreadsCache>(
     { queryKey: ["pc-cs-workbench-threads"] },
@@ -331,6 +348,25 @@ export function markCustomerServiceThreadReadInCache(
       return changed ? { ...old, queueItems, activeItems } : old;
     },
   );
+  queryClient.setQueriesData<{ items?: StaffServiceHistoryItem[] }>(
+    { queryKey: ["pc-cs-staff-service-history"] },
+    (old) => {
+      if (!old?.items) return old;
+      let changed = false;
+      const items = old.items.map((item) => {
+        if (
+          item.threadId !== threadId &&
+          (!conversationId || item.conversationId !== conversationId)
+        ) {
+          return item;
+        }
+        if (!item.unreadCount) return item;
+        changed = true;
+        return { ...item, unreadCount: 0 };
+      });
+      return changed ? { ...old, items } : old;
+    },
+  );
   logCustomerServiceCacheDiagnostic({
     event: "cache.thread.read",
     result: "ok",
@@ -344,6 +380,38 @@ export function markCustomerServiceThreadClosed(
   result: { status?: string; closed?: boolean },
 ) {
   const status = result.status || (result.closed ? "closed_by_staff" : "closed_by_staff");
+  const indexedThread =
+    getCustomerServiceThreadIndex(thread.threadId) ||
+    getCustomerServiceConversationIndex(thread.conversationId ?? "");
+  let closedUnreadCount = Math.max(
+    0,
+    Number(thread.unreadCount ?? 0),
+    Number(indexedThread?.overlayUnreadCount ?? 0),
+  );
+  queryClient.setQueriesData<CustomerServiceThreadsCache>(
+    { queryKey: ["pc-cs-workbench-threads"] },
+    (old) => {
+      if (!old) return old;
+      let changed = false;
+      const closeListItem = (item: CustomerServiceThread) => {
+        if (!isCustomerServiceThreadMatch(item, thread.threadId)) return item;
+        changed = true;
+        const unreadCount = Math.max(
+          closedUnreadCount,
+          Math.max(0, Number(item.unreadCount ?? 0)),
+        );
+        closedUnreadCount = Math.max(closedUnreadCount, unreadCount);
+        return {
+          ...item,
+          status,
+          unreadCount,
+        };
+      };
+      const queueItems = old.queueItems.map(closeListItem);
+      const activeItems = old.activeItems.map(closeListItem);
+      return changed ? { ...old, queueItems, activeItems } : old;
+    },
+  );
   queryClient.setQueriesData<{ status?: string; messages?: MessageItemDto[] }>(
     {
       predicate: (query) =>
@@ -352,6 +420,17 @@ export function markCustomerServiceThreadClosed(
     },
     (old) => (old ? { ...old, status } : old),
   );
+  rememberCustomerServiceConversationIndex({
+    conversationId: thread.conversationId || thread.threadId,
+    lastMessageAt: thread.lastMessageAt ?? thread.updatedAt,
+    lastMessageId: readNonEmptyString(
+      (thread as unknown as Record<string, unknown>).lastMessageId,
+    ),
+    lastMessagePreview: thread.lastMessagePreview,
+    overlayUnreadCount: closedUnreadCount,
+    threadId: thread.threadId,
+    threadType: thread.threadType,
+  });
   logCustomerServiceCacheDiagnostic({
     event: "cache.thread.closed",
     result: "ok",
@@ -361,6 +440,10 @@ export function markCustomerServiceThreadClosed(
       threadType: thread.threadType,
     },
   });
+}
+
+function readNonEmptyString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 export function applyCustomerServiceGatewayMessageCache(

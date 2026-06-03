@@ -124,11 +124,12 @@ describe("customer service workspace view model", () => {
     });
 
     const closed = createCustomerServiceWorkspaceViewModel({
-      selectedThread: thread({ status: "closed_by_staff" }),
+      selectedThread: thread({ status: "closed_by_staff", unreadCount: 2 }),
     });
-    expect(closed.composerDisabledText).toBeUndefined();
+    expect(closed.closedUnreadNoticeText).toBe("有 2 条关闭前未读消息");
+    expect(closed.composerDisabledText).toBe("会话已结束，无法继续回复");
     expect(closed.modeLabel).toBe("历史会话");
-    expect(closed.receptionText).toContain("只读查看");
+    expect(closed.receptionText).toBe("会话已结束 · 客服关闭");
   });
 });
 

@@ -145,6 +145,29 @@ describe("architecture boundaries", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps API DTO types free of feature domain model imports", () => {
+    const apiTypesPath = "src/renderer/data/api/types.ts";
+    const apiTypesFile = join(repoRoot, apiTypesPath);
+    const forbiddenTargets = [
+      "src/renderer/customer-service",
+      "src/renderer/messages",
+      "src/renderer/components",
+      "src/renderer/data/customer-service",
+      "src/renderer/data/im-read",
+      "src/renderer/data/send",
+      "src/renderer/data/workspace-ui",
+    ];
+    const violations = importsOf(apiTypesFile).flatMap((specifier) => {
+      const resolvedImport = resolveImport(apiTypesFile, specifier);
+      return resolvedImport &&
+        forbiddenTargets.some((target) => isUnder(resolvedImport, target))
+        ? [`${apiTypesPath} imports feature domain model ${relative(resolvedImport)}`]
+        : [];
+    });
+
+    expect(violations).toEqual([]);
+  });
+
   it("keeps PanelState as a shared UI primitive", () => {
     const violations = files
       .filter((file) => isUnder(file, "src/renderer"))

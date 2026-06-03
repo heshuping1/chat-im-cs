@@ -32,6 +32,7 @@ export type ReminderPolicySettings = Pick<
   | "customerServiceMessageNotifications"
   | "notificationPreview"
   | "notificationSound"
+  | "foregroundInAppCustomerServiceReminders"
   | "serviceQueueNotifications"
   | "slaTimeoutNotifications"
 >;

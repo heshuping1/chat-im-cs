@@ -54,18 +54,44 @@ describe("customer service read visibility", () => {
     expect(canMarkCustomerServiceThreadRead({ visibility: loaded })).toBe(true);
   });
 
-  it("treats reminder and claim opens as explicit read intent after detail load", () => {
-    for (const source of ["reminder", "claim"] as const) {
-      const visibility = resolveCustomerServiceThreadReadVisibility({
-        activeModule: "onlineService",
-        activeThreadId: "conversation-1",
-        activeThreadOpenSource: source,
-        conversationId: "conversation-1",
-        detailLoaded: true,
-        threadId: "thread-1",
-      });
+  it("treats reminder opens as explicit read intent after detail load", () => {
+    const visibility = resolveCustomerServiceThreadReadVisibility({
+      activeModule: "onlineService",
+      activeThreadId: "conversation-1",
+      activeThreadOpenSource: "reminder",
+      conversationId: "conversation-1",
+      detailLoaded: true,
+      threadId: "thread-1",
+    });
 
-      expect(visibility).toBe("detailVisible");
-    }
+    expect(visibility).toBe("detailVisible");
+  });
+
+  it("keeps claimed service threads list-only while the detail is still loading", () => {
+    const visibility = resolveCustomerServiceThreadReadVisibility({
+      activeModule: "onlineService",
+      activeThreadId: "conversation-1",
+      activeThreadOpenSource: "claim",
+      conversationId: "conversation-1",
+      detailLoaded: false,
+      threadId: "thread-1",
+    });
+
+    expect(visibility).toBe("listOnly");
+    expect(canMarkCustomerServiceThreadRead({ visibility })).toBe(false);
+  });
+
+  it("marks claimed service threads read once their detail is visible", () => {
+    const visibility = resolveCustomerServiceThreadReadVisibility({
+      activeModule: "onlineService",
+      activeThreadId: "conversation-1",
+      activeThreadOpenSource: "claim",
+      conversationId: "conversation-1",
+      detailLoaded: true,
+      threadId: "thread-1",
+    });
+
+    expect(visibility).toBe("detailVisible");
+    expect(canMarkCustomerServiceThreadRead({ visibility })).toBe(true);
   });
 });

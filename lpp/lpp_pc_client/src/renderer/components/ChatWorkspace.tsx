@@ -7,6 +7,7 @@ import {
   type MessageItemDto,
   type KnowledgeInsertPayload,
 } from "../data/api-client";
+import type { CustomerServiceThreadAction } from "../data/customer-service/cs-action-service";
 import { usePcSettings } from "../data/settings/settings-store";
 import {
   useDismissRealtimeRemindersForTarget,
@@ -68,6 +69,12 @@ import { useCustomerServiceIncomingNotifications } from "../customer-service/hoo
 import { useCustomerServiceThreadLifecycle } from "../customer-service/hooks/useCustomerServiceThreadLifecycle";
 import { useCustomerServiceSendController } from "../customer-service/hooks/useCustomerServiceSendController";
 import { useCustomerServiceWorkspaceController } from "../customer-service/hooks/useCustomerServiceWorkspaceController";
+import {
+  countPendingCustomerServiceCloseMessages,
+  createCustomerServiceCloseConfirmation,
+  type CustomerServiceCloseConfirmation,
+  shouldConfirmCustomerServiceCloseAction,
+} from "../customer-service/models/csCloseConfirmationModel";
 import { startVerticalPaneResize } from "../lib/paneResize";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
 import { isRiskyCustomerServiceThread } from "../customer-service/models/serviceWorkbenchModel";
@@ -87,6 +94,11 @@ type AiDraftDrawerState = {
   customerMessageId?: string | null;
 } | null;
 
+type CloseConfirmationState = {
+  model: CustomerServiceCloseConfirmation;
+  threadId: string;
+} | null;
+
 export function ChatWorkspace({
   onOpenCustomerContext,
   onToggleAssistantPane,
@@ -102,6 +114,8 @@ export function ChatWorkspace({
   const [messageAnnotations, setMessageAnnotations] = useState<Record<string, string>>({});
   const [knowledgeDrawerOpen, setKnowledgeDrawerOpen] = useState(false);
   const [aiDraftDrawer, setAiDraftDrawer] = useState<AiDraftDrawerState>(null);
+  const [closeConfirmation, setCloseConfirmation] =
+    useState<CloseConfirmationState>(null);
   const composerRef = useRef<MessageComposerHandle | null>(null);
   const serviceAssistantPane = useServiceAssistantPane();
   const setServiceAssistantPane = useSetServiceAssistantPane();
@@ -125,6 +139,7 @@ export function ChatWorkspace({
   });
   const {
     canReply,
+    closedUnreadNoticeText,
     composerDisabledText,
     identity,
     messageStageState,
@@ -223,6 +238,10 @@ export function ChatWorkspace({
     );
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  useEffect(() => {
+    setCloseConfirmation(null);
+  }, [selectedThreadId]);
 
   useWindowDismiss(Boolean(messageMenu), () => setMessageMenu(null));
 
@@ -382,6 +401,37 @@ export function ChatWorkspace({
     setNotice,
   });
 
+  const handleThreadAction = useCallback(
+    (action: CustomerServiceThreadAction) => {
+      if (!shouldConfirmCustomerServiceCloseAction(action)) {
+        threadActionMutation.mutate(action);
+        return;
+      }
+      if (!selectedThread) {
+        setNotice("请选择在线客服会话");
+        return;
+      }
+      setCloseConfirmation({
+        model: createCustomerServiceCloseConfirmation({
+          customerTitle: title || selectedThread.title || "当前客户",
+          pendingMessageCount: countPendingCustomerServiceCloseMessages(messages),
+        }),
+        threadId: selectedThread.threadId,
+      });
+    },
+    [messages, selectedThread, threadActionMutation, title],
+  );
+
+  const confirmCloseThread = useCallback(() => {
+    if (!closeConfirmation || closeConfirmation.threadId !== selectedThread?.threadId) {
+      setCloseConfirmation(null);
+      setNotice("当前会话已变化，请重新确认关闭。");
+      return;
+    }
+    setCloseConfirmation(null);
+    threadActionMutation.mutate("close");
+  }, [closeConfirmation, selectedThread?.threadId, threadActionMutation]);
+
   if (!selectedThread) {
     const noThreadState = createCustomerServiceNoThreadState();
     return <main className="h-chat-workspace"><PanelState {...noThreadState} /></main>;
@@ -418,10 +468,63 @@ export function ChatWorkspace({
         selectedStatus={selectedThread.status}
         status={status || selectedThread.status}
         threadState={threadState}
-        onAction={(action) => threadActionMutation.mutate(action)}
+        onAction={handleThreadAction}
       />
 
       {notice && <ChatToastNotice text={notice} />}
+
+      {closeConfirmation && (
+        <div
+          className="pc-modal-backdrop cs-close-confirm-backdrop"
+          role="presentation"
+          onClick={() => setCloseConfirmation(null)}
+        >
+          <section
+            aria-labelledby="cs-close-confirm-title"
+            aria-modal="true"
+            className="cs-close-confirm-dialog"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <span className="cs-close-confirm-mark" aria-hidden="true">!</span>
+              <div>
+                <h3 id="cs-close-confirm-title">{closeConfirmation.model.title}</h3>
+                <p>{closeConfirmation.model.detail}</p>
+              </div>
+            </header>
+            <p className="cs-close-confirm-risk">{closeConfirmation.model.riskText}</p>
+            {closeConfirmation.model.warningText && (
+              <p className="cs-close-confirm-warning">
+                {closeConfirmation.model.warningText}
+              </p>
+            )}
+            <footer>
+              <button
+                type="button"
+                disabled={threadActionMutation.isPending}
+                onClick={() => setCloseConfirmation(null)}
+              >
+                取消
+              </button>
+              <button
+                className="danger"
+                type="button"
+                disabled={threadActionMutation.isPending}
+                onClick={confirmCloseThread}
+              >
+                {threadActionMutation.isPending
+                  ? "关闭中..."
+                  : closeConfirmation.model.confirmLabel}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {closedUnreadNoticeText && (
+        <div className="composer-disabled-note">{closedUnreadNoticeText}</div>
+      )}
 
       <CustomerServiceMessageStage
         accountId={
@@ -529,7 +632,7 @@ export function ChatWorkspace({
           onNotice={setNotice}
         />
       )}
-      {!readOnly && composerDisabledText && (
+      {composerDisabledText && (
         <div className="composer-disabled-note">{composerDisabledText}</div>
       )}
     </main>

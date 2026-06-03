@@ -114,6 +114,11 @@ export function normalizeCustomerServiceThreadStateStatus(status?: string | numb
   return String(status ?? "").trim().toLowerCase().replace(/-/g, "_");
 }
 
+export function isTerminalCustomerServiceThreadStatus(status?: string | number | null) {
+  const normalized = normalizeCustomerServiceThreadStateStatus(status);
+  return isTerminalStatus(normalized);
+}
+
 export function logCustomerServiceThreadStateTransition(
   transition: CustomerServiceThreadStateTransition,
   context: Record<string, unknown> = {},

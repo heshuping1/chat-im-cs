@@ -1,5 +1,4 @@
 import { ApiError } from "./base";
-import { staffServiceHistoryItemToThread } from "../customer-service/cs-history-model";
 
 export interface PlatformTenant {
   tenantId: string;
@@ -49,6 +48,7 @@ export interface PlatformLoginResult {
 export interface PlatformRegisterRequest {
   displayName: string;
   password: string;
+  avatarUrl?: string | null;
   email?: string | null;
   mobile?: string | null;
   captchaToken?: string | null;
@@ -698,39 +698,6 @@ export interface WorkbenchSummary {
 
 export type CustomerServiceThreadType = "temp_session" | "im_direct";
 
-const terminalCustomerServiceThreadStatuses = new Set([
-  "closed",
-  "closed_by_visitor",
-  "closed_by_staff",
-  "closed_timeout",
-  "closed_system",
-  "archived",
-  "ended",
-  "finished",
-  "resolved",
-  "terminated",
-  "cancelled",
-  "canceled",
-  "expired",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-]);
-
-export function normalizeCustomerServiceThreadStatus(status?: string | null) {
-  return (status ?? "").trim().toLowerCase().replace(/-/g, "_");
-}
-
-export function isTerminalCustomerServiceThreadStatus(status?: string | null) {
-  const normalized = normalizeCustomerServiceThreadStatus(status);
-  return (
-    terminalCustomerServiceThreadStatuses.has(normalized) ||
-    normalized.startsWith("closed")
-  );
-}
-
 export function normalizeCustomerServiceThreadType(
   threadType?: string | null,
 ): CustomerServiceThreadType {
@@ -832,8 +799,6 @@ export interface StaffServiceHistoryResponse {
   items: StaffServiceHistoryItem[];
   nextCursor?: string | null;
 }
-
-export { staffServiceHistoryItemToThread };
 
 export interface StaffReceptionStatusDto {
   staffUserId?: string;

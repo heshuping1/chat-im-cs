@@ -11,6 +11,7 @@ const enumKeyPattern =
 const maxDepth = 4;
 const maxKeys = 40;
 const maxArrayItems = 8;
+const maxBufferedCsRoutingDiagnostics = 200;
 
 export interface DiagnosticSummaryOptions {
   plaintext?: boolean;
@@ -33,10 +34,21 @@ export function recordCsRoutingDiagnostic(
       : undefined,
     summary: payload.summary ? summarizeDiagnosticValue(payload.summary, summaryOptions) : undefined,
   };
+  rememberCsRoutingDiagnostic(record);
   void globalThis.window?.desktopApi?.recordCsRoutingDiagnostic(record).catch((error) => {
     console.warn("[cs-routing:diagnostic] persist failed", error);
   });
   console.debug("[cs-routing:diagnostic]", record);
+}
+
+function rememberCsRoutingDiagnostic(record: CsRoutingDiagnosticPayload) {
+  if (typeof globalThis.window === "undefined") return;
+  const diagnostics = globalThis.window.__lppCsRoutingDiagnostics ?? [];
+  diagnostics.push(record);
+  if (diagnostics.length > maxBufferedCsRoutingDiagnostics) {
+    diagnostics.splice(0, diagnostics.length - maxBufferedCsRoutingDiagnostics);
+  }
+  globalThis.window.__lppCsRoutingDiagnostics = diagnostics;
 }
 
 export function summarizeDiagnosticValue(

@@ -46,10 +46,12 @@ describe("customer service badge view", () => {
     const view = resolveCustomerServiceBadgeView({
       activeItems: [
         thread({ threadId: "temp-active", threadType: "temp_session", unreadCount: 2 }),
+        thread({ status: "closed_by_visitor", threadId: "temp-closed", unreadCount: 7 }),
         thread({ threadId: "im-direct-active", threadType: "im_direct", unreadCount: 9 }),
       ],
       queueItems: [
         thread({ status: "queued", threadId: "temp-queue", threadType: "temp_session" }),
+        thread({ status: "closed_timeout", threadId: "temp-closed-queue", unreadCount: 5 }),
         thread({ status: "queued", threadId: "im-direct-queue", threadType: "im_direct" }),
       ],
       summaryQueuedCount: 0,
@@ -61,6 +63,7 @@ describe("customer service badge view", () => {
     expect(view.activeServiceUnreadCount).toBe(2);
     expect(view.taskbarServiceUnreadCount).toBe(2);
     expect(view.serviceAlertCount).toBe(3);
+    expect(view.closedHistoryUnreadCount).toBe(12);
   });
 });
 

@@ -6,9 +6,11 @@ import {
 } from "../../settings/models/chatBackgroundModel";
 
 export interface PcSettings {
+  settingsSchemaVersion: number;
   imNotifications: boolean;
   serviceQueueNotifications: boolean;
   customerServiceMessageNotifications: boolean;
+  foregroundInAppCustomerServiceReminders: boolean;
   slaTimeoutNotifications: boolean;
   desktopNotifications: boolean;
   notificationPreview: boolean;
@@ -55,11 +57,14 @@ export interface ReadStoredPcSettingsOptions {
 }
 
 export const pcSettingsStorageKey = "lpp.pc.settings";
+export const pcSettingsSchemaVersion = 2;
 
 export const defaultPcSettings: PcSettings = {
+  settingsSchemaVersion: pcSettingsSchemaVersion,
   imNotifications: true,
   serviceQueueNotifications: true,
-  customerServiceMessageNotifications: false,
+  customerServiceMessageNotifications: true,
+  foregroundInAppCustomerServiceReminders: true,
   slaTimeoutNotifications: true,
   desktopNotifications: true,
   notificationPreview: true,
@@ -133,7 +138,7 @@ export function readStoredPcSettings(
 export function parseStoredPcSettings(raw: string | null): PcSettings {
   if (!raw) return defaultPcSettings;
   try {
-    return mergePcSettings(JSON.parse(raw) as Partial<PcSettings>);
+    return mergePcSettings(migrateStoredPcSettings(JSON.parse(raw) as Partial<PcSettings>));
   } catch (error) {
     logSettingsDiagnostic({
       event: "settings.parse",
@@ -150,8 +155,27 @@ export function mergePcSettings(partial: Partial<PcSettings> = {}): PcSettings {
   return {
     ...defaultPcSettings,
     ...partial,
+    settingsSchemaVersion: pcSettingsSchemaVersion,
     chatBackgroundPreset: normalizeChatBackgroundPreset(partial.chatBackgroundPreset),
   };
+}
+
+function migrateStoredPcSettings(partial: Partial<PcSettings> = {}): Partial<PcSettings> {
+  const version = normalizeSettingsSchemaVersion(partial.settingsSchemaVersion);
+  if (version >= pcSettingsSchemaVersion) return partial;
+  return {
+    ...partial,
+    customerServiceMessageNotifications:
+      partial.customerServiceMessageNotifications === false
+        ? true
+        : partial.customerServiceMessageNotifications ?? defaultPcSettings.customerServiceMessageNotifications,
+    settingsSchemaVersion: pcSettingsSchemaVersion,
+  };
+}
+
+function normalizeSettingsSchemaVersion(value: unknown) {
+  const version = Number(value);
+  return Number.isFinite(version) ? Math.floor(version) : 1;
 }
 
 export function persistPcSettings(

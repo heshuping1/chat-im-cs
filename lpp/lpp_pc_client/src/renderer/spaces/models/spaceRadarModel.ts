@@ -59,6 +59,48 @@ export function currentSpaceSidebarBadgeCount({
   );
 }
 
+export function spaceRadarNewReminderSummary(viewModel: SpaceRadarViewModel) {
+  const totalNewReminderCount = finiteCount(viewModel.totalNewReminderCount);
+  if (totalNewReminderCount <= 0) return null;
+  return {
+    reminderSpaceCount: viewModel.items.filter((item) => item.hasNewReminder).length,
+    totalNewReminderCount,
+  };
+}
+
+export function spaceRadarItemReminderPresentation(
+  item: Pick<SpaceRadarItem, "attentionText" | "current" | "hasNewReminder" | "syncState">,
+  {
+    currentSpaceBadgeCount = 0,
+  }: {
+    currentSpaceBadgeCount?: number | null;
+  } = {},
+) {
+  const normalizedCurrentBadgeCount = finiteCount(currentSpaceBadgeCount);
+  if (item.current && normalizedCurrentBadgeCount > 0) {
+    return {
+      live: true,
+      text: `${formatPlainBadgeCount(normalizedCurrentBadgeCount)} 条未读消息`,
+    };
+  }
+  if (item.hasNewReminder) {
+    return {
+      live: true,
+      text: item.attentionText,
+    };
+  }
+  if (item.syncState === "error") {
+    return {
+      live: false,
+      text: "未同步",
+    };
+  }
+  return {
+    live: false,
+    text: "无新提醒",
+  };
+}
+
 export function buildSpaceRadarViewModel({
   authSession,
   currentTenant,
@@ -295,7 +337,6 @@ function recordToItem({
 }
 
 function spaceRadarAttentionLevel({
-  backlogUnreadMessageCount,
   newReminderCount,
 }: {
   backlogUnreadMessageCount: number | null;
@@ -303,13 +344,11 @@ function spaceRadarAttentionLevel({
 }): SpaceRadarAttentionLevel {
   if (newReminderCount >= 10) return "urgent";
   if (newReminderCount > 0) return "new";
-  if ((backlogUnreadMessageCount ?? 0) > 0) return "backlog";
   return "none";
 }
 
 function spaceRadarAttentionText({
   attentionLevel,
-  backlogUnreadMessageCount,
   newReminderCount,
 }: {
   attentionLevel: SpaceRadarAttentionLevel;
@@ -319,15 +358,16 @@ function spaceRadarAttentionText({
   if (attentionLevel === "urgent" || attentionLevel === "new") {
     return `${newReminderCount} 条新消息`;
   }
-  if (attentionLevel === "backlog") {
-    return `${backlogUnreadMessageCount ?? 0} 条历史未读`;
-  }
   return "无新提醒";
 }
 
 function finiteCount(value: unknown) {
   const parsed = typeof value === "number" ? value : Number(value ?? 0);
   return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+}
+
+function formatPlainBadgeCount(value: number) {
+  return value > 99 ? "99+" : String(value);
 }
 
 function compareSpaceRadarItems(a: SpaceRadarItem, b: SpaceRadarItem) {

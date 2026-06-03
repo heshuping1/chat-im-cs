@@ -3,7 +3,12 @@ import { AlertCircle, BellRing, Building2, Check, ChevronRight, Search } from "l
 
 import { formatBadgeCount, formatError } from "../../lib/format";
 import { PcAvatar } from "../../components/PcAvatar";
-import type { SpaceRadarItem, SpaceRadarViewModel } from "../models/spaceRadarModel";
+import {
+  spaceRadarItemReminderPresentation,
+  spaceRadarNewReminderSummary,
+  type SpaceRadarItem,
+  type SpaceRadarViewModel,
+} from "../models/spaceRadarModel";
 import { targetForSpaceRadarItem } from "../hooks/useSpaceRadarController";
 import type { SpaceSwitchTarget } from "../hooks/useSpaceSwitchController";
 
@@ -11,6 +16,7 @@ type SpaceRadarFilter = "alerts" | "all" | "recent";
 
 export function SpaceRadarPopover({
   canSwitch,
+  currentSpaceBadgeCount = 0,
   onManageSpaces,
   onSwitchSpace,
   spacesError,
@@ -22,6 +28,7 @@ export function SpaceRadarPopover({
   viewModel,
 }: {
   canSwitch: boolean;
+  currentSpaceBadgeCount?: number;
   onManageSpaces: () => void;
   onSwitchSpace: (target: SpaceSwitchTarget) => void;
   spacesError: unknown;
@@ -39,8 +46,8 @@ export function SpaceRadarPopover({
     [filter, keyword, viewModel.items],
   );
   const hasAlerts = viewModel.items.some((item) => item.hasNewReminder);
-  const totalReminderText = formatBadgeCount(viewModel.totalNewReminderCount);
-  const reminderSpaceCount = viewModel.items.filter((item) => item.hasNewReminder).length;
+  const newReminderSummary = spaceRadarNewReminderSummary(viewModel);
+  const totalReminderText = formatBadgeCount(newReminderSummary?.totalNewReminderCount ?? 0);
 
   return (
     <div
@@ -56,13 +63,15 @@ export function SpaceRadarPopover({
             <span>跨空间仅显示红点摘要，切换后查看详情</span>
           </div>
         </div>
-        <div className="space-radar-totals" aria-label={`新提醒 ${totalReminderText}`}>
-          <b>{totalReminderText}</b>
-          <em>{reminderSpaceCount} 个空间</em>
-        </div>
+        {newReminderSummary && (
+          <div className="space-radar-totals" aria-label={`新提醒 ${totalReminderText}`}>
+            <b>{totalReminderText}</b>
+            <em>{newReminderSummary.reminderSpaceCount} 个空间</em>
+          </div>
+        )}
       </header>
 
-      {viewModel.totalNewReminderCount > 0 && (
+      {newReminderSummary && (
         <div className="space-radar-alert-strip" role="status">
           <BellRing size={14} aria-hidden="true" />
           <strong>{totalReminderText} 条跨空间新消息</strong>
@@ -121,12 +130,13 @@ export function SpaceRadarPopover({
           <div className="space-radar-empty">
             <Building2 size={17} />
             <strong>{hasAlerts ? "未找到匹配空间" : "暂无跨空间新消息"}</strong>
-            <span>{hasAlerts ? "换个关键词试试。" : "历史未读会保留在全部列表里，但不会触发提醒。"}</span>
+            <span>{hasAlerts ? "换个关键词试试。" : "切换空间后查看对应空间详情。"}</span>
           </div>
         ) : (
           visibleItems.map((item) => (
             <SpaceRadarRow
               item={item}
+              currentSpaceBadgeCount={currentSpaceBadgeCount}
               key={item.identityKey}
               onManageSpaces={onManageSpaces}
               onSwitchSpace={onSwitchSpace}
@@ -146,29 +156,23 @@ export function SpaceRadarPopover({
 }
 
 function SpaceRadarRow({
+  currentSpaceBadgeCount,
   item,
   onManageSpaces,
   onSwitchSpace,
   switching,
 }: {
+  currentSpaceBadgeCount: number;
   item: SpaceRadarItem;
   onManageSpaces: () => void;
   onSwitchSpace: (target: SpaceSwitchTarget) => void;
   switching: boolean;
 }) {
-  const backlogUnreadMessageCount = item.backlogUnreadMessageCount;
-  const backlogUnreadConversationCount = item.backlogUnreadConversationCount;
   const target = targetForSpaceRadarItem(item);
   const canSwitch = item.canSwitch && Boolean(target) && !item.current;
-  const reminderLabel = item.hasNewReminder
-    ? item.attentionText
-    : backlogUnreadMessageCount === null
-      ? "未同步"
-      : "无新提醒";
-  const backlogLabel =
-    backlogUnreadMessageCount !== null && backlogUnreadMessageCount > 0
-      ? `历史未读 ${backlogUnreadMessageCount}`
-      : "";
+  const reminderPresentation = spaceRadarItemReminderPresentation(item, {
+    currentSpaceBadgeCount,
+  });
 
   return (
     <article
@@ -188,13 +192,9 @@ function SpaceRadarRow({
         <strong>{item.displayName}</strong>
         <em>{[item.displayCode, item.roleLabel].filter(Boolean).join(" · ")}</em>
         <span className="space-radar-badges">
-          <b className={item.hasNewReminder ? "danger is-live" : ""}>
-            {reminderLabel}
+          <b className={reminderPresentation.live ? "danger is-live" : ""}>
+            {reminderPresentation.text}
           </b>
-          {backlogLabel && <b>{backlogLabel}</b>}
-          {backlogUnreadConversationCount !== null && backlogUnreadConversationCount > 0 && (
-            <b>{backlogUnreadConversationCount} 个历史会话</b>
-          )}
           {item.syncState === "error" && (
             <b className="warning">
               <AlertCircle size={11} />

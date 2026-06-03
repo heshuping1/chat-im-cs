@@ -61,7 +61,6 @@ export function ServiceReceptionControl({
   };
 
   const setQueueMode = (mode: ReceptionQueueMode) => {
-    if (mode === "auto" && autoDisabledReason) return;
     onSetQueueMode(mode);
     setOpen(false);
   };
@@ -120,23 +119,22 @@ export function ServiceReceptionControl({
             <div className="service-reception-options">
               {(["manual", "auto"] as ReceptionQueueMode[]).map((mode) => {
                 const selected = summary.queueMode === mode;
-                const disabledByStatus = mode === "auto" && Boolean(autoDisabledReason);
+                const modeDescription =
+                  mode === "auto" && autoDisabledReason
+                    ? "点击后切换为在线状态，并启用自动分配。"
+                    : getReceptionQueueModeDescription(mode);
                 return (
                   <button
                     className={selected ? "selected" : ""}
                     type="button"
                     key={mode}
-                    disabled={disabled || pending || disabledByStatus}
-                    title={disabledByStatus ? autoDisabledReason ?? undefined : undefined}
+                    disabled={disabled || pending}
+                    title={modeDescription}
                     onClick={() => setQueueMode(mode)}
                   >
                     <span>
                       <b>{getReceptionQueueModeLabel(mode)}</b>
-                      <em>
-                        {disabledByStatus
-                          ? autoDisabledReason
-                          : getReceptionQueueModeDescription(mode)}
-                      </em>
+                      <em>{modeDescription}</em>
                     </span>
                     {selected && <Check size={15} />}
                   </button>

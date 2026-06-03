@@ -15,6 +15,7 @@ import {
 } from "../customer-service/models/serviceWorkbenchModel";
 import {
   getReceptionControlLayout,
+  resolveReceptionQueueModePatch,
   type ReceptionQueueMode,
 } from "../customer-service/models/serviceReceptionControlModel";
 import { emitCustomerServiceAssistantInsert } from "../customer-service/runtime/customer-service-assistant-events";
@@ -243,6 +244,8 @@ export function OnlineServicePage() {
   const sidebarCollapsed = useSidebarCollapsed();
   const [confirmedServiceStatus, setConfirmedServiceStatus] =
     useState<CustomerServiceStatus | null>(null);
+  const [confirmedQueueAcceptEnabled, setConfirmedQueueAcceptEnabled] =
+    useState<boolean | null>(null);
   const [queueRadarHint, setQueueRadarHint] = useState<string | null>(null);
   const [serviceCustomerPinned, setServiceCustomerPinned] = useState(
     () =>
@@ -293,15 +296,27 @@ export function OnlineServicePage() {
   const selectedThread = selectableThreads.find((thread) => thread.threadId === activeThreadId);
   const aiReplyTarget = aiReplyTargetForServiceThread(selectedThread);
   const receptionStatus = receptionStatusQuery.data;
+  const optimisticReceptionStatus = useMemo(
+    () =>
+      receptionStatus
+        ? {
+            ...receptionStatus,
+            queueAcceptEnabled:
+              confirmedQueueAcceptEnabled ?? receptionStatus.queueAcceptEnabled,
+            serviceStatus: confirmedServiceStatus ?? receptionStatus.serviceStatus,
+          }
+        : receptionStatus,
+    [confirmedQueueAcceptEnabled, confirmedServiceStatus, receptionStatus],
+  );
   const commandMetrics = useMemo(
     () =>
       createServiceCommandMetrics({
         isRiskyThread,
         lastKnownStatus: confirmedServiceStatus,
-        receptionStatus,
+        receptionStatus: optimisticReceptionStatus,
         threads: threadsQuery.data,
       }),
-    [confirmedServiceStatus, receptionStatus, threadsQuery.data],
+    [confirmedServiceStatus, optimisticReceptionStatus, threadsQuery.data],
   );
   const {
     activeCount,
@@ -338,6 +353,11 @@ export function OnlineServicePage() {
       setCustomerServiceStatus(serverStatus);
     }
   }, [receptionStatus?.serviceStatus, setCustomerServiceStatus]);
+  useEffect(() => {
+    if (typeof receptionStatus?.queueAcceptEnabled === "boolean") {
+      setConfirmedQueueAcceptEnabled(receptionStatus.queueAcceptEnabled);
+    }
+  }, [receptionStatus?.queueAcceptEnabled]);
   const receptionStatusMutation = useMutation({
     mutationFn: async (serviceStatus: CustomerServiceStatus) => {
       if (!client) throw new Error("Customer service API is not ready");
@@ -345,9 +365,29 @@ export function OnlineServicePage() {
         serviceStatus,
         queueAcceptEnabled:
           serviceStatus === "online"
-            ? (receptionStatus?.queueAcceptEnabled ?? false)
+            ? (confirmedQueueAcceptEnabled ?? receptionStatus?.queueAcceptEnabled ?? false)
             : false,
       });
+    },
+    onMutate: (serviceStatus) => {
+      const previous = {
+        queueAcceptEnabled: confirmedQueueAcceptEnabled,
+        serviceStatus: confirmedServiceStatus,
+      };
+      const nextQueueAcceptEnabled =
+        serviceStatus === "online"
+          ? (confirmedQueueAcceptEnabled ?? receptionStatus?.queueAcceptEnabled ?? false)
+          : false;
+      setConfirmedServiceStatus(serviceStatus);
+      setConfirmedQueueAcceptEnabled(nextQueueAcceptEnabled);
+      setCustomerServiceStatus(serviceStatus);
+      return previous;
+    },
+    onError: (_error, _serviceStatus, previous) => {
+      if (!previous) return;
+      setConfirmedServiceStatus(previous.serviceStatus);
+      setConfirmedQueueAcceptEnabled(previous.queueAcceptEnabled);
+      if (previous.serviceStatus) setCustomerServiceStatus(previous.serviceStatus);
     },
     onSuccess: (status) => {
       if (
@@ -357,6 +397,7 @@ export function OnlineServicePage() {
         status.serviceStatus === "offline"
       ) {
         setConfirmedServiceStatus(status.serviceStatus);
+        setConfirmedQueueAcceptEnabled(Boolean(status.queueAcceptEnabled));
         setCustomerServiceStatus(status.serviceStatus);
       }
       void queryClient.invalidateQueries({
@@ -371,11 +412,28 @@ export function OnlineServicePage() {
     mutationFn: async (mode: ReceptionQueueMode) => {
       if (!client) throw new Error("Customer service API is not ready");
       const serviceStatus = receptionStatus?.serviceStatus ?? confirmedServiceStatus;
-      if (!serviceStatus) throw new Error("接待状态未同步，请稍后重试");
-      return client.updateReceptionStatus({
-        serviceStatus,
-        queueAcceptEnabled: serviceStatus === "online" && mode === "auto",
-      });
+      const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
+      if (!patch) throw new Error("接待状态未同步，请稍后重试");
+      return client.updateReceptionStatus(patch);
+    },
+    onMutate: (mode) => {
+      const serviceStatus = confirmedServiceStatus ?? receptionStatus?.serviceStatus;
+      const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
+      const previous = {
+        queueAcceptEnabled: confirmedQueueAcceptEnabled,
+        serviceStatus: confirmedServiceStatus,
+      };
+      if (!patch) return previous;
+      setConfirmedServiceStatus(patch.serviceStatus);
+      setConfirmedQueueAcceptEnabled(patch.queueAcceptEnabled);
+      setCustomerServiceStatus(patch.serviceStatus);
+      return previous;
+    },
+    onError: (_error, _mode, previous) => {
+      if (!previous) return;
+      setConfirmedServiceStatus(previous.serviceStatus);
+      setConfirmedQueueAcceptEnabled(previous.queueAcceptEnabled);
+      if (previous.serviceStatus) setCustomerServiceStatus(previous.serviceStatus);
     },
     onSuccess: (status) => {
       if (
@@ -385,6 +443,7 @@ export function OnlineServicePage() {
         status.serviceStatus === "offline"
       ) {
         setConfirmedServiceStatus(status.serviceStatus);
+        setConfirmedQueueAcceptEnabled(Boolean(status.queueAcceptEnabled));
         setCustomerServiceStatus(status.serviceStatus);
       }
       void queryClient.invalidateQueries({

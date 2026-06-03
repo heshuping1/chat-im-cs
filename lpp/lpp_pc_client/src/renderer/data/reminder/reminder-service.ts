@@ -124,6 +124,17 @@ export function shouldPushCustomerServiceThreadMessageReminder(settings: Reminde
   return settings.customerServiceMessageNotifications;
 }
 
+export function shouldPushCustomerServiceThreadMessageInAppReminder(
+  settings: ReminderPolicySettings,
+  input: Pick<DesktopNotificationVisibilityInput, "windowFocused"> = {},
+) {
+  return (
+    shouldPushCustomerServiceThreadMessageReminder(settings) &&
+    settings.foregroundInAppCustomerServiceReminders &&
+    Boolean(input.windowFocused)
+  );
+}
+
 export function shouldShowCustomerServiceThreadMessageDesktopNotification(
   settings: ReminderPolicySettings,
 ) {

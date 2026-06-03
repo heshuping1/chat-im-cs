@@ -58,6 +58,7 @@ export function CustomerServiceThreadActionButton({
   if (!closePermission.visible) return null;
   return (
     <button
+      className="danger"
       type="button"
       disabled={pending || !closePermission.enabled}
       onClick={() => onAction("close")}

@@ -81,6 +81,7 @@ const notificationSectionRows: Record<NotificationSettingsSectionId, string[]> =
   customerService: [
     "serviceQueueNotifications",
     "customerServiceMessageNotifications",
+    "foregroundInAppCustomerServiceReminders",
     "slaTimeoutNotifications",
   ],
   common: [
@@ -173,6 +174,16 @@ export function NotificationSettingsSection({
               {...settingRowProps(rowId)}
               checked={pcSettings.customerServiceMessageNotifications}
               onChange={(value) => setSetting("customerServiceMessageNotifications", value)}
+            />
+          );
+        }
+        if (rowId === "foregroundInAppCustomerServiceReminders") {
+          return (
+            <SwitchRow
+              key={rowId}
+              {...settingRowProps(rowId)}
+              checked={pcSettings.foregroundInAppCustomerServiceReminders}
+              onChange={(value) => setSetting("foregroundInAppCustomerServiceReminders", value)}
             />
           );
         }

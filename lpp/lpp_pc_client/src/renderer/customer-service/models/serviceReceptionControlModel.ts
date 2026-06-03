@@ -88,6 +88,25 @@ export function getQueueAutoDisabledReason(
     : "仅在线状态可以启用自动分配。";
 }
 
+export function resolveReceptionQueueModePatch(
+  mode: ReceptionQueueMode,
+  currentStatus?: string | null,
+): { serviceStatus: CustomerServiceStatus; queueAcceptEnabled: boolean } | null {
+  if (mode === "auto") {
+    return {
+      queueAcceptEnabled: true,
+      serviceStatus: "online",
+    };
+  }
+  if (!receptionControlStatusOptions.some((item) => item.value === currentStatus)) {
+    return null;
+  }
+  return {
+    queueAcceptEnabled: false,
+    serviceStatus: normalizeReceptionStatus(currentStatus),
+  };
+}
+
 export function getReceptionControlLayout(
   mode: string,
 ): ReceptionControlLayout {

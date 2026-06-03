@@ -1,6 +1,5 @@
 import {
   normalizeCustomerServiceThreadType,
-  staffServiceHistoryItemToThread,
   type CustomerProfileCard,
   type CustomerServiceThread,
   type CustomerServiceThreadType,
@@ -8,6 +7,7 @@ import {
   type StaffServiceHistoryItem,
 } from "../api/types";
 import { customerServiceHistoryStatusLabel } from "../customer-service-display";
+import { staffServiceHistoryItemToThread } from "./cs-history-model";
 import {
   createCustomerServiceThreadState,
   type CustomerServiceReplyGate,
@@ -60,6 +60,7 @@ export interface CustomerServiceWorkspaceInlineState {
 
 export interface CustomerServiceWorkspaceViewModel {
   canReply: boolean;
+  closedUnreadNoticeText?: string;
   composerDisabledText?: string;
   identity: CustomerServiceIdentityViewModel;
   messageStageState?: CustomerServiceWorkspaceInlineState;
@@ -117,6 +118,10 @@ export function createCustomerServiceWorkspaceViewModel(
 
   return {
     canReply: threadState.replyGate === "open",
+    closedUnreadNoticeText: createCustomerServiceClosedUnreadNoticeText({
+      readOnly,
+      unreadCount: selectedThread?.unreadCount,
+    }),
     composerDisabledText: createCustomerServiceComposerDisabledText(threadState.replyGate),
     identity,
     messageStageState: createCustomerServiceMessageStageState({
@@ -245,7 +250,7 @@ function createCustomerServiceReceptionText(input: {
   sourceLabel: string;
   status: string;
 }) {
-  if (input.readOnly) return `只读查看 · ${customerServiceHistoryStatusLabel(input.status)}`;
+  if (input.readOnly) return `会话已结束 · ${customerServiceHistoryStatusLabel(input.status)}`;
   if (input.replyGate === "claim") {
     return `客户正在排队 · 来自 ${input.sourceLabel} · 接入后才能人工回复`;
   }
@@ -258,5 +263,15 @@ function createCustomerServiceReceptionText(input: {
 function createCustomerServiceComposerDisabledText(replyGate: CustomerServiceReplyGate) {
   if (replyGate === "claim") return "当前会话仍在排队中，请先点击“接入”。";
   if (replyGate === "takeover") return "当前会话仍由 AI 接待，请先点击“人工接管”。";
+  if (replyGate === "readonly") return "会话已结束，无法继续回复";
   return undefined;
+}
+
+function createCustomerServiceClosedUnreadNoticeText(input: {
+  readOnly: boolean;
+  unreadCount?: number | null;
+}) {
+  const unreadCount = Math.max(0, Number(input.unreadCount ?? 0));
+  if (!input.readOnly || unreadCount <= 0) return undefined;
+  return `有 ${unreadCount} 条关闭前未读消息`;
 }

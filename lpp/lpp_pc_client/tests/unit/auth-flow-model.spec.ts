@@ -37,17 +37,24 @@ describe("auth flow model", () => {
         ],
       }),
     ).toBeNull();
+    const selectAutoTenantIdWithLegacyPreferred = selectAutoTenantId as (
+      login: Parameters<typeof selectAutoTenantId>[0],
+      preferred?: string,
+    ) => string | null;
     expect(
-      selectAutoTenantId(
+      selectAutoTenantIdWithLegacyPreferred(
         {
           platformUserId: "p1",
           lppId: "lpp_1",
           displayName: "A",
-          tenants: [{ tenantId: "tenant-1", tenantName: "A 企业" }],
+          tenants: [
+            { tenantId: "tenant-1", tenantName: "A 企业" },
+            { tenantId: "tenant-2", tenantName: "B 企业" },
+          ],
         },
         "tenant-1",
       ),
-    ).toBe("tenant-1");
+    ).toBeNull();
   });
 
   it("builds tenant choices for a post-login space picker", () => {

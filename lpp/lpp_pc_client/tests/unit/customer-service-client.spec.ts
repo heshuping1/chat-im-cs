@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CustomerServiceApiClient } from "../../src/renderer/data/api/customer-service-client";
 import type { CustomerServiceThreadsResponse } from "../../src/renderer/data/api/types";
 import {
   customerServiceIndexScopeKey,
+  getCustomerServiceThreadIndex,
   rememberCustomerServiceCompatUnreadCandidate,
   rememberCustomerServiceConversationIndex,
   rememberCustomerServiceStaffSentMessage,
@@ -94,6 +95,8 @@ class WorkspaceScopedCustomerServiceApiClient extends CustomerServiceApiClient {
 describe("CustomerServiceApiClient", () => {
   beforeEach(() => {
     resetCustomerServiceConversationIndexForTest();
+    vi.restoreAllMocks();
+    delete (globalThis as { window?: unknown }).window;
   });
 
   it("queries customer service conversations with an admin token for owner workspaces", async () => {
@@ -301,6 +304,227 @@ describe("CustomerServiceApiClient", () => {
     });
   });
 
+  it("uses explicit server-read history snapshots to clear stale local overlay unread", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "temp-conversation-closed-unread",
+      lastMessagePreview: "visitor unread before close",
+      overlayUnreadCount: 4,
+      scopeKey: testScopeKey,
+      threadId: "temp-thread-closed-unread",
+      threadType: "temp_session",
+    });
+    class HistoryClient extends CustomerServiceApiClient {
+      constructor() {
+        super({
+          baseUrl: "https://api.example.test",
+          tenantToken: "tenant-token",
+          traceId: "test-trace",
+        });
+      }
+
+      override async request<T>() {
+        return {
+          items: [
+            {
+              conversationId: "temp-conversation-closed-unread",
+              lastMessagePreview: "",
+              status: "closed_by_staff",
+              threadId: "temp-thread-closed-unread",
+              threadType: "temp_session",
+              title: "Visitor",
+              unreadCount: 0,
+            },
+          ],
+        } as T;
+      }
+    }
+
+    await expect(new HistoryClient().getStaffServiceHistory()).resolves.toMatchObject({
+      items: [
+        {
+          lastMessagePreview: "visitor unread before close",
+          threadId: "temp-thread-closed-unread",
+          unreadCount: 0,
+        },
+      ],
+    });
+  });
+
+  it("restores missing history unread from the local overlay index", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "temp-conversation-missing-unread",
+      lastMessagePreview: "visitor unread before close",
+      overlayUnreadCount: 4,
+      scopeKey: testScopeKey,
+      threadId: "temp-thread-missing-unread",
+      threadType: "temp_session",
+    });
+    class HistoryClient extends CustomerServiceApiClient {
+      constructor() {
+        super({
+          baseUrl: "https://api.example.test",
+          tenantToken: "tenant-token",
+          traceId: "test-trace",
+        });
+      }
+
+      override async request<T>() {
+        return {
+          items: [
+            {
+              conversationId: "temp-conversation-missing-unread",
+              lastMessagePreview: "",
+              status: "closed_by_staff",
+              threadId: "temp-thread-missing-unread",
+              threadType: "temp_session",
+              title: "Visitor",
+            },
+          ],
+        } as T;
+      }
+    }
+
+    await expect(new HistoryClient().getStaffServiceHistory()).resolves.toMatchObject({
+      items: [
+        {
+          lastMessagePreview: "visitor unread before close",
+          threadId: "temp-thread-missing-unread",
+          unreadCount: 4,
+        },
+      ],
+    });
+  });
+
+  it("links a server session id to a conversation overlay before the session closes", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "widget-conversation-before-close",
+      lastMessagePreview: "visitor unread before close",
+      overlayUnreadCount: 3,
+      scopeKey: testScopeKey,
+      threadId: "widget-conversation-before-close",
+      threadType: "temp_session",
+    });
+    const client = new TestCustomerServiceApiClient({
+      activeItems: [
+        {
+          conversationId: "widget-conversation-before-close",
+          lastMessagePreview: null as never,
+          status: "active",
+          threadId: "server-session-before-close",
+          threadType: "temp_session",
+          title: "Visitor",
+          unreadCount: 0,
+        },
+      ],
+      queueItems: [],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          lastMessagePreview: "visitor unread before close",
+          threadId: "server-session-before-close",
+          unreadCount: 3,
+        },
+      ],
+    });
+    expect(
+      getCustomerServiceThreadIndex("server-session-before-close", testScopeKey),
+    ).toMatchObject({
+      conversationId: "widget-conversation-before-close",
+      overlayUnreadCount: 3,
+      threadId: "server-session-before-close",
+    });
+  });
+
+  it("records service-history unread diagnostics before and after local overlay", async () => {
+    const diagnostics: unknown[] = [];
+    const recordCsRoutingDiagnostic = vi.fn((payload: unknown) => {
+      diagnostics.push(payload);
+      return Promise.resolve();
+    });
+    (globalThis as { window?: unknown }).window = {
+      desktopApi: {
+        recordCsRoutingDiagnostic,
+        recordMessageReminderDiagnostic: vi.fn(() => Promise.resolve()),
+      },
+      localStorage: { getItem: () => "1" },
+    };
+    rememberCustomerServiceConversationIndex({
+      conversationId: "temp-conversation-history-diagnostic",
+      overlayUnreadCount: 3,
+      scopeKey: testScopeKey,
+      threadId: "temp-thread-history-diagnostic",
+      threadType: "temp_session",
+    });
+    class HistoryClient extends CustomerServiceApiClient {
+      constructor() {
+        super({
+          baseUrl: "https://api.example.test",
+          tenantToken: "tenant-token",
+          traceId: "test-trace",
+        });
+      }
+
+      override async request<T>() {
+        return {
+          items: [
+            {
+              closedAt: "2026-06-03T17:53:00.000Z",
+              conversationId: "temp-conversation-history-diagnostic",
+              lastMessageAt: "2026-06-03T17:52:30.000Z",
+              status: "closed_by_staff",
+              threadId: "temp-thread-history-diagnostic",
+              threadType: "temp_session",
+              title: "Visitor",
+              unreadCount: 0,
+            },
+            {
+              closedAt: "2026-06-03T17:54:00.000Z",
+              conversationId: "temp-conversation-history-missing",
+              status: "closed_by_visitor",
+              threadId: "temp-thread-history-missing",
+              threadType: "temp_session",
+              title: "Visitor",
+            },
+          ],
+        } as T;
+      }
+    }
+
+    await new HistoryClient().getStaffServiceHistory();
+
+    expect(recordCsRoutingDiagnostic).toHaveBeenCalled();
+    const snapshot = diagnostics.find(
+      (entry) =>
+        typeof entry === "object" &&
+        entry !== null &&
+        (entry as { phase?: string }).phase === "history-snapshot",
+    ) as { classification?: Record<string, unknown>; summary?: { items?: unknown[] } };
+    expect(snapshot).toBeTruthy();
+    expect(snapshot.classification).toMatchObject({
+      missingServerUnreadCount: 1,
+      overlayUnreadItems: 0,
+      serverUnreadItems: 0,
+      terminalItems: 2,
+      total: 2,
+    });
+    expect(snapshot.summary?.items).toEqual([
+      expect.objectContaining({
+        conversationId: "temp-conversation-history-diagnostic",
+        overlayUnreadCount: 0,
+        serverUnreadCount: 0,
+        threadId: "temp-thread-history-diagnostic",
+      }),
+      expect.objectContaining({
+        conversationId: "temp-conversation-history-missing",
+        overlayUnreadCount: 0,
+        serverUnreadCount: "[undefined]",
+        threadId: "temp-thread-history-missing",
+      }),
+    ]);
+  });
+
   it("overlays missing workbench thread preview and unread from indexed temp-session data", async () => {
     rememberCustomerServiceConversationIndex({
       conversationId: "im-conversation-cs-1",
@@ -330,7 +554,7 @@ describe("CustomerServiceApiClient", () => {
     await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
       activeItems: [
         {
-          lastMessageAt: "2026-06-01T09:59:00.000Z",
+          lastMessageAt: "2026-06-01T10:00:00.000Z",
           lastMessagePreview: "visitor text",
           unreadCount: 6,
         },
@@ -448,8 +672,58 @@ describe("CustomerServiceApiClient", () => {
     await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
       activeItems: [
         {
-          lastMessagePreview: "old server text",
+          lastMessagePreview: "gateway visitor text",
           unreadCount: 2,
+        },
+      ],
+    });
+  });
+
+  it("prefers a newer conversation overlay over a stale server-session alias", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "widget-conversation-fresh",
+      lastMessageAt: "2026-06-03T19:15:28.000Z",
+      lastMessageId: "old-message-3",
+      lastMessagePreview: "9",
+      lastMessageSeq: 3,
+      overlayUnreadCount: 0,
+      scopeKey: testScopeKey,
+      threadId: "server-session-stale-alias",
+      threadType: "temp_session",
+    });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "widget-conversation-fresh",
+      lastMessageAt: "2026-06-03T19:15:41.000Z",
+      lastMessageId: "gateway-message-5",
+      lastMessagePreview: "987654321",
+      lastMessageSeq: 5,
+      overlayUnreadCount: 1,
+      scopeKey: testScopeKey,
+      threadId: "widget-conversation-fresh",
+      threadType: "temp_session",
+    });
+    const client = new TestCustomerServiceApiClient({
+      activeItems: [
+        {
+          conversationId: "widget-conversation-fresh",
+          lastMessageAt: "2026-06-03T19:15:41.000Z",
+          lastMessagePreview: "最近活跃 6/4 03:15",
+          status: "active",
+          threadId: "server-session-stale-alias",
+          threadType: "temp_session",
+          title: "Visitor",
+          unreadCount: 0,
+        } as never,
+      ],
+      queueItems: [],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          lastMessageId: "gateway-message-5",
+          lastMessagePreview: "987654321",
+          unreadCount: 1,
         },
       ],
     });

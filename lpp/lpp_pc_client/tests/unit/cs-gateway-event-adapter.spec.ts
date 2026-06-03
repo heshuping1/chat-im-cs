@@ -87,6 +87,26 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(statusEvent.serviceStatus).toBe("busy");
   });
 
+  it("adapts temp-session close events with a root session id", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "temp_session.closed",
+      receivedAt: 7,
+      args: [
+        {
+          closedAt: "2026-06-04T01:53:00.000Z",
+          sessionId: "temp-session-closed-1",
+          status: "closed_by_visitor",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.thread.changed");
+    if (event.kind !== "cs.thread.changed") return;
+    expect(event.changeKind).toBe("thread_closed");
+    expect(event.threadId).toBe("temp-session-closed-1");
+    expect(event.threadStatus).toBe("closed_by_visitor");
+  });
+
   it("returns invalid for customer service messages without a thread id", () => {
     const event = adaptCustomerServiceGatewayEvent({
       eventName: "customer_service.message",

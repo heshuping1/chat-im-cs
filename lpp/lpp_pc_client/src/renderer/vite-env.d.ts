@@ -15,6 +15,7 @@ interface Window {
   __lppMessageCenterDiagnostics?: import("./messages/diagnostics/message-center-diagnostics").MessageCenterDiagnosticRecord[];
   __lppCustomerServiceStateDiagnostics?: import("./data/customer-service/cs-thread-state").CustomerServiceThreadStateDiagnosticRecord[];
   __lppCustomerServiceCacheDiagnostics?: import("./data/customer-service/cs-cache-adapter").CustomerServiceCacheDiagnosticRecord[];
+  __lppCsRoutingDiagnostics?: import("../shared/desktop-api").CsRoutingDiagnosticPayload[];
   __lppStartupDiagnostics?: import("./data/performance/startup-performance").StartupDiagnosticRecord[];
   __lppRuntimeErrorDiagnostics?: import("./data/diagnostics/runtime-error-diagnostics").RuntimeErrorDiagnosticRecord[];
 }

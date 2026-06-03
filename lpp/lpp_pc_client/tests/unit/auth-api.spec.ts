@@ -48,6 +48,7 @@ describe("auth api client", () => {
       captchaAnswer: " 42 ",
       verificationCode: " 123456 ",
       tenantId: " tenant-1 ",
+      avatarUrl: " data:image/svg+xml,%3Csvg%3Eavatar%3C/svg%3E ",
     });
 
     expect(requests[0]).toEqual({
@@ -62,6 +63,7 @@ describe("auth api client", () => {
         captchaAnswer: "42",
         verificationCode: "123456",
         tenantId: "tenant-1",
+        avatarUrl: "data:image/svg+xml,%3Csvg%3Eavatar%3C/svg%3E",
       },
     });
   });

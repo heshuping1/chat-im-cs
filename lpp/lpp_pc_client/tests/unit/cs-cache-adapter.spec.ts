@@ -17,6 +17,7 @@ import {
 } from "../../src/renderer/data/customer-service/cs-cache-adapter";
 import {
   getCustomerServiceThreadIndex,
+  rememberCustomerServiceConversationIndex,
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
 import { shouldRecordCustomerServiceImListCompatDiagnostic } from "../../src/renderer/data/customer-service/cs-compatibility-bridge";
@@ -142,6 +143,46 @@ describe("customer service cache adapter", () => {
     });
   });
 
+  it("updates workbench preview when gateway message uses the conversation id alias", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    queryClient.setQueryData(["pc-cs-workbench-threads"], {
+      activeItems: [
+        thread({
+          conversationId: "widget-conversation-1",
+          threadId: "server-session-1",
+          unreadCount: 0,
+        }),
+      ],
+      queueItems: [],
+    });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "widget-conversation-1",
+      overlayUnreadCount: 0,
+      threadId: "server-session-1",
+      threadType: "temp_session",
+    });
+
+    applyCustomerServiceGatewayMessageCache(queryClient, {
+      conversationId: "widget-conversation-1",
+      message: message({
+        conversationId: "widget-conversation-1",
+        messageId: "gw-alias",
+        preview: "visitor alias",
+        sentAt: "2026-05-29T12:02:00.000Z",
+      }),
+      read: false,
+      threadId: "widget-conversation-1",
+      threadType: "temp_session",
+    });
+
+    expect(workbenchCache(queryClient).activeItems[0]).toMatchObject({
+      lastMessagePreview: "visitor alias",
+      threadId: "server-session-1",
+      unreadCount: 1,
+    });
+  });
+
   it("does not increment unread twice for the same gateway message", () => {
     const queryClient = createQueryClient();
     seedCaches(queryClient);
@@ -185,6 +226,17 @@ describe("customer service cache adapter", () => {
   it("clears overlay unread when a customer-service thread is read", () => {
     const queryClient = createQueryClient();
     seedCaches(queryClient);
+    queryClient.setQueryData(["pc-cs-staff-service-history"], {
+      items: [
+        {
+          status: "closed_by_visitor",
+          threadId: "thread-1",
+          threadType: "temp_session",
+          title: "Visitor",
+          unreadCount: 4,
+        },
+      ],
+    });
 
     applyCustomerServiceGatewayMessageCache(queryClient, {
       message: message({ messageId: "gw-read", preview: "visitor" }),
@@ -195,8 +247,46 @@ describe("customer service cache adapter", () => {
     markCustomerServiceThreadReadInCache(queryClient, "thread-1");
 
     expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({ unreadCount: 0 });
+    expect(
+      queryClient.getQueryData<{ items: Array<{ unreadCount?: number }> }>([
+        "pc-cs-staff-service-history",
+      ])?.items[0],
+    ).toMatchObject({ unreadCount: 0 });
     expect(getCustomerServiceThreadIndex("thread-1")).toMatchObject({
       overlayUnreadCount: 0,
+    });
+  });
+
+  it("marks a closed thread as history without clearing unread", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+
+    markCustomerServiceThreadClosed(queryClient, thread({ unreadCount: 3 }), {
+      status: "closed_by_visitor",
+    });
+
+    expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({
+      status: "closed_by_visitor",
+      unreadCount: 3,
+    });
+    expect(queryClient.getQueryData<{ status?: string }>(detailKey())).toMatchObject({
+      status: "closed_by_visitor",
+    });
+  });
+
+  it("keeps closed unread in the customer-service overlay index for history refetches", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+
+    markCustomerServiceThreadClosed(queryClient, thread({ unreadCount: 3 }), {
+      status: "closed_by_staff",
+    });
+
+    expect(getCustomerServiceThreadIndex("thread-1")).toMatchObject({
+      conversationId: "thread-1",
+      overlayUnreadCount: 3,
+      threadId: "thread-1",
+      threadType: "temp_session",
     });
   });
 
@@ -223,6 +313,39 @@ describe("customer service cache adapter", () => {
     expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({
       lastMessagePreview: "agent reply",
       unreadCount: 1,
+    });
+  });
+
+  it("remembers loaded detail preview so workbench overlay does not revert to stale text", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    rememberCustomerServiceConversationIndex({
+      conversationId: "thread-1",
+      lastMessageAt: "2026-05-29T12:03:00.000Z",
+      lastMessageId: "old-message",
+      lastMessagePreview: "old preview",
+      overlayUnreadCount: 0,
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    mergeLoadedCustomerServiceThreadDetail(queryClient, thread(), {
+      messages: [
+        message({
+          messageId: "detail-new",
+          preview: "detail latest",
+          sentAt: "2026-05-29T12:05:00.000Z",
+        }),
+      ],
+    });
+
+    expect(getCustomerServiceThreadIndex("thread-1")).toMatchObject({
+      lastMessageId: "detail-new",
+      lastMessagePreview: "detail latest",
+      overlayUnreadCount: 0,
+    });
+    expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({
+      lastMessagePreview: "detail latest",
     });
   });
 
@@ -309,6 +432,29 @@ describe("customer service cache adapter", () => {
     });
     expect(globalThis.window.__lppCustomerServiceCacheDiagnostics?.length).toBeGreaterThan(0);
   });
+
+  it("preserves local overlay unread when closing a customer-service thread", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient, { unreadCount: 0 });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "thread-1",
+      lastMessagePreview: "visitor before close",
+      overlayUnreadCount: 3,
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    markCustomerServiceThreadClosed(queryClient, thread({ unreadCount: 0 }), { closed: true });
+
+    expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({
+      status: "closed_by_staff",
+      unreadCount: 3,
+    });
+    expect(getCustomerServiceThreadIndex("thread-1")).toMatchObject({
+      lastMessagePreview: "visitor before close",
+      overlayUnreadCount: 3,
+    });
+  });
 });
 
 function createQueryClient() {
@@ -319,11 +465,11 @@ function createQueryClient() {
   });
 }
 
-function seedCaches(queryClient: QueryClient) {
+function seedCaches(queryClient: QueryClient, threadOverrides: Partial<CustomerServiceThread> = {}) {
   queryClient.setQueryData(detailKey(), { messages: [] });
   queryClient.setQueryData(["pc-cs-workbench-threads"], {
     activeItems: [],
-    queueItems: [thread({ unreadCount: 1 })],
+    queueItems: [thread({ unreadCount: 1, ...threadOverrides })],
   });
 }
 
