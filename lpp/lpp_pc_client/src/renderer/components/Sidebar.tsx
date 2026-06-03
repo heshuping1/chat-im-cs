@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { TrayStatus } from "../../shared/desktop-api";
 import type { AuthSession } from "../data/auth/auth-session";
+import { currentSpaceSidebarBadgeCount } from "../spaces/models/spaceRadarModel";
 import {
   type CustomerServiceThread,
   type MessageItemDto,
@@ -355,7 +356,11 @@ export function Sidebar() {
     enabled: spaceStatusOpen,
     onSwitchSuccess: () => setSpaceStatusOpen(false),
   });
-  const spaceRadarNewReminderTotal = spaceRadar.viewModel.totalNewReminderCount;
+  const currentSpaceBadgeCount = currentSpaceSidebarBadgeCount({
+    contactRequestCount: pendingIncomingRequestCount,
+    imUnreadCount: unreadCount,
+    serviceAlertCount,
+  });
   const accountMeta = profile?.lppId ?? authSession?.lppId ?? spaceCode;
   const appInstance = appInstanceQuery.data;
   const appInstanceLabel = appInstance
@@ -1124,15 +1129,15 @@ export function Sidebar() {
           <div className="sidebar-status-row-wrap">
             <button
               className={`sidebar-status-row sidebar-space-status-row ${
-                spaceRadarNewReminderTotal > 0 ? "has-space-alert" : ""
+                currentSpaceBadgeCount > 0 ? "has-space-alert" : ""
               }`}
               type="button"
               aria-expanded={spaceStatusOpen}
               aria-label={`当前空间：${spaceName}，企业码 ${spaceCode}`}
               data-sidebar-popover-trigger="space"
               data-sidebar-tooltip={`空间 · ${spaceName} · ${spaceCode}${
-                spaceRadarNewReminderTotal > 0
-                  ? ` · ${formatBadgeCount(spaceRadarNewReminderTotal)} 条新提醒`
+                currentSpaceBadgeCount > 0
+                  ? ` · ${formatBadgeCount(currentSpaceBadgeCount)} 条未处理`
                   : ""
               }`}
               onClick={() => {
@@ -1159,9 +1164,9 @@ export function Sidebar() {
                 <strong>{spaceCode}</strong>
                 <em>{spaceMeta}</em>
               </span>
-              {spaceRadarNewReminderTotal > 0 && (
+              {currentSpaceBadgeCount > 0 && (
                 <span className="sidebar-space-unread-badge" aria-hidden="true">
-                  {formatBadgeCount(spaceRadarNewReminderTotal)}
+                  {formatBadgeCount(currentSpaceBadgeCount)}
                 </span>
               )}
               <ChevronRight size={14} aria-hidden="true" />

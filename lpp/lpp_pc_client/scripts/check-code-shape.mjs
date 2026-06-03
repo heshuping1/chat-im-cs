@@ -7,6 +7,7 @@ const sourceExtensions = new Set([".ts", ".tsx", ".cts"]);
 const maxLines = 900;
 const largeFileAllowlist = new Map([
   ["src/renderer/components/CustomerProfileWorkspace.tsx", "P19 documented customer profile workspace owner"],
+  ["src/renderer/components/MePage.tsx", "P19 documented me page assembly owner"],
   ["src/renderer/components/MessageCenter.tsx", "P19 documented IM page assembly owner"],
   ["src/renderer/components/OnlineServicePage.tsx", "P19 documented online service page assembly owner"],
   ["src/renderer/components/Sidebar.tsx", "P19 documented app sidebar assembly owner"],

@@ -41,6 +41,24 @@ export type SpaceRadarViewModel = {
   unreadSpaceCount: number | null;
 };
 
+export type CurrentSpaceSidebarBadgeInput = {
+  contactRequestCount?: number | null;
+  imUnreadCount?: number | null;
+  serviceAlertCount?: number | null;
+};
+
+export function currentSpaceSidebarBadgeCount({
+  contactRequestCount,
+  imUnreadCount,
+  serviceAlertCount,
+}: CurrentSpaceSidebarBadgeInput) {
+  return (
+    finiteCount(imUnreadCount) +
+    finiteCount(serviceAlertCount) +
+    finiteCount(contactRequestCount)
+  );
+}
+
 export function buildSpaceRadarViewModel({
   authSession,
   currentTenant,

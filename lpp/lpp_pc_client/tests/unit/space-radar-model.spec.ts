@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSpaceRadarViewModel,
+  currentSpaceSidebarBadgeCount,
   spaceRadarIdentityKey,
 } from "../../src/renderer/spaces/models/spaceRadarModel";
 import type {
@@ -167,6 +168,24 @@ describe("space radar model", () => {
       hasNewReminder: true,
       newReminderCount: 3,
     });
+  });
+
+  it("builds the current space sidebar badge from visible module counters", () => {
+    expect(
+      currentSpaceSidebarBadgeCount({
+        contactRequestCount: 0,
+        imUnreadCount: 3,
+        serviceAlertCount: 3,
+      }),
+    ).toBe(6);
+
+    expect(
+      currentSpaceSidebarBadgeCount({
+        contactRequestCount: 1,
+        imUnreadCount: 3.9,
+        serviceAlertCount: "4" as unknown as number,
+      }),
+    ).toBe(8);
   });
 
   it("keeps personal space addressable without a tenant id", () => {

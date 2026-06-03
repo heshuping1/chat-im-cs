@@ -88,6 +88,7 @@ AI 上下文可读性第二；
 | `src/renderer/data/customer-service/cs-cache-adapter.ts` | customer-service cache adapter | 客服 thread/message/query cache 合并入口、列表详情快照更新 | Gateway route 判断、UI 展示、API 请求 | 553 | 刚过 data 审查线，cache owner 清楚 | cache adapter 导出入口不变 | 观察保留；新增非 cache 规则必须迁出 |
 | `src/renderer/customer-service/components/CustomerServiceQuickReplyDrawer.tsx` | quick reply drawer | 客服快捷回复抽屉展示、搜索、分类和插入交互 | 快捷回复 API normalizer、发送 runtime、权限模型 | 547 | 刚过组件审查线，交互状态集中；继续增长会影响抽屉可读性 | drawer props 入口不变 | 观察保留；新增管理能力时拆 picker/list/editor |
 | `src/renderer/settings/models/settingsCatalog.ts` | settings catalog model | 设置项 catalog、分组、搜索和展示元数据 | 设置页面组件、runtime IPC、业务 API | 544 | model 偏大但为纯配置/模型入口，拆分会增加配置跳转 | settings catalog 入口不变 | 观察保留；新增大类设置时按 category 拆配置 |
+| `src/main/main.ts` | electron main bootstrap | Electron app/window lifecycle、主进程 IPC handler 注册、托盘和运行时诊断编排 | renderer 业务状态、API DTO normalizer、消息/客服领域规则 | 517 | 刚过 main/preload 审查线；当前仍是主进程启动和能力注册入口，继续增长容易让平台能力回流 | main process bootstrap 入口不变 | 观察保留；新增主进程能力前优先拆 runtime owner 并仅在 main 注册 |
 | `src/renderer/messages/hooks/useImReadCommandExecutor.ts` | IM read command executor | IM 已读命令编排、批量同步、可见性和 read command 调度 | 消息展示、API DTO normalizer、客服已读规则 | 417 | 刚过 hook 审查线，行为链路完整；强拆会增加已读 race 排查成本 | hook 入口不变 | 观察保留；新增已读来源时优先抽 command helper |
 
 ## 5. 本轮最小拆分
