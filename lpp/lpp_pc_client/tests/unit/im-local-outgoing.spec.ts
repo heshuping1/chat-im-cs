@@ -52,4 +52,24 @@ describe("mergeLocalOutgoingMessages", () => {
 
     expect(mergeLocalOutgoingMessages(server, local)).toEqual(server);
   });
+
+  it("uses the server copy when clientMsgId confirms a failed local echo", () => {
+    const server = [{
+      ...textMessage("server-23", "sent", "12321323"),
+      clientMsgId: "pc-local-text-1",
+    }];
+    const local = [textMessage("pc-local-text-1", "failed", "12321323")];
+
+    expect(mergeLocalOutgoingMessages(server, local)).toEqual(server);
+  });
+
+  it("keeps failed local text when the server copy has no client confirmation", () => {
+    const server = [textMessage("server-23", "sent", "12321323")];
+    const local = [textMessage("pc-local-text-1", "failed", "12321323")];
+
+    expect(mergeLocalOutgoingMessages(server, local).map((item) => item.messageId)).toEqual([
+      "server-23",
+      "pc-local-text-1",
+    ]);
+  });
 });

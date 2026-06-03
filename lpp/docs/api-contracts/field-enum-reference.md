@@ -1071,6 +1071,23 @@
 | `group` | `2` | 群聊 |
 | `temp_session` | `3` | 临时会话（访客客服） |
 
+> 注意：客户端 `GET /conversations`（纯 IM 列表）只返回 `direct`/`group`；`temp_session` 仅出现在客服接口与 Gateway 实时事件中。
+
+### 7.16.1 消息来源类型 `sourceType`（Gateway `msg.new`）
+
+`msg.new` 推送帧携带的**消息级**来源判别符（2026-06-03 新增），二值，用于客户端分流"在线客服(widget)"与"IM"：
+
+| 值 | 说明 |
+|---|---|
+| `widget` | 在线客服：来自 Web Widget 的访客会话（对应 `conversationType=temp_session`） |
+| `im` | 普通 IM：单聊或群聊（对应 `conversationType=direct`/`group`） |
+
+判别建议：`sourceType === "widget"` 即在线客服，否则为 IM。与 `conversationType` 的对应关系是 `temp_session → widget`、`direct/group → im`（`temp_session` 与 widget 严格等价：`temp_session` 的唯一来源就是 widget 访客建会话）。
+
+> **边界**：`sourceType` 只回答"这条消息来自 widget 还是 IM"。**会话级属性**（能否拉黑、能否转接、归属坐席、接待是否进行中等）不在消息帧里，请从会话/客服接口获取。
+>
+> 服务端内部另有一个 `Conversation.ServiceMode`（0 普通 / 1 IM 客服 direct / 2 widget）用于客服工作台与统计，**不对外出现在 `msg.new` 帧**；第三方按 `sourceType` 判别即可，无需关心 `ServiceMode`。
+
 ### 7.17 群成员角色 `role`
 
 | 值 | 说明 |

@@ -6,6 +6,10 @@ import type { AuthSession } from "../../data/auth/auth-session";
 import { reuseStableMessageItems } from "../../data/message/message-domain";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
+import {
+  activeDirectReadStatusRefetchIntervalMs,
+  shouldEnableDirectReadStatusQuery,
+} from "../models/imReadReceiptPolicy";
 
 type ImConversationType = "direct" | "group";
 
@@ -51,16 +55,16 @@ export function useActiveImConversationQueries({
       session?.tenantToken,
       activeConversation?.conversationId,
     ),
-    enabled: Boolean(
-      session &&
-        activeConversation &&
-        activeConversationType === "direct",
-    ),
+    enabled: shouldEnableDirectReadStatusQuery({
+      conversationType: activeConversationType,
+      hasActiveConversation: Boolean(activeConversation),
+      hasSession: Boolean(session),
+    }),
     queryFn: async () =>
       requireApiClient(session).getDirectReadStatus(
         activeConversation!.conversationId,
       ),
-    refetchInterval: 5_000,
+    refetchInterval: activeDirectReadStatusRefetchIntervalMs(),
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     staleTime: 2_000,

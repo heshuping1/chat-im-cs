@@ -6,11 +6,19 @@ import { canAutoReadImConversation } from "../../src/renderer/messages/hooks/use
 const mocks = vi.hoisted(() => ({
   markConversationRead: vi.fn(),
   markImConversationReadLocally: vi.fn(),
+  workspaceUiSnapshot: {
+    activeImConversationId: "",
+    activeImConversationVisibility: "hidden",
+    activeModule: "messages",
+  },
 }));
 
 vi.mock("../../src/renderer/data/auth/auth-store", () => ({
   getAuthSessionSnapshot: () => ({
     apiBaseUrl: "https://api.example.test",
+    platformUserId: "platform-staff-1",
+    spaceType: 2,
+    tenantId: "tenant-1",
     tenantToken: "tenant-token",
     userId: "staff-1",
   }),
@@ -33,10 +41,7 @@ vi.mock("../../src/renderer/data/im-read/im-read-store", () => ({
 }));
 
 vi.mock("../../src/renderer/data/workspace-ui/workspace-ui-store", () => ({
-  getWorkspaceUiSnapshot: () => ({
-    activeImConversationId: "",
-    activeModule: "messages",
-  }),
+  getWorkspaceUiSnapshot: () => mocks.workspaceUiSnapshot,
 }));
 
 vi.mock("../../src/renderer/data/reminder/reminder-store", () => ({
@@ -46,8 +51,19 @@ vi.mock("../../src/renderer/data/reminder/reminder-store", () => ({
 }));
 
 describe("gateway IM side effects", () => {
+  const scopedConversationsKey = [
+    "pc-im-conversations",
+    "workspace|https://api.example.test|tenant|tenant-1|staff-1|platform-staff-1",
+    100,
+  ];
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.workspaceUiSnapshot = {
+      activeImConversationId: "",
+      activeImConversationVisibility: "hidden",
+      activeModule: "messages",
+    };
     mocks.markConversationRead.mockResolvedValue(undefined);
   });
 
@@ -57,7 +73,7 @@ describe("gateway IM side effects", () => {
     );
     const queryClient = new QueryClient();
     queryClient.setQueryData(["pc-im-messages", "base", "tenant", "direct", "direct-1"], []);
-    queryClient.setQueryData<ConversationListResponse>(["pc-im-conversations"], {
+    queryClient.setQueryData<ConversationListResponse>(scopedConversationsKey, {
       items: [
         {
           conversationId: "direct-1",
@@ -86,7 +102,7 @@ describe("gateway IM side effects", () => {
     expect(mocks.markImConversationReadLocally).not.toHaveBeenCalled();
     expect(mocks.markConversationRead).not.toHaveBeenCalled();
     expect(
-      queryClient.getQueryData<ConversationListResponse>(["pc-im-conversations"])
+      queryClient.getQueryData<ConversationListResponse>(scopedConversationsKey)
         ?.items[0]?.unreadCount,
     ).toBe(1);
   });
@@ -96,7 +112,7 @@ describe("gateway IM side effects", () => {
       "../../src/renderer/data/gateway/gateway-im-side-effects"
     );
     const queryClient = new QueryClient();
-    queryClient.setQueryData<ConversationListResponse>(["pc-im-conversations"], {
+    queryClient.setQueryData<ConversationListResponse>(scopedConversationsKey, {
       items: [
         {
           conversationId: "direct-1",
@@ -122,11 +138,100 @@ describe("gateway IM side effects", () => {
       "direct",
     );
 
-    const item = queryClient.getQueryData<ConversationListResponse>([
-      "pc-im-conversations",
-    ])?.items[0];
+    const item = queryClient.getQueryData<ConversationListResponse>(
+      scopedConversationsKey,
+    )?.items[0];
     expect(item?.unreadCount).toBe(0);
     expect(item?.lastReadSeq).toBe(2);
+  });
+
+  it("does not mark an active conversation read from gateway when the chat pane is not visible", async () => {
+    mocks.workspaceUiSnapshot = {
+      activeImConversationId: "direct-1",
+      activeImConversationVisibility: "listOnly",
+      activeModule: "messages",
+    };
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+    const queryClient = new QueryClient();
+    queryClient.setQueryData<ConversationListResponse>(scopedConversationsKey, {
+      items: [
+        {
+          conversationId: "direct-1",
+          conversationType: "direct",
+          lastMessageSeq: 0,
+          lastReadSeq: 0,
+          title: "Direct",
+          unreadCount: 0,
+        },
+      ],
+    });
+
+    mergeImGatewayMessage(
+      queryClient,
+      {
+        conversationId: "direct-1",
+        conversationSeq: 1,
+        messageId: "m-1",
+        messageType: "text",
+        senderUserId: "user-2",
+        text: "9999999999",
+      },
+      "direct-1",
+      "direct",
+    );
+
+    expect(mocks.markImConversationReadLocally).not.toHaveBeenCalled();
+    expect(mocks.markConversationRead).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData<ConversationListResponse>(scopedConversationsKey)
+        ?.items[0]?.unreadCount,
+    ).toBe(1);
+  });
+
+  it("marks a peer gateway message read only when the active conversation pane is visible", async () => {
+    mocks.workspaceUiSnapshot = {
+      activeImConversationId: "direct-1",
+      activeImConversationVisibility: "paneVisible",
+      activeModule: "messages",
+    };
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+    const queryClient = new QueryClient();
+    queryClient.setQueryData<ConversationListResponse>(scopedConversationsKey, {
+      items: [
+        {
+          conversationId: "direct-1",
+          conversationType: "direct",
+          lastMessageSeq: 0,
+          lastReadSeq: 0,
+          title: "Direct",
+          unreadCount: 0,
+        },
+      ],
+    });
+
+    mergeImGatewayMessage(
+      queryClient,
+      {
+        conversationId: "direct-1",
+        conversationSeq: 2,
+        messageId: "m-visible",
+        messageType: "text",
+        senderUserId: "user-2",
+      },
+      "direct-1",
+      "direct",
+    );
+
+    expect(mocks.markImConversationReadLocally).toHaveBeenCalledWith("direct-1", 2);
+    expect(mocks.markConversationRead).toHaveBeenCalledWith("direct", "direct-1", 2);
+    expect(
+      queryClient.getQueryData<ConversationListResponse>(scopedConversationsKey)
+        ?.items[0]?.unreadCount,
+    ).toBe(0);
   });
 
   it("allows automatic read only for visible conversations with loaded messages", () => {

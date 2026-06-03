@@ -12,6 +12,12 @@ export function createAuthSessionAppliedState<LocalReads, PeerReads, ReadState>(
 ) {
   return {
     authSession,
+    activeImConversationId: "",
+    activeImConversationVisibility: "hidden" as const,
+    activeThreadId: "",
+    activeThreadOpenSource: "none" as const,
+    openServiceThreadIds: [],
+    realtimeReminders: [],
     locallyReadImConversationReads: reloaders.readLocalReads(authSession),
     imPeerReadReceipts: reloaders.readPeerReads(authSession),
     imReadStateByConversation: reloaders.readReadState(authSession),
@@ -25,6 +31,7 @@ export function createAuthSessionClearedState() {
     activeThreadOpenSource: "none" as const,
     openServiceThreadIds: [],
     activeImConversationId: "",
+    activeImConversationVisibility: "hidden" as const,
     locallyReadImConversationReads: {},
     imPeerReadReceipts: {},
     imReadStateByConversation: {},

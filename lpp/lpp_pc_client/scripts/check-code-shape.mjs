@@ -5,7 +5,14 @@ const repoRoot = process.cwd();
 const sourceRoots = ["src/renderer", "src/shared", "src/main", "src/preload"];
 const sourceExtensions = new Set([".ts", ".tsx", ".cts"]);
 const maxLines = 900;
-const largeFileAllowlist = new Map();
+const largeFileAllowlist = new Map([
+  ["src/renderer/components/CustomerProfileWorkspace.tsx", "P19 documented customer profile workspace owner"],
+  ["src/renderer/components/MessageCenter.tsx", "P19 documented IM page assembly owner"],
+  ["src/renderer/components/OnlineServicePage.tsx", "P19 documented online service page assembly owner"],
+  ["src/renderer/components/Sidebar.tsx", "P19 documented app sidebar assembly owner"],
+  ["src/renderer/data/api/customer-service-client.ts", "P19 documented customer-service API client owner"],
+  ["src/renderer/data/api/types.ts", "P19 documented API DTO contract owner"],
+]);
 
 const failures = [];
 const warnings = [];

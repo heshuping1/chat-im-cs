@@ -1,12 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  rememberCustomerServiceConversationIndex,
+  resetCustomerServiceConversationIndexForTest,
+} from "../../src/renderer/data/customer-service/cs-conversation-index";
+import { workspaceScopeKeyFromSession } from "../../src/renderer/data/workspace-scope";
+
 const mocks = vi.hoisted(() => ({
   notifyDesktopOrBrowser: vi.fn(),
   pushRealtimeReminder: vi.fn(),
+  pcSettings: {
+    desktopNotifications: true,
+    customerServiceMessageNotifications: true,
+    notificationSound: true,
+    serviceQueueNotifications: true,
+  },
 }));
 
 vi.mock("../../src/renderer/data/auth/auth-store", () => ({
-  getAuthSessionSnapshot: () => ({ tenantToken: "tenant-token", userId: "staff-1" }),
+  getAuthSessionSnapshot: () => ({
+    apiBaseUrl: "https://api.example.test",
+    platformUserId: "platform-user-1",
+    spaceType: 2,
+    tenantId: "tenant-1",
+    tenantToken: "tenant-token",
+    userId: "staff-1",
+  }),
 }));
 
 vi.mock("../../src/renderer/data/reminder/reminder-store", () => ({
@@ -14,18 +33,21 @@ vi.mock("../../src/renderer/data/reminder/reminder-store", () => ({
 }));
 
 vi.mock("../../src/renderer/data/settings/settings-store", () => ({
-  getPcSettingsSnapshot: () => ({
-    desktopNotifications: true,
-    notificationSound: true,
-    serviceQueueNotifications: true,
-  }),
+  getPcSettingsSnapshot: () => mocks.pcSettings,
 }));
 
 vi.mock("../../src/renderer/data/reminder/reminder-service", () => ({
   isRendererWindowFocused: () => false,
   notifyDesktopOrBrowser: mocks.notifyDesktopOrBrowser,
+  shouldPushCustomerServiceQueueReminder: (settings: { serviceQueueNotifications?: boolean }) =>
+    settings.serviceQueueNotifications === true,
+  shouldPushCustomerServiceThreadMessageReminder: (settings: { customerServiceMessageNotifications?: boolean }) =>
+    settings.customerServiceMessageNotifications === true,
   shouldPushRealtimeReminder: () => true,
   shouldShowDesktopNotification: () => true,
+  shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget: (
+    settings: { customerServiceMessageNotifications?: boolean },
+  ) => settings.customerServiceMessageNotifications === true,
   shouldShowDesktopNotificationForTarget: () => true,
 }));
 
@@ -39,6 +61,11 @@ vi.mock("../../src/renderer/data/workspace-ui/workspace-ui-store", () => ({
 describe("gateway customer service side effects", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pcSettings.desktopNotifications = true;
+    mocks.pcSettings.customerServiceMessageNotifications = true;
+    mocks.pcSettings.notificationSound = true;
+    mocks.pcSettings.serviceQueueNotifications = true;
+    resetCustomerServiceConversationIndexForTest();
   });
 
   it("passes source avatar into queue reminders and desktop notifications", async () => {
@@ -79,7 +106,7 @@ describe("gateway customer service side effects", () => {
     );
   });
 
-  it("pushes visitor messages into online-service serviceQueue reminders", async () => {
+  it("pushes visitor messages into online-service thread message reminders", async () => {
     const { mergeCustomerServiceGatewayMessage } = await import(
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
@@ -112,6 +139,131 @@ describe("gateway customer service side effects", () => {
       }),
       expect.objectContaining({
         channel: "serviceQueue",
+      }),
+    );
+  });
+
+  it("does not let queue reminder settings block active thread visitor messages", async () => {
+    mocks.pcSettings.serviceQueueNotifications = false;
+    const { mergeCustomerServiceGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+    const queryClient = {
+      setQueriesData: vi.fn(),
+    };
+
+    mergeCustomerServiceGatewayMessage(
+      queryClient as never,
+      {
+        conversationId: "active-service-conversation",
+        messageId: "visitor-message-with-queue-off",
+        messageType: "text",
+        senderRole: "visitor",
+        body: { text: "new visitor message" },
+      },
+      "active-service-thread",
+    );
+
+    expect(mocks.pushRealtimeReminder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetId: "active-service-thread",
+        targetModule: "onlineService",
+      }),
+    );
+  });
+
+  it("uses thread message settings to block active visitor message reminders", async () => {
+    mocks.pcSettings.customerServiceMessageNotifications = false;
+    const { mergeCustomerServiceGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+    const queryClient = {
+      setQueriesData: vi.fn(),
+    };
+
+    mergeCustomerServiceGatewayMessage(
+      queryClient as never,
+      {
+        conversationId: "active-service-conversation",
+        messageId: "visitor-message-with-message-off",
+        messageType: "text",
+        senderRole: "visitor",
+        body: { text: "new visitor message" },
+      },
+      "active-service-thread",
+    );
+
+    expect(mocks.pushRealtimeReminder).not.toHaveBeenCalled();
+    expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+  });
+
+  it("uses queue settings to block queue reminders", async () => {
+    mocks.pcSettings.serviceQueueNotifications = false;
+    const { notifyCustomerServiceQueue } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+
+    notifyCustomerServiceQueue(
+      {
+        source: "官网",
+        thread: {
+          title: "官网访客",
+        },
+      },
+      "thread-queue-disabled",
+    );
+
+    expect(mocks.pushRealtimeReminder).not.toHaveBeenCalled();
+    expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+  });
+
+  it("uses indexed temp-session threadId for widget gateway messages that only carry conversationId", async () => {
+    const { mergeCustomerServiceGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+    const scopeKey = workspaceScopeKeyFromSession({
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-1",
+      spaceType: 2,
+      tenantId: "tenant-1",
+      tenantToken: "tenant-token",
+      userId: "staff-1",
+    });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "widget-conversation-1",
+      scopeKey,
+      threadId: "widget-thread-1",
+      threadType: "temp_session",
+    });
+    const queryClient = {
+      setQueriesData: vi.fn(),
+    };
+
+    mergeCustomerServiceGatewayMessage(
+      queryClient as never,
+      {
+        conversationId: "widget-conversation-1",
+        conversationType: "temp_session",
+        messageId: "widget-message-1",
+        messageType: "text",
+        senderRole: "visitor",
+        sourceType: "widget",
+        body: { text: "99998888" },
+      },
+      "widget-conversation-1",
+    );
+
+    const detailUpdate = queryClient.setQueriesData.mock.calls[1]?.[1] as
+      | ((old: unknown) => unknown)
+      | undefined;
+    expect(detailUpdate?.({ messages: [] })).toMatchObject({
+      threadId: "widget-thread-1",
+      threadType: "temp_session",
+    });
+    expect(mocks.pushRealtimeReminder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetId: "widget-thread-1",
+        targetModule: "onlineService",
       }),
     );
   });
@@ -160,6 +312,59 @@ describe("gateway customer service side effects", () => {
       }),
     ).toMatchObject({
       queueItems: [{ unreadCount: 3 }],
+    });
+  });
+
+  it("uses sourceType as channel ownership rather than sender role in side effects", async () => {
+    const { mergeCustomerServiceGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+    const queryClient = {
+      setQueriesData: vi.fn(),
+    };
+
+    mergeCustomerServiceGatewayMessage(
+      queryClient as never,
+      {
+        conversationId: "im-customer-service-thread",
+        messageId: "staff-source-type-im",
+        messageType: "text",
+        senderUserId: "staff-1",
+        sourceType: "im",
+        body: { text: "agent reply" },
+      },
+      "im-customer-service-thread",
+    );
+
+    expect(mocks.pushRealtimeReminder).not.toHaveBeenCalled();
+    expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+
+    const detailUpdate = queryClient.setQueriesData.mock.calls[1]?.[1] as
+      | ((old: unknown) => unknown)
+      | undefined;
+    expect(detailUpdate?.({ messages: [] })).toMatchObject({
+      threadId: "im-customer-service-thread",
+      threadType: "im_direct",
+    });
+
+    const listUpdate = queryClient.setQueriesData.mock.calls.at(-1)?.[1] as
+      | ((old: unknown) => unknown)
+      | undefined;
+    expect(
+      listUpdate?.({
+        activeItems: [],
+        queueItems: [
+          {
+            conversationId: "im-customer-service-thread",
+            threadId: "im-customer-service-thread",
+            threadType: "im_direct",
+            unreadCount: 2,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      activeItems: [],
+      queueItems: [{ threadType: "im_direct", unreadCount: 2 }],
     });
   });
 });

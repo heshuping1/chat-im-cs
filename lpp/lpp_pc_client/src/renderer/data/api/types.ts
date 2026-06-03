@@ -9,6 +9,24 @@ export interface PlatformTenant {
   membershipRole?: number;
 }
 
+export interface SpaceUnreadSummaryDto {
+  spaceType: number;
+  tenantId?: string | null;
+  spaceName?: string;
+  tenantCode?: string | null;
+  logoUrl?: string | null;
+  unreadConversationCount?: number;
+  unreadMessageCount?: number;
+  hasUnread?: boolean;
+}
+
+export interface PlatformSpaceUnreadSummaryDto {
+  spaces?: SpaceUnreadSummaryDto[];
+  unreadSpaceCount?: number;
+  totalUnreadConversationCount?: number;
+  totalUnreadMessageCount?: number;
+}
+
 export interface PlatformLoginResult {
   platformUserId: string;
   lppId: string;
@@ -61,6 +79,10 @@ export interface TenantAuthResult {
   accessToken: string;
   refreshToken?: string;
   expiresIn?: number;
+  spaceContext?: {
+    spaceType: number;
+    tenantId?: string | null;
+  };
 }
 
 export interface UserProfileDto {
@@ -761,6 +783,7 @@ export interface CustomerServiceThread {
   updatedAt?: string | null;
   assignedAt?: string | null;
   unreadCount?: number;
+  accessMode?: "workbench" | "management_readonly";
 }
 
 export interface CustomerServiceThreadsResponse {

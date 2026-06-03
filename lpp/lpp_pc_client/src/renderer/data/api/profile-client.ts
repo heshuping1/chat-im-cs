@@ -12,6 +12,7 @@ import type {
   JoinableTenantDto,
   NotificationSettingsDto,
   PlatformJoinResultDto,
+  PlatformSpaceUnreadSummaryDto,
   TenantInfoDto,
   TenantCodePreviewDto,
   PlatformTenant,
@@ -46,6 +47,12 @@ export class ProfileApiClient extends AuthApiClient {
 
   getPlatformTenants() {
     return this.platformRequest<PlatformTenant[]>(endpointPlan.platformTenants);
+  }
+
+  getPlatformSpaceUnreadSummary() {
+    return this.platformRequest<PlatformSpaceUnreadSummaryDto>(
+      endpointPlan.platformSpaceUnreadSummary,
+    );
   }
 
   getAccountDevices() {

@@ -11,6 +11,10 @@ describe("account space session identity", () => {
     resolve(process.cwd(), "src/renderer/data/auth/auth-session.ts"),
     "utf8",
   );
+  const spaceSwitchSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/spaces/hooks/useSpaceSwitchController.ts"),
+    "utf8",
+  );
   const endpointsSource = readFileSync(
     resolve(process.cwd(), "src/renderer/data/api/endpoints.ts"),
     "utf8",
@@ -26,8 +30,10 @@ describe("account space session identity", () => {
 
   it("persists identity hints when switching tenant or personal space", () => {
     expect(accountSpaceSource).toContain("userType: profile?.userType");
-    expect(accountSpaceSource).toContain("spaceType: space ? 2 : 1");
-    expect(accountSpaceSource).toContain("membershipRole: space ? space.membershipRole : undefined");
+    expect(spaceSwitchSource).toContain("spaceType: tenant.spaceContext?.spaceType ?? (space ? 2 : 1)");
+    expect(accountSpaceSource).toContain("spaceType: 2");
+    expect(spaceSwitchSource).toContain("membershipRole: space ? space.membershipRole : undefined");
+    expect(accountSpaceSource).toContain("membershipRole: joinedSpace?.membershipRole");
   });
 
   it("requires a tenant code preview before submitting an enterprise join request", () => {

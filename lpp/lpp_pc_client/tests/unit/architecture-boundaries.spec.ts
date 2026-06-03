@@ -606,6 +606,18 @@ describe("architecture boundaries", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps Sidebar from owning space switch transport or unread-summary parsing", () => {
+    const sidebarSource = readFileSync(
+      join(repoRoot, "src/renderer/components/Sidebar.tsx"),
+      "utf8",
+    );
+
+    expect(sidebarSource).not.toContain("selectTenant(");
+    expect(sidebarSource).not.toContain("selectPersonalSpace(");
+    expect(sidebarSource).not.toContain("getPlatformSpaceUnreadSummary");
+    expect(sidebarSource).not.toContain("PlatformSpaceUnreadSummaryDto");
+  });
+
   it("keeps direct desktopApi calls pinned to documented owners", () => {
     const allowedDirectDesktopApiCallers = new Set([
       "src/renderer/data/app-instance/app-instance.ts",
@@ -626,6 +638,7 @@ describe("architecture boundaries", () => {
       "src/renderer/messages/runtime/messageMediaDesktopActions.ts",
       "src/renderer/messages/runtime/screenshotCapture.ts",
       "src/renderer/settings/components/HelpAboutSettingsSection.tsx",
+      "src/renderer/settings/runtime/chatArchiveFileRuntime.ts",
       "src/renderer/settings/runtime/diagnosticsExport.ts",
     ]);
     const directDesktopApiPattern = /\b(?:window\.)?desktopApi(?:\?\.|\.)\w+/;

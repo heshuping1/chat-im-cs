@@ -1,6 +1,7 @@
 import {
   useWorkspaceStore,
   type CustomerServiceThreadOpenSource,
+  type ActiveImConversationVisibility,
   type GatewayRealtimeStatus,
   type MessageLayoutMode,
   type ServiceLayoutMode,
@@ -12,6 +13,7 @@ import type { CustomerServiceStatus } from "../types";
 
 export type {
   MessageLayoutMode,
+  ActiveImConversationVisibility,
   CustomerServiceThreadOpenSource,
   GatewayRealtimeStatus,
   ServiceAssistantPane,
@@ -29,6 +31,7 @@ export interface WorkspaceUiCompatibleState {
   activeThreadOpenSource: CustomerServiceThreadOpenSource;
   openServiceThreadIds: string[];
   activeImConversationId: string;
+  activeImConversationVisibility: ActiveImConversationVisibility;
   activeContactId: string;
   listPaneWidth: number;
   profilePaneWidth: number;
@@ -57,6 +60,7 @@ export interface WorkspaceUiCompatibleState {
   ) => void;
   closeOpenServiceThread: (id: string) => void;
   setActiveImConversation: (id: string) => void;
+  setActiveImConversationVisibility: (visibility: ActiveImConversationVisibility) => void;
   setActiveContact: (id: string) => void;
   setListPaneWidth: (width: number) => void;
   setProfilePaneWidth: (width: number) => void;
@@ -116,6 +120,12 @@ export function selectActiveImConversationId(state: WorkspaceUiCompatibleState) 
 
 export function selectSetActiveImConversation(state: WorkspaceUiCompatibleState) {
   return state.setActiveImConversation;
+}
+
+export function selectSetActiveImConversationVisibility(
+  state: WorkspaceUiCompatibleState,
+) {
+  return state.setActiveImConversationVisibility;
 }
 
 export function selectActiveContactId(state: WorkspaceUiCompatibleState) {
@@ -345,6 +355,10 @@ export function useSetActiveImConversation() {
   return useWorkspaceStore(selectSetActiveImConversation);
 }
 
+export function useSetActiveImConversationVisibility() {
+  return useWorkspaceStore(selectSetActiveImConversationVisibility);
+}
+
 export function useActiveContactId() {
   return useWorkspaceStore(selectActiveContactId);
 }
@@ -509,6 +523,7 @@ export function getWorkspaceUiSnapshot() {
   const state = useWorkspaceStore.getState();
   return {
     activeImConversationId: state.activeImConversationId,
+    activeImConversationVisibility: state.activeImConversationVisibility,
     activeModule: state.activeModule,
     activeThreadId: state.activeThreadId,
     activeThreadOpenSource: state.activeThreadOpenSource,

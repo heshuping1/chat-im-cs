@@ -1826,8 +1826,15 @@ Base URL：`/api/client/v1/departments`
 |---|---|---|
 | `cursor` | string? | 游标 |
 | `limit` | int? | 默认 50 |
-| `type` | string? | `direct`、`group` 或 `temp_session` |
+| `type` | string? | `direct` 或 `group`（仅用于在 IM 列表内再过滤；见下方说明） |
 | `pinnedOnly` | bool? | 仅置顶会话 |
+
+> **会话边界（2026-06-03 起）**：本接口是**纯 IM 会话列表**，只返回 `direct`（单聊）与 `group`（群聊）。
+> 在线客服的临时会话（`temp_session`，即 Web Widget 访客会话）**不再出现在这里**——它们属于客服工作台，
+> 请改用 `/customer-service/workbench/threads`、`/customer-service/temp-sessions/*` 等客服接口获取。
+> 传 `type=temp_session`（或其它未识别值）会返回空列表，而不会再泄漏客服会话。
+> 注意：IM 客服 direct 线程（用户联系品牌/客服且双方是 1v1 单聊）本身就是真实 `direct` 会话，**仍会**出现在本列表中，
+> 可通过会话的 `serviceMode`（见 [字段与枚举参考](field-enum-reference.md)）区分是否为客服流。
 
 当前 `data` 不是纯数组，而是：
 
@@ -1847,7 +1854,7 @@ Base URL：`/api/client/v1/departments`
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `conversationId` | GUID | 会话 ID |
-| `conversationType` | string | 会话类型：`direct`、`group` 或 `temp_session` |
+| `conversationType` | string | 会话类型：`direct` 或 `group`（本接口不再返回 `temp_session`） |
 | `title` | string | 会话标题；单聊为对端昵称，群聊为群名称 |
 | `avatarUrl` | string? | 会话头像 |
 | `lastMessage` | object? | 最后一条消息摘要；为空表示暂无消息 |
@@ -1861,18 +1868,7 @@ Base URL：`/api/client/v1/departments`
 | `peerUserType` | short? | 单聊对端的用户类型：`1=客户`、`2=员工/客服`、`3=访客`；群聊时为 `null` |
 | `memberCount` | int? | 群成员数；单聊时为 `null` |
 | `ownerUserId` | GUID? | 群主用户 ID；单聊时为 `null` |
-| `tempSession` | object? | 临时会话摘要；仅 `temp_session` 类型有值 |
-
-当 `conversationType=temp_session` 时，`tempSession` 子对象字段：
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `sessionId` | GUID? | 临时会话 ID |
-| `visitorId` | GUID? | 访客 ID |
-| `locale` | string? | 访客语言 |
-| `category` | string? | 会话分类 |
-| `sourceChannel` | string? | 来源渠道 |
-| `visitorName` | string? | 访客名称 |
+| `tempSession` | object? | 历史保留字段；本接口已不返回临时会话，故恒为 `null`（临时会话请走客服接口） |
 
 其中：
 
@@ -2849,7 +2845,9 @@ Hub 路径：`/ws/client`
     "forwardFromMessageId": null,
     "mentions": null,
     "sentAt": "2026-04-08T11:39:59Z",
-    "isRecalled": false
+    "isRecalled": false,
+    "conversationType": "direct",
+    "sourceType": "im"
   }
 }
 ```
@@ -2859,6 +2857,11 @@ Hub 路径：`/ws/client`
 - `appId` 仅在 BOT 发消息场景下可能非空
 - `conversationSeq` 是会话内消息序号
 - `replyToMessageId` / `forwardFromMessageId` / `mentions` / `sentAt` / `isRecalled` 与历史消息 DTO 保持同一语义
+- **`conversationType` / `sourceType`（2026-06-03 新增）**：让客户端无需再查会话即可直接对 `msg.new` 分流在线客服(widget)与 IM。
+  - `sourceType`：消息来源类型，二值 —— `"widget"`(在线客服访客会话) / `"im"`(普通 IM，含单聊与群聊)。客户端分流就一行：`isWidget = msg.sourceType === "widget"`。
+  - `conversationType`：`direct`(单聊) / `group`(群聊) / `temp_session`(widget 访客会话)；与 `/sync`、会话列表的同名字段一致。`sourceType` 与它的对应关系是 `temp_session → widget`、`direct/group → im`。
+  - 两字段由 Gateway 在推送时从会话类型补齐，对所有 `msg.new`（单聊/群聊/转发/系统消息/客服）一致生效。`recall`、`msg.read` 等其它下行事件不带这两个字段。
+  - 注意：**“能否拉黑 / 转接 / 坐席归属 / 接待是否进行中”是会话级属性，不在消息帧里**，请从会话或客服接口获取。`msg.new` 只回答"这条消息来自 widget 还是 IM"。
 
 ### 10.2 `space.notice`
 

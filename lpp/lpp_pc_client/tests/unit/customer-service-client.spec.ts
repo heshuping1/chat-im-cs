@@ -9,6 +9,7 @@ import {
   rememberCustomerServiceStaffSentMessage,
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
+import { workspaceScopeKeyFromSession } from "../../src/renderer/data/workspace-scope";
 
 const testScopeKey = customerServiceIndexScopeKey({
   apiBaseUrl: "https://api.example.test",
@@ -29,9 +30,275 @@ class TestCustomerServiceApiClient extends CustomerServiceApiClient {
   }
 }
 
+class RecordingCustomerServiceApiClient extends CustomerServiceApiClient {
+  readonly requests: Array<{ path: string; admin: boolean }> = [];
+  readonly platformRequests: Array<{ path: string; body?: unknown }> = [];
+
+  constructor(options: {
+    membershipRole?: number;
+    response?: unknown;
+    tenantId?: string;
+  } = {}) {
+    super({
+      baseUrl: "https://api.example.test",
+      membershipRole: options.membershipRole,
+      platformToken: "platform-token",
+      tenantId: options.tenantId,
+      tenantToken: "tenant-token",
+      traceId: "test-trace",
+    });
+    this.response = options.response ?? {
+      activeItems: [],
+      queueItems: [],
+    };
+  }
+
+  private readonly response: unknown;
+
+  override async request<T>(
+    path: string,
+    _init: RequestInit = {},
+    admin = false,
+  ) {
+    this.requests.push({ path, admin });
+    return this.response as T;
+  }
+
+  override async platformRequest<T>(path: string, init: RequestInit = {}) {
+    this.platformRequests.push({
+      path,
+      body: init.body ? JSON.parse(String(init.body)) : undefined,
+    });
+    return { accessToken: "admin-access-token" } as T;
+  }
+}
+
+class WorkspaceScopedCustomerServiceApiClient extends CustomerServiceApiClient {
+  constructor(private readonly response: CustomerServiceThreadsResponse) {
+    super({
+      baseUrl: "https://api.example.test",
+      platformUserId: "platform-user-1",
+      spaceType: 2,
+      tenantId: "tenant-1",
+      tenantToken: "tenant-token",
+      traceId: "test-trace",
+      userId: "user-1",
+    } as never);
+  }
+
+  override async request<T>() {
+    return this.response as T;
+  }
+}
+
 describe("CustomerServiceApiClient", () => {
   beforeEach(() => {
     resetCustomerServiceConversationIndexForTest();
+  });
+
+  it("queries customer service conversations with an admin token for owner workspaces", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: [
+        {
+          conversationId: "conversation-1",
+          lastMessageAt: "2026-06-02T12:00:00.000Z",
+          sessionId: "session-1",
+          status: "closed_timeout",
+          visitorName: "访客 A",
+        },
+      ],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          conversationId: "conversation-1",
+          status: "closed_timeout",
+          threadId: "session-1",
+          threadType: "temp_session",
+          title: "访客 A",
+        },
+      ],
+      queueItems: [],
+      summary: {
+        activeCount: 0,
+        allCount: 0,
+        queuedCount: 0,
+      },
+    });
+    expect(client.platformRequests).toEqual([
+      {
+        body: { tenantId: "tenant-1" },
+        path: "/api/platform/v1/auth/admin-token",
+      },
+    ]);
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/temp-sessions?page=1&pageSize=50",
+      },
+    ]);
+  });
+
+  it("loads owner readonly temp-session detail with the admin token", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        messages: [
+          {
+            body: { text: "hello" },
+            conversationId: "conversation-1",
+            conversationSeq: 1,
+            messageId: "message-1",
+            messageType: "text",
+            sentAt: "2026-06-02T12:00:00.000Z",
+          },
+        ],
+        session: {
+          conversationId: "conversation-1",
+          lastMessageAt: "2026-06-02T12:00:00.000Z",
+          sessionId: "session-1",
+          status: "closed_timeout",
+          visitorName: "访客 A",
+        },
+      },
+    });
+
+    await expect(
+      client.getWorkbenchThreadDetail("temp_session", "session-1"),
+    ).resolves.toMatchObject({
+      accessMode: "management_readonly",
+      conversationId: "conversation-1",
+      messages: [{ messageId: "message-1" }],
+      status: "closed_timeout",
+      threadId: "session-1",
+      title: "访客 A",
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/temp-sessions/session-1",
+      },
+    ]);
+  });
+
+  it("keeps customer service workbench queries on the tenant token for staff workspaces", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 2,
+      tenantId: "tenant-1",
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [],
+      queueItems: [],
+    });
+    expect(client.platformRequests).toEqual([]);
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        path: "/api/client/v1/customer-service/workbench/threads",
+      },
+    ]);
+  });
+
+  it("drops plain IM conversations from customer service workbench snapshots", async () => {
+    const client = new TestCustomerServiceApiClient({
+      activeItems: [
+        {
+          conversationId: "direct-1",
+          status: "active",
+          threadId: "direct-1",
+          threadType: "direct" as never,
+          title: "Plain IM",
+        },
+        {
+          conversationId: "group-1",
+          status: "active",
+          threadId: "group-1",
+          threadType: "group" as never,
+          title: "Plain Group",
+        },
+        {
+          conversationId: "temp-conversation-1",
+          status: "active",
+          threadId: "temp-thread-1",
+          threadType: "temp_session",
+          title: "Visitor",
+        },
+      ],
+      queueItems: [
+        {
+          conversationId: "im-direct-cs-1",
+          status: "queued",
+          threadId: "im-direct-thread-1",
+          threadType: "im_direct",
+          title: "Customer Direct",
+        },
+      ],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          conversationId: "temp-conversation-1",
+          threadId: "temp-thread-1",
+          threadType: "temp_session",
+        },
+      ],
+      queueItems: [
+        {
+          conversationId: "im-direct-cs-1",
+          threadId: "im-direct-thread-1",
+          threadType: "im_direct",
+        },
+      ],
+    });
+  });
+
+  it("drops plain IM conversations from customer service history snapshots", async () => {
+    class HistoryClient extends CustomerServiceApiClient {
+      constructor() {
+        super({
+          baseUrl: "https://api.example.test",
+          tenantToken: "tenant-token",
+          traceId: "test-trace",
+        });
+      }
+
+      override async request<T>() {
+        return {
+          items: [
+            {
+              conversationId: "direct-1",
+              status: "closed",
+              threadId: "direct-1",
+              threadType: "direct",
+              title: "Plain IM",
+            },
+            {
+              conversationId: "temp-conversation-1",
+              status: "closed",
+              threadId: "temp-thread-1",
+              threadType: "temp_session",
+              title: "Visitor",
+            },
+          ],
+        } as T;
+      }
+    }
+
+    await expect(new HistoryClient().getStaffServiceHistory()).resolves.toMatchObject({
+      items: [
+        {
+          conversationId: "temp-conversation-1",
+          threadId: "temp-thread-1",
+          threadType: "temp_session",
+        },
+      ],
+    });
   });
 
   it("overlays missing workbench thread preview and unread from indexed temp-session data", async () => {
@@ -66,6 +333,51 @@ describe("CustomerServiceApiClient", () => {
           lastMessageAt: "2026-06-01T09:59:00.000Z",
           lastMessagePreview: "visitor text",
           unreadCount: 6,
+        },
+      ],
+    });
+  });
+
+  it("uses workspace scope to overlay gateway widget messages after workbench refetch", async () => {
+    const workspaceScopeKey = workspaceScopeKeyFromSession({
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-1",
+      spaceType: 2,
+      tenantId: "tenant-1",
+      tenantToken: "tenant-token",
+      userId: "user-1",
+    });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "widget-conversation-1",
+      lastMessageAt: "2026-06-03T07:51:33.708929Z",
+      lastMessageId: "widget-message-1",
+      lastMessagePreview: "99998888",
+      overlayUnreadCount: 2,
+      scopeKey: workspaceScopeKey,
+      threadId: "widget-thread-1",
+      threadType: "temp_session",
+    });
+    const client = new WorkspaceScopedCustomerServiceApiClient({
+      activeItems: [
+        {
+          conversationId: "widget-conversation-1",
+          lastMessageAt: "2026-06-03T07:51:33.708929Z",
+          lastMessagePreview: null as never,
+          status: "active",
+          threadId: "widget-thread-1",
+          threadType: "temp_session",
+          title: "访客",
+          unreadCount: 0,
+        },
+      ],
+      queueItems: [],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          lastMessagePreview: "99998888",
+          unreadCount: 2,
         },
       ],
     });

@@ -1,11 +1,11 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNLT65F7GCC9",
+  "requestId": "0HNM0Q9OQ6426",
   "data": {
-    "messageId": "019e71c1-3106-7f9c-99ec-dea59c288c1f",
-    "conversationId": "019e71c1-2ef9-72fc-a037-6d02de0a1605",
+    "messageId": "019e8989-3b4a-7031-9969-c931382b77ea",
+    "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
     "conversationSeq": 4,
-    "serverTime": "2026-05-29T03:22:26.9502363\u002B00:00"
+    "serverTime": "2026-06-02T18:12:12.7462894\u002B00:00"
   }
 }

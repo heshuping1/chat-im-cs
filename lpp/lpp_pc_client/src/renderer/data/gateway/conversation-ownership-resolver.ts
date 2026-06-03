@@ -37,6 +37,35 @@ export function resolveConversationOwnership(
   const thread = asRecord(payload.thread);
   const tempSession = firstRecord(payload.tempSession);
   const conversationId = payloadConversationId(payload);
+  const sourceTypeThreadType = tempSessionThreadTypeFromSourceType(
+    payload,
+    message,
+    conversation,
+    thread,
+    tempSession,
+  );
+  if (sourceTypeThreadType) {
+    const indexed = scopeKey
+      ? getCustomerServiceConversationIndex(conversationId || "", scopeKey)
+      : undefined;
+    return {
+      owner: "customerService",
+      confidence: "explicit",
+      conversationId: indexed?.conversationId || conversationId,
+      threadId: tempSessionThreadId(
+        payload,
+        message,
+        thread,
+        tempSession,
+        indexed?.threadId,
+        conversationId,
+      ),
+      threadType: sourceTypeThreadType,
+      reason: "explicit-source-widget",
+      scopeKey,
+      source,
+    };
+  }
 
   if (hasExplicitTempSession(payload, message, conversation, thread, tempSession)) {
     const threadId =
@@ -57,6 +86,25 @@ export function resolveConversationOwnership(
     };
   }
 
+  if (hasExplicitCustomerServiceDirectType(payload, message, conversation, thread)) {
+    const threadId =
+      stringField(thread, "threadId") ||
+      stringField(payload, "threadId") ||
+      stringField(message, "threadId") ||
+      stringField(conversation, "threadId") ||
+      conversationId;
+    return {
+      owner: "customerService",
+      confidence: "explicit",
+      conversationId,
+      threadId,
+      threadType: "im_direct",
+      reason: "explicit-customer-service-direct",
+      scopeKey,
+      source,
+    };
+  }
+
   if (hasExplicitImType(payload, message, conversation, thread)) {
     return {
       owner: "im",
@@ -70,34 +118,34 @@ export function resolveConversationOwnership(
 
   if (!scopeKey) {
     return {
-      owner: "im",
+      owner: "unknown",
       confidence: "unknown",
       conversationId,
-      reason: "default-im-missing-scope",
+      reason: "missing-ownership-evidence",
       scopeKey,
       source,
     };
   }
 
   const indexed = getCustomerServiceConversationIndex(conversationId || "", scopeKey);
-  if (indexed?.threadType === "temp_session") {
+  if (indexed?.threadType === "temp_session" || indexed?.threadType === "im_direct") {
     return {
       owner: "customerService",
       confidence: "indexed",
       conversationId: indexed.conversationId || conversationId,
       threadId: indexed.threadId,
-      threadType: "temp_session",
-      reason: "indexed-temp-session",
+      threadType: indexed.threadType,
+      reason: indexed.threadType === "temp_session" ? "indexed-temp-session" : "indexed-im-direct",
       scopeKey,
       source,
     };
   }
 
   return {
-    owner: "im",
+    owner: "unknown",
     confidence: "unknown",
     conversationId,
-    reason: "default-im",
+    reason: "missing-ownership-evidence",
     scopeKey,
     source,
   };
@@ -158,14 +206,61 @@ function hasExplicitImType(
     stringField(thread, "threadType", "conversationType", "type"),
   ]
     .map(normalizeType)
+    .some((value) => ["direct", "group"].includes(value));
+}
+
+function hasExplicitCustomerServiceDirectType(
+  payload: Record<string, unknown>,
+  message: Record<string, unknown>,
+  conversation: Record<string, unknown>,
+  thread: Record<string, unknown>,
+) {
+  return [
+    stringField(payload, "threadType", "conversationType", "type"),
+    stringField(message, "threadType", "conversationType", "type"),
+    stringField(conversation, "threadType", "conversationType", "type"),
+    stringField(thread, "threadType", "conversationType", "type"),
+  ]
+    .map(normalizeType)
     .some((value) =>
-      [
-        "direct",
-        "im_direct",
-        "direct_customer",
-        "customer_direct",
-        "group",
-        "im_group",
-      ].includes(value),
+      ["direct_customer", "customer_direct", "im_direct"].includes(value),
     );
+}
+
+function tempSessionThreadTypeFromSourceType(
+  payload: Record<string, unknown>,
+  message: Record<string, unknown>,
+  conversation: Record<string, unknown>,
+  thread: Record<string, unknown>,
+  tempSession: Record<string, unknown>,
+): "temp_session" | undefined {
+  const sourceType = [
+    stringField(payload, "sourceType", "source_type"),
+    stringField(message, "sourceType", "source_type"),
+    stringField(conversation, "sourceType", "source_type"),
+    stringField(thread, "sourceType", "source_type"),
+    stringField(tempSession, "sourceType", "source_type"),
+  ]
+    .map(normalizeType)
+    .find(Boolean);
+  if (sourceType === "widget") return "temp_session";
+  return undefined;
+}
+
+function tempSessionThreadId(
+  payload: Record<string, unknown>,
+  message: Record<string, unknown>,
+  thread: Record<string, unknown>,
+  tempSession: Record<string, unknown>,
+  indexedThreadId?: string,
+  conversationId?: string,
+) {
+  return (
+    stringField(tempSession, "sessionId", "threadId") ||
+    stringField(thread, "threadId") ||
+    stringField(payload, "threadId") ||
+    stringField(message, "threadId") ||
+    indexedThreadId ||
+    conversationId
+  );
 }

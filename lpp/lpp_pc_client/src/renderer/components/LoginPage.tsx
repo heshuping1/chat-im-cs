@@ -323,14 +323,15 @@ export function LoginPage() {
       fetchTenantInfo(baseUrl, login.accessToken ?? ""),
     ]);
     const isPersonal = login.spaceContext?.spaceType === 1;
-    rememberLoginSite(baseUrl);
+    const loginSite = rememberLoginSite(baseUrl);
     setAuthSession({
       apiBaseUrl: baseUrl,
+      adminBaseUrl: loginSite.adminBaseUrl,
       tenantToken: login.accessToken ?? "",
       platformToken: login.platformToken,
       platformRefreshToken: login.platformRefreshToken,
       refreshToken: login.refreshToken,
-      tenantId: isPersonal ? undefined : login.tenantId ?? tenantInfo?.tenantId,
+      tenantId: login.tenantId ?? tenantInfo?.tenantId,
       tenantCode: isPersonal ? undefined : tenantInfo?.tenantCode,
       tenantName: isPersonal ? "个人空间" : tenantInfo?.tenantName,
       tenantLogoUrl: isPersonal ? undefined : tenantInfo?.logoUrl,
@@ -358,14 +359,15 @@ export function LoginPage() {
       fetchSessionProfile(baseUrl, tenant.accessToken),
       isPersonal ? Promise.resolve(null) : fetchTenantInfo(baseUrl, tenant.accessToken),
     ]);
-    rememberLoginSite(baseUrl);
+    const loginSite = rememberLoginSite(baseUrl);
     setAuthSession({
       apiBaseUrl: baseUrl,
+      adminBaseUrl: loginSite.adminBaseUrl,
       tenantToken: tenant.accessToken,
       platformToken: login.platformToken,
       platformRefreshToken: login.platformRefreshToken,
       refreshToken: tenant.refreshToken,
-      tenantId: isPersonal ? undefined : currentTenant?.tenantId ?? selectedTenant?.tenantId ?? tenant.tenantId,
+      tenantId: tenant.tenantId ?? currentTenant?.tenantId ?? selectedTenant?.tenantId,
       tenantCode: isPersonal ? undefined : currentTenant?.tenantCode ?? selectedTenant?.tenantCode,
       tenantName: isPersonal
         ? "个人空间"
@@ -377,7 +379,7 @@ export function LoginPage() {
       displayName: profile?.displayName ?? tenant.displayName,
       avatarUrl: profile?.avatarUrl ?? tenant.avatarUrl,
       userType: profile?.userType ?? login.userType ?? undefined,
-      spaceType: isPersonal ? 1 : 2,
+      spaceType: tenant.spaceContext?.spaceType ?? (isPersonal ? 1 : 2),
       membershipRole: isPersonal ? undefined : selectedTenant?.membershipRole,
       roleLabel: isPersonal ? "个人空间" : getAuthTenantRoleLabel(selectedTenant?.membershipRole),
       tenants: login.tenants,
@@ -471,10 +473,9 @@ export function LoginPage() {
 
 function rememberLoginSite(baseUrl: string) {
   if (baseUrl.replace(/\/$/, "") === primarySiteBaseUrl) {
-    siteLineManager.selectSite(primarySiteLine);
-    return;
+    return siteLineManager.selectSite(primarySiteLine);
   }
-  siteLineManager.selectSite({
+  return siteLineManager.selectSite({
     id: baseUrl,
     name: "当前登录线路",
     apiBaseUrl: baseUrl,

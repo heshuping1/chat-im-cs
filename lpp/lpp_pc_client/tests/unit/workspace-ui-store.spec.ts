@@ -29,6 +29,7 @@ describe("workspace ui store selectors", () => {
       activeThreadOpenSource: "user" as const,
       openServiceThreadIds: ["thread-1", "thread-2"],
       activeImConversationId: "conversation-1",
+      activeImConversationVisibility: "paneVisible" as const,
       activeContactId: "contact-1",
       listPaneWidth: 220,
       profilePaneWidth: 400,
@@ -54,6 +55,7 @@ describe("workspace ui store selectors", () => {
       openCustomerServiceThread: vi.fn(),
       closeOpenServiceThread,
       setActiveImConversation: vi.fn(),
+      setActiveImConversationVisibility: vi.fn(),
       setActiveContact: vi.fn(),
       setListPaneWidth: vi.fn(),
       setProfilePaneWidth: vi.fn(),
@@ -155,6 +157,39 @@ describe("workspace ui store selectors", () => {
         activeThreadId: previousState.activeThreadId,
         activeThreadOpenSource: previousState.activeThreadOpenSource,
         openServiceThreadIds: previousState.openServiceThreadIds,
+      });
+    }
+  });
+
+  it("opens the message module as a list until a conversation is explicitly selected", () => {
+    const previousState = useWorkspaceStore.getState();
+    try {
+      useWorkspaceStore.setState({
+        activeImConversationId: "conversation-1",
+        activeImConversationVisibility: "paneVisible",
+        activeModule: "contacts",
+      });
+
+      useWorkspaceStore.getState().setActiveModule("messages");
+      expect(useWorkspaceStore.getState()).toMatchObject({
+        activeImConversationId: "",
+        activeImConversationVisibility: "hidden",
+        activeModule: "messages",
+      });
+
+      useWorkspaceStore.getState().setActiveImConversation("conversation-2");
+      expect(useWorkspaceStore.getState()).toMatchObject({
+        activeImConversationId: "conversation-2",
+        activeModule: "messages",
+      });
+
+      useWorkspaceStore.getState().setActiveImConversationVisibility("paneVisible");
+      expect(useWorkspaceStore.getState().activeImConversationVisibility).toBe("paneVisible");
+    } finally {
+      useWorkspaceStore.setState({
+        activeImConversationId: previousState.activeImConversationId,
+        activeImConversationVisibility: previousState.activeImConversationVisibility,
+        activeModule: previousState.activeModule,
       });
     }
   });

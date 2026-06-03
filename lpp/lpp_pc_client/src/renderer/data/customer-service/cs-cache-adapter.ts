@@ -12,6 +12,7 @@ import {
   rememberCustomerServiceStaffSentMessage,
 } from "./cs-conversation-index";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import { isQueryInWorkspaceScope, workspaceScopeKeyFromSession } from "../workspace-scope";
 import {
   customerServiceMessageFromSendResult,
   latestCustomerServiceMessage,
@@ -71,15 +72,18 @@ export function mergeSentCustomerServiceMessage(
     messageType: CustomerServiceCacheMessageKind;
     body: Record<string, unknown>;
     identity?: CurrentUserIdentity | null;
+    scopeKey?: string;
   },
 ) {
   const message = customerServiceMessageFromSendResult(params);
-  const scopeKey = customerServiceIndexScopeKey(params.identity as never);
+  const imCacheScopeKey = customerServiceCacheScopeKey(params.scopeKey, params.identity);
+  const indexScopeKey =
+    imCacheScopeKey || customerServiceIndexScopeKey(params.identity as never);
   rememberCustomerServiceConversationMessageOverlay({
     conversationId: params.thread.conversationId,
     message,
     read: true,
-    scopeKey,
+    scopeKey: indexScopeKey,
     source: "send",
     threadId: params.thread.threadId,
     threadType: params.thread.threadType,
@@ -87,10 +91,15 @@ export function mergeSentCustomerServiceMessage(
   rememberCustomerServiceStaffSentMessage({
     conversationId: params.thread.conversationId,
     message,
-    scopeKey,
+    scopeKey: indexScopeKey,
     threadId: params.thread.threadId,
     threadType: params.thread.threadType,
   });
+  removeCustomerServiceConversationFromImCache(
+    queryClient,
+    params.thread.conversationId,
+    imCacheScopeKey,
+  );
   appendCustomerServiceMessageToDetail(queryClient, params.thread, message);
   updateCustomerServiceThreadPreviewInList(queryClient, {
     message,
@@ -126,6 +135,27 @@ export function mergeSentCustomerServiceMessage(
       threadType: params.thread.threadType,
     },
   });
+}
+
+function customerServiceCacheScopeKey(
+  explicitScopeKey: string | undefined,
+  identity?: CurrentUserIdentity | null,
+) {
+  if (explicitScopeKey) return explicitScopeKey;
+  const record = identity as unknown as Record<string, unknown> | undefined;
+  if (typeof record?.scopeKey === "string" && record.scopeKey.trim()) {
+    return record.scopeKey.trim();
+  }
+  if (
+    typeof record?.apiBaseUrl === "string" &&
+    typeof record?.spaceType === "number" &&
+    typeof record?.tenantId === "string" &&
+    typeof record?.userId === "string" &&
+    typeof record?.platformUserId === "string"
+  ) {
+    return workspaceScopeKeyFromSession(record as never);
+  }
+  return undefined;
 }
 
 export function appendCustomerServiceLocalMessage(
@@ -354,6 +384,11 @@ export function applyCustomerServiceGatewayMessageCache(
     threadId: params.threadId,
     threadType: params.threadType,
   });
+  removeCustomerServiceConversationFromImCache(
+    queryClient,
+    params.conversationId || params.message.conversationId || params.threadId,
+    params.scopeKey,
+  );
   const thread = {
     conversationId: params.threadId,
     status: "",
@@ -402,6 +437,28 @@ export function applyCustomerServiceGatewayMessageCache(
       threadType: params.threadType,
     },
   });
+}
+
+function removeCustomerServiceConversationFromImCache(
+  queryClient: QueryClient,
+  conversationId?: string,
+  scopeKey?: string,
+) {
+  if (!conversationId) return;
+  queryClient.setQueriesData<{ items: Array<{ conversationId?: string }> }>(
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-conversations" &&
+        isQueryInWorkspaceScope(query, scopeKey),
+    },
+    (old) =>
+      old
+        ? {
+            ...old,
+            items: old.items.filter((item) => item.conversationId !== conversationId),
+          }
+        : old,
+  );
 }
 
 function appendCustomerServiceMessageToDetail(

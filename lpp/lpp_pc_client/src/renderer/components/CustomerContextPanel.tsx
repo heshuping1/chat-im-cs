@@ -11,6 +11,7 @@ import {
 import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
+import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import { useActiveThreadId } from "../data/workspace-ui/workspace-ui-store";
 import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
 
@@ -22,6 +23,7 @@ export function useCustomerContextPanelModel() {
     [session],
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken];
+  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -30,7 +32,7 @@ export function useCustomerContextPanelModel() {
   });
   const historyQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
-    enabled: Boolean(client),
+    enabled: Boolean(client && canUseStaffEndpoints),
     queryFn: async () =>
       client!.getStaffServiceHistory({ threadType: "temp_session", limit: 50 }),
   });

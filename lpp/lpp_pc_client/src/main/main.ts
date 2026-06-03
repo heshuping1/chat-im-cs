@@ -4,6 +4,7 @@ import {
   desktopCapturer,
   dialog,
   ipcMain,
+  Menu,
   nativeImage,
   screen,
   shell,
@@ -87,6 +88,8 @@ const appInstanceIdentityPromise = readOrCreateAppInstanceIdentity(appInstancePr
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let trayStatus: TrayStatus = 'online';
+let minimizeToTray = true;
+let isQuitting = false;
 let taskbarBadgeCount = 0;
 let taskbarBadgeUrgent = false;
 const registeredDesktopIpcChannels = new Set<string>();
@@ -97,7 +100,10 @@ if (!singleInstanceLock) {
   app.quit();
 }
 
-app.once('will-quit', releaseProfileInstanceLock);
+app.once('will-quit', () => {
+  isQuitting = true;
+  releaseProfileInstanceLock();
+});
 
 function handleDesktopIpc<Args extends unknown[]>(
   method: DesktopApiMethod,
@@ -154,6 +160,12 @@ function createWindow() {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 
+  mainWindow.on('close', (event) => {
+    if (!minimizeToTray || isQuitting) return;
+    if (!ensureTray()) return;
+    event.preventDefault();
+    mainWindow?.hide();
+  });
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -163,15 +175,46 @@ function createWindow() {
 }
 
 function ensureTray() {
-  if (tray) return;
+  if (tray) return true;
   const emptyIcon = process.platform === 'win32' ? appIconPath : undefined;
-  if (!emptyIcon) return;
+  if (!emptyIcon) return false;
   try {
     tray = new Tray(emptyIcon);
     tray.setToolTip(appTitle);
+    tray.on('click', showMainWindow);
+    updateTrayContextMenu();
+    updateTrayTooltip();
   } catch {
     tray = null;
   }
+  return Boolean(tray);
+}
+
+function showMainWindow() {
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+}
+
+function updateTrayContextMenu() {
+  if (!tray) return;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '显示主窗口', click: showMainWindow },
+      { type: 'separator' },
+      {
+        label: '退出 LPP 客服客户端',
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
 }
 
 function updateTrayTooltip() {
@@ -241,6 +284,20 @@ handleDesktopIpc('clearAuthSession', async () => clearSecureAuthSession());
 
 handleDesktopIpc('getAppInstanceProfile', async () => appInstanceIdentityPromise);
 
+handleDesktopIpc('getLaunchAtStartup', async () => getLaunchAtStartup());
+
+handleDesktopIpc('setLaunchAtStartup', async (_event, enabled: boolean) => {
+  setLaunchAtStartup(enabled);
+  return getLaunchAtStartup();
+});
+
+handleDesktopIpc('getMinimizeToTray', async () => minimizeToTray);
+
+handleDesktopIpc('setMinimizeToTray', async (_event, enabled: boolean) => {
+  minimizeToTray = enabled && ensureTray();
+  return minimizeToTray;
+});
+
 handleDesktopIpc('openAppProfile', async (_event, profileId?: string) => {
   const nextProfileId = profileId?.trim() || await nextAvailableProfileId();
   openProfileInstance(nextProfileId);
@@ -304,6 +361,17 @@ handleDesktopIpc('setTrayStatus', async (_event, status: TrayStatus) => {
   updateTrayTooltip();
 });
 
+function getLaunchAtStartup() {
+  return app.getLoginItemSettings().openAtLogin;
+}
+
+function setLaunchAtStartup(enabled: boolean) {
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    openAsHidden: false,
+  });
+}
+
 async function recordCsRoutingDiagnostic(payload: CsRoutingDiagnosticPayload) {
   await diagnosticsWriter('cs-routing.jsonl', 500).write(payload);
 }
@@ -336,12 +404,11 @@ app.whenReady().then(() => {
 });
 
 app.on('second-instance', () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.focus();
+  showMainWindow();
 });
 
 app.on('window-all-closed', () => {
+  if (minimizeToTray && !isQuitting) return;
   if (process.platform !== 'darwin') app.quit();
 });
 

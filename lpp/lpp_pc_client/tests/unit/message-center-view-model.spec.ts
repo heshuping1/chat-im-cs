@@ -7,7 +7,7 @@ import {
 import type { ConversationListItem, FriendDto } from "../../src/renderer/data/api/types";
 
 describe("message center view model", () => {
-  it("selects active conversation with visible fallback and derives stable keys", () => {
+  it("selects an explicitly active conversation and derives stable keys", () => {
     const conversations = [
       conversation({ conversationId: "hidden", title: "Hidden", conversationType: "group" }),
       conversation({ conversationId: "visible", title: "Visible", conversationType: "direct" }),
@@ -15,7 +15,7 @@ describe("message center view model", () => {
 
     expect(
       createMessageCenterViewModel({
-        activeConversationId: "missing",
+        activeConversationId: "visible",
         conversations,
         draftsByConversation: { visible: "draft" },
         friends: [],
@@ -50,10 +50,75 @@ describe("message center view model", () => {
     });
   });
 
-  it("normalizes conversation type aliases and builds direct contact fallback", () => {
+  it("does not default into the first conversation without an active conversation id", () => {
+    const visible = conversation({
+      conversationId: "visible",
+      title: "Visible",
+      conversationType: "direct",
+    });
+
+    expect(
+      createMessageCenterViewModel({
+        activeConversationId: "",
+        conversations: [visible],
+        draftsByConversation: { visible: "draft" },
+        friends: [],
+        groupMembers: [],
+        imReadStateByConversation: {
+          "direct:visible": {
+            conversationId: "visible",
+            conversationKey: "direct:visible",
+            conversationType: "direct",
+            lastMessageSeq: 2,
+            myReadSeq: 1,
+            peerReadSeq: 0,
+            unreadCount: 1,
+            updatedAt: 1,
+          },
+        },
+        unreadIdentity: null,
+        visibleConversations: [visible],
+      }),
+    ).toMatchObject({
+      activeConversation: undefined,
+      activeConversationDraft: "",
+      activeConversationHeaderTitle: "",
+      activeConversationIsGroup: false,
+      activeConversationKey: undefined,
+      activeConversationReadState: undefined,
+      activeConversationType: undefined,
+      selectedConversation: false,
+    });
+  });
+
+  it("does not fallback to the first conversation when the active id is stale", () => {
+    const visible = conversation({
+      conversationId: "visible",
+      title: "Visible",
+      conversationType: "direct",
+    });
+
+    expect(
+      createMessageCenterViewModel({
+        activeConversationId: "missing",
+        conversations: [visible],
+        draftsByConversation: { visible: "draft" },
+        friends: [],
+        groupMembers: [],
+        imReadStateByConversation: {},
+        unreadIdentity: null,
+        visibleConversations: [visible],
+      }),
+    ).toMatchObject({
+      activeConversation: undefined,
+      selectedConversation: false,
+    });
+  });
+
+  it("builds direct contact fallback for strict direct conversations", () => {
     const direct = conversation({
       conversationId: "c1",
-      conversationType: "im-direct",
+      conversationType: "direct",
       peerUserId: "u2",
       title: "Alice",
     });
@@ -83,6 +148,16 @@ describe("message center view model", () => {
       name: "Alice Friend",
     });
     expect(viewModel.activeConversationContact).not.toHaveProperty("source");
+  });
+
+  it("does not treat customer-service direct aliases as IM conversations", () => {
+    const directCustomer = conversation({
+      conversationId: "c1",
+      conversationType: "direct_customer",
+      title: "Service Direct",
+    });
+
+    expect(getImConversationType(directCustomer)).toBeUndefined();
   });
 
   it("does not inject fake source channel for direct conversation fallback contacts", () => {

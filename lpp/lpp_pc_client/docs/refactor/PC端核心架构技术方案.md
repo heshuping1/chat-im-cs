@@ -107,6 +107,7 @@ Infrastructure
 6. 头像、时间、badge、空态、错误态、媒体预览、通知等公共能力不得重复散落实现。
 7. Electron IPC 必须 typed、validated、最小能力暴露。
 8. 新增依赖、替换技术、扩大公共抽象、删除核心旧链路前必须找负责人确认。
+9. 服务端 API/Gateway 违反合同或缺少强归属字段时，先作为服务端合同异常记录并提醒；PC 端不得用猜测归属、默认纳入或 UI 兜底修补来破坏 DDD 边界。
 
 ---
 
@@ -159,6 +160,7 @@ Infrastructure
 3. 字段缺失、字段别名、枚举兼容、权限失败必须有稳定降级规则。
 4. React Query query key 是公共合同，变更前必须确认影响范围。
 5. wire shape 变化优先更新 API 合同和 fixture，再改 UI。
+6. 服务端返回与 API 合同冲突时，先输出脱敏证据和合同缺口提醒；仅允许在 API/Gateway 防腐层做白名单阻断或显式隔离，不允许把错误数据解释成其它领域事实。
 
 字段依赖细节见 `architecture/PC端API合同与字段依赖矩阵.md`。
 

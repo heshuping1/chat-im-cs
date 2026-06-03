@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import {
+  rememberCustomerServiceConversationIndex,
+  resetCustomerServiceConversationIndexForTest,
+} from "../../src/renderer/data/customer-service/cs-conversation-index";
+import {
+  isVisibleImConversationInScope,
+} from "../../src/renderer/data/im/im-conversation-boundary";
 import {
   filterMessageConversations,
   sortMessageConversations,
@@ -7,6 +14,10 @@ import {
 import type { ConversationListItem } from "../../src/renderer/data/api/types";
 
 describe("message conversation list model", () => {
+  beforeEach(() => {
+    resetCustomerServiceConversationIndexForTest();
+  });
+
   it("sorts pinned conversations first, then unread, then recent activity", () => {
     const oldUnread = conversation({
       conversationId: "old-unread",
@@ -81,6 +92,24 @@ describe("message conversation list model", () => {
         { userId: "current-user" },
       ).map((item) => item.conversationId),
     ).toEqual(["effective-unread", "raw-unread-but-read"]);
+  });
+
+  it("hides direct-shaped conversations once the customer-service index owns them", () => {
+    const directShapedCustomerService = conversation({
+      conversationId: "indexed-cs-conversation",
+      conversationType: "direct",
+      title: "新会话",
+    });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "indexed-cs-conversation",
+      scopeKey: "scope-a",
+      source: "send",
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    expect(isVisibleImConversationInScope(directShapedCustomerService, "scope-a")).toBe(false);
+    expect(isVisibleImConversationInScope(directShapedCustomerService, "scope-b")).toBe(true);
   });
 });
 

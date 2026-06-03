@@ -3,6 +3,7 @@ import type { AuthSession } from "../auth/auth-session";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 import { recordMessageSourceObserved } from "../diagnostics/message-source-diagnostics";
 import { recordMessageTraceEvent } from "../diagnostics/message-trace-diagnostics";
+import { isStrictImConversationType } from "../im/im-conversation-boundary";
 import type { CustomerServiceStatus } from "../types";
 import {
   mergeCustomerServiceGatewayMessage,
@@ -12,6 +13,9 @@ import {
   mergeImGatewayMessage,
   mergeReadEvent,
 } from "./gateway-im-side-effects";
+import {
+  classifyCustomerServiceGatewayPayload,
+} from "./gateway-cs-payload-utils";
 import {
   invalidateCustomerServiceGatewayQueries,
 } from "./gateway-query-invalidation";
@@ -81,7 +85,7 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
         source: input.source,
         summary: {
           latency: deliveryLatencySummary(input.payload),
-          payload: input.payload,
+          message: deliveryPayloadSummary(input.payload),
           threadId: input.threadId,
         },
       });
@@ -106,7 +110,7 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
         source: input.source,
         summary: {
           latency: deliveryLatencySummary(input.payload),
-          payload: input.payload,
+          message: deliveryPayloadSummary(input.payload),
           threadId: input.threadId,
         },
       });
@@ -115,6 +119,25 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
     },
 
     deliverImMessage(input: DeliverImMessageInput) {
+      const ownershipGuard = evaluateImOwnershipGuard(input, scopeKey);
+      if (ownershipGuard) {
+        recordDeliveryGuardDiagnostic({
+          guard: ownershipGuard,
+          owner: "im",
+          route: input.route,
+          scopeKey,
+          source: input.source,
+        });
+        if (ownershipGuard.reason === "unknown-ownership") {
+          triggerMessageGapSync(queryClient, {
+            conversationId: ownershipGuard.conversationId,
+            reason: "unknown-ownership",
+            scopeKey,
+            source: "message-delivery-service",
+          });
+        }
+        return;
+      }
       const guard = evaluateDeliveryGuard({
         conversationId: input.conversationId,
         owner: "im",
@@ -147,7 +170,7 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
           conversationId: input.conversationId,
           conversationType: input.conversationType,
           latency: deliveryLatencySummary(input.payload),
-          payload: input.payload,
+          message: deliveryPayloadSummary(input.payload),
         },
       });
       recordDeliveryTraceEvent({
@@ -177,7 +200,7 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
         summary: {
           conversationId: input.conversationId,
           latency: deliveryLatencySummary(input.payload),
-          payload: input.payload,
+          message: deliveryPayloadSummary(input.payload),
         },
       });
       mergeReadEvent(queryClient, input.payload, session);
@@ -203,13 +226,74 @@ interface DeliveryGuardResult {
   gapSize?: number;
   highestSeqBefore?: number;
   messageId?: string;
-  reason: "accepted" | "duplicate-message-id" | "duplicate-or-stale-seq" | "seq-gap";
+  reason:
+    | "accepted"
+    | "customer-service-payload"
+    | "duplicate-message-id"
+    | "duplicate-or-stale-seq"
+    | "non-im-conversation-type"
+    | "seq-gap"
+    | "unknown-ownership";
   seq?: number;
 }
 
 const deliveredMessageIds = new Set<string>();
 const highestSeqByConversation = new Map<string, number>();
 const maxGuardEntries = 5000;
+
+function evaluateImOwnershipGuard(
+  input: DeliverImMessageInput,
+  scopeKey: string,
+): DeliveryGuardResult | null {
+  const metadata = deliveryMetadata({
+    conversationId: input.conversationId,
+    owner: "im",
+    payload: input.payload,
+    scopeKey,
+  });
+  const strictImType = isStrictImConversationType(input.conversationType);
+  const ownership = classifyCustomerServiceGatewayPayload(
+    strictImType ? { ...input.payload, conversationType: input.conversationType } : input.payload,
+    scopeKey,
+  );
+  if (ownership.isCustomerService) {
+    return {
+      conversationId: metadata.conversationId || ownership.conversationId,
+      decision: "skip",
+      messageId: metadata.messageId,
+      reason: "customer-service-payload",
+      seq: metadata.seq,
+    };
+  }
+  if (!strictImType && input.conversationType) {
+    return {
+      conversationId: metadata.conversationId,
+      decision: "skip",
+      messageId: metadata.messageId,
+      reason: "non-im-conversation-type",
+      seq: metadata.seq,
+    };
+  }
+  if (ownership.owner === "unknown") {
+    return {
+      conversationId: metadata.conversationId || ownership.conversationId,
+      decision: "skip",
+      messageId: metadata.messageId,
+      reason: "unknown-ownership",
+      seq: metadata.seq,
+    };
+  }
+  if (!strictImType) {
+    return {
+      conversationId: metadata.conversationId,
+      decision: "skip",
+      messageId: metadata.messageId,
+      reason: "non-im-conversation-type",
+      seq: metadata.seq,
+    };
+  }
+  return null;
+}
 
 function evaluateDeliveryGuard(input: DeliveryGuardInput): DeliveryGuardResult {
   const metadata = deliveryMetadata(input);
@@ -312,7 +396,7 @@ function recordDeliveryGuardDiagnostic(input: {
       messageId: input.guard.messageId,
       owner: input.owner,
       reason: input.guard.reason,
-      scopeKey: input.scopeKey,
+      scopeKey: diagnosticScopeKey(input.scopeKey),
       seq: input.guard.seq,
     },
   });
@@ -401,11 +485,11 @@ export function recordGatewayPushReceived(input: {
     classification: {
       argCount: input.args?.length ?? 0,
       eventName: input.eventName,
-      scopeKey: input.scopeKey,
+      scopeKey: input.scopeKey ? diagnosticScopeKey(input.scopeKey) : undefined,
     },
     summary: {
       latency: deliveryLatencySummary(input.payload),
-      payload: input.payload,
+      message: deliveryPayloadSummary(input.payload),
     },
   });
 }
@@ -487,8 +571,53 @@ function recordMessageDeliveryDiagnostic(input: {
     route: input.route,
     classification: {
       owner: input.owner,
-      scopeKey: input.scopeKey,
+      scopeKey: diagnosticScopeKey(input.scopeKey),
     },
     summary: input.summary,
   });
+}
+
+function deliveryPayloadSummary(payload: Record<string, unknown> | undefined) {
+  if (!payload) return undefined;
+  const message = messageRecord(payload);
+  return {
+    clientMsgId:
+      stringField(message, "clientMsgId", "clientMessageId") ||
+      stringField(payload, "clientMsgId", "clientMessageId") ||
+      undefined,
+    conversationId:
+      stringField(message, "conversationId", "threadId") ||
+      stringField(payload, "conversationId", "threadId") ||
+      undefined,
+    conversationSeq:
+      numberField(message, "conversationSeq", "seq") ||
+      numberField(payload, "conversationSeq", "seq") ||
+      undefined,
+    messageId:
+      stringField(message, "messageId") ||
+      stringField(payload, "messageId") ||
+      undefined,
+    messageType:
+      stringField(message, "messageType", "type") ||
+      stringField(payload, "messageType", "type") ||
+      undefined,
+    sentAt:
+      stringField(message, "sentAt", "sendTime", "createdAt", "serverTime", "timestamp") ||
+      stringField(payload, "sentAt", "sendTime", "createdAt", "serverTime", "timestamp") ||
+      undefined,
+  };
+}
+
+function diagnosticScopeKey(value: string) {
+  return `[scope-key len=${value.length} hash=${hashString(value)}]`;
+}
+
+function hashString(value: string) {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= BigInt(value.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return hash.toString(16).padStart(16, "0").slice(0, 12);
 }

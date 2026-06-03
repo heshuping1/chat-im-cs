@@ -10,6 +10,8 @@ import type {
 } from "../data/api-client";
 import type { CurrentUserIdentity } from "../data/message-display";
 import { pcQueryKeys } from "../data/query-keys";
+import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
+import { workspaceScopeFromSession, workspaceScopeDiagnostic } from "../data/workspace-scope";
 import { requireApiClient } from "../data/runtime";
 import { useAuthSession } from "../data/auth/auth-store";
 import { failedMessageRetryAction } from "../data/message/message-retry-model";
@@ -37,6 +39,7 @@ import {
   useMessageProfileVisible,
   useProfilePaneWidth,
   useSetActiveImConversation,
+  useSetActiveImConversationVisibility,
   useSetActiveModule,
   useSetContactFilter,
   useSetListPaneWidth,
@@ -45,7 +48,6 @@ import {
   useSetMessageProfileVisible,
   useSetProfilePaneWidth,
 } from "../data/workspace-ui/workspace-ui-store";
-import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
 import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
 import { useMessageDetailSync } from "../lib/useMessageDetailSync";
 import { MessageConversationSidebar } from "../messages/components/MessageConversationSidebar";
@@ -74,6 +76,10 @@ import { useMessageConversationSelection } from "../messages/hooks/useMessageCon
 import { useMessageListScrollRegistry } from "../messages/hooks/useMessageListScrollRegistry";
 import { useMessageContactPickerData } from "../messages/hooks/useMessageContactPickerData";
 import { useMessageContactProfileController } from "../messages/hooks/useMessageContactProfileController";
+import { useAutoTranslateConversationPreference } from "../translation/hooks/useAutoTranslateConversationPreference";
+import { useAutoTranslateMessages } from "../translation/hooks/useAutoTranslateMessages";
+import { autoTranslateTargetLanguage } from "../translation/models/autoTranslateModel";
+import { nextAutoTranslateConversationMode } from "../translation/models/autoTranslatePreferences";
 import {
   useMessageGroupManagement,
   type GroupFileFilter,
@@ -182,6 +188,7 @@ export function MessageCenter() {
   const setMessageProfileVisible = useSetMessageProfileVisible();
   const messageLayoutMode = useMessageLayoutMode();
   const setMessageLayoutMode = useSetMessageLayoutMode();
+  const setActiveImConversationVisibility = useSetActiveImConversationVisibility();
   const setActiveModule = useSetActiveModule();
   const setContactFilter = useSetContactFilter();
   const queryClient = useQueryClient();
@@ -272,7 +279,7 @@ export function MessageCenter() {
   }, [messageContextPaneOrder]);
 
   const conversationsQuery = useQuery({
-    queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
+    queryKey: pcQueryKeys.imConversationsForSession(session),
     enabled: Boolean(session),
     queryFn: async () => requireApiClient(session).getConversations({ limit: 100 }),
     gcTime: 30 * 60_000,
@@ -281,6 +288,20 @@ export function MessageCenter() {
     refetchOnWindowFocus: false,
     staleTime: 2 * 60_000,
   });
+  useEffect(() => {
+    if (!session || !conversationsQuery.data) return;
+    recordMessageReminderDiagnostic({
+      event: "im.scope.query-visible",
+      source: "message-center",
+      phase: "query",
+      route: "conversation-list",
+      classification: {
+        itemCount: conversationsQuery.data.items.length,
+        queryKey: pcQueryKeys.imConversationsForSession(session),
+        scope: workspaceScopeDiagnostic(workspaceScopeFromSession(session)),
+      },
+    });
+  }, [conversationsQuery.data, session]);
 
   const {
     activeConversation,
@@ -434,6 +455,36 @@ export function MessageCenter() {
     serverMessages: messagesQuery.data ?? [],
     unreadIdentity,
   });
+  const autoTranslateConversationKind =
+    activeConversationType === "group" ? "im-group" : "im-direct";
+  const autoTranslateScopeKey = useMemo(
+    () => workspaceScopeFromSession(session).key,
+    [session],
+  );
+  const {
+    enabled: autoTranslateEffective,
+    mode: autoTranslateConversationMode,
+    setMode: setAutoTranslateConversationMode,
+  } = useAutoTranslateConversationPreference({
+    conversationId: activeConversation?.conversationId,
+    conversationKind: autoTranslateConversationKind,
+    globalEnabled: pcSettings.autoTranslate,
+    scopeKey: autoTranslateScopeKey,
+  });
+  const autoTranslateIsMineMessage = useCallback(
+    (message: MessageItemDto) => isMineMessage(message, session),
+    [session],
+  );
+  useAutoTranslateMessages({
+    annotations: messageAnnotations,
+    conversationKey: activeConversation?.conversationId,
+    enabled: autoTranslateEffective,
+    isMineMessage: autoTranslateIsMineMessage,
+    messages: visibleMessages,
+    session,
+    setAnnotations: setMessageAnnotations,
+    targetLanguage: autoTranslateTargetLanguage(pcSettings.language),
+  });
   useImSendOutboxRestore({
     activeConversation,
     activeConversationType,
@@ -470,6 +521,9 @@ export function MessageCenter() {
     conversationId: activeConversation?.conversationId,
     messageLayoutMode,
   });
+  useEffect(() => {
+    setActiveImConversationVisibility(activeConversationVisibility);
+  }, [activeConversationVisibility, setActiveImConversationVisibility]);
   const activeConversationMessagesLoaded = messagesQuery.data !== undefined;
   useEffect(() => {
     recordMessageReminderDiagnostic({
@@ -900,6 +954,8 @@ export function MessageCenter() {
         activeConversationMessagesLoaded={activeConversationMessagesLoaded}
         activeConversationReadState={activeConversationReadState}
         activeConversationType={activeConversationType}
+        autoTranslateConversationMode={autoTranslateConversationMode}
+        autoTranslateEffective={autoTranslateEffective}
         avatarProfilePopover={avatarProfilePopover}
         contactCardActionPending={
           contactProfileController.contactCardActionPending
@@ -961,6 +1017,11 @@ export function MessageCenter() {
         multiSelectMode={multiSelectMode}
         notice={notice}
         onAvatarProfileClose={() => setAvatarProfilePopover(null)}
+        onCycleAutoTranslateMode={() =>
+          setAutoTranslateConversationMode(
+            nextAutoTranslateConversationMode(autoTranslateConversationMode),
+          )
+        }
         onContactCardAccept={() => {
           const relation = contactProfileController.contactCardRelation;
           if (relation?.status !== "incomingPending") return;

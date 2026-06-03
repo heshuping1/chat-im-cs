@@ -59,8 +59,8 @@ test("settings left navigation does not jump between bottom sections", async ({ 
     await expect(page.getByRole("heading", { name: "设置中心" })).toBeVisible();
 
     const nav = page.locator(".settings-nav");
-    const storageButton = page.getByRole("button", { name: /存储与诊断/ });
-    const helpButton = page.getByRole("button", { name: /帮助与关于/ });
+    const storageButton = page.getByRole("button", { name: /存储诊断/ });
+    const helpButton = page.getByRole("button", { name: /关于/ });
     const navBox = await nav.boundingBox();
     const storageBox = await storageButton.boundingBox();
     const helpBox = await helpButton.boundingBox();

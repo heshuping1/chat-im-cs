@@ -102,7 +102,7 @@ describe("createCustomerServiceGatewayDispatchHandlers", () => {
     expect(handled).toEqual(["temp_session:thread-2"]);
   });
 
-  it("does not claim direct-customer compatibility message events without temp-session evidence", () => {
+  it("claims direct-customer message events as online-service direct threads", () => {
     const handled: string[] = [];
     const result = handleFirstStageCustomerServiceGatewayEvent(
       {
@@ -130,8 +130,8 @@ describe("createCustomerServiceGatewayDispatchHandlers", () => {
       },
     );
 
-    expect(result).toBe(false);
-    expect(handled).toEqual([]);
+    expect(result).toBe(true);
+    expect(handled).toEqual(["im_direct:thread-direct-customer"]);
   });
 
   it("does not claim unsupported non-customer-service events", () => {

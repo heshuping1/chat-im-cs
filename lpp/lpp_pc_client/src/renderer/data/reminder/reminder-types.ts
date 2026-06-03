@@ -29,6 +29,7 @@ export type ReminderPolicySettings = Pick<
   | "desktopNotifications"
   | "doNotDisturb"
   | "imNotifications"
+  | "customerServiceMessageNotifications"
   | "notificationPreview"
   | "notificationSound"
   | "serviceQueueNotifications"

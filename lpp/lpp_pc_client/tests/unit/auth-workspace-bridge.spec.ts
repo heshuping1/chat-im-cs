@@ -24,6 +24,12 @@ describe("auth workspace bridge", () => {
 
     expect(next).toEqual({
       authSession: session,
+      activeImConversationId: "",
+      activeImConversationVisibility: "hidden",
+      activeThreadId: "",
+      activeThreadOpenSource: "none",
+      openServiceThreadIds: [],
+      realtimeReminders: [],
       locallyReadImConversationReads: { direct: { readSeq: 1 } },
       imPeerReadReceipts: { direct: { readSeq: 2 } },
       imReadStateByConversation: { direct: { conversationId: "direct" } },
@@ -40,6 +46,7 @@ describe("auth workspace bridge", () => {
       activeThreadOpenSource: "none",
       openServiceThreadIds: [],
       activeImConversationId: "",
+      activeImConversationVisibility: "hidden",
       locallyReadImConversationReads: {},
       imPeerReadReceipts: {},
       imReadStateByConversation: {},

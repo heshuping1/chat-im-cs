@@ -26,6 +26,7 @@ import {
   createCustomerServiceNoThreadState,
 } from "../data/customer-service/cs-workspace-view-model";
 import { isMineCustomerServiceMessage } from "../data/customer-service/cs-reminder-model";
+import { workspaceScopeFromSession } from "../data/workspace-scope";
 import { formatError } from "../lib/format";
 import {
   hasOpenableMessageMedia,
@@ -59,6 +60,10 @@ import {
 import { CustomerServiceWorkspaceHeader } from "../customer-service/components/CustomerServiceWorkspaceHeader";
 import { CustomerServiceReceptionStrip } from "../customer-service/components/CustomerServiceReceptionStrip";
 import { CustomerServiceMessageStage } from "../customer-service/components/CustomerServiceMessageStage";
+import { useAutoTranslateConversationPreference } from "../translation/hooks/useAutoTranslateConversationPreference";
+import { useAutoTranslateMessages } from "../translation/hooks/useAutoTranslateMessages";
+import { autoTranslateTargetLanguage } from "../translation/models/autoTranslateModel";
+import { nextAutoTranslateConversationMode } from "../translation/models/autoTranslatePreferences";
 import { useCustomerServiceIncomingNotifications } from "../customer-service/hooks/useCustomerServiceIncomingNotifications";
 import { useCustomerServiceThreadLifecycle } from "../customer-service/hooks/useCustomerServiceThreadLifecycle";
 import { useCustomerServiceSendController } from "../customer-service/hooks/useCustomerServiceSendController";
@@ -94,6 +99,7 @@ export function ChatWorkspace({
   const activeThreadOpenSource = useActiveThreadOpenSource();
   const [notice, setNotice] = useState<string | null>(null);
   const [messageMenu, setMessageMenu] = useState<ServiceMessageMenuState>(null);
+  const [messageAnnotations, setMessageAnnotations] = useState<Record<string, string>>({});
   const [knowledgeDrawerOpen, setKnowledgeDrawerOpen] = useState(false);
   const [aiDraftDrawer, setAiDraftDrawer] = useState<AiDraftDrawerState>(null);
   const composerRef = useRef<MessageComposerHandle | null>(null);
@@ -177,6 +183,36 @@ export function ChatWorkspace({
     selectedThread,
     session,
     title,
+  });
+  const autoTranslateConversationModeKey =
+    selectedThread?.threadId || selectedThread?.conversationId;
+  const autoTranslateScopeKey = useMemo(
+    () => workspaceScopeFromSession(session).key,
+    [session],
+  );
+  const {
+    enabled: autoTranslateEffective,
+    mode: autoTranslateConversationMode,
+    setMode: setAutoTranslateConversationMode,
+  } = useAutoTranslateConversationPreference({
+    conversationId: autoTranslateConversationModeKey,
+    conversationKind: "customer-service",
+    globalEnabled: pcSettings.autoTranslate,
+    scopeKey: autoTranslateScopeKey,
+  });
+  const autoTranslateIsMineMessage = useCallback(
+    (message: MessageItemDto) => isMineMessage(message, session),
+    [session],
+  );
+  useAutoTranslateMessages({
+    annotations: messageAnnotations,
+    conversationKey: autoTranslateConversationModeKey,
+    enabled: autoTranslateEffective,
+    isMineMessage: autoTranslateIsMineMessage,
+    messages,
+    session,
+    setAnnotations: setMessageAnnotations,
+    targetLanguage: autoTranslateTargetLanguage(pcSettings.language),
   });
 
   useEffect(() => {
@@ -364,7 +400,14 @@ export function ChatWorkspace({
         risky={isRiskyCustomerServiceThread(selectedThread)}
         source={source}
         title={title}
+        autoTranslateEffective={autoTranslateEffective}
+        autoTranslateMode={autoTranslateConversationMode}
         unreadCount={selectedThread.unreadCount}
+        onCycleAutoTranslateMode={() =>
+          setAutoTranslateConversationMode(
+            nextAutoTranslateConversationMode(autoTranslateConversationMode),
+          )
+        }
         onOpenCustomerContext={onOpenCustomerContext}
       />
 
@@ -391,6 +434,7 @@ export function ChatWorkspace({
         authToken={session?.tenantToken}
         isMineMessage={(message) => isMineMessage(message, session)}
         jumpToLatest={jumpToLatest}
+        messageAnnotations={messageAnnotations}
         messageMenu={messageMenu}
         messages={messages}
         messageStageState={messageStageState}

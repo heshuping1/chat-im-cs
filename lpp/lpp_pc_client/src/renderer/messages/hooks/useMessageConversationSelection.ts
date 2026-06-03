@@ -2,10 +2,11 @@ import { useEffect, useMemo } from "react";
 
 import type { ConversationListItem } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { customerServiceIndexScopeKey } from "../../data/customer-service/cs-conversation-index";
 import { resolveImConversationReadView } from "../../data/im-read/im-conversation-read-view";
+import { isVisibleImConversationInScope } from "../../data/im/im-conversation-boundary";
 import {
   type CurrentUserIdentity,
-  isImConversation,
 } from "../../data/message-display";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
 import {
@@ -56,11 +57,15 @@ export function useMessageConversationSelection({
         : null,
     [imReadStateByConversation, locallyReadConversationReads, session],
   );
+  const ownershipScopeKey = useMemo(
+    () => (session ? customerServiceIndexScopeKey(session) : undefined),
+    [session],
+  );
   const conversations = useMemo(
     () =>
       sortMessageConversations(
         conversationItems
-          .filter((item) => isImConversation(item))
+          .filter((item) => isVisibleImConversationInScope(item, ownershipScopeKey))
           .filter((item) => !localHiddenConversationIds.has(item.conversationId))
           .map((item) =>
             localMutedConversationIds.has(item.conversationId)
@@ -73,6 +78,7 @@ export function useMessageConversationSelection({
       conversationItems,
       localHiddenConversationIds,
       localMutedConversationIds,
+      ownershipScopeKey,
       unreadIdentity,
     ],
   );
@@ -140,11 +146,10 @@ export function useMessageConversationSelection({
     }
   }, [conversations, unreadIdentity]);
 
-  const activeConversation =
-    visibleConversations.find((item) => item.conversationId === activeConversationId) ??
-    conversations.find((item) => item.conversationId === activeConversationId) ??
-    visibleConversations[0] ??
-    conversations[0];
+  const activeConversation = activeConversationId
+    ? visibleConversations.find((item) => item.conversationId === activeConversationId) ??
+      conversations.find((item) => item.conversationId === activeConversationId)
+    : undefined;
   const activeConversationType = getImConversationType(activeConversation);
   const activeConversationKey =
     activeConversation && activeConversationType

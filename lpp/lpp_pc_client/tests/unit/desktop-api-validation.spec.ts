@@ -6,6 +6,7 @@ import {
 } from "../../src/shared/desktop-api";
 import {
   validateCacheMediaFilePayload,
+  validateChatArchiveFilePayload,
   validateCsRoutingDiagnosticPayload,
   validateDesktopApiCall,
   validateDesktopIpcCall,
@@ -27,9 +28,33 @@ describe("desktop api validation", () => {
     expect(methods).toContain("cacheLocalMediaFile");
     expect(methods).toContain("openAppProfile");
     expect(methods).toContain("getAppInstanceProfile");
+    expect(methods).toContain("getLaunchAtStartup");
+    expect(methods).toContain("setLaunchAtStartup");
+    expect(methods).toContain("getMinimizeToTray");
+    expect(methods).toContain("setMinimizeToTray");
     expect(methods).toContain("recordCsRoutingDiagnostic");
     expect(methods).toContain("recordMessageReminderDiagnostic");
+    expect(methods).toContain("saveChatArchiveFile");
+    expect(methods).toContain("openChatArchiveFile");
     expect(desktopIpcChannelByMethod.cacheLocalMediaFile).toBe("desktop:cache-local-media-file");
+    expect(desktopIpcChannelByMethod.saveChatArchiveFile).toBe(
+      "desktop:save-chat-archive-file",
+    );
+    expect(desktopIpcChannelByMethod.openChatArchiveFile).toBe(
+      "desktop:open-chat-archive-file",
+    );
+    expect(desktopIpcChannelByMethod.getLaunchAtStartup).toBe(
+      "desktop:get-launch-at-startup",
+    );
+    expect(desktopIpcChannelByMethod.setLaunchAtStartup).toBe(
+      "desktop:set-launch-at-startup",
+    );
+    expect(desktopIpcChannelByMethod.getMinimizeToTray).toBe(
+      "desktop:get-minimize-to-tray",
+    );
+    expect(desktopIpcChannelByMethod.setMinimizeToTray).toBe(
+      "desktop:set-minimize-to-tray",
+    );
     expect(desktopIpcChannelByMethod.recordCsRoutingDiagnostic).toBe(
       "desktop:record-cs-routing-diagnostic",
     );
@@ -65,6 +90,12 @@ describe("desktop api validation", () => {
     expect(validateTrayStatus("busy")).toBe("busy");
     expect(validateDesktopApiCall("captureScreenshot", ["ignored"])).toEqual([]);
     expect(validateDesktopApiCall("getAppInstanceProfile", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("getLaunchAtStartup", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("setLaunchAtStartup", [true])).toEqual([true]);
+    expect(validateDesktopApiCall("setLaunchAtStartup", [false])).toEqual([false]);
+    expect(validateDesktopApiCall("getMinimizeToTray", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("setMinimizeToTray", [true])).toEqual([true]);
+    expect(validateDesktopApiCall("setMinimizeToTray", [false])).toEqual([false]);
     expect(validateDesktopApiCall("setTaskbarBadge", [{ count: 84, urgent: true }])).toEqual([
       { count: 84, urgent: true },
     ]);
@@ -96,6 +127,12 @@ describe("desktop api validation", () => {
     ).toThrow("notify.iconDataUrl");
     expect(() => validateTaskbarBadgePayload({ count: -1 })).toThrow("taskbarBadge.count");
     expect(() => validateTaskbarBadgePayload({ count: 1.5 })).toThrow("taskbarBadge.count");
+    expect(() => validateDesktopApiCall("setLaunchAtStartup", ["yes"])).toThrow(
+      "launchAtStartup.enabled",
+    );
+    expect(() => validateDesktopApiCall("setMinimizeToTray", ["yes"])).toThrow(
+      "minimizeToTray.enabled",
+    );
   });
 
   it("validates media payloads without changing valid fields", () => {
@@ -300,7 +337,7 @@ describe("desktop api validation", () => {
       phase: "received",
       route: "im",
       classification: { tenantToken: "[redacted]", route: "im" },
-      summary: { body: { text: "hello" }, conversationId: "conversation-1" },
+      summary: { body: "[redacted-content len=16]", conversationId: "conversation-1" },
     });
     expect(() =>
       validateDesktopApiCall("recordCsRoutingDiagnostic", [
@@ -317,7 +354,12 @@ describe("desktop api validation", () => {
         source: "gateway-im-side-effects",
         phase: "reduce",
         route: "background_conversation",
-        classification: { tenantToken: "raw-token", unreadAfter: 1 },
+        classification: {
+          scopeKey:
+            "https://chat.example.test|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.raw.signature|tenant-1|user-1",
+          tenantToken: "raw-token",
+          unreadAfter: 1,
+        },
         summary: { body: { text: "hello" }, conversationId: "conversation-1" },
       }),
     ).toEqual({
@@ -326,8 +368,12 @@ describe("desktop api validation", () => {
       source: "gateway-im-side-effects",
       phase: "reduce",
       route: "background_conversation",
-      classification: { tenantToken: "[redacted]", unreadAfter: 1 },
-      summary: { body: { text: "hello" }, conversationId: "conversation-1" },
+      classification: {
+        scopeKey: expect.stringMatching(/^\[scope-key len=\d+ hash=[a-f0-9]{12}\]$/),
+        tenantToken: "[redacted]",
+        unreadAfter: 1,
+      },
+      summary: { body: "[redacted-content len=16]", conversationId: "conversation-1" },
     });
     expect(() =>
       validateDesktopApiCall("recordMessageReminderDiagnostic", [
@@ -406,6 +452,58 @@ describe("desktop api validation", () => {
         },
       ]),
     ).toThrow("authSession.tenantToken");
+  });
+
+  it("validates chat archive file payloads without accepting paths or unsafe extensions", () => {
+    expect(
+      validateChatArchiveFilePayload({
+        content: "{\"version\":1}",
+        defaultName: "lpp-chat-export-2026-06-03.json",
+        kind: "export",
+      }),
+    ).toEqual({
+      content: "{\"version\":1}",
+      defaultName: "lpp-chat-export-2026-06-03.json",
+      kind: "export",
+    });
+    expect(
+      validateDesktopApiCall("saveChatArchiveFile", [
+        {
+          content: "{\"version\":1}",
+          defaultName: "lpp-chat-backup-2026-06-03.lpp-chat-backup",
+          filePath: "/tmp/forged.lpp-chat-backup",
+          kind: "backup",
+        },
+      ]),
+    ).toEqual([
+      {
+        content: "{\"version\":1}",
+        defaultName: "lpp-chat-backup-2026-06-03.lpp-chat-backup",
+        kind: "backup",
+      },
+    ]);
+    expect(validateDesktopApiCall("openChatArchiveFile", ["ignored"])).toEqual([]);
+    expect(() =>
+      validateChatArchiveFilePayload({
+        content: "{}",
+        defaultName: "backup.json",
+        kind: "backup",
+      }),
+    ).toThrow("chatArchive.defaultName");
+    expect(() =>
+      validateChatArchiveFilePayload({
+        content: "{}",
+        defaultName: "export.exe",
+        kind: "export",
+      }),
+    ).toThrow("chatArchive.defaultName");
+    expect(() =>
+      validateChatArchiveFilePayload({
+        content: "x".repeat(26 * 1024 * 1024),
+        defaultName: "backup.lpp-chat-backup",
+        kind: "backup",
+      }),
+    ).toThrow("chatArchive.content is too long");
   });
 
   it("rejects null bytes and oversized strings at the boundary", () => {

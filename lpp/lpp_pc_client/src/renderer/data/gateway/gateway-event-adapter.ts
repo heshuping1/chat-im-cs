@@ -93,11 +93,15 @@ function adaptImReadEvent(
   if (readSeq <= 0) {
     return invalid(envelope, "missing_read_seq", ["gateway.read.missing_read_seq"]);
   }
+  const conversationType = inferImConversationType(payload);
+  if (!conversationType) {
+    return invalid(envelope, "missing_conversation_type", ["gateway.read.missing_conversation_type"]);
+  }
   return {
     ...envelope,
     kind: "im.read.received",
     conversationId,
-    conversationType: inferImConversationType(payload) || "direct",
+    conversationType,
     readerIdentity: {
       userId:
         stringField(payload, "userId") ||
@@ -262,10 +266,7 @@ function normalizeImConversationType(value: string): ImConversationType | "" {
   if (
     [
       "direct",
-      "im_direct",
       "direct_chat",
-      "direct_customer",
-      "customer_direct",
       "private",
       "single",
       "single_chat",
@@ -314,16 +315,5 @@ function inferImConversationType(payload: Record<string, unknown>): ImConversati
     stringField(conversation, "peerUserId", "targetUserId", "receiverUserId", "toUserId");
   if (directMarker) return "direct";
 
-  return imConversationId(payload, fallbackConversationIdFromPeer(payload)) ? "direct" : "";
+  return "";
 }
-
-function fallbackConversationIdFromPeer(payload: Record<string, unknown>) {
-  const raw = messageRecord(payload);
-  const conversation = conversationRecord(payload);
-  return (
-    stringField(raw, "peerUserId", "targetUserId", "receiverUserId", "toUserId", "senderUserId") ||
-    stringField(payload, "peerUserId", "targetUserId", "receiverUserId", "toUserId", "senderUserId") ||
-    stringField(conversation, "peerUserId", "targetUserId", "receiverUserId", "toUserId")
-  );
-}
-

@@ -1,4 +1,5 @@
 import { ApiClient } from './api-client';
+import { deriveAdminApiBaseUrl } from './api/base';
 import type { AuthSession } from './auth/auth-session';
 
 export const defaultApiBaseUrl =
@@ -12,8 +13,14 @@ export function createTraceId(prefix = 'pc') {
 export function createApiClient(session: AuthSession) {
   return new ApiClient({
     baseUrl: session.apiBaseUrl,
+    adminBaseUrl: session.adminBaseUrl || deriveAdminApiBaseUrl(session.apiBaseUrl),
     tenantToken: session.tenantToken,
     platformToken: session.platformToken,
+    tenantId: session.tenantId,
+    platformUserId: session.platformUserId,
+    spaceType: session.spaceType,
+    userId: session.userId,
+    membershipRole: session.membershipRole,
     traceId: createTraceId(),
   });
 }

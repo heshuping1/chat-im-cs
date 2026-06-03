@@ -63,6 +63,7 @@ export interface SendOutboxStorage {
 }
 
 export const sendOutboxRetentionMs = 30 * 24 * 60 * 60 * 1000;
+export const sendOutboxInterruptedGraceMs = 10_000;
 const outboxDbName = "lpp-pc-send-outbox";
 const outboxDbVersion = 1;
 const recordsStoreName = "records";
@@ -147,6 +148,15 @@ export function interruptedOutboxMessage(message: MessageItemDto): MessageItemDt
     uploadPhase: "failed",
     uploadProgress: undefined,
   } as MessageItemDto;
+}
+
+export function shouldMarkOutboxRecordInterrupted(
+  record: Pick<SendOutboxRecord, "createdAt" | "status" | "updatedAt">,
+  now = Date.now(),
+) {
+  if (!["queued", "uploading", "sending", "paused"].includes(record.status)) return false;
+  const latestActivityAt = Math.max(record.createdAt, record.updatedAt);
+  return now - latestActivityAt >= sendOutboxInterruptedGraceMs;
 }
 
 export async function createOutboxFile(

@@ -20,6 +20,7 @@ import {
   type MessageCoreEvent,
 } from "../../data/message-core/message-core";
 import { pcQueryKeys } from "../../data/query-keys";
+import { isQueryInWorkspaceScope, workspaceScopeKeyFromSession } from "../../data/workspace-scope";
 import { currentIsoTimestamp, timestampFromDateValue } from "../../lib/format";
 import { getImConversationType } from "./messageConversationTypeModel";
 import { messageActionPreview } from "./messageListModel";
@@ -65,9 +66,9 @@ export function appendLocalMessage(
     localTaskId?: string;
   } = {},
 ) {
-  const queryKey = pcQueryKeys.imMessages(
-    session?.apiBaseUrl,
-    session?.tenantToken,
+  const scopeKey = workspaceScopeKeyFromSession(session);
+  const queryKey = pcQueryKeys.imMessagesForSession(
+    session,
     getImConversationType(conversation),
     conversation.conversationId,
   );
@@ -111,7 +112,11 @@ export function appendLocalMessage(
     ).state.messages;
   });
   queryClient.setQueriesData<{ items: ConversationListItem[] }>(
-    { queryKey: ["pc-im-conversations"] },
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-conversations" &&
+        isQueryInWorkspaceScope(query, scopeKey),
+    },
     (old) =>
       old
         ? {
@@ -158,9 +163,9 @@ export function replaceLocalMessageInCache(
   body: Record<string, unknown>,
   result: { messageId?: string; conversationId?: string; conversationSeq?: number; serverTime?: string },
 ) {
-  const queryKey = pcQueryKeys.imMessages(
-    session?.apiBaseUrl,
-    session?.tenantToken,
+  const scopeKey = workspaceScopeKeyFromSession(session);
+  const queryKey = pcQueryKeys.imMessagesForSession(
+    session,
     getImConversationType(conversation),
     conversation.conversationId,
   );
@@ -197,7 +202,11 @@ export function replaceLocalMessageInCache(
     ).state.messages;
   });
   queryClient.setQueriesData<{ items: ConversationListItem[] }>(
-    { queryKey: ["pc-im-conversations"] },
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-conversations" &&
+        isQueryInWorkspaceScope(query, scopeKey),
+    },
     (old) =>
       old
         ? {

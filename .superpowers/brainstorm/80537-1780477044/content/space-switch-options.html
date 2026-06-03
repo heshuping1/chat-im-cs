@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>空间提醒切换原型方案</title>
+<style>
+  :root { --bg:#f4f7fb; --panel:#ffffff; --line:#dfe7ef; --text:#172033; --muted:#657487; --green:#11b980; --blue:#276ef1; --red:#ef4056; --amber:#f59e0b; --shadow:0 20px 55px rgba(22,34,52,.14); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:linear-gradient(180deg,#f8fbff 0%,#eef4f9 100%); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .page { padding:28px 30px 36px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; margin-bottom:20px; }
+  h1 { margin:0; font-size:24px; line-height:1.2; letter-spacing:0; }
+  .subtitle { margin:8px 0 0; color:var(--muted); font-size:14px; }
+  .hint { padding:9px 12px; border:1px solid #d8e5f0; border-radius:8px; color:#536276; background:#fff; font-size:12px; font-weight:760; }
+  .grid { display:grid; grid-template-columns:repeat(3,minmax(310px,1fr)); gap:18px; align-items:start; }
+  .option { border:2px solid transparent; border-radius:10px; background:#fff; box-shadow:0 14px 38px rgba(31,46,68,.10); overflow:hidden; cursor:pointer; transition:.15s ease; }
+  .option:hover { transform:translateY(-2px); border-color:rgba(17,185,128,.32); }
+  .option.selected { border-color:var(--green); box-shadow:0 16px 42px rgba(17,185,128,.18); }
+  .option-head { display:flex; justify-content:space-between; gap:14px; padding:15px 16px 12px; border-bottom:1px solid #edf2f6; }
+  .option-head h2 { margin:0; font-size:17px; line-height:1.2; }
+  .tag { align-self:start; padding:4px 8px; border-radius:999px; background:#eaf8f2; color:#087a54; font-size:11px; font-weight:900; white-space:nowrap; }
+  .tag.alt { background:#eef4ff; color:#2557b8; }
+  .tag.heavy { background:#fff5df; color:#a35d00; }
+  .desc { margin:7px 0 0; color:#637184; font-size:12px; line-height:1.5; }
+  .mock { position:relative; min-height:520px; padding:18px 16px 20px; background:#edf3f8; }
+  .app { display:grid; grid-template-columns:78px 1fr; height:480px; border:1px solid #d6e0e9; border-radius:9px; background:#fbfdff; overflow:hidden; }
+  .side { display:flex; flex-direction:column; gap:7px; padding:11px 9px; border-right:1px solid #e2e9f1; background:#fff; }
+  .logo { width:34px; height:34px; border-radius:9px; background:#12b981; margin:0 auto 7px; }
+  .nav { height:36px; border-radius:9px; background:#f2f6fa; position:relative; }
+  .nav.active { background:#e8f8f1; }
+  .nav .dot { position:absolute; right:8px; top:7px; min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--red); color:white; font-size:9px; font-weight:900; display:grid; place-items:center; }
+  .footer { margin-top:auto; display:grid; gap:6px; }
+  .me,.cs,.space-row { height:38px; border-radius:9px; background:#f7fafc; border:1px solid #e3ebf3; }
+  .space-row { background:#eaf2ff; border-color:#cfe0ff; box-shadow:0 0 0 2px rgba(39,110,241,.05); }
+  .canvas { position:relative; background:linear-gradient(90deg,#f8fbfd 0,#fff 42%,#f8fbfd 100%); }
+  .placeholder { position:absolute; inset:18px; border:1px dashed #d7e1ea; border-radius:8px; color:#9aa8b6; display:grid; place-items:center; font-size:13px; }
+  .popover { position:absolute; left:66px; bottom:22px; width:356px; border:1px solid #d7e1ea; border-radius:12px; background:white; box-shadow:var(--shadow); overflow:hidden; }
+  .popover.wide { width:438px; }
+  .pop-head { padding:13px 14px; border-bottom:1px solid #edf2f6; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .pop-title strong { display:block; font-size:14px; line-height:1.2; }
+  .pop-title span { display:block; margin-top:3px; color:#738196; font-size:11px; }
+  .summary { display:flex; gap:5px; align-items:center; }
+  .pill { min-width:24px; height:22px; padding:0 7px; border-radius:999px; display:grid; place-items:center; font-size:11px; font-weight:950; background:#f2f6fa; color:#536276; }
+  .pill.red { background:#fff1f2; color:#c6253a; }
+  .pill.amber { background:#fff7e8; color:#9d5a00; }
+  .tabs { display:flex; gap:6px; padding:9px 12px 0; }
+  .tab { flex:1; height:28px; border-radius:8px; display:grid; place-items:center; background:#f3f7fa; color:#657487; font-size:12px; font-weight:850; }
+  .tab.on { background:#e8f8f1; color:#087a54; }
+  .search { margin:9px 12px 7px; height:30px; border-radius:8px; background:#f7fafc; border:1px solid #e3ebf3; color:#94a3b5; display:flex; align-items:center; padding:0 10px; font-size:12px; }
+  .list { padding:5px 8px 9px; display:grid; gap:5px; max-height:305px; overflow:hidden; }
+  .space-item { min-height:62px; border-radius:10px; border:1px solid transparent; display:grid; grid-template-columns:34px minmax(0,1fr) auto; gap:9px; align-items:center; padding:8px; background:#fff; }
+  .space-item.current { background:#f0faf5; border-color:#ccefe1; }
+  .space-item.hot { background:#fffafb; border-color:#ffd6dd; }
+  .avatar { width:34px; height:34px; border-radius:9px; background:#276ef1; color:white; display:grid; place-items:center; font-weight:950; font-size:12px; }
+  .avatar.green { background:#12b981; } .avatar.dark { background:#364152; } .avatar.orange { background:#f59e0b; }
+  .main strong { display:block; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .main em { display:block; margin-top:3px; color:#748299; font-style:normal; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chips { display:flex; gap:4px; margin-top:5px; flex-wrap:wrap; }
+  .chip { height:18px; padding:0 6px; border-radius:999px; display:inline-grid; place-items:center; background:#f2f6fa; color:#657487; font-size:10px; font-weight:850; }
+  .chip.red { background:#fff1f2; color:#c6253a; } .chip.amber { background:#fff7e8; color:#9d5a00; } .chip.blue { background:#eef4ff; color:#2557b8; }
+  .action { min-width:42px; height:28px; border-radius:8px; display:grid; place-items:center; background:#e8f8f1; color:#087a54; font-size:11px; font-weight:950; }
+  .check { color:#10a371; font-size:18px; font-weight:950; }
+  .mini-list .space-item { min-height:50px; grid-template-columns:30px minmax(0,1fr) auto; }
+  .mini-list .avatar { width:30px; height:30px; border-radius:8px; }
+  .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:8px 12px; }
+  .metric { border:1px solid #e3ebf3; border-radius:9px; padding:8px; background:#f8fbfd; }
+  .metric b { display:block; font-size:15px; line-height:1; } .metric span { color:#748299; font-size:10px; font-weight:800; }
+  .urgent { margin:9px 12px 0; padding:9px; border-radius:10px; background:#fff6e8; border:1px solid #ffe0ad; display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
+  .urgent strong { font-size:12px; } .urgent span { display:block; margin-top:2px; color:#8a5a12; font-size:11px; }
+  .foot { padding:10px 12px; border-top:1px solid #edf2f6; display:flex; gap:8px; }
+  .foot button { flex:1; height:30px; border:0; border-radius:8px; background:#f2f6fa; color:#536276; font-weight:900; font-size:12px; }
+  .foot button.primary { background:#12b981; color:#fff; }
+  .notes { padding:13px 16px 16px; border-top:1px solid #edf2f6; }
+  .notes b { display:block; margin-bottom:6px; font-size:13px; }
+  .notes p { margin:0; color:#657487; font-size:12px; line-height:1.55; }
+  @media (max-width:1100px){ .grid{grid-template-columns:1fr;} .mock{min-height:500px;} }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <div><h1>底部当前空间入口：第一层弹层设计选型</h1><p class="subtitle">点击卡片选择方向。原型里的数量用于表达布局；落地时必须接真实空间与提醒合同，缺字段显示同步/不可用状态。</p></div>
+    <div class="hint">推荐先选方向，再细化视觉密度和字段</div>
+  </div>
+  <div class="grid">
+    <section class="option" data-choice="a-task-radar" onclick="toggleSelect(this)">
+      <div class="option-head"><div><h2>A. 任务雷达型</h2><p class="desc">第一层同时看到各空间 IM 未读、客服未读、排队和当前状态，适合客服每天高频切换。</p></div><span class="tag">推荐</span></div>
+      <div class="mock"><div class="app"><div class="side"><div class="logo"></div><div class="nav active"><span class="dot">12</span></div><div class="nav"><span class="dot">5</span></div><div class="nav"></div><div class="nav"></div><div class="footer"><div class="me"></div><div class="cs"></div><div class="space-row"></div></div></div><div class="canvas"><div class="placeholder">当前工作台</div><div class="popover"><div class="pop-head"><div class="pop-title"><strong>切换空间</strong><span>当前：Mouse 客服中心 · owner</span></div><div class="summary"><span class="pill red">23</span><span class="pill amber">4</span></div></div><div class="tabs"><div class="tab on">有提醒</div><div class="tab">全部</div><div class="tab">最近</div></div><div class="search">搜索空间 / 企业码</div><div class="list"><div class="space-item current"><div class="avatar green">M</div><div class="main"><strong>Mouse 客服中心</strong><em>当前使用中 · owner · MOUSE</em><div class="chips"><span class="chip red">IM 12</span><span class="chip amber">排队 4</span><span class="chip red">客服 7</span></div></div><div class="check">✓</div></div><div class="space-item hot"><div class="avatar orange">T</div><div class="main"><strong>TikTok 跨境售后</strong><em>2 分钟前有新访客 · admin</em><div class="chips"><span class="chip red">客服 3</span><span class="chip amber">排队 2</span><span class="chip blue">SLA</span></div></div><div class="action">切换</div></div><div class="space-item"><div class="avatar dark">B</div><div class="main"><strong>Brand 商城咨询</strong><em>9 分钟前 · member</em><div class="chips"><span class="chip red">IM 4</span><span class="chip">客服 0</span></div></div><div class="action">切换</div></div><div class="space-item"><div class="avatar">P</div><div class="main"><strong>个人空间</strong><em>LPP_10086</em><div class="chips"><span class="chip">无新提醒</span></div></div><div class="action">切换</div></div></div><div class="foot"><button>加入空间</button><button class="primary">管理空间</button></div></div></div></div></div>
+      <div class="notes"><b>为什么顶级</b><p>把客服最需要的“哪里有事、事有多急、能否立即切换”放在第一眼；保留独立页面承载加入企业、详情管理，弹层只做高频决策。</p></div>
+    </section>
+    <section class="option" data-choice="b-wechat-light" onclick="toggleSelect(this)">
+      <div class="option-head"><div><h2>B. 微信轻量型</h2><p class="desc">像微信账号/企业切换一样克制：空间列表、红点总数、当前勾选，弹层更小更安静。</p></div><span class="tag alt">轻量</span></div>
+      <div class="mock"><div class="app"><div class="side"><div class="logo"></div><div class="nav active"><span class="dot">12</span></div><div class="nav"><span class="dot">5</span></div><div class="nav"></div><div class="nav"></div><div class="footer"><div class="me"></div><div class="cs"></div><div class="space-row"></div></div></div><div class="canvas"><div class="placeholder">当前工作台</div><div class="popover" style="width:310px"><div class="pop-head"><div class="pop-title"><strong>空间</strong><span>Mouse 客服中心</span></div><span class="pill red">23</span></div><div class="list mini-list"><div class="space-item current"><div class="avatar green">M</div><div class="main"><strong>Mouse 客服中心</strong><em>当前空间</em></div><div class="check">✓</div></div><div class="space-item"><div class="avatar orange">T</div><div class="main"><strong>TikTok 跨境售后</strong><em>5 条提醒</em></div><span class="pill red">5</span></div><div class="space-item"><div class="avatar dark">B</div><div class="main"><strong>Brand 商城咨询</strong><em>4 条提醒</em></div><span class="pill red">4</span></div><div class="space-item"><div class="avatar">P</div><div class="main"><strong>个人空间</strong><em>无新提醒</em></div><span class="pill">0</span></div></div><div class="foot"><button>更多</button><button class="primary">切换</button></div></div></div></div></div><div class="notes"><b>适合场景</b><p>空间少、提醒类型不用拆太细、希望减少学习成本。缺点是客服排队/SLA 等优先级弱，容易只看到数字看不出紧急度。</p></div>
+    </section>
+    <section class="option" data-choice="c-command" onclick="toggleSelect(this)">
+      <div class="option-head"><div><h2>C. 客服指挥台型</h2><p class="desc">更宽的运营型弹层：先展示紧急空间和全局客服指标，再展示空间列表。</p></div><span class="tag heavy">强运营</span></div>
+      <div class="mock"><div class="app"><div class="side"><div class="logo"></div><div class="nav active"><span class="dot">12</span></div><div class="nav"><span class="dot">5</span></div><div class="nav"></div><div class="nav"></div><div class="footer"><div class="me"></div><div class="cs"></div><div class="space-row"></div></div></div><div class="canvas"><div class="placeholder">当前工作台</div><div class="popover wide"><div class="pop-head"><div class="pop-title"><strong>多空间客服指挥台</strong><span>跨空间提醒汇总 · 每 30 秒同步</span></div><div class="summary"><span class="pill red">26</span><span class="pill amber">6</span></div></div><div class="metrics"><div class="metric"><b>26</b><span>未读</span></div><div class="metric"><b>6</b><span>排队</span></div><div class="metric"><b>2</b><span>SLA 风险</span></div></div><div class="urgent"><div><strong>TikTok 跨境售后需要接入</strong><span>2 个排队超过 90 秒，建议立即切换</span></div><div class="action">处理</div></div><div class="list"><div class="space-item current"><div class="avatar green">M</div><div class="main"><strong>Mouse 客服中心</strong><em>当前 · 接待 8/12</em><div class="chips"><span class="chip red">IM 12</span><span class="chip red">客服 7</span><span class="chip amber">排 4</span></div></div><div class="check">✓</div></div><div class="space-item hot"><div class="avatar orange">T</div><div class="main"><strong>TikTok 跨境售后</strong><em>SLA 风险 · 接待 11/12</em><div class="chips"><span class="chip red">客服 3</span><span class="chip amber">排 2</span><span class="chip blue">主管</span></div></div><div class="action">接入</div></div><div class="space-item"><div class="avatar dark">B</div><div class="main"><strong>Brand 商城咨询</strong><em>稳定 · 接待 2/8</em><div class="chips"><span class="chip red">IM 4</span><span class="chip">排 0</span></div></div><div class="action">切换</div></div></div><div class="foot"><button>提醒设置</button><button>加入空间</button><button class="primary">打开空间管理</button></div></div></div></div></div><div class="notes"><b>适合场景</b><p>客服主管/多品牌值守最强，但对普通成员偏重；如果服务端没有跨空间摘要合同，首版实现成本最高。</p></div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

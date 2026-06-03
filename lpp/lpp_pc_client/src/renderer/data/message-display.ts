@@ -1,6 +1,6 @@
 import type { ConversationListItem } from "./api-client";
+import { isStrictImConversationType } from "./im/im-conversation-boundary";
 import {
-  isLocalReadCoversLastMessage,
   localReadCoverReason,
   type LocalReadCoverReason,
   resolveEffectiveImUnreadCount,
@@ -30,17 +30,7 @@ export interface ConversationUnreadDiagnostic {
 }
 
 export function isImConversation(item: ConversationListItem) {
-  const conversationType = item.conversationType.trim().toLowerCase().replace(/-/g, "_");
-  return (
-    conversationType === "direct" ||
-    conversationType === "im_direct" ||
-    conversationType === "direct_chat" ||
-    conversationType === "direct_customer" ||
-    conversationType === "customer_direct" ||
-    conversationType === "group" ||
-    conversationType === "im_group" ||
-    conversationType === "group_chat"
-  );
+  return isStrictImConversationType(item.conversationType);
 }
 
 export function isSelfSender(
@@ -293,14 +283,6 @@ function normalizeIdentity(
   return typeof currentUserId === "object" && currentUserId !== null
     ? currentUserId
     : { userId: currentUserId, displayName: currentDisplayName };
-}
-
-function isLocallyReadConversation(
-  item: ConversationListItem,
-  identity: CurrentUserIdentity,
-  selfLastMessage = isSelfLastMessage(item, identity),
-) {
-  return localReadCoverReasonForConversation(item, identity, selfLastMessage) !== "none";
 }
 
 function localReadCoverReasonForConversation(

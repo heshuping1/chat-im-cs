@@ -1609,6 +1609,55 @@ describe("IM read model state machine", () => {
     expect(result.viewByConversation["direct:chat-1"].unreadCount).toBe(1);
   });
 
+  it("keeps gateway peer unread when a polled snapshot low-reports zero unread", () => {
+    const afterGateway = reduceImCoreEvent({
+      identity,
+      stateByConversation: {
+        "direct:chat-1": createInitialImReadState("direct", "chat-1", {
+          myReadSeq: 300,
+          lastMessageSeq: 300,
+          unreadCount: 0,
+        }),
+      },
+      event: {
+        type: "gateway.message_received",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        isActiveConversation: false,
+        message: {
+          messageId: "m301",
+          conversationId: "chat-1",
+          conversationSeq: 301,
+          senderUserId: "peer-user",
+          direction: "in",
+        },
+      },
+    });
+
+    const afterPoll = reduceImCoreEvent({
+      identity,
+      stateByConversation: afterGateway.stateByConversation,
+      event: {
+        type: "api.conversation_snapshot",
+        conversationId: "chat-1",
+        conversationType: "direct",
+        conversation: {
+          myReadSeq: 300,
+          lastMessageSeq: 301,
+          unreadCount: 0,
+        },
+      },
+    });
+
+    expect(afterGateway.viewByConversation["direct:chat-1"].unreadCount).toBe(1);
+    expect(afterPoll.stateByConversation["direct:chat-1"]).toMatchObject({
+      myReadSeq: 300,
+      lastMessageSeq: 301,
+      unreadCount: 1,
+    });
+    expect(afterPoll.viewByConversation["direct:chat-1"].unreadCount).toBe(1);
+  });
+
   it("does not treat read receipts without reader identity as peer reads", () => {
     const state: ConversationReadState = createInitialImReadState("direct", "chat-1", {
       peerReadSeq: 5,

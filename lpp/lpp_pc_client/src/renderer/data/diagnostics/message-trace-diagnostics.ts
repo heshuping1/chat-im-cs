@@ -68,7 +68,7 @@ export interface MessageTraceGroupSummary {
   traceId: string;
 }
 
-const maxSamples = 80;
+const maxSamples = 500;
 const recentSamples: MessageTraceSample[] = [];
 const lastAtByTrace = new Map<string, number>();
 
@@ -146,7 +146,11 @@ export function summarizeRecentMessageTraceGroups(
   }
   return [...groups.entries()]
     .map(([traceId, stages]) => summarizeGroup(traceId, stages))
-    .sort((left, right) => Date.parse(right.lastAt) - Date.parse(left.lastAt))
+    .sort((left, right) => {
+      const priorityDelta = traceGroupPriority(right) - traceGroupPriority(left);
+      if (priorityDelta) return priorityDelta;
+      return Date.parse(right.lastAt) - Date.parse(left.lastAt);
+    })
     .slice(0, limit);
 }
 
@@ -208,6 +212,10 @@ function summarizeGroup(traceId: string, stages: MessageTraceSample[]): MessageT
 
 function firstStage(samples: MessageTraceSample[], stage: MessageTraceStage) {
   return samples.find((sample) => sample.stage === stage);
+}
+
+function traceGroupPriority(group: MessageTraceGroupSummary) {
+  return group.stages.some((sample) => sample.sourceChannel !== "http-query") ? 1 : 0;
 }
 
 function elapsedMs(startAt: string | undefined, endAt: string | undefined) {

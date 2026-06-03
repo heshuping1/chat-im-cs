@@ -11,8 +11,8 @@ describe("resolveConversationOwnership", () => {
     resetCustomerServiceConversationIndexForTest();
   });
 
-  it("routes direct and group IM conversation types to IM", () => {
-    for (const conversationType of ["direct", "group", "im_direct", "im_group"]) {
+  it("routes strict direct and group IM conversation types to IM", () => {
+    for (const conversationType of ["direct", "group"]) {
       expect(
         resolveConversationOwnership({
           payload: {
@@ -50,8 +50,8 @@ describe("resolveConversationOwnership", () => {
     });
   });
 
-  it("protects direct_customer conversations as IM unless tempSession is explicit", () => {
-    for (const conversationType of ["direct_customer", "customer_direct"]) {
+  it("routes online-service direct-customer types to customer service", () => {
+    for (const conversationType of ["direct_customer", "customer_direct", "im_direct"]) {
       const ownership = resolveConversationOwnership({
         payload: {
           conversationId: `conversation-${conversationType}`,
@@ -63,10 +63,51 @@ describe("resolveConversationOwnership", () => {
 
       expect(ownership).toMatchObject({
         confidence: "explicit",
-        owner: "im",
-        reason: "explicit-im",
+        owner: "customerService",
+        reason: "explicit-customer-service-direct",
+        threadId: `conversation-${conversationType}`,
+        threadType: "im_direct",
       });
     }
+  });
+
+  it("routes sourceType widget to customer-service temp sessions", () => {
+    const ownership = resolveConversationOwnership({
+      payload: {
+        conversationId: "conversation-widget",
+        sourceType: "widget",
+        threadId: "thread-widget",
+      },
+      scopeKey: "scope-a",
+      source: "gateway",
+    });
+
+    expect(ownership).toMatchObject({
+      confidence: "explicit",
+      owner: "customerService",
+      reason: "explicit-source-widget",
+      threadId: "thread-widget",
+      threadType: "temp_session",
+    });
+  });
+
+  it("routes sourceType im direct messages to IM instead of online-service temp sessions", () => {
+    const ownership = resolveConversationOwnership({
+      payload: {
+        conversationId: "conversation-im-cs",
+        conversationType: "direct",
+        sourceType: "im",
+        threadId: "thread-im-cs",
+      },
+      scopeKey: "scope-a",
+      source: "gateway",
+    });
+
+    expect(ownership).toMatchObject({
+      confidence: "explicit",
+      owner: "im",
+      reason: "explicit-im",
+    });
   });
 
   it("routes unmarked messages to customer service only when the same scope indexed them", () => {
@@ -99,12 +140,12 @@ describe("resolveConversationOwnership", () => {
       }),
     ).toMatchObject({
       confidence: "unknown",
-      owner: "im",
-      reason: "default-im",
+      owner: "unknown",
+      reason: "missing-ownership-evidence",
     });
   });
 
-  it("defaults to IM and does not use indexed ownership when scope is missing", () => {
+  it("does not default unmarked messages to IM when scope is missing", () => {
     rememberCustomerServiceConversationIndex({
       conversationId: "conversation-indexed",
       scopeKey: "scope-a",
@@ -121,8 +162,8 @@ describe("resolveConversationOwnership", () => {
       }),
     ).toMatchObject({
       confidence: "unknown",
-      owner: "im",
-      reason: "default-im-missing-scope",
+      owner: "unknown",
+      reason: "missing-ownership-evidence",
     });
   });
 
@@ -141,8 +182,8 @@ describe("resolveConversationOwnership", () => {
 
     expect(ownership).toMatchObject({
       confidence: "unknown",
-      owner: "im",
-      reason: "default-im",
+      owner: "unknown",
+      reason: "missing-ownership-evidence",
     });
   });
 });

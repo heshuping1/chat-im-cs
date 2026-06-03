@@ -16,4 +16,5 @@ interface Window {
   __lppCustomerServiceStateDiagnostics?: import("./data/customer-service/cs-thread-state").CustomerServiceThreadStateDiagnosticRecord[];
   __lppCustomerServiceCacheDiagnostics?: import("./data/customer-service/cs-cache-adapter").CustomerServiceCacheDiagnosticRecord[];
   __lppStartupDiagnostics?: import("./data/performance/startup-performance").StartupDiagnosticRecord[];
+  __lppRuntimeErrorDiagnostics?: import("./data/diagnostics/runtime-error-diagnostics").RuntimeErrorDiagnosticRecord[];
 }

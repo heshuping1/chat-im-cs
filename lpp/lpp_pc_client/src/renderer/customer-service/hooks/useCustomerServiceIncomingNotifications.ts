@@ -11,8 +11,8 @@ import { consumeCustomerServiceMessageReminder } from "../../data/customer-servi
 import {
   isRendererWindowFocused,
   notifyDesktopOrBrowser,
-  shouldPushRealtimeReminder,
-  shouldShowDesktopNotificationForTarget,
+  shouldPushCustomerServiceThreadMessageReminder,
+  shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget,
 } from "../../data/reminder/reminder-service";
 import { isExplicitCustomerServiceThreadOpenSource } from "../../data/customer-service/customer-service-read-visibility";
 import type { PcRealtimeReminderInput } from "../../data/reminder/reminder-types";
@@ -107,7 +107,7 @@ function notifyIncomingCustomerServiceMessage({
   thread: CustomerServiceThread;
   title: string;
 }) {
-  if (!shouldPushRealtimeReminder(pcSettings, "serviceQueue")) return;
+  if (!shouldPushCustomerServiceThreadMessageReminder(pcSettings)) return;
   const presentation = buildCustomerServiceNotificationPresentation({
     fallbackTitle: title,
     message,
@@ -137,7 +137,7 @@ function notifyIncomingCustomerServiceMessage({
     ? uiState.activeThreadId
     : undefined;
   if (
-    shouldShowDesktopNotificationForTarget(pcSettings, "serviceQueue", {
+    shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(pcSettings, {
       activeModule: uiState.activeModule,
       activeTargetId,
       targetId,

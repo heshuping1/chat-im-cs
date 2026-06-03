@@ -412,7 +412,6 @@ function mergeConversationPatch(
   if (!conversation) return { ...current };
 
   const preserveLocalUnread = shouldPreserveLocalUnreadFromSnapshot(current, event);
-  const snapshotMyReadSeq = normalizedSeq(conversation.myReadSeq);
   const snapshotUnreadCount =
     conversation.unreadCount === undefined
       ? current.unreadCount
@@ -452,7 +451,7 @@ function shouldPreserveLocalUnreadFromSnapshot(
   if (currentUnreadCount <= 0) return false;
   if (currentLastMessageSeq <= 0 || currentMyReadSeq >= currentLastMessageSeq) return false;
   if (pendingReadSeq >= currentLastMessageSeq) return false;
-  return snapshotUnreadCount === 0 && snapshotMyReadSeq >= currentLastMessageSeq;
+  return snapshotUnreadCount === 0;
 }
 
 function advanceMyReadSeq(state: ConversationReadState, readSeq: number) {

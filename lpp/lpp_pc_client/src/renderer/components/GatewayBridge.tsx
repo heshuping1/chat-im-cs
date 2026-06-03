@@ -88,8 +88,7 @@ export function GatewayBridge() {
       }, 30_000);
     };
 
-    let manager: GatewayConnectionManager;
-    manager = new GatewayConnectionManager({
+    const manager = new GatewayConnectionManager({
       createConnection: async () => {
         const instance = await getAppInstanceProfile();
         const gatewayUrl = new URL(

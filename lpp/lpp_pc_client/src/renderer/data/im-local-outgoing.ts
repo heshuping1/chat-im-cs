@@ -17,9 +17,13 @@ export function mergeLocalOutgoingMessages(
     return localMessage ? mergeServerAndLocalMessage(serverMessage, localMessage) : serverMessage;
   });
   const serverIds = new Set(serverMessages.map((message) => message.messageId).filter(Boolean));
+  const confirmedLocalClientIds = new Set(
+    serverMessages.flatMap((message) => clientMessageIds(message)).filter(Boolean),
+  );
   const matchedServerIndexes = new Set<number>();
   const localOnly = localMessages.filter((message) => {
     if (serverIds.has(message.messageId)) return false;
+    if (clientMessageIds(message).some((id) => confirmedLocalClientIds.has(id))) return false;
     const matchingServerIndex = serverMessages.findIndex(
       (serverMessage, index) =>
         !matchedServerIndexes.has(index) && isPendingLocalServerEcho(serverMessage, message),
@@ -175,6 +179,14 @@ function messageSignature(message: MessageItemDto) {
     return `${key}:${fileName}:${size}:${mimeType}`;
   }
   return String(message.preview ?? "");
+}
+
+function clientMessageIds(message: MessageItemDto) {
+  return [
+    message.clientMsgId,
+    message.clientMessageId,
+    message.messageId?.startsWith("pc-local-") ? message.messageId : undefined,
+  ].filter((value): value is string => Boolean(value));
 }
 
 function sortMessages(left: MessageItemDto, right: MessageItemDto) {

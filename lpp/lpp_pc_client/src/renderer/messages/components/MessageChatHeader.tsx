@@ -1,9 +1,10 @@
-import { AppWindow, ChevronLeft, Search } from "lucide-react";
+import { AppWindow, ChevronLeft, Languages, Search } from "lucide-react";
 
 import { ChannelBadge, channelLabel } from "../../components/ChannelBadge";
 import type { ConversationListItem } from "../../data/api-client";
 import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
+import type { AutoTranslateConversationMode } from "../../translation/models/autoTranslatePreferences";
 import { ConversationAvatar } from "./ConversationListParts";
 
 export function MessageChatHeader({
@@ -16,7 +17,10 @@ export function MessageChatHeader({
   historyOpen,
   messageSearchOpen,
   messagesLoaded,
+  autoTranslateEffective,
+  autoTranslateMode,
   unreadIdentity,
+  onCycleAutoTranslateMode,
   onOpenConversationDrawer,
   onToggleLookup,
 }: {
@@ -29,7 +33,10 @@ export function MessageChatHeader({
   historyOpen: boolean;
   messageSearchOpen: boolean;
   messagesLoaded: boolean;
+  autoTranslateEffective: boolean;
+  autoTranslateMode: AutoTranslateConversationMode;
   unreadIdentity?: CurrentUserIdentity | null;
+  onCycleAutoTranslateMode: () => void;
   onOpenConversationDrawer: () => void;
   onToggleLookup: () => void;
 }) {
@@ -90,6 +97,16 @@ export function MessageChatHeader({
       </div>
       <div className="e-chat-actions">
         <button
+          className={`e-icon-button ${autoTranslateEffective ? "active" : ""}`}
+          type="button"
+          aria-label={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
+          title={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
+          aria-pressed={autoTranslateEffective}
+          onClick={onCycleAutoTranslateMode}
+        >
+          <Languages size={18} />
+        </button>
+        <button
           className={`e-icon-button ${lookupOpen ? "active" : ""}`}
           type="button"
           aria-label="查找聊天内容"
@@ -111,4 +128,13 @@ export function MessageChatHeader({
       </div>
     </header>
   );
+}
+
+function autoTranslateModeLabel(
+  mode: AutoTranslateConversationMode,
+  effective: boolean,
+) {
+  if (mode === "enabled") return "本会话开启";
+  if (mode === "disabled") return "本会话关闭";
+  return effective ? "跟随全局，已开启" : "跟随全局，已关闭";
 }

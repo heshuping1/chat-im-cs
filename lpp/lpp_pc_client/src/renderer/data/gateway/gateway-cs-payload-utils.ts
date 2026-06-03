@@ -70,7 +70,9 @@ export function customerServiceThreadId(payload: Record<string, unknown>, scopeK
 }
 
 export function normalizeThreadType(value: string): CustomerServiceThreadType {
-  return normalizeType(value) === "im_direct" ? "im_direct" : "temp_session";
+  return ["im", "direct_customer", "customer_direct", "im_direct"].includes(normalizeType(value))
+    ? "im_direct"
+    : "temp_session";
 }
 
 export function isSelfCustomerServiceGatewayMessage(
@@ -81,8 +83,8 @@ export function isSelfCustomerServiceGatewayMessage(
   const messageRecord = customerServiceMessageRecord(payload);
   const raw = Object.keys(messageRecord).length ? messageRecord : payload;
   const roleText = [
-    stringField(raw, "senderRole", "senderType", "authorType", "fromType", "role", "sourceType"),
-    stringField(payload, "senderRole", "senderType", "authorType", "fromType", "role", "sourceType"),
+    stringField(raw, "senderRole", "senderType", "authorType", "fromType", "role"),
+    stringField(payload, "senderRole", "senderType", "authorType", "fromType", "role"),
     stringField(asRecord(payload.thread), "senderRole", "senderType", "authorType", "fromType"),
   ]
     .map(normalizeType)

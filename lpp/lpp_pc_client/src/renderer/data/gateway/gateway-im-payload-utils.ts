@@ -26,11 +26,10 @@ export function imCoreEventFromGatewayMessageForTest(params: {
   const conversationId =
     imConversationId(payload, params.fallbackConversationId) ||
     stringField(raw, "conversationId", "conversation_id", "chatId", "chat_id");
-  const conversationType =
-    inferImConversationType(payload, params.fallbackConversationType) || "direct";
+  const conversationType = inferImConversationType(payload, params.fallbackConversationType);
   const validation = validateGatewayMessageContract(gatewayMessageContractInput(payload));
 
-  if (!conversationId || validation.level === "blocking") return undefined;
+  if (!conversationId || !conversationType || validation.level === "blocking") return undefined;
 
   return {
     type: "gateway.message_received",
@@ -52,14 +51,15 @@ export function imCoreEventFromGatewayReadForTest(
     numberField(payload, "readSeq", "read_seq", "lastReadSeq", "last_read_seq", "conversationSeq", "conversation_seq") ??
     0;
   if (!conversationId || readSeq <= 0) return undefined;
+  const conversationType = inferImConversationType(
+    payload,
+    stringField(payload, "conversationType", "conversation_type", "chatType", "chat_type"),
+  );
+  if (!conversationType) return undefined;
   return {
     type: "gateway.read_received",
     conversationId,
-    conversationType:
-      inferImConversationType(
-        payload,
-        stringField(payload, "conversationType", "conversation_type", "chatType", "chat_type"),
-      ) || "direct",
+    conversationType,
     readerIdentity: readReceiptReaderIdentity(payload),
     readSeq,
   };
@@ -125,7 +125,7 @@ export function inferImConversationType(
     stringField(conversation, "directChatId", "direct_chat_id", "directId", "direct_id", "peerUserId", "peer_user_id", "targetUserId", "target_user_id", "receiverUserId", "receiver_user_id", "toUserId", "to_user_id");
   if (directMarker) return "direct";
 
-  return imConversationId(payload, fallbackConversationIdFromPeer(payload)) ? "direct" : "";
+  return "";
 }
 
 export function fallbackConversationIdFromPeer(payload: Record<string, unknown>) {
@@ -259,10 +259,7 @@ function normalizeImConversationType(value: string): "direct" | "group" | "" {
   if (
     [
       "direct",
-      "im_direct",
       "direct_chat",
-      "direct_customer",
-      "customer_direct",
       "private",
       "single",
       "single_chat",

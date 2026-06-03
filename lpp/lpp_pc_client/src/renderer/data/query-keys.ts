@@ -1,3 +1,6 @@
+import type { AuthSession } from "./auth/auth-session";
+import { workspaceScopeKeyFromSession } from "./workspace-scope";
+
 export function sessionKey(apiBaseUrl?: string, tenantToken?: string) {
   return [apiBaseUrl ?? "", tenantToken ?? ""] as const;
 }
@@ -5,6 +8,8 @@ export function sessionKey(apiBaseUrl?: string, tenantToken?: string) {
 export const pcQueryKeys = {
   imConversations: (apiBaseUrl?: string, tenantToken?: string, limit = 100) =>
     ["pc-im-conversations", ...sessionKey(apiBaseUrl, tenantToken), limit] as const,
+  imConversationsForSession: (session?: AuthSession | null, limit = 100) =>
+    ["pc-im-conversations", workspaceScopeKeyFromSession(session), limit] as const,
   imMessages: (
     apiBaseUrl?: string,
     tenantToken?: string,
@@ -14,6 +19,17 @@ export const pcQueryKeys = {
     [
       "pc-im-messages",
       ...sessionKey(apiBaseUrl, tenantToken),
+      conversationType ?? "",
+      conversationId ?? "",
+    ] as const,
+  imMessagesForSession: (
+    session?: AuthSession | null,
+    conversationType?: string,
+    conversationId?: string,
+  ) =>
+    [
+      "pc-im-messages",
+      workspaceScopeKeyFromSession(session),
       conversationType ?? "",
       conversationId ?? "",
     ] as const,
@@ -89,6 +105,8 @@ export const pcQueryKeys = {
     ["pc-account-blocklist", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountSpaces: (apiBaseUrl?: string, platformToken?: string) =>
     ["pc-account-spaces", apiBaseUrl ?? "", platformToken ?? ""] as const,
+  accountSpaceUnreadSummary: (apiBaseUrl?: string, platformToken?: string) =>
+    ["pc-account-space-unread-summary", apiBaseUrl ?? "", platformToken ?? ""] as const,
   accountDevices: (apiBaseUrl?: string, platformToken?: string) =>
     ["pc-account-devices", apiBaseUrl ?? "", platformToken ?? ""] as const,
   workbenchAnnouncements: (apiBaseUrl?: string, tenantToken?: string) =>

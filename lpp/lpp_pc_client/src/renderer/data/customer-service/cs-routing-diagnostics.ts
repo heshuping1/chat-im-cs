@@ -3,7 +3,8 @@ import type { CsRoutingDiagnosticPayload, DiagnosticsJsonValue } from "../../../
 const diagnosticsFlag = "lpp.csRoutingDiagnostics";
 const plaintextDiagnosticsFlag = "lpp.diagnosticsPlaintext";
 const sensitiveKeyPattern = /token|password|authorization|secret|credential|phone|mobile|email/i;
-const contentKeyPattern = /^(body|content|text|messageText|rawText)$/i;
+const contentKeyPattern = /^(body|content|messageText|rawText)$/i;
+const scopeKeyPattern = /^scopeKey$/i;
 const idKeyPattern = /(^id$|id$|Id$|_id$|seq$|Seq$|session|Session|conversation|Conversation|thread|Thread|user|User|lpp|Lpp)/;
 const enumKeyPattern =
   /type|Type|status|Status|channel|Channel|source|Source|role|Role|event|Event|module|Module|scene|Scene|biz|Biz|kind|Kind|route|Route|phase|Phase|target|Target/;
@@ -63,12 +64,15 @@ function summarizeValue(
   depth: number,
   options: DiagnosticSummaryOptions,
 ): DiagnosticsJsonValue {
-  if (!options.plaintext && contentKeyPattern.test(key)) return summarizeContent(value);
   if (depth > maxDepth) return "[truncated-depth]";
   if (value === null || value === undefined) return value === undefined ? "[undefined]" : null;
+  if (sensitiveKeyPattern.test(key)) return "[redacted]";
+  if (contentKeyPattern.test(key)) return summarizeContent(value);
+  if (scopeKeyPattern.test(key) && typeof value === "string") return summarizeScopeKey(value);
   if (typeof value === "number") return Number.isFinite(value) ? value : "[non-finite-number]";
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {
+    if (looksLikeSensitiveString(value)) return "[redacted]";
     return options.plaintext ? value : summarizeString(key, value);
   }
   if (Array.isArray(value)) {
@@ -90,11 +94,31 @@ function summarizeValue(
 
 function summarizeString(key: string, value: string) {
   if (sensitiveKeyPattern.test(key)) return "[redacted]";
+  if (scopeKeyPattern.test(key)) return summarizeScopeKey(value);
   if (contentKeyPattern.test(key)) return `[redacted-content len=${value.length}]`;
+  if (looksLikeSensitiveString(value)) return "[redacted]";
   if (idKeyPattern.test(key)) return summarizeIdentifier(value);
   if (enumKeyPattern.test(key) && value.length <= 96) return value;
   if (value.length <= 24 && /^[A-Za-z0-9._:-]+$/.test(value)) return value;
   return `[string len=${value.length}]`;
+}
+
+function summarizeScopeKey(value: string) {
+  return `[scope-key len=${value.length} hash=${hashString(value)}]`;
+}
+
+function looksLikeSensitiveString(value: string) {
+  return /\bBearer\s+[A-Za-z0-9._~+/=-]+/i.test(value) || /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/.test(value);
+}
+
+function hashString(value: string) {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= BigInt(value.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return hash.toString(16).padStart(16, "0").slice(0, 12);
 }
 
 function summarizeIdentifier(value: string) {

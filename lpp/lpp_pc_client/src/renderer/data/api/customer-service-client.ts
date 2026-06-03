@@ -9,6 +9,7 @@ import type {
   MediaResourceDto,
   MessageItemDto,
   StaffReceptionStatusDto,
+  StaffServiceHistoryItem,
   StaffServiceHistoryResponse,
 } from "./types";
 import { logApiContractDiagnostic } from "../api-contract/contract-diagnostics";
@@ -36,17 +37,66 @@ import {
 
 export class CustomerServiceApiClient extends MessagesApiClient {
   getWorkbenchThreads() {
+    if (this.shouldUseAdminConversationManagement()) {
+      return this.getManagedCustomerServiceThreads();
+    }
     return this.request<CustomerServiceThreadsResponse>(
       endpointPlan.customerServiceThreads,
     ).then((response) =>
       normalizeCustomerServiceThreadsResponse(
         response,
-        customerServiceIndexScopeKey({
-          apiBaseUrl: this.options.baseUrl,
-          tenantToken: this.options.tenantToken,
-        }),
+        customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
       ),
     );
+  }
+
+  private async getManagedCustomerServiceThreads() {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    const search = new URLSearchParams({
+      page: "1",
+      pageSize: "50",
+    });
+    return this.request<AdminTempSessionsResponse>(
+      `${endpointPlan.adminCustomerServiceTempSessions}?${search.toString()}`,
+      {},
+      true,
+    ).then((response) =>
+      normalizeCustomerServiceThreadsResponse(
+        normalizeAdminTempSessionsResponse(response),
+        customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
+      ),
+    );
+  }
+
+  private shouldUseAdminConversationManagement() {
+    return (
+      (this.options.membershipRole ?? 0) >= 3 &&
+      Boolean(this.options.platformToken && this.options.tenantId)
+    );
+  }
+
+  private async issueAdminToken() {
+    const tenantId = this.options.tenantId?.trim();
+    if (!tenantId) throw new Error("缺少租户 ID，无法签发管理端 Token");
+    const cacheKey = adminTokenCacheKey({
+      baseUrl: this.options.baseUrl,
+      platformToken: this.options.platformToken,
+      tenantId,
+    });
+    const cached = adminTokenCache.get(cacheKey);
+    if (cached) return cached;
+    const response = await this.platformRequest<AdminTokenIssueResponse>(
+      endpointPlan.adminToken,
+      {
+        method: "POST",
+        body: JSON.stringify({ tenantId }),
+      },
+    );
+    const accessToken = readString(response.accessToken);
+    if (!accessToken) throw new Error("管理端 Token 签发响应缺少 accessToken");
+    adminTokenCache.set(cacheKey, accessToken);
+    return accessToken;
   }
 
   getStaffServiceHistory(params: {
@@ -63,7 +113,7 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     const query = search.toString();
     return this.request<StaffServiceHistoryResponse>(
       `${endpointPlan.staffServiceHistory}${query ? `?${query}` : ""}`,
-    );
+    ).then(normalizeStaffServiceHistoryResponse);
   }
 
   getReceptionStatus() {
@@ -109,6 +159,9 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     threadType: CustomerServiceThreadType,
     threadId: string,
   ) {
+    if (this.shouldUseAdminConversationManagement()) {
+      return this.getManagedTempSessionDetail(threadId);
+    }
     return this.request<CustomerServiceThreadDetailResponse>(
       endpointPlan.customerServiceThreadDetail
         .replace("{threadType}", threadRoutePathType(threadType))
@@ -119,6 +172,16 @@ export class CustomerServiceApiClient extends MessagesApiClient {
         fallbackThreadType: threadType,
       }),
     );
+  }
+
+  private async getManagedTempSessionDetail(sessionId: string) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<AdminTempSessionDetailResponse>(
+      endpointPlan.adminCustomerServiceTempSession.replace("{sessionId}", sessionId),
+      {},
+      true,
+    ).then((detail) => normalizeAdminTempSessionDetail(detail, sessionId));
   }
 
   private sendWorkbenchMessage(
@@ -306,6 +369,31 @@ type CustomerServiceThreadDetailResponse = NestedThreadPayload & {
   direct_chat?: NestedThreadPayload | null;
 };
 
+type AdminTokenIssueResponse = {
+  accessToken?: string;
+};
+
+type AdminConversationManagementResponse =
+  | CustomerServiceThreadsResponse
+  | CustomerServiceThread[]
+  | {
+      activeItems?: unknown[];
+      data?: unknown[];
+      items?: unknown[];
+      queueItems?: unknown[];
+      threads?: unknown[];
+    };
+
+type AdminTempSessionsResponse = AdminConversationManagementResponse;
+
+type AdminTempSessionDetailResponse = {
+  session?: Record<string, unknown>;
+  visitor?: Record<string, unknown>;
+  messages?: MessageItemDto[];
+};
+
+const adminTokenCache = new Map<string, string>();
+
 function normalizeCustomerServiceThreadsResponse(
   response: CustomerServiceThreadsResponse,
   scopeKey?: string,
@@ -325,11 +413,15 @@ function normalizeCustomerServiceThreadsResponse(
       summary: response.summary,
     },
   });
-  const queueItems = (response.queueItems ?? [])
+  const rawQueueItems = (response.queueItems ?? []);
+  const rawActiveItems = (response.activeItems ?? []);
+  const queueItems = rawQueueItems
+    .filter(isCustomerServiceThreadSnapshot)
     .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
     .filter((item): item is CustomerServiceThread => Boolean(item))
     .map((item) => applyCustomerServiceThreadOverlay(item, scopeKey));
-  const activeItems = (response.activeItems ?? [])
+  const activeItems = rawActiveItems
+    .filter(isCustomerServiceThreadSnapshot)
     .map((item) => normalizeCustomerServiceThreadFromContract(item, "pc-cs-workbench-threads"))
     .filter((item): item is CustomerServiceThread => Boolean(item))
     .map((item) => applyCustomerServiceThreadOverlay(item, scopeKey));
@@ -340,6 +432,8 @@ function normalizeCustomerServiceThreadsResponse(
     route: "thread-list",
     classification: {
       active: activeItems.length,
+      droppedActive: rawActiveItems.length - activeItems.length,
+      droppedQueue: rawQueueItems.length - queueItems.length,
       queue: queueItems.length,
     },
     summary: {
@@ -354,6 +448,171 @@ function normalizeCustomerServiceThreadsResponse(
     activeItems,
     queueItems,
   };
+}
+
+function apiClientIndexScopeInput(options: {
+  baseUrl?: string;
+  platformUserId?: string;
+  spaceType?: number;
+  tenantId?: string;
+  tenantToken?: string;
+  userId?: string;
+}) {
+  return {
+    apiBaseUrl: options.baseUrl,
+    platformUserId: options.platformUserId,
+    spaceType: options.spaceType,
+    tenantId: options.tenantId,
+    tenantToken: options.tenantToken,
+    userId: options.userId,
+  };
+}
+
+function isCustomerServiceThreadSnapshot(item: CustomerServiceThread | StaffServiceHistoryItem) {
+  const record = item as unknown as Record<string, unknown>;
+  const type = normalizeResponseWireType(
+    readString(record.threadType) ||
+      readString(record.thread_type) ||
+      readString(record.conversationType) ||
+      readString(record.conversation_type) ||
+      readString(record.type),
+  );
+  if (type === "direct" || type === "group" || type === "im_group" || type === "group_chat") {
+    return false;
+  }
+  if (type === "temp_session" || type === "im_direct") return true;
+  if (asRecord(record.tempSession ?? record.temp_session)) return true;
+  if (readString(record.sessionId) || readString(record.session_id)) return true;
+  return Boolean(readString(record.threadId) || readString(record.thread_id));
+}
+
+function normalizeResponseWireType(value?: string | null) {
+  return String(value ?? "").trim().toLowerCase().replace(/-/g, "_");
+}
+
+function normalizeStaffServiceHistoryResponse(
+  response: StaffServiceHistoryResponse,
+): StaffServiceHistoryResponse {
+  const items = (response.items ?? []).filter(isCustomerServiceThreadSnapshot);
+  recordCsRoutingDiagnostic({
+    event: "pc-cs-service-history",
+    source: "customer-service-client",
+    phase: "filter",
+    route: "service-history",
+    classification: {
+      dropped: (response.items ?? []).length - items.length,
+      kept: items.length,
+      total: response.items?.length ?? 0,
+    },
+    summary: {
+      dropped: (response.items ?? [])
+        .filter((item) => !isCustomerServiceThreadSnapshot(item))
+        .slice(0, 20),
+    },
+  });
+  return {
+    ...response,
+    items,
+  };
+}
+
+function normalizeAdminTempSessionsResponse(
+  response: AdminTempSessionsResponse,
+): CustomerServiceThreadsResponse {
+  const items = readAdminConversationItems(response)
+    .map(adminTempSessionItemToCustomerServiceThread)
+    .filter((item): item is CustomerServiceThread => Boolean(item));
+  return {
+    activeItems: items,
+    queueItems: [],
+    summary: {
+      activeCount: 0,
+      allCount: 0,
+      queuedCount: 0,
+      vipCount: 0,
+    },
+  };
+}
+
+function normalizeAdminTempSessionDetail(
+  detail: AdminTempSessionDetailResponse,
+  fallbackSessionId: string,
+) {
+  const session = asRecord(detail.session) ?? {};
+  const visitor = asRecord(detail.visitor) ?? {};
+  const thread = adminTempSessionItemToCustomerServiceThread({
+    ...session,
+    visitorName:
+      readString(session.visitorName) ||
+      readString(visitor.displayName) ||
+      readString(visitor.visitorName),
+  }) ?? {
+    accessMode: "management_readonly" as const,
+    conversationId: fallbackSessionId,
+    status: "closed_timeout",
+    threadId: fallbackSessionId,
+    threadType: "temp_session" as const,
+    title: "访客",
+  };
+  const rawMessages = readMessages(detail.messages) ?? [];
+  const messages = normalizeCustomerServiceMessagesFromContract(rawMessages, {
+    conversationId: thread.conversationId,
+    threadId: thread.threadId,
+    threadType: thread.threadType,
+  });
+  return {
+    ...detail,
+    ...thread,
+    messages,
+  };
+}
+
+function adminTempSessionItemToCustomerServiceThread(
+  value: unknown,
+): CustomerServiceThread | null {
+  const item = asRecord(value);
+  if (!item) return null;
+  const threadId = readString(item.sessionId) || readString(item.threadId);
+  const conversationId = readString(item.conversationId) || threadId;
+  if (!threadId || !conversationId) return null;
+  return {
+    accessMode: "management_readonly",
+    assignedAt: readString(item.assignedAt) || null,
+    avatarUrl: readString(item.avatarUrl) ?? null,
+    conversationId,
+    customerAvatarUrl: readString(item.customerAvatarUrl) ?? null,
+    lastMessageAt: readString(item.lastMessageAt) || readString(item.updatedAt) || null,
+    lastMessagePreview: readString(item.lastMessagePreview),
+    priority: readString(item.priority),
+    source: readString(item.source),
+    sourceChannel: readString(item.sourceChannel) || readString(item.channel),
+    status: readString(item.status) || "closed_timeout",
+    threadId,
+    threadType: "temp_session",
+    title:
+      readString(item.visitorName) ||
+      readString(item.title) ||
+      readString(item.displayName) ||
+      "访客",
+    unreadCount: readNumber(item.unreadCount),
+    updatedAt: readString(item.updatedAt) || readString(item.createdAt) || null,
+  };
+}
+
+function readAdminConversationItems(response: AdminConversationManagementResponse) {
+  if (Array.isArray(response)) return response;
+  const record = asRecord(response);
+  if (!record) return [];
+  if (Array.isArray(record.items)) return record.items;
+  if (Array.isArray(record.threads)) return record.threads;
+  if (Array.isArray(record.data)) return record.data;
+  if (Array.isArray(record.activeItems) || Array.isArray(record.queueItems)) {
+    return [
+      ...(Array.isArray(record.queueItems) ? record.queueItems : []),
+      ...(Array.isArray(record.activeItems) ? record.activeItems : []),
+    ];
+  }
+  return [];
 }
 
 function normalizeCustomerServiceThreadFromContract(
@@ -652,6 +911,21 @@ function lastMessageId(item: CustomerServiceThread) {
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function adminTokenCacheKey(input: {
+  baseUrl: string;
+  platformToken?: string;
+  tenantId: string;
+}) {
+  return `${input.baseUrl}|${input.tenantId}|${input.platformToken ?? ""}`;
 }
 
 function previewFromMessage(message?: MessageItemDto) {

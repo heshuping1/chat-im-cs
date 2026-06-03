@@ -6,6 +6,7 @@ import {
   conversationKey as imConversationKey,
   type ConversationReadState,
 } from "../../data/im-read-model";
+import { logImReadDiagnostic } from "../../data/im-read/im-read-diagnostics";
 import { getImReadSnapshot } from "../../data/im-read/im-read-store";
 import { reduceMessageCoreEvent } from "../../data/message-core/message-core";
 import type { CurrentUserIdentity } from "../../data/message-display";
@@ -44,7 +45,24 @@ export function useDirectReadReceiptSync({
 
     const key = imConversationKey("direct", activeConversation.conversationId);
     const currentReadState = getImReadSnapshot().imReadStateByConversation[key];
-    if ((currentReadState?.peerReadSeq ?? 0) >= peerReadSeq) return;
+    const previousPeerReadSeq = currentReadState?.peerReadSeq ?? 0;
+    if (previousPeerReadSeq >= peerReadSeq) {
+      logImReadDiagnostic({
+        event: "im-read.read-status-merge",
+        phase: "merge",
+        result: "skipped",
+        reason: "peer_read_not_advanced",
+        context: {
+          cacheUpdated: false,
+          conversationId: activeConversation.conversationId,
+          conversationType: "direct",
+          peerReadSeq,
+          previousPeerReadSeq,
+          route: "query",
+        },
+      });
+      return;
+    }
 
     markImPeerReadReceipt(activeConversation.conversationId, peerReadSeq);
     upsertImReadState({
@@ -82,6 +100,20 @@ export function useDirectReadReceiptSync({
             ).state.messages
           : old,
     );
+    logImReadDiagnostic({
+      event: "im-read.read-status-merge",
+      phase: "merge",
+      result: "success",
+      reason: "peer_read_advanced",
+      context: {
+        cacheUpdated: true,
+        conversationId: activeConversation.conversationId,
+        conversationType: "direct",
+        peerReadSeq,
+        previousPeerReadSeq,
+        route: "query",
+      },
+    });
   }, [
     activeConversation,
     activeConversationType,

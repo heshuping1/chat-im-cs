@@ -21,6 +21,7 @@ import {
   isQueuedCustomerServiceThread,
 } from "../data/customer-service-display";
 import { createCustomerServiceIdentityViewModel } from "../data/customer-service/cs-identity-view-model";
+import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import { chatConversationEntityFromCustomerServiceThread } from "../data/conversation/conversation-domain";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
@@ -63,6 +64,7 @@ export function ThreadList() {
     [authSession],
   );
   const queryBaseKey = [authSession?.apiBaseUrl, authSession?.tenantToken];
+  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(authSession);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -71,7 +73,7 @@ export function ThreadList() {
   });
   const historyQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
-    enabled: Boolean(client),
+    enabled: Boolean(client && canUseStaffEndpoints),
     queryFn: async () =>
       client!.getStaffServiceHistory({
         threadType: "temp_session",
@@ -108,16 +110,24 @@ export function ThreadList() {
         ...(threadsQuery.data?.activeItems ?? []),
       ]
         .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
-        .filter((thread) => !isTerminalCustomerServiceThreadStatus(thread.status)),
+        .filter((thread) => !isCustomerServiceHistoryThread(thread)),
     [threadsQuery.data],
   );
   const historyThreads = useMemo(
-    () =>
-      (historyQuery.data?.items ?? [])
+    () => {
+      const readonlyHistoryThreads = [
+        ...(threadsQuery.data?.queueItems ?? []),
+        ...(threadsQuery.data?.activeItems ?? []),
+      ]
+        .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
+        .filter(isCustomerServiceHistoryThread);
+      const staffHistoryThreads = (historyQuery.data?.items ?? [])
         .map(staffServiceHistoryItemToThread)
         .filter((thread) => thread.threadType === "temp_session")
-        .filter((thread) => isTerminalCustomerServiceThreadStatus(thread.status)),
-    [historyQuery.data],
+        .filter((thread) => isTerminalCustomerServiceThreadStatus(thread.status));
+      return dedupeThreadList([...readonlyHistoryThreads, ...staffHistoryThreads]);
+    },
+    [historyQuery.data, threadsQuery.data],
   );
   const currentCounts = useMemo(
     () => createServiceThreadListCounts(currentThreads, isRiskyCustomerServiceThread),
@@ -365,6 +375,23 @@ export function ThreadList() {
       </div>
     </section>
   );
+}
+
+function isCustomerServiceHistoryThread(thread: CustomerServiceThread) {
+  return (
+    thread.accessMode === "management_readonly" ||
+    isTerminalCustomerServiceThreadStatus(thread.status)
+  );
+}
+
+function dedupeThreadList(threads: CustomerServiceThread[]) {
+  const seen = new Set<string>();
+  return threads.filter((thread) => {
+    const key = `${thread.threadType}:${thread.threadId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function FilterButton({

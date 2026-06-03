@@ -1,8 +1,14 @@
 import { logSettingsDiagnostic } from "./settings-diagnostics";
+import {
+  defaultChatBackgroundPreset,
+  normalizeChatBackgroundPreset,
+  type ChatBackgroundPresetId,
+} from "../../settings/models/chatBackgroundModel";
 
 export interface PcSettings {
   imNotifications: boolean;
   serviceQueueNotifications: boolean;
+  customerServiceMessageNotifications: boolean;
   slaTimeoutNotifications: boolean;
   desktopNotifications: boolean;
   notificationPreview: boolean;
@@ -22,6 +28,7 @@ export interface PcSettings {
   enterToSend: boolean;
   screenshotShortcut: "Alt+A" | "Ctrl+Alt+A" | "Ctrl+Shift+A" | "None";
   dragUpload: boolean;
+  chatBackgroundPreset: ChatBackgroundPresetId;
   localMessageCache: boolean;
   allowLppSearch: boolean;
   allowMobileSearch: boolean;
@@ -52,6 +59,7 @@ export const pcSettingsStorageKey = "lpp.pc.settings";
 export const defaultPcSettings: PcSettings = {
   imNotifications: true,
   serviceQueueNotifications: true,
+  customerServiceMessageNotifications: false,
   slaTimeoutNotifications: true,
   desktopNotifications: true,
   notificationPreview: true,
@@ -71,6 +79,7 @@ export const defaultPcSettings: PcSettings = {
   enterToSend: true,
   screenshotShortcut: "Alt+A",
   dragUpload: true,
+  chatBackgroundPreset: defaultChatBackgroundPreset,
   localMessageCache: true,
   allowLppSearch: true,
   allowMobileSearch: true,
@@ -141,6 +150,7 @@ export function mergePcSettings(partial: Partial<PcSettings> = {}): PcSettings {
   return {
     ...defaultPcSettings,
     ...partial,
+    chatBackgroundPreset: normalizeChatBackgroundPreset(partial.chatBackgroundPreset),
   };
 }
 

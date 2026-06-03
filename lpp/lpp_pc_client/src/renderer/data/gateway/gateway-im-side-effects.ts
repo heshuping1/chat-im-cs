@@ -9,6 +9,7 @@ import {
   getImReadActions,
   getImReadSnapshot,
 } from "../im-read/im-read-store";
+import { logImReadDiagnostic } from "../im-read/im-read-diagnostics";
 import {
   applyImGatewayMessageCache,
   applyImGatewayReadCache,
@@ -32,6 +33,7 @@ import { requireApiClient } from "../runtime";
 import { getReminderActions } from "../reminder/reminder-store";
 import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import { workspaceScopeFromSession } from "../workspace-scope";
 
 export function mergeImGatewayMessage(
   queryClient: QueryClient,
@@ -43,6 +45,7 @@ export function mergeImGatewayMessage(
     fallbackConversationId || imConversationId(payload) || fallbackConversationIdFromPeer(payload);
   const message = gatewayMessage(payload, fallbackId);
   const identity = getAuthSessionSnapshot();
+  const workspaceScope = workspaceScopeFromSession(identity);
   const readSnapshot = getImReadSnapshot();
   const readActions = getImReadActions();
   const eventMessage = isImEventMessage(message);
@@ -50,12 +53,15 @@ export function mergeImGatewayMessage(
   if (!message.conversationId) {
     return;
   }
-  const imConversationType =
-    inferImConversationType(payload, fallbackConversationType) || "direct";
+  const imConversationType = inferImConversationType(payload, fallbackConversationType);
+  if (!imConversationType) {
+    return;
+  }
   const uiState = getWorkspaceUiSnapshot();
   const active =
     uiState.activeModule === "messages" &&
-    uiState.activeImConversationId === message.conversationId;
+    uiState.activeImConversationId === message.conversationId &&
+    uiState.activeImConversationVisibility === "paneVisible";
   const previousKey = conversationKey(
     imConversationType === "group" ? "group" : "direct",
     message.conversationId,
@@ -69,6 +75,7 @@ export function mergeImGatewayMessage(
     classification: {
       activeDecision: active,
       activeImConversationId: uiState.activeImConversationId,
+      activeImConversationVisibility: uiState.activeImConversationVisibility,
       activeModule: uiState.activeModule,
       conversationId: message.conversationId,
       conversationType: imConversationType,
@@ -157,6 +164,8 @@ export function mergeImGatewayMessage(
     unreadCount: effectiveUnreadCount,
     readSeq: effectiveReadSeq,
     payload,
+    currentTenantId: workspaceScope.tenantId,
+    scopeKey: workspaceScope.key,
   });
   recordMessageReminderDiagnostic({
     event: "im.cache.write",
@@ -202,6 +211,7 @@ export function mergeReadEvent(
 
   const readerIds = readReceiptReaderIds(payload);
   const readerIsCurrentUser = readReceiptReaderIsCurrentUser(readerIds, identity);
+  const clientObservedAt = new Date().toISOString();
   recordMessageReminderDiagnostic({
     event: "im.read.received",
     source: "gateway-im-side-effects",
@@ -223,7 +233,27 @@ export function mergeReadEvent(
       unreadBefore: previousState?.unreadCount,
     },
     summary: {
-      payload,
+      conversationId: event.conversationId,
+      conversationType: event.conversationType,
+      readSeq: event.readSeq,
+      readerIds,
+    },
+  });
+  logImReadDiagnostic({
+    event: "im-read.gateway-receipt",
+    phase: "received",
+    result: "success",
+    reason: "msg_read_received",
+    context: {
+      clientObservedAt,
+      conversationId: event.conversationId,
+      conversationType: event.conversationType,
+      eventTime: readReceiptTime(payload),
+      peerReadSeq: nextState.peerReadSeq,
+      readSeq: event.readSeq,
+      reader: readerIsCurrentUser ? "current_user" : readerIds.some(Boolean) ? "peer" : "unknown",
+      route: "push",
+      serverTime: readReceiptTime(payload),
     },
   });
   const peerReadSeq = nextState.peerReadSeq;
@@ -233,6 +263,7 @@ export function mergeReadEvent(
   if (hasPeerReadUpdate) {
     readActions.markImPeerReadReceipt(event.conversationId, peerReadSeq);
   }
+  const workspaceScope = workspaceScopeFromSession(getAuthSessionSnapshot());
   applyImGatewayReadCache(queryClient, {
     conversationId: event.conversationId,
     readerIsCurrentUser,
@@ -241,7 +272,35 @@ export function mergeReadEvent(
     previousPeerReadSeq,
     identity,
     view: nextView,
+    currentTenantId: workspaceScope.tenantId,
+    scopeKey: workspaceScope.key,
   });
+}
+
+function readReceiptTime(payload: Record<string, unknown>) {
+  return (
+    stringDiagnosticField(
+      payload,
+      "eventTime",
+      "event_time",
+      "serverTime",
+      "server_time",
+      "readAt",
+      "read_at",
+      "timestamp",
+      "createdAt",
+      "created_at",
+    ) || undefined
+  );
+}
+
+function stringDiagnosticField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
 }
 
 function identityDiagnostic(identity: CurrentUserIdentity | null) {

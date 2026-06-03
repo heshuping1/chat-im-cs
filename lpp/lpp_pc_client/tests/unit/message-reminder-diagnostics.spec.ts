@@ -11,11 +11,13 @@ import { gatewayFailureHint } from "../../src/renderer/data/gateway/gateway-heal
 import { gatewayReminderDiagnosticClassification } from "../../src/renderer/data/gateway/gateway-message-reminder-diagnostics";
 
 describe("message reminder diagnostics", () => {
-  it("keeps plaintext diagnostics when plaintext mode is enabled", () => {
+  it("never leaks sensitive fields or message content when plaintext mode is enabled", () => {
     expect(
       summarizeMessageReminderDiagnosticValue({
         activeDecision: false,
         conversationId: "conversation-abcdef",
+        scopeKey:
+          "https://chat.example.test|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.raw.signature|tenant-1|user-1",
         message: {
           body: { text: "haishibuxinga111" },
           messageId: "message-123456",
@@ -27,12 +29,13 @@ describe("message reminder diagnostics", () => {
     ).toEqual({
       activeDecision: false,
       conversationId: "conversation-abcdef",
+      scopeKey: expect.stringMatching(/^\[scope-key len=\d+ hash=[a-f0-9]{12}\]$/),
       message: {
-        body: { text: "haishibuxinga111" },
+        body: "[redacted-content len=27]",
         messageId: "message-123456",
         senderRole: "visitor",
       },
-      tenantToken: "secret-token",
+      tenantToken: "[redacted]",
       unreadAfter: 2,
     });
   });
@@ -212,6 +215,25 @@ describe("message reminder diagnostics", () => {
     });
     expect(messageTraceStageLabel("receive.gateway.observed")).toBe("长连接收到");
     expect(messageTraceStageLabel("send.http.done")).toBe("发送请求完成");
+  });
+
+  it("prioritizes active send and gateway trace groups over passive query refresh groups", () => {
+    const samples: MessageTraceSample[] = [
+      traceSample("send-trace", "send.compose.submit", "2026-06-02T17:13:44.100Z", {
+        sourceChannel: "send",
+      }),
+      traceSample("send-trace", "send.server_ack.observed", "2026-06-02T17:13:44.500Z", {
+        sourceChannel: "send",
+      }),
+      traceSample("query-trace", "query.message.discovered", "2026-06-02T17:13:45.000Z", {
+        sourceChannel: "http-query",
+      }),
+    ];
+
+    expect(summarizeRecentMessageTraceGroups(samples, 2).map((group) => group.traceId)).toEqual([
+      "send-trace",
+      "query-trace",
+    ]);
   });
 
   it("classifies SignalR negotiate fetch failures for transport triage", () => {

@@ -8,6 +8,7 @@ import {
   invalidateCustomerServiceQueries,
   markCustomerServiceThreadClosed,
 } from "../../data/customer-service/cs-cache-adapter";
+import { canUseCustomerServiceStaffEndpoints } from "../../data/customer-service/cs-role-capabilities";
 import { customerServiceRealtimePollIntervalMs } from "../../data/customer-service/cs-realtime-config";
 import { createCustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
 import {
@@ -38,6 +39,7 @@ export function useCustomerServiceWorkspaceController({
     [session],
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
+  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -48,7 +50,7 @@ export function useCustomerServiceWorkspaceController({
   });
   const historyQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
-    enabled: Boolean(client),
+    enabled: Boolean(client && canUseStaffEndpoints),
     queryFn: async () =>
       client!.getStaffServiceHistory({ threadType: "temp_session", limit: 50 }),
   });

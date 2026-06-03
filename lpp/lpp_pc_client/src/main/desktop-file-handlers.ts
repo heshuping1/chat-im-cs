@@ -1,10 +1,13 @@
-import { clipboard, dialog, nativeImage, shell } from 'electron';
+import { clipboard, dialog, nativeImage, safeStorage, shell } from 'electron';
 import { execFile } from 'node:child_process';
-import { copyFile, writeFile } from 'node:fs/promises';
+import { basename } from 'node:path';
+import { copyFile, readFile, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import type {
   CacheMediaFilePayload,
   CacheMediaPosterPayload,
+  ChatArchiveFilePayload,
+  ChatArchiveFileResult,
   DesktopApiMethod,
   LocalMediaCacheSource,
   VideoPlayerPayload,
@@ -25,6 +28,7 @@ type DesktopIpcRegister = <Args extends unknown[]>(
 ) => void;
 
 const execFileAsync = promisify(execFile);
+const encryptedChatBackupPrefix = 'LPP_CHAT_BACKUP_SAFE_STORAGE_V1:';
 
 export function registerDesktopFileHandlers({
   appIconPath,
@@ -178,6 +182,61 @@ export function registerDesktopFileHandlers({
     await writeFile(result.filePath, content, 'utf8');
     return result.filePath;
   });
+
+  register('saveChatArchiveFile', async (_event, payload: ChatArchiveFilePayload) => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: payload.defaultName,
+      filters: [
+        payload.kind === 'backup'
+          ? { name: 'LPP Chat Backup', extensions: ['lpp-chat-backup'] }
+          : { name: 'JSON', extensions: ['json'] },
+      ],
+    });
+    if (result.canceled || !result.filePath) return null;
+    const content =
+      payload.kind === 'backup'
+        ? encryptChatBackupPayload(payload.content)
+        : payload.content;
+    await writeFile(result.filePath, content, 'utf8');
+    return result.filePath;
+  });
+
+  register('openChatArchiveFile', async (): Promise<ChatArchiveFileResult | null> => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'LPP Chat Backup', extensions: ['lpp-chat-backup'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const filePath = result.filePaths[0];
+    if (!filePath.toLowerCase().endsWith('.lpp-chat-backup')) {
+      throw new Error('只能打开 LPP 聊天备份文件');
+    }
+    const encrypted = await readFile(filePath, 'utf8');
+    return {
+      content: decryptChatBackupPayload(encrypted),
+      fileName: basename(filePath),
+      filePath,
+      kind: 'backup',
+    };
+  });
+}
+
+function encryptChatBackupPayload(content: string) {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('当前系统不支持安全备份加密');
+  }
+  return `${encryptedChatBackupPrefix}${safeStorage.encryptString(content).toString('base64')}`;
+}
+
+function decryptChatBackupPayload(content: string) {
+  if (!content.startsWith(encryptedChatBackupPrefix)) {
+    throw new Error('备份文件缺少安全封装');
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('当前系统不支持安全备份解密');
+  }
+  const encoded = content.slice(encryptedChatBackupPrefix.length);
+  return safeStorage.decryptString(Buffer.from(encoded, 'base64'));
 }
 
 async function copyFileToClipboard(filePath: string) {

@@ -27,13 +27,20 @@ import {
   isCustomerServiceGatewayPayload,
   isCustomerServiceStatus,
   normalizeType,
+  numberField,
   stringField,
+  booleanField,
 } from "./gateway-payload-utils";
 import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
 import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
 import { handleFirstStageImGatewayEvent } from "./im-gateway-handler";
 import { recordGatewayReminderDiagnostic } from "./gateway-message-reminder-diagnostics";
 import { createMessageDeliveryService } from "./message-delivery-service";
+import { pcQueryKeys } from "../query-keys";
+import {
+  applySpaceNoticeReminder,
+  spaceReminderScopeKey,
+} from "../spaces/space-reminder-ledger";
 
 export function createGatewayEventRouter(options: {
   clearAuthSession: () => void;
@@ -313,7 +320,45 @@ export function createGatewayEventRouter(options: {
         return;
       }
       invalidateIm(stringField(payload, "conversationId", "chatId"));
-      if (eventName === "space.notice") invalidateCustomerService();
+      if (eventName === "space.notice") {
+        applySpaceNoticeReminder(
+          spaceReminderScopeKey(session.apiBaseUrl, session.platformToken),
+          {
+            noticeType: stringField(payload, "noticeType", "notice_type"),
+            requiresSwitch: booleanField(payload, "requiresSwitch", "requires_switch"),
+            spaceType: numberField(payload, "spaceType", "space_type"),
+            targetUnreadConversationCount: numberField(
+              payload,
+              "targetUnreadConversationCount",
+              "target_unread_conversation_count",
+            ),
+            targetUnreadMessageCount: numberField(
+              payload,
+              "targetUnreadMessageCount",
+              "target_unread_message_count",
+            ),
+            tenantId: stringField(payload, "tenantId", "tenant_id"),
+            totalUnreadConversationCount: numberField(
+              payload,
+              "totalUnreadConversationCount",
+              "total_unread_conversation_count",
+            ),
+            totalUnreadMessageCount: numberField(
+              payload,
+              "totalUnreadMessageCount",
+              "total_unread_message_count",
+            ),
+            unreadSpaceCount: numberField(payload, "unreadSpaceCount", "unread_space_count"),
+          },
+        );
+        queryClient.invalidateQueries({
+          queryKey: pcQueryKeys.accountSpaceUnreadSummary(
+            session.apiBaseUrl,
+            session.platformToken,
+          ),
+        });
+        invalidateCustomerService();
+      }
       recordGatewayReminderDiagnostic({
         eventName,
         payload,

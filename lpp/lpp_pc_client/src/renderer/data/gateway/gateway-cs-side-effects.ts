@@ -8,13 +8,15 @@ import { consumeCustomerServiceMessageReminder } from "../customer-service/cs-re
 import {
   isRendererWindowFocused,
   notifyDesktopOrBrowser,
-  shouldPushRealtimeReminder,
+  shouldPushCustomerServiceQueueReminder,
+  shouldPushCustomerServiceThreadMessageReminder,
+  shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget,
   shouldShowDesktopNotification,
-  shouldShowDesktopNotificationForTarget,
 } from "../reminder/reminder-service";
 import { getReminderActions } from "../reminder/reminder-store";
 import { getPcSettingsSnapshot } from "../settings/settings-store";
 import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
+import { workspaceScopeKeyFromSession } from "../workspace-scope";
 import {
   isExplicitCustomerServiceThreadOpenSource,
   resolveCustomerServiceThreadReadVisibility,
@@ -37,18 +39,21 @@ export function mergeCustomerServiceGatewayMessage(
   payload: Record<string, unknown>,
   fallbackThreadId: string,
 ) {
+  const session = getAuthSessionSnapshot();
+  const scopeKey = workspaceScopeKeyFromSession(session);
   const threadId =
     stringField(payload, "threadId", "sessionId") ||
     stringField(asRecord(payload.thread), "threadId", "sessionId") ||
+    customerServiceThreadId(payload, scopeKey) ||
     fallbackThreadId;
   if (!threadId) return;
   const threadType = normalizeThreadType(
-    stringField(payload, "threadType", "conversationType") ||
+    stringField(payload, "sourceType", "source_type") ||
+      stringField(asRecord(payload.thread), "sourceType", "source_type") ||
+      stringField(payload, "threadType", "conversationType") ||
       stringField(asRecord(payload.thread), "threadType"),
   );
   const message = gatewayMessage(payload, threadId);
-  const session = getAuthSessionSnapshot();
-  const scopeKey = customerServiceIndexScopeKey(session ?? undefined);
   const self = isSelfCustomerServiceGatewayMessage(payload, message, session);
   const uiState = getWorkspaceUiSnapshot();
   const visibility = resolveCustomerServiceThreadReadVisibility({
@@ -105,7 +110,7 @@ export function mergeCustomerServiceGatewayMessage(
 export function notifyCustomerServiceQueue(payload: Record<string, unknown>, threadId: string) {
   const reminderActions = getReminderActions();
   const settings = getPcSettingsSnapshot();
-  if (!shouldPushRealtimeReminder(settings, "serviceQueue")) return;
+  if (!shouldPushCustomerServiceQueueReminder(settings)) return;
   const session = getAuthSessionSnapshot();
   const scopeKey = customerServiceIndexScopeKey(session ?? undefined);
   const normalizedThreadId = threadId || customerServiceThreadId(payload, scopeKey);
@@ -170,7 +175,7 @@ function notifyCustomerServiceMessage(
 ) {
   const reminderActions = getReminderActions();
   const settings = getPcSettingsSnapshot();
-  if (!shouldPushRealtimeReminder(settings, "serviceQueue")) return;
+  if (!shouldPushCustomerServiceThreadMessageReminder(settings)) return;
   const targetId =
     options.targetId ||
     customerServiceThreadId(payload, customerServiceIndexScopeKey(options.identity ?? undefined)) ||
@@ -208,7 +213,7 @@ function notifyCustomerServiceMessage(
     ? uiState.activeThreadId
     : undefined;
   if (
-    shouldShowDesktopNotificationForTarget(settings, "serviceQueue", {
+    shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(settings, {
       activeModule: uiState.activeModule,
       activeTargetId,
       targetId: nextTargetId,

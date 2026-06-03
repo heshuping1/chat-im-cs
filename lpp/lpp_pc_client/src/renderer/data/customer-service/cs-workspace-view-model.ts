@@ -211,7 +211,11 @@ export function listCustomerServiceSelectableThreads(input: {
     ...(input.threads?.activeItems ?? []),
   ]
     .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
-    .filter((thread) => !createCustomerServiceThreadState(thread.status).readOnly);
+    .filter(
+      (thread) =>
+        thread.accessMode === "management_readonly" ||
+        !createCustomerServiceThreadState(thread.status).readOnly,
+    );
   const historyThreads = (input.historyItems ?? [])
     .map(staffServiceHistoryItemToThread)
     .filter((thread) => thread.threadType === "temp_session");

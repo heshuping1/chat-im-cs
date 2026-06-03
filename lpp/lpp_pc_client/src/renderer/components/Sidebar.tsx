@@ -34,6 +34,7 @@ import { resolveCustomerServiceBadgeView } from "../data/customer-service/custom
 import { customerServiceRealtimePollIntervalMs } from "../data/customer-service/cs-realtime-config";
 import { consumeCustomerServiceMessageReminder } from "../data/customer-service/cs-reminder-model";
 import { isExplicitCustomerServiceThreadOpenSource } from "../data/customer-service/customer-service-read-visibility";
+import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
 import {
   useImReadStateByConversation,
@@ -44,9 +45,10 @@ import {
   applyTaskbarBadge,
   isRendererWindowFocused,
   notifyDesktopOrBrowser,
-  shouldPushRealtimeReminder,
+  shouldPushCustomerServiceQueueReminder,
+  shouldPushCustomerServiceThreadMessageReminder,
+  shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget,
   shouldShowDesktopNotification,
-  shouldShowDesktopNotificationForTarget,
 } from "../data/reminder/reminder-service";
 import type { PcRealtimeReminderInput } from "../data/reminder/reminder-types";
 import { usePushRealtimeReminder } from "../data/reminder/reminder-store";
@@ -88,9 +90,12 @@ import {
   normalizeReceptionStatus,
   receptionControlStatusOptions,
 } from "../customer-service/models/serviceReceptionControlModel";
+import { isRiskyCustomerServiceThread } from "../customer-service/models/serviceWorkbenchModel";
 import { derivePcWorkspaceAccess } from "../data/workspace-access";
 import { formatBadgeCount, formatError } from "../lib/format";
 import { useFriendRequestReminderController } from "../contacts/hooks/useFriendRequestReminderController";
+import { SpaceRadarPopover } from "../spaces/components/SpaceRadarPopover";
+import { useSpaceRadarController } from "../spaces/hooks/useSpaceRadarController";
 import { PcAvatar } from "./PcAvatar";
 import {
   AccountAction,
@@ -177,13 +182,11 @@ export function Sidebar() {
   const queueReminderReadyRef = useRef(false);
   const queueReminderSessionRef = useRef("");
   const previousQueuedThreadIdsRef = useRef<Set<string>>(new Set());
+  const previousSlaRiskThreadIdsRef = useRef<Set<string>>(new Set());
   const previousQueuedCountRef = useRef(0);
   const previousServiceUnreadRef = useRef<Map<string, number>>(new Map());
   const conversationsQuery = useQuery({
-    queryKey: pcQueryKeys.imConversations(
-      authSession?.apiBaseUrl,
-      authSession?.tenantToken,
-    ),
+    queryKey: pcQueryKeys.imConversationsForSession(authSession),
     enabled: Boolean(authSession),
     refetchInterval: 5_000,
     refetchIntervalInBackground: true,
@@ -199,12 +202,17 @@ export function Sidebar() {
     refetchIntervalInBackground: true,
     queryFn: async () => requireApiClient(authSession).getWorkbenchThreads(),
   });
+  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(authSession);
   const receptionStatusQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceReception(
       authSession?.apiBaseUrl,
       authSession?.tenantToken,
     ),
-    enabled: Boolean(authSession && workspaceAccess.canReadServiceWorkbench),
+    enabled: Boolean(
+      authSession &&
+        workspaceAccess.canReadServiceWorkbench &&
+        canUseStaffEndpoints,
+    ),
     refetchInterval: 15_000,
     refetchIntervalInBackground: true,
     queryFn: async () => requireApiClient(authSession).getReceptionStatus(),
@@ -342,6 +350,12 @@ export function Sidebar() {
   const spaceName = tenantInfo?.tenantName || authSession?.tenantName || spaceCode;
   const spaceMeta = "企业空间";
   const tenantLogoUrl = tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl ?? null;
+  const spaceRadar = useSpaceRadarController({
+    currentTenant: tenantInfo,
+    enabled: spaceStatusOpen,
+    onSwitchSuccess: () => setSpaceStatusOpen(false),
+  });
+  const spaceRadarNewReminderTotal = spaceRadar.viewModel.totalNewReminderCount;
   const accountMeta = profile?.lppId ?? authSession?.lppId ?? spaceCode;
   const appInstance = appInstanceQuery.data;
   const appInstanceLabel = appInstance
@@ -527,6 +541,7 @@ export function Sidebar() {
       queueReminderReadyRef.current = false;
       queueReminderSessionRef.current = "";
       previousQueuedThreadIdsRef.current = new Set();
+      previousSlaRiskThreadIdsRef.current = new Set();
       previousQueuedCountRef.current = 0;
       previousServiceUnreadRef.current = new Map();
       return;
@@ -535,6 +550,7 @@ export function Sidebar() {
       queueReminderSessionRef.current = queueReminderSessionKey;
       queueReminderReadyRef.current = false;
       previousQueuedThreadIdsRef.current = new Set();
+      previousSlaRiskThreadIdsRef.current = new Set();
       previousQueuedCountRef.current = 0;
       previousServiceUnreadRef.current = new Map();
     }
@@ -551,9 +567,17 @@ export function Sidebar() {
         ] as const)
         .filter(([id]) => Boolean(id)),
     );
+    const customerServiceThreads = [...queuedTempSessions, ...activeTempSessions];
+    const currentSlaRiskIds = new Set(
+      customerServiceThreads
+        .filter(isRiskyCustomerServiceThread)
+        .map((item) => item.threadId || item.conversationId)
+        .filter(Boolean),
+    );
     if (!queueReminderReadyRef.current) {
       queueReminderReadyRef.current = true;
       previousQueuedThreadIdsRef.current = currentIds;
+      previousSlaRiskThreadIdsRef.current = currentSlaRiskIds;
       previousQueuedCountRef.current = queuedServiceCount;
       previousServiceUnreadRef.current = currentUnread;
       return;
@@ -572,17 +596,27 @@ export function Sidebar() {
     });
     const queuedCountIncreased =
       queuedServiceCount > previousQueuedCountRef.current && newQueuedThreads.length === 0;
+    const newSlaRiskThreads = customerServiceThreads.filter((item) => {
+      const id = item.threadId || item.conversationId;
+      return (
+        id &&
+        isRiskyCustomerServiceThread(item) &&
+        !previousSlaRiskThreadIdsRef.current.has(id)
+      );
+    });
     previousQueuedThreadIdsRef.current = currentIds;
+    previousSlaRiskThreadIdsRef.current = currentSlaRiskIds;
     previousQueuedCountRef.current = queuedServiceCount;
     previousServiceUnreadRef.current = currentUnread;
     if (
       newQueuedThreads.length === 0 &&
         activeUnreadThreads.length === 0 &&
+        newSlaRiskThreads.length === 0 &&
         !queuedCountIncreased
     ) {
       return;
     }
-    if (!shouldPushRealtimeReminder(pcSettings, "serviceQueue")) return;
+    const shouldPushQueueReminder = shouldPushCustomerServiceQueueReminder(pcSettings);
 
     const notifyThread = (
       thread: (typeof queuedTempSessions)[number],
@@ -623,7 +657,9 @@ export function Sidebar() {
       }
     };
 
-    newQueuedThreads.forEach((thread) => notifyThread(thread, ""));
+    if (shouldPushQueueReminder) {
+      newQueuedThreads.forEach((thread) => notifyThread(thread, ""));
+    }
     activeUnreadThreads.forEach((thread) =>
       notifyActiveCustomerServiceThreadMessage({
         activeModule,
@@ -635,7 +671,14 @@ export function Sidebar() {
         thread,
       }),
     );
-    if (queuedCountIncreased) {
+    newSlaRiskThreads.forEach((thread) =>
+      notifyCustomerServiceSlaRiskThread({
+        pcSettings,
+        pushRealtimeReminder,
+        thread,
+      }),
+    );
+    if (queuedCountIncreased && shouldPushQueueReminder) {
       const title = "新的在线客服会话";
       const body = "有新的访客正在排队，等待接入";
       pushRealtimeReminder({
@@ -660,9 +703,11 @@ export function Sidebar() {
     activeTempSessions,
     authSession,
     pcSettings.desktopNotifications,
+    pcSettings.customerServiceMessageNotifications,
     pcSettings.notificationPreview,
     pcSettings.notificationSound,
     pcSettings.serviceQueueNotifications,
+    pcSettings.slaTimeoutNotifications,
     pushRealtimeReminder,
     activeServiceUnreadCount,
     serviceQuery.data,
@@ -717,7 +762,7 @@ export function Sidebar() {
               }}
             >
               <Info size={15} />
-              帮助与关于 / 检查更新
+              帮助 / 关于 / 检查更新
             </button>
           </div>
         )}
@@ -1078,12 +1123,18 @@ export function Sidebar() {
 
           <div className="sidebar-status-row-wrap">
             <button
-              className="sidebar-status-row sidebar-space-status-row"
+              className={`sidebar-status-row sidebar-space-status-row ${
+                spaceRadarNewReminderTotal > 0 ? "has-space-alert" : ""
+              }`}
               type="button"
               aria-expanded={spaceStatusOpen}
               aria-label={`当前空间：${spaceName}，企业码 ${spaceCode}`}
               data-sidebar-popover-trigger="space"
-              data-sidebar-tooltip={`空间 · ${spaceName} · ${spaceCode}`}
+              data-sidebar-tooltip={`空间 · ${spaceName} · ${spaceCode}${
+                spaceRadarNewReminderTotal > 0
+                  ? ` · ${formatBadgeCount(spaceRadarNewReminderTotal)} 条新提醒`
+                  : ""
+              }`}
               onClick={() => {
                 setSpaceStatusOpen((opened) => !opened);
                 setBrandInfoOpen(false);
@@ -1108,30 +1159,29 @@ export function Sidebar() {
                 <strong>{spaceCode}</strong>
                 <em>{spaceMeta}</em>
               </span>
+              {spaceRadarNewReminderTotal > 0 && (
+                <span className="sidebar-space-unread-badge" aria-hidden="true">
+                  {formatBadgeCount(spaceRadarNewReminderTotal)}
+                </span>
+              )}
               <ChevronRight size={14} aria-hidden="true" />
             </button>
             {spaceStatusOpen && (
-              <div
-                className="sidebar-status-popover sidebar-space-status-popover"
-                role="dialog"
-                aria-label="当前空间"
-              >
-                <strong>{spaceName}</strong>
-                <span>企业码：{spaceCode}</span>
-                <span>空间类型：{spaceMeta}</span>
-                <span>角色：{roleLabel}</span>
-                <button
-                  className="sidebar-status-action"
-                  type="button"
-                  onClick={() => {
-                    setActiveModule("enterpriseSwitch");
-                    setSpaceStatusOpen(false);
-                  }}
-                >
-                  <Building2 size={15} />
-                  空间切换
-                </button>
-              </div>
+              <SpaceRadarPopover
+                canSwitch={Boolean(authSession?.platformToken)}
+                onManageSpaces={() => {
+                  setActiveModule("enterpriseSwitch");
+                  setSpaceStatusOpen(false);
+                }}
+                onSwitchSpace={spaceRadar.switchSpace}
+                spacesError={spaceRadar.spacesError}
+                spacesLoading={spaceRadar.spacesLoading}
+                switchError={spaceRadar.switchSpaceMutation.error}
+                switchingIdentityKey={spaceRadar.switchingIdentityKey}
+                unreadSummaryError={spaceRadar.unreadSummaryError}
+                unreadSummaryLoading={spaceRadar.unreadSummaryLoading}
+                viewModel={spaceRadar.viewModel}
+              />
             )}
           </div>
 
@@ -1168,6 +1218,7 @@ function notifyActiveCustomerServiceThreadMessage({
   pushRealtimeReminder: (reminder: PcRealtimeReminderInput) => void;
   thread: CustomerServiceThread;
 }) {
+  if (!shouldPushCustomerServiceThreadMessageReminder(pcSettings)) return;
   const targetId = thread.threadId || thread.conversationId;
   if (!targetId) return;
   const message = customerServiceThreadReminderMessage(thread);
@@ -1209,9 +1260,8 @@ function notifyActiveCustomerServiceThreadMessage({
     severity: "warning",
     icon: "service",
   });
-  const shouldShowDesktop = shouldShowDesktopNotificationForTarget(
+  const shouldShowDesktop = shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(
     pcSettings,
-    "serviceQueue",
     {
       activeModule,
       activeTargetId: isExplicitCustomerServiceThreadOpenSource(activeThreadOpenSource)
@@ -1247,6 +1297,47 @@ function notifyActiveCustomerServiceThreadMessage({
     {
       authToken: authSession?.tenantToken,
       channel: "serviceQueue",
+      settings: pcSettings,
+    },
+  );
+}
+
+function notifyCustomerServiceSlaRiskThread({
+  pcSettings,
+  pushRealtimeReminder,
+  thread,
+}: {
+  pcSettings: PcSettings;
+  pushRealtimeReminder: (reminder: PcRealtimeReminderInput) => void;
+  thread: CustomerServiceThread;
+}) {
+  const targetId = thread.threadId || thread.conversationId;
+  if (!targetId || !pcSettings.slaTimeoutNotifications) return;
+  const title = "SLA 超时提醒";
+  const body = thread.title
+    ? `${thread.title} 接近超时或已经超时`
+    : "在线客服会话接近超时或已经超时";
+
+  pushRealtimeReminder({
+    id: `cs-sla-${targetId}`,
+    title,
+    body,
+    targetModule: "onlineService",
+    targetId,
+    severity: "critical",
+    icon: "sla",
+  });
+  if (!shouldShowDesktopNotification(pcSettings, "sla")) return;
+  void notifyDesktopOrBrowser(
+    {
+      title,
+      body,
+      conversationId: targetId,
+      targetId,
+      targetModule: "onlineService",
+    },
+    {
+      channel: "sla",
       settings: pcSettings,
     },
   );

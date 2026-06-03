@@ -113,7 +113,31 @@ export function shouldPushRealtimeReminder(
   if (settings.doNotDisturb && channel === "im") return false;
   if (channel === "im") return settings.imNotifications;
   if (channel === "sla") return settings.slaTimeoutNotifications;
+  return shouldPushCustomerServiceQueueReminder(settings);
+}
+
+export function shouldPushCustomerServiceQueueReminder(settings: ReminderPolicySettings) {
   return settings.serviceQueueNotifications;
+}
+
+export function shouldPushCustomerServiceThreadMessageReminder(settings: ReminderPolicySettings) {
+  return settings.customerServiceMessageNotifications;
+}
+
+export function shouldShowCustomerServiceThreadMessageDesktopNotification(
+  settings: ReminderPolicySettings,
+) {
+  return settings.desktopNotifications && shouldPushCustomerServiceThreadMessageReminder(settings);
+}
+
+export function shouldPushCustomerServiceMessageReminder(settings: ReminderPolicySettings) {
+  return shouldPushCustomerServiceThreadMessageReminder(settings);
+}
+
+export function shouldShowCustomerServiceMessageDesktopNotification(
+  settings: ReminderPolicySettings,
+) {
+  return shouldShowCustomerServiceThreadMessageDesktopNotification(settings);
 }
 
 export function shouldShowDesktopNotification(
@@ -142,6 +166,24 @@ export function shouldShowDesktopNotificationForTarget(
   if (input.targetModule !== "onlineService") return true;
   if (input.activeModule !== "onlineService") return true;
   return !input.targetId || input.activeTargetId !== input.targetId;
+}
+
+export function shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(
+  settings: ReminderPolicySettings,
+  input: DesktopNotificationVisibilityInput = {},
+) {
+  if (!shouldShowCustomerServiceThreadMessageDesktopNotification(settings)) return false;
+  if (!input.windowFocused) return true;
+  if (input.targetModule !== "onlineService") return true;
+  if (input.activeModule !== "onlineService") return true;
+  return !input.targetId || input.activeTargetId !== input.targetId;
+}
+
+export function shouldShowCustomerServiceMessageDesktopNotificationForTarget(
+  settings: ReminderPolicySettings,
+  input: DesktopNotificationVisibilityInput = {},
+) {
+  return shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(settings, input);
 }
 
 export function isRendererWindowFocused() {

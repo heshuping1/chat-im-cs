@@ -9,6 +9,7 @@ import {
 import {
   customerServiceConversationRecord,
   customerServiceMessageRecord,
+  customerServiceThreadId,
   isCustomerServiceGatewayPayload,
   normalizeThreadType,
 } from "./gateway-cs-payload-utils";
@@ -124,7 +125,11 @@ function customerServiceThreadType(payload: Record<string, unknown>) {
   const message = customerServiceMessageRecord(payload);
   const conversation = customerServiceConversationRecord(payload);
   return normalizeThreadType(
-    stringField(payload, "threadType", "conversationType") ||
+    stringField(payload, "sourceType", "source_type") ||
+      stringField(message, "sourceType", "source_type") ||
+      stringField(conversation, "sourceType", "source_type") ||
+      stringField(asRecord(payload.thread), "sourceType", "source_type") ||
+      stringField(payload, "threadType", "conversationType") ||
       stringField(message, "threadType", "conversationType", "type") ||
       stringField(conversation, "threadType", "conversationType", "type") ||
       stringField(asRecord(payload.thread), "threadType", "conversationType"),
@@ -142,6 +147,7 @@ function customerServiceStandardThreadId(payload: Record<string, unknown>, scope
     stringField(thread, "threadId") ||
     stringField(conversation, "threadId") ||
     stringField(tempSession, "sessionId") ||
+    customerServiceThreadId(payload, scopeKey) ||
     indexedThreadId(payload, scopeKey)
   );
 }
@@ -203,7 +209,9 @@ function customerServiceStandardMessageInput(payload: Record<string, unknown>) {
       stringField(payload, "sentAt", "serverTime"),
     threadType:
       stringField(message, "threadType") ||
-      stringField(payload, "threadType"),
+      stringField(payload, "threadType") ||
+      stringField(message, "sourceType", "source_type") ||
+      stringField(payload, "sourceType", "source_type"),
   };
 }
 

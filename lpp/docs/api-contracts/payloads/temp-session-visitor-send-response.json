@@ -1,19 +1,19 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNLT65F7GC8M",
+  "requestId": "0HNLVOL2JTIK6",
   "data": {
-    "messageId": "019e71c1-0c20-79fc-b093-9a774a0f4173",
-    "conversationId": "019e71c1-06a6-776d-ae6a-8edb87aef4c7",
+    "messageId": "019e82a5-188a-776d-b1b6-a9a3481b57ea",
+    "conversationId": "019e82a5-14a7-706a-b6e5-eb0fdd8ba5d9",
     "conversationSeq": 3,
-    "senderUserId": "019e71c1-06a5-7811-9c55-3c20776a9042",
+    "senderUserId": "019e82a5-14a6-7f19-8d51-c289cd428e58",
     "senderDisplayName": "Widget Visitor",
     "senderType": "visitor",
     "messageType": "text",
     "body": {
       "text": "\u6211\u4E5F\u60F3\u786E\u8BA4\u4E00\u4E0B\u79C1\u6709\u90E8\u7F72\u4EF7\u683C\u3002"
     },
-    "sentAt": "2026-05-29T03:22:17.5043883\u002B00:00",
+    "sentAt": "2026-06-01T10:05:18.3465133\u002B00:00",
     "replyToMessageId": null,
     "senderRole": null
   }

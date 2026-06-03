@@ -1,8 +1,9 @@
-import { Mail, ShieldAlert } from "lucide-react";
+import { Languages, Mail, ShieldAlert } from "lucide-react";
 import { ChannelBadge } from "../../components/ChannelBadge";
 import { PcAvatar } from "../../components/PcAvatar";
 import type { CustomerServiceIdentityViewModel } from "../../data/customer-service/cs-identity-view-model";
 import type { CustomerServiceReplyGate } from "../../data/customer-service/cs-thread-state";
+import type { AutoTranslateConversationMode } from "../../translation/models/autoTranslatePreferences";
 
 export function CustomerServiceWorkspaceHeader({
   identity,
@@ -12,7 +13,10 @@ export function CustomerServiceWorkspaceHeader({
   risky,
   source,
   title,
+  autoTranslateEffective,
+  autoTranslateMode,
   unreadCount = 0,
+  onCycleAutoTranslateMode,
   onOpenCustomerContext,
 }: {
   identity: CustomerServiceIdentityViewModel;
@@ -22,7 +26,10 @@ export function CustomerServiceWorkspaceHeader({
   risky?: boolean;
   source?: string;
   title: string;
+  autoTranslateEffective: boolean;
+  autoTranslateMode: AutoTranslateConversationMode;
   unreadCount?: number;
+  onCycleAutoTranslateMode: () => void;
   onOpenCustomerContext?: () => void;
 }) {
   return (
@@ -48,6 +55,17 @@ export function CustomerServiceWorkspaceHeader({
             <ChannelBadge source={source} compact />
             <span>{identity.isVip ? "VIP 客户" : "普通客户"}</span>
             <span>{modeLabel}</span>
+            <button
+              className={`chat-meta-action ${autoTranslateEffective ? "active" : ""}`}
+              type="button"
+              aria-label={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
+              title={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
+              aria-pressed={autoTranslateEffective}
+              onClick={onCycleAutoTranslateMode}
+            >
+              <Languages size={12} />
+              翻译
+            </button>
             <span className={`reply-gate-${replyGate}`}>
               {replyGateLabel(replyGate, readOnly)}
             </span>
@@ -68,6 +86,15 @@ export function CustomerServiceWorkspaceHeader({
       </div>
     </header>
   );
+}
+
+function autoTranslateModeLabel(
+  mode: AutoTranslateConversationMode,
+  effective: boolean,
+) {
+  if (mode === "enabled") return "本会话开启";
+  if (mode === "disabled") return "本会话关闭";
+  return effective ? "跟随全局，已开启" : "跟随全局，已关闭";
 }
 
 function replyGateLabel(replyGate: CustomerServiceReplyGate, readOnly?: boolean) {

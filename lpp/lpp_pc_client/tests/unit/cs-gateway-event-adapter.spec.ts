@@ -131,6 +131,53 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.message.messageId).toBe("m-indexed");
   });
 
+  it("adapts sourceType widget messages as temp-session customer service events", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 10,
+      args: [
+        {
+          conversationId: "conversation-widget",
+          sourceType: "widget",
+          threadId: "thread-widget",
+          messageId: "m-widget",
+          messageType: "text",
+          senderUserId: "visitor-1",
+          body: { text: "widget hello" },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.message.received");
+    if (event.kind !== "cs.message.received") return;
+    expect(event.threadId).toBe("thread-widget");
+    expect(event.threadType).toBe("temp_session");
+    expect(event.message.messageId).toBe("m-widget");
+  });
+
+  it("does not adapt sourceType im generic messages as online-service events", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 11,
+      args: [
+        {
+          conversationId: "conversation-im-cs",
+          conversationType: "direct",
+          sourceType: "im",
+          threadId: "thread-im-cs",
+          messageId: "m-im-cs",
+          messageType: "text",
+          senderUserId: "staff-1",
+          body: { text: "im customer service hello" },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("ignored");
+    if (event.kind !== "ignored") return;
+    expect(event.reason).toBe("non_cs_event");
+  });
+
   it("does not adapt unmarked indexed messages without a matching scope", () => {
     rememberCustomerServiceConversationIndex({
       conversationId: "im-conversation-cs-1",
@@ -158,7 +205,7 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.kind).toBe("ignored");
   });
 
-  it("rejects customer service messages that only provide non-standard thread aliases", () => {
+  it("accepts customer service messages through the ownership thread-id resolver", () => {
     const event = adaptCustomerServiceGatewayEvent({
       eventName: "customer_service.message.new",
       receivedAt: 8,
@@ -173,9 +220,10 @@ describe("adaptCustomerServiceGatewayEvent", () => {
       ],
     });
 
-    expect(event.kind).toBe("invalid");
-    if (event.kind !== "invalid") return;
-    expect(event.reason).toBe("missing_thread_id");
+    expect(event.kind).toBe("cs.message.received");
+    if (event.kind !== "cs.message.received") return;
+    expect(event.threadId).toBe("legacy-thread-1");
+    expect(event.threadType).toBe("temp_session");
   });
 
   it("does not read legacy message id aliases as a valid customer service message id", () => {

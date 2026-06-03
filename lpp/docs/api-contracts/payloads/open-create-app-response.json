@@ -1,11 +1,11 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNLT65F7GCA4",
+  "requestId": "0HNM0Q9OQ640B",
   "data": {
-    "appId": "019e71c1-1e5c-79a2-b40c-1a0febdd4a0a",
+    "appId": "019e8989-2a95-76de-b592-a3ed64f21ffc",
     "appCode": "qa-bot",
     "appName": "QA Bot",
-    "secret": "6FolexYTkxJeK0Q6zZxdSwcNIQDba9cd"
+    "secret": "5D6b/n0SF3gLTSywx7BgXHfnej1y9UdJ"
   }
 }

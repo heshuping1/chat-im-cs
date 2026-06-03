@@ -23,6 +23,7 @@ export function CustomerServiceMessageStage({
   authToken,
   isMineMessage,
   jumpToLatest,
+  messageAnnotations,
   messageMenu,
   messages,
   messageStageState,
@@ -40,6 +41,7 @@ export function CustomerServiceMessageStage({
   authToken?: string;
   isMineMessage: (message: MessageItemDto) => boolean;
   jumpToLatest: () => void;
+  messageAnnotations: Record<string, string>;
   messageMenu: ServiceMessageMenuState;
   messages: MessageItemDto[];
   messageStageState?: CustomerServiceWorkspaceInlineState;
@@ -79,6 +81,7 @@ export function CustomerServiceMessageStage({
               key={message.messageId}
               message={message}
               mine={isMineMessage(message)}
+              translationText={message.messageId ? messageAnnotations[message.messageId] : undefined}
               assetBaseUrl={assetBaseUrl}
               authToken={authToken}
               mediaCacheContext={{

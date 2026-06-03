@@ -7,7 +7,10 @@ import {
   resetDesktopNotificationDedupeForTest,
   notificationPayloadForPolicy,
   reduceRealtimeReminders,
+  shouldPushCustomerServiceQueueReminder,
+  shouldPushCustomerServiceThreadMessageReminder,
   shouldPushRealtimeReminder,
+  shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget,
   shouldShowDesktopNotification,
   shouldShowDesktopNotificationForTarget,
   taskbarBadgeLabel,
@@ -64,6 +67,27 @@ describe("reminder service", () => {
 
   it("uses settings policy for realtime and desktop notifications", () => {
     expect(shouldPushRealtimeReminder(defaultPcSettings, "serviceQueue")).toBe(true);
+    expect(shouldPushCustomerServiceQueueReminder(defaultPcSettings)).toBe(true);
+    expect(shouldPushCustomerServiceThreadMessageReminder(defaultPcSettings)).toBe(false);
+    expect(
+      shouldPushCustomerServiceThreadMessageReminder({
+        ...defaultPcSettings,
+        customerServiceMessageNotifications: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPushCustomerServiceThreadMessageReminder({
+        ...defaultPcSettings,
+        customerServiceMessageNotifications: true,
+        serviceQueueNotifications: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPushCustomerServiceQueueReminder({
+        ...defaultPcSettings,
+        serviceQueueNotifications: false,
+      }),
+    ).toBe(false);
     expect(shouldShowDesktopNotification(defaultPcSettings, "serviceQueue")).toBe(true);
     expect(
       shouldShowDesktopNotification(
@@ -101,6 +125,16 @@ describe("reminder service", () => {
         "serviceQueue",
       ),
     ).toBe(true);
+    expect(shouldPushRealtimeReminder(defaultPcSettings, "sla")).toBe(true);
+    expect(
+      shouldPushRealtimeReminder(
+        {
+          ...defaultPcSettings,
+          slaTimeoutNotifications: false,
+        },
+        "sla",
+      ),
+    ).toBe(false);
     expect(
       shouldShowDesktopNotificationForTarget(defaultPcSettings, "serviceQueue", {
         activeModule: "onlineService",
@@ -127,6 +161,22 @@ describe("reminder service", () => {
         targetModule: "onlineService",
         windowFocused: true,
       }),
+    ).toBe(true);
+    expect(
+      shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(
+        {
+          ...defaultPcSettings,
+          customerServiceMessageNotifications: true,
+          serviceQueueNotifications: false,
+        },
+        {
+          activeModule: "onlineService",
+          activeTargetId: "t1",
+          targetId: "t2",
+          targetModule: "onlineService",
+          windowFocused: true,
+        },
+      ),
     ).toBe(true);
   });
 

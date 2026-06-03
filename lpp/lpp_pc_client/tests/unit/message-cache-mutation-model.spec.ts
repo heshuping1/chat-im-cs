@@ -11,11 +11,14 @@ import {
   markMessageRecalledInCache,
   patchLocalMediaMessage,
   removeMessageFromCache,
+  replaceLocalMessageInCache,
   replaceLocalOutgoingMessage,
   upsertLocalOutgoingMessage,
   withLocalMediaPreviews,
 } from "../../src/renderer/messages/models/messageCacheMutationModel";
 import type { ConversationListResponse } from "../../src/renderer/data/api-client";
+import type { AuthSession } from "../../src/renderer/data/auth/auth-session";
+import { pcQueryKeys } from "../../src/renderer/data/query-keys";
 
 describe("messageCacheMutationModel", () => {
   it("upserts and replaces local outgoing messages by conversation key", () => {
@@ -231,5 +234,62 @@ describe("messageCacheMutationModel", () => {
       queryClient.getQueryData<ConversationListResponse>(["pc-im-conversations"])
         ?.items[0],
     ).toMatchObject({ lastReadSeq: 3, unreadCount: 0 });
+  });
+
+  it("replaces sent local messages only in the current workspace conversation cache", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-1",
+      spaceType: 1,
+      tenantId: "personal-tenant",
+      tenantToken: "personal-token",
+      userId: "personal-user",
+    } as AuthSession;
+    const conversation = {
+      conversationId: "c1",
+      conversationType: "direct",
+      lastMessage: { messageId: "pc-local-text-1", preview: "old" },
+      title: "Peer",
+    } as ConversationListItem;
+    const currentKey = pcQueryKeys.imConversationsForSession(session);
+    const otherKey = ["pc-im-conversations", "workspace|other", 100] as const;
+    queryClient.setQueryData<ConversationListResponse>(currentKey, {
+      items: [conversation],
+    });
+    queryClient.setQueryData<ConversationListResponse>(otherKey, {
+      items: [{
+        ...conversation,
+        title: "Other space peer",
+      }],
+    });
+
+    replaceLocalMessageInCache(
+      queryClient,
+      session,
+      conversation,
+      "pc-local-text-1",
+      "text",
+      { text: "12321323" },
+      {
+        conversationId: "c1",
+        conversationSeq: 9,
+        messageId: "server-1",
+        serverTime: "2026-06-03T08:20:16.011Z",
+      },
+    );
+
+    expect(
+      queryClient.getQueryData<ConversationListResponse>(currentKey)?.items[0],
+    ).toMatchObject({
+      lastMessage: { messageId: "server-1", preview: "12321323" },
+      lastMessageSeq: 9,
+    });
+    expect(
+      queryClient.getQueryData<ConversationListResponse>(otherKey)?.items[0],
+    ).toMatchObject({
+      lastMessage: { messageId: "pc-local-text-1", preview: "old" },
+      title: "Other space peer",
+    });
   });
 });

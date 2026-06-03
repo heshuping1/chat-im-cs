@@ -53,6 +53,10 @@ import {
   closeServiceThread,
   openServiceThread,
 } from '../customer-service/cs-multi-open';
+import {
+  workspaceScopeFromSession,
+  workspaceScopeDiagnostic,
+} from '../workspace-scope';
 
 // Compatibility export only. New code should import AuthSession from data/auth/auth-session.
 export type { AuthSession } from '../auth/auth-session';
@@ -78,6 +82,7 @@ export type MessageLayoutMode =
   | 'compact-sidebar'
   | 'no-sidebar'
   | 'chat-focus';
+export type ActiveImConversationVisibility = 'hidden' | 'listOnly' | 'paneVisible';
 export type ServiceLayoutMode =
   | 'full'
   | 'no-assistant'
@@ -187,6 +192,7 @@ interface WorkspaceState {
   activeThreadOpenSource: CustomerServiceThreadOpenSource;
   openServiceThreadIds: string[];
   activeImConversationId: string;
+  activeImConversationVisibility: ActiveImConversationVisibility;
   locallyReadImConversationReads: Record<string, LocalImConversationRead>;
   imPeerReadReceipts: Record<string, LocalImPeerReadReceipt>;
   imReadStateByConversation: StoredImReadState;
@@ -220,6 +226,7 @@ interface WorkspaceState {
   ) => void;
   closeOpenServiceThread: (id: string) => void;
   setActiveImConversation: (id: string) => void;
+  setActiveImConversationVisibility: (visibility: ActiveImConversationVisibility) => void;
   markImConversationReadLocally: (
     id: string,
     readSeq?: number,
@@ -270,6 +277,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   activeThreadOpenSource: 'none',
   openServiceThreadIds: [],
   activeImConversationId: '',
+  activeImConversationVisibility: 'hidden',
   locallyReadImConversationReads: readStoredLocalImConversationReads(initialAuthSession),
   imPeerReadReceipts: readStoredLocalImPeerReadReceipts(initialAuthSession),
   imReadStateByConversation: readStoredImReadState(initialAuthSession),
@@ -300,7 +308,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   gatewayRealtimeUpdatedAt: 0,
   pcSettings: readStoredPcSettings(),
   realtimeReminders: [],
-  setActiveModule: (activeModule) => set({ activeModule }),
+  setActiveModule: (activeModule) =>
+    set(
+      activeModule === 'messages'
+        ? { activeModule, activeImConversationId: '', activeImConversationVisibility: 'hidden' }
+        : { activeModule, activeImConversationVisibility: 'hidden' },
+    ),
   setActiveThread: (id) =>
     set((state) => ({
       activeThreadId: id,
@@ -327,6 +340,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }),
   setActiveImConversation: (id) =>
     set({ activeImConversationId: id, activeModule: 'messages' }),
+  setActiveImConversationVisibility: (activeImConversationVisibility) =>
+    set((state) =>
+      state.activeImConversationVisibility === activeImConversationVisibility
+        ? state
+        : { activeImConversationVisibility },
+    ),
   markImConversationReadLocally: (id, readSeq = 0, messageKey) =>
     set((state) => {
       if (!id) return state;
@@ -643,7 +662,24 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return { realtimeReminders };
     }),
   setAuthSession: (authSession) => {
+    const previousSession = get().authSession;
     persistAuthSession(authSession);
+    recordMessageReminderDiagnostic({
+      event: 'workspace.scope.changed',
+      source: 'workspace-store-core',
+      phase: 'auth-session',
+      route: 'set-auth-session',
+      classification: {
+        from: workspaceScopeDiagnostic(workspaceScopeFromSession(previousSession)),
+        to: workspaceScopeDiagnostic(workspaceScopeFromSession(authSession)),
+        reset: {
+          activeImConversationId: true,
+          activeThreadId: true,
+          openServiceThreadIds: true,
+          realtimeReminders: true,
+        },
+      },
+    });
     set(createAuthSessionAppliedState(authSession, {
       readLocalReads: readStoredLocalImConversationReads,
       readPeerReads: readStoredLocalImPeerReadReceipts,
@@ -654,6 +690,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (get().authSession) return;
     const authSession = await readDesktopStoredAuthSession();
     if (!authSession || get().authSession) return;
+    recordMessageReminderDiagnostic({
+      event: 'workspace.scope.changed',
+      source: 'workspace-store-core',
+      phase: 'auth-session',
+      route: 'restore-auth-session',
+      classification: {
+        from: workspaceScopeDiagnostic(workspaceScopeFromSession(null)),
+        to: workspaceScopeDiagnostic(workspaceScopeFromSession(authSession)),
+        reset: {
+          activeImConversationId: true,
+          activeThreadId: true,
+          openServiceThreadIds: true,
+          realtimeReminders: true,
+        },
+      },
+    });
     set(createAuthSessionAppliedState(authSession, {
       readLocalReads: readStoredLocalImConversationReads,
       readPeerReads: readStoredLocalImPeerReadReceipts,

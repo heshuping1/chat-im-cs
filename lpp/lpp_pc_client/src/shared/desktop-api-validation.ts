@@ -1,6 +1,8 @@
 import type {
   CacheMediaFilePayload,
   CacheMediaPosterPayload,
+  ChatArchiveFileKind,
+  ChatArchiveFilePayload,
   DesktopNotificationChannel,
   DesktopNotificationTargetModule,
   DesktopApiMethod,
@@ -19,6 +21,7 @@ import type {
 
 const maxShortTextLength = 4_096;
 const maxSavedContentLength = 5 * 1024 * 1024;
+const maxChatArchiveContentLength = 25 * 1024 * 1024;
 const maxNotificationIconDataUrlLength = 512 * 1024;
 const maxDiagnosticsItems = 200;
 const maxDiagnosticsModules = 30;
@@ -34,6 +37,8 @@ const notificationTargetModules = new Set<DesktopNotificationTargetModule>([
   'onlineService',
 ]);
 const sensitiveDiagnosticsKeyPattern = /token|password|authorization|secret|credential/i;
+const diagnosticsContentKeyPattern = /^(body|content|messageText|rawText)$/i;
+const diagnosticsScopeKeyPattern = /^scopeKey$/i;
 
 export function validateDesktopApiCall(
   method: DesktopApiMethod,
@@ -50,7 +55,13 @@ export function validateDesktopApiCall(
     case 'readAuthSession':
     case 'clearAuthSession':
     case 'getAppInstanceProfile':
+    case 'getLaunchAtStartup':
+    case 'getMinimizeToTray':
       return [];
+    case 'setLaunchAtStartup':
+      return [safeBoolean(args[0], 'launchAtStartup.enabled')];
+    case 'setMinimizeToTray':
+      return [safeBoolean(args[0], 'minimizeToTray.enabled')];
     case 'openAppProfile':
       return args[0] === undefined || args[0] === null
         ? []
@@ -80,6 +91,10 @@ export function validateDesktopApiCall(
         safeString(args[0], 'saveFile.defaultName'),
         safeString(args[1], 'saveFile.content', maxSavedContentLength),
       ];
+    case 'saveChatArchiveFile':
+      return [validateChatArchiveFilePayload(args[0])];
+    case 'openChatArchiveFile':
+      return [];
     case 'captureScreenshot':
     case 'getAppVersion':
       return [];
@@ -198,6 +213,7 @@ export function validateDiagnosticsPayload(value: unknown): DiagnosticsPayload {
 export function validateDesktopAuthSessionPayload(value: unknown): DesktopAuthSessionPayload {
   const record = objectValue(value, 'authSession.payload');
   return {
+    adminBaseUrl: optionalString(record.adminBaseUrl, 'authSession.adminBaseUrl'),
     apiBaseUrl: safeString(record.apiBaseUrl, 'authSession.apiBaseUrl'),
     avatarUrl: optionalNullableString(record.avatarUrl, 'authSession.avatarUrl'),
     displayName: safeString(record.displayName, 'authSession.displayName'),
@@ -277,6 +293,27 @@ export function validateTaskbarBadgePayload(value: unknown): TaskbarBadgePayload
   };
 }
 
+export function validateChatArchiveFilePayload(value: unknown): ChatArchiveFilePayload {
+  const record = objectValue(value, 'chatArchive.payload');
+  const kind = safeString(record.kind, 'chatArchive.kind', 32) as ChatArchiveFileKind;
+  if (kind !== 'export' && kind !== 'backup') {
+    throw new Error(`Invalid chatArchive.kind: ${kind}`);
+  }
+  const defaultName = safeString(record.defaultName, 'chatArchive.defaultName', 180).trim();
+  if (!defaultName || defaultName.includes('/') || defaultName.includes('\\')) {
+    throw new Error('chatArchive.defaultName must be a safe file name');
+  }
+  const expectedExtension = kind === 'backup' ? '.lpp-chat-backup' : '.json';
+  if (!defaultName.toLowerCase().endsWith(expectedExtension)) {
+    throw new Error(`chatArchive.defaultName must end with ${expectedExtension}`);
+  }
+  return {
+    content: safeString(record.content, 'chatArchive.content', maxChatArchiveContentLength),
+    defaultName,
+    kind,
+  };
+}
+
 function validateOpenDownloadedFilePayload(value: unknown): Omit<CacheMediaFilePayload, 'kind'> {
   const record = objectValue(value, 'downloadedFile.payload');
   return {
@@ -310,6 +347,11 @@ function safeString(value: unknown, label: string, maxLength = maxShortTextLengt
   if (typeof value !== 'string') throw new Error(`${label} must be a string`);
   if (value.length > maxLength) throw new Error(`${label} is too long`);
   if (value.includes('\0')) throw new Error(`${label} contains invalid characters`);
+  return value;
+}
+
+function safeBoolean(value: unknown, label: string) {
+  if (typeof value !== 'boolean') throw new Error(`${label} must be a boolean`);
   return value;
 }
 
@@ -464,7 +506,12 @@ function sanitizeDiagnosticsJsonValue(
 ): DiagnosticsJsonValue {
   if (depth > maxDiagnosticsDepth) return '[truncated-depth]';
   if (value === null) return null;
-  if (typeof value === 'string') return redactDiagnosticsString('', safeString(value, label));
+  if (diagnosticsContentKeyPattern.test(lastLabelSegment(label))) {
+    return summarizeDiagnosticsContent(value);
+  }
+  if (typeof value === 'string') {
+    return redactDiagnosticsString(lastLabelSegment(label), safeString(value, label));
+  }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new Error(`${label} must be finite`);
     return value;
@@ -485,6 +532,8 @@ function sanitizeDiagnosticsJsonValue(
             safeKey,
             sensitiveDiagnosticsKeyPattern.test(safeKey)
               ? '[redacted]'
+              : diagnosticsContentKeyPattern.test(safeKey)
+                ? summarizeDiagnosticsContent(entry)
               : sanitizeDiagnosticsJsonValue(entry, `${label}.${safeKey}`, depth + 1),
           ];
         }),
@@ -495,5 +544,42 @@ function sanitizeDiagnosticsJsonValue(
 
 function redactDiagnosticsString(key: string, value: string) {
   if (sensitiveDiagnosticsKeyPattern.test(key)) return '[redacted]';
+  if (diagnosticsScopeKeyPattern.test(key)) return summarizeDiagnosticsScopeKey(value);
+  if (looksLikeDiagnosticsSensitiveString(value)) return '[redacted]';
   return value.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer ***');
+}
+
+function summarizeDiagnosticsContent(value: unknown) {
+  if (typeof value === 'string') return `[redacted-content len=${value.length}]`;
+  if (value && typeof value === 'object') {
+    try {
+      return `[redacted-content len=${JSON.stringify(value).length}]`;
+    } catch {
+      return '[redacted-content]';
+    }
+  }
+  return '[redacted-content]';
+}
+
+function summarizeDiagnosticsScopeKey(value: string) {
+  return `[scope-key len=${value.length} hash=${hashString(value)}]`;
+}
+
+function looksLikeDiagnosticsSensitiveString(value: string) {
+  return /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/.test(value);
+}
+
+function lastLabelSegment(label: string) {
+  const dot = label.lastIndexOf('.');
+  return dot >= 0 ? label.slice(dot + 1) : label;
+}
+
+function hashString(value: string) {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= BigInt(value.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return hash.toString(16).padStart(16, '0').slice(0, 12);
 }

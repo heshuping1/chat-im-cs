@@ -85,6 +85,10 @@ const desktopApi: DesktopApi = {
     validatedInvoke('copyImageFromUrl', 'desktop:copy-image-from-url', payload),
   saveFile: (defaultName: string, content: string) =>
     validatedInvoke('saveFile', 'desktop:save-file', defaultName, content),
+  saveChatArchiveFile: (payload) =>
+    validatedInvoke('saveChatArchiveFile', 'desktop:save-chat-archive-file', payload),
+  openChatArchiveFile: () =>
+    validatedInvoke('openChatArchiveFile', 'desktop:open-chat-archive-file'),
   openExternal: (url: string) => validatedInvoke('openExternal', 'desktop:open-external', url),
   readAuthSession: () => validatedInvoke('readAuthSession', 'desktop:read-auth-session'),
   saveAuthSession: (payload) =>
@@ -94,6 +98,14 @@ const desktopApi: DesktopApi = {
     validatedInvoke('openAppProfile', 'desktop:open-app-profile', profileId),
   getAppInstanceProfile: () =>
     validatedInvoke('getAppInstanceProfile', 'desktop:get-app-instance-profile'),
+  getLaunchAtStartup: () =>
+    validatedInvoke('getLaunchAtStartup', 'desktop:get-launch-at-startup'),
+  setLaunchAtStartup: (enabled: boolean) =>
+    validatedInvoke('setLaunchAtStartup', 'desktop:set-launch-at-startup', enabled),
+  getMinimizeToTray: () =>
+    validatedInvoke('getMinimizeToTray', 'desktop:get-minimize-to-tray'),
+  setMinimizeToTray: (enabled: boolean) =>
+    validatedInvoke('setMinimizeToTray', 'desktop:set-minimize-to-tray', enabled),
   captureScreenshot: () => validatedInvoke('captureScreenshot', 'desktop:capture-screenshot'),
   getAppVersion: () => validatedInvoke('getAppVersion', 'desktop:get-app-version'),
   exportDiagnostics: (payload: DiagnosticsPayload) =>

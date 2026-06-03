@@ -830,7 +830,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `conversationId` | GUID | 会话 ID |
-| `conversationType` | string | `direct`、`group` 或 `temp_session` |
+| `conversationType` | string | `direct` 或 `group`（`GET /conversations` 纯 IM 列表不再返回 `temp_session`，2026-06-03 起） |
 | `title` | string | 单聊为对端昵称，群聊为群名 |
 | `avatarUrl` | string? | 会话头像 |
 | `lastMessage` | `LastMessageDto?` | 最后一条消息摘要 |
@@ -844,7 +844,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `peerUserType` | short? | 单聊对端用户类型：`1=客户`、`2=员工/客服`、`3=访客`；群聊为 `null` |
 | `memberCount` | int? | 群成员数，仅群聊有值 |
 | `ownerUserId` | GUID? | 群主 ID，仅群聊有值 |
-| `tempSession` | `TempSessionSummaryDto?` | 临时会话摘要，仅 `temp_session` 类型有值 |
+| `tempSession` | `TempSessionSummaryDto?` | 历史保留字段；`GET /conversations` 已不返回临时会话，恒为 `null` |
 
 会话列表分页壳：
 
@@ -1055,7 +1055,7 @@ Hub 路径：`/ws/client`（标准客户端）、`/ws/widget`（访客 Widget）
 
 | 事件名 | 推送目标 | `data` 关键字段 | 说明 |
 |---|---|---|---|
-| `msg.new` | 会话成员 | `tenantId` `conversationId` `messageId` `conversationSeq` `senderUserId` `messageType` `body` `sentAt` | 新消息推送 |
+| `msg.new` | 会话成员 | `tenantId` `conversationId` `messageId` `conversationSeq` `senderUserId` `messageType` `body` `sentAt` `conversationType` `sourceType` | 新消息推送；`sourceType`(widget/im)+`conversationType`(direct/group/temp_session) 2026-06-03 新增，便于直接分流在线客服与 IM：`sourceType==="widget"` 即在线客服（详见 client-api.md §10.1 与 [字段枚举 §7.16.1](field-enum-reference.md)） |
 | `space.notice` | 平台级连接 | `noticeType` `spaceType` `tenantId` `requiresSwitch` `targetUnreadConversationCount` `targetUnreadMessageCount` `unreadSpaceCount` `totalUnreadConversationCount` `totalUnreadMessageCount` | 跨空间新消息全局提醒；`noticeType` 当前固定 `"message"`；`spaceType=1` 为个人空间、`2` 为企业空间；`tenantId` 在企业空间下为目标租户 ID，个人空间为 `null` |
 | `presence.changed` | 好友/同租户成员 | `userId` `isOnline` `customStatus?` | 在线状态变更；只包含这 3 个字段 |
 | `msg.read` | 会话其他成员 | `tenantId` `conversationId` `userId` `readSeq` | 已读回执推送 |

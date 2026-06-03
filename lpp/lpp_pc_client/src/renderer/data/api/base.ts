@@ -3,9 +3,15 @@ import { getAppInstanceHeaders } from "../app-instance/app-instance";
 
 export interface ApiClientOptions {
   baseUrl: string;
+  adminBaseUrl?: string;
   tenantToken?: string;
   platformToken?: string;
   adminToken?: string;
+  tenantId?: string;
+  platformUserId?: string;
+  spaceType?: number;
+  userId?: string;
+  membershipRole?: number;
   traceId: string;
 }
 
@@ -50,11 +56,21 @@ export class ApiBaseClient {
     admin = false,
   ): Promise<T> {
     const token = admin ? this.options.adminToken : this.options.tenantToken;
-    return this.executeRequest<T>(path, init, token);
+    return this.executeRequest<T>(
+      path,
+      init,
+      token,
+      admin ? adminApiBaseUrl(this.options) : this.options.baseUrl,
+    );
   }
 
   async platformRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-    return this.executeRequest<T>(path, init, this.options.platformToken);
+    return this.executeRequest<T>(
+      path,
+      init,
+      this.options.platformToken,
+      this.options.baseUrl,
+    );
   }
 
   protected uploadFormData<T>(
@@ -169,6 +185,7 @@ export class ApiBaseClient {
     path: string,
     init: RequestInit,
     token?: string,
+    baseUrl = this.options.baseUrl,
   ): Promise<T> {
     const startedAt = Date.now();
     const method = init.method ?? "GET";
@@ -185,7 +202,7 @@ export class ApiBaseClient {
     }
 
     try {
-      const response = await fetch(`${this.options.baseUrl}${path}`, {
+      const response = await fetch(`${baseUrl}${path}`, {
         ...init,
         credentials: "omit",
         headers,
@@ -231,6 +248,24 @@ export class ApiBaseClient {
       throw error;
     }
   }
+}
+
+function adminApiBaseUrl(options: ApiClientOptions) {
+  return options.adminBaseUrl?.trim() || deriveAdminApiBaseUrl(options.baseUrl);
+}
+
+export function deriveAdminApiBaseUrl(baseUrl: string) {
+  const normalized = baseUrl.trim().replace(/\/$/, "");
+  try {
+    const url = new URL(normalized);
+    if (url.hostname === "chat.hearteasechat.com") {
+      url.hostname = "admin.hearteasechat.com";
+      return url.toString().replace(/\/$/, "");
+    }
+  } catch {
+    return normalized;
+  }
+  return normalized;
 }
 
 function parseJson<T>(value: string): T | null {

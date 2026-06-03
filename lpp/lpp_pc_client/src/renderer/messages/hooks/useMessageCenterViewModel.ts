@@ -95,13 +95,12 @@ export function useMessageCenterViewModel(input: CreateMessageCenterViewModelInp
 export function createMessageCenterViewModel(
   input: CreateMessageCenterViewModelInput,
 ): MessageCenterViewModel {
-  const activeConversation =
-    input.visibleConversations.find(
-      (item) => item.conversationId === input.activeConversationId,
-    ) ??
-    input.conversations.find((item) => item.conversationId === input.activeConversationId) ??
-    input.visibleConversations[0] ??
-    input.conversations[0];
+  const activeConversation = input.activeConversationId
+    ? input.visibleConversations.find(
+        (item) => item.conversationId === input.activeConversationId,
+      ) ??
+      input.conversations.find((item) => item.conversationId === input.activeConversationId)
+    : undefined;
   const activeConversationType = getImConversationType(activeConversation);
   const activeConversationKey =
     activeConversation && activeConversationType

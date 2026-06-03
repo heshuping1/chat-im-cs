@@ -12,7 +12,6 @@ import {
   PlaySquare,
   Search,
   Tag,
-  UserRound,
 } from "lucide-react";
 import {
   ApiClient,
@@ -27,6 +26,7 @@ import { pcQueryKeys } from "../data/query-keys";
 import { createTraceId } from "../data/runtime";
 import { requireApiClient } from "../data/runtime";
 import { formatError, formatShortDate } from "../lib/format";
+import { useSpaceSwitchController } from "../spaces/hooks/useSpaceSwitchController";
 import { PcAvatar } from "./PcAvatar";
 
 export function EnterpriseSwitchPage() {
@@ -63,64 +63,9 @@ export function EnterpriseSwitchPage() {
     spaces.forEach((space) => map.set(space.tenantId, space));
     return map;
   }, [spaces]);
-  const switchSpaceMutation = useMutation({
-    mutationFn: async (space: PlatformTenant | "personal") => {
-      if (!authSession?.platformToken) {
-        throw new Error("当前登录未保留平台会话，请重新登录后切换空间");
-      }
-      const client = new ApiClient({
-        baseUrl: authSession.apiBaseUrl,
-        platformToken: authSession.platformToken,
-        traceId: createTraceId("pc-space"),
-      });
-      const tenant =
-        space === "personal"
-          ? await client.selectPersonalSpace()
-          : await client.selectTenant(space.tenantId);
-      const sessionClient = new ApiClient({
-        baseUrl: authSession.apiBaseUrl,
-        tenantToken: tenant.accessToken,
-        platformToken: authSession.platformToken,
-        traceId: createTraceId("pc-space-profile"),
-      });
-      const [profile, currentTenant] = await Promise.all([
-        sessionClient.getMyProfile().catch(() => null),
-        sessionClient.getTenantInfo().catch(() => null),
-      ]);
-      return {
-        tenant,
-        space: space === "personal" ? null : space,
-        profile,
-        currentTenant,
-      };
-    },
-    onSuccess: async ({ tenant, space, profile, currentTenant }) => {
-      if (!authSession) return;
-      setAuthSession({
-        ...authSession,
-        tenantToken: tenant.accessToken,
-        refreshToken: tenant.refreshToken,
-        tenantId: tenant.tenantId,
-        tenantCode: currentTenant?.tenantCode ?? space?.tenantCode,
-        tenantName:
-          currentTenant?.tenantName ??
-          space?.tenantName ??
-          (tenant.tenantId ? "个人空间" : authSession.tenantName),
-        tenantLogoUrl: currentTenant?.logoUrl ?? space?.logoUrl,
-        userId: profile?.userId ?? tenant.userId,
-        platformUserId: profile?.platformUserId ?? tenant.platformUserId,
-        lppId: profile?.lppId ?? tenant.lppId,
-        displayName: profile?.displayName ?? tenant.displayName,
-        avatarUrl: profile?.avatarUrl ?? tenant.avatarUrl,
-        userType: profile?.userType ?? authSession.userType,
-        membershipRole: space ? space.membershipRole : undefined,
-        spaceType: space ? 2 : 1,
-        roleLabel: space ? roleLabel(space.membershipRole) : "个人空间",
-      });
-      await queryClient.invalidateQueries();
-      setNotice("空间已切换");
-    },
+  const { switchSpaceMutation } = useSpaceSwitchController({
     onError: (error) => setNotice(`空间切换失败：${formatError(error)}`),
+    onSuccess: () => setNotice("空间已切换"),
   });
   const tenantSearchMutation = useMutation({
     mutationFn: async (code: string) => {

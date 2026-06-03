@@ -84,7 +84,7 @@ describe("adaptGatewayEvent", () => {
     expect(event.reason).toBe("customer_service_event");
   });
 
-  it("classifies direct-customer compatibility messages as plain IM unless temp-session evidence exists", () => {
+  it("ignores direct-customer messages so the customer-service adapter owns them", () => {
     const event = adaptGatewayEvent({
       eventName: "msg.new",
       receivedAt: 5,
@@ -103,16 +103,85 @@ describe("adaptGatewayEvent", () => {
       ],
     });
 
+    expect(event.kind).toBe("ignored");
+    if (event.kind !== "ignored") return;
+    expect(event.reason).toBe("customer_service_event");
+  });
+
+  it("adapts sourceType im messages as IM instead of online-service events", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 6,
+      args: [
+        {
+          data: {
+            conversationId: "im-customer-service-direct",
+            conversationType: "direct",
+            conversationSeq: 12,
+            sourceType: "im",
+            messageId: "m-im-source",
+            messageType: "text",
+            senderUserId: "user-2",
+          },
+        },
+      ],
+    });
+
     expect(event.kind).toBe("im.message.received");
     if (event.kind !== "im.message.received") return;
-    expect(event.conversationId).toBe("thread-direct-customer");
+    expect(event.conversationId).toBe("im-customer-service-direct");
     expect(event.conversationType).toBe("direct");
+    expect(event.message.messageId).toBe("m-im-source");
+  });
+
+  it("ignores sourceType widget messages so online-service temp-session owns them", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 6,
+      args: [
+        {
+          data: {
+            conversationId: "widget-session",
+            conversationType: "direct",
+            sourceType: "widget",
+            threadId: "thread-widget",
+            messageId: "m-widget",
+            messageType: "text",
+          },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("ignored");
+    if (event.kind !== "ignored") return;
+    expect(event.reason).toBe("customer_service_event");
+  });
+
+  it("does not guess direct IM ownership from message events that only carry a conversationId", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.new",
+      receivedAt: 7,
+      args: [
+        {
+          data: {
+            conversationId: "ambiguous-conversation",
+            conversationSeq: 11,
+            messageId: "m-ambiguous",
+            messageType: "text",
+          },
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("invalid");
+    if (event.kind !== "invalid") return;
+    expect(event.reason).toBe("missing_conversation_type");
   });
 
   it("rejects non-standard IM alias fields instead of guessing PC-side compatibility", () => {
     const event = adaptGatewayEvent({
       eventName: "msg.new",
-      receivedAt: 6,
+      receivedAt: 8,
       args: [
         {
           data: {
@@ -135,7 +204,7 @@ describe("adaptGatewayEvent", () => {
   it("does not accept read receipt alias fields", () => {
     const event = adaptGatewayEvent({
       eventName: "msg.read",
-      receivedAt: 7,
+      receivedAt: 9,
       args: [
         {
           chatId: "legacy-group-1",
@@ -149,5 +218,23 @@ describe("adaptGatewayEvent", () => {
     expect(event.kind).toBe("invalid");
     if (event.kind !== "invalid") return;
     expect(event.reason).toBe("missing_conversation_id");
+  });
+
+  it("does not default read receipts without an IM conversation type to direct", () => {
+    const event = adaptGatewayEvent({
+      eventName: "msg.read",
+      receivedAt: 10,
+      args: [
+        {
+          conversationId: "ambiguous-read",
+          readSeq: 12,
+          userId: "user-3",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("invalid");
+    if (event.kind !== "invalid") return;
+    expect(event.reason).toBe("missing_conversation_type");
   });
 });

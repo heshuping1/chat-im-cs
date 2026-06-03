@@ -8,10 +8,10 @@ import {
   DatabaseBackup,
   Globe2,
   Headphones,
-  HelpCircle,
+  Info,
   Keyboard,
   LockKeyhole,
-  Palette,
+  MessageCircleMore,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -43,7 +43,9 @@ import {
 } from "../settings/models/settingsCatalog";
 import { AccountSecuritySection } from "../settings/components/AccountSecuritySection";
 import { ChatArchiveSection } from "../settings/components/ChatArchiveSection";
-import { DiagnosticsSettingsSection } from "../settings/components/DiagnosticsSettingsSection";
+import { ChatBackgroundSection } from "../settings/components/ChatBackgroundSection";
+import { ConnectivityHealthSection } from "../settings/components/ConnectivityHealthSection";
+import { DiagnosticsRecordsSection } from "../settings/components/DiagnosticsRecordsSection";
 import { HelpAboutSettingsSection } from "../settings/components/HelpAboutSettingsSection";
 import { NetworkLineSettingsSection } from "../settings/components/NetworkLineSettingsSection";
 import { NotificationSettingsSection } from "../settings/components/NotificationSettingsSection";
@@ -53,14 +55,15 @@ import { PrivacySettingsSection } from "./MePrivacySections";
 type SettingKey = keyof PcSettings;
 
 const sectionIcons = {
-  accountEnterprise: UserRound,
-  privacySecurity: ShieldCheck,
-  messageReception: Headphones,
-  chatCollaboration: Keyboard,
-  appearanceEfficiency: Palette,
-  generalNetwork: Globe2,
+  account: UserRound,
+  enterprise: Building2,
+  messages: MessageCircleMore,
+  privacy: ShieldCheck,
+  customerService: Headphones,
+  network: Globe2,
+  common: Keyboard,
   storageDiagnostics: DatabaseBackup,
-  helpAbout: HelpCircle,
+  about: Info,
 } satisfies Record<SettingsSectionId, typeof Bell>;
 
 export function MePage() {
@@ -71,7 +74,7 @@ export function MePage() {
   const setAuthSession = useSetAuthSession();
   const updatePcSetting = useUpdatePcSetting();
   const [activeSectionId, setActiveSectionId] =
-    useState<SettingsSectionId>("accountEnterprise");
+    useState<SettingsSectionId>("account");
   const [notice, setNotice] = useState("设置更改后会自动保存");
   const activeSection = useMemo(
     () =>
@@ -110,7 +113,7 @@ export function MePage() {
         <div className="settings-nav-header">
           <span className="settings-nav-kicker">SETTINGS</span>
           <strong>设置中心</strong>
-          <p>按客服真实工作心智组织账号、安全、接待、协作、网络和诊断。</p>
+          <p>按账户、企业、消息、隐私、在线客服、线路、通用、诊断和关于组织设置。</p>
         </div>
         <div className="settings-nav-list">
           {settingsSections.map((section) => {
@@ -139,7 +142,7 @@ export function MePage() {
             <span className="eyebrow">PC 客服客户端</span>
             <h1>设置中心</h1>
             <p>
-              按账号身份、隐私安全、消息接待、聊天协作、网络诊断和帮助关于管理 PC 客服工作环境。
+              按清晰领域管理 PC 客服工作环境，聊天、通知和外观等共用能力统一收进通用设置。
             </p>
           </div>
           <div className="settings-health">
@@ -196,14 +199,10 @@ function renderSection(
   },
 ) {
   switch (section) {
-    case "accountEnterprise":
+    case "account":
       return (
         <>
           <ProfileSettingsSection {...actions} />
-          <EnterpriseIdentitySection
-            authSession={actions.authSession}
-            tenantInfo={actions.tenantInfo}
-          />
           <AccountSecuritySection
             authSession={actions.authSession}
             clearAuthSession={actions.clearAuthSession}
@@ -212,7 +211,17 @@ function renderSection(
           <PlanningSupportBlock sectionId={section} />
         </>
       );
-    case "privacySecurity":
+    case "enterprise":
+      return (
+        <>
+          <EnterpriseIdentitySection
+            authSession={actions.authSession}
+            tenantInfo={actions.tenantInfo}
+          />
+          <PlanningSupportBlock sectionId={section} />
+        </>
+      );
+    case "privacy":
       return (
         <>
           <PrivacySettingsSection
@@ -223,21 +232,39 @@ function renderSection(
           <PlanningSupportBlock sectionId={section} />
         </>
       );
-    case "messageReception":
+    case "messages":
+    case "customerService":
       return (
         <>
           <NotificationSettingsSection
             authSession={actions.authSession}
             pcSettings={pcSettings}
+            sectionId={section}
             setNotice={actions.setNotice}
             setSetting={setSetting}
           />
+          {section === "customerService" && (
+            <SwitchRow
+              {...settingRowProps("highDensityContext")}
+              checked={pcSettings.highDensityContext}
+              onChange={(value) => setSetting("highDensityContext", value)}
+            />
+          )}
           <PlanningSupportBlock sectionId={section} />
         </>
       );
-    case "chatCollaboration":
+    case "common":
       return (
         <>
+          <SettingsGroupLabel title="通知" />
+          <NotificationSettingsSection
+            authSession={actions.authSession}
+            pcSettings={pcSettings}
+            sectionId={section}
+            setNotice={actions.setNotice}
+            setSetting={setSetting}
+          />
+          <SettingsGroupLabel title="输入" />
           <SwitchRow
             {...settingRowProps("enterToSend")}
             checked={pcSettings.enterToSend}
@@ -265,17 +292,26 @@ function renderSection(
             checked={pcSettings.shortcutHints}
             onChange={(value) => setSetting("shortcutHints", value)}
           />
-          <ChatArchiveSection
+          <SettingsGroupLabel title="翻译" />
+          <SwitchRow
+            {...settingRowProps("autoTranslate")}
+            checked={pcSettings.autoTranslate}
+            stateText="会话级按钮可设为跟随、开启或关闭。"
+            onChange={(value) => setSetting("autoTranslate", value)}
+          />
+          <SettingsGroupLabel title="聊天" />
+          <ChatBackgroundSection
             pcSettings={pcSettings}
             setNotice={actions.setNotice}
             setSetting={setSetting}
           />
-          <PlanningSupportBlock sectionId={section} />
-        </>
-      );
-    case "appearanceEfficiency":
-      return (
-        <>
+          <ChatArchiveSection
+            authSession={actions.authSession}
+            pcSettings={pcSettings}
+            setNotice={actions.setNotice}
+            setSetting={setSetting}
+          />
+          <SettingsGroupLabel title="外观" />
           <SelectRow
             {...settingRowProps("theme")}
             value={pcSettings.theme}
@@ -312,11 +348,6 @@ function renderSection(
             onChange={(value) => setSetting("compactList", value)}
           />
           <SwitchRow
-            {...settingRowProps("highDensityContext")}
-            checked={pcSettings.highDensityContext}
-            onChange={(value) => setSetting("highDensityContext", value)}
-          />
-          <SwitchRow
             {...settingRowProps("reduceMotion")}
             checked={pcSettings.reduceMotion}
             onChange={(value) => setSetting("reduceMotion", value)}
@@ -331,15 +362,27 @@ function renderSection(
             checked={pcSettings.keyboardFocusHint}
             onChange={(value) => setSetting("keyboardFocusHint", value)}
           />
+          <SettingsGroupLabel title="桌面" />
+          <MinimizeToTraySwitch
+            pcSettings={pcSettings}
+            setNotice={actions.setNotice}
+            setSetting={setSetting}
+          />
+          <LaunchAtStartupSwitch
+            pcSettings={pcSettings}
+            setNotice={actions.setNotice}
+            setSetting={setSetting}
+          />
           <AppProfileInfoRow />
+          <SettingsGroupLabel title="语言与时间" />
+          <InfoRow {...settingRowProps("language")} desc={pcSettings.language} />
+          <InfoRow {...settingRowProps("timezone")} desc={pcSettings.timezone} />
           <PlanningSupportBlock sectionId={section} />
         </>
       );
-    case "generalNetwork":
+    case "network":
       return (
         <>
-          <InfoRow {...settingRowProps("language")} desc={pcSettings.language} />
-          <InfoRow {...settingRowProps("timezone")} desc={pcSettings.timezone} />
           <InfoRow
             {...settingRowProps("currentEnvironment")}
             desc={formatEnvironment(actions.authSession?.apiBaseUrl)}
@@ -371,8 +414,10 @@ function renderSection(
               actions.setNotice("已清理聊天缓存");
             }}
           />
-          <DiagnosticsSettingsSection
+          <ConnectivityHealthSection authSession={actions.authSession} />
+          <DiagnosticsRecordsSection
             exportDiagnostics={actions.exportDiagnostics}
+            setNotice={actions.setNotice}
           />
           <RuntimeStatusSettingsSection />
           {shouldShowDevelopmentDiagnostics(actions.authSession) && (
@@ -381,7 +426,7 @@ function renderSection(
           <PlanningSupportBlock sectionId={section} />
         </>
       );
-    case "helpAbout":
+    case "about":
       return (
         <HelpAboutSettingsSection
           authSession={actions.authSession}
@@ -389,6 +434,14 @@ function renderSection(
         />
       );
   }
+}
+
+function SettingsGroupLabel({ title }: { title: string }) {
+  return (
+    <div className="settings-group-label">
+      <strong>{title}</strong>
+    </div>
+  );
 }
 
 function PlanningSupportBlock({ sectionId }: { sectionId: SettingsSectionId }) {
@@ -680,6 +733,159 @@ function EnterpriseIdentitySection({
         desc={`${tenantName} / 企业号 ${tenantCode} / ${authSession?.roleLabel || "成员"}`}
       />
     </div>
+  );
+}
+
+function LaunchAtStartupSwitch({
+  pcSettings,
+  setNotice,
+  setSetting,
+}: {
+  pcSettings: PcSettings;
+  setNotice: (notice: string) => void;
+  setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
+}) {
+  const desktopApi = typeof window === "undefined" ? undefined : window.desktopApi;
+  const hasDesktopCapability = Boolean(
+    desktopApi?.getLaunchAtStartup && desktopApi?.setLaunchAtStartup,
+  );
+  const [checked, setChecked] = useState<boolean | null>(null);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!hasDesktopCapability) return;
+    let cancelled = false;
+    desktopApi
+      ?.getLaunchAtStartup()
+      .then((value) => {
+        if (!cancelled) {
+          setChecked(value);
+          setFailed(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopApi, hasDesktopCapability]);
+
+  const updateLaunchAtStartup = async (value: boolean) => {
+    if (!desktopApi?.setLaunchAtStartup) {
+      setNotice("当前浏览器调试环境不支持开机自启");
+      return;
+    }
+    const previous = checked ?? pcSettings.launchAtStartup;
+    setPending(true);
+    setChecked(value);
+    try {
+      const nextValue = await desktopApi.setLaunchAtStartup(value);
+      setChecked(nextValue);
+      setSetting("launchAtStartup", nextValue);
+      setFailed(false);
+      setNotice(nextValue ? "已开启开机自启" : "已关闭开机自启");
+    } catch (error) {
+      setChecked(previous);
+      setFailed(true);
+      setNotice(`开机自启设置失败：${formatError(error)}`);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <SwitchRow
+      {...settingRowProps("launchAtStartup")}
+      checked={checked ?? pcSettings.launchAtStartup}
+      enabled={hasDesktopCapability && !pending}
+      stateText={
+        hasDesktopCapability
+          ? failed
+            ? "状态读取失败"
+            : "桌面客户端生效"
+          : "浏览器调试不可用"
+      }
+      onChange={(value) => void updateLaunchAtStartup(value)}
+    />
+  );
+}
+
+function MinimizeToTraySwitch({
+  pcSettings,
+  setNotice,
+  setSetting,
+}: {
+  pcSettings: PcSettings;
+  setNotice: (notice: string) => void;
+  setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
+}) {
+  const desktopApi = typeof window === "undefined" ? undefined : window.desktopApi;
+  const hasDesktopCapability = Boolean(
+    desktopApi?.getMinimizeToTray && desktopApi?.setMinimizeToTray,
+  );
+  const [checked, setChecked] = useState<boolean | null>(null);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!hasDesktopCapability) return;
+    let cancelled = false;
+    desktopApi
+      ?.setMinimizeToTray(pcSettings.minimizeToTray)
+      .then((value) => {
+        if (!cancelled) {
+          setChecked(value);
+          if (value !== pcSettings.minimizeToTray) setSetting("minimizeToTray", value);
+          setFailed(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [desktopApi, hasDesktopCapability, pcSettings.minimizeToTray, setSetting]);
+
+  const updateMinimizeToTray = async (value: boolean) => {
+    if (!desktopApi?.setMinimizeToTray) {
+      setNotice("当前浏览器调试环境不支持最小化到托盘");
+      return;
+    }
+    const previous = checked ?? pcSettings.minimizeToTray;
+    setPending(true);
+    setChecked(value);
+    try {
+      const nextValue = await desktopApi.setMinimizeToTray(value);
+      setChecked(nextValue);
+      setSetting("minimizeToTray", nextValue);
+      setFailed(false);
+      setNotice(nextValue ? "已开启最小化到托盘" : "已关闭最小化到托盘");
+    } catch (error) {
+      setChecked(previous);
+      setFailed(true);
+      setNotice(`最小化到托盘设置失败：${formatError(error)}`);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <SwitchRow
+      {...settingRowProps("minimizeToTray")}
+      checked={checked ?? pcSettings.minimizeToTray}
+      enabled={hasDesktopCapability && !pending}
+      stateText={
+        hasDesktopCapability
+          ? failed
+            ? "状态同步失败"
+            : "桌面客户端生效"
+          : "浏览器调试不可用"
+      }
+      onChange={(value) => void updateMinimizeToTray(value)}
+    />
   );
 }
 

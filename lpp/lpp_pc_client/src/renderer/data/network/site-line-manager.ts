@@ -1,6 +1,7 @@
 export const primarySiteId = "main-1";
 export const primarySiteName = "主站1";
 export const primarySiteBaseUrl = "https://chat.hearteasechat.com";
+export const primaryAdminBaseUrl = "https://admin.hearteasechat.com";
 
 const cachedSwitchableSitesKey = "site_line_cached_switchable_sites_v1";
 const currentSiteIdKey = "site_line_current_site_id_v1";
@@ -44,6 +45,7 @@ export const primarySiteLine: AppSiteLine = {
   id: primarySiteId,
   name: primarySiteName,
   apiBaseUrl: primarySiteBaseUrl,
+  adminBaseUrl: primaryAdminBaseUrl,
   isPrimary: true,
 };
 
@@ -103,7 +105,10 @@ class PcSiteLineManager {
         selectedFromConfigFile = configFileUrl;
         break;
       } catch (error) {
-        console.warn("[SiteLine] configfile failed", configFileUrl, error);
+        console.warn("[site-line:diagnostic] configfile failed", {
+          configFileUrl,
+          reason: error instanceof Error ? error.message : "unknown_error",
+        });
       }
     }
 

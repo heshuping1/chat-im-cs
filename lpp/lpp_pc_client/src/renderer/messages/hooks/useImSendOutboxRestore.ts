@@ -10,6 +10,7 @@ import {
   sendOutboxRecordToMessage,
   sendOutboxScopeKey,
   sendOutboxTargetKey,
+  shouldMarkOutboxRecordInterrupted,
   type SendOutboxRecord,
 } from "../../data/send/send-outbox";
 import { conversationKey } from "../../data/im-read-model";
@@ -52,6 +53,8 @@ export function useImSendOutboxRestore({
       const records = await storage.listRecords({ scopeKey, targetKey });
       if (canceled) return;
       for (const record of records) {
+        const isInFlight = ["queued", "uploading", "sending", "paused"].includes(record.status);
+        if (isInFlight && !shouldMarkOutboxRecordInterrupted(record)) continue;
         const restored = await restoreRecordMedia(storage, record, objectUrls);
         if (canceled) return;
         setLocalOutgoingMessagesByConversation((current) =>
@@ -84,7 +87,7 @@ export function useImSendOutboxRestore({
             updatedAt: Date.now(),
           });
         }
-        if (["queued", "uploading", "sending", "paused"].includes(record.status)) {
+        if (isInFlight) {
           await storage.patchRecord(scopeKey, record.localMessageId, {
             localError: "发送中断，点击重试",
             status: "failed",

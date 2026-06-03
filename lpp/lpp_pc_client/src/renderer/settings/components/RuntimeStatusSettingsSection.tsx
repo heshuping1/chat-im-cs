@@ -12,12 +12,12 @@ import { settingRowProps } from "../models/settingsCatalog";
 
 export function RuntimeStatusSettingsSection() {
   const [samples, setSamples] = useState<MessageTraceSample[]>(() =>
-    getRecentMessageTraceSamples(80),
+    getRecentMessageTraceSamples(500),
   );
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setSamples(getRecentMessageTraceSamples(80));
+      setSamples(getRecentMessageTraceSamples(500));
     }, 1500);
     return () => window.clearInterval(timer);
   }, []);

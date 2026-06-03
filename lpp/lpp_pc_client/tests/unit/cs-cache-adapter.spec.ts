@@ -30,6 +30,22 @@ describe("customer service cache adapter", () => {
   it("merges sent messages into detail and thread preview caches", () => {
     const queryClient = createQueryClient();
     seedCaches(queryClient);
+    queryClient.setQueryData(["pc-im-conversations"], {
+      items: [
+        {
+          conversationId: "thread-1",
+          conversationType: "direct",
+          title: "新会话",
+          unreadCount: 1,
+        },
+        {
+          conversationId: "direct-2",
+          conversationType: "direct",
+          title: "Real IM",
+          unreadCount: 0,
+        },
+      ],
+    });
 
     mergeSentCustomerServiceMessage(queryClient, {
       body: { text: "hello" },
@@ -48,6 +64,60 @@ describe("customer service cache adapter", () => {
       lastMessagePreview: "hello",
       unreadCount: 1,
     });
+    expect(
+      queryClient
+        .getQueryData<{ items: Array<{ conversationId: string }> }>(["pc-im-conversations"])
+        ?.items.map((item) => item.conversationId),
+    ).toEqual(["direct-2"]);
+  });
+
+  it("only removes customer-service conversations from the current IM workspace scope", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    queryClient.setQueryData(["pc-im-conversations", "scope-a", 100], {
+      items: [
+        { conversationId: "thread-1", conversationType: "direct", title: "Dirty A" },
+        { conversationId: "direct-a", conversationType: "direct", title: "Real A" },
+      ],
+    });
+    queryClient.setQueryData(["pc-im-conversations", "scope-b", 100], {
+      items: [
+        { conversationId: "thread-1", conversationType: "direct", title: "Dirty B" },
+        { conversationId: "direct-b", conversationType: "direct", title: "Real B" },
+      ],
+    });
+
+    mergeSentCustomerServiceMessage(queryClient, {
+      body: { text: "hello" },
+      identity: {
+        apiBaseUrl: "https://api.example.test",
+        displayName: "Agent",
+        scopeKey: "scope-a",
+        userId: "staff-1",
+      } as never,
+      messageType: "text",
+      result: { messageId: "m-scope" },
+      thread: thread(),
+    });
+
+    expect(
+      queryClient
+        .getQueryData<{ items: Array<{ conversationId: string }> }>([
+          "pc-im-conversations",
+          "scope-a",
+          100,
+        ])
+        ?.items.map((item) => item.conversationId),
+    ).toEqual(["direct-a"]);
+    expect(
+      queryClient
+        .getQueryData<{ items: Array<{ conversationId: string }> }>([
+          "pc-im-conversations",
+          "scope-b",
+          100,
+        ])
+        ?.items.map((item) => item.conversationId),
+    ).toEqual(["thread-1", "direct-b"]);
   });
 
   it("applies gateway messages and increments unread when not read", () => {

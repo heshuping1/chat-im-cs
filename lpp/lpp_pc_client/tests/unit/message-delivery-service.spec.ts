@@ -87,6 +87,99 @@ describe("MessageDeliveryService", () => {
     vi.useRealTimers();
   });
 
+  it("records delivery diagnostics without raw scope keys or message body payloads", () => {
+    const queryClient = new QueryClient();
+    const service = createMessageDeliveryService({
+      queryClient,
+      scopeKey:
+        "https://chat.example.test|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.raw.signature|tenant-1|user-1",
+      session: {
+        apiBaseUrl: "https://api.example.test",
+        displayName: "Tester",
+        tenantToken: "token",
+      },
+      setCustomerServiceStatus: vi.fn(),
+    });
+
+    service.deliverImMessage({
+      conversationId: "direct-sensitive",
+      conversationType: "direct",
+      payload: {
+        conversationId: "direct-sensitive",
+        message: {
+          body: { text: "sensitive message text" },
+          conversationSeq: 2,
+          messageId: "m-sensitive",
+          messageType: "text",
+          sentAt: "2026-06-02T11:13:21.000Z",
+        },
+      },
+      route: "im-first-stage",
+      source: "gateway-router",
+    });
+
+    const deliveryRecord = mocks.record.mock.calls.find(
+      ([payload]) => payload.event === "message.delivery",
+    )?.[0];
+
+    expect(deliveryRecord).toMatchObject({
+      classification: {
+        owner: "im",
+        scopeKey: expect.stringMatching(/^\[scope-key len=\d+ hash=[a-f0-9]{12}\]$/),
+      },
+      summary: expect.objectContaining({
+        message: expect.objectContaining({
+          messageId: "m-sensitive",
+          messageType: "text",
+        }),
+      }),
+    });
+    expect(JSON.stringify(deliveryRecord)).not.toContain("eyJhbGci");
+    expect(JSON.stringify(deliveryRecord)).not.toContain("sensitive message text");
+  });
+
+  it("accepts sourceType im direct messages into IM delivery instead of customer-service guard", () => {
+    const queryClient = new QueryClient();
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverImMessage({
+      conversationId: "direct-source-im-delivery",
+      conversationType: "direct",
+      payload: {
+        conversationId: "direct-source-im-delivery",
+        conversationType: "direct",
+        sourceType: "im",
+        conversationSeq: 2,
+        message: {
+          conversationId: "direct-source-im-delivery",
+          conversationSeq: 2,
+          messageId: "m-source-im-delivery",
+          sourceType: "im",
+        },
+      },
+      route: "im-first-stage",
+      source: "gateway-router",
+    });
+
+    expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
+    expect(mocks.mergeImGatewayMessage).toHaveBeenCalledWith(
+      queryClient,
+      expect.objectContaining({
+        conversationId: "direct-source-im-delivery",
+        sourceType: "im",
+      }),
+      "direct-source-im-delivery",
+      "direct",
+    );
+    expect(mocks.record).not.toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      phase: "skip",
+      classification: expect.objectContaining({
+        reason: "customer-service-payload",
+      }),
+    }));
+  });
+
   it("deduplicates repeated IM messages before writing cache", () => {
     const queryClient = new QueryClient();
     const service = createTestDeliveryService(queryClient);
@@ -111,6 +204,99 @@ describe("MessageDeliveryService", () => {
       phase: "skip",
       classification: expect.objectContaining({
         reason: "duplicate-message-id",
+      }),
+    }));
+  });
+
+  it("skips customer-service payloads before writing the IM cache", () => {
+    const queryClient = new QueryClient();
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverImMessage({
+      conversationId: "temp-1",
+      conversationType: "temp_session",
+      payload: {
+        conversationId: "temp-1",
+        conversationType: "temp_session",
+        tempSession: { sessionId: "thread-1" },
+        message: {
+          conversationId: "temp-1",
+          conversationSeq: 1,
+          messageId: "m-temp",
+        },
+      },
+      route: "im-first-stage",
+      source: "gateway-router",
+    });
+
+    expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      phase: "skip",
+      classification: expect.objectContaining({
+        owner: "im",
+        reason: "customer-service-payload",
+      }),
+    }));
+  });
+
+  it("skips non-strict IM conversation types before writing the IM cache", () => {
+    const queryClient = new QueryClient();
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverImMessage({
+      conversationId: "legacy-group-1",
+      conversationType: "im_group",
+      payload: {
+        conversationId: "legacy-group-1",
+        conversationType: "im_group",
+        message: {
+          conversationId: "legacy-group-1",
+          conversationSeq: 1,
+          messageId: "m-legacy-group",
+        },
+      },
+      route: "im-first-stage",
+      source: "gateway-router",
+    });
+
+    expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      phase: "skip",
+      classification: expect.objectContaining({
+        owner: "im",
+        reason: "non-im-conversation-type",
+      }),
+    }));
+  });
+
+  it("skips unknown ownership gateway messages instead of defaulting them into IM cache", () => {
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverImMessage({
+      conversationId: "ambiguous-conversation",
+      conversationType: "",
+      payload: {
+        conversationId: "ambiguous-conversation",
+        conversationSeq: 4,
+        messageId: "m-ambiguous",
+        messageType: "text",
+      },
+      route: "im-first-stage",
+      source: "gateway-router",
+    });
+
+    expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pc-im-conversations"] });
+    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
+      event: "message.delivery.guard",
+      phase: "skip",
+      classification: expect.objectContaining({
+        owner: "im",
+        reason: "unknown-ownership",
       }),
     }));
   });

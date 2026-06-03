@@ -7,6 +7,7 @@ export type MessageGapSyncReason =
   | "gateway-closed-retry"
   | "push-seq-gap"
   | "startup-snapshot-gap"
+  | "unknown-ownership"
   | "manual";
 
 export interface MessageGapSyncInput {

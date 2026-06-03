@@ -6,14 +6,22 @@ import type {
 } from "../api-client";
 import { normalizeMessageType } from "../im-message-normalize";
 import { reduceMessageCoreEvent } from "../message-core/message-core";
-import { isImConversation, type CurrentUserIdentity } from "../message-display";
+import {
+  isStrictImConversationType,
+  strictImConversationType,
+} from "../im/im-conversation-boundary";
+import { type CurrentUserIdentity } from "../message-display";
 import type { ConversationReadView } from "../im-read-model";
+import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import { isQueryInWorkspaceScope } from "../workspace-scope";
 
 export interface ApplyImGatewayMessageCacheInput {
   conversationId: string;
   conversationType: string;
   message: MessageItemDto;
   payload: Record<string, unknown>;
+  currentTenantId?: string;
+  scopeKey?: string;
   unreadCount?: number;
   readSeq?: number;
 }
@@ -26,25 +34,39 @@ export interface ApplyImGatewayReadCacheInput {
   previousPeerReadSeq: number;
   identity: CurrentUserIdentity | null;
   view?: ConversationReadView;
+  currentTenantId?: string;
+  scopeKey?: string;
 }
 
 export function applyImGatewayMessageCache(
   queryClient: QueryClient,
   input: ApplyImGatewayMessageCacheInput,
 ) {
+  if (!isStrictImConversationType(input.conversationType)) return;
+  if (!payloadTenantMatchesScope(input.payload, input.currentTenantId)) {
+    recordImScopeCacheWrite(input, "skipped", "tenant_mismatch");
+    return;
+  }
+
   queryClient.setQueriesData<MessageItemDto[]>(
     {
       predicate: (query) =>
         query.queryKey[0] === "pc-im-messages" &&
+        isQueryInWorkspaceScope(query, input.scopeKey) &&
         query.queryKey.includes(input.conversationId),
     },
     (old) => appendImMessageForConversation(old, input),
   );
 
   queryClient.setQueriesData<ConversationListResponse>(
-    { queryKey: ["pc-im-conversations"] },
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-conversations" &&
+        isQueryInWorkspaceScope(query, input.scopeKey),
+    },
     (old) => updateImConversationList(old, input),
   );
+  recordImScopeCacheWrite(input, "written", "current_scope");
 }
 
 export function applyImGatewayReadCache(
@@ -52,7 +74,11 @@ export function applyImGatewayReadCache(
   input: ApplyImGatewayReadCacheInput,
 ) {
   queryClient.setQueriesData<ConversationListResponse>(
-    { queryKey: ["pc-im-conversations"] },
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-conversations" &&
+        isQueryInWorkspaceScope(query, input.scopeKey),
+    },
     (old) =>
       old
         ? {
@@ -71,11 +97,46 @@ export function applyImGatewayReadCache(
       {
         predicate: (query) =>
           query.queryKey[0] === "pc-im-messages" &&
+          isQueryInWorkspaceScope(query, input.scopeKey) &&
           query.queryKey.includes(input.conversationId),
       },
       (old) => applyGatewayReadToMessages(old, input),
     );
   }
+}
+
+function payloadTenantMatchesScope(
+  payload: Record<string, unknown>,
+  currentTenantId?: string,
+) {
+  const payloadTenantId = stringField(payload, "tenantId", "tenant_id");
+  if (!payloadTenantId || !currentTenantId) return true;
+  return payloadTenantId === currentTenantId;
+}
+
+function recordImScopeCacheWrite(
+  input: Pick<
+    ApplyImGatewayMessageCacheInput,
+    "conversationId" | "conversationType" | "currentTenantId" | "payload" | "scopeKey"
+  >,
+  result: "written" | "skipped",
+  reason: string,
+) {
+  recordMessageReminderDiagnostic({
+    event: "im.scope.cache-write",
+    source: "im-gateway-cache",
+    phase: "cache-write",
+    route: "gateway-message",
+    classification: {
+      conversationId: input.conversationId,
+      conversationType: input.conversationType,
+      currentTenantId: input.currentTenantId,
+      payloadTenantId: stringField(input.payload, "tenantId", "tenant_id"),
+      result,
+      scopeKey: input.scopeKey,
+      reason,
+    },
+  });
 }
 
 export function isImEventMessage(message: MessageItemDto) {
@@ -87,12 +148,14 @@ function applyGatewayMessageToConversation(
   item: ConversationListItem,
   input: ApplyImGatewayMessageCacheInput,
 ) {
+  const conversationType = strictImConversationType(input.conversationType);
+  if (!conversationType) return item;
   return reduceMessageCoreEvent(
     { conversation: item, messages: [] },
     {
       type: "message.gateway_received",
       conversationId: input.conversationId,
-      conversationType: input.conversationType === "group" ? "group" : "direct",
+      conversationType,
       message: input.message,
       readSeq: input.readSeq,
       unreadCount: input.unreadCount,
@@ -121,12 +184,14 @@ function appendImMessageForConversation(
   old: MessageItemDto[] | undefined,
   input: ApplyImGatewayMessageCacheInput,
 ) {
+  const conversationType = strictImConversationType(input.conversationType);
+  if (!conversationType) return old ?? [];
   return reduceMessageCoreEvent(
     { messages: old ?? [] },
     {
       type: "message.gateway_received",
       conversationId: input.conversationId,
-      conversationType: input.conversationType === "group" ? "group" : "direct",
+      conversationType,
       message: input.message,
       readSeq: input.readSeq,
       unreadCount: input.unreadCount,
@@ -161,11 +226,12 @@ function updateImConversationList(
   const items = old.items.map((item) => {
     if (item.conversationId !== input.conversationId) return item;
     found = true;
+    if (!isStrictImConversationType(item.conversationType)) return item;
     return applyGatewayMessageToConversation(item, input);
   });
   if (!found) {
     const conversation = gatewayConversation(input.payload, input);
-    if (conversation && isImConversation(conversation)) {
+    if (conversation) {
       items.unshift(conversation);
     }
   }
@@ -189,6 +255,8 @@ function gatewayConversation(
   payload: Record<string, unknown>,
   input: ApplyImGatewayMessageCacheInput,
 ): ConversationListItem | null {
+  const conversationType = strictImConversationType(input.conversationType);
+  if (!conversationType) return null;
   const raw = asRecord(payload.conversation);
   const title =
     stringField(raw, "title", "name", "displayName") ||
@@ -197,7 +265,7 @@ function gatewayConversation(
     "新会话";
   return {
     conversationId: input.conversationId,
-    conversationType: input.conversationType,
+    conversationType,
     title,
     avatarUrl:
       stringField(raw, "avatarUrl") ||

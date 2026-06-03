@@ -27,6 +27,7 @@ describe("pc settings service shell", () => {
     const storage = createMemoryStorage();
 
     expect(readStoredPcSettings({ storage })).toEqual(defaultPcSettings);
+    expect(defaultPcSettings.customerServiceMessageNotifications).toBe(false);
   });
 
   it("merges persisted settings over defaults", () => {
@@ -40,6 +41,7 @@ describe("pc settings service shell", () => {
     expect(readStoredPcSettings({ storage })).toMatchObject({
       theme: "dark",
       desktopNotifications: false,
+      customerServiceMessageNotifications: false,
       serviceQueueNotifications: defaultPcSettings.serviceQueueNotifications,
     });
   });

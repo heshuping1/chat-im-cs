@@ -10,6 +10,7 @@ import {
   sendOutboxRecordToMessage,
   sendOutboxTargetKey,
   sendOutboxRetentionMs,
+  shouldMarkOutboxRecordInterrupted,
   type SendOutboxRecord,
 } from "../../src/renderer/data/send/send-outbox";
 
@@ -68,6 +69,22 @@ describe("send outbox", () => {
       uploadPhase: "failed",
       uploadProgress: undefined,
     });
+  });
+
+  it("does not mark fresh in-flight outbox records as interrupted", () => {
+    const fresh = record({
+      createdAt: now - 1_000,
+      status: "sending",
+      updatedAt: now - 500,
+    });
+    const stale = record({
+      createdAt: now - 20_000,
+      status: "sending",
+      updatedAt: now - 20_000,
+    });
+
+    expect(shouldMarkOutboxRecordInterrupted(fresh, now)).toBe(false);
+    expect(shouldMarkOutboxRecordInterrupted(stale, now)).toBe(true);
   });
 
   it("converts records to local outgoing messages without changing identity scope", () => {

@@ -643,8 +643,23 @@
 }
 
 .h-flagship-grid .e-filter-row.compact {
-  height: 38px !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  height: auto !important;
+  min-height: 38px !important;
   margin-top: 6px !important;
+  overflow: visible !important;
+}
+
+.h-flagship-grid .e-filter-row.compact button {
+  min-width: 0 !important;
+  width: 100% !important;
+  padding-inline: 6px !important;
+}
+
+.h-flagship-grid .e-filter-row.compact em {
+  min-width: 18px !important;
+  padding-inline: 5px !important;
 }
 
 .h-flagship-grid .h-thread-list {
@@ -3564,6 +3579,7 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
 }
 
 .h-flagship-grid .h-customer-title .chat-header-meta-chips > span,
+.h-flagship-grid .h-customer-title .chat-header-meta-chips > button,
 .h-flagship-grid .h-customer-title .chat-header-meta-chips .channel-badge {
   display: inline-flex;
   align-items: center;
@@ -3577,6 +3593,17 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
   font-size: 11px;
   font-weight: 850;
   line-height: 1;
+}
+
+.h-flagship-grid .h-customer-title .chat-header-meta-chips > button {
+  cursor: pointer;
+}
+
+.h-flagship-grid .h-customer-title .chat-header-meta-chips > button:hover,
+.h-flagship-grid .h-customer-title .chat-header-meta-chips > button.active {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(232, 251, 243, 0.78);
+  color: var(--e2-green-dark);
 }
 
 .h-flagship-grid .h-customer-title .chat-header-meta-chips > span.attention {

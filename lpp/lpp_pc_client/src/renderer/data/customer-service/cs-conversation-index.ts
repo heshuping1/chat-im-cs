@@ -1,6 +1,7 @@
 import type { CustomerServiceThread, CustomerServiceThreadType, MessageItemDto } from "../api/types";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 import { reconcileSnapshot } from "../gateway/snapshot-reconcile-service";
+import { workspaceScopeKeyFromSession } from "../workspace-scope";
 import {
   resolveCustomerServiceCompatUnreadCandidate,
   resolveCustomerServiceEffectiveCompatUnread,
@@ -40,13 +41,22 @@ export function customerServiceIndexScopeKey(input?: {
   apiBaseUrl?: string | null;
   tenantToken?: string | null;
   tenantId?: string | null;
+  platformUserId?: string | null;
+  spaceType?: number | null;
   userId?: string | null;
 }) {
+  if (
+    input?.apiBaseUrl &&
+    input.tenantId &&
+    input.userId &&
+    input.platformUserId &&
+    typeof input.spaceType === "number"
+  ) {
+    return workspaceScopeKeyFromSession(input as never);
+  }
   const parts = [
     input?.apiBaseUrl ?? "",
     input?.tenantToken ?? "",
-    input?.tenantId ?? "",
-    input?.userId ?? "",
   ];
   return parts.some((part) => part.trim()) ? parts.join("|") : defaultCustomerServiceIndexScope;
 }

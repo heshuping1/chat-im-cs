@@ -1,9 +1,11 @@
 export const endpointPlan = {
   platformLogin: "/api/platform/v1/auth/login",
   platformRegister: "/api/platform/v1/auth/register",
+  adminToken: "/api/platform/v1/auth/admin-token",
   selectTenant: "/api/platform/v1/auth/select-tenant",
   selectPersonalSpace: "/api/platform/v1/auth/select-personal-space",
   platformTenants: "/api/platform/v1/my/tenants",
+  platformSpaceUnreadSummary: "/api/platform/v1/my/spaces/unread-summary",
   tenantSearch: "/api/platform/v1/tenants/search",
   tenantByCode: "/api/platform/v1/tenants/by-code/{code}",
   tenantJoinByCode: "/api/platform/v1/tenants/join-by-code",
@@ -82,6 +84,10 @@ export const endpointPlan = {
     "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/messages",
   customerServiceThreadAction:
     "/api/client/v1/customer-service/workbench/threads/{threadActionType}/{threadId}/{action}",
+  adminCustomerServiceTempSessions:
+    "/api/admin/v1/customer-service/temp-sessions",
+  adminCustomerServiceTempSession:
+    "/api/admin/v1/customer-service/temp-sessions/{sessionId}",
   threadProfileCard:
     "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/profile-card",
   clientErrors: "/api/client/v1/client-errors",

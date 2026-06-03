@@ -79,7 +79,21 @@ export function HelpAboutSettingsSection({
     <>
       <div className="settings-sub-card">
         <header>
-          <strong>投诉建议与问题反馈</strong>
+          <strong>版本信息</strong>
+          <span>{version}</span>
+        </header>
+        <InfoRow {...settingRowProps("aboutClient")} desc={`LPP PC 客服客户端 ${version}`} />
+        <InfoRow label="更新通道" desc="Windows 测试环境；自动更新依赖 Electron updater、签名安装包和发布通道。" />
+      </div>
+      <ActionRow
+        {...settingRowProps("checkUpdate")}
+        action={checkUpdate.isPending ? "检查中" : "检查"}
+        enabled={!checkUpdate.isPending}
+        onClick={() => checkUpdate.mutate()}
+      />
+      <div className="settings-sub-card">
+        <header>
+          <strong>反馈</strong>
           <span>提交后进入后台问题池</span>
         </header>
         <div className="settings-feedback-form">
@@ -118,7 +132,6 @@ export function HelpAboutSettingsSection({
         </div>
         <InlineSettingsState text="反馈内容会带上脱敏后的客户端上下文，不会上传密码、token、Authorization 或 cookie。" />
       </div>
-
       <ActionRow
         {...settingRowProps("terms")}
         action="查看"
@@ -140,20 +153,6 @@ export function HelpAboutSettingsSection({
           <p>{currentLegal.body}</p>
         </section>
       )}
-      <div className="settings-sub-card">
-        <header>
-          <strong>版本信息</strong>
-          <span>{version}</span>
-        </header>
-        <InfoRow {...settingRowProps("aboutClient")} desc={`LPP PC 客服客户端 ${version}`} />
-        <InfoRow label="更新通道" desc="Windows 测试环境；自动更新依赖 Electron updater、签名安装包和发布通道。" />
-      </div>
-      <ActionRow
-        {...settingRowProps("checkUpdate")}
-        action={checkUpdate.isPending ? "检查中" : "检查"}
-        enabled={!checkUpdate.isPending}
-        onClick={() => checkUpdate.mutate()}
-      />
     </>
   );
 }

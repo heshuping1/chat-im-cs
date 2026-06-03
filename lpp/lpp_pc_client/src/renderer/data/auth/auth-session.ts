@@ -4,6 +4,7 @@ import { logAuthDiagnostic } from "./auth-diagnostics";
 
 export interface AuthSession {
   apiBaseUrl: string;
+  adminBaseUrl?: string;
   tenantToken: string;
   platformToken?: string;
   platformRefreshToken?: string;

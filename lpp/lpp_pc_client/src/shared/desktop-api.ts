@@ -79,6 +79,7 @@ export interface MessageReminderDiagnosticPayload {
 
 export interface DesktopAuthSessionPayload {
   apiBaseUrl: string;
+  adminBaseUrl?: string;
   tenantToken: string;
   platformToken?: string;
   platformRefreshToken?: string;
@@ -144,6 +145,21 @@ export interface VideoPlayerPayload extends CacheMediaFilePayload {
   sizeBytes?: number;
 }
 
+export type ChatArchiveFileKind = 'export' | 'backup';
+
+export interface ChatArchiveFilePayload {
+  kind: ChatArchiveFileKind;
+  defaultName: string;
+  content: string;
+}
+
+export interface ChatArchiveFileResult {
+  kind: ChatArchiveFileKind;
+  fileName: string;
+  filePath: string;
+  content: string;
+}
+
 export interface DesktopApi {
   notify(payload: NotifyPayload): Promise<void>;
   onNotificationClicked(callback: (payload: NotificationClickedPayload) => void): () => void;
@@ -168,12 +184,18 @@ export interface DesktopApi {
     conversationId?: string;
   }): Promise<void>;
   saveFile(defaultName: string, content: string): Promise<string | null>;
+  saveChatArchiveFile(payload: ChatArchiveFilePayload): Promise<string | null>;
+  openChatArchiveFile(): Promise<ChatArchiveFileResult | null>;
   openExternal(url: string): Promise<void>;
   readAuthSession(): Promise<DesktopAuthSessionPayload | null>;
   saveAuthSession(payload: DesktopAuthSessionPayload): Promise<void>;
   clearAuthSession(): Promise<void>;
   openAppProfile(profileId?: string): Promise<void>;
   getAppInstanceProfile(): Promise<AppInstanceProfilePayload>;
+  getLaunchAtStartup(): Promise<boolean>;
+  setLaunchAtStartup(enabled: boolean): Promise<boolean>;
+  getMinimizeToTray(): Promise<boolean>;
+  setMinimizeToTray(enabled: boolean): Promise<boolean>;
   captureScreenshot(): Promise<ScreenshotCaptureResult>;
   getAppVersion(): Promise<string>;
   exportDiagnostics(payload: DiagnosticsPayload): Promise<string | null>;
@@ -197,10 +219,13 @@ export const desktopIpcChannelByMethod = {
   editMediaFile: 'desktop:edit-media-file',
   exportDiagnostics: 'desktop:export-diagnostics',
   getAppVersion: 'desktop:get-app-version',
+  getLaunchAtStartup: 'desktop:get-launch-at-startup',
+  getMinimizeToTray: 'desktop:get-minimize-to-tray',
   getCachedMediaStatus: 'desktop:get-cached-media-status',
   notify: 'desktop:notify',
   getAppInstanceProfile: 'desktop:get-app-instance-profile',
   openDownloadedFile: 'desktop:open-downloaded-file',
+  openChatArchiveFile: 'desktop:open-chat-archive-file',
   openAppProfile: 'desktop:open-app-profile',
   openExternal: 'desktop:open-external',
   openFile: 'desktop:open-file',
@@ -211,9 +236,12 @@ export const desktopIpcChannelByMethod = {
   recordMessageReminderDiagnostic: 'desktop:record-message-reminder-diagnostic',
   revealMediaInFolder: 'desktop:reveal-media-in-folder',
   saveAuthSession: 'desktop:save-auth-session',
+  saveChatArchiveFile: 'desktop:save-chat-archive-file',
   saveFile: 'desktop:save-file',
   saveMediaAs: 'desktop:save-media-as',
   setTaskbarBadge: 'desktop:set-taskbar-badge',
+  setLaunchAtStartup: 'desktop:set-launch-at-startup',
+  setMinimizeToTray: 'desktop:set-minimize-to-tray',
   setTrayStatus: 'desktop:set-tray-status',
 } as const satisfies Record<DesktopApiMethod, `desktop:${string}`>;
 

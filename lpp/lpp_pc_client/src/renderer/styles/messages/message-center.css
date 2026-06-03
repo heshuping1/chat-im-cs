@@ -2404,7 +2404,9 @@ body:has(.sidebar.collapsed)
 }
 
 .e-chat-panel.group-chat-mode .e-message-stage {
-  background: #f8fafc !important;
+  background:
+    linear-gradient(180deg, var(--chat-stage-background-wash), rgba(255, 255, 255, 0) 170px),
+    var(--chat-stage-background) !important;
 }
 
 .group-info-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }

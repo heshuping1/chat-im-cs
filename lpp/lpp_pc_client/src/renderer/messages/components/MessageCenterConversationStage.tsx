@@ -19,6 +19,7 @@ import type { AuthSession } from "../../data/auth/auth-session";
 import type { ConversationReadState } from "../../data/im-read-model";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import type { PcSettings } from "../../data/settings/pc-settings";
+import type { AutoTranslateConversationMode } from "../../translation/models/autoTranslatePreferences";
 import type { ContactItem } from "../../data/types";
 import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
 import { requireApiClient } from "../../data/runtime";
@@ -62,6 +63,8 @@ export function MessageCenterConversationStage({
   activeConversationMessagesLoaded,
   activeConversationReadState,
   activeConversationType,
+  autoTranslateConversationMode,
+  autoTranslateEffective,
   avatarProfilePopover,
   contactCardActionPending,
   contactCardProfile,
@@ -121,6 +124,7 @@ export function MessageCenterConversationStage({
   multiSelectMode,
   notice,
   onAvatarProfileClose,
+  onCycleAutoTranslateMode,
   onContactCardAccept,
   onContactCardBlock,
   onContactCardClose,
@@ -195,6 +199,8 @@ export function MessageCenterConversationStage({
   activeConversationMessagesLoaded: boolean;
   activeConversationReadState?: ConversationReadState;
   activeConversationType?: "direct" | "group";
+  autoTranslateConversationMode: AutoTranslateConversationMode;
+  autoTranslateEffective: boolean;
   avatarProfilePopover: AvatarProfilePopoverState | null;
   contactCardActionPending?: boolean;
   contactCardProfile: MessageOverlayProps["contactCardProfile"];
@@ -255,6 +261,7 @@ export function MessageCenterConversationStage({
   messagesBottomRef: Ref<HTMLDivElement>;
   multiSelectMode: boolean;
   notice: string | null;
+  onCycleAutoTranslateMode: () => void;
   onAvatarProfileClose: () => void;
   onContactCardAccept: MessageOverlayProps["onContactCardAccept"];
   onContactCardBlock: MessageOverlayProps["onContactCardBlock"];
@@ -373,7 +380,10 @@ export function MessageCenterConversationStage({
               historyOpen={historyOpen}
               messageSearchOpen={messageSearchOpen}
               messagesLoaded={activeConversationMessagesLoaded}
+              autoTranslateEffective={autoTranslateEffective}
+              autoTranslateMode={autoTranslateConversationMode}
               unreadIdentity={unreadIdentity}
+              onCycleAutoTranslateMode={onCycleAutoTranslateMode}
               onOpenConversationDrawer={() => setConversationDrawerOpen(true)}
               onToggleLookup={() => {
                 const nextOpen = profileStandaloneOpen ? true : !(messageSearchOpen || historyOpen);
@@ -416,6 +426,7 @@ export function MessageCenterConversationStage({
                 }
                 assetBaseUrl={session?.apiBaseUrl}
                 authToken={session?.tenantToken}
+                chatBackgroundPreset={pcSettings.chatBackgroundPreset}
                 conversation={activeConversation}
                 emptyText={messageList.emptyText}
                 eventMessageText={eventMessageText}

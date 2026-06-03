@@ -32,7 +32,7 @@ describe("MessagesApiClient", () => {
     resetCustomerServiceConversationIndexForTest();
   });
 
-  it("keeps plain IM compatibility conversations in the IM list", async () => {
+  it("keeps only direct and group conversations in the IM list", async () => {
     const client = new TestMessagesApiClient({
       items: [
         {
@@ -42,6 +42,14 @@ describe("MessagesApiClient", () => {
           unreadCount: 1,
           lastReadSeq: 1,
           lastMessageSeq: 2,
+        },
+        {
+          conversationId: "group-1",
+          conversationType: "group",
+          title: "Group",
+          unreadCount: 0,
+          lastReadSeq: 1,
+          lastMessageSeq: 1,
         },
         {
           conversationId: "thread-direct-customer",
@@ -66,13 +74,12 @@ describe("MessagesApiClient", () => {
     await expect(client.getConversations()).resolves.toMatchObject({
       items: [
         { conversationId: "direct-1", conversationType: "direct" },
-        { conversationId: "thread-direct-customer" },
-        { conversationId: "thread-source-customer-service", conversationType: "direct" },
+        { conversationId: "group-1", conversationType: "group" },
       ],
     });
   });
 
-  it("indexes temp-session conversations filtered from the IM list with bounded unknown compat unread", async () => {
+  it("drops temp-session conversations from the IM list and stores ownership evidence only", async () => {
     const client = new TestMessagesApiClient({
       items: [
         {
@@ -97,28 +104,26 @@ describe("MessagesApiClient", () => {
     });
 
     await expect(client.getConversations()).resolves.toMatchObject({ items: [] });
-    expect(getCustomerServiceConversationIndex("im-conversation-cs-1", testScopeKey)).toMatchObject({
-      compatLastMessageId: "m-temp-1",
-      compatLastMessageSeq: 4,
-      compatLastReadSeq: 0,
-      compatRawUnreadCount: 4,
-      compatUnreadCandidate: 4,
-      compatUnreadReason: "compat-unknown-bounded",
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-1", testScopeKey),
+    ).toMatchObject({
       conversationId: "im-conversation-cs-1",
-      lastMessageAt: "2026-06-01T10:00:00.000Z",
-      lastMessageId: "m-temp-1",
-      lastMessagePreview: "visitor text",
-      source: "temp-chat-widget",
+      scopeKey: testScopeKey,
+      source: "imList",
       threadId: "temp-session-1",
       threadType: "temp_session",
     });
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-1", testScopeKey)
+        ?.compatUnreadCandidate,
+    ).toBeUndefined();
     expect(
       getCustomerServiceConversationIndex("im-conversation-cs-1", testScopeKey)
         ?.overlayUnreadCount,
     ).toBeUndefined();
   });
 
-  it("creates a trusted compat unread candidate only for explicit inbound temp-session messages", async () => {
+  it("does not derive customer-service unread from inbound temp-session IM pollution", async () => {
     const client = new TestMessagesApiClient({
       items: [
         {
@@ -147,15 +152,22 @@ describe("MessagesApiClient", () => {
     expect(
       getCustomerServiceConversationIndex("im-conversation-cs-inbound", testScopeKey),
     ).toMatchObject({
-      compatRawUnreadCount: 3,
-      compatUnreadCandidate: 3,
-      compatUnreadReason: "compat-inbound-trusted",
-      lastMessagePreview: "visitor text",
+      conversationId: "im-conversation-cs-inbound",
+      source: "imList",
       threadId: "temp-session-inbound",
+      threadType: "temp_session",
     });
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-inbound", testScopeKey)
+        ?.compatUnreadCandidate,
+    ).toBeUndefined();
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-inbound", testScopeKey)
+        ?.overlayUnreadCount,
+    ).toBeUndefined();
   });
 
-  it("does not create a compat unread candidate for explicit self temp-session last messages", async () => {
+  it("does not derive customer-service unread from self temp-session IM pollution", async () => {
     const client = new TestMessagesApiClient({
       items: [
         {
@@ -184,11 +196,18 @@ describe("MessagesApiClient", () => {
     expect(
       getCustomerServiceConversationIndex("im-conversation-cs-self", testScopeKey),
     ).toMatchObject({
-      compatRawUnreadCount: 4,
-      compatUnreadCandidate: 0,
-      compatUnreadReason: "self-message-suppressed",
-      lastMessagePreview: "agent reply",
+      conversationId: "im-conversation-cs-self",
+      source: "imList",
       threadId: "temp-session-self",
+      threadType: "temp_session",
     });
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-self", testScopeKey)
+        ?.compatUnreadCandidate,
+    ).toBeUndefined();
+    expect(
+      getCustomerServiceConversationIndex("im-conversation-cs-self", testScopeKey)
+        ?.overlayUnreadCount,
+    ).toBeUndefined();
   });
 });

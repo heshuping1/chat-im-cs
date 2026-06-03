@@ -2,11 +2,20 @@ import type { ImConversationType } from "../im-read-model";
 
 export type ImReadDiagnosticEvent =
   | "im-read.clear-pending"
+  | "im-read.gateway-receipt"
   | "im-read.mark-local"
   | "im-read.mark-peer"
+  | "im-read.read-status-merge"
+  | "im-read.read-status-query"
   | "im-read.upsert-state";
 
-export type ImReadDiagnosticPhase = "clear" | "mark" | "upsert";
+export type ImReadDiagnosticPhase =
+  | "clear"
+  | "mark"
+  | "merge"
+  | "query"
+  | "received"
+  | "upsert";
 export type ImReadDiagnosticResult = "failed" | "skipped" | "success";
 
 export interface ImReadDiagnosticRecord {
@@ -23,9 +32,19 @@ export interface ImReadDiagnosticRecord {
     conversationType?: ImConversationType;
     readSeq?: number;
     peerReadSeq?: number;
+    previousPeerReadSeq?: number;
+    peerLastReadSeq?: number;
     myReadSeq?: number;
     lastMessageSeq?: number;
     unreadCount?: number;
+    cacheUpdated?: boolean;
+    clientObservedAt?: string;
+    durationMs?: number;
+    eventTime?: string;
+    path?: string;
+    reader?: "current_user" | "peer" | "unknown";
+    route?: "push" | "query";
+    serverTime?: string;
   };
   error?: {
     message: string;

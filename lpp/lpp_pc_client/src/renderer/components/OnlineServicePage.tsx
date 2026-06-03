@@ -26,6 +26,7 @@ import { useAuthSession } from "../data/auth/auth-store";
 import { customerServiceRealtimePollIntervalMs } from "../data/customer-service/cs-realtime-config";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
+import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import type { CustomerServiceStatus } from "../data/types";
 import {
   type ServiceAssistantPane,
@@ -266,6 +267,7 @@ export function OnlineServicePage() {
     [session],
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken];
+  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
     enabled: Boolean(client),
@@ -275,7 +277,7 @@ export function OnlineServicePage() {
   });
   const receptionStatusQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceReception(...queryBaseKey),
-    enabled: Boolean(client),
+    enabled: Boolean(client && canUseStaffEndpoints),
     queryFn: async () => client!.getReceptionStatus(),
     refetchInterval: 15_000,
     refetchIntervalInBackground: true,

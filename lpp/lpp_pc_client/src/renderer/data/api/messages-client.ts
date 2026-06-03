@@ -26,8 +26,11 @@ import {
   normalizeImMessageDto,
 } from "../im/im-message-contract";
 import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
-import { rememberCustomerServiceConversationFromImList } from "../customer-service/cs-compatibility-bridge";
-import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
+import {
+  customerServiceIndexScopeKey,
+  rememberCustomerServiceConversationIndex,
+} from "../customer-service/cs-conversation-index";
+import { logImReadDiagnostic } from "../im-read/im-read-diagnostics";
 import { recordMessageSourceObserved } from "../diagnostics/message-source-diagnostics";
 import { recordMessageTraceEvent } from "../diagnostics/message-trace-diagnostics";
 import { resolveConversationOwnership } from "../gateway/conversation-ownership-resolver";
@@ -49,10 +52,13 @@ export class MessagesApiClient extends ContactsApiClient {
       const items = page.items ?? [];
       const scopeKey = customerServiceIndexScopeKey({
         apiBaseUrl: this.options.baseUrl,
+        platformUserId: this.options.platformUserId,
+        spaceType: this.options.spaceType,
+        tenantId: this.options.tenantId,
         tenantToken: this.options.tenantToken,
+        userId: this.options.userId,
       });
       const filtered = items.filter((item) => isPlainImConversation(item, scopeKey));
-      items.forEach((item) => rememberCustomerServiceConversationFromImList(item, scopeKey));
       const dropped = items.filter((item) => !isPlainImConversation(item, scopeKey));
       recordCsRoutingDiagnostic({
         event: "pc-im-conversations",
@@ -272,9 +278,55 @@ export class MessagesApiClient extends ContactsApiClient {
   }
 
   getDirectReadStatus(conversationId: string) {
-    return this.request<DirectReadStatusDto>(
-      endpointPlan.directReadStatus.replace("{conversationId}", conversationId),
-    );
+    const path = endpointPlan.directReadStatus.replace("{conversationId}", conversationId);
+    const startedAt = Date.now();
+    logImReadDiagnostic({
+      event: "im-read.read-status-query",
+      phase: "query",
+      result: "success",
+      reason: "direct_read_status_start",
+      context: {
+        conversationId,
+        conversationType: "direct",
+        path,
+        route: "query",
+      },
+    });
+    return this.request<DirectReadStatusDto>(path)
+      .then((status) => {
+        logImReadDiagnostic({
+          event: "im-read.read-status-query",
+          phase: "query",
+          result: "success",
+          reason: "direct_read_status_done",
+          context: {
+            conversationId,
+            conversationType: "direct",
+            durationMs: Date.now() - startedAt,
+            path,
+            peerLastReadSeq: normalizeReadStatusSeq(status?.peerLastReadSeq),
+            route: "query",
+          },
+        });
+        return status;
+      })
+      .catch((error) => {
+        logImReadDiagnostic({
+          event: "im-read.read-status-query",
+          phase: "query",
+          result: "failed",
+          reason: "direct_read_status_failed",
+          context: {
+            conversationId,
+            conversationType: "direct",
+            durationMs: Date.now() - startedAt,
+            path,
+            route: "query",
+          },
+          error,
+        });
+        throw error;
+      });
   }
 
   private sendConversationMessage(
@@ -309,6 +361,11 @@ export class MessagesApiClient extends ContactsApiClient {
   }
 }
 
+function normalizeReadStatusSeq(value: unknown) {
+  const seq = Math.floor(Number(value ?? 0));
+  return Number.isFinite(seq) && seq > 0 ? seq : 0;
+}
+
 function isPlainImConversation(item: ConversationListItem, scopeKey: string) {
   const record = item as unknown as Record<string, unknown>;
   const ownership = resolveConversationOwnership({
@@ -316,7 +373,10 @@ function isPlainImConversation(item: ConversationListItem, scopeKey: string) {
     scopeKey,
     source: "imList",
   });
-  if (ownership.owner === "customerService" && ownership.confidence === "explicit") return false;
+  if (ownership.owner === "customerService") {
+    rememberCustomerServiceOwnershipEvidence(ownership);
+    return false;
+  }
   const conversationType = normalizeGatewayType(
     stringField(record, "conversationType", "type"),
   );
@@ -329,16 +389,38 @@ function isPlainImConversation(item: ConversationListItem, scopeKey: string) {
   if (record.tempSession || record.temp_session) {
     return false;
   }
+  if (hasCustomerServiceSource(record)) return false;
+  return conversationType === "direct" || conversationType === "group";
+}
+
+function rememberCustomerServiceOwnershipEvidence(
+  ownership: ReturnType<typeof resolveConversationOwnership>,
+) {
+  if (!ownership.conversationId || !ownership.threadId || !ownership.threadType) return;
+  rememberCustomerServiceConversationIndex({
+    conversationId: ownership.conversationId,
+    scopeKey: ownership.scopeKey,
+    source: ownership.source,
+    threadId: ownership.threadId,
+    threadType: ownership.threadType,
+  });
+}
+
+function hasCustomerServiceSource(record: Record<string, unknown>) {
   return [
-    "direct",
-    "im_direct",
-    "direct_chat",
-    "direct_customer",
-    "customer_direct",
-    "group",
-    "im_group",
-    "group_chat",
-  ].includes(conversationType);
+    stringField(record, "source", "from", "channel", "sourceChannel", "entryChannel"),
+    stringField(record, "owner", "domain", "module"),
+  ]
+    .map(normalizeGatewayType)
+    .some((value) =>
+      [
+        "customer_service",
+        "customer-service",
+        "cs",
+        "kefu",
+        "temp_session",
+      ].includes(value),
+    );
 }
 
 function normalizeConversationSummaryFromContract(

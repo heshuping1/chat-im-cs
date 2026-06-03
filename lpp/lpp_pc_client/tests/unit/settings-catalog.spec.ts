@@ -12,17 +12,116 @@ import {
 import { checkClientUpdate } from "../../src/renderer/settings/components/HelpAboutSettingsSection";
 
 describe("settings catalog", () => {
-  it("defines eight desktop settings sections around IM and customer service work", () => {
+  it("defines the nine top-level settings categories without fragmented sections", () => {
     expect(settingsSections.map((section) => section.id)).toEqual([
+      "account",
+      "enterprise",
+      "messages",
+      "privacy",
+      "customerService",
+      "network",
+      "common",
+      "storageDiagnostics",
+      "about",
+    ]);
+    for (const section of settingsSections) {
+      expect(section.title, section.id).not.toMatch(/[与和]/);
+    }
+    for (const oldSectionId of [
       "accountEnterprise",
       "privacySecurity",
       "messageReception",
       "chatCollaboration",
       "appearanceEfficiency",
       "generalNetwork",
-      "storageDiagnostics",
       "helpAbout",
-    ]);
+      "security",
+      "commonNotifications",
+      "chatInput",
+      "translation",
+      "chatAppearance",
+      "chatArchive",
+      "appearance",
+      "efficiency",
+      "desktop",
+      "language",
+      "storage",
+      "diagnostics",
+      "help",
+    ]) {
+      expect(getSettingsSection(oldSectionId as never), oldSectionId).toBeUndefined();
+    }
+  });
+
+  it("maps every settings row into the nine categories without orphan rows", () => {
+    const expectedSectionsByRowId: Record<string, string> = {
+      profile: "account",
+      changePassword: "account",
+      loginDevices: "account",
+      logoutAccount: "account",
+      deactivateAccount: "account",
+      enterpriseIdentity: "enterprise",
+      imNotifications: "messages",
+      friendRequestNotifications: "messages",
+      doNotDisturb: "messages",
+      allowMobileSearch: "privacy",
+      allowLppSearch: "privacy",
+      friendRequestVerification: "privacy",
+      profileVisibility: "privacy",
+      blocklist: "privacy",
+      serviceQueueNotifications: "customerService",
+      customerServiceMessageNotifications: "customerService",
+      slaTimeoutNotifications: "customerService",
+      highDensityContext: "customerService",
+      currentEnvironment: "network",
+      activeLine: "network",
+      lineLatencyTest: "network",
+      autoReconnect: "network",
+      weakNetworkDiagnostics: "network",
+      desktopNotifications: "common",
+      notificationPreview: "common",
+      notificationSound: "common",
+      enterToSend: "common",
+      screenshotShortcut: "common",
+      dragUpload: "common",
+      shortcutHints: "common",
+      autoTranslate: "common",
+      chatBackground: "common",
+      chatExport: "common",
+      chatBackup: "common",
+      chatRestore: "common",
+      theme: "common",
+      skin: "common",
+      fontSize: "common",
+      compactList: "common",
+      reduceMotion: "common",
+      highContrastBoundary: "common",
+      keyboardFocusHint: "common",
+      minimizeToTray: "common",
+      launchAtStartup: "common",
+      multiProfileIndicator: "common",
+      language: "common",
+      timezone: "common",
+      clearLocalCache: "storageDiagnostics",
+      diagnosticsExport: "storageDiagnostics",
+      diagnosticsRecentRecords: "storageDiagnostics",
+      connectivityHealth: "storageDiagnostics",
+      developmentDiagnostics: "storageDiagnostics",
+      runtimeStatus: "storageDiagnostics",
+      feedback: "about",
+      terms: "about",
+      privacyPolicy: "about",
+      aboutClient: "about",
+      checkUpdate: "about",
+    };
+
+    expect(settingsRows.map((row) => row.id).sort()).toEqual(
+      Object.keys(expectedSectionsByRowId).sort(),
+    );
+    for (const row of settingsRows) {
+      expect(row.sectionId, row.id).toBe(expectedSectionsByRowId[row.id]);
+      expect(getSettingsSection(row.sectionId), row.id).toBeTruthy();
+    }
   });
 
   it("keeps setting source semantics internal without surfacing them as row labels", () => {
@@ -40,32 +139,85 @@ describe("settings catalog", () => {
     });
   });
 
-  it("keeps real local notification settings on message reception", () => {
+  it("places IM settings under messages, customer service settings under customer service, and shared notification settings under common", () => {
     expect(getSettingsRow("imNotifications")).toMatchObject({
-      sectionId: "messageReception",
+      sectionId: "messages",
       source: "account",
       control: "switch",
       capability: "available",
+    });
+    expect(getSettingsRow("friendRequestNotifications")).toMatchObject({
+      sectionId: "messages",
     });
     expect(getSettingsRow("serviceQueueNotifications")).toMatchObject({
-      sectionId: "messageReception",
+      sectionId: "customerService",
+      label: "访客排队/待接入提醒",
+      desc: "有访客排队、待接入或待接管时提醒客服。",
       source: "account",
       control: "switch",
       capability: "available",
     });
+    expect(getSettingsRow("customerServiceMessageNotifications")).toMatchObject({
+      sectionId: "customerService",
+      label: "已接入会话新消息提醒",
+      desc: "已接入或正在处理的客服会话收到访客新消息时提醒。",
+      source: "local",
+      control: "switch",
+      capability: "available",
+    });
+    expect(getSettingsRow("slaTimeoutNotifications")).toMatchObject({
+      sectionId: "customerService",
+    });
+    for (const rowId of [
+      "desktopNotifications",
+      "notificationPreview",
+      "notificationSound",
+    ]) {
+      expect(getSettingsRow(rowId), rowId).toMatchObject({
+        sectionId: "common",
+      });
+    }
+    expect(getSettingsRow("doNotDisturb")).toMatchObject({ sectionId: "messages" });
+  });
+
+  it("keeps customer service presence status out of settings navigation", () => {
+    expect(getSettingsSection("customerService")?.desc).not.toContain("接待状态");
+    expect(getSettingsRow("receptionStatusSync")).toBeUndefined();
   });
 
   it("keeps account privacy rows on privacy and security", () => {
     expect(getSettingsRow("allowMobileSearch")).toMatchObject({
-      sectionId: "privacySecurity",
+      sectionId: "privacy",
       source: "account",
       capability: "available",
     });
     expect(getSettingsRow("profileVisibility")).toMatchObject({
-      sectionId: "privacySecurity",
+      sectionId: "privacy",
       source: "account",
       capability: "available",
     });
+  });
+
+  it("places account, enterprise and security rows into the account and enterprise categories", () => {
+    expect(getSettingsRow("profile")).toMatchObject({ sectionId: "account" });
+    expect(getSettingsRow("enterpriseIdentity")).toMatchObject({ sectionId: "enterprise" });
+    for (const rowId of ["changePassword", "loginDevices", "logoutAccount", "deactivateAccount"]) {
+      expect(getSettingsRow(rowId), rowId).toMatchObject({ sectionId: "account" });
+    }
+  });
+
+  it("removes undecided privacy planning cards from settings", () => {
+    expect(getSettingsRow("sensitiveMasking")).toBeUndefined();
+    expect(getSettingsRow("customerAccessBoundary")).toBeUndefined();
+    expect(getSettingsRow("copyScreenshotGuard")).toBeUndefined();
+  });
+
+  it("removes the undecided after work reminder planning card", () => {
+    expect(getSettingsRow("afterWorkReminder")).toBeUndefined();
+  });
+
+  it("removes the rejected busy do not disturb planning card", () => {
+    expect(getSettingsRow("busyDoNotDisturb")).toBeUndefined();
   });
 
   it("covers App settings capabilities in the PC information architecture", () => {
@@ -89,7 +241,9 @@ describe("settings catalog", () => {
   });
 
   it("does not expose unsupported capabilities as fake switches", () => {
-    for (const rowId of ["launchAtStartup", "minimizeToTray"]) {
+    const unsupportedRowIds: string[] = [];
+
+    for (const rowId of unsupportedRowIds) {
       expect(getSettingsRow(rowId)).toMatchObject({
         enabled: false,
         visibleInMainList: false,
@@ -98,15 +252,35 @@ describe("settings catalog", () => {
     }
   });
 
+  it("promotes minimize to tray into a real desktop setting", () => {
+    expect(getSettingsRow("minimizeToTray")).toMatchObject({
+      sectionId: "common",
+      control: "switch",
+      capability: "available",
+      enabled: true,
+      visibleInMainList: true,
+    });
+  });
+
+  it("promotes launch at startup into a real desktop setting", () => {
+    expect(getSettingsRow("launchAtStartup")).toMatchObject({
+      sectionId: "common",
+      control: "switch",
+      capability: "available",
+      enabled: true,
+      visibleInMainList: true,
+    });
+  });
+
   it("promotes APP-equivalent network line settings into real PC capabilities", () => {
     expect(getSettingsRow("activeLine")).toMatchObject({
-      sectionId: "generalNetwork",
+      sectionId: "network",
       capability: "available",
       enabled: true,
       visibleInMainList: true,
     });
     expect(getSettingsRow("lineLatencyTest")).toMatchObject({
-      sectionId: "generalNetwork",
+      sectionId: "network",
       capability: "localEffective",
       enabled: true,
       visibleInMainList: true,
@@ -114,9 +288,8 @@ describe("settings catalog", () => {
   });
 
   it("keeps help and about actions real instead of hidden planning cards", async () => {
-    expect(getSettingsSection("helpAbout")?.desc).not.toContain("开源许可");
     expect(getSettingsRow("checkUpdate")).toMatchObject({
-      sectionId: "helpAbout",
+      sectionId: "about",
       control: "action",
       capability: "available",
       enabled: true,
@@ -140,19 +313,82 @@ describe("settings catalog", () => {
       visibleInMainList: true,
     });
     expect(getSettingsRow("autoTranslate")).toMatchObject({
-      capability: "missingRuntimeWiring",
-      visibleInMainList: false,
+      control: "switch",
+      capability: "localEffective",
+      visibleInMainList: true,
     });
-    expect(getSettingsRow("sensitiveMasking")).toMatchObject({
-      capability: "missingBackendApi",
-      visibleInMainList: false,
+  });
+
+  it("promotes chat archive import export and local backup into real settings entries", () => {
+    for (const rowId of ["chatExport", "chatBackup", "chatRestore"]) {
+      expect(getSettingsRow(rowId), rowId).toMatchObject({
+        sectionId: "common",
+        control: "action",
+        capability: "available",
+        enabled: true,
+        visibleInMainList: true,
+      });
+      expect(getSettingsRow(rowId)?.productValue).toBeUndefined();
+      expect(getSettingsRow(rowId)?.dependency).toBeUndefined();
+      expect(getSettingsRow(rowId)?.nextAction).toBeUndefined();
+    }
+  });
+
+  it("promotes chat background into a local effective setting with stage wiring", () => {
+    expect(getSettingsRow("chatBackground")).toMatchObject({
+      sectionId: "common",
+      control: "action",
+      capability: "localEffective",
+      enabled: true,
+      visibleInMainList: true,
     });
+    expect(getSettingsRow("chatBackground")?.productValue).toBeUndefined();
+    expect(getSettingsRow("chatBackground")?.dependency).toBeUndefined();
+    expect(getSettingsRow("chatBackground")?.nextAction).toBeUndefined();
+
+    const backgroundSectionSource = readFileSync(
+      join(process.cwd(), "src/renderer/settings/components/ChatBackgroundSection.tsx"),
+      "utf8",
+    );
+    const stageSource = readFileSync(
+      join(process.cwd(), "src/renderer/messages/components/MessageCenterConversationStage.tsx"),
+      "utf8",
+    );
+    const listSource = readFileSync(
+      join(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
+      "utf8",
+    );
+
+    expect(backgroundSectionSource).toContain("chatBackgroundPresets");
+    expect(backgroundSectionSource).toContain("chatBackgroundPreset");
+    expect(stageSource).toContain("chatBackgroundPreset={pcSettings.chatBackgroundPreset}");
+    expect(listSource).toContain("chatBackgroundStyleVariables");
+  });
+
+  it("keeps quick reply management out of chat collaboration planning", () => {
+    const commonRows = settingsRows.filter((row) => row.sectionId === "common");
+
+    expect(getSettingsRow("quickReplyEntry")).toBeUndefined();
+    expect(commonRows.map((row) => row.label)).not.toContain("快捷回复管理");
+  });
+
+  it("keeps media send preference removed from chat collaboration planning", () => {
+    const commonRows = settingsRows.filter((row) => row.sectionId === "common");
+
+    expect(getSettingsRow("mediaSendPreference")).toBeUndefined();
+    expect(commonRows.map((row) => row.label)).not.toContain("图片/文件/视频发送偏好");
+  });
+
+  it("keeps undecided local message cache out of chat collaboration planning", () => {
+    const commonRows = settingsRows.filter((row) => row.sectionId === "common");
+
+    expect(getSettingsRow("localMessageCache")).toBeUndefined();
+    expect(commonRows.map((row) => row.label)).not.toContain("聊天记录缓存");
   });
 
   it("requires every planned capability to explain value, dependency and next action", () => {
     const plannedRows = settingsRows.filter((row) => row.capability.startsWith("missing"));
 
-    expect(plannedRows.length).toBeGreaterThan(10);
     for (const row of plannedRows) {
       expect(row.productValue, row.id).toBeTruthy();
       expect(row.dependency, row.id).toBeTruthy();
@@ -171,6 +407,28 @@ describe("settings catalog", () => {
     }
   });
 
+  it("promotes recent diagnostics records into the storage and diagnostics page", () => {
+    expect(getSettingsRow("diagnosticsRecentRecords")).toMatchObject({
+      sectionId: "storageDiagnostics",
+      label: "诊断记录",
+      control: "info",
+      capability: "available",
+      visibleInMainList: true,
+    });
+    expect(getSettingsRow("profileLogDirectory")).toBeUndefined();
+  });
+
+  it("promotes connectivity health into a real storage diagnostics panel", () => {
+    expect(getSettingsRow("connectivityHealth")).toMatchObject({
+      sectionId: "storageDiagnostics",
+      label: "连接体检",
+      control: "info",
+      capability: "available",
+      visibleInMainList: true,
+    });
+    expect(getSettingsRow("apiConnectivity")).toBeUndefined();
+  });
+
   it("does not pass source scope labels into normal settings rows", () => {
     expect(settingRowProps("imNotifications")).not.toHaveProperty("scopeLabel");
     expect(settingRowProps("allowMobileSearch")).not.toHaveProperty("scopeLabel");
@@ -187,8 +445,6 @@ describe("settings catalog", () => {
     );
 
     for (const key of [
-      "launchAtStartup",
-      "minimizeToTray",
       "activeLine",
       "language",
       "timezone",
@@ -205,7 +461,7 @@ describe("settings catalog", () => {
       "utf8",
     );
     const diagnosticsSource = readFileSync(
-      join(process.cwd(), "src/renderer/settings/components/DiagnosticsSettingsSection.tsx"),
+      join(process.cwd(), "src/renderer/settings/components/DiagnosticsRecordsSection.tsx"),
       "utf8",
     );
     const pageSource = readFileSync(
@@ -215,16 +471,17 @@ describe("settings catalog", () => {
 
     expect(privacySource).toContain("pcQueryKeys.accountPrivacy");
     expect(diagnosticsSource).toContain("exportDiagnostics");
+    expect(diagnosticsSource).toContain("getRecentDiagnosticsRecords");
     expect(pageSource).toContain("getAppInstanceProfile");
     expect(pageSource).toContain("NotificationSettingsSection");
     expect(pageSource).toContain("HelpAboutSettingsSection");
     expect(pageSource).toContain("RuntimeStatusSettingsSection");
-    const helpAboutBranch = pageSource.slice(
-      pageSource.indexOf('case "helpAbout"'),
+    const aboutBranch = pageSource.slice(
+      pageSource.indexOf('case "about"'),
       pageSource.indexOf("function PlanningSupportBlock"),
     );
-    expect(helpAboutBranch).toContain("HelpAboutSettingsSection");
-    expect(helpAboutBranch).not.toContain("PlanningSupportBlock");
+    expect(aboutBranch).toContain("HelpAboutSettingsSection");
+    expect(aboutBranch).not.toContain("PlanningSupportBlock");
   });
 
   it("wires local composer settings into the real message composer", () => {
@@ -249,6 +506,57 @@ describe("settings catalog", () => {
     expect(stageSource).toContain("enterToSend={pcSettings.enterToSend}");
     expect(stageSource).toContain("dragUpload={pcSettings.dragUpload}");
     expect(stageSource).toContain("shortcutHints={pcSettings.shortcutHints}");
+  });
+
+  it("wires auto translate into settings, IM and customer service conversations", () => {
+    const pageSource = readFileSync(
+      join(process.cwd(), "src/renderer/components/MePage.tsx"),
+      "utf8",
+    );
+    const messageCenterSource = readFileSync(
+      join(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
+      "utf8",
+    );
+    const chatWorkspaceSource = readFileSync(
+      join(process.cwd(), "src/renderer/components/ChatWorkspace.tsx"),
+      "utf8",
+    );
+    const serviceBubbleSource = readFileSync(
+      join(process.cwd(), "src/renderer/customer-service/components/ServiceMessageBubble.tsx"),
+      "utf8",
+    );
+
+    expect(pageSource).toContain('setSetting("autoTranslate"');
+    expect(messageCenterSource).toContain("useAutoTranslateMessages");
+    expect(messageCenterSource).toContain("autoTranslateConversationMode");
+    expect(chatWorkspaceSource).toContain("useAutoTranslateMessages");
+    expect(chatWorkspaceSource).toContain("autoTranslateConversationMode");
+    expect(serviceBubbleSource).toContain("translationText");
+  });
+
+  it("wires chat archive actions into a real settings panel instead of planning cards", () => {
+    const chatArchiveSource = readFileSync(
+      join(process.cwd(), "src/renderer/settings/components/ChatArchiveSection.tsx"),
+      "utf8",
+    );
+
+    expect(chatArchiveSource).toContain("exportChatArchiveJson");
+    expect(chatArchiveSource).toContain("saveChatArchiveFile");
+    expect(chatArchiveSource).toContain("openChatArchiveFile");
+    expect(chatArchiveSource).not.toContain("待接入");
+    expect(chatArchiveSource).toContain("本地归档不会同步到云端");
+  });
+
+  it("wires SLA timeout reminders into the customer service polling path", () => {
+    const sidebarSource = readFileSync(
+      join(process.cwd(), "src/renderer/components/Sidebar.tsx"),
+      "utf8",
+    );
+
+    expect(sidebarSource).toContain("isRiskyCustomerServiceThread");
+    expect(sidebarSource).toContain("pcSettings.slaTimeoutNotifications");
+    expect(sidebarSource).toContain('channel: "sla"');
+    expect(sidebarSource).toContain('icon: "sla"');
   });
 
   it("keeps source and engineering language out of visible settings source files", () => {

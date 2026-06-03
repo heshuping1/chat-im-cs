@@ -11,7 +11,7 @@ import {
   TextCursorInput,
   X,
 } from "lucide-react";
-import type { MouseEvent, Ref } from "react";
+import type { CSSProperties, MouseEvent, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatMessageBubble } from "../../components/ChatMessageBubble";
@@ -23,6 +23,7 @@ import type { UploadActionHandler } from "../../components/MessageBodyView";
 import type { HistoryFilterKey } from "../models/messageListModel";
 import { messageActionPreview } from "../models/messageListModel";
 import { chatMessageRenderKey } from "../models/messageRenderKey";
+import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
 import {
   createMessageRenderWindow,
   messageRenderWindowExpandStep,
@@ -34,6 +35,7 @@ export interface MessageListPanelProps {
   assetBaseUrl?: string;
   authToken?: string;
   conversation: ConversationListItem;
+  chatBackgroundPreset?: unknown;
   eventMessageText: (message: MessageItemDto) => string | undefined;
   groupMemberMap: Map<string, GroupMemberDto>;
   historyCounts: Record<HistoryFilterKey, number>;
@@ -103,6 +105,7 @@ export function MessageListPanel({
   accountId,
   assetBaseUrl,
   authToken,
+  chatBackgroundPreset,
   conversation,
   emptyText,
   eventMessageText,
@@ -195,6 +198,7 @@ export function MessageListPanel({
       onLoadCapture={onLoadCapture}
       onScroll={onMessageStageScroll}
       ref={messageStageRef}
+      style={chatBackgroundStyleVariables(chatBackgroundPreset) as CSSProperties}
     >
       {lookupOpen && (
         <div className="chat-history-panel chat-lookup-panel">
