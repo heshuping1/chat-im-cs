@@ -103,6 +103,7 @@ import { formatBadgeCount, formatError } from "../lib/format";
 import { useFriendRequestReminderController } from "../contacts/hooks/useFriendRequestReminderController";
 import { SpaceRadarPopover } from "../spaces/components/SpaceRadarPopover";
 import { useSpaceRadarController } from "../spaces/hooks/useSpaceRadarController";
+import { useTenantJoinReminderController } from "../spaces/hooks/useTenantJoinReminderController";
 import { PcAvatar } from "./PcAvatar";
 import {
   AccountAction,
@@ -188,6 +189,7 @@ export function Sidebar() {
   const pcSettings = usePcSettings();
   const pushRealtimeReminder = usePushRealtimeReminder();
   const { pendingIncomingRequestCount } = useFriendRequestReminderController();
+  useTenantJoinReminderController();
   const queueReminderReadyRef = useRef(false);
   const queueReminderSessionRef = useRef("");
   const previousQueuedThreadIdsRef = useRef<Set<string>>(new Set());

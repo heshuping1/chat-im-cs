@@ -2,8 +2,8 @@ import {
   normalizeCustomerServiceThreadType,
   type CustomerServiceThread,
 } from "../api/types";
-import { isQueuedCustomerServiceThread } from "../customer-service-display";
 import { isTerminalCustomerServiceThreadStatus } from "./cs-thread-state";
+import { createCustomerServiceLiveCounters } from "./customer-service-live-counters";
 
 export interface CustomerServiceBadgeViewInput {
   activeItems?: CustomerServiceThread[];
@@ -27,17 +27,7 @@ export function resolveCustomerServiceBadgeView(
 ): CustomerServiceBadgeView {
   const activeItems = input.activeItems ?? [];
   const queueItems = input.queueItems ?? [];
-  const queuedTempSessions = [...queueItems, ...activeItems].filter(
-    (item) =>
-      normalizeCustomerServiceThreadType(item.threadType) === "temp_session" &&
-      !isTerminalCustomerServiceThreadStatus(item.status) &&
-      isQueuedCustomerServiceThread(item),
-  );
-  const activeTempSessions = activeItems.filter(
-    (item) =>
-      normalizeCustomerServiceThreadType(item.threadType) === "temp_session" &&
-      !isTerminalCustomerServiceThreadStatus(item.status),
-  );
+  const liveCounters = createCustomerServiceLiveCounters({ activeItems, queueItems });
   const closedHistoryUnreadCount = input.threadDataLoaded
     ? [...queueItems, ...activeItems]
         .filter(
@@ -47,21 +37,16 @@ export function resolveCustomerServiceBadgeView(
         )
         .reduce((sum, item) => sum + Math.max(0, Number(item.unreadCount ?? 0)), 0)
     : 0;
-  const queuedServiceCount = input.threadDataLoaded
-    ? Math.max(input.summaryQueuedCount ?? 0, queuedTempSessions.length)
-    : 0;
+  const queuedServiceCount = input.threadDataLoaded ? liveCounters.queuedServiceCount : 0;
   const activeServiceUnreadCount = input.threadDataLoaded
-    ? activeTempSessions.reduce(
-        (sum, item) => sum + Math.max(0, Number(item.unreadCount ?? 0)),
-        0,
-      )
+    ? liveCounters.activeServiceUnreadCount
     : 0;
   return {
     activeServiceUnreadCount,
-    activeTempSessions,
+    activeTempSessions: input.threadDataLoaded ? liveCounters.activeTempSessions : [],
     closedHistoryUnreadCount,
     queuedServiceCount,
-    queuedTempSessions,
+    queuedTempSessions: input.threadDataLoaded ? liveCounters.queuedTempSessions : [],
     serviceAlertCount: queuedServiceCount + activeServiceUnreadCount,
     taskbarServiceUnreadCount: activeServiceUnreadCount,
   };

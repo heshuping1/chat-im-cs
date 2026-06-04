@@ -9,11 +9,14 @@ import type {
   FeedbackSubmitResultDto,
   FriendInviteQrDto,
   BlockedUserDto,
+  CreateTenantInvitationRequest,
   JoinableTenantDto,
   NotificationSettingsDto,
   PlatformJoinResultDto,
   PlatformSpaceUnreadSummaryDto,
+  TenantInvitationDto,
   TenantInfoDto,
+  TenantJoinRequestDto,
   TenantCodePreviewDto,
   PlatformTenant,
   ProfilePrivacySettingsDto,
@@ -43,6 +46,35 @@ export class ProfileApiClient extends AuthApiClient {
 
   getTenantInfo() {
     return this.request<TenantInfoDto>(endpointPlan.tenantInfo);
+  }
+
+  getTenantInvitations() {
+    return this.request<TenantInvitationDto[] | { items?: TenantInvitationDto[] }>(
+      endpointPlan.tenantInvitations,
+    );
+  }
+
+  createTenantInvitation(body: CreateTenantInvitationRequest) {
+    return this.request<TenantInvitationDto>(endpointPlan.tenantInvitations, {
+      method: "POST",
+      body: JSON.stringify({
+        maxUses: Math.max(1, Math.floor(body.maxUses)),
+        expireHours: Math.max(1, Math.floor(body.expireHours)),
+        ...(body.targetIdentifier?.trim()
+          ? { targetIdentifier: body.targetIdentifier.trim() }
+          : {}),
+        ...(body.targetMembershipRole === undefined
+          ? {}
+          : { targetMembershipRole: body.targetMembershipRole }),
+      }),
+    });
+  }
+
+  deleteTenantInvitation(invitationId: string) {
+    return this.request<{ invitationId?: string }>(
+      endpointPlan.tenantInvitation.replace("{invitationId}", encodeURIComponent(invitationId)),
+      { method: "DELETE" },
+    );
   }
 
   getPlatformTenants() {
@@ -100,6 +132,12 @@ export class ProfileApiClient extends AuthApiClient {
         method: "POST",
         body: JSON.stringify({ message: body.message?.trim() ?? "" }),
       },
+    );
+  }
+
+  getMyTenantJoinRequests() {
+    return this.platformRequest<TenantJoinRequestDto[]>(
+      endpointPlan.tenantJoinRequests,
     );
   }
 

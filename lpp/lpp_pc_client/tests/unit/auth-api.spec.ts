@@ -4,10 +4,25 @@ import { ApiClient, endpointPlan } from "../../src/renderer/data/api-client";
 
 describe("auth api client", () => {
   const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
   const requests: Array<{ body?: unknown; method: string; url: string }> = [];
+  const diagnosticRecords: unknown[] = [];
 
   beforeEach(() => {
     requests.length = 0;
+    diagnosticRecords.length = 0;
+    (globalThis as any).window = {
+      desktopApi: {
+        recordMessageReminderDiagnostic: vi.fn((record: unknown) => {
+          diagnosticRecords.push(record);
+          return Promise.resolve();
+        }),
+      },
+      localStorage: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+      },
+    };
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       requests.push({
         body: init?.body ? JSON.parse(String(init.body)) : undefined,
@@ -32,10 +47,13 @@ describe("auth api client", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    (globalThis as any).window = originalWindow;
   });
 
   it("declares the platform registration endpoint", () => {
     expect(endpointPlan.platformRegister).toBe("/api/platform/v1/auth/register");
+    expect(endpointPlan.platformInvitation).toBe("/api/platform/v1/invitations/{code}");
+    expect(endpointPlan.platformInvitationAccept).toBe("/api/platform/v1/invitations/{code}/accept");
   });
 
   it("registers platform accounts with trimmed public fields and no local-only fields", async () => {
@@ -66,6 +84,8 @@ describe("auth api client", () => {
         avatarUrl: "data:image/svg+xml,%3Csvg%3Eavatar%3C/svg%3E",
       },
     });
+    expect(JSON.stringify(requests[0].body)).not.toContain("invite");
+    expect(JSON.stringify(requests[0].body)).not.toContain("invitation");
   });
 
   it("keeps platform login request shape stable", async () => {
@@ -88,6 +108,48 @@ describe("auth api client", () => {
         devicePlatform: "pc",
       },
     });
+  });
+
+  it("previews and accepts platform invitations by code with platform token", async () => {
+    await apiClient().getPlatformInvitationPreview(" D0BFA03D38DC013C ");
+    await apiClient().acceptPlatformInvitation(" D0BFA03D38DC013C ");
+
+    expect(requests[0]).toMatchObject({
+      method: "GET",
+      url: "https://api.example/api/platform/v1/invitations/D0BFA03D38DC013C",
+    });
+    expect(requests[1]).toMatchObject({
+      method: "POST",
+      url: "https://api.example/api/platform/v1/invitations/D0BFA03D38DC013C/accept",
+      body: {},
+    });
+  });
+
+  it("records invitation API gateway request and response diagnostics through desktop diagnostics", async () => {
+    await apiClient().getPlatformInvitationPreview(" 5BC4B6A19CF80546 ");
+
+    expect(diagnosticRecords).toHaveLength(2);
+    expect(diagnosticRecords[0]).toMatchObject({
+      event: "auth.invitation.preview",
+      source: "auth-api-gateway",
+      phase: "request",
+      route: "platform-invitation",
+      classification: {
+        endpoint: "/api/platform/v1/invitations/{code}",
+        method: "GET",
+        platformSessionPresent: true,
+        result: "request",
+      },
+    });
+    expect(diagnosticRecords[1]).toMatchObject({
+      event: "auth.invitation.preview",
+      source: "auth-api-gateway",
+      phase: "response",
+      classification: {
+        result: "success",
+      },
+    });
+    expect(JSON.stringify(diagnosticRecords)).not.toContain("5BC4B6A19CF80546");
   });
 });
 

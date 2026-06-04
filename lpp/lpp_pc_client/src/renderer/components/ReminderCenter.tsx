@@ -1,4 +1,4 @@
-import { Clock, Headphones, MessageSquare, UserPlus, X } from "lucide-react";
+import { Building2, Clock, Headphones, MessageSquare, UserPlus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   useDismissRealtimeReminder,
@@ -25,7 +25,7 @@ interface ReminderItem {
   severity: ReminderSeverity;
   targetModule: ModuleKey;
   targetId?: string;
-  icon: "contacts" | "im" | "service" | "sla";
+  icon: "contacts" | "enterprise" | "im" | "service" | "sla";
 }
 
 export function ReminderCenter() {
@@ -47,7 +47,9 @@ export function ReminderCenter() {
             ? "查看消息"
             : item.targetModule === "contacts"
               ? "处理申请"
-              : "查看会话",
+              : item.targetModule === "enterpriseSwitch"
+                ? "进入企业"
+                : "查看会话",
         severity: item.severity ?? "info",
         icon:
           item.icon ??
@@ -55,7 +57,9 @@ export function ReminderCenter() {
             ? "im"
             : item.targetModule === "contacts"
               ? "contacts"
-              : "service"),
+              : item.targetModule === "enterpriseSwitch"
+                ? "enterprise"
+                : "service"),
       })),
       ...buildReminders(),
     ] satisfies ReminderItem[],
@@ -71,6 +75,8 @@ export function ReminderCenter() {
     } else if (item.targetModule === "contacts") {
       setContactFilter("requests");
       setActiveModule("contacts");
+    } else if (item.targetModule === "enterpriseSwitch") {
+      setActiveModule("enterpriseSwitch");
     } else {
       if (item.targetId) openCustomerServiceThread(item.targetId, "reminder");
       if (item.id === "service-queue") setFilter("queued");
@@ -91,7 +97,9 @@ export function ReminderCenter() {
               ? Clock
               : item.icon === "contacts"
                 ? UserPlus
-                : Headphones;
+                : item.icon === "enterprise"
+                  ? Building2
+                  : Headphones;
         return (
           <article
             className={`reminder-card ${item.severity} ${item.icon === "service" ? "service" : ""}`}

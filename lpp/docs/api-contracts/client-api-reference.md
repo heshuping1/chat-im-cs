@@ -188,7 +188,7 @@ Base URL：`/api/client/v1`
 | `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户 |
 | `/tenant/members/{userId}` | DELETE | 路径参数：`userId` | `userId` | 当前实现返回被移除用户 ID |
 | `/tenant/members/{userId}/role` | PUT | `membershipRole` | `userId` | 仅所有者可修改角色 |
-| `/tenant/invitations` | POST | `maxUses` `expireHours` `targetIdentifier?` | `InvitationDto` | **客服/管理员/所有者**可调用(2026-05-31 起放宽,原为仅管理员/所有者);`inviteType=0(public)`、`1(targeted)`；`status=0(revoked)`、`1(active)`、`3(exhausted)`；权限不足返回 `403 TENANT_PERMISSION_DENIED` |
+| `/tenant/invitations` | POST | `maxUses` `expireHours` `targetIdentifier?` `targetMembershipRole?` | `InvitationDto` | **客服/管理员/所有者**可调用(2026-05-31 起放宽,原为仅管理员/所有者);`inviteType=0(public)`、`1(targeted)`；`status=0(revoked)`、`1(active)`、`3(exhausted)`；权限不足返回 `403 TENANT_PERMISSION_DENIED`。**2026-06-03 起** `targetMembershipRole?`(1=技术/2=客服/3=管理员,省略=普通成员)→接受后直接落地为员工角色;只能签发<自己的角色,否则 `403 INVITATION_ROLE_TOO_HIGH`;请求 `4(Owner)` 返回 `400 INVITATION_ROLE_INVALID` |
 | `/tenant/invitations` | GET | 无 | `InvitationDto[]` | **客服/管理员/所有者**可调用(2026-05-31 起放宽);最多返回最近 100 条 |
 | `/tenant/invitations/{invitationId}` | DELETE | 路径参数：`invitationId` | `invitationId` | **客服/管理员/所有者**可调用(2026-05-31 起放宽);删除动作本质是把状态改为 `0=revoked` |
 | `/tenant/join-requests` | GET | 无 | `JoinRequestDto[]` | 仅管理员/所有者可调用；最多返回最近 100 条 |
@@ -700,6 +700,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `expiresAt` | DateTimeOffset | 过期时间 |
 | `status` | short | 当前状态：`0=revoked`、`1=active`、`3=exhausted` |
 | `createdAt` | DateTimeOffset | 创建时间 |
+| `targetMembershipRole` | short? | **2026-06-03 新增**。员工入职邀请的目标角色：`1=技术支持`、`2=客服`、`3=管理员`；`null`=普通成员邀请（旧行为）。接受邀请后直接落地为该角色 |
 
 ### 4.4 `JoinRequestDto`
 

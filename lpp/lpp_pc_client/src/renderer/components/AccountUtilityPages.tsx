@@ -3,15 +3,19 @@ import { useMemo, useState } from "react";
 import {
   Building2,
   Check,
+  CheckCircle2,
+  Clock3,
   Copy,
   Star,
   FileText,
   Image,
+  Info,
   MessageSquareText,
   Mic,
   PlaySquare,
   Search,
   Tag,
+  TriangleAlert,
 } from "lucide-react";
 import {
   ApiClient,
@@ -19,6 +23,7 @@ import {
   type FavoriteSummaryDto,
   type PlatformJoinResultDto,
   type PlatformTenant,
+  type TenantJoinRequestDto,
   type TenantCodePreviewDto,
 } from "../data/api-client";
 import { useAuthSession, useSetAuthSession } from "../data/auth/auth-store";
@@ -26,8 +31,21 @@ import { pcQueryKeys } from "../data/query-keys";
 import { createTraceId } from "../data/runtime";
 import { requireApiClient } from "../data/runtime";
 import { formatError, formatShortDate } from "../lib/format";
+import { TenantInvitationPanel } from "../spaces/components/TenantInvitationPanel";
 import { useSpaceSwitchController } from "../spaces/hooks/useSpaceSwitchController";
+import {
+  tenantJoinRequestStatus,
+  tenantJoinRequestsPollIntervalMs,
+} from "../spaces/models/tenantJoinReminderModel";
 import { PcAvatar } from "./PcAvatar";
+
+type UtilityNoticeTone = "info" | "success" | "warning" | "error";
+
+interface UtilityNotice {
+  tone: UtilityNoticeTone;
+  title: string;
+  detail?: string;
+}
 
 export function EnterpriseSwitchPage() {
   const queryClient = useQueryClient();
@@ -36,10 +54,15 @@ export function EnterpriseSwitchPage() {
   const [tenantKeyword, setTenantKeyword] = useState("");
   const [joinMessage, setJoinMessage] = useState("");
   const [tenantPreviewStarted, setTenantPreviewStarted] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<UtilityNotice | null>(null);
+  const isPersonalSpace =
+    authSession?.spaceType === 1 ||
+    authSession?.roleLabel === "个人空间" ||
+    authSession?.tenantName === "个人空间" ||
+    isPersonalTenantPlaceholder(authSession?.tenantId);
   const tenantInfoQuery = useQuery({
     queryKey: pcQueryKeys.accountTenant(authSession?.apiBaseUrl, authSession?.tenantToken),
-    enabled: Boolean(authSession),
+    enabled: Boolean(authSession && !isPersonalSpace),
     staleTime: 60_000,
     queryFn: async () => requireApiClient(authSession).getTenantInfo(),
   });
@@ -49,14 +72,37 @@ export function EnterpriseSwitchPage() {
     staleTime: 60_000,
     queryFn: async () => requireApiClient(authSession).getPlatformTenants(),
   });
+  const joinRequestsQuery = useQuery({
+    queryKey: pcQueryKeys.tenantJoinRequests(
+      authSession?.apiBaseUrl,
+      authSession?.platformToken,
+    ),
+    enabled: Boolean(authSession?.platformToken),
+    staleTime: 60_000,
+    refetchInterval: (query) =>
+      tenantJoinRequestsPollIntervalMs(
+        (query.state.data as TenantJoinRequestDto[] | undefined) ?? [],
+      ),
+    refetchIntervalInBackground: true,
+    queryFn: async () => requireApiClient(authSession).getMyTenantJoinRequests(),
+  });
   const tenantInfo = tenantInfoQuery.data;
-  const tenantName = tenantInfo?.tenantName || authSession?.tenantName || "当前企业";
-  const tenantCode = tenantInfo?.tenantCode || authSession?.tenantCode || "--";
-  const tenantId = tenantInfo?.tenantId || authSession?.tenantId || "--";
-  const logoUrl = tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl;
+  const tenantName = isPersonalSpace
+    ? "个人空间"
+    : tenantInfo?.tenantName || authSession?.tenantName || "当前企业";
+  const tenantCode = isPersonalSpace ? "--" : tenantInfo?.tenantCode || authSession?.tenantCode || "--";
+  const tenantId = isPersonalSpace ? "--" : tenantInfo?.tenantId || authSession?.tenantId || "--";
+  const logoUrl = isPersonalSpace ? undefined : tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl;
   const spaces = useMemo(
     () => normalizeSpaces(spacesQuery.data, authSession?.tenants),
     [authSession?.tenants, spacesQuery.data],
+  );
+  const pendingJoinRequests = useMemo(
+    () =>
+      (joinRequestsQuery.data ?? []).filter(
+        (request) => tenantJoinRequestStatus(request) === "pending",
+      ),
+    [joinRequestsQuery.data],
   );
   const spaceByTenantId = useMemo(() => {
     const map = new Map<string, PlatformTenant>();
@@ -64,8 +110,13 @@ export function EnterpriseSwitchPage() {
     return map;
   }, [spaces]);
   const { switchSpaceMutation } = useSpaceSwitchController({
-    onError: (error) => setNotice(`空间切换失败：${formatError(error)}`),
-    onSuccess: () => setNotice("空间已切换"),
+    onError: (error) => setNotice(errorNotice("空间切换失败", formatError(error))),
+    onSuccess: () =>
+      setNotice({
+        tone: "success",
+        title: "空间已切换",
+        detail: "当前会话身份和企业上下文已同步更新。",
+      }),
   });
   const tenantSearchMutation = useMutation({
     mutationFn: async (code: string) => {
@@ -77,7 +128,7 @@ export function EnterpriseSwitchPage() {
     onSuccess: () => {
       setJoinMessage("");
     },
-    onError: (error) => setNotice(`企业码预览失败：${formatError(error)}`),
+    onError: (error) => setNotice(errorNotice("企业码预览失败", formatError(error))),
   });
   const joinMutation = useMutation({
     mutationFn: async (tenant: TenantCodePreviewDto) => {
@@ -94,19 +145,32 @@ export function EnterpriseSwitchPage() {
       setJoinMessage("");
       if (result.accessToken) {
         await applyJoinedTenantSession(result, tenant);
-        setNotice("已加入企业并进入空间");
+        setNotice({
+          tone: "success",
+          title: "已加入企业并进入空间",
+          detail: "当前空间列表和会话身份已刷新。",
+        });
         return;
       }
-      setNotice("申请已提交，等待管理员审核");
+      setNotice({
+        tone: "warning",
+        title: "申请已提交，等待管理员审核",
+        detail: "审核通过后，该企业会出现在可切换空间中。系统会每 5 分钟自动检查一次。",
+      });
+      await joinRequestsQuery.refetch();
       await spacesQuery.refetch();
     },
-    onError: (error) => setNotice(`加入企业失败：${formatError(error)}`),
+    onError: (error) => setNotice(tenantJoinErrorNotice(error)),
   });
   const previewTenant = tenantSearchMutation.data ?? null;
   const handleTenantSearch = () => {
     const code = tenantKeyword.trim();
     if (!code) {
-      setNotice("请输入企业码后再预览");
+      setNotice({
+        tone: "info",
+        title: "请输入企业码后再预览",
+        detail: "先确认企业名称、审批方式和成员状态，再提交加入申请。",
+      });
       return;
     }
     setNotice(null);
@@ -127,7 +191,11 @@ export function EnterpriseSwitchPage() {
       switchSpaceMutation.mutate(refreshedSpace);
       return;
     }
-    setNotice("已是成员，但本地空间列表暂未刷新出该企业，请刷新或重新登录后进入");
+    setNotice({
+      tone: "warning",
+      title: "成员身份已确认，空间列表暂未同步",
+      detail: "请刷新空间列表或重新登录后进入该企业。",
+    });
   };
   const applyJoinedTenantSession = async (
     result: PlatformJoinResultDto,
@@ -182,19 +250,24 @@ export function EnterpriseSwitchPage() {
           <em>{authSession?.lppId ?? authSession?.platformUserId ?? "--"}</em>
         </div>
       </section>
-      {notice && <p className="utility-inline-state">{notice}</p>}
+      {notice && <UtilityNoticeBanner notice={notice} />}
 
       <section className="account-utility-card enterprise-space-panel">
           <header>
             <Building2 size={18} />
             <strong>当前空间</strong>
           </header>
-          {tenantInfoQuery.isLoading && <InlineState text="正在读取企业信息..." />}
-          {tenantInfoQuery.error && (
+          {!isPersonalSpace && tenantInfoQuery.isLoading && <InlineState text="正在读取企业信息..." />}
+          {!isPersonalSpace && tenantInfoQuery.error && (
             <InlineState tone="error" text={`企业信息加载失败：${formatError(tenantInfoQuery.error)}`} />
           )}
           <div className="enterprise-current-card">
-            <PcAvatar avatarUrl={logoUrl} className="tenant-logo large" kind="tenant" name={tenantName} />
+            <PcAvatar
+              avatarUrl={logoUrl}
+              className="tenant-logo large"
+              kind={isPersonalSpace ? "person" : "tenant"}
+              name={isPersonalSpace ? authSession?.displayName ?? "我" : tenantName}
+            />
             <div>
               <strong>{tenantName}</strong>
               <span>{tenantCode}</span>
@@ -203,8 +276,8 @@ export function EnterpriseSwitchPage() {
           </div>
           <div className="enterprise-current-meta">
             <InfoLine label="空间码" value={tenantCode} copyable />
-            <InfoLine label="空间 ID" value={tenantId} copyable={tenantId !== "--"} />
-            <InfoLine label="当前角色" value={authSession?.roleLabel || "成员"} />
+            <InfoLine label="空间 ID" value={tenantId} copyable={!isPersonalSpace && tenantId !== "--"} />
+            <InfoLine label="当前角色" value={isPersonalSpace ? "个人空间" : authSession?.roleLabel || "成员"} />
           </div>
 
           <div className="space-panel-section">
@@ -285,6 +358,11 @@ export function EnterpriseSwitchPage() {
           </form>
           {!authSession?.platformToken && (
             <InlineState tone="error" text="当前会话缺少平台 Token，请重新登录后预览和加入企业。" />
+          )}
+          {pendingJoinRequests.length > 0 && (
+            <InlineState
+              text={`已有 ${pendingJoinRequests.length} 个加入申请待审核，系统会每 5 分钟自动检查一次。`}
+            />
           )}
           {tenantSearchMutation.error && (
             <InlineState tone="error" text={`企业码预览失败：${formatError(tenantSearchMutation.error)}`} />
@@ -394,6 +472,7 @@ export function EnterpriseSwitchPage() {
             </div>
           )}
           </div>
+          <TenantInvitationPanel isPersonalSpace={isPersonalSpace} />
         </section>
     </main>
   );
@@ -534,6 +613,10 @@ function roleLabel(role?: number) {
   return "成员";
 }
 
+function isPersonalTenantPlaceholder(tenantId?: string | null) {
+  return tenantId === "11111111-1111-1111-1111-111111111111";
+}
+
 function normalizeFavorites(data?: FavoriteItemDto[] | { items?: FavoriteItemDto[] }) {
   if (Array.isArray(data)) return data;
   return data?.items ?? [];
@@ -572,8 +655,62 @@ function ChevronHint() {
   return <span className="space-page-chevron">进入</span>;
 }
 
+function UtilityNoticeBanner({ notice }: { notice: UtilityNotice }) {
+  const Icon =
+    notice.tone === "success"
+      ? CheckCircle2
+      : notice.tone === "warning"
+        ? Clock3
+        : notice.tone === "error"
+          ? TriangleAlert
+          : Info;
+
+  return (
+    <div className={`utility-notice ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>
+      <span className="utility-notice-icon" aria-hidden="true">
+        <Icon size={17} />
+      </span>
+      <span className="utility-notice-copy">
+        <strong>{notice.title}</strong>
+        {notice.detail && <em>{notice.detail}</em>}
+      </span>
+    </div>
+  );
+}
+
 function InlineState({ text, tone = "muted" }: { text: string; tone?: "muted" | "error" }) {
   return <p className={`utility-inline-state ${tone}`}>{text}</p>;
+}
+
+function errorNotice(title: string, detail: string): UtilityNotice {
+  return {
+    tone: "error",
+    title,
+    detail,
+  };
+}
+
+function tenantJoinErrorNotice(error: unknown): UtilityNotice {
+  const message = formatError(error);
+  if (isTenantJoinPendingMessage(message)) {
+    return {
+      tone: "warning",
+      title: "申请已在审核中",
+      detail: "你已提交过加入申请，管理员审核通过后会出现在可切换空间中。",
+    };
+  }
+  if (message.includes("你已在该企业中")) {
+    return {
+      tone: "info",
+      title: "你已在该企业中",
+      detail: "请从可切换空间进入，或刷新空间列表后再试。",
+    };
+  }
+  return errorNotice("加入企业失败", message);
+}
+
+function isTenantJoinPendingMessage(message: string) {
+  return message.includes("已提交加入申请") || message.includes("等待管理员审核");
 }
 
 function InfoLine({

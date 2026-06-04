@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ApiError,
   ApiClient,
   type CaptchaChallenge,
+  type PlatformInvitationPreviewDto,
   type PlatformLoginResult,
   type PlatformTenant,
   type TenantAuthResult,
 } from "../data/api-client";
 import {
   AuthAdvancedSettings,
+  AuthInvitationField,
   AuthModeSwitch,
   AuthSpacePicker,
   AuthSubmitButton,
@@ -17,13 +20,21 @@ import {
 } from "./auth/AuthPageParts";
 import {
   createAuthSpaceChoices,
+  createInvitationPreviewErrorView,
+  createInvitationPreviewLoadingView,
+  createInvitationPreviewView,
   createRegisterContactPayload,
   getAuthTenantRoleLabel,
   inferLoginType,
   isCaptchaRequired,
   mapAuthErrorMessage,
+  normalizeInvitationCode,
+  registerPhoneCountryOptions,
   selectAutoTenantId,
+  shouldContinueAfterInvitationPreviewError,
   validateRegisterForm,
+  type InvitationPreviewView,
+  type RegisterContactType,
   type AuthMode,
 } from "../data/auth/auth-flow-model";
 import { registerAvatarOptions } from "../data/auth/register-avatar-options";
@@ -37,6 +48,11 @@ type PendingLogin = {
   mode: AuthMode;
 };
 
+type InvitationFlowContext = {
+  code: string;
+  preview: PlatformInvitationPreviewDto | null;
+};
+
 export function LoginPage() {
   const setAuthSession = useSetAuthSession();
   const apiBaseUrlTouched = useRef(false);
@@ -47,9 +63,13 @@ export function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
+  const [registerContactType, setRegisterContactType] = useState<RegisterContactType>("email");
+  const [registerCountryDialCode, setRegisterCountryDialCode] = useState("+86");
   const [registerContact, setRegisterContact] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirm, setRegisterConfirm] = useState("");
+  const [invitationCode, setInvitationCode] = useState("");
+  const [invitationPreview, setInvitationPreview] = useState<InvitationPreviewView | null>(null);
   const [selectedRegisterAvatarUrl, setSelectedRegisterAvatarUrl] = useState(
     () => registerAvatarOptions[0]?.avatarUrl ?? "",
   );
@@ -66,10 +86,12 @@ export function LoginPage() {
       validateRegisterForm({
         displayName: registerName,
         contact: registerContact,
+        contactType: registerContactType,
+        countryDialCode: registerCountryDialCode,
         password: registerPassword,
         confirmPassword: registerConfirm,
       }),
-    [registerConfirm, registerContact, registerName, registerPassword],
+    [registerConfirm, registerContact, registerContactType, registerCountryDialCode, registerName, registerPassword],
   );
   const canSubmit = useMemo(() => {
     if (!apiBaseUrl.trim() || pendingLogin) return false;
@@ -90,6 +112,7 @@ export function LoginPage() {
     () => (pendingLogin ? createAuthSpaceChoices(pendingLogin.login) : []),
     [pendingLogin],
   );
+  const hasInvitation = Boolean(normalizeInvitationCode(invitationCode));
 
   useEffect(() => {
     const unsubscribe = siteLineManager.subscribe(() => {
@@ -100,6 +123,40 @@ export function LoginPage() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const code = normalizeInvitationCode(invitationCode);
+    if (!code) {
+      setInvitationPreview(null);
+      return;
+    }
+    if (code.length < 6) {
+      setInvitationPreview(null);
+      return;
+    }
+    let active = true;
+    setInvitationPreview(createInvitationPreviewLoadingView());
+    const timer = window.setTimeout(() => {
+      const baseUrl = normalizeBaseUrl(apiBaseUrl);
+      new ApiClient({
+        baseUrl,
+        traceId: createTraceId("pc-invitation-preview"),
+      })
+        .getPlatformInvitationPreview(code)
+        .then((preview) => {
+          if (!active) return;
+          setInvitationPreview(createInvitationPreviewView(preview));
+        })
+        .catch((previewError) => {
+          if (!active) return;
+          setInvitationPreview(createInvitationPreviewErrorView(previewError));
+        });
+    }, 450);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [apiBaseUrl, invitationCode]);
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
@@ -144,6 +201,7 @@ export function LoginPage() {
     setNotice(null);
     try {
       const baseUrl = normalizeBaseUrl(apiBaseUrl);
+      const invitation = await prepareInvitation(baseUrl);
       const login = await new ApiClient({
         baseUrl,
         traceId: createTraceId("pc-login"),
@@ -154,7 +212,7 @@ export function LoginPage() {
         captchaToken: captchaInput.captchaToken,
         captchaAnswer: captchaInput.captchaAnswer,
       });
-      await resolveLoginResult(baseUrl, login, "login");
+      await resolveLoginResult(baseUrl, login, "login", invitation);
     } catch (err) {
       await handleAuthError(err, "login", captchaInput.allowAutoCaptcha);
     } finally {
@@ -173,7 +231,11 @@ export function LoginPage() {
     setNotice(null);
     try {
       const baseUrl = normalizeBaseUrl(apiBaseUrl);
-      const contactPayload = createRegisterContactPayload(registerContact);
+      const invitation = await prepareInvitation(baseUrl);
+      const contactPayload = createRegisterContactPayload(registerContact, {
+        type: registerContactType,
+        countryDialCode: registerCountryDialCode,
+      });
       const client = new ApiClient({
         baseUrl,
         traceId: createTraceId("pc-register"),
@@ -187,16 +249,16 @@ export function LoginPage() {
         captchaAnswer: captchaInput.captchaAnswer,
         verificationCode: null,
       });
-      setNotice("注册成功，正在进入账号");
+      setNotice(invitation ? "注册成功，正在接受企业邀请" : "注册成功，正在进入账号");
       const login = await new ApiClient({
         baseUrl,
         traceId: createTraceId("pc-register-login"),
       }).platformLogin({
-        identifier: registerContact.trim(),
+        identifier: contactPayload.email ?? contactPayload.mobile ?? registerContact.trim(),
         password: registerPassword,
-        loginType: inferLoginType(registerContact),
+        loginType: inferLoginType(contactPayload.email ?? contactPayload.mobile ?? registerContact),
       });
-      await resolveLoginResult(baseUrl, login, "register");
+      await resolveLoginResult(baseUrl, login, "register", invitation);
     } catch (err) {
       await handleAuthError(err, "register", captchaInput.allowAutoCaptcha);
     } finally {
@@ -208,9 +270,14 @@ export function LoginPage() {
     baseUrl: string,
     login: PlatformLoginResult,
     sourceMode: AuthMode,
+    invitation: InvitationFlowContext | null = null,
   ) => {
     setCaptcha(null);
     setCaptchaAnswer("");
+    if (invitation?.code && login.accessToken && !login.platformToken) {
+      setError("当前登录结果无法接受邀请码，请重新登录后重试");
+      return;
+    }
     if (login.accessToken) {
       await applyDirectSession(baseUrl, login);
       return;
@@ -221,6 +288,10 @@ export function LoginPage() {
           ? "注册成功，但当前账号还没有可进入空间，请联系管理员加入企业后再登录"
           : "登录成功，但没有可进入空间，请确认账号已加入企业",
       );
+      return;
+    }
+    if (invitation?.code) {
+      await acceptInvitation(baseUrl, login, invitation);
       return;
     }
     const selectedTenantId = selectAutoTenantId(login);
@@ -234,6 +305,62 @@ export function LoginPage() {
       return;
     }
     await enterPersonalSpace(baseUrl, login, sourceMode);
+  };
+
+  const prepareInvitation = async (baseUrl: string): Promise<InvitationFlowContext | null> => {
+    const code = normalizeInvitationCode(invitationCode);
+    if (!code) return null;
+    try {
+      const preview = await new ApiClient({
+        baseUrl,
+        traceId: createTraceId("pc-invitation-preview"),
+      }).getPlatformInvitationPreview(code);
+      setInvitationPreview(createInvitationPreviewView(preview));
+      if (preview.tenantName) {
+        setNotice(`将加入：${preview.tenantName}`);
+      }
+      return { code, preview };
+    } catch (previewError) {
+      if (!shouldContinueAfterInvitationPreviewError(previewError)) {
+        throw previewError;
+      }
+      setInvitationPreview(createInvitationPreviewErrorView(previewError));
+      setNotice("登录后将尝试接受邀请码");
+      return { code, preview: null };
+    }
+  };
+
+  const acceptInvitation = async (
+    baseUrl: string,
+    login: PlatformLoginResult,
+    invitation: InvitationFlowContext,
+  ) => {
+    if (!login.platformToken) throw new Error("missing platform token");
+    try {
+      setNotice("正在接受企业邀请");
+      const tenant = await new ApiClient({
+        baseUrl,
+        platformToken: login.platformToken,
+        traceId: createTraceId("pc-invitation-accept"),
+      }).acceptPlatformInvitation(invitation.code);
+      setNotice("已加入企业，正在进入工作台");
+      await applySelectedTenantSession(baseUrl, login, tenant, null);
+    } catch (err) {
+      if (
+        err instanceof ApiError &&
+        err.code === "TENANT_ALREADY_MEMBER" &&
+        invitation.preview?.tenantId
+      ) {
+        setNotice("你已在该企业中，角色不会因邀请码变更");
+        await selectTenantSpace({
+          baseUrl,
+          login,
+          tenantId: invitation.preview.tenantId,
+        });
+        return;
+      }
+      throw err;
+    }
   };
 
   const handleSelectTenant = async (selectedTenantId: string) => {
@@ -333,7 +460,7 @@ export function LoginPage() {
       platformToken: login.platformToken,
       platformRefreshToken: login.platformRefreshToken,
       refreshToken: login.refreshToken,
-      tenantId: login.tenantId ?? tenantInfo?.tenantId,
+      tenantId: isPersonal ? undefined : login.tenantId ?? tenantInfo?.tenantId,
       tenantCode: isPersonal ? undefined : tenantInfo?.tenantCode,
       tenantName: isPersonal ? "个人空间" : tenantInfo?.tenantName,
       tenantLogoUrl: isPersonal ? undefined : tenantInfo?.logoUrl,
@@ -369,7 +496,7 @@ export function LoginPage() {
       platformToken: login.platformToken,
       platformRefreshToken: login.platformRefreshToken,
       refreshToken: tenant.refreshToken,
-      tenantId: tenant.tenantId ?? currentTenant?.tenantId ?? selectedTenant?.tenantId,
+      tenantId: isPersonal ? undefined : tenant.tenantId ?? currentTenant?.tenantId ?? selectedTenant?.tenantId,
       tenantCode: isPersonal ? undefined : currentTenant?.tenantCode ?? selectedTenant?.tenantCode,
       tenantName: isPersonal
         ? "个人空间"
@@ -382,8 +509,10 @@ export function LoginPage() {
       avatarUrl: profile?.avatarUrl ?? tenant.avatarUrl,
       userType: profile?.userType ?? login.userType ?? undefined,
       spaceType: tenant.spaceContext?.spaceType ?? (isPersonal ? 1 : 2),
-      membershipRole: isPersonal ? undefined : selectedTenant?.membershipRole,
-      roleLabel: isPersonal ? "个人空间" : getAuthTenantRoleLabel(selectedTenant?.membershipRole),
+      membershipRole: isPersonal ? undefined : tenant.membershipRole ?? selectedTenant?.membershipRole,
+      roleLabel: isPersonal
+        ? "个人空间"
+        : getAuthTenantRoleLabel(tenant.membershipRole ?? selectedTenant?.membershipRole),
       tenants: login.tenants,
     });
   };
@@ -428,17 +557,32 @@ export function LoginPage() {
             avatarOptions={registerAvatarOptions}
             confirmPassword={registerConfirm}
             contact={registerContact}
+            contactType={registerContactType}
+            countryDialCode={registerCountryDialCode}
             displayName={registerName}
             onAvatarChange={setSelectedRegisterAvatarUrl}
             onConfirmPasswordChange={setRegisterConfirm}
             onContactChange={setRegisterContact}
+            onContactTypeChange={(value) => {
+              setRegisterContactType(value);
+              setRegisterContact("");
+            }}
+            onCountryDialCodeChange={setRegisterCountryDialCode}
             onDisplayNameChange={setRegisterName}
             onPasswordChange={setRegisterPassword}
             onSubmit={() => void submitForm()}
             password={registerPassword}
+            phoneCountryOptions={registerPhoneCountryOptions}
             selectedAvatarUrl={selectedRegisterAvatarUrl}
           />
         )}
+
+        <AuthInvitationField
+          code={invitationCode}
+          onChange={setInvitationCode}
+          onSubmit={() => void submitForm()}
+          preview={invitationPreview}
+        />
 
         {captcha && (
           <CaptchaField
@@ -465,6 +609,7 @@ export function LoginPage() {
         <AuthSubmitButton
           captchaVisible={Boolean(captcha)}
           disabled={!canSubmit || submitting}
+          hasInvitation={hasInvitation}
           mode={mode}
           onSubmit={() => void submitForm()}
           submitting={submitting}

@@ -56,6 +56,21 @@ describe("architecture boundaries", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps electron-log behind the main app logging facade", () => {
+    const allowedImporter = "src/main/app-logging.ts";
+    const violations = files.flatMap((file) =>
+      importsOf(file).flatMap((specifier) =>
+        specifier === "electron-log" || specifier.startsWith("electron-log/")
+          ? relative(file) === allowedImporter
+            ? []
+            : [`${relative(file)} imports ${specifier} instead of using main app logging facade`]
+          : [],
+      ),
+    );
+
+    expect(violations).toEqual([]);
+  });
+
   it("keeps shared modules free of renderer, main and preload dependencies", () => {
     const violations = files
       .filter((file) => isUnder(file, "src/shared"))

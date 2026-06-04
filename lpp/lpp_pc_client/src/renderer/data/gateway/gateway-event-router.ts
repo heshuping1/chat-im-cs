@@ -10,6 +10,7 @@ import {
   isCustomerServiceQueueEventName,
   isForceLogoutEventName,
   isImMessageEventName,
+  isTenantJoinRequestEventName,
 } from "./gateway-event-registry";
 import {
   invalidateImAvatarGatewayQueries,
@@ -155,6 +156,30 @@ export function createGatewayEventRouter(options: {
       });
       queryClient.clear();
       clearAuthSession();
+      return;
+    }
+
+    if (isTenantJoinRequestEventName(eventName)) {
+      recordGatewayReminderDiagnostic({
+        eventName,
+        payload,
+        phase: "routed",
+        route: "tenant-join-request",
+        scopeKey,
+        source: "gateway-router",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.tenantJoinRequests(
+          session.apiBaseUrl,
+          session.platformToken,
+        ),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.accountSpaces(
+          session.apiBaseUrl,
+          session.platformToken,
+        ),
+      });
       return;
     }
 

@@ -34,6 +34,11 @@ import {
   readSecureAuthSession,
   saveSecureAuthSession,
 } from './auth-session-storage.js';
+import {
+  configureDefaultMainAppLogging,
+  mainAppLogBackend,
+  recordDefaultMainAppLog,
+} from './app-logging.js';
 import { registerDesktopFileHandlers } from './desktop-file-handlers.js';
 import { DiagnosticsJsonlWriter } from './diagnostics-jsonl-writer.js';
 import { showDesktopNotification } from './desktop-notification.js';
@@ -43,6 +48,7 @@ import {
   installElectronProcessDiagnostics,
   mergeElectronRuntimeDiagnosticsPayload,
   recordRendererProcessGone,
+  setElectronRuntimeDiagnosticLogger,
 } from './runtime-diagnostics.js';
 import { selectScreenshotRegion } from './screenshot-selection-window.js';
 import {
@@ -72,6 +78,9 @@ if (process.platform === 'win32') {
   app.setAppUserModelId(appUserModelIdForProfile(null));
 }
 const appInstanceProfile = configureAppInstanceProfile(app);
+const diagnosticsDir = join(app.getPath('userData'), 'diagnostics');
+configureDefaultMainAppLogging({ diagnosticsDir, isDev });
+setElectronRuntimeDiagnosticLogger(mainAppLogBackend);
 const appTitle = formatProfileWindowTitle(
   appDisplayName,
   appInstanceProfile.profileId,
@@ -382,7 +391,6 @@ async function recordMessageReminderDiagnostic(payload: MessageReminderDiagnosti
 }
 
 function diagnosticsWriter(fileName: string, maxLines: number) {
-  const diagnosticsDir = join(app.getPath('userData'), 'diagnostics');
   const filePath = join(diagnosticsDir, fileName);
   const existing = diagnosticsWriters.get(fileName);
   if (existing) return existing;
@@ -394,6 +402,18 @@ function diagnosticsWriter(fileName: string, maxLines: number) {
 app.whenReady().then(() => {
   if (!singleInstanceLock) return;
   installElectronAppDiagnostics(app);
+  recordDefaultMainAppLog({
+    context: {
+      appVersion: app.getVersion(),
+      isPackaged: app.isPackaged,
+      platform: process.platform,
+      profileId: appInstanceProfile.profileId ?? 'default',
+    },
+    event: 'app.ready',
+    module: 'electron-main',
+    phase: 'startup',
+    result: 'ok',
+  });
   if (process.platform === 'darwin' && !app.isPackaged) {
     app.dock?.setIcon(devDockIconPath);
   }

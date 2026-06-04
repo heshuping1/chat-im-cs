@@ -10,6 +10,7 @@ import {
   SelectRow,
   SwitchRow,
 } from "../settings/components/SettingsRows";
+import { settingRowProps } from "../settings/models/settingsCatalog";
 
 type SettingKey = keyof PcSettings;
 
@@ -59,8 +60,7 @@ export function PrivacySettingsSection({
         />
       )}
       <SwitchRow
-        label="允许通过手机号搜索"
-        desc="其他用户可通过手机号找到你。"
+        {...settingRowProps("allowMobileSearch")}
         checked={data?.searchableByMobile ?? pcSettings.allowMobileSearch}
         onChange={(value) => {
           setSetting("allowMobileSearch", value);
@@ -68,8 +68,7 @@ export function PrivacySettingsSection({
         }}
       />
       <SwitchRow
-        label="允许通过 LPP 号搜索"
-        desc="其他用户可通过 LPP 号找到你。"
+        {...settingRowProps("allowLppSearch")}
         checked={data?.searchableByLppId ?? pcSettings.allowLppSearch}
         onChange={(value) => {
           setSetting("allowLppSearch", value);
@@ -77,8 +76,7 @@ export function PrivacySettingsSection({
         }}
       />
       <SelectRow
-        label="加我为好友"
-        desc="控制陌生人向你发起好友申请的范围。"
+        {...settingRowProps("friendRequestVerification")}
         value={friendRequestLabel(data?.allowFriendRequest, pcSettings.friendRequestVerification)}
         options={["所有人", "有共同好友的人", "不允许"]}
         onChange={(value) => {
@@ -87,20 +85,13 @@ export function PrivacySettingsSection({
         }}
       />
       <SelectRow
-        label="个人资料可见性"
-        desc="控制资料页对外展示范围。"
+        {...settingRowProps("profileVisibility")}
         value={profileVisibilityLabel(data?.profileVisibility, pcSettings.profileVisibility)}
         options={["所有人", "仅好友", "不允许"]}
         onChange={(value) => {
           setSetting("profileVisibility", value);
           updatePrivacy.mutate({ profileVisibility: profileVisibilityValue(value) });
         }}
-      />
-      <SwitchRow
-        label="敏感信息脱敏"
-        desc="手机号、邮箱、证件、资金等敏感字段默认脱敏显示。"
-        checked={pcSettings.sensitiveMasking}
-        onChange={(value) => setSetting("sensitiveMasking", value)}
       />
       <BlacklistBlock actions={actions} />
     </>
@@ -116,6 +107,7 @@ function BlacklistBlock({
     queryClient: QueryClient;
   };
 }) {
+  const blocklistRow = settingRowProps("blocklist");
   const blocklistQuery = useQuery({
     queryKey: pcQueryKeys.accountBlocklist(
       actions.authSession?.apiBaseUrl,
@@ -143,7 +135,7 @@ function BlacklistBlock({
   return (
     <div className="settings-sub-card">
       <header>
-        <strong>黑名单</strong>
+        <strong>{blocklistRow.label}</strong>
         <span>{list.length} 人</span>
       </header>
       {blocklistQuery.isLoading && <InlineSettingsState text="正在读取黑名单..." />}

@@ -1,0 +1,209 @@
+.tenant-invitation-panel {
+  gap: 12px;
+}
+
+.tenant-invitation-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.86fr) minmax(0, 1.14fr);
+  gap: 14px;
+}
+
+.tenant-invitation-form,
+.tenant-invitation-side,
+.tenant-invitation-created,
+.tenant-invitation-item {
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.tenant-invitation-form {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+}
+
+.tenant-invitation-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.tenant-invitation-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.tenant-invitation-field span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tenant-invitation-field input,
+.tenant-invitation-field select {
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--pc-border);
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+  color: var(--pc-text);
+  font: inherit;
+  padding: 0 10px;
+}
+
+.tenant-invitation-role-hint,
+.tenant-invitation-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+  padding: 9px 10px;
+}
+
+.tenant-invitation-warning {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.tenant-invitation-form > button,
+.tenant-invitation-created button,
+.tenant-invitation-item button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 8px;
+  background: rgba(236, 253, 245, 0.95);
+  color: var(--pc-primary-strong);
+  font-weight: 850;
+  padding: 0 12px;
+}
+
+.tenant-invitation-form > button:disabled,
+.tenant-invitation-created button:disabled,
+.tenant-invitation-item button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.tenant-invitation-side {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+}
+
+.tenant-invitation-created {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+  border-color: rgba(16, 185, 129, 0.3);
+  background: #f7fffb;
+  padding: 10px;
+}
+
+.tenant-invitation-created strong,
+.tenant-invitation-created span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-invitation-created span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tenant-invitation-created button {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+}
+
+.tenant-invitation-list {
+  display: grid;
+  max-height: min(360px, 44vh);
+  gap: 8px;
+  overflow: auto;
+}
+
+.tenant-invitation-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 10px;
+}
+
+.tenant-invitation-item div,
+.tenant-invitation-item > span {
+  min-width: 0;
+}
+
+.tenant-invitation-item strong,
+.tenant-invitation-item div span,
+.tenant-invitation-item > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-invitation-item div span,
+.tenant-invitation-item > span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.tenant-invitation-code {
+  grid-column: 1 / -1;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.tenant-invitation-item em {
+  grid-column: 2;
+  border-radius: 999px;
+  background: #eef8f4;
+  color: #047857;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+  padding: 4px 8px;
+}
+
+.tenant-invitation-actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tenant-invitation-actions button {
+  min-height: 30px;
+}
+
+.tenant-invitation-actions button:last-child {
+  border-color: rgba(244, 63, 94, 0.2);
+  background: #fff1f2;
+  color: #be123c;
+}

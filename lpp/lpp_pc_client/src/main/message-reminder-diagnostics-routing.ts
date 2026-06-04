@@ -9,13 +9,17 @@ export interface ReminderDiagnosticsTarget {
     | 'message-delivery.jsonl'
     | 'message-gap-sync.jsonl'
     | 'message-source.jsonl'
-    | 'message-trace.jsonl';
+    | 'message-trace.jsonl'
+    | 'auth-invitation.jsonl';
   maxLines: number;
 }
 
 export function reminderDiagnosticsTarget(
   payload: MessageReminderDiagnosticPayload,
 ): ReminderDiagnosticsTarget {
+  if (payload.event.startsWith('auth.invitation.')) {
+    return { fileName: 'auth-invitation.jsonl', maxLines: 1200 };
+  }
   if (payload.event === 'gateway.health') {
     return { fileName: 'gateway-health.jsonl', maxLines: 1200 };
   }

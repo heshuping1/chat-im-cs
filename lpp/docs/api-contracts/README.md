@@ -160,6 +160,7 @@ flowchart TD
 |---|---|
 | 创建租户 | 当前统一由管理后台承载；APP / 普通平台用户入口已禁用；企业绑定模式下返回 `TENANT_CREATION_DISABLED` |
 | 邀请加入 / 申请加入 | 两种加入租户方式；默认都需要租户管理员或所有者审批成员加入；企业绑定模式下返回 `JOIN_DISABLED_IN_BINDING_MODE`。邀请码的生成/查看/撤销自 2026-05-31 起 **客服(2)及以上** 即可(原为管理员/所有者) |
+| **员工入职邀请**(2026-06-03) | 创建邀请码时可带 `targetMembershipRole`(1=技术/2=客服/3=管理员)，接受后**直接落地为该员工角色**，无需所有者事后改角色。防提权:只能签发<自己的角色，Owner(4) 永不可经邀请码授予。详见 [client-api.md §4.3](client-api.md) 与 [tenant-join-invite-permissions §4.4](tenant-join-invite-permissions-2026-05-31.md) |
 | 邀请预览 / 企业码预览 / 撤销申请 | 邀请页可预览组织名称、组织说明等信息(`GET /invitations/{code}`)；企业码可凭 `GET /tenants/by-code/{code}` 预览企业信息后再加入(不受 `isListed` 限制)；申请人可主动撤销待审批申请 |
 | 成员与角色管理 | 成员、管理员、所有者 |
 | 退出组织 | 普通成员/管理员可主动退出；最后一个所有者不可直接退出；企业绑定模式下返回 `LEAVE_DISABLED_IN_BINDING_MODE` |

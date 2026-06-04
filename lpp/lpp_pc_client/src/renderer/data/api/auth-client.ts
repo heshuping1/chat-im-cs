@@ -1,8 +1,10 @@
 import { ApiBaseClient } from "./base";
+import { recordAuthInvitationGatewayDiagnostic } from "./auth-invitation-gateway-diagnostics";
 import { endpointPlan } from "./endpoints";
 import { getAppInstanceProfile } from "../app-instance/app-instance";
 import type {
   CaptchaChallenge,
+  PlatformInvitationPreviewDto,
   PlatformLoginResult,
   PlatformRegisterRequest,
   PlatformRegisterResult,
@@ -53,6 +55,88 @@ export class AuthApiClient extends ApiBaseClient {
     });
   }
 
+  async getPlatformInvitationPreview(code: string) {
+    const normalizedCode = normalizeCode(code);
+    const endpoint = endpointPlan.platformInvitation;
+    recordAuthInvitationGatewayDiagnostic({
+      code: normalizedCode,
+      endpointTemplate: endpoint,
+      hasPlatformToken: Boolean(this.options.platformToken),
+      method: "GET",
+      phase: "request",
+      route: "platform-invitation",
+    });
+    try {
+      const response = await this.platformRequest<PlatformInvitationPreviewDto>(
+        endpoint.replace("{code}", encodeURIComponent(normalizedCode)),
+      );
+      recordAuthInvitationGatewayDiagnostic({
+        code: normalizedCode,
+        endpointTemplate: endpoint,
+        hasPlatformToken: Boolean(this.options.platformToken),
+        method: "GET",
+        phase: "response",
+        response,
+        route: "platform-invitation",
+      });
+      return response;
+    } catch (error) {
+      recordAuthInvitationGatewayDiagnostic({
+        code: normalizedCode,
+        endpointTemplate: endpoint,
+        error,
+        hasPlatformToken: Boolean(this.options.platformToken),
+        method: "GET",
+        phase: "response",
+        route: "platform-invitation",
+      });
+      throw error;
+    }
+  }
+
+  async acceptPlatformInvitation(code: string) {
+    const normalizedCode = normalizeCode(code);
+    const endpoint = endpointPlan.platformInvitationAccept;
+    recordAuthInvitationGatewayDiagnostic({
+      code: normalizedCode,
+      endpointTemplate: endpoint,
+      hasPlatformToken: Boolean(this.options.platformToken),
+      method: "POST",
+      phase: "request",
+      route: "platform-invitation-accept",
+    });
+    try {
+      const response = await this.platformRequest<TenantAuthResult>(
+        endpoint.replace("{code}", encodeURIComponent(normalizedCode)),
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+      );
+      recordAuthInvitationGatewayDiagnostic({
+        code: normalizedCode,
+        endpointTemplate: endpoint,
+        hasPlatformToken: Boolean(this.options.platformToken),
+        method: "POST",
+        phase: "response",
+        response,
+        route: "platform-invitation-accept",
+      });
+      return response;
+    } catch (error) {
+      recordAuthInvitationGatewayDiagnostic({
+        code: normalizedCode,
+        endpointTemplate: endpoint,
+        error,
+        hasPlatformToken: Boolean(this.options.platformToken),
+        method: "POST",
+        phase: "response",
+        route: "platform-invitation-accept",
+      });
+      throw error;
+    }
+  }
+
   generateCaptcha() {
     return this.request<CaptchaChallenge>(endpointPlan.captchaGenerate, {
       method: "POST",
@@ -80,4 +164,8 @@ export class AuthApiClient extends ApiBaseClient {
 
 function optionalText(value: string | null | undefined) {
   return value?.trim() || null;
+}
+
+function normalizeCode(code: string) {
+  return code.trim();
 }

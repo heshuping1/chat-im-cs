@@ -63,6 +63,18 @@ export interface PlatformRegisterResult extends Partial<PlatformLoginResult> {
   tenantId?: string;
 }
 
+export interface PlatformInvitationPreviewDto {
+  tenantId?: string;
+  tenantName?: string;
+  tenantCode?: string | null;
+  logoUrl?: string | null;
+  tenantDescription?: string | null;
+  industry?: string | null;
+  expiresAt?: string | null;
+  alreadyMember?: boolean;
+  identityMatched?: boolean;
+}
+
 export interface CaptchaChallenge {
   token: string;
   question: string;
@@ -76,6 +88,7 @@ export interface TenantAuthResult {
   lppId: string;
   displayName: string;
   avatarUrl?: string | null;
+  membershipRole?: number;
   accessToken: string;
   refreshToken?: string;
   expiresIn?: number;
@@ -120,6 +133,35 @@ export interface TenantInfoDto {
   tenantCode?: string;
   tenantName?: string;
   logoUrl?: string | null;
+}
+
+export interface CreateTenantInvitationRequest {
+  maxUses: number;
+  expireHours: number;
+  targetIdentifier?: string | null;
+  targetMembershipRole?: number | null;
+}
+
+export interface TenantInvitationDto {
+  invitationId?: string;
+  code?: string | null;
+  token?: string | null;
+  inviteCode?: string | null;
+  invitationCode?: string | null;
+  inviteUrl?: string | null;
+  invitationUrl?: string | null;
+  url?: string | null;
+  targetIdentifier?: string | null;
+  targetMembershipRole?: number | null;
+  maxUses?: number | null;
+  usedCount?: number | null;
+  remainingUses?: number | null;
+  expireHours?: number | null;
+  expiresAt?: string | null;
+  expiredAt?: string | null;
+  createdAt?: string | null;
+  status?: string | number | null;
+  createdByDisplayName?: string | null;
 }
 
 export interface AccountDeviceDto {
@@ -262,6 +304,24 @@ export interface PlatformJoinResultDto {
   expiresIn?: number;
   message?: string;
   requestId?: string;
+}
+
+export interface TenantJoinRequestDto {
+  requestId?: string;
+  tenantId?: string;
+  tenantName?: string;
+  name?: string;
+  tenantCode?: string | null;
+  logoUrl?: string | null;
+  status?: string | number | null;
+  message?: string | null;
+  reason?: string | null;
+  rejectReason?: string | null;
+  reviewReason?: string | null;
+  submittedAt?: string | null;
+  createdAt?: string | null;
+  reviewedAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface KnowledgeBaseDto {

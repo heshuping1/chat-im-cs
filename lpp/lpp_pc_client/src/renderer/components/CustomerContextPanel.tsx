@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { DragEvent } from "react";
-import { GripVertical, LibraryBig, MessageSquareText, Pin, PinOff } from "lucide-react";
+import { GripVertical, LibraryBig, MessageSquareText, Pin, PinOff, UserRound } from "lucide-react";
 import {
   isTerminalCustomerServiceThreadStatus,
   normalizeCustomerServiceThreadType,
@@ -14,6 +14,8 @@ import { createApiClient } from "../data/runtime";
 import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import { useActiveThreadId } from "../data/workspace-ui/workspace-ui-store";
 import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
+
+const customerInfoEntryIcon = "/customer-info-entry.svg";
 
 export function useCustomerContextPanelModel() {
   const session = useAuthSession();
@@ -38,6 +40,10 @@ export function useCustomerContextPanelModel() {
   });
 
   const selectedThread = useMemo(() => {
+    if (!selectedThreadId) return undefined;
+    const normalizedSelectedThreadId = selectedThreadId.trim();
+    if (!normalizedSelectedThreadId) return undefined;
+
     const currentThreads = [
       ...(threadsQuery.data?.queueItems ?? []),
       ...(threadsQuery.data?.activeItems ?? []),
@@ -47,12 +53,8 @@ export function useCustomerContextPanelModel() {
     const historyThreads = (historyQuery.data?.items ?? [])
       .map(staffServiceHistoryItemToThread)
       .filter((thread) => thread.threadType === "temp_session");
-    return (
-      [...currentThreads, ...historyThreads].find(
-        (thread) => thread.threadId === selectedThreadId,
-      ) ??
-      currentThreads[0] ??
-      historyThreads[0]
+    return [...currentThreads, ...historyThreads].find(
+      (thread) => thread.threadId === normalizedSelectedThreadId,
     );
   }, [historyQuery.data, selectedThreadId, threadsQuery.data]);
 
@@ -133,7 +135,10 @@ export function CustomerContextPanel({
             </div>
           )}
         </header>
-        <div className="panel-state muted">请选择在线客服会话查看客户资料。</div>
+        <div className="customer-context-empty-state panel-state muted">
+          <strong>未选择客户</strong>
+          <span>从会话池选择排队、进行中或历史会话后查看客户资料。</span>
+        </div>
       </aside>
     );
   }
@@ -174,7 +179,11 @@ export function CustomerContextRail({
   onToggleAssistantPane: (pane: "aiDraft" | "knowledge" | "quickReply") => void;
 }) {
   const { selectedThread } = useCustomerContextPanelModel();
-  const customerTooltip = customerPaneCollapsed ? "展开客户信息" : "收起客户信息";
+  const customerTooltip = selectedThread
+    ? customerPaneCollapsed
+      ? "展开客户信息"
+      : "收起客户信息"
+    : "选择会话后查看客户信息";
 
   return (
     <aside className="service-customer-rail" aria-label="客户上下文快捷栏">
@@ -187,12 +196,16 @@ export function CustomerContextRail({
         aria-pressed={!customerPaneCollapsed}
         onClick={onToggleCustomerPane}
       >
-        <img
-          className="service-customer-rail-avatar-image"
-          src="/customer-info-entry.svg"
-          alt=""
-          aria-hidden="true"
-        />
+        {selectedThread ? (
+          <img
+            className="service-customer-rail-avatar-image"
+            src={customerInfoEntryIcon}
+            alt=""
+            aria-hidden="true"
+          />
+        ) : (
+          <UserRound size={18} aria-hidden="true" />
+        )}
         {selectedThread && <span className="service-customer-status-dot" />}
       </button>
       <div className="service-customer-rail-actions" aria-label="客服工具">

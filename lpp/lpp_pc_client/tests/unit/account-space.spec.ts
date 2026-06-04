@@ -67,6 +67,33 @@ describe("account space session identity", () => {
     expect(accountSpaceSource).toContain("先输入企业码预览企业");
     expect(accountSpaceSource).toContain("未找到该企业码");
     expect(accountSpaceSource).toContain("企业码预览失败");
+    expect(accountSpaceSource).toContain("申请已提交，等待管理员审核");
+    expect(accountSpaceSource).toContain("申请已在审核中");
+    expect(accountSpaceSource).toContain("tenantJoinErrorNotice");
+    expect(accountSpaceSource).not.toContain("加入企业失败：");
+    expect(productPagesCss).toContain(".utility-notice.warning");
+    expect(productPagesCss).toContain(".utility-notice-copy");
+  });
+
+  it("polls pending tenant join requests every five minutes and explains the check cadence", () => {
+    expect(accountSpaceSource).toContain("getMyTenantJoinRequests");
+    expect(accountSpaceSource).toContain("tenantJoinRequestsPollIntervalMs");
+    expect(accountSpaceSource).toContain("pcQueryKeys.tenantJoinRequests");
+    expect(accountSpaceSource).toContain("系统会每 5 分钟自动检查一次");
+    expect(accountSpaceSource).toContain("queryKey: pcQueryKeys.tenantJoinRequests");
+    expect(accountSpaceSource).toContain("await joinRequestsQuery.refetch()");
+  });
+
+  it("does not present personal space placeholder tenant IDs as real space IDs", () => {
+    expect(accountSpaceSource).toContain("const isPersonalSpace =");
+    expect(accountSpaceSource).toContain("const tenantId = isPersonalSpace ? \"--\"");
+    expect(accountSpaceSource).toContain("!isPersonalSpace && tenantInfoQuery.isLoading");
+    expect(accountSpaceSource).toContain("!isPersonalSpace && tenantInfoQuery.error");
+    expect(accountSpaceSource).toContain("copyable={!isPersonalSpace && tenantId !== \"--\"}");
+    expect(spaceSwitchSource).toContain("tenantId: isPersonalSpace ? undefined : tenant.tenantId");
+    expect(spaceSwitchSource).not.toContain(
+      "(tenant.tenantId ? \"个人空间\" : authSession.tenantName)",
+    );
   });
 
   it("keeps identity hints optional for legacy persisted sessions", () => {

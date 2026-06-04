@@ -3,7 +3,7 @@ import type { ModuleKey } from "../types";
 
 export type ReminderSeverity = "info" | "warning" | "critical";
 
-export type ReminderIcon = "contacts" | "im" | "service" | "sla";
+export type ReminderIcon = "contacts" | "enterprise" | "im" | "service" | "sla";
 
 export type ReminderDesktopChannel = "im" | "serviceQueue" | "sla";
 

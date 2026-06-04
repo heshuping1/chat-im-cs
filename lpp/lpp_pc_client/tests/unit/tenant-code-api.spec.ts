@@ -81,6 +81,50 @@ describe("tenant code platform api", () => {
     });
   });
 
+  it("loads my tenant join requests with the platform token", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      requests.push({
+        authorization: headers.get("Authorization"),
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        method: init?.method ?? "GET",
+        url: String(input),
+      });
+      return new Response(
+        JSON.stringify({
+          code: "OK",
+          data: [
+            {
+              requestId: "join-r1",
+              tenantId: "tenant-1",
+              tenantName: "Mouse Corp",
+              status: "pending",
+              createdAt: "2026-06-04T10:00:00.000Z",
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+    const client = apiClient();
+
+    await expect(client.getMyTenantJoinRequests()).resolves.toEqual([
+      expect.objectContaining({
+        requestId: "join-r1",
+        tenantId: "tenant-1",
+        tenantName: "Mouse Corp",
+        status: "pending",
+      }),
+    ]);
+
+    expect(requests[0]).toMatchObject({
+      authorization: "Bearer platform-token",
+      body: undefined,
+      method: "GET",
+      url: "https://api.example/api/platform/v1/my/join-requests",
+    });
+  });
+
   it("supports auto-join token responses and already-member previews", async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const headers = new Headers(init?.headers);

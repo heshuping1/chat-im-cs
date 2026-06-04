@@ -30,6 +30,17 @@ describe("api error model", () => {
     ).toBe("你已被禁言，暂时无法发言");
   });
 
+  it("maps tenant join pending errors to product copy", () => {
+    expect(
+      formatApiErrorForUser(
+        new ApiError("a join request is already pending", "TENANT_JOIN_REQUEST_PENDING", "r6", 409),
+      ),
+    ).toBe("已提交加入申请，正在等待管理员审核");
+    expect(formatApiErrorForUser(new ApiError("a join request is already pending", undefined, "r7", 409))).toBe(
+      "已提交加入申请，正在等待管理员审核",
+    );
+  });
+
   it("maps common http errors without exposing backend internals", () => {
     expect(formatApiErrorForUser(new ApiError("not found", "NOT_FOUND", "r3", 404))).toBe(
       "目标内容不存在或已被删除",

@@ -333,4 +333,52 @@ describe("createGatewayEventRouter", () => {
       queryKey: ["pc-cs-workbench-threads"],
     });
   });
+
+  it("invalidates tenant join request and account spaces for tenant join review events", async () => {
+    const { createGatewayEventRouter } = await import(
+      "../../src/renderer/data/gateway/gateway-event-router"
+    );
+    const queryClient = {
+      clear: vi.fn(),
+      invalidateQueries: vi.fn(),
+    };
+    const router = createGatewayEventRouter({
+      clearAuthSession: vi.fn(),
+      queryClient: queryClient as never,
+      session: {
+        apiBaseUrl: "https://api.example.test",
+        platformToken: "platform-token",
+        tenantToken: "tenant-token",
+      } as never,
+      setCustomerServiceStatus: vi.fn(),
+    });
+
+    router.handleEvent("tenant.join_request.approved", [
+      {
+        data: {
+          requestId: "join-r1",
+          status: "approved",
+          tenantId: "tenant-new",
+          tenantName: "新企业",
+        },
+      },
+    ]);
+
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: [
+        "pc-tenant-join-requests",
+        "https://api.example.test",
+        "platform-token",
+      ],
+    });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: [
+        "pc-account-spaces",
+        "https://api.example.test",
+        "platform-token",
+      ],
+    });
+    expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
+    expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
+  });
 });

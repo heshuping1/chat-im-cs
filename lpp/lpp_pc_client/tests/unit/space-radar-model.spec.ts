@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import {
   buildSpaceRadarViewModel,
@@ -14,6 +16,19 @@ import type {
 import type { AuthSession } from "../../src/renderer/data/auth/auth-session";
 
 describe("space radar model", () => {
+  const spaceRadarPopoverSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/spaces/components/SpaceRadarPopover.tsx"),
+    "utf8",
+  );
+
+  it("labels the popover as space switching and reminders instead of tasks", () => {
+    expect(spaceRadarPopoverSource).toContain('aria-label="空间"');
+    expect(spaceRadarPopoverSource).toContain("<strong>空间</strong>");
+    expect(spaceRadarPopoverSource).toContain("查看各空间消息提醒，切换后查看详情");
+    expect(spaceRadarPopoverSource).not.toContain("空间任务雷达");
+    expect(spaceRadarPopoverSource).not.toContain("任务");
+  });
+
   it("merges current tenant, platform spaces and unread summary with current space first", () => {
     const viewModel = buildSpaceRadarViewModel({
       authSession: session({ tenantId: "tenant-current", tenantName: "Mouse 客服中心" }),

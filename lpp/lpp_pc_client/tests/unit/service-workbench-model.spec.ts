@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CustomerServiceThread } from "../../src/renderer/data/api/types";
 import {
+  createCustomerServiceLiveCounters,
   createServiceCommandMetrics,
   createServiceHistoryTabBadge,
   createServiceHistoryThreadStatusText,
@@ -11,6 +12,36 @@ import {
 } from "../../src/renderer/customer-service/models/serviceWorkbenchModel";
 
 describe("customer service workbench model", () => {
+  it("derives live counters from displayable temp sessions instead of raw summaries", () => {
+    const counters = createCustomerServiceLiveCounters({
+      activeItems: [
+        thread({ threadId: "serving-1", status: "serving", unreadCount: 2 }),
+        thread({ threadId: "direct-1", status: "serving", threadType: "im_direct", unreadCount: 9 }),
+        thread({ threadId: "closed-1", status: "closed_by_staff", unreadCount: 7 }),
+        thread({ threadId: "queued-in-active", status: "queued", unreadCount: 4 }),
+      ],
+      isRiskyThread: (item) => item.priority === "urgent",
+      queueItems: [
+        thread({ priority: "urgent", status: "queued", threadId: "queued-1" }),
+        thread({ status: "closed_timeout", threadId: "closed-queue", unreadCount: 5 }),
+      ],
+    });
+
+    expect(counters).toMatchObject({
+      activeCount: 1,
+      activeUnreadCount: 2,
+      queuedCount: 2,
+      serviceAlertCount: 4,
+      slaRiskCount: 1,
+      totalCount: 3,
+    });
+    expect(counters.activeTempSessions.map((item) => item.threadId)).toEqual(["serving-1"]);
+    expect(counters.queuedTempSessions.map((item) => item.threadId)).toEqual([
+      "queued-in-active",
+      "queued-1",
+    ]);
+  });
+
   it("derives command bar metrics from current threads and reception status", () => {
     const metrics = createServiceCommandMetrics({
       isRiskyThread: (thread) => thread.priority === "urgent",
@@ -109,6 +140,8 @@ describe("customer service workbench model", () => {
           thread({ status: "queued" }),
           thread({ priority: "urgent", status: "serving" }),
           thread({ status: "serving" }),
+          thread({ status: "serving", threadType: "im_direct" }),
+          thread({ status: "closed_timeout" }),
         ],
         (item) => item.priority === "urgent",
       ),

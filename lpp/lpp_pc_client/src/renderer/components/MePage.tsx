@@ -511,6 +511,9 @@ function ProfileSettingsSection({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const displayName = profile?.displayName || authSession?.displayName || "--";
+  const profileSignature = profile?.signature || profile?.bio || "";
+  const [displayNameDraft, setDisplayNameDraft] = useState(displayName === "--" ? "" : displayName);
+  const [signatureDraft, setSignatureDraft] = useState(profileSignature);
   const avatarUrl = avatarPreviewUrl || profile?.avatarUrl || authSession?.avatarUrl;
   const updateAvatar = useMutation({
     mutationFn: async (file: File) => {
@@ -568,6 +571,54 @@ function ProfileSettingsSection({
     },
     onError: (error) => setNotice(`头像更新失败：${formatError(error)}`),
   });
+  const updateProfile = useMutation({
+    mutationFn: async () => {
+      const nextDisplayName = displayNameDraft.trim();
+      const nextSignature = signatureDraft.trim();
+      if (!nextDisplayName) throw new Error("昵称不能为空");
+      const updatedProfile = await requireApiClient(authSession).updateMyProfile({
+        displayName: nextDisplayName,
+        signature: nextSignature || null,
+      });
+      return {
+        ...updatedProfile,
+        displayName: updatedProfile.displayName || nextDisplayName,
+        signature: updatedProfile.signature ?? (nextSignature || null),
+      };
+    },
+    onSuccess: async (updatedProfile) => {
+      queryClient.setQueryData(
+        pcQueryKeys.accountProfile(authSession?.apiBaseUrl, authSession?.tenantToken),
+        updatedProfile,
+      );
+      await queryClient.invalidateQueries({
+        queryKey: pcQueryKeys.accountProfile(
+          authSession?.apiBaseUrl,
+          authSession?.tenantToken,
+        ),
+      });
+      setDisplayNameDraft(updatedProfile.displayName || "");
+      setSignatureDraft(updatedProfile.signature || updatedProfile.bio || "");
+      if (authSession) {
+        setAuthSession({
+          ...authSession,
+          avatarUrl: updatedProfile.avatarUrl ?? authSession.avatarUrl,
+          displayName: updatedProfile.displayName || authSession.displayName,
+          lppId: updatedProfile.lppId ?? authSession.lppId,
+          userId: updatedProfile.userId ?? authSession.userId,
+          platformUserId: updatedProfile.platformUserId ?? authSession.platformUserId,
+          userType: updatedProfile.userType ?? authSession.userType,
+        });
+      }
+      setNotice("个人资料已保存");
+    },
+    onError: (error) => setNotice(`个人资料保存失败：${formatError(error)}`),
+  });
+
+  useEffect(() => {
+    setDisplayNameDraft(displayName === "--" ? "" : displayName);
+    setSignatureDraft(profileSignature);
+  }, [displayName, profileSignature]);
 
   useEffect(() => {
     if (!avatarFile) {
@@ -659,10 +710,57 @@ function ProfileSettingsSection({
           <InlineSettingsState tone="error" text="登录状态已失效，请重新登录后设置头像。" />
         )}
       </div>
-      <InfoRow label="昵称" desc={displayName} />
       <InfoRow label="LPP 号" desc={profile?.lppId || authSession?.lppId || "--"} />
       <InfoRow label="角色" desc={authSession?.roleLabel || "成员"} />
-      <InfoRow label="签名" desc={profile?.signature || profile?.bio || "暂无签名"} />
+      <div className="settings-sub-card settings-profile-form">
+        <header>
+          <strong>资料信息</strong>
+          <span className="settings-sub-card-meta">
+            <UserRound size={14} />
+            <em>昵称和签名会同步到个人名片</em>
+          </span>
+        </header>
+        <label>
+          <span>昵称</span>
+          <input
+            maxLength={32}
+            placeholder="请输入昵称"
+            value={displayNameDraft}
+            disabled={updateProfile.isPending || !authSession}
+            onChange={(event) => setDisplayNameDraft(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>签名</span>
+          <textarea
+            maxLength={120}
+            placeholder="添加一句工作状态或个人签名"
+            value={signatureDraft}
+            disabled={updateProfile.isPending || !authSession}
+            onChange={(event) => setSignatureDraft(event.target.value)}
+          />
+        </label>
+        <div className="settings-profile-form-actions">
+          <button
+            type="button"
+            disabled={updateProfile.isPending || !authSession}
+            onClick={() => updateProfile.mutate()}
+          >
+            {updateProfile.isPending ? "保存中" : "保存资料"}
+          </button>
+          <button
+            type="button"
+            disabled={updateProfile.isPending}
+            onClick={() => {
+              setDisplayNameDraft(displayName === "--" ? "" : displayName);
+              setSignatureDraft(profileSignature);
+              setNotice("已还原资料编辑");
+            }}
+          >
+            还原
+          </button>
+        </div>
+      </div>
       <InfoRow label="登录名" desc={profile?.loginName || "--"} />
       <InfoRow label="用户 ID" desc={profile?.userId || authSession?.userId || "--"} />
       <InfoRow label="手机号" desc={maskMobile(profile?.mobile)} />

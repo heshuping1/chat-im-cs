@@ -219,6 +219,12 @@ describe("settings catalog", () => {
     expect(getSettingsRow("sensitiveMasking")).toBeUndefined();
     expect(getSettingsRow("customerAccessBoundary")).toBeUndefined();
     expect(getSettingsRow("copyScreenshotGuard")).toBeUndefined();
+    const source = readFileSync(
+      join(process.cwd(), "src/renderer/components/MePrivacySections.tsx"),
+      "utf8",
+    );
+    expect(source).not.toContain("敏感信息脱敏");
+    expect(source).not.toContain('setSetting("sensitiveMasking"');
   });
 
   it("removes the undecided after work reminder planning card", () => {
@@ -259,6 +265,136 @@ describe("settings catalog", () => {
       });
       expect(getSettingsRow(rowId)?.capability).toMatch(/^missing/);
     }
+  });
+
+  it("keeps visible implemented controls enabled by default", () => {
+    const implementedControlRows = settingsRows.filter(
+      (row) =>
+        row.visibleInMainList &&
+        row.control !== "info" &&
+        (row.capability === "available" || row.capability === "localEffective"),
+    );
+
+    expect(implementedControlRows.length).toBeGreaterThan(0);
+    for (const row of implementedControlRows) {
+      expect(row.enabled, row.id).toBe(true);
+    }
+  });
+
+  it("renders account nickname and signature as editable profile fields", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/renderer/components/MePage.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("settings-profile-form");
+    expect(source).toContain("displayNameDraft");
+    expect(source).toContain("signatureDraft");
+    expect(source).toContain("updateMyProfile");
+    expect(source).not.toContain('<InfoRow label="昵称"');
+    expect(source).not.toContain('<InfoRow label="签名"');
+  });
+
+  it("keeps implemented settings backed by an editable renderer surface", () => {
+    const sources = new Map(
+      [
+        "src/renderer/components/MePage.tsx",
+        "src/renderer/components/MePrivacySections.tsx",
+        "src/renderer/settings/components/AccountSecuritySection.tsx",
+        "src/renderer/settings/components/ChatArchiveSection.tsx",
+        "src/renderer/settings/components/ChatBackgroundSection.tsx",
+        "src/renderer/settings/components/DiagnosticsRecordsSection.tsx",
+        "src/renderer/settings/components/HelpAboutSettingsSection.tsx",
+        "src/renderer/settings/components/NetworkLineSettingsSection.tsx",
+        "src/renderer/settings/components/NotificationSettingsSection.tsx",
+      ].map((file) => [file, readFileSync(join(process.cwd(), file), "utf8")]),
+    );
+    const sourceText = [...sources.values()].join("\n");
+
+    const notificationRows = [
+      "imNotifications",
+      "serviceQueueNotifications",
+      "customerServiceMessageNotifications",
+      "foregroundInAppCustomerServiceReminders",
+      "slaTimeoutNotifications",
+      "desktopNotifications",
+      "notificationPreview",
+      "notificationSound",
+      "doNotDisturb",
+    ];
+    const notificationSource =
+      sources.get("src/renderer/settings/components/NotificationSettingsSection.tsx") ?? "";
+    for (const rowId of notificationRows) {
+      expect(notificationSource, rowId).toContain(`"${rowId}"`);
+    }
+    expect(notificationSource).toContain("settingRowProps(remoteRow.id)");
+    expect(notificationSource).toContain("settingRowProps(rowId)");
+
+    const catalogDrivenRows = [
+      "enterToSend",
+      "screenshotShortcut",
+      "dragUpload",
+      "autoTranslate",
+      "shortcutHints",
+      "chatBackground",
+      "chatExport",
+      "chatBackup",
+      "chatRestore",
+      "theme",
+      "skin",
+      "fontSize",
+      "compactList",
+      "highDensityContext",
+      "reduceMotion",
+      "highContrastBoundary",
+      "keyboardFocusHint",
+      "minimizeToTray",
+      "launchAtStartup",
+      "clearLocalCache",
+      "terms",
+      "privacyPolicy",
+      "checkUpdate",
+    ];
+    for (const rowId of catalogDrivenRows) {
+      expect(sourceText, rowId).toContain(`settingRowProps("${rowId}")`);
+    }
+
+    expect(sources.get("src/renderer/components/MePrivacySections.tsx")).toContain(
+      'settingRowProps("allowMobileSearch")',
+    );
+    expect(sources.get("src/renderer/components/MePrivacySections.tsx")).toContain(
+      'settingRowProps("allowLppSearch")',
+    );
+    expect(sources.get("src/renderer/components/MePrivacySections.tsx")).toContain(
+      'settingRowProps("friendRequestVerification")',
+    );
+    expect(sources.get("src/renderer/components/MePrivacySections.tsx")).toContain(
+      'settingRowProps("profileVisibility")',
+    );
+    expect(sources.get("src/renderer/components/MePrivacySections.tsx")).toContain(
+      'settingRowProps("blocklist")',
+    );
+    expect(sources.get("src/renderer/components/MePrivacySections.tsx")).toContain(
+      "unblock.mutate",
+    );
+    expect(sources.get("src/renderer/settings/components/AccountSecuritySection.tsx")).toContain(
+      "changePassword.mutate",
+    );
+    expect(sources.get("src/renderer/settings/components/AccountSecuritySection.tsx")).toContain(
+      "deactivate.mutate",
+    );
+    expect(sources.get("src/renderer/settings/components/HelpAboutSettingsSection.tsx")).toContain(
+      "submitFeedback.mutate",
+    );
+    expect(sources.get("src/renderer/settings/components/NetworkLineSettingsSection.tsx")).toContain(
+      "handleSelect(site)",
+    );
+    expect(sources.get("src/renderer/settings/components/NetworkLineSettingsSection.tsx")).toContain(
+      "testAll()",
+    );
+    expect(sources.get("src/renderer/settings/components/DiagnosticsRecordsSection.tsx")).toContain(
+      "exportDiagnostics()",
+    );
   });
 
   it("promotes minimize to tray into a real desktop setting", () => {

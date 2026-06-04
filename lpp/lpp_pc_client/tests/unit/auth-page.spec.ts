@@ -11,7 +11,11 @@ describe("auth page contract", () => {
     resolve(process.cwd(), "src/renderer/components/auth/AuthPageParts.tsx"),
     "utf8",
   );
-  const authSource = `${source}\n${partsSource}`;
+  const modelSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/data/auth/auth-flow-model.ts"),
+    "utf8",
+  );
+  const authSource = `${source}\n${partsSource}\n${modelSource}`;
   const css = readFileSync(
     resolve(process.cwd(), "src/renderer/styles/account/auth.css"),
     "utf8",
@@ -64,13 +68,49 @@ describe("auth page contract", () => {
     expect(source).toContain("handleSelectTenant");
   });
 
+  it("supports optional invitation code for existing-login and new-registration join flows", () => {
+    expect(authSource).toContain("邀请码（可选）");
+    expect(authSource).toContain("auth-invitation-field");
+    expect(authSource).toContain("auth-invitation-preview-card");
+    expect(authSource).toContain("将加入企业");
+    expect(authSource).toContain("无法确认邀请码");
+    expect(authSource).toContain("已有账号可登录后加入被邀请的企业，不会修改已加入企业的角色。");
+    expect(authSource).not.toContain("<summary>已有邀请码？</summary>");
+    expect(source).toContain("invitationCode");
+    expect(source).toContain("invitationPreview");
+    expect(source).toContain("createInvitationPreviewView");
+    expect(source).toContain("createInvitationPreviewErrorView");
+    expect(source).toContain("getPlatformInvitationPreview");
+    expect(source).toContain("acceptPlatformInvitation");
+    expect(source).toContain("已加入企业，正在进入工作台");
+    expect(source).toContain("applySelectedTenantSession(baseUrl, login, tenant, null)");
+    expect(source).not.toContain("inviteCode:");
+    expect(source).not.toContain("invitationCode:");
+  });
+
+  it("keeps register contact selectable between email and multi-country mobile", () => {
+    expect(source).toContain("registerContactType");
+    expect(source).toContain("registerCountryDialCode");
+    expect(source).toContain("registerPhoneCountryOptions");
+    expect(authSource).toContain("auth-contact-mode");
+    expect(authSource).toContain("邮箱");
+    expect(authSource).toContain("手机号");
+    expect(authSource).toContain("国家/地区");
+    expect(authSource).toContain("请输入有效邮箱");
+    expect(authSource).toContain("请输入手机号");
+  });
+
   it("styles auth modes, space picker and advanced settings locally", () => {
+    expect(css).toContain("overflow: auto");
     expect(css).toContain(".auth-mode-switch");
     expect(css).toContain(".auth-avatar-grid");
     expect(css).toContain("grid-template-columns: repeat(6, minmax(0, 1fr))");
     expect(css).toContain(".auth-avatar-option.selected");
     expect(css).toContain(".auth-avatar-toggle");
     expect(css).toContain(".auth-advanced");
+    expect(css).toContain(".auth-invitation");
+    expect(css).toContain(".auth-contact-mode");
+    expect(css).toContain(".auth-phone-row");
     expect(css).toContain(".auth-space-list");
     expect(css).toContain(".auth-space-option");
   });

@@ -891,6 +891,32 @@
   font-weight: 800;
 }
 
+.customer-context-empty-state {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 36px;
+  padding: 14px 16px !important;
+  border: 1px solid rgba(216, 226, 237, 0.9);
+  border-radius: 10px;
+  background: rgba(248, 251, 255, 0.9);
+  color: #64748b;
+  text-align: left;
+}
+
+.customer-context-empty-state strong {
+  color: #111827;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.customer-context-empty-state span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
 .customer-info-card,
 .customer-info-block {
   border: 1px solid rgba(224, 232, 241, 0.95);

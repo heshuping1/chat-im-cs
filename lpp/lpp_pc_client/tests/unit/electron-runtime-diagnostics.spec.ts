@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createElectronRuntimeDiagnosticRecord,
@@ -6,7 +6,9 @@ import {
   mergeElectronRuntimeDiagnosticsPayload,
   recordElectronRuntimeDiagnostic,
   resetElectronRuntimeDiagnosticsForTest,
+  setElectronRuntimeDiagnosticLogger,
 } from "../../src/main/runtime-diagnostics";
+import type { ElectronLogLike } from "../../src/main/app-logging";
 
 describe("electron runtime diagnostics", () => {
   beforeEach(() => {
@@ -93,5 +95,39 @@ describe("electron runtime diagnostics", () => {
         message: "本地媒体文件不可用：source_file_unavailable",
       },
     });
+  });
+
+  it("mirrors runtime diagnostics to the main app logger when configured", () => {
+    const logger: ElectronLogLike = {
+      debug: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+    setElectronRuntimeDiagnosticLogger(logger);
+
+    const record = recordElectronRuntimeDiagnostic({
+      event: "main.unhandled_rejection",
+      error: new Error("request failed with Bearer raw-token"),
+      occurredAt: new Date("2026-06-04T00:00:00.000Z"),
+      reason: "token=raw-token",
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "[electron-runtime] main.unhandled_rejection",
+      expect.objectContaining({
+        error: {
+          message: "request failed with Bearer ***",
+          name: "Error",
+        },
+        event: "main.unhandled_rejection",
+        level: "error",
+        module: "electron-runtime",
+        phase: "runtime",
+        reason: "[redacted]",
+        result: "failed",
+        traceId: record.traceId,
+      }),
+    );
   });
 });

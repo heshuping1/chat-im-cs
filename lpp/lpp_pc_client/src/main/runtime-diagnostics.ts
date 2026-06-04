@@ -6,6 +6,7 @@ import type {
   DiagnosticsModuleSnapshot,
   DiagnosticsPayload,
 } from '../shared/desktop-api.js';
+import { recordMainAppLog, type ElectronLogLike } from './app-logging.js';
 
 export type ElectronRuntimeDiagnosticEvent =
   | 'app.child_process_gone'
@@ -57,6 +58,7 @@ const maxRuntimeDiagnostics = 120;
 const sensitiveRuntimePattern = /Bearer\s+[A-Za-z0-9._~+/=-]+|token=[^&\s]+|password=[^&\s]+/gi;
 const runtimeDiagnostics: ElectronRuntimeDiagnosticRecord[] = [];
 let runtimeDiagnosticsFilePath: string | null = null;
+let runtimeDiagnosticLogger: ElectronLogLike | null = null;
 let processDiagnosticsInstalled = false;
 let appDiagnosticsInstalled = false;
 
@@ -95,6 +97,10 @@ export function setElectronRuntimeDiagnosticsFilePath(filePath: string | null) {
   runtimeDiagnosticsFilePath = filePath;
 }
 
+export function setElectronRuntimeDiagnosticLogger(logger: ElectronLogLike | null) {
+  runtimeDiagnosticLogger = logger;
+}
+
 export function recordRendererProcessGone(
   details: { exitCode?: number; reason?: string },
   windowId?: number,
@@ -115,6 +121,7 @@ export function recordElectronRuntimeDiagnostic(
   if (runtimeDiagnostics.length > maxRuntimeDiagnostics) {
     runtimeDiagnostics.splice(0, runtimeDiagnostics.length - maxRuntimeDiagnostics);
   }
+  mirrorElectronRuntimeDiagnosticToMainLog(record);
   void persistElectronRuntimeDiagnostic(record);
   return record;
 }
@@ -181,6 +188,7 @@ export function resetElectronRuntimeDiagnosticsForTest() {
   runtimeDiagnosticsFilePath = null;
   processDiagnosticsInstalled = false;
   appDiagnosticsInstalled = false;
+  runtimeDiagnosticLogger = null;
 }
 
 function normalizeRuntimeError(error: unknown): ElectronRuntimeDiagnosticRecord['error'] {
@@ -210,4 +218,25 @@ async function persistElectronRuntimeDiagnostic(record: ElectronRuntimeDiagnosti
   } catch (error) {
     console.warn('[electron-runtime:diagnostic] persist failed', error);
   }
+}
+
+function mirrorElectronRuntimeDiagnosticToMainLog(record: ElectronRuntimeDiagnosticRecord) {
+  if (!runtimeDiagnosticLogger) return;
+  recordMainAppLog(runtimeDiagnosticLogger, {
+    context: {
+      exitCode: record.exitCode,
+      occurredAt: record.occurredAt,
+      processType: record.processType,
+      windowId: record.windowId,
+    },
+    error: record.error,
+    event: record.event,
+    level: 'error',
+    module: 'electron-runtime',
+    occurredAt: new Date(record.occurredAt),
+    phase: 'runtime',
+    reason: record.reason,
+    result: 'failed',
+    traceId: record.traceId,
+  });
 }

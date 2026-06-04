@@ -1281,6 +1281,73 @@
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
+.settings-profile-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-profile-form label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.settings-profile-form label span {
+  color: var(--pc-text-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.settings-profile-form input,
+.settings-profile-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--pc-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--pc-text);
+  font: inherit;
+  padding: 9px 12px;
+}
+
+.settings-profile-form input {
+  height: 38px;
+}
+
+.settings-profile-form textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.settings-profile-form input:disabled,
+.settings-profile-form textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.settings-profile-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-profile-form-actions button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 10px;
+  background: rgba(236, 253, 245, 0.95);
+  color: var(--pc-primary-strong);
+  font-weight: 850;
+  padding: 0 14px;
+}
+
+.settings-profile-form-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .settings-avatar-actions {
   display: grid;
   min-width: 0;

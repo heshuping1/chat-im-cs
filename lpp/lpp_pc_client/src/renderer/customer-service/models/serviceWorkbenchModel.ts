@@ -3,10 +3,12 @@ import type {
   CustomerServiceThreadsResponse,
   StaffReceptionStatusDto,
 } from "../../data/api/types";
+import {
+  createCustomerServiceLiveCounters,
+} from "../../data/customer-service/customer-service-live-counters";
 import { isTerminalCustomerServiceThreadStatus } from "../../data/customer-service/cs-thread-state";
 import {
   customerServiceHistoryStatusLabel,
-  isQueuedCustomerServiceThread,
 } from "../../data/customer-service-display";
 import type { CustomerServiceStatus } from "../../data/types";
 
@@ -49,16 +51,21 @@ export interface ServiceCommandMetrics {
   totalCount: number;
 }
 
+export { createCustomerServiceLiveCounters };
+
 export function createServiceThreadListCounts(
   threads: CustomerServiceThread[],
   isRiskyThread: (thread: CustomerServiceThread) => boolean,
 ): ServiceThreadListCounts {
-  const queued = threads.filter(isQueuedCustomerServiceThread).length;
+  const counters = createCustomerServiceLiveCounters({
+    activeItems: threads,
+    isRiskyThread,
+  });
   return {
-    all: threads.length,
-    queued,
-    serving: Math.max(0, threads.length - queued),
-    sla: threads.filter(isRiskyThread).length,
+    all: counters.totalCount,
+    queued: counters.queuedCount,
+    serving: counters.activeCount,
+    sla: counters.slaRiskCount,
   };
 }
 
@@ -194,23 +201,18 @@ export function createServiceCommandMetrics(input: {
 }): ServiceCommandMetrics {
   const hasThreadData = Boolean(input.threads);
   const hasReceptionStatus = Boolean(input.receptionStatus);
-  const activeItems = input.threads?.activeItems ?? [];
-  const queueItems = input.threads?.queueItems ?? [];
-  const liveActiveItems = activeItems.filter(
-    (item) => !isTerminalCustomerServiceThreadStatus(item.status),
-  );
-  const liveQueueItems = queueItems.filter(
-    (item) => !isTerminalCustomerServiceThreadStatus(item.status),
-  );
-  const selectableThreads = [...liveActiveItems, ...liveQueueItems];
-  const queuedCount = liveQueueItems.length;
-  const activeCount = liveActiveItems.length;
-  const totalCount = queuedCount + activeCount;
-  const activeUnreadCount = liveActiveItems.reduce(
-    (sum, item) => sum + Math.max(0, item.unreadCount ?? 0),
-    0,
-  );
-  const slaRiskCount = selectableThreads.filter(input.isRiskyThread).length;
+  const liveCounters = createCustomerServiceLiveCounters({
+    activeItems: input.threads?.activeItems,
+    isRiskyThread: input.isRiskyThread,
+    queueItems: input.threads?.queueItems,
+  });
+  const {
+    activeCount,
+    activeUnreadCount,
+    queuedCount,
+    slaRiskCount,
+    totalCount,
+  } = liveCounters;
   const serviceStatus =
     input.receptionStatus?.serviceStatus ?? input.lastKnownStatus ?? "unknown";
   const activeSessions = input.receptionStatus?.activeSessionCount ?? null;

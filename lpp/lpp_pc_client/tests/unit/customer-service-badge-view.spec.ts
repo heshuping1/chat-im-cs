@@ -4,7 +4,7 @@ import type { CustomerServiceThread } from "../../src/renderer/data/api/types";
 import { resolveCustomerServiceBadgeView } from "../../src/renderer/data/customer-service/customer-service-badge-view";
 
 describe("customer service badge view", () => {
-  it("aggregates queued sessions and active unread without reminder count stacking", () => {
+  it("aggregates displayable queued sessions and active unread without summary inflation", () => {
     const view = resolveCustomerServiceBadgeView({
       activeItems: [
         thread({ threadId: "active-1", unreadCount: 2 }),
@@ -20,10 +20,22 @@ describe("customer service badge view", () => {
       "active-1",
       "active-2",
     ]);
-    expect(view.queuedServiceCount).toBe(4);
+    expect(view.queuedServiceCount).toBe(1);
     expect(view.activeServiceUnreadCount).toBe(5);
     expect(view.taskbarServiceUnreadCount).toBe(5);
-    expect(view.serviceAlertCount).toBe(9);
+    expect(view.serviceAlertCount).toBe(6);
+  });
+
+  it("does not create strong service alerts from summary-only queued counts", () => {
+    const view = resolveCustomerServiceBadgeView({
+      activeItems: [],
+      queueItems: [],
+      summaryQueuedCount: 1,
+      threadDataLoaded: true,
+    });
+
+    expect(view.queuedServiceCount).toBe(0);
+    expect(view.serviceAlertCount).toBe(0);
   });
 
   it("returns zero counters before workbench data is loaded", () => {

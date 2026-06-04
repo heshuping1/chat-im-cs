@@ -88,6 +88,7 @@ function buildSwitchedAuthSession(
   authSession: AuthSession,
   { currentTenant, profile, space, tenant }: SpaceSwitchResult,
 ): AuthSession {
+  const isPersonalSpace = !space;
   return {
     ...authSession,
     avatarUrl: profile?.avatarUrl ?? tenant.avatarUrl,
@@ -99,12 +100,11 @@ function buildSwitchedAuthSession(
     roleLabel: space ? roleLabel(space.membershipRole) : "个人空间",
     spaceType: tenant.spaceContext?.spaceType ?? (space ? 2 : 1),
     tenantCode: currentTenant?.tenantCode ?? space?.tenantCode,
-    tenantId: tenant.tenantId,
+    tenantId: isPersonalSpace ? undefined : tenant.tenantId,
     tenantLogoUrl: currentTenant?.logoUrl ?? space?.logoUrl,
-    tenantName:
-      currentTenant?.tenantName ??
-      space?.tenantName ??
-      (tenant.tenantId ? "个人空间" : authSession.tenantName),
+    tenantName: isPersonalSpace
+      ? "个人空间"
+      : currentTenant?.tenantName ?? space?.tenantName ?? authSession.tenantName,
     tenantToken: tenant.accessToken,
     userId: profile?.userId ?? tenant.userId,
     userType: profile?.userType ?? authSession.userType,

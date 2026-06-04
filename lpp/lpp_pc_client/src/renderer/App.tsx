@@ -50,6 +50,7 @@ import './styles/messages/message-shared.css';
 import './styles/messages/message-media-content.css';
 import './styles/messages/composer-shell.css';
 import './styles/pages/product-pages.css';
+import './styles/spaces/tenant-invitations.css';
 import './styles/shared/porcelain-shell.css';
 import './styles/customer-service/customer-service-skin.css';
 import './styles/messages/composer-rich-input.css';

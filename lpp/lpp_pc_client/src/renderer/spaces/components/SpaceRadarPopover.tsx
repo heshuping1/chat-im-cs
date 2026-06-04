@@ -53,14 +53,14 @@ export function SpaceRadarPopover({
     <div
       className="sidebar-status-popover sidebar-space-status-popover sidebar-space-radar-popover"
       role="dialog"
-      aria-label="空间任务雷达"
+      aria-label="空间"
     >
       <header className="space-radar-head">
         <div className="space-radar-title">
           <BellRing size={16} aria-hidden="true" />
           <div>
-            <strong>空间任务雷达</strong>
-            <span>跨空间仅显示红点摘要，切换后查看详情</span>
+            <strong>空间</strong>
+            <span>查看各空间消息提醒，切换后查看详情</span>
           </div>
         </div>
         {newReminderSummary && (
@@ -75,7 +75,7 @@ export function SpaceRadarPopover({
         <div className="space-radar-alert-strip" role="status">
           <BellRing size={14} aria-hidden="true" />
           <strong>{totalReminderText} 条跨空间新消息</strong>
-          <span>优先处理带红色脉冲的空间</span>
+          <span>切换空间后查看消息详情</span>
         </div>
       )}
 
@@ -129,7 +129,7 @@ export function SpaceRadarPopover({
         {visibleItems.length === 0 ? (
           <div className="space-radar-empty">
             <Building2 size={17} />
-            <strong>{hasAlerts ? "未找到匹配空间" : "暂无跨空间新消息"}</strong>
+            <strong>{hasAlerts ? "未找到匹配空间" : "暂无新消息"}</strong>
             <span>{hasAlerts ? "换个关键词试试。" : "切换空间后查看对应空间详情。"}</span>
           </div>
         ) : (

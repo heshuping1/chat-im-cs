@@ -66,6 +66,17 @@ export function userMessageForApiError(
   errorCode?: string,
 ) {
   const code = (errorCode || message).toUpperCase();
+  if (
+    code.includes("TENANT_JOIN_REQUEST_PENDING") ||
+    message.toLowerCase().includes("join request is already pending")
+  ) {
+    return "已提交加入申请，正在等待管理员审核";
+  }
+  if (code.includes("TENANT_ALREADY_MEMBER")) return "你已在该企业中，可直接切换进入";
+  if (code.includes("TENANT_NOT_FOUND")) return "未找到该企业，请确认企业码是否正确";
+  if (code.includes("JOIN_DISABLED_IN_BINDING_MODE")) {
+    return "该企业暂不支持自助加入，请联系企业管理员邀请你加入";
+  }
   if (code.includes("MSG_MEMBER_FORBIDDEN")) return "你不在该会话中，无法发送消息";
   if (code.includes("MSG_CONVERSATION_FROZEN")) return "该会话已被冻结，暂时无法发送";
   if (code.includes("MSG_GROUP_MUTED")) return "群聊已开启全员禁言，暂时无法发送";

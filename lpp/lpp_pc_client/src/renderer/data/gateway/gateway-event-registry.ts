@@ -56,6 +56,12 @@ export const customerServiceLifecycleEventNames = [
   "customer_service.sla.breached",
 ] as const;
 
+export const tenantJoinRequestEventNames = [
+  "tenant.join_request.reviewed",
+  "tenant.join_request.approved",
+  "tenant.join_request.cancelled",
+] as const;
+
 export const gatewayEvents = [
   ...imMessageEventNames,
   ...imReadEventNames,
@@ -69,6 +75,7 @@ export const gatewayEvents = [
   "friend.request.rejected",
   "friend.profile.updated",
   "presence.changed",
+  ...tenantJoinRequestEventNames,
   ...forceLogoutEventNames,
 ] as const;
 
@@ -109,6 +116,7 @@ const customerServiceQueueEventNameSet = new Set<string>(
 const customerServiceLifecycleEventNameSet = new Set<string>(
   customerServiceLifecycleEventNames,
 );
+const tenantJoinRequestEventNameSet = new Set<string>(tenantJoinRequestEventNames);
 
 export function isImMessageEventName(eventName: string) {
   return imMessageEventNameSet.has(eventName);
@@ -132,4 +140,8 @@ export function isCustomerServiceQueueEventName(eventName: string) {
 
 export function isCustomerServiceLifecycleEventName(eventName: string) {
   return customerServiceLifecycleEventNameSet.has(eventName);
+}
+
+export function isTenantJoinRequestEventName(eventName: string) {
+  return tenantJoinRequestEventNameSet.has(eventName);
 }

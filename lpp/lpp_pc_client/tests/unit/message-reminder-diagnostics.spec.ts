@@ -148,6 +148,18 @@ describe("message reminder diagnostics", () => {
     } as any)).toEqual({ fileName: "im-read.jsonl", maxLines: 1200 });
   });
 
+  it("routes auth invitation API gateway diagnostics into the dedicated auth invitation log file", () => {
+    expect(reminderDiagnosticsTarget({
+      event: "auth.invitation.accept",
+      source: "auth-api-gateway",
+    } as any)).toEqual({ fileName: "auth-invitation.jsonl", maxLines: 1200 });
+
+    expect(reminderDiagnosticsTarget({
+      event: "auth.invitation.preview",
+      source: "auth-api-gateway",
+    } as any)).toEqual({ fileName: "auth-invitation.jsonl", maxLines: 1200 });
+  });
+
   it("routes customer-service reminder diagnostics away from the IM log file", () => {
     expect(reminderDiagnosticsTarget({
       event: "cs.overlay.write",

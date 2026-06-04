@@ -79,6 +79,8 @@ export const pcQueryKeys = {
     ["pc-account-profile", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountTenant: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-account-tenant", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  tenantInvitations: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-tenant-invitations", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountInviteQrs: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-account-invite-qrs", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountFavoritesSummary: (apiBaseUrl?: string, tenantToken?: string) =>
@@ -105,6 +107,8 @@ export const pcQueryKeys = {
     ["pc-account-blocklist", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountSpaces: (apiBaseUrl?: string, platformToken?: string) =>
     ["pc-account-spaces", apiBaseUrl ?? "", platformToken ?? ""] as const,
+  tenantJoinRequests: (apiBaseUrl?: string, platformToken?: string) =>
+    ["pc-tenant-join-requests", apiBaseUrl ?? "", platformToken ?? ""] as const,
   accountSpaceUnreadSummary: (apiBaseUrl?: string, platformToken?: string) =>
     ["pc-account-space-unread-summary", apiBaseUrl ?? "", platformToken ?? ""] as const,
   accountDevices: (apiBaseUrl?: string, platformToken?: string) =>

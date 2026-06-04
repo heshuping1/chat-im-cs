@@ -1346,7 +1346,8 @@ Base URL：`/api/client/v1`，需要租户级 Token。
 {
   "maxUses": 10,
   "expireHours": 168,
-  "targetIdentifier": null
+  "targetIdentifier": null,
+  "targetMembershipRole": 2
 }
 ```
 
@@ -1356,6 +1357,27 @@ Base URL：`/api/client/v1`，需要租户级 Token。
 - `targetIdentifier` 为空时为通用邀请
 - 非空时服务端会将邀请标记为定向邀请
 - `GET /tenant/invitations` 与 `DELETE /tenant/invitations/{invitationId}` 同样为客服/管理员/所有者可调用
+
+#### 员工入职邀请 `targetMembershipRole`（2026-06-03 新增）
+
+`targetMembershipRole` 为**可选**字段。设置后，被邀请人**接受邀请即直接成为对应员工角色**，无需所有者事后到成员管理里改角色——这就是"注册员工"的服务端闭环。
+
+| 取值 | 含义 | 接受后效果 |
+|---|---|---|
+| 省略 / `null` / `0` | 普通成员（旧行为） | 落地为成员(`membershipRole=0`)，`userType=customer` |
+| `1` | 技术支持 | 落地为技术(1)，`userType=staff(2)` |
+| `2` | 客服 | 落地为客服(2)，`userType=staff(2)` |
+| `3` | 管理员 | 落地为管理员(3)，`userType=staff(2)` |
+| `4` | 所有者 | **不允许**，返回 `400 INVITATION_ROLE_INVALID`（所有权转移只能走 `PUT /tenant/members/{userId}/role`） |
+
+**防提权规则（重要）**：创建者只能签发**严格低于自己角色**的邀请。
+
+- 客服(2)：只能签发普通成员邀请（省略/`null`/`0`）。请求 `>=2` → `403 INVITATION_ROLE_TOO_HIGH`
+- 管理员(3)：可签发 技术(1) / 客服(2)。请求 `>=3` → `403 INVITATION_ROLE_TOO_HIGH`
+- 所有者(4)：可签发 技术(1) / 客服(2) / 管理员(3)。请求 `4` → `400 INVITATION_ROLE_INVALID`
+
+兼容性：旧客户端不传该字段 = 旧行为（落普通成员），完全向后兼容。`InvitationDto` 响应也新增同名字段 `targetMembershipRole`（`null` 表示普通成员邀请）。
+**注意**：角色只在**邀请码**路径生效；租户码加入 `POST /tenants/join-by-code` 与加入申请审批 `POST /tenant/join-requests/{id}/approve` 仍恒为普通成员（不开放自助选角色）。
 
 ### 4.4 加入申请审批
 
