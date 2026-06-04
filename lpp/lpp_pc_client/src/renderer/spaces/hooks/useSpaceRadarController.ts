@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { TenantInfoDto } from "../../data/api-client";
+import { mergePlatformTenants } from "../../data/auth/auth-tenant-role";
 import { useAuthSession } from "../../data/auth/auth-store";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
@@ -121,9 +122,8 @@ export function targetForSpaceRadarItem(item: SpaceRadarItem): SpaceSwitchTarget
 }
 
 function normalizeSpaces(remote?: SpaceSwitchTarget[], fallback?: SpaceSwitchTarget[]) {
-  const map = new Map<string, Exclude<SpaceSwitchTarget, "personal">>();
-  [...(fallback ?? []), ...(remote ?? [])].forEach((item) => {
-    if (item !== "personal" && item.tenantId) map.set(item.tenantId, item);
-  });
-  return Array.from(map.values());
+  return mergePlatformTenants(
+    remote?.filter((item) => item !== "personal"),
+    fallback?.filter((item) => item !== "personal"),
+  );
 }

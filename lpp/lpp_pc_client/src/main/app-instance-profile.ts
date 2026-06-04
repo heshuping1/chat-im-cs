@@ -15,7 +15,7 @@ export interface ProfileSource {
 
 const profileArgNames = new Set(['--profile', '--lpp-profile', '--pc-profile']);
 const profileEnvNames = ['LPP_PC_PROFILE', 'LPP_PC_INSTANCE_PROFILE'];
-export const appUserModelIdPrefix = 'com.lpp.pcclient';
+export const appUserModelIdPrefix = 'com.lppchat.desktop';
 
 export function configureAppInstanceProfile(
   app: Pick<typeof ElectronApp, 'getPath' | 'setPath' | 'setAppUserModelId'>,
@@ -27,7 +27,7 @@ export function configureAppInstanceProfile(
     return {
       defaultUserDataPath,
       profileId: null,
-      profileName: '主客户端',
+      profileName: 'main',
       userDataPath: defaultUserDataPath,
     };
   }

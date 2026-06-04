@@ -17,10 +17,12 @@ import { ContactDetailContent } from "./ContactDetailViews";
 import { ContactsInviteQrCard } from "./ContactsInviteQrCard";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
+import { useQuery } from "@tanstack/react-query";
 import {
   type FriendInviteQrDto,
   type FriendRequestDto,
 } from "../data/api-client";
+import { useAuthSession } from "../data/auth/auth-store";
 import {
   contactDirectoryEmptyText,
   contactDirectorySearchPlaceholder,
@@ -32,6 +34,8 @@ import {
   groupOrganizationContactsByRole,
   requestStatusLabel,
 } from "../data/contact-directory";
+import { pcQueryKeys } from "../data/query-keys";
+import { requireApiClient } from "../data/runtime";
 import type { ContactFilter, ContactItem } from "../data/types";
 import {
   useActiveContactId,
@@ -44,6 +48,7 @@ import { formatError, formatShortDate } from "../lib/format";
 import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
 
 export function ContactsPage() {
+  const session = useAuthSession();
   const activeContactId = useActiveContactId();
   const setActiveContact = useSetActiveContact();
   const contactFilter = useContactFilter();
@@ -109,11 +114,29 @@ export function ContactsPage() {
   const activeContact =
     visibleContacts.find((item) => item.id === activeContactId) ??
     visibleContacts[0];
+  const activeTenantMemberUserId =
+    activeContact?.kind === "staff" && activeContact.userId ? activeContact.userId : "";
+  const tenantMemberProfileQuery = useQuery({
+    queryKey: pcQueryKeys.tenantMemberProfile(
+      session?.apiBaseUrl,
+      session?.tenantToken,
+      activeTenantMemberUserId,
+    ),
+    enabled: Boolean(activeTenantMemberUserId && !activeContact?.greenBubbleNo && session),
+    queryFn: async () => requireApiClient(session).getTenantMemberProfile(activeTenantMemberUserId),
+  });
+  const activeContactDetail = useMemo(() => {
+    const greenBubbleNo = tenantMemberProfileQuery.data?.greenBubbleNo;
+    if (!activeContact || activeContact.greenBubbleNo || !greenBubbleNo) return activeContact;
+    return { ...activeContact, greenBubbleNo };
+  }, [activeContact, tenantMemberProfileQuery.data?.greenBubbleNo]);
 
   const showProfilePanel =
-    directoryViewMode === "staff" && activeContact && activeContact.kind === "customer";
+    directoryViewMode === "staff" &&
+    activeContactDetail &&
+    activeContactDetail.kind === "customer";
   const relationshipActionsAvailable =
-    activeContact?.kind === "customer" || activeContact?.kind === "friend";
+    activeContactDetail?.kind === "customer" || activeContactDetail?.kind === "friend";
 
   const handleAddContact = () => {
     setContactFilter("requests");
@@ -244,26 +267,26 @@ export function ContactsPage() {
             onCreateInviteQr={onCreateInviteQr}
             onReject={(requestId) => handleRequest(requestId, "reject")}
           />
-        ) : activeContact ? (
+        ) : activeContactDetail ? (
           <>
             <div className="contacts-detail-head">
-              <ContactAvatar contact={activeContact} large />
+              <ContactAvatar contact={activeContactDetail} large />
               <div>
-                <h2>{activeContact.name}</h2>
-                <p>{activeContact.subtitle}</p>
+                <h2>{activeContactDetail.name}</h2>
+                <p>{activeContactDetail.subtitle}</p>
               </div>
             </div>
 
             <div className="contacts-actions">
-              <button className="primary" onClick={() => openMessage(activeContact)} type="button">
+              <button className="primary" onClick={() => openMessage(activeContactDetail)} type="button">
                 <MessageSquare size={16} />
                 {createDirectChatPending
                   ? "打开中..."
-                  : activeContact.kind === "group"
+                  : activeContactDetail.kind === "group"
                     ? "进入群聊"
                     : "发消息"}
               </button>
-              {activeContact.kind === "customer" && (
+              {activeContactDetail.kind === "customer" && (
                 <button type="button" onClick={() => setNotice("右侧已展示当前客户资料")}>
                   客户画像
                 </button>
@@ -272,7 +295,7 @@ export function ContactsPage() {
                 <button
                   className="danger-subtle"
                   disabled={relationshipActionPending}
-                  onClick={() => onDeleteFriend(activeContact)}
+                  onClick={() => onDeleteFriend(activeContactDetail)}
                   type="button"
                 >
                   <Trash2 size={15} />
@@ -283,7 +306,7 @@ export function ContactsPage() {
                 <button
                   className="danger-subtle"
                   disabled={relationshipActionPending}
-                  onClick={() => onBlockContact(activeContact)}
+                  onClick={() => onBlockContact(activeContactDetail)}
                   type="button"
                 >
                   <Ban size={15} />
@@ -292,7 +315,7 @@ export function ContactsPage() {
               )}
             </div>
 
-            <ContactDetailContent contact={activeContact} />
+            <ContactDetailContent contact={activeContactDetail} />
           </>
         ) : (
           <div className="contacts-empty-detail">
@@ -305,10 +328,10 @@ export function ContactsPage() {
       {showProfilePanel ? (
         <CustomerInfoPanel
           className="contacts-profile-panel"
-          contact={activeContact}
+          contact={activeContactDetail}
         />
       ) : (
-        <ContactSidePanel filter={effectiveFilter} contact={activeContact} />
+        <ContactSidePanel filter={effectiveFilter} contact={activeContactDetail} />
       )}
     </main>
   );

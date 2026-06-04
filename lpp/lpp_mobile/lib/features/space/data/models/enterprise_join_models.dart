@@ -58,6 +58,7 @@ class InvitationPreview {
   final String? description;
   final bool alreadyMember;
   final bool? identityMatched;
+  final int? targetMembershipRole;
   final String? targetHint;
 
   const InvitationPreview({
@@ -69,6 +70,7 @@ class InvitationPreview {
     this.description,
     this.alreadyMember = false,
     this.identityMatched,
+    this.targetMembershipRole,
     this.targetHint,
   });
 
@@ -83,6 +85,7 @@ class InvitationPreview {
           _nonEmpty(json['description']),
       alreadyMember: json['alreadyMember'] as bool? ?? false,
       identityMatched: json['identityMatched'] as bool?,
+      targetMembershipRole: _asInt(json['targetMembershipRole']),
       targetHint: _nonEmpty(json['targetIdentifierHint']),
     );
   }
@@ -93,7 +96,7 @@ class InvitationPreview {
       tenantName: tenantName,
       tenantCode: tenantCode.isEmpty ? null : tenantCode,
       logoUrl: logoUrl,
-      membershipRole: 0,
+      membershipRole: targetMembershipRole ?? 0,
     );
   }
 }

@@ -209,7 +209,7 @@ function cachedVideoPath({
 }) {
   const month = new Date().toISOString().slice(0, 7);
   const hash = createHash("sha1").update(url).digest("hex").slice(0, 16);
-  return join(userDataDir, "LPP Files", accountId, conversationId, "Videos", month, `${hash}-${fileName}`);
+  return join(userDataDir, "lppchat-files", accountId, conversationId, "Videos", month, `${hash}-${fileName}`);
 }
 
 function cachedMediaPath({
@@ -229,5 +229,5 @@ function cachedMediaPath({
 }) {
   const month = new Date().toISOString().slice(0, 7);
   const hash = createHash("sha1").update(url).digest("hex").slice(0, 16);
-  return join(userDataDir, "LPP Files", accountId, conversationId, directory, month, `${hash}-${fileName}`);
+  return join(userDataDir, "lppchat-files", accountId, conversationId, directory, month, `${hash}-${fileName}`);
 }

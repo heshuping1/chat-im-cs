@@ -9,6 +9,7 @@ import {
 } from "../../data/api-client";
 import { useAuthSession, useSetAuthSession } from "../../data/auth/auth-store";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { writeRendererAppLog } from "../../data/logging/app-log";
 import { createTraceId } from "../../data/runtime";
 import { roleLabel } from "../models/spaceRadarModel";
 
@@ -89,12 +90,28 @@ function buildSwitchedAuthSession(
   { currentTenant, profile, space, tenant }: SpaceSwitchResult,
 ): AuthSession {
   const isPersonalSpace = !space;
+  const sessionRole = space ? space.membershipRole : undefined;
+  writeRendererAppLog({
+    module: "auth",
+    event: "auth.space.switch.apply",
+    phase: "role",
+    result: "ok",
+    context: {
+      tenantId: isPersonalSpace ? null : tenant.tenantId,
+      spaceType: tenant.spaceContext?.spaceType ?? (space ? 2 : 1),
+      spaceRole: space?.membershipRole ?? null,
+      tenantRole: tenant.membershipRole ?? null,
+      sessionRole: sessionRole ?? null,
+      userType: profile?.userType ?? authSession.userType ?? null,
+      roleLabel: isPersonalSpace ? "personal" : roleLabel(sessionRole),
+    },
+  });
   return {
     ...authSession,
     avatarUrl: profile?.avatarUrl ?? tenant.avatarUrl,
     displayName: profile?.displayName ?? tenant.displayName,
     lppId: profile?.lppId ?? tenant.lppId,
-    membershipRole: space ? space.membershipRole : undefined,
+    membershipRole: sessionRole,
     platformUserId: profile?.platformUserId ?? tenant.platformUserId,
     refreshToken: tenant.refreshToken,
     roleLabel: space ? roleLabel(space.membershipRole) : "个人空间",

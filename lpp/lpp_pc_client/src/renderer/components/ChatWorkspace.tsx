@@ -535,6 +535,7 @@ export function ChatWorkspace({
         }
         assetBaseUrl={session?.apiBaseUrl}
         authToken={session?.tenantToken}
+        chatBackgroundPreset={pcSettings.chatBackgroundPreset}
         isMineMessage={(message) => isMineMessage(message, session)}
         jumpToLatest={jumpToLatest}
         messageAnnotations={messageAnnotations}

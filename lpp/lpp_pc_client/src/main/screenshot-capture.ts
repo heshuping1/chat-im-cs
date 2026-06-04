@@ -20,7 +20,7 @@ export interface ScreenshotSourceLike {
 }
 
 export const screenshotPermissionErrorMessage =
-  "截图失败：请在系统设置中允许 LPP 客服客户端录制屏幕后重试。";
+  "截图失败：请在系统设置中允许 lppchat 录制屏幕后重试。";
 
 export function selectScreenshotSource<T extends ScreenshotSourceLike>(
   sources: readonly T[],

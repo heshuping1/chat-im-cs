@@ -264,6 +264,7 @@ describe("diagnostics records view model", () => {
       { id: "message", label: "消息链路", count: 1, failedCount: 1 },
       { id: "gateway", label: "网关", count: 1, failedCount: 0 },
       { id: "cs-routing", label: "客服路由", count: 0, failedCount: 0 },
+      { id: "api-traffic", label: "API 请求", count: 0, failedCount: 0 },
       { id: "api-error", label: "API 错误", count: 0, failedCount: 0 },
       { id: "settings", label: "设置", count: 0, failedCount: 0 },
       { id: "runtime", label: "运行时", count: 0, failedCount: 0 },

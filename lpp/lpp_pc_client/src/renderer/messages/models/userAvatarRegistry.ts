@@ -51,9 +51,7 @@ export function buildUserAvatarRegistry({
     register(
       {
         userId: friend.friendUserId,
-        lppId: friend.lppId,
-        lppNo: friend.lppNo,
-        lppNumber: friend.lppNumber,
+        greenBubbleNo: friend.greenBubbleNo,
       },
       friend.avatarUrl,
     );

@@ -7,12 +7,14 @@ import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import { formatError, formatShortDate } from "../../lib/format";
 import {
+  canCreateTenantInvitations,
   createTenantInvitationDefaults,
   invitationAcceptedRoleText,
   invitationCopyTarget,
   invitationCreateButtonLabel,
   invitationRoleDescription,
   invitationRoleLabel,
+  normalizeTenantInvitationRoleFields,
   tenantInvitationRoleOptionsFor,
   tenantInvitationStatusLabel,
 } from "../models/tenantInvitationModel";
@@ -20,9 +22,10 @@ import {
 export function TenantInvitationPanel({ isPersonalSpace }: { isPersonalSpace: boolean }) {
   const authSession = useAuthSession();
   const queryClient = useQueryClient();
+  const canInviteEmployees = canCreateTenantInvitations(authSession?.membershipRole);
   const roleOptions = useMemo(
-    () => tenantInvitationRoleOptionsFor(authSession?.membershipRole),
-    [authSession?.membershipRole],
+    () => (canInviteEmployees ? tenantInvitationRoleOptionsFor(authSession?.membershipRole) : []),
+    [authSession?.membershipRole, canInviteEmployees],
   );
   const defaults = useMemo(
     () => createTenantInvitationDefaults(authSession?.membershipRole),
@@ -43,7 +46,7 @@ export function TenantInvitationPanel({ isPersonalSpace }: { isPersonalSpace: bo
 
   const invitationsQuery = useQuery({
     queryKey: pcQueryKeys.tenantInvitations(authSession?.apiBaseUrl, authSession?.tenantToken),
-    enabled: Boolean(authSession?.tenantToken && !isPersonalSpace && roleOptions.length > 0),
+    enabled: Boolean(authSession?.tenantToken && !isPersonalSpace && canInviteEmployees),
     staleTime: 30_000,
     queryFn: async () => requireApiClient(authSession).getTenantInvitations(),
   });
@@ -58,8 +61,9 @@ export function TenantInvitationPanel({ isPersonalSpace }: { isPersonalSpace: bo
         targetMembershipRole,
       }),
     onSuccess: async (invitation) => {
-      setCreatedInvitation(invitation);
-      setNotice(`${invitationRoleLabel(invitation.targetMembershipRole ?? targetMembershipRole)}邀请已创建`);
+      const normalizedInvitation = normalizeTenantInvitationRoleFields(invitation);
+      setCreatedInvitation(normalizedInvitation);
+      setNotice(`${invitationRoleLabel(normalizedInvitation.targetMembershipRole ?? targetMembershipRole)}邀请已创建`);
       await queryClient.invalidateQueries({
         queryKey: pcQueryKeys.tenantInvitations(authSession?.apiBaseUrl, authSession?.tenantToken),
       });
@@ -81,7 +85,7 @@ export function TenantInvitationPanel({ isPersonalSpace }: { isPersonalSpace: bo
 
   if (isPersonalSpace) return null;
 
-  if (roleOptions.length === 0) {
+  if (!canInviteEmployees || roleOptions.length === 0) {
     return (
       <section className="space-panel-section tenant-invitation-panel">
         <header>
@@ -273,8 +277,8 @@ export function TenantInvitationPanel({ isPersonalSpace }: { isPersonalSpace: bo
 }
 
 function normalizeTenantInvitations(data?: TenantInvitationDto[] | { items?: TenantInvitationDto[] }) {
-  if (Array.isArray(data)) return data;
-  return data?.items ?? [];
+  const invitations = Array.isArray(data) ? data : data?.items ?? [];
+  return invitations.map(normalizeTenantInvitationRoleFields);
 }
 
 function formatInvitationUses(invitation: TenantInvitationDto) {

@@ -14,6 +14,7 @@ export function ContactSidePanel({
         <p>组织成员只展示部门、职位、角色和会话入口，不展示客户画像或好友危险操作。</p>
         <div className="contacts-mini-rows">
           <InfoLine label="姓名" value={contact.name} />
+          <InfoLine label="身份" value="企业成员" />
           <InfoLine label="角色" value={contact.roleLabel || "--"} />
           <InfoLine label="部门" value={contact.departmentName || "--"} />
         </div>

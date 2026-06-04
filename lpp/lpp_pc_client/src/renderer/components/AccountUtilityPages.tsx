@@ -26,6 +26,7 @@ import {
   type TenantJoinRequestDto,
   type TenantCodePreviewDto,
 } from "../data/api-client";
+import { authTenantRoleLabel, mergePlatformTenants } from "../data/auth/auth-tenant-role";
 import { useAuthSession, useSetAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createTraceId } from "../data/runtime";
@@ -598,19 +599,11 @@ function normalizeSpaces(
   remote?: PlatformTenant[],
   fallback?: PlatformTenant[],
 ) {
-  const map = new Map<string, PlatformTenant>();
-  [...(fallback ?? []), ...(remote ?? [])].forEach((item) => {
-    if (item.tenantId) map.set(item.tenantId, item);
-  });
-  return Array.from(map.values());
+  return mergePlatformTenants(remote, fallback);
 }
 
 function roleLabel(role?: number) {
-  if (role === 4) return "所有者";
-  if (role === 3) return "管理员";
-  if (role === 2) return "客服";
-  if (role === 1) return "技术支持";
-  return "成员";
+  return authTenantRoleLabel(role);
 }
 
 function isPersonalTenantPlaceholder(tenantId?: string | null) {

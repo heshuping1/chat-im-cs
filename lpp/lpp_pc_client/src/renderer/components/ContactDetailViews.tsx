@@ -48,7 +48,7 @@ function CustomerContactDetail({ contact }: { contact: ContactItem }) {
           <InfoLine label="关系类型" value="客户好友" />
           <InfoLine label="通讯录分组" value={contact.groupName || "--"} />
           <InfoLine label="备注" value={contact.remark || "--"} />
-          <InfoLine label="绿泡泡号" value={contact.lppId || "--"} />
+          <InfoLine label="绿泡泡号" value={contact.greenBubbleNo || "--"} />
         </div>
       </section>
     </>
@@ -71,7 +71,7 @@ function FriendContactDetail({ contact }: { contact: ContactItem }) {
         <div className="contacts-mini-rows">
           <InfoLine label="通讯录分组" value={contact.groupName || "--"} />
           <InfoLine label="备注" value={contact.remark || "--"} />
-          <InfoLine label="绿泡泡号" value={contact.lppId || "--"} />
+          <InfoLine label="绿泡泡号" value={contact.greenBubbleNo || "--"} />
         </div>
       </section>
       <section className="contacts-section-card">
@@ -89,7 +89,8 @@ function StaffContactDetail({ contact }: { contact: ContactItem }) {
   return (
     <>
       <div className="contacts-info-grid">
-        <InfoCard label="组织角色" value={contact.roleLabel || "--"} />
+        <InfoCard label="身份" value="企业成员" />
+        <InfoCard label="角色" value={contact.roleLabel || "--"} />
         <InfoCard label="所属部门" value={contact.departmentName || "--"} />
         <InfoCard label="职位" value={contact.position || "--"} />
         <InfoCard label="加入时间" value={formatShortDate(contact.joinedAt)} />
@@ -101,7 +102,7 @@ function StaffContactDetail({ contact }: { contact: ContactItem }) {
         </h3>
         <div className="contacts-mini-rows">
           <InfoLine label="组织路径" value={contact.departmentName || "企业成员"} />
-          <InfoLine label="绿泡泡号" value={contact.lppId || "--"} />
+          <InfoLine label="绿泡泡号" value={contact.greenBubbleNo || "--"} />
           <InfoLine label="关联会话" value={contact.conversationId ? "已建立" : "未建立"} />
         </div>
       </section>
@@ -110,7 +111,10 @@ function StaffContactDetail({ contact }: { contact: ContactItem }) {
           <Crown size={16} />
           权限身份
         </h3>
-        <ContactTags tags={contact.tags} />
+        <div className="contacts-mini-rows">
+          <InfoLine label="身份" value="企业成员" />
+          <InfoLine label="角色" value={contact.roleLabel || "--"} />
+        </div>
       </section>
     </>
   );

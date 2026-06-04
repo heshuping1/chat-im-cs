@@ -10,7 +10,7 @@ const packageJson = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'u
     productName?: string;
   };
 };
-const buildProductName = packageJson.build?.productName?.trim() || 'LPP 客服客户端';
+const buildProductName = packageJson.build?.productName?.trim() || 'lppchat';
 
 export default defineConfig({
   plugins: [react()],

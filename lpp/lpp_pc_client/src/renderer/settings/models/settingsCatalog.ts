@@ -166,7 +166,7 @@ export const settingsRows = [
     "account",
     "action",
   ),
-  row("logoutAccount", "account", "退出登录", "退出当前 PC 客服客户端账号。", "account", "action"),
+  row("logoutAccount", "account", "退出登录", "退出当前 lppchat 账号。", "account", "action"),
   row("deactivateAccount", "account", "注销账户", "提交验证码后进入账号注销冷静期。", "account", "action"),
 
   row("allowMobileSearch", "privacy", "允许通过手机号搜索", "其他用户可通过手机号找到你。", "account", "switch"),
@@ -226,6 +226,7 @@ export const settingsRows = [
 
   row("clearLocalCache", "storageDiagnostics", "清理缓存", "清理图片、文件缩略图和临时缓存，不删除云端消息。", "local", "action"),
   row("diagnosticsExport", "storageDiagnostics", "导出诊断包", "导出本地日志、traceId、接口错误和关键操作轨迹。", "local", "action"),
+  row("apiTrafficLogLevel", "storageDiagnostics", "API 请求响应日志", "控制 data/api 层统一记录接口请求、响应和脱敏 body 的详细程度。", "local", "select", "localEffective"),
   row("diagnosticsRecentRecords", "storageDiagnostics", "诊断记录", "查看本机最近诊断摘要、模块筛选和脱敏后的 traceId。", "local", "info"),
   row("connectivityHealth", "storageDiagnostics", "连接体检", "查看当前 API、线路、实时连接、媒体和客服路由的可观测状态。", "local", "info"),
   row("developmentDiagnostics", "storageDiagnostics", "开发诊断", "查看环境、版本、构建、接口、实时连接和 profile 状态。", "system", "info", "recordOnly"),
@@ -340,7 +341,7 @@ function row(
     id,
     sectionId,
     label,
-    desc,
+    desc: withEffectCopy(desc, source, capability),
     source,
     control,
     capability,
@@ -355,10 +356,48 @@ function row(
 }
 
 function statusLabelForCapability(capability: SettingCapability) {
-  if (capability === "localEffective") return "本机生效";
-  if (capability === "recordOnly") return "状态展示";
   if (capability === "missingBackendApi") return "缺少接口";
   if (capability === "missingDesktopApi") return "缺少桌面能力";
   if (capability === "missingRuntimeWiring") return "待接入流程";
   return undefined;
+}
+
+function withEffectCopy(
+  desc: string,
+  source: SettingSource,
+  capability: SettingCapability,
+) {
+  const suffix = effectCopy(source, capability);
+  return suffix ? `${desc}${suffix}` : desc;
+}
+
+function effectCopy(source: SettingSource, capability: SettingCapability) {
+  if (capability === "recordOnly") {
+    return " 此项仅展示当前状态，不提供设置入口。";
+  }
+  if (capability === "localEffective") {
+    return " 此设置仅影响当前 PC 客户端。";
+  }
+  if (capability === "missingBackendApi") {
+    return " 需要补齐账号或企业接口后才能提供真实设置入口。";
+  }
+  if (capability === "missingDesktopApi") {
+    return " 需要补齐 Windows 桌面客户端能力后才能启用。";
+  }
+  if (capability === "missingRuntimeWiring") {
+    return " 需要接入完整客户端流程后才能启用。";
+  }
+  if (source === "local") {
+    return " 操作结果仅保存在当前 PC 客户端。";
+  }
+  if (source === "system") {
+    return " 仅在 Windows 桌面客户端生效，浏览器调试环境不可用。";
+  }
+  if (source === "account") {
+    return " 设置会随账号保存，当前 PC 客户端会立即使用最新策略。";
+  }
+  if (source === "enterprise") {
+    return " 内容来自当前企业信息，当前 PC 客户端只展示可用状态。";
+  }
+  return "";
 }

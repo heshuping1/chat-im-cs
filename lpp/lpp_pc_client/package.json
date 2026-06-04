@@ -1,5 +1,5 @@
 {
-  "name": "lpp-pc-client",
+  "name": "lppchat",
   "version": "0.1.0",
   "private": true,
   "description": "LPP Windows customer service desktop client",
@@ -86,8 +86,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.lpp.pcclient",
-    "productName": "LPP 客服客户端",
+    "appId": "com.lppchat.desktop",
+    "productName": "lppchat",
     "icon": "assets/app-icon-green-bubble.ico",
     "mac": {
       "icon": "assets/app-icon-green-bubble.icns"
@@ -108,7 +108,8 @@
     "win": {
       "icon": "assets/app-icon-green-bubble.ico",
       "target": "nsis",
-      "artifactName": "LPP-CustomerService-${version}.${ext}"
+      "artifactName": "lppchat-${version}.${ext}",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "installerIcon": "assets/app-icon-green-bubble.ico",

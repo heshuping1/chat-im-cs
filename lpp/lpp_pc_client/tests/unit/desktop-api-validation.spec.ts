@@ -7,6 +7,7 @@ import {
 import {
   validateCacheMediaFilePayload,
   validateChatArchiveFilePayload,
+  validateAppLogPayload,
   validateCsRoutingDiagnosticPayload,
   validateDesktopApiCall,
   validateDesktopIpcCall,
@@ -33,6 +34,7 @@ describe("desktop api validation", () => {
     expect(methods).toContain("getMinimizeToTray");
     expect(methods).toContain("setMinimizeToTray");
     expect(methods).toContain("recordCsRoutingDiagnostic");
+    expect(methods).toContain("writeAppLog");
     expect(methods).toContain("recordMessageReminderDiagnostic");
     expect(methods).toContain("saveChatArchiveFile");
     expect(methods).toContain("openChatArchiveFile");
@@ -58,6 +60,7 @@ describe("desktop api validation", () => {
     expect(desktopIpcChannelByMethod.recordCsRoutingDiagnostic).toBe(
       "desktop:record-cs-routing-diagnostic",
     );
+    expect(desktopIpcChannelByMethod.writeAppLog).toBe("desktop:write-app-log");
     expect(desktopIpcChannelByMethod.recordMessageReminderDiagnostic).toBe(
       "desktop:record-message-reminder-diagnostic",
     );
@@ -452,6 +455,56 @@ describe("desktop api validation", () => {
         },
       ]),
     ).toThrow("authSession.tenantToken");
+  });
+
+  it("validates app log payloads and redacts sensitive context", () => {
+    expect(
+      validateAppLogPayload({
+        module: "auth",
+        event: "auth.space.switch.apply",
+        phase: "role",
+        result: "ok",
+        level: "info",
+        traceId: "trace-1",
+        context: {
+          tenantId: "tenant-1",
+          tenantRole: 2,
+          sessionRole: 0,
+          tenantToken: "raw-token",
+        },
+      }),
+    ).toEqual({
+      module: "auth",
+      event: "auth.space.switch.apply",
+      phase: "role",
+      result: "ok",
+      level: "info",
+      traceId: "trace-1",
+      occurredAt: undefined,
+      reason: undefined,
+      context: {
+        tenantId: "tenant-1",
+        tenantRole: 2,
+        sessionRole: 0,
+        tenantToken: "[redacted]",
+      },
+      error: undefined,
+    });
+    expect(() =>
+      validateDesktopApiCall("writeAppLog", [
+        { module: "debug", event: "x", phase: "x", result: "ok" },
+      ]),
+    ).toThrow("appLog.module");
+    expect(() =>
+      validateDesktopApiCall("writeAppLog", [
+        { module: "auth", event: "x", phase: "x", result: "success" },
+      ]),
+    ).toThrow("appLog.result");
+    expect(() =>
+      validateDesktopApiCall("writeAppLog", [
+        { module: "auth", event: "x", phase: "x", result: "ok", level: "verbose" },
+      ]),
+    ).toThrow("appLog.level");
   });
 
   it("validates chat archive file payloads without accepting paths or unsafe extensions", () => {

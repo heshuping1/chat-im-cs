@@ -3,6 +3,11 @@ import type {
   CacheMediaPosterPayload,
   ChatArchiveFileKind,
   ChatArchiveFilePayload,
+  AppLogLevel,
+  AppLogModule,
+  AppLogPayload,
+  AppLogResult,
+  ApiTrafficDiagnosticPayload,
   DesktopNotificationChannel,
   DesktopNotificationTargetModule,
   DesktopApiMethod,
@@ -31,6 +36,9 @@ const maxDataUrlLength = 25 * 1024 * 1024;
 const trayStatuses = new Set<TrayStatus>(['online', 'busy', 'away', 'invisible']);
 const mediaKinds = new Set<CacheMediaFilePayload['kind']>(['image', 'video', 'file']);
 const notificationChannels = new Set<DesktopNotificationChannel>(['im', 'serviceQueue', 'sla']);
+const appLogModules = new Set<AppLogModule>(['main', 'auth', 'api']);
+const appLogLevels = new Set<AppLogLevel>(['debug', 'info', 'warn', 'error']);
+const appLogResults = new Set<AppLogResult>(['ok', 'degraded', 'ignored', 'invalid', 'failed']);
 const notificationTargetModules = new Set<DesktopNotificationTargetModule>([
   'contacts',
   'messages',
@@ -100,6 +108,10 @@ export function validateDesktopApiCall(
       return [];
     case 'exportDiagnostics':
       return [validateDiagnosticsPayload(args[0])];
+    case 'writeAppLog':
+      return [validateAppLogPayload(args[0])];
+    case 'recordApiTrafficDiagnostic':
+      return [validateApiTrafficDiagnosticPayload(args[0])];
     case 'recordCsRoutingDiagnostic':
       return [validateCsRoutingDiagnosticPayload(args[0])];
     case 'recordMessageReminderDiagnostic':
@@ -283,6 +295,89 @@ export function validateMessageReminderDiagnosticPayload(
         ? undefined
         : sanitizeDiagnosticsJsonValue(record.summary, 'messageReminder.summary'),
   };
+}
+
+export function validateApiTrafficDiagnosticPayload(value: unknown): ApiTrafficDiagnosticPayload {
+  const record = objectValue(value, 'apiTraffic.payload');
+  const phase = safeString(record.phase, 'apiTraffic.phase', 32);
+  if (phase !== 'request' && phase !== 'upload') {
+    throw new Error(`Invalid apiTraffic.phase: ${phase}`);
+  }
+  const result = safeString(record.result, 'apiTraffic.result', 32);
+  if (result !== 'success' && result !== 'failed') {
+    throw new Error(`Invalid apiTraffic.result: ${result}`);
+  }
+  const level = safeString(record.level, 'apiTraffic.level', 32);
+  if (level !== 'debug' && level !== 'info' && level !== 'warn' && level !== 'error') {
+    throw new Error(`Invalid apiTraffic.level: ${level}`);
+  }
+  return {
+    at: safeString(record.at, 'apiTraffic.at', 64),
+    level,
+    event: safeString(record.event, 'apiTraffic.event', 128),
+    source: safeString(record.source, 'apiTraffic.source', 128),
+    traceId: safeString(record.traceId, 'apiTraffic.traceId', 160),
+    module: 'api-traffic',
+    phase,
+    result,
+    route: optionalString(record.route, 'apiTraffic.route', 512),
+    timestamp: boundedInteger(record.timestamp, 'apiTraffic.timestamp', 0, Number.MAX_SAFE_INTEGER),
+    method: safeString(record.method, 'apiTraffic.method', 16),
+    path: safeString(record.path, 'apiTraffic.path', 512),
+    status: optionalPositiveNumber(record.status, 'apiTraffic.status'),
+    durationMs: optionalPositiveNumber(record.durationMs, 'apiTraffic.durationMs') ?? 0,
+    requestId: optionalString(record.requestId, 'apiTraffic.requestId', 160),
+    content:
+      record.content === undefined
+        ? undefined
+        : sanitizeApiTrafficJsonValue(record.content, 'apiTraffic.content'),
+    request:
+      record.request === undefined
+        ? undefined
+        : sanitizeApiTrafficJsonValue(record.request, 'apiTraffic.request'),
+    response:
+      record.response === undefined
+        ? undefined
+        : sanitizeApiTrafficJsonValue(record.response, 'apiTraffic.response'),
+    error:
+      record.error === undefined
+        ? undefined
+        : sanitizeApiTrafficJsonValue(record.error, 'apiTraffic.error'),
+  };
+}
+
+export function validateAppLogPayload(value: unknown): AppLogPayload {
+  const record = objectValue(value, 'appLog.payload');
+  const module = safeString(record.module, 'appLog.module', 32) as AppLogModule;
+  if (!appLogModules.has(module)) throw new Error(`Invalid appLog.module: ${module}`);
+  const result = safeString(record.result, 'appLog.result', 32) as AppLogResult;
+  if (!appLogResults.has(result)) throw new Error(`Invalid appLog.result: ${result}`);
+  const level = optionalAppLogLevel(record.level, 'appLog.level');
+  return {
+    module,
+    event: safeRequiredString(record.event, 'appLog.event', 128),
+    phase: safeRequiredString(record.phase, 'appLog.phase', 128),
+    result,
+    level,
+    traceId: optionalString(record.traceId, 'appLog.traceId', 160),
+    occurredAt: optionalString(record.occurredAt, 'appLog.occurredAt', 64),
+    reason: optionalString(record.reason, 'appLog.reason', 512),
+    context:
+      record.context === undefined
+        ? undefined
+        : sanitizeDiagnosticsJsonValue(record.context, 'appLog.context'),
+    error:
+      record.error === undefined
+        ? undefined
+        : sanitizeDiagnosticsJsonValue(record.error, 'appLog.error'),
+  };
+}
+
+function optionalAppLogLevel(value: unknown, label: string): AppLogLevel | undefined {
+  if (value === undefined || value === null) return undefined;
+  const level = safeString(value, label, 32) as AppLogLevel;
+  if (!appLogLevels.has(level)) throw new Error(`Invalid ${label}: ${level}`);
+  return level;
 }
 
 export function validateTaskbarBadgePayload(value: unknown): TaskbarBadgePayload {
@@ -535,6 +630,44 @@ function sanitizeDiagnosticsJsonValue(
               : diagnosticsContentKeyPattern.test(safeKey)
                 ? summarizeDiagnosticsContent(entry)
               : sanitizeDiagnosticsJsonValue(entry, `${label}.${safeKey}`, depth + 1),
+          ];
+        }),
+    );
+  }
+  return String(value);
+}
+
+function sanitizeApiTrafficJsonValue(
+  value: unknown,
+  label: string,
+  depth = 0,
+): DiagnosticsJsonValue {
+  if (depth > maxDiagnosticsDepth) return '[truncated-depth]';
+  if (value === null) return null;
+  if (typeof value === 'string') {
+    return redactDiagnosticsString(lastLabelSegment(label), safeString(value, label));
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`${label} must be finite`);
+    return value;
+  }
+  if (typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, maxDiagnosticsItems)
+      .map((item, index) => sanitizeApiTrafficJsonValue(item, `${label}.${index}`, depth + 1));
+  }
+  if (typeof value === 'object' && value) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .slice(0, maxDiagnosticsObjectEntries)
+        .map(([key, entry]) => {
+          const safeKey = safeString(key, `${label}.key`, 128);
+          return [
+            safeKey,
+            sensitiveDiagnosticsKeyPattern.test(safeKey)
+              ? '[redacted]'
+              : sanitizeApiTrafficJsonValue(entry, `${label}.${safeKey}`, depth + 1),
           ];
         }),
     );

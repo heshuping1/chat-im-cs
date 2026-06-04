@@ -8,5 +8,6 @@ export function canUseCustomerServiceStaffEndpoints(input?: {
 export function canUseCustomerServiceManagementReadonly(input?: {
   membershipRole?: number;
 } | null) {
-  return (input?.membershipRole ?? 0) >= 3;
+  const role = input?.membershipRole;
+  return role === 3 || role === 4;
 }

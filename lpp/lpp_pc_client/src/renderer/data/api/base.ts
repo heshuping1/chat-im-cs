@@ -1,4 +1,8 @@
 import { logApiErrorDiagnostic } from "./api-error-diagnostics";
+import {
+  logApiTrafficDiagnostic,
+  summarizeRequestBody,
+} from "./api-traffic-diagnostics";
 import { getAppInstanceHeaders } from "../app-instance/app-instance";
 
 export interface ApiClientOptions {
@@ -79,9 +83,12 @@ export class ApiBaseClient {
     options: UploadRequestOptions = {},
   ): Promise<T> {
     const startedAt = Date.now();
+    const method = "POST";
+    const requestBody = summarizeRequestBody(body);
     return new Promise<T>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       let settled = false;
+      let trafficLogged = false;
       let abortListener: (() => void) | undefined;
       const cleanup = () => {
         if (abortListener) {
@@ -96,9 +103,21 @@ export class ApiBaseClient {
       };
       const rejectWithDiagnostic = (error: unknown) =>
         finish(() => {
+          if (!trafficLogged) {
+            trafficLogged = true;
+            logApiTrafficDiagnostic({
+              phase: "upload",
+              result: "failed",
+              method,
+              path,
+              durationMs: Date.now() - startedAt,
+              requestBody,
+              error,
+            });
+          }
           logApiErrorDiagnostic({
             phase: "upload",
-            method: "POST",
+            method,
             path,
             durationMs: Date.now() - startedAt,
             error,
@@ -135,6 +154,18 @@ export class ApiBaseClient {
         const payload = parseJson<ApiEnvelope<T> | T | null>(xhr.responseText);
         if (xhr.status < 200 || xhr.status >= 300) {
           const envelope = payload as ApiEnvelope<T> | null;
+          trafficLogged = true;
+          logApiTrafficDiagnostic({
+            phase: "upload",
+            result: "failed",
+            method,
+            path,
+            status: xhr.status,
+            durationMs: Date.now() - startedAt,
+            requestId: envelope?.requestId,
+            requestBody,
+            responseBody: payload,
+          });
           rejectWithDiagnostic(
             new ApiError(
               envelope?.message ?? `HTTP ${xhr.status} ${path}`,
@@ -153,6 +184,18 @@ export class ApiBaseClient {
         ) {
           const envelope = payload as ApiEnvelope<T>;
           if (envelope.code !== "OK" && envelope.code !== "SUCCESS") {
+            trafficLogged = true;
+            logApiTrafficDiagnostic({
+              phase: "upload",
+              result: "failed",
+              method,
+              path,
+              status: xhr.status,
+              durationMs: Date.now() - startedAt,
+              requestId: envelope.requestId,
+              requestBody,
+              responseBody: payload,
+            });
             rejectWithDiagnostic(
               new ApiError(
                 envelope.message ?? envelope.code,
@@ -163,9 +206,30 @@ export class ApiBaseClient {
             );
             return;
           }
+          logApiTrafficDiagnostic({
+            phase: "upload",
+            result: "success",
+            method,
+            path,
+            status: xhr.status,
+            durationMs: Date.now() - startedAt,
+            requestId: envelope.requestId,
+            requestBody,
+            responseBody: envelope.data,
+          });
           finish(() => resolve(envelope.data));
           return;
         }
+        logApiTrafficDiagnostic({
+          phase: "upload",
+          result: "success",
+          method,
+          path,
+          status: xhr.status,
+          durationMs: Date.now() - startedAt,
+          requestBody,
+          responseBody: payload,
+        });
         finish(() => resolve(payload as T));
       };
       if (options.signal) {
@@ -189,6 +253,7 @@ export class ApiBaseClient {
   ): Promise<T> {
     const startedAt = Date.now();
     const method = init.method ?? "GET";
+    const requestBody = summarizeRequestBody(init.body);
     const headers = new Headers(init.headers);
     if (!(init.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
@@ -212,6 +277,17 @@ export class ApiBaseClient {
         .catch(() => null)) as ApiEnvelope<T> | null;
       if (!response.ok) {
         const suffix = payload?.requestId ? ` requestId=${payload.requestId}` : "";
+        logApiTrafficDiagnostic({
+          phase: "request",
+          result: "failed",
+          method,
+          path,
+          status: response.status,
+          durationMs: Date.now() - startedAt,
+          requestId: payload?.requestId,
+          requestBody,
+          responseBody: payload,
+        });
         throw new ApiError(
           payload?.message ?? `HTTP ${response.status} ${path}${suffix}`,
           payload?.code,
@@ -227,6 +303,17 @@ export class ApiBaseClient {
       ) {
         if (payload.code !== "OK" && payload.code !== "SUCCESS") {
           const suffix = payload.requestId ? ` requestId=${payload.requestId}` : "";
+          logApiTrafficDiagnostic({
+            phase: "request",
+            result: "failed",
+            method,
+            path,
+            status: response.status,
+            durationMs: Date.now() - startedAt,
+            requestId: payload.requestId,
+            requestBody,
+            responseBody: payload,
+          });
           throw new ApiError(
             `${payload.message ?? payload.code}${suffix}`,
             payload.code,
@@ -234,10 +321,42 @@ export class ApiBaseClient {
             response.status,
           );
         }
+        logApiTrafficDiagnostic({
+          phase: "request",
+          result: "success",
+          method,
+          path,
+          status: response.status,
+          durationMs: Date.now() - startedAt,
+          requestId: payload.requestId,
+          requestBody,
+          responseBody: payload.data,
+        });
         return payload.data;
       }
+      logApiTrafficDiagnostic({
+        phase: "request",
+        result: "success",
+        method,
+        path,
+        status: response.status,
+        durationMs: Date.now() - startedAt,
+        requestBody,
+        responseBody: payload,
+      });
       return payload as T;
     } catch (error) {
+      if (!(error instanceof ApiError)) {
+        logApiTrafficDiagnostic({
+          phase: "request",
+          result: "failed",
+          method,
+          path,
+          durationMs: Date.now() - startedAt,
+          requestBody,
+          error,
+        });
+      }
       logApiErrorDiagnostic({
         phase: "request",
         method,

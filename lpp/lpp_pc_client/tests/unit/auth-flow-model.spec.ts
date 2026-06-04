@@ -173,17 +173,20 @@ describe("auth flow model", () => {
         tenantDescription: "用于测试各角色场景的企业",
         alreadyMember: false,
         identityMatched: true,
+        targetMembershipRole: 2,
         expiresAt: "2026-06-11T00:00:00.000Z",
       }),
     ).toEqual({
       kind: "ready",
       alreadyMember: false,
-      badges: ["定向匹配", "有效至 2026-06-11"],
+      badges: ["将以 客服 身份加入", "定向匹配", "有效至 2026-06-11"],
       codeText: "mouse-corp",
       description: "用于测试各角色场景的企业",
       identityMatched: true,
       logoUrl: "https://example.test/logo.png",
       name: "Mouse 测试企业",
+      targetMembershipRole: 2,
+      targetRoleText: "将以 客服 身份加入",
       title: "将加入企业",
     });
   });
@@ -225,4 +228,5 @@ describe("auth flow model", () => {
       "该邀请码仅限指定账号使用",
     );
   });
+
 });

@@ -1,6 +1,8 @@
 import type {
   DesktopApi,
   DesktopApiMethod,
+  AppLogPayload,
+  ApiTrafficDiagnosticPayload,
   CsRoutingDiagnosticPayload,
   DiagnosticsPayload,
   MessageReminderDiagnosticPayload,
@@ -110,6 +112,10 @@ const desktopApi: DesktopApi = {
   getAppVersion: () => validatedInvoke('getAppVersion', 'desktop:get-app-version'),
   exportDiagnostics: (payload: DiagnosticsPayload) =>
     validatedInvoke('exportDiagnostics', 'desktop:export-diagnostics', payload),
+  writeAppLog: (payload: AppLogPayload) =>
+    validatedInvoke('writeAppLog', 'desktop:write-app-log', payload),
+  recordApiTrafficDiagnostic: (payload: ApiTrafficDiagnosticPayload) =>
+    validatedInvoke('recordApiTrafficDiagnostic', 'desktop:record-api-traffic-diagnostic', payload),
   recordCsRoutingDiagnostic: (payload: CsRoutingDiagnosticPayload) =>
     validatedInvoke('recordCsRoutingDiagnostic', 'desktop:record-cs-routing-diagnostic', payload),
   recordMessageReminderDiagnostic: (payload: MessageReminderDiagnosticPayload) =>

@@ -174,8 +174,25 @@ GET /api/platform/v1/tenants/by-code/mouse-corp   (Authorization: Bearer <platfo
 | `maxUses` | int | 1 | 最大使用次数 |
 | `expireHours` | int | 168(7 天) | 有效期(小时) |
 | `targetIdentifier` | string? | null | 填手机号/邮箱 → 定向邀请(`inviteType=1`),仅该账号可用;不填 → 通用邀请码(`inviteType=0`) |
+| `targetMembershipRole` | short? | null | **2026-06-03 新增。员工入职邀请的目标角色**。`1=技术`、`2=客服`、`3=管理员`;省略/`null`=普通成员(旧行为)。被邀请人**接受后直接成为该角色**,无需所有者事后改角色 |
 
 > 注意:邀请码在**企业成员客户端 / IM 端**生成(client API,需租户 token),**不是**在平台管理后台(admin-web)。平台管理后台没有"生成邀请码"入口。
+
+### 4.4 员工入职邀请 `targetMembershipRole`(2026-06-03 新增)
+
+这就是第三方此前提出的"缺一个员工入职邀请能力"的服务端闭环。设置 `targetMembershipRole` 后,接受邀请即直接落地为对应员工角色(并把 `userType` 归一为员工=2),**不再需要"先加入为普通成员 → 所有者手工改角色"两步走**。
+
+**防提权:创建者只能签发严格低于自己角色的邀请。**
+
+| 创建者角色 | 可签发的 `targetMembershipRole` | 越权请求的返回 |
+|---|---|---|
+| 客服(2) | 仅普通成员(省略/`null`/`0`) | 请求 `>=2` → `403 INVITATION_ROLE_TOO_HIGH` |
+| 管理员(3) | 技术(1) / 客服(2) | 请求 `>=3` → `403 INVITATION_ROLE_TOO_HIGH` |
+| 所有者(4) | 技术(1) / 客服(2) / 管理员(3) | 请求 `4(Owner)` → `400 INVITATION_ROLE_INVALID` |
+
+- **Owner(4) 永远不能通过邀请码授予**:所有权转移只能走 `PUT /tenant/members/{userId}/role`(仅 Owner 可调,见下方权限矩阵)。
+- 角色只在**邀请码**路径生效:`POST /tenants/join-by-code` 与加入申请审批 `POST /tenant/join-requests/{id}/approve` 仍恒为普通成员(不开放自助选角色,避免提权)。
+- 向后兼容:旧客户端不传该字段 = 旧行为(落普通成员)。
 
 ---
 

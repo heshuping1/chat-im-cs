@@ -77,6 +77,45 @@ export interface MessageReminderDiagnosticPayload {
   summary?: DiagnosticsJsonValue;
 }
 
+export interface ApiTrafficDiagnosticPayload {
+  at: string;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  event: string;
+  source: string;
+  traceId: string;
+  module: 'api-traffic';
+  phase: 'request' | 'upload';
+  result: 'success' | 'failed';
+  route?: string;
+  timestamp: number;
+  method: string;
+  path: string;
+  status?: number;
+  durationMs: number;
+  requestId?: string;
+  content?: DiagnosticsJsonValue;
+  request?: DiagnosticsJsonValue;
+  response?: DiagnosticsJsonValue;
+  error?: DiagnosticsJsonValue;
+}
+
+export type AppLogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type AppLogModule = 'main' | 'auth' | 'api';
+export type AppLogResult = 'ok' | 'degraded' | 'ignored' | 'invalid' | 'failed';
+
+export interface AppLogPayload {
+  module: AppLogModule;
+  event: string;
+  phase: string;
+  result: AppLogResult;
+  level?: AppLogLevel;
+  traceId?: string;
+  occurredAt?: string;
+  reason?: string;
+  context?: DiagnosticsJsonValue;
+  error?: DiagnosticsJsonValue;
+}
+
 export interface DesktopAuthSessionPayload {
   apiBaseUrl: string;
   adminBaseUrl?: string;
@@ -199,6 +238,8 @@ export interface DesktopApi {
   captureScreenshot(): Promise<ScreenshotCaptureResult>;
   getAppVersion(): Promise<string>;
   exportDiagnostics(payload: DiagnosticsPayload): Promise<string | null>;
+  writeAppLog(payload: AppLogPayload): Promise<void>;
+  recordApiTrafficDiagnostic(payload: ApiTrafficDiagnosticPayload): Promise<void>;
   recordCsRoutingDiagnostic(payload: CsRoutingDiagnosticPayload): Promise<void>;
   recordMessageReminderDiagnostic(payload: MessageReminderDiagnosticPayload): Promise<void>;
   setTaskbarBadge(payload: TaskbarBadgePayload): Promise<void>;
@@ -232,6 +273,8 @@ export const desktopIpcChannelByMethod = {
   openMediaFile: 'desktop:open-media-file',
   openVideoPlayer: 'desktop:open-video-player',
   readAuthSession: 'desktop:read-auth-session',
+  writeAppLog: 'desktop:write-app-log',
+  recordApiTrafficDiagnostic: 'desktop:record-api-traffic-diagnostic',
   recordCsRoutingDiagnostic: 'desktop:record-cs-routing-diagnostic',
   recordMessageReminderDiagnostic: 'desktop:record-message-reminder-diagnostic',
   revealMediaInFolder: 'desktop:reveal-media-in-folder',

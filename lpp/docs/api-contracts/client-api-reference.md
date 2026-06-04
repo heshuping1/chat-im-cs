@@ -108,6 +108,7 @@ Base URL：`/api/platform/v1`
 | `expiresAt` | DateTimeOffset | 过期时间 |
 | `alreadyMember` | bool | 当前平台账号是否已是该租户成员；未传平台 Token 时固定为 `false` |
 | `identityMatched` | bool? | 当前平台账号是否匹配定向邀请；通用邀请或未传平台 Token 时为 `null` |
+| `targetMembershipRole` | short? | **2026-06-04 新增**。接受本邀请后将落地的角色：`1=技术支持`、`2=客服`、`3=管理员`；`null`=普通成员（旧邀请或未指定角色的邀请）。用于在用户接受前展示"你将以 客服 身份加入" |
 
 ### 1.5 `PlatformSpaceUnreadSummaryResponse` / `SpaceUnreadSummaryDto`
 

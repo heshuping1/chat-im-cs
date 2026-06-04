@@ -2,11 +2,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  canCreateTenantInvitations,
   createTenantInvitationDefaults,
   invitationCopyTarget,
   invitationCreateButtonLabel,
   invitationRoleDescription,
   invitationRoleLabel,
+  normalizeTenantInvitationRoleFields,
+  normalizeTenantInvitationTargetRole,
   tenantInvitationRoleOptionsFor,
   tenantInvitationStatusLabel,
 } from "../../src/renderer/spaces/models/tenantInvitationModel";
@@ -34,9 +37,14 @@ describe("tenant employee invitations", () => {
   );
 
   it("maps creator role to allowed invitation target roles without owner grants", () => {
-    expect(tenantInvitationRoleOptionsFor(2).map((option) => option.role)).toEqual([0]);
+    expect(canCreateTenantInvitations(2)).toBe(false);
+    expect(canCreateTenantInvitations(3)).toBe(true);
+    expect(canCreateTenantInvitations(4)).toBe(true);
+    expect(canCreateTenantInvitations(5)).toBe(false);
+    expect(tenantInvitationRoleOptionsFor(2).map((option) => option.role)).toEqual([]);
     expect(tenantInvitationRoleOptionsFor(3).map((option) => option.role)).toEqual([0, 1, 2]);
     expect(tenantInvitationRoleOptionsFor(4).map((option) => option.role)).toEqual([0, 1, 2, 3]);
+    expect(tenantInvitationRoleOptionsFor(5).map((option) => option.role)).toEqual([]);
     expect(tenantInvitationRoleOptionsFor(4).map((option) => option.label)).not.toContain("所有者");
     expect(createTenantInvitationDefaults(3).targetMembershipRole).toBe(2);
     expect(createTenantInvitationDefaults(2).targetMembershipRole).toBe(0);
@@ -53,6 +61,16 @@ describe("tenant employee invitations", () => {
     expect(profileClientSource).toContain("getTenantInvitations");
     expect(profileClientSource).toContain("deleteTenantInvitation");
     expect(queryKeysSource).toContain("tenantInvitations");
+  });
+
+  it("normalizes returned invitation role aliases before rendering labels", () => {
+    expect(normalizeTenantInvitationTargetRole({ targetRole: 2 })).toBe(2);
+    expect(normalizeTenantInvitationTargetRole({ membershipRole: "2" })).toBe(2);
+    expect(normalizeTenantInvitationTargetRole({ target_membership_role: "customer_service" })).toBe(2);
+    expect(normalizeTenantInvitationRoleFields({ code: "ABC", targetRole: 2 })).toMatchObject({
+      code: "ABC",
+      targetMembershipRole: 2,
+    });
   });
 
   it("maps invitation status without leaking raw backend numeric codes", () => {

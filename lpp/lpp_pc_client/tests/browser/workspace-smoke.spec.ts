@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("renders the local login shell", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "LPP PC 客服客户端" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "lppchat" })).toBeVisible();
   await expect(page.locator(".auth-advanced summary")).toBeVisible();
   await expect(page.locator(".auth-advanced input").first()).toBeHidden();
   await expect(page.getByText("LPP 号 / 邮箱 / 手机号")).toBeVisible();

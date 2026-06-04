@@ -35,10 +35,16 @@ export function tenantInvitationRoleOptionsFor(
   const role = Number.isFinite(creatorMembershipRole)
     ? Number(creatorMembershipRole)
     : 0;
-  if (role >= 4) return roleOptions;
-  if (role >= 3) return roleOptions.filter((option) => option.role <= 2);
-  if (role >= 2) return roleOptions.filter((option) => option.role === 0);
+  if (role === 4) return roleOptions;
+  if (role === 3) return roleOptions.filter((option) => option.role === 0 || option.role === 1 || option.role === 2);
   return [];
+}
+
+export function canCreateTenantInvitations(creatorMembershipRole?: number | null) {
+  const role = Number.isFinite(creatorMembershipRole)
+    ? Number(creatorMembershipRole)
+    : 0;
+  return role === 3 || role === 4;
 }
 
 export function createTenantInvitationDefaults(creatorMembershipRole?: number | null) {
@@ -69,6 +75,52 @@ export function invitationAcceptedRoleText(role?: number | null) {
 
 export function invitationRoleDescription(role?: number | null) {
   return roleOptions.find((option) => option.role === role)?.description ?? roleOptions[0].description;
+}
+
+interface TenantInvitationRoleSource {
+  targetMembershipRole?: number | string | null;
+  targetRole?: number | string | null;
+  target_role?: number | string | null;
+  target_membership_role?: number | string | null;
+  membershipRole?: number | string | null;
+  role?: number | string | null;
+}
+
+export function normalizeTenantInvitationTargetRole(
+  source?: TenantInvitationRoleSource | number | string | null,
+) {
+  const rawRole =
+    typeof source === "number" || typeof source === "string"
+      ? source
+      : source?.targetMembershipRole ??
+        source?.targetRole ??
+        source?.target_role ??
+        source?.target_membership_role ??
+        source?.membershipRole ??
+        source?.role;
+
+  if (rawRole === 3 || rawRole === "3") return 3;
+  if (rawRole === 2 || rawRole === "2") return 2;
+  if (rawRole === 1 || rawRole === "1") return 1;
+  if (rawRole === 0 || rawRole === "0") return 0;
+
+  const normalized = String(rawRole ?? "").trim().toLowerCase();
+  if (["admin", "manager", "administrator"].includes(normalized)) return 3;
+  if (["customer_service", "customer-service", "customerservice", "service", "agent"].includes(normalized)) return 2;
+  if (["technical_support", "technical-support", "technicalsupport", "support"].includes(normalized)) return 1;
+  if (["member", "employee", "staff"].includes(normalized)) return 0;
+
+  return undefined;
+}
+
+export function normalizeTenantInvitationRoleFields<T extends TenantInvitationRoleSource>(invitation: T) {
+  const role = normalizeTenantInvitationTargetRole(invitation);
+  return role === undefined
+    ? invitation
+    : {
+        ...invitation,
+        targetMembershipRole: role,
+      };
 }
 
 export function tenantInvitationStatusLabel(status?: string | number | null) {

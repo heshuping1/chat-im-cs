@@ -75,6 +75,8 @@ export const pcQueryKeys = {
     ] as const,
   friendProfileExtra: (apiBaseUrl?: string, tenantToken?: string, friendUserId?: string) =>
     ["pc-friend-profile-extra", ...sessionKey(apiBaseUrl, tenantToken), friendUserId ?? ""] as const,
+  tenantMemberProfile: (apiBaseUrl?: string, tenantToken?: string, userId?: string) =>
+    ["pc-tenant-member-profile", ...sessionKey(apiBaseUrl, tenantToken), userId ?? ""] as const,
   accountProfile: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-account-profile", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountTenant: (apiBaseUrl?: string, tenantToken?: string) =>

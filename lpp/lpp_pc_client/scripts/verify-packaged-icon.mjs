@@ -7,12 +7,12 @@ const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
 const targets = [
   {
-    exe: join(root, "release", "win-unpacked", "LPP 客服客户端.exe"),
+    exe: join(root, "release", "win-unpacked", "lppchat.exe"),
     outputPng: join(root, "tmp", "packaged-exe-icon.png"),
     required: true,
   },
   {
-    exe: process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\lpp-pc-client\\LPP 客服客户端.exe",
+    exe: process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\lppchat\\lppchat.exe",
     outputPng: join(root, "tmp", "installed-exe-icon.png"),
     required: false,
   },

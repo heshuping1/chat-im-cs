@@ -1,4 +1,40 @@
-export type PcUserTimezone = "系统默认" | "Asia/Shanghai" | "UTC";
+const systemTimezone = "系统默认";
+
+const fixedUtcTimezoneOptions = [
+  "UTC-12:00",
+  "UTC-11:00",
+  "UTC-10:00",
+  "UTC-09:00",
+  "UTC-08:00",
+  "UTC-07:00",
+  "UTC-06:00",
+  "UTC-05:00",
+  "UTC-04:00",
+  "UTC-03:00",
+  "UTC-02:00",
+  "UTC-01:00",
+  "UTC+00:00",
+  "UTC+01:00",
+  "UTC+02:00",
+  "UTC+03:00",
+  "UTC+04:00",
+  "UTC+05:00",
+  "UTC+06:00",
+  "UTC+07:00",
+  "UTC+08:00",
+  "UTC+09:00",
+  "UTC+10:00",
+  "UTC+11:00",
+] as const;
+
+export const pcUserTimezoneOptions = [
+  systemTimezone,
+  ...fixedUtcTimezoneOptions,
+] as const;
+
+export type PcSelectableUserTimezone = (typeof pcUserTimezoneOptions)[number];
+export type PcLegacyUserTimezone = "Asia/Shanghai" | "UTC";
+export type PcUserTimezone = PcSelectableUserTimezone | PcLegacyUserTimezone;
 
 export interface UserTimezoneFormattingOptions {
   timezone?: PcUserTimezone;
@@ -13,22 +49,40 @@ interface DateParts {
   minute: number;
 }
 
-export const pcUserTimezoneOptions = [
-  "系统默认",
-  "Asia/Shanghai",
-  "UTC",
-] satisfies PcUserTimezone[];
-
-export const pcUserTimezoneLabels: Record<PcUserTimezone, string> = {
+export const pcUserTimezoneLabels: Record<PcSelectableUserTimezone, string> = {
   系统默认: "系统默认",
-  "Asia/Shanghai": "中国标准时间",
-  UTC: "UTC",
+  "UTC-12:00": "UTC-12:00",
+  "UTC-11:00": "UTC-11:00",
+  "UTC-10:00": "UTC-10:00",
+  "UTC-09:00": "UTC-09:00",
+  "UTC-08:00": "UTC-08:00",
+  "UTC-07:00": "UTC-07:00",
+  "UTC-06:00": "UTC-06:00",
+  "UTC-05:00": "UTC-05:00",
+  "UTC-04:00": "UTC-04:00",
+  "UTC-03:00": "UTC-03:00",
+  "UTC-02:00": "UTC-02:00",
+  "UTC-01:00": "UTC-01:00",
+  "UTC+00:00": "UTC+00:00",
+  "UTC+01:00": "UTC+01:00",
+  "UTC+02:00": "UTC+02:00",
+  "UTC+03:00": "UTC+03:00",
+  "UTC+04:00": "UTC+04:00",
+  "UTC+05:00": "UTC+05:00",
+  "UTC+06:00": "UTC+06:00",
+  "UTC+07:00": "UTC+07:00",
+  "UTC+08:00": "UTC+08:00",
+  "UTC+09:00": "UTC+09:00",
+  "UTC+10:00": "UTC+10:00",
+  "UTC+11:00": "UTC+11:00",
 };
 
-export function normalizePcUserTimezone(value: unknown): PcUserTimezone {
-  return pcUserTimezoneOptions.includes(value as PcUserTimezone)
-    ? (value as PcUserTimezone)
-    : "系统默认";
+export function normalizePcUserTimezone(value: unknown): PcSelectableUserTimezone {
+  if (value === "Asia/Shanghai") return "UTC+08:00";
+  if (value === "UTC") return "UTC+00:00";
+  return pcUserTimezoneOptions.includes(value as PcSelectableUserTimezone)
+    ? (value as PcSelectableUserTimezone)
+    : systemTimezone;
 }
 
 export function formatUserShortDate(
@@ -90,34 +144,32 @@ export function formatUserClockTime(
 }
 
 export function getUserDateParts(date: Date, timezone: unknown): DateParts {
-  const timeZone = resolveIntlTimeZone(timezone);
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    ...(timeZone ? { timeZone } : {}),
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-  const parts = Object.fromEntries(
-    formatter
-      .formatToParts(date)
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  );
+  const normalized = normalizePcUserTimezone(timezone);
+  if (normalized === systemTimezone) {
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hour: date.getHours(),
+      minute: date.getMinutes(),
+    };
+  }
+
+  const zoned = new Date(date.getTime() + utcOffsetMinutes(normalized) * 60_000);
   return {
-    year: Number(parts.year),
-    month: Number(parts.month),
-    day: Number(parts.day),
-    hour: Number(parts.hour),
-    minute: Number(parts.minute),
+    year: zoned.getUTCFullYear(),
+    month: zoned.getUTCMonth() + 1,
+    day: zoned.getUTCDate(),
+    hour: zoned.getUTCHours(),
+    minute: zoned.getUTCMinutes(),
   };
 }
 
-function resolveIntlTimeZone(timezone: unknown) {
-  const normalized = normalizePcUserTimezone(timezone);
-  return normalized === "系统默认" ? undefined : normalized;
+function utcOffsetMinutes(timezone: PcSelectableUserTimezone) {
+  const match = /^UTC([+-])(\d{2}):00$/.exec(timezone);
+  if (!match) return 0;
+  const sign = match[1] === "-" ? -1 : 1;
+  return sign * Number(match[2]) * 60;
 }
 
 function parseDateValue(value?: string | null) {

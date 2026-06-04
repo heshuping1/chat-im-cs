@@ -18,6 +18,8 @@ import { readdir } from 'node:fs/promises';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import type {
+  AppLogPayload,
+  ApiTrafficDiagnosticPayload,
   DesktopAuthSessionPayload,
   DesktopApiMethod,
   CsRoutingDiagnosticPayload,
@@ -38,6 +40,7 @@ import {
   configureDefaultMainAppLogging,
   mainAppLogBackend,
   recordDefaultMainAppLog,
+  writeAppLogToFile,
 } from './app-logging.js';
 import { registerDesktopFileHandlers } from './desktop-file-handlers.js';
 import { DiagnosticsJsonlWriter } from './diagnostics-jsonl-writer.js';
@@ -72,14 +75,16 @@ const appIconPath = app.isPackaged
   ? join(process.resourcesPath, 'app-icon.ico')
   : join(__dirname, '../../assets/app-icon-green-bubble.ico');
 const devDockIconPath = join(__dirname, '../../assets/app-icon-green-bubble.png');
-const appDisplayName = 'LPP 客服客户端';
+const appDisplayName = 'lppchat';
 app.setName(appDisplayName);
 if (process.platform === 'win32') {
   app.setAppUserModelId(appUserModelIdForProfile(null));
 }
 const appInstanceProfile = configureAppInstanceProfile(app);
+app.setAppLogsPath(join(app.getPath('userData'), 'logs'));
+const logsDir = app.getPath('logs');
 const diagnosticsDir = join(app.getPath('userData'), 'diagnostics');
-configureDefaultMainAppLogging({ diagnosticsDir, isDev });
+configureDefaultMainAppLogging({ logsDir, isDev });
 setElectronRuntimeDiagnosticLogger(mainAppLogBackend);
 const appTitle = formatProfileWindowTitle(
   appDisplayName,
@@ -216,7 +221,7 @@ function updateTrayContextMenu() {
       { label: '显示主窗口', click: showMainWindow },
       { type: 'separator' },
       {
-        label: '退出 LPP 客服客户端',
+        label: 'Quit lppchat',
         click: () => {
           isQuitting = true;
           app.quit();
@@ -349,9 +354,20 @@ handleDesktopIpc('exportDiagnostics', async (_event, payload: DiagnosticsPayload
   return result.filePath;
 });
 
+handleDesktopIpc('writeAppLog', async (_event, payload: AppLogPayload) => {
+  await writeAppLogToFile(payload);
+});
+
 handleDesktopIpc('recordCsRoutingDiagnostic', async (_event, payload: CsRoutingDiagnosticPayload) => {
   await recordCsRoutingDiagnostic(payload);
 });
+
+handleDesktopIpc(
+  'recordApiTrafficDiagnostic',
+  async (_event, payload: ApiTrafficDiagnosticPayload) => {
+    await recordApiTrafficDiagnostic(payload);
+  },
+);
 
 handleDesktopIpc(
   'recordMessageReminderDiagnostic',
@@ -385,6 +401,10 @@ async function recordCsRoutingDiagnostic(payload: CsRoutingDiagnosticPayload) {
   await diagnosticsWriter('cs-routing.jsonl', 500).write(payload);
 }
 
+async function recordApiTrafficDiagnostic(payload: ApiTrafficDiagnosticPayload) {
+  await diagnosticsWriter('api-traffic.jsonl', 1000).write(payload);
+}
+
 async function recordMessageReminderDiagnostic(payload: MessageReminderDiagnosticPayload) {
   const target = reminderDiagnosticsTarget(payload);
   await diagnosticsWriter(target.fileName, target.maxLines).write(payload);
@@ -399,8 +419,14 @@ function diagnosticsWriter(fileName: string, maxLines: number) {
   return writer;
 }
 
+function ensureDiagnosticsLogFiles() {
+  mkdirSync(diagnosticsDir, { recursive: true });
+  writeFileSync(join(diagnosticsDir, 'api-traffic.jsonl'), '', { flag: 'a' });
+}
+
 app.whenReady().then(() => {
   if (!singleInstanceLock) return;
+  ensureDiagnosticsLogFiles();
   installElectronAppDiagnostics(app);
   recordDefaultMainAppLog({
     context: {

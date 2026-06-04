@@ -8,6 +8,11 @@ import type {
   FriendDto,
   TenantMemberDto,
 } from "../../src/renderer/data/api/types";
+import {
+  normalizeFriendDto,
+  normalizeTenantMemberDto,
+  normalizeTenantMemberProfileDto,
+} from "../../src/renderer/data/api/contacts-client";
 import { deriveContactDirectoryAccess } from "../../src/renderer/data/contact-directory-permissions";
 import {
   contactMatchesDirectoryFilter,
@@ -70,7 +75,7 @@ describe("contact directory model", () => {
       members: [
         {
           userId: "u1",
-          lppId: "lpp-u1",
+          greenBubbleNo: "lpp-u1",
           displayName: "小周",
           membershipRole: 2,
         } satisfies TenantMemberDto,
@@ -81,7 +86,7 @@ describe("contact directory model", () => {
       expect.objectContaining({
         departmentName: "客服部",
         kind: "staff",
-        lppId: "lpp-u1",
+        greenBubbleNo: "lpp-u1",
         name: "小周",
         position: "一线客服",
         roleLabel: "客服",
@@ -91,14 +96,111 @@ describe("contact directory model", () => {
     ]);
   });
 
+  it("maps organization member green bubble numbers from the normalized contact model", () => {
+    const contacts = mapContacts({
+      conversations: [],
+      currentUserId: "me",
+      departmentMembersById: {},
+      departments: [],
+      friends: [],
+      members: [
+        {
+          userId: "u1",
+          greenBubbleNo: "gb-10086",
+          displayName: "灏忓懆",
+          membershipRole: 2,
+        } satisfies TenantMemberDto,
+      ],
+    });
+
+    expect(contacts[0]).toMatchObject({
+      kind: "staff",
+      greenBubbleNo: "gb-10086",
+    });
+  });
+
+  it("normalizes tenant member API aliases at the contacts anti-corruption boundary", () => {
+    expect(
+      normalizeTenantMemberDto({
+        userId: "u1",
+        displayName: "staff",
+        lpp_id: "lpp-alias",
+      }),
+    ).toMatchObject({
+      userId: "u1",
+      displayName: "staff",
+      greenBubbleNo: "lpp-alias",
+    });
+    expect(
+      normalizeTenantMemberDto({
+        userId: "u2",
+        displayName: "staff",
+        greenBubbleNo: "gb-canonical",
+        lppId: "lpp-alias",
+      }),
+    ).toMatchObject({
+      greenBubbleNo: "gb-canonical",
+    });
+  });
+
+  it("normalizes tenant member profile LPP fields at the contacts anti-corruption boundary", () => {
+    expect(
+      normalizeTenantMemberProfileDto({
+        userId: "u1",
+        displayName: "staff",
+        lppId: "lpp-profile",
+      }),
+    ).toEqual({
+      userId: "u1",
+      greenBubbleNo: "lpp-profile",
+    });
+  });
+
+  it("normalizes friend API aliases at the contacts anti-corruption boundary", () => {
+    expect(
+      normalizeFriendDto({
+        friendUserId: "u1",
+        displayName: "friend",
+        lpp_no: "friend-lpp",
+      }),
+    ).toMatchObject({
+      friendUserId: "u1",
+      displayName: "friend",
+      greenBubbleNo: "friend-lpp",
+    });
+    expect(
+      normalizeFriendDto({
+        friendUserId: "u2",
+        displayName: "friend",
+        greenBubbleNo: "friend-gb",
+        lppNumber: "friend-lpp",
+      }),
+    ).toMatchObject({
+      greenBubbleNo: "friend-gb",
+    });
+  });
+
   it("shows public LPP numbers instead of internal user ids in contact details", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/renderer/components/ContactDetailViews.tsx"),
       "utf8",
     );
 
-    expect(source).toContain('InfoLine label="绿泡泡号" value={contact.lppId || "--"}');
+    expect(source).toContain('InfoLine label="绿泡泡号" value={contact.greenBubbleNo || "--"}');
+    expect(source).toContain('<InfoLine label="身份" value="企业成员" />');
+    expect(source).toContain('<InfoLine label="角色" value={contact.roleLabel || "--"} />');
     expect(source).not.toContain('InfoLine label="用户 ID"');
+  });
+
+  it("enriches selected organization contacts from user profile instead of UI alias guessing", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/renderer/components/ContactsPage.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("getTenantMemberProfile(activeTenantMemberUserId)");
+    expect(source).toContain("activeContactDetail");
+    expect(source).not.toContain("lppId");
   });
 
   it("groups organization contacts by role for the organization list", () => {
@@ -363,6 +465,17 @@ describe("contact directory access", () => {
         tenantToken: "token",
       }).canReadOrganization,
     ).toBe(true);
+  });
+
+  it("does not treat unknown high membership roles as organization members", () => {
+    expect(
+      deriveContactDirectoryAccess({
+        apiBaseUrl: "https://example.test",
+        displayName: "unknown",
+        membershipRole: 5,
+        tenantToken: "token",
+      }).canReadOrganization,
+    ).toBe(false);
   });
 
   it("falls back to tenant membership role and keeps unknown legacy sessions open", () => {

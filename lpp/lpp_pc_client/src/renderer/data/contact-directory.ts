@@ -140,7 +140,7 @@ export function filterContacts(contacts: ContactItem[], keyword: string) {
       item.name,
       item.subtitle,
       item.remark,
-      item.lppId,
+      item.greenBubbleNo,
       item.departmentName,
       item.position,
       item.tags.join(" "),
@@ -240,11 +240,11 @@ export function mapContacts({
         : friend.userType === 1
           ? ["customer", "friend"]
           : ["friend"];
-    const lppId = friend.lppId || friend.lppNo || friend.lppNumber;
+    const greenBubbleNo = friend.greenBubbleNo;
     return {
       id: `friend-${friend.friendUserId}`,
       userId: friend.friendUserId,
-      lppId,
+      greenBubbleNo,
       conversationId: directByPeer.get(friend.friendUserId),
       kind,
       directoryFilters,
@@ -262,11 +262,10 @@ export function mapContacts({
     .filter((member) => member.userId !== currentUserId)
     .map((member) => {
       const department = departmentByMember.get(member.userId);
-      const lppId = member.lppId || member.lppNo || member.lppNumber || undefined;
       return {
         id: `staff-${member.userId}`,
         userId: member.userId,
-        lppId,
+        greenBubbleNo: member.greenBubbleNo,
         conversationId: directByPeer.get(member.userId),
         kind: "staff",
         directoryFilters: ["organization"],
@@ -326,7 +325,7 @@ export function contactRowHint(contact: ContactItem) {
     return contact.createdAt ? `添加于 ${formatShortDate(contact.createdAt)}` : "客户好友";
   }
   if (contact.kind === "staff") {
-    return [contact.position, contact.lppId].filter(Boolean).join(" · ") || "企业成员";
+    return [contact.position, contact.greenBubbleNo].filter(Boolean).join(" · ") || "企业成员";
   }
   if (contact.kind === "group") return contact.lastMessagePreview || "暂无最近消息";
   return contact.remark || "好友关系";

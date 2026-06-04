@@ -1,4 +1,5 @@
 import type { AuthSession } from "./auth/auth-session";
+import { writeRendererAppLog } from "./logging/app-log";
 import type { ModuleKey } from "./types";
 
 export type PcIdentityKind = "customer" | "employee" | "legacy";
@@ -42,18 +43,26 @@ export const fullBusinessModules: ModuleKey[] = [
   "settings",
 ];
 
+let lastWorkspaceAccessLogKey = "";
+
 export function derivePcWorkspaceAccess(
   session: AuthSession | null | undefined,
 ): PcWorkspaceAccess {
-  if (!session) return legacyAccess();
+  if (!session) {
+    const access = legacyAccess();
+    logWorkspaceAccess(session, undefined, undefined, access, "missing_session");
+    return access;
+  }
 
   const userType = finiteNumber(session.userType);
+  const sessionMembershipRole = finiteNumber(session.membershipRole);
+  const tenantMembershipRole = currentTenantMembershipRole(session);
   const membershipRole =
-    finiteNumber(session.membershipRole) ?? currentTenantMembershipRole(session);
+    sessionMembershipRole ?? tenantMembershipRole;
   const roleLabel = `${session.roleLabel ?? ""}`.trim().toLowerCase();
   const isCustomer = userType === 1 || membershipRole === 0;
   if (isCustomer) {
-    return {
+    const access: PcWorkspaceAccess = {
       canReadServiceWorkbench: false,
       dataCenterView: undefined,
       identityKind: "customer",
@@ -61,25 +70,33 @@ export function derivePcWorkspaceAccess(
       settingsProfile: "customer",
       visibleModules: defaultChatModules,
     };
+    logWorkspaceAccess(session, tenantMembershipRole, membershipRole, access, "customer_role");
+    return access;
   }
 
   const identityKind: PcIdentityKind =
-    userType === 2 || (membershipRole !== undefined && membershipRole >= 1)
+    userType === 2 || isKnownEmployeeRole(membershipRole)
       ? "employee"
       : "legacy";
   const roleKind = employeeRoleKind(roleLabel, membershipRole);
 
   if (roleKind === "customer_service") {
-    return employeeBusinessAccess(roleKind, "self-service");
+    const access = employeeBusinessAccess(roleKind, "self-service");
+    logWorkspaceAccess(session, tenantMembershipRole, membershipRole, access, "service_role");
+    return access;
   }
   if (roleKind === "admin") {
-    return employeeBusinessAccess(roleKind, "team-admin");
+    const access = employeeBusinessAccess(roleKind, "team-admin");
+    logWorkspaceAccess(session, tenantMembershipRole, membershipRole, access, "admin_role");
+    return access;
   }
   if (roleKind === "owner") {
-    return employeeBusinessAccess(roleKind, "enterprise-owner");
+    const access = employeeBusinessAccess(roleKind, "enterprise-owner");
+    logWorkspaceAccess(session, tenantMembershipRole, membershipRole, access, "owner_role");
+    return access;
   }
 
-  return {
+  const access: PcWorkspaceAccess = {
     canReadServiceWorkbench: false,
     dataCenterView: undefined,
     identityKind,
@@ -87,6 +104,8 @@ export function derivePcWorkspaceAccess(
     settingsProfile: "employee",
     visibleModules: defaultChatModules,
   };
+  logWorkspaceAccess(session, tenantMembershipRole, membershipRole, access, "basic_employee_role");
+  return access;
 }
 
 export function isModuleVisibleForAccess(
@@ -154,6 +173,49 @@ function finiteNumber(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : undefined;
 }
 
+function isKnownEmployeeRole(role: number | undefined) {
+  return role === 1 || role === 2 || role === 3 || role === 4;
+}
+
 function includesAny(value: string, needles: string[]) {
   return needles.some((needle) => value.includes(needle));
+}
+
+function logWorkspaceAccess(
+  session: AuthSession | null | undefined,
+  tenantMembershipRole: number | undefined,
+  membershipRole: number | undefined,
+  access: PcWorkspaceAccess,
+  reason: string,
+) {
+  const key = JSON.stringify({
+    tenantId: session?.tenantId,
+    userType: session?.userType,
+    sessionMembershipRole: session?.membershipRole,
+    tenantMembershipRole,
+    membershipRole,
+    roleKind: access.roleKind,
+    canReadServiceWorkbench: access.canReadServiceWorkbench,
+  });
+  if (key === lastWorkspaceAccessLogKey) return;
+  lastWorkspaceAccessLogKey = key;
+  writeRendererAppLog({
+    module: "auth",
+    event: "workspace.access.resolve",
+    phase: "derive",
+    result: "ok",
+    reason,
+    context: {
+      tenantId: session?.tenantId ?? null,
+      spaceType: session?.spaceType ?? null,
+      userType: session?.userType ?? null,
+      sessionRole: session?.membershipRole ?? null,
+      tenantRole: tenantMembershipRole ?? null,
+      membershipRole: membershipRole ?? null,
+      roleLabel: session?.roleLabel ?? null,
+      identityKind: access.identityKind,
+      roleKind: access.roleKind,
+      canReadServiceWorkbench: access.canReadServiceWorkbench,
+    },
+  });
 }

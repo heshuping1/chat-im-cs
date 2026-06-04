@@ -18,6 +18,10 @@ describe("customer service role capabilities", () => {
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 2 })).toBe(false);
   });
 
+  it("does not treat unknown high role numbers as management roles", () => {
+    expect(canUseCustomerServiceManagementReadonly({ membershipRole: 5 })).toBe(false);
+  });
+
   it("does not block configured token sessions without role metadata", () => {
     expect(canUseCustomerServiceStaffEndpoints({})).toBe(true);
   });

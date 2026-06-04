@@ -140,7 +140,7 @@ export function MePage() {
       <section className="settings-main">
         <section className="settings-hero-panel settings-hero-compact">
           <div>
-            <span className="eyebrow">PC 客服客户端</span>
+            <span className="eyebrow">lppchat</span>
             <h1>设置中心</h1>
             <p>
               按清晰领域管理 PC 客服工作环境，聊天、通知和外观等共用能力统一收进通用设置。
@@ -154,12 +154,18 @@ export function MePage() {
 
         <section className="settings-detail-card" aria-live="polite">
           <header className="settings-detail-head">
-            <span className="settings-detail-icon">
-              <ActiveIcon size={22} />
-            </span>
-            <div>
-              <h2>{activeSection.title}</h2>
-              <p>{activeSection.desc}</p>
+            <div className="settings-detail-title">
+              <span className="settings-detail-icon">
+                <ActiveIcon size={22} />
+              </span>
+              <div>
+                <h2>{activeSection.title}</h2>
+                <p>{activeSection.desc}</p>
+              </div>
+            </div>
+            <div className="settings-detail-statusbar" aria-label="当前设置状态">
+              <CheckCircle2 size={15} />
+              <span>{sectionStatusSummary(activeSection.id, notice, authSession)}</span>
             </div>
           </header>
           <div className="settings-detail-body">
@@ -202,15 +208,19 @@ function renderSection(
   switch (section) {
     case "account":
       return (
-        <>
-          <ProfileSettingsSection {...actions} />
-          <AccountSecuritySection
-            authSession={actions.authSession}
-            clearAuthSession={actions.clearAuthSession}
-            setNotice={actions.setNotice}
-          />
+        <section className="settings-account-layout" aria-label="账户设置">
+          <div className="settings-account-profile-column">
+            <ProfileSettingsSection {...actions} />
+          </div>
+          <div className="settings-account-security-column">
+            <AccountSecuritySection
+              authSession={actions.authSession}
+              clearAuthSession={actions.clearAuthSession}
+              setNotice={actions.setNotice}
+            />
+          </div>
           <PlanningSupportBlock sectionId={section} />
-        </>
+        </section>
       );
     case "enterprise":
       return (
@@ -224,14 +234,14 @@ function renderSection(
       );
     case "privacy":
       return (
-        <>
+        <section className="settings-privacy-layout" aria-label="隐私设置">
           <PrivacySettingsSection
             actions={actions}
             pcSettings={pcSettings}
             setSetting={setSetting}
           />
           <PlanningSupportBlock sectionId={section} />
-        </>
+        </section>
       );
     case "messages":
     case "customerService":
@@ -381,7 +391,7 @@ function renderSection(
             {...settingRowProps("timezone")}
             capability="localEffective"
             optionLabels={pcUserTimezoneLabels}
-            options={pcUserTimezoneOptions}
+            options={[...pcUserTimezoneOptions]}
             value={pcSettings.timezone}
             onChange={(value) => setSetting("timezone", value)}
           />
@@ -423,6 +433,18 @@ function renderSection(
             }}
           />
           <ConnectivityHealthSection authSession={actions.authSession} />
+          <SelectRow
+            {...settingRowProps("apiTrafficLogLevel")}
+            value={pcSettings.apiTrafficLogLevel}
+            options={["off", "errors", "summary", "body"]}
+            optionLabels={{
+              off: "关闭",
+              errors: "仅失败",
+              summary: "全部摘要",
+              body: "完整脱敏",
+            }}
+            onChange={(value) => setSetting("apiTrafficLogLevel", value)}
+          />
           <DiagnosticsRecordsSection
             exportDiagnostics={actions.exportDiagnostics}
             setNotice={actions.setNotice}
@@ -450,6 +472,19 @@ function SettingsGroupLabel({ title }: { title: string }) {
       <strong>{title}</strong>
     </div>
   );
+}
+
+function sectionStatusSummary(
+  sectionId: SettingsSectionId,
+  notice: string,
+  authSession: AuthSession | null,
+) {
+  if (notice && notice !== "已保存" && notice !== "设置更改后会自动保存") return notice;
+  if (!authSession && sectionId !== "about") return "登录状态未恢复，账号类设置会在重新登录后读取。";
+  if (sectionId === "common") return "通用设置已按通知、输入、聊天、外观、桌面、语言时间分组。";
+  if (sectionId === "customerService") return "客服提醒和客户上下文设置会服务当前接待工作台。";
+  if (sectionId === "storageDiagnostics") return "诊断和体检信息只展示脱敏后的本机可观测状态。";
+  return "设置项会在当前页面自动保存并显示最新状态。";
 }
 
 function PlanningSupportBlock({ sectionId }: { sectionId: SettingsSectionId }) {
@@ -661,119 +696,125 @@ function ProfileSettingsSection({
           text={`个人资料加载失败：${formatError(profileError)}`}
         />
       )}
-      <div className="settings-sub-card settings-avatar-card">
-        <header>
-          <strong>个人头像</strong>
-          <span className="settings-sub-card-meta">
-            <Camera size={14} />
-            <em>JPG、PNG、WebP，最大 5 MB</em>
-          </span>
-        </header>
-        <div className="settings-avatar-editor">
-          <PcAvatar
-            avatarUrl={avatarUrl}
-            className="settings-profile-avatar"
-            name={displayName}
-          />
-          <div className="settings-avatar-actions">
-            <strong>{displayName}</strong>
-            <em>{avatarFile ? avatarFile.name : "当前头像会同步到会话、联系人和侧边栏展示。"}</em>
-            <div>
-              <label className="settings-avatar-upload-button">
-                <input
-                  accept="image/*"
-                  type="file"
-                  onChange={(event) => {
-                    handleAvatarFileChange(event.currentTarget.files?.[0]);
-                    event.currentTarget.value = "";
-                  }}
-                />
-                选择图片
-              </label>
-              <button
-                type="button"
-                disabled={!avatarFile || updateAvatar.isPending || !authSession}
-                onClick={() => {
-                  if (avatarFile) updateAvatar.mutate(avatarFile);
-                }}
-              >
-                {updateAvatar.isPending ? "保存中" : "保存头像"}
-              </button>
-              {avatarFile && (
-                <button
-                  type="button"
-                  disabled={updateAvatar.isPending}
-                  onClick={() => {
-                    setAvatarFile(null);
-                    setNotice("已取消头像更改");
-                  }}
-                >
-                  取消
-                </button>
-              )}
+      <div className="settings-account-profile-grid">
+        <div className="settings-account-overview-stack">
+          <div className="settings-sub-card settings-avatar-card">
+            <header>
+              <strong>个人头像</strong>
+              <span className="settings-sub-card-meta">
+                <Camera size={14} />
+                <em>JPG、PNG、WebP，最大 5 MB</em>
+              </span>
+            </header>
+            <div className="settings-avatar-editor">
+              <PcAvatar
+                avatarUrl={avatarUrl}
+                className="settings-profile-avatar"
+                name={displayName}
+              />
+              <div className="settings-avatar-actions">
+                <strong>{displayName}</strong>
+                <em>{avatarFile ? avatarFile.name : "当前头像会同步到会话、联系人和侧边栏展示。"}</em>
+                <div>
+                  <label className="settings-avatar-upload-button">
+                    <input
+                      accept="image/*"
+                      type="file"
+                      onChange={(event) => {
+                        handleAvatarFileChange(event.currentTarget.files?.[0]);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                    选择图片
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!avatarFile || updateAvatar.isPending || !authSession}
+                    onClick={() => {
+                      if (avatarFile) updateAvatar.mutate(avatarFile);
+                    }}
+                  >
+                    {updateAvatar.isPending ? "保存中" : "保存头像"}
+                  </button>
+                  {avatarFile && (
+                    <button
+                      type="button"
+                      disabled={updateAvatar.isPending}
+                      onClick={() => {
+                        setAvatarFile(null);
+                        setNotice("已取消头像更改");
+                      }}
+                    >
+                      取消
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
+            {!authSession && (
+              <InlineSettingsState tone="error" text="登录状态已失效，请重新登录后设置头像。" />
+            )}
+          </div>
+          <InfoRow label="LPP 号" desc={profile?.lppId || authSession?.lppId || "--"} />
+          <InfoRow label="角色" desc={authSession?.roleLabel || "成员"} />
+        </div>
+        <div className="settings-sub-card settings-profile-form">
+          <header>
+            <strong>资料信息</strong>
+            <span className="settings-sub-card-meta">
+              <UserRound size={14} />
+              <em>昵称和签名会同步到个人名片</em>
+            </span>
+          </header>
+          <label>
+            <span>昵称</span>
+            <input
+              maxLength={32}
+              placeholder="请输入昵称"
+              value={displayNameDraft}
+              disabled={updateProfile.isPending || !authSession}
+              onChange={(event) => setDisplayNameDraft(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>签名</span>
+            <textarea
+              maxLength={120}
+              placeholder="添加一句工作状态或个人签名"
+              value={signatureDraft}
+              disabled={updateProfile.isPending || !authSession}
+              onChange={(event) => setSignatureDraft(event.target.value)}
+            />
+          </label>
+          <div className="settings-profile-form-actions">
+            <button
+              type="button"
+              disabled={updateProfile.isPending || !authSession}
+              onClick={() => updateProfile.mutate()}
+            >
+              {updateProfile.isPending ? "保存中" : "保存资料"}
+            </button>
+            <button
+              type="button"
+              disabled={updateProfile.isPending}
+              onClick={() => {
+                setDisplayNameDraft(displayName === "--" ? "" : displayName);
+                setSignatureDraft(profileSignature);
+                setNotice("已还原资料编辑");
+              }}
+            >
+              还原
+            </button>
           </div>
         </div>
-        {!authSession && (
-          <InlineSettingsState tone="error" text="登录状态已失效，请重新登录后设置头像。" />
-        )}
       </div>
-      <InfoRow label="LPP 号" desc={profile?.lppId || authSession?.lppId || "--"} />
-      <InfoRow label="角色" desc={authSession?.roleLabel || "成员"} />
-      <div className="settings-sub-card settings-profile-form">
-        <header>
-          <strong>资料信息</strong>
-          <span className="settings-sub-card-meta">
-            <UserRound size={14} />
-            <em>昵称和签名会同步到个人名片</em>
-          </span>
-        </header>
-        <label>
-          <span>昵称</span>
-          <input
-            maxLength={32}
-            placeholder="请输入昵称"
-            value={displayNameDraft}
-            disabled={updateProfile.isPending || !authSession}
-            onChange={(event) => setDisplayNameDraft(event.target.value)}
-          />
-        </label>
-        <label>
-          <span>签名</span>
-          <textarea
-            maxLength={120}
-            placeholder="添加一句工作状态或个人签名"
-            value={signatureDraft}
-            disabled={updateProfile.isPending || !authSession}
-            onChange={(event) => setSignatureDraft(event.target.value)}
-          />
-        </label>
-        <div className="settings-profile-form-actions">
-          <button
-            type="button"
-            disabled={updateProfile.isPending || !authSession}
-            onClick={() => updateProfile.mutate()}
-          >
-            {updateProfile.isPending ? "保存中" : "保存资料"}
-          </button>
-          <button
-            type="button"
-            disabled={updateProfile.isPending}
-            onClick={() => {
-              setDisplayNameDraft(displayName === "--" ? "" : displayName);
-              setSignatureDraft(profileSignature);
-              setNotice("已还原资料编辑");
-            }}
-          >
-            还原
-          </button>
-        </div>
+      <div className="settings-account-info-grid">
+        <InfoRow label="登录名" desc={profile?.loginName || "--"} />
+        <InfoRow label="用户 ID" desc={profile?.userId || authSession?.userId || "--"} />
+        <InfoRow label="手机号" desc={maskMobile(profile?.mobile)} />
+        <InfoRow label="邮箱" desc={maskEmail(profile?.email)} />
+        <InfoRow label="创建时间" desc={formatShortDate(profile?.createdAt)} />
       </div>
-      <InfoRow label="登录名" desc={profile?.loginName || "--"} />
-      <InfoRow label="用户 ID" desc={profile?.userId || authSession?.userId || "--"} />
-      <InfoRow label="手机号" desc={maskMobile(profile?.mobile)} />
-      <InfoRow label="邮箱" desc={maskEmail(profile?.email)} />
-      <InfoRow label="创建时间" desc={formatShortDate(profile?.createdAt)} />
     </>
   );
 }
@@ -910,7 +951,7 @@ function LaunchAtStartupSwitch({
         hasDesktopCapability
           ? failed
             ? "状态读取失败"
-            : "桌面客户端生效"
+            : undefined
           : "浏览器调试不可用"
       }
       onChange={(value) => void updateLaunchAtStartup(value)}
@@ -987,7 +1028,7 @@ function MinimizeToTraySwitch({
         hasDesktopCapability
           ? failed
             ? "状态同步失败"
-            : "桌面客户端生效"
+            : undefined
           : "浏览器调试不可用"
       }
       onChange={(value) => void updateMinimizeToTray(value)}

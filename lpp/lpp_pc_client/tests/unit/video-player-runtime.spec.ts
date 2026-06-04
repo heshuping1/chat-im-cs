@@ -63,7 +63,7 @@ describe("openDesktopVideoPlayer", () => {
     await expect(
       openDesktopVideoPlayer({
         authToken: "token",
-        displaySrc: "file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/clip.mp4",
+        displaySrc: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4",
         remoteSrc: "https://cdn.example.com/server-video.mp4",
         media: {
           fileName: "clip.mp4",
@@ -75,7 +75,7 @@ describe("openDesktopVideoPlayer", () => {
 
     expect(openVideoPlayer).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: "file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/clip.mp4",
+        url: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4",
       }),
     );
   });
@@ -90,7 +90,7 @@ describe("openDesktopVideoPlayer", () => {
     await expect(
       openDesktopVideoPlayer({
         displaySrc: "blob:http://127.0.0.1:5173/preview",
-        localOpenSrc: "file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/local-open.mp4",
+        localOpenSrc: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/local-open.mp4",
         remoteSrc: "https://cdn.example.com/server-video.mp4",
         media: {
           fileName: "clip.mp4",
@@ -103,7 +103,7 @@ describe("openDesktopVideoPlayer", () => {
 
     expect(openVideoPlayer).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: "file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/local-open.mp4",
+        url: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/local-open.mp4",
       }),
     );
     expect(onDiagnostic).toHaveBeenCalledWith(
@@ -164,7 +164,7 @@ describe("openDesktopVideoPlayer", () => {
 
     await expect(
       openDesktopVideoPlayer({
-        displaySrc: "file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/clip.mp4",
+        displaySrc: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4",
         posterSrc: "blob:http://127.0.0.1:5173/stale-poster",
         media: {
           fileName: "clip.mp4",
@@ -177,7 +177,7 @@ describe("openDesktopVideoPlayer", () => {
 
     expect(openVideoPlayer).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: "file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/clip.mp4",
+        url: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4",
       }),
     );
     expect(openVideoPlayer.mock.calls[0]?.[0]).not.toHaveProperty("posterUrl");
@@ -191,7 +191,7 @@ describe("openDesktopVideoPlayer", () => {
   });
 
   it("does not use local file cache urls as inline video preview sources", () => {
-    expect(inlineVideoPreviewSrc("file:///Users/eric/Library/Application%20Support/lpp-pc-client/LPP%20Files/u1/c1/Videos/clip.mp4")).toBeUndefined();
+    expect(inlineVideoPreviewSrc("file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4")).toBeUndefined();
     expect(inlineVideoPreviewSrc("blob:http://127.0.0.1:5173/video")).toBe(
       "blob:http://127.0.0.1:5173/video",
     );

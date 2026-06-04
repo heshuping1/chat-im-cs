@@ -74,7 +74,7 @@ describe("app brand assets", () => {
     expect(iconManual).toContain("win-unpacked");
     expect(iconManual).toContain("icon:fix-taskbar");
     expect(iconManual).toContain("icon:sync");
-    expect(iconManual).toContain("D:\\Program Files\\lpp-pc-client");
+    expect(iconManual).toContain("D:\\Program Files\\lppchat");
     expect(iconManual).toContain("Windows 图标缓存");
   });
 
@@ -82,12 +82,12 @@ describe("app brand assets", () => {
     expect(iconSyncSource).toContain("rcedit-x64.exe");
     expect(iconSyncSource).toContain("app-icon-green-bubble.ico");
     expect(iconSyncSource).toContain("public/app-icon-green-bubble.png");
-    expect(iconSyncSource).toContain("LPP 客服客户端.exe");
+    expect(iconSyncSource).toContain("lppchat.exe");
     expect(iconVerifySource).toContain("packaged-exe-icon.png");
     expect(iconVerifySource).toContain("installed-exe-icon.png");
     expect(startPackagedSource).toContain("sync-app-icon.mjs");
     expect(fixTaskbarSource).toContain("ie4uinit.exe");
-    expect(fixTaskbarSource).toContain("D:\\\\Program Files\\\\lpp-pc-client");
+    expect(fixTaskbarSource).toContain("D:\\\\Program Files\\\\lppchat");
     expect(fixTaskbarSource).toContain("rcedit-x64.exe");
   });
 

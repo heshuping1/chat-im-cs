@@ -1,4 +1,4 @@
-# LPP PC 客服客户端
+# lppchat
 
 这是 LPP 的 Windows 客服客户端工程骨架。
 

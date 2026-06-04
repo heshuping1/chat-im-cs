@@ -27,6 +27,7 @@ class _SearchResult {
   final bool codeOnly;
   // 邀请码专属
   final bool? identityMatched;
+  final int? targetMembershipRole;
   final String? targetHint;
 
   const _SearchResult({
@@ -41,6 +42,7 @@ class _SearchResult {
     this.alreadyMember = false,
     this.codeOnly = false,
     this.identityMatched,
+    this.targetMembershipRole,
     this.targetHint,
   });
 
@@ -132,6 +134,7 @@ class _JoinCompanyPageState extends ConsumerState<JoinCompanyPage> {
             description: preview.description,
             alreadyMember: preview.alreadyMember,
             identityMatched: preview.identityMatched,
+            targetMembershipRole: preview.targetMembershipRole,
             targetHint: preview.targetHint,
           );
         });
@@ -237,7 +240,7 @@ class _JoinCompanyPageState extends ConsumerState<JoinCompanyPage> {
             tenantName: result.tenantName,
             tenantCode: result.tenantCode,
             logoUrl: result.logoUrl,
-            membershipRole: 0,
+            membershipRole: result.targetMembershipRole ?? 0,
           ),
         );
         if (!mounted) return;
@@ -740,6 +743,34 @@ class _JoinCompanyPageState extends ConsumerState<JoinCompanyPage> {
             ],
           ],
 
+          // 邀请入企角色提示
+          if (r.type == _ResultType.invitation) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.badge_outlined,
+                      size: 14, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '将以 ${_targetMembershipRoleLabel(r.targetMembershipRole)} 身份加入',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF2563EB),
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // 定向邀请提示
           if (r.type == _ResultType.invitation && r.targetHint != null) ...[
             const SizedBox(height: 10),
@@ -791,6 +822,15 @@ class _JoinCompanyPageState extends ConsumerState<JoinCompanyPage> {
       ),
     );
   }
+}
+
+String _targetMembershipRoleLabel(int? role) {
+  return switch (role) {
+    3 => '管理员',
+    2 => '客服',
+    1 => '技术',
+    _ => '普通成员',
+  };
 }
 
 class _Section extends StatelessWidget {

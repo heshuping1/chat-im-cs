@@ -71,7 +71,7 @@ export class CustomerServiceApiClient extends MessagesApiClient {
 
   private shouldUseAdminConversationManagement() {
     return (
-      (this.options.membershipRole ?? 0) >= 3 &&
+      isTenantAdminOrOwner(this.options.membershipRole) &&
       Boolean(this.options.platformToken && this.options.tenantId)
     );
   }
@@ -905,6 +905,10 @@ function adminTokenCacheKey(input: {
   tenantId: string;
 }) {
   return `${input.baseUrl}|${input.tenantId}|${input.platformToken ?? ""}`;
+}
+
+function isTenantAdminOrOwner(role?: number) {
+  return role === 3 || role === 4;
 }
 
 function previewFromMessage(message?: MessageItemDto) {

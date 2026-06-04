@@ -15,6 +15,7 @@ import type { ConversationReadState, ImConversationType } from '../im-read-model
 import { conversationKey } from '../im-read-model';
 import { logImReadDiagnostic } from '../im-read/im-read-diagnostics';
 import { recordMessageReminderDiagnostic } from '../diagnostics/message-reminder-diagnostics';
+import { writeRendererAppLog } from '../logging/app-log';
 import {
   normalizedStoredSeq,
   persistImReadState,
@@ -664,6 +665,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setAuthSession: (authSession) => {
     const previousSession = get().authSession;
     persistAuthSession(authSession);
+    writeRendererAppLog({
+      module: 'auth',
+      event: 'auth.session.store.apply',
+      phase: 'store',
+      result: 'ok',
+      context: {
+        tenantId: authSession.tenantId ?? null,
+        spaceType: authSession.spaceType ?? null,
+        userType: authSession.userType ?? null,
+        previousSessionRole: previousSession?.membershipRole ?? null,
+        sessionRole: authSession.membershipRole ?? null,
+        roleLabel: authSession.roleLabel ?? null,
+      },
+    });
     recordMessageReminderDiagnostic({
       event: 'workspace.scope.changed',
       source: 'workspace-store-core',

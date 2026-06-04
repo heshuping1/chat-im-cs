@@ -12,6 +12,7 @@ import { persistedSendDiagnosticsStorageKey } from "../send/send-state-machine";
 type DiagnosticsWindowKey =
   | "__lppApiContractDiagnostics"
   | "__lppApiErrorDiagnostics"
+  | "__lppApiTrafficDiagnostics"
   | "__lppAuthDiagnostics"
   | "__lppCustomerServiceCacheDiagnostics"
   | "__lppCustomerServiceStateDiagnostics"
@@ -60,6 +61,7 @@ const diagnosticsSources: DiagnosticsSource[] = [
   { module: "reminder", key: "__lppReminderDiagnostics" },
   { module: "api-contract", key: "__lppApiContractDiagnostics" },
   { module: "api-error", key: "__lppApiErrorDiagnostics" },
+  { module: "api-traffic", key: "__lppApiTrafficDiagnostics" },
   {
     module: "send",
     key: "__lppSendDiagnostics",

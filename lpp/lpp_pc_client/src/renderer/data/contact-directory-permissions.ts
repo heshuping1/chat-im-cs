@@ -24,7 +24,7 @@ export function deriveContactDirectoryAccess(
   const isPersonalSpace = spaceType === 1 || session.roleLabel === "个人空间";
   const isCustomerTenantMember = userType === 1 || membershipRole === 0;
   const isOrganizationMember =
-    userType === 2 || (membershipRole !== undefined && membershipRole >= 1);
+    userType === 2 || isKnownEmployeeRole(membershipRole);
 
   return {
     canReadOrganization:
@@ -47,4 +47,8 @@ function finiteNumber(value: unknown) {
   if (value === undefined || value === null || value === "") return undefined;
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : undefined;
+}
+
+function isKnownEmployeeRole(role: number | undefined) {
+  return role === 1 || role === 2 || role === 3 || role === 4;
 }

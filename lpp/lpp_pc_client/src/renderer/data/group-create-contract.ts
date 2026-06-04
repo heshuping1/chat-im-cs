@@ -58,7 +58,7 @@ export function deriveGroupCreateAccess(
     return { canCreateGroup: true };
   }
   if (membershipRole !== undefined) {
-    return membershipRole >= 3
+    return isAdminOrOwnerRole(membershipRole)
       ? { canCreateGroup: true }
       : { canCreateGroup: false, reason: groupCreateDeniedReason };
   }
@@ -144,6 +144,10 @@ function isAdminOrOwner(roleLabel: string) {
     roleLabel.includes("所有者") ||
     roleLabel.includes("owner")
   );
+}
+
+function isAdminOrOwnerRole(role: number) {
+  return role === 3 || role === 4;
 }
 
 function isExplicitlyDeniedRole(roleLabel: string) {

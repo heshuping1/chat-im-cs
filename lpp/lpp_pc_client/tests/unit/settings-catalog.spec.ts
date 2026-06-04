@@ -105,6 +105,7 @@ describe("settings catalog", () => {
       timezone: "common",
       clearLocalCache: "storageDiagnostics",
       diagnosticsExport: "storageDiagnostics",
+      apiTrafficLogLevel: "storageDiagnostics",
       diagnosticsRecentRecords: "storageDiagnostics",
       connectivityHealth: "storageDiagnostics",
       developmentDiagnostics: "storageDiagnostics",
@@ -153,27 +154,42 @@ describe("settings catalog", () => {
     expect(getSettingsRow("serviceQueueNotifications")).toMatchObject({
       sectionId: "customerService",
       label: "访客排队/待接入提醒",
-      desc: "有访客排队、待接入或待接管时提醒客服。",
       source: "account",
       control: "switch",
       capability: "available",
     });
+    expect(getSettingsRow("serviceQueueNotifications")?.desc).toContain(
+      "有访客排队、待接入或待接管时提醒客服。",
+    );
+    expect(getSettingsRow("serviceQueueNotifications")?.desc).toContain(
+      "设置会随账号保存",
+    );
     expect(getSettingsRow("customerServiceMessageNotifications")).toMatchObject({
       sectionId: "customerService",
       label: "已接入会话新消息提醒",
-      desc: "已接入或正在处理的客服会话收到访客新消息时提醒。",
       source: "local",
       control: "switch",
       capability: "available",
     });
+    expect(getSettingsRow("customerServiceMessageNotifications")?.desc).toContain(
+      "已接入或正在处理的客服会话收到访客新消息时提醒。",
+    );
+    expect(getSettingsRow("customerServiceMessageNotifications")?.desc).toContain(
+      "当前 PC 客户端",
+    );
     expect(getSettingsRow("foregroundInAppCustomerServiceReminders")).toMatchObject({
       sectionId: "customerService",
       label: "前台站内消息提醒",
-      desc: "PC 客户端在前台时，收到已接入客服会话新消息显示右上角提醒卡片。",
       source: "local",
       control: "switch",
       capability: "localEffective",
     });
+    expect(getSettingsRow("foregroundInAppCustomerServiceReminders")?.desc).toContain(
+      "PC 客户端在前台时，收到已接入客服会话新消息显示右上角提醒卡片。",
+    );
+    expect(getSettingsRow("foregroundInAppCustomerServiceReminders")?.desc).toContain(
+      "仅影响当前 PC 客户端",
+    );
     expect(getSettingsRow("slaTimeoutNotifications")).toMatchObject({
       sectionId: "customerService",
     });
@@ -503,11 +519,23 @@ describe("settings catalog", () => {
       join(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
       "utf8",
     );
+    const serviceStageSource = readFileSync(
+      join(process.cwd(), "src/renderer/customer-service/components/CustomerServiceMessageStage.tsx"),
+      "utf8",
+    );
+    const porcelainCss = readFileSync(
+      join(process.cwd(), "src/renderer/styles/shared/porcelain-shell.css"),
+      "utf8",
+    );
 
     expect(backgroundSectionSource).toContain("chatBackgroundPresets");
     expect(backgroundSectionSource).toContain("chatBackgroundPreset");
+    expect(backgroundSectionSource).toContain("--swatch-background");
     expect(stageSource).toContain("chatBackgroundPreset={pcSettings.chatBackgroundPreset}");
     expect(listSource).toContain("chatBackgroundStyleVariables");
+    expect(serviceStageSource).toContain("chatBackgroundStyleVariables");
+    expect(serviceStageSource).toContain("style={chatBackgroundStyleVariables(chatBackgroundPreset)");
+    expect(porcelainCss).toContain("var(--chat-stage-background-image)");
   });
 
   it("keeps quick reply management out of chat collaboration planning", () => {

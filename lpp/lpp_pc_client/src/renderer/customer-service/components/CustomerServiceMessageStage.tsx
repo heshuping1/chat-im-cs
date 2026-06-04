@@ -1,9 +1,10 @@
-import type { MouseEvent, Ref } from "react";
+import type { CSSProperties, MouseEvent, Ref } from "react";
 
 import { PanelState } from "../../components/PanelState";
 import type { CustomerServiceThread } from "../../data/api-client";
 import type { MessageItemDto } from "../../data/api-client";
 import type { CustomerServiceWorkspaceInlineState } from "../../data/customer-service/cs-workspace-view-model";
+import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
 import {
   ServiceMessageContextMenu,
   type ServiceMessageContextAction,
@@ -21,6 +22,7 @@ export function CustomerServiceMessageStage({
   accountId,
   assetBaseUrl,
   authToken,
+  chatBackgroundPreset,
   isMineMessage,
   jumpToLatest,
   messageAnnotations,
@@ -39,6 +41,7 @@ export function CustomerServiceMessageStage({
   accountId?: string;
   assetBaseUrl?: string;
   authToken?: string;
+  chatBackgroundPreset?: unknown;
   isMineMessage: (message: MessageItemDto) => boolean;
   jumpToLatest: () => void;
   messageAnnotations: Record<string, string>;
@@ -61,6 +64,7 @@ export function CustomerServiceMessageStage({
         aria-label="在线客服聊天"
         onScroll={onScroll}
         ref={stageRef}
+        style={chatBackgroundStyleVariables(chatBackgroundPreset) as CSSProperties}
       >
         {pendingNewMessageCount > 0 && (
           <button

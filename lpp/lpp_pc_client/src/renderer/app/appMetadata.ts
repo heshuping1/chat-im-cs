@@ -1,4 +1,4 @@
-const fallbackProductName = "LPP 客服客户端";
+const fallbackProductName = "lppchat";
 
 function normalizeProductName(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : fallbackProductName;

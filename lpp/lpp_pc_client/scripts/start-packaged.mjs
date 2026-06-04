@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
-const packagedExe = join(root, "release", "win-unpacked", "LPP 客服客户端.exe");
+const packagedExe = join(root, "release", "win-unpacked", "lppchat.exe");
 const syncScript = join(root, "scripts", "sync-app-icon.mjs");
 
 if (process.platform !== "win32") {

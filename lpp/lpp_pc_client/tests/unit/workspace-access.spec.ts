@@ -98,6 +98,21 @@ describe("pc workspace access model", () => {
     ).toBe("enterprise-owner");
   });
 
+  it("does not classify unknown high membership roles as employees", () => {
+    expect(
+      derivePcWorkspaceAccess({
+        apiBaseUrl: "https://api.example",
+        displayName: "unknown",
+        membershipRole: 5,
+        tenantToken: "token",
+      }),
+    ).toMatchObject({
+      canReadServiceWorkbench: false,
+      identityKind: "legacy",
+      roleKind: "basic_employee",
+    });
+  });
+
   it("falls back from hidden modules when a customer or basic employee switches accounts", () => {
     const customerAccess = derivePcWorkspaceAccess({
       apiBaseUrl: "https://api.example",

@@ -15,11 +15,57 @@ import type {
   GroupSettingsDto,
   SearchUserDto,
   TenantMemberDto,
+  UserProfileDto,
 } from "./types";
+
+interface RawFriendDto extends Omit<FriendDto, "greenBubbleNo"> {
+  greenBubbleId?: string | null;
+  green_bubble_id?: string | null;
+  greenBubbleNo?: string | null;
+  green_bubble_no?: string | null;
+  lppId?: string | null;
+  lpp_id?: string | null;
+  lppNo?: string | null;
+  lpp_no?: string | null;
+  lppNumber?: string | null;
+  lpp_number?: string | null;
+}
+
+interface RawTenantMemberDto extends Omit<TenantMemberDto, "greenBubbleNo"> {
+  greenBubbleId?: string | null;
+  green_bubble_id?: string | null;
+  greenBubbleNo?: string | null;
+  green_bubble_no?: string | null;
+  lppId?: string | null;
+  lpp_id?: string | null;
+  lppNo?: string | null;
+  lpp_no?: string | null;
+  lppNumber?: string | null;
+  lpp_number?: string | null;
+}
+
+interface RawTenantMemberProfileDto extends UserProfileDto {
+  greenBubbleId?: string | null;
+  green_bubble_id?: string | null;
+  greenBubbleNo?: string | null;
+  green_bubble_no?: string | null;
+  lpp_id?: string | null;
+  lppNo?: string | null;
+  lpp_no?: string | null;
+  lppNumber?: string | null;
+  lpp_number?: string | null;
+}
+
+export interface TenantMemberProfileDto {
+  userId: string;
+  greenBubbleNo: string | null;
+}
 
 export class ContactsApiClient extends ProfileApiClient {
   getFriends() {
-    return this.request<FriendDto[]>(endpointPlan.friends);
+    return this.request<RawFriendDto[]>(endpointPlan.friends).then((friends) =>
+      friends.map(normalizeFriendDto),
+    );
   }
 
   getFriendRequests() {
@@ -65,13 +111,13 @@ export class ContactsApiClient extends ProfileApiClient {
   }
 
   updateFriendProfile(friendUserId: string, payload: FriendProfileUpdateDto) {
-    return this.request<FriendDto>(
+    return this.request<RawFriendDto>(
       endpointPlan.friendItem.replace("{friendUserId}", encodeURIComponent(friendUserId)),
       {
         method: "PUT",
         body: JSON.stringify(payload),
       },
-    );
+    ).then(normalizeFriendDto);
   }
 
   getFriendProfileExtra(friendUserId: string) {
@@ -81,7 +127,15 @@ export class ContactsApiClient extends ProfileApiClient {
   }
 
   getTenantMembers() {
-    return this.request<TenantMemberDto[]>(endpointPlan.tenantMembers);
+    return this.request<RawTenantMemberDto[]>(endpointPlan.tenantMembers).then((members) =>
+      members.map(normalizeTenantMemberDto),
+    );
+  }
+
+  getTenantMemberProfile(userId: string) {
+    return this.getUserProfile(userId).then((profile) =>
+      normalizeTenantMemberProfileDto(profile as RawTenantMemberProfileDto),
+    );
   }
 
   getDepartments() {
@@ -279,4 +333,67 @@ export class ContactsApiClient extends ProfileApiClient {
       { method: "PUT", body: JSON.stringify({ muted }) },
     );
   }
+}
+
+export function normalizeFriendDto(friend: RawFriendDto): FriendDto {
+  return {
+    avatarUrl: friend.avatarUrl,
+    createdAt: friend.createdAt,
+    displayName: friend.displayName,
+    friendUserId: friend.friendUserId,
+    greenBubbleNo: publicGreenBubbleNo(friend),
+    groupName: friend.groupName,
+    remarkName: friend.remarkName,
+    userType: friend.userType,
+  };
+}
+
+export function normalizeTenantMemberDto(member: RawTenantMemberDto): TenantMemberDto {
+  return {
+    avatarUrl: member.avatarUrl,
+    displayName: member.displayName,
+    greenBubbleNo: publicGreenBubbleNo(member),
+    joinedAt: member.joinedAt,
+    joinMethod: member.joinMethod,
+    membershipRole: member.membershipRole,
+    platformUserId: member.platformUserId,
+    userId: member.userId,
+  };
+}
+
+export function normalizeTenantMemberProfileDto(
+  profile: RawTenantMemberProfileDto,
+): TenantMemberProfileDto {
+  return {
+    userId: profile.userId,
+    greenBubbleNo: publicGreenBubbleNo(profile),
+  };
+}
+
+function publicGreenBubbleNo(source: object) {
+  return (
+    stringField(
+      source,
+      "greenBubbleNo",
+      "green_bubble_no",
+      "greenBubbleId",
+      "green_bubble_id",
+      "lppId",
+      "lpp_id",
+      "lppNo",
+      "lpp_no",
+      "lppNumber",
+      "lpp_number",
+    ) || null
+  );
+}
+
+function stringField(value: object, ...keys: string[]) {
+  const record = value as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
 }

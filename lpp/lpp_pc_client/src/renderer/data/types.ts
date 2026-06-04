@@ -31,6 +31,7 @@ export interface ContactItem {
   tags: string[];
   userId?: string;
   lppId?: string;
+  greenBubbleNo?: string | null;
   conversationId?: string;
   avatarUrl?: string | null;
   online?: boolean;

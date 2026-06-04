@@ -12,7 +12,7 @@ const paths = {
   publicPng: join(root, "public", "app-icon-green-bubble.png"),
   ico: join(root, "assets", "app-icon-green-bubble.ico"),
   icns: join(root, "assets", "app-icon-green-bubble.icns"),
-  packagedExe: join(root, "release", "win-unpacked", "LPP 客服客户端.exe"),
+  packagedExe: join(root, "release", "win-unpacked", "lppchat.exe"),
 };
 const outputManifest = ["assets/app-icon-green-bubble.ico", "public/app-icon-green-bubble.png"];
 

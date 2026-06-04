@@ -1,4 +1,5 @@
 import { ApiError, type PlatformInvitationPreviewDto, type PlatformLoginResult } from "../api-client";
+import { authTenantRoleLabel } from "./auth-tenant-role";
 
 export type AuthMode = "login" | "register";
 export type RegisterContactType = "email" | "mobile";
@@ -27,6 +28,8 @@ export type InvitationPreviewView =
       kind: "ready";
       logoUrl?: string | null;
       name: string;
+      targetMembershipRole?: number | null;
+      targetRoleText: string;
       title: "将加入企业";
     }
   | {
@@ -129,7 +132,9 @@ export function createInvitationPreviewView(
   preview: PlatformInvitationPreviewDto,
 ): InvitationPreviewView {
   const name = preview.tenantName?.trim() || "企业邀请";
+  const targetRoleText = `将以 ${invitationPreviewTargetRoleLabel(preview.targetMembershipRole)} 身份加入`;
   const badges = [
+    targetRoleText,
     preview.alreadyMember ? "已在企业中" : undefined,
     preview.identityMatched ? "定向匹配" : preview.identityMatched === false ? "定向不匹配" : undefined,
     preview.expiresAt ? `有效至 ${formatInvitationDate(preview.expiresAt)}` : undefined,
@@ -143,6 +148,8 @@ export function createInvitationPreviewView(
     identityMatched: preview.identityMatched,
     logoUrl: preview.logoUrl,
     name,
+    targetMembershipRole: preview.targetMembershipRole,
+    targetRoleText,
     title: "将加入企业",
   };
 }
@@ -231,12 +238,7 @@ export function mapAuthErrorMessage(error: unknown, mode: AuthMode = "login") {
 }
 
 export function getAuthTenantRoleLabel(role?: number | null) {
-  if (role === 4) return "所有者";
-  if (role === 3) return "管理员";
-  if (role === 2) return "客服";
-  if (role === 1) return "技术支持";
-  if (role === 0) return "成员";
-  return "成员";
+  return authTenantRoleLabel(role);
 }
 
 function isRegisterContact(value: string) {
@@ -263,6 +265,13 @@ function normalizeMobileNumber(value: string, countryDialCode = "+86") {
   if (!/^\+\d{7,15}$/.test(normalized)) return null;
   if (/^0+$/.test(numeric)) return null;
   return normalized;
+}
+
+function invitationPreviewTargetRoleLabel(role?: number | null) {
+  if (role === 3) return "管理员";
+  if (role === 2) return "客服";
+  if (role === 1) return "技术";
+  return "普通成员";
 }
 
 function formatInvitationDate(value: string) {

@@ -18,10 +18,12 @@ import {
   useRestoreDesktopAuthSession,
   useSetAuthSession,
 } from './data/auth/auth-store';
+import { reconcileAuthSessionTenantRole } from './data/auth/auth-tenant-role';
 import { siteLineManager } from './data/network/site-line-manager';
 import { recordMessageReminderDiagnostic } from './data/diagnostics/message-reminder-diagnostics';
 import { markFirstInteractive } from './data/performance/startup-performance';
 import { subscribeDesktopNotificationClicks } from './data/reminder/reminder-service';
+import { createApiClient } from './data/runtime';
 import type { PcSettings } from './data/settings/pc-settings';
 import { usePcSettings } from './data/settings/settings-store';
 import type { ModuleKey } from './data/types';
@@ -180,6 +182,41 @@ export default function App() {
   useEffect(() => {
     void restoreDesktopAuthSession?.();
   }, [restoreDesktopAuthSession]);
+  useEffect(() => {
+    if (!authSession?.platformToken || !authSession.tenantId || authSession.spaceType === 1) {
+      return undefined;
+    }
+    let cancelled = false;
+    const sessionAtRequest = authSession;
+    void createApiClient(sessionAtRequest)
+      .getPlatformTenants()
+      .then((tenants) => {
+        if (cancelled) return;
+        const latestSession = getAuthSessionSnapshot();
+        if (
+          !latestSession ||
+          latestSession.apiBaseUrl !== sessionAtRequest.apiBaseUrl ||
+          latestSession.platformToken !== sessionAtRequest.platformToken ||
+          latestSession.tenantId !== sessionAtRequest.tenantId
+        ) {
+          return;
+        }
+        const reconciledSession = reconcileAuthSessionTenantRole(latestSession, tenants);
+        if (reconciledSession !== latestSession) setAuthSession(reconciledSession);
+      })
+      .catch(() => {
+        // Role refresh is best-effort; existing auth remains usable when the platform API is unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authSession?.apiBaseUrl,
+    authSession?.platformToken,
+    authSession?.spaceType,
+    authSession?.tenantId,
+    setAuthSession,
+  ]);
   useEffect(() => {
     let cancelled = false;
     void siteLineManager.bootstrap().then((result) => {

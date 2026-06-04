@@ -4,6 +4,7 @@ import type {
   SpaceUnreadSummaryDto,
   TenantInfoDto,
 } from "../../data/api-client";
+import { authTenantRoleLabel } from "../../data/auth/auth-tenant-role";
 import type { AuthSession } from "../../data/auth/auth-session";
 import type { SpaceReminderSnapshot } from "../../data/spaces/space-reminder-ledger";
 
@@ -206,11 +207,7 @@ export function spaceRadarIdentityKey(input: {
 }
 
 export function roleLabel(role?: number | null) {
-  if (role === 4) return "所有者";
-  if (role === 3) return "管理员";
-  if (role === 2) return "客服";
-  if (role === 1) return "技术支持";
-  return "成员";
+  return authTenantRoleLabel(role);
 }
 
 function tenantIdentityKey(tenantId: string | null | undefined) {

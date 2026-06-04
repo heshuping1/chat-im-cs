@@ -94,6 +94,7 @@ function summarizeInvitationResponse(response: PlatformInvitationPreviewDto | Te
     membershipRole: "membershipRole" in response ? response.membershipRole : undefined,
     platformUserIdPresent: "platformUserId" in response ? Boolean(response.platformUserId) : undefined,
     spaceType: "spaceContext" in response ? response.spaceContext?.spaceType : undefined,
+    targetMembershipRole: "targetMembershipRole" in response ? response.targetMembershipRole : undefined,
     tenantIdPresent: Boolean(response.tenantId),
     userIdPresent: "userId" in response ? Boolean(response.userId) : undefined,
   });

@@ -29,10 +29,6 @@ export function ChatBackgroundSection({
       <span className="setting-row-copy">
         <span className="setting-row-title">
           <strong>{row.label}</strong>
-          {row.statusLabel && (
-            <span className={`settings-status-pill ${row.capability}`}>{row.statusLabel}</span>
-          )}
-          <span className="settings-state-pill">本机生效</span>
         </span>
         <em>
           {row.desc}
@@ -49,7 +45,7 @@ export function ChatBackgroundSection({
               className={selected ? "selected" : ""}
               key={preset.id}
               role="radio"
-              style={{ "--swatch-color": preset.color } as CSSProperties}
+              style={{ "--swatch-background": preset.preview } as CSSProperties}
               title={preset.label}
               type="button"
               onClick={() =>

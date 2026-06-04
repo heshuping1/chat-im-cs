@@ -43,7 +43,7 @@ describe("app instance profile", () => {
 
   it("moves userData into a profile-specific directory", () => {
     const app = {
-      getPath: vi.fn(() => join("C:", "Users", "tester", "AppData", "LPP")),
+      getPath: vi.fn(() => join("C:", "Users", "tester", "AppData", "lppchat")),
       setPath: vi.fn(),
       setAppUserModelId: vi.fn(),
     };
@@ -54,17 +54,17 @@ describe("app instance profile", () => {
     });
 
     expect(profile).toEqual({
-      defaultUserDataPath: join("C:", "Users", "tester", "AppData", "LPP"),
+      defaultUserDataPath: join("C:", "Users", "tester", "AppData", "lppchat"),
       profileId: "agent-b",
       profileName: "agent-b",
-      userDataPath: join("C:", "Users", "tester", "AppData", "LPP", "profiles", "agent-b"),
+      userDataPath: join("C:", "Users", "tester", "AppData", "lppchat", "profiles", "agent-b"),
     });
     expect(app.setPath).toHaveBeenCalledWith("userData", profile.userDataPath);
   });
 
   it("keeps profile app user model ids under the product prefix", () => {
-    expect(appUserModelIdForProfile(null)).toBe("com.lpp.pcclient");
-    expect(appUserModelIdForProfile("agent-a")).toBe("com.lpp.pcclient.agent-a");
+    expect(appUserModelIdForProfile(null)).toBe("com.lppchat.desktop");
+    expect(appUserModelIdForProfile("agent-a")).toBe("com.lppchat.desktop.agent-a");
   });
 
   it("allocates the next explicit client profile id", () => {

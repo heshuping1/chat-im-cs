@@ -489,6 +489,8 @@ body {
 
 .e-message-stage {
   --chat-stage-background: #efefef;
+  --chat-stage-background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.38), rgba(226, 232, 240, 0.12));
+  --chat-stage-background-size: auto;
   --chat-stage-background-wash: rgba(255, 255, 255, 0.38);
   --chat-avatar-size: 34px;
   --chat-edge-gap: 12px;
@@ -504,7 +506,12 @@ body {
   padding: clamp(10px, 1.55vw, 18px);
   background:
     linear-gradient(180deg, var(--chat-stage-background-wash), rgba(255, 255, 255, 0) 170px),
+    var(--chat-stage-background-image),
     var(--chat-stage-background);
+  background-size:
+    auto,
+    var(--chat-stage-background-size),
+    auto;
 }
 
 .e-day-divider {

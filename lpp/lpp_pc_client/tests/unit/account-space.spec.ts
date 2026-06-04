@@ -32,7 +32,9 @@ describe("account space session identity", () => {
     expect(accountSpaceSource).toContain("userType: profile?.userType");
     expect(spaceSwitchSource).toContain("spaceType: tenant.spaceContext?.spaceType ?? (space ? 2 : 1)");
     expect(accountSpaceSource).toContain("spaceType: 2");
-    expect(spaceSwitchSource).toContain("membershipRole: space ? space.membershipRole : undefined");
+    expect(spaceSwitchSource).toContain("const sessionRole = space ? space.membershipRole : undefined");
+    expect(spaceSwitchSource).toContain("tenantRole: tenant.membershipRole");
+    expect(spaceSwitchSource).toContain("membershipRole: sessionRole");
     expect(accountSpaceSource).toContain("membershipRole: joinedSpace?.membershipRole");
   });
 

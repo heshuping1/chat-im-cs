@@ -39,6 +39,7 @@ import {
 } from "../data/auth/auth-flow-model";
 import { registerAvatarOptions } from "../data/auth/register-avatar-options";
 import { useSetAuthSession } from "../data/auth/auth-store";
+import { writeRendererAppLog } from "../data/logging/app-log";
 import { defaultApiBaseUrl, createTraceId } from "../data/runtime";
 import { primarySiteBaseUrl, primarySiteLine, siteLineManager } from "../data/network/site-line-manager";
 
@@ -396,6 +397,12 @@ export function LoginPage() {
       traceId: createTraceId("pc-select-tenant"),
     }).selectTenant(selectedTenantId);
     const tenantInfo = login.tenants?.find((item) => item.tenantId === selectedTenantId);
+    logAuthRoleEvent("auth.select-tenant.response", {
+      tenantId: selectedTenantId,
+      loginTenantRole: tenantInfo?.membershipRole ?? null,
+      tenantRole: tenant.membershipRole ?? null,
+      userType: login.userType ?? null,
+    });
     await applySelectedTenantSession(baseUrl, login, tenant, tenantInfo);
   };
 
@@ -453,6 +460,15 @@ export function LoginPage() {
     ]);
     const isPersonal = login.spaceContext?.spaceType === 1;
     const loginSite = rememberLoginSite(baseUrl);
+    const selectedTenant = login.tenants?.find((item) => item.tenantId === login.tenantId);
+    logAuthRoleEvent("auth.direct-session.apply", {
+      tenantId: isPersonal ? null : login.tenantId ?? tenantInfo?.tenantId ?? null,
+      loginTenantRole: selectedTenant?.membershipRole ?? null,
+      tenantRole: null,
+      sessionRole: null,
+      userType: profile?.userType ?? login.userType ?? null,
+      roleLabel: isPersonal ? "personal" : "tenant-account",
+    });
     setAuthSession({
       apiBaseUrl: baseUrl,
       adminBaseUrl: loginSite.adminBaseUrl,
@@ -489,6 +505,15 @@ export function LoginPage() {
       isPersonal ? Promise.resolve(null) : fetchTenantInfo(baseUrl, tenant.accessToken),
     ]);
     const loginSite = rememberLoginSite(baseUrl);
+    const resolvedRole = isPersonal ? undefined : tenant.membershipRole ?? selectedTenant?.membershipRole;
+    logAuthRoleEvent("auth.session.apply-selected-tenant", {
+      tenantId: isPersonal ? null : tenant.tenantId ?? currentTenant?.tenantId ?? selectedTenant?.tenantId ?? null,
+      loginTenantRole: selectedTenant?.membershipRole ?? null,
+      tenantRole: tenant.membershipRole ?? null,
+      sessionRole: resolvedRole ?? null,
+      userType: profile?.userType ?? login.userType ?? null,
+      roleLabel: isPersonal ? "personal" : getAuthTenantRoleLabel(resolvedRole),
+    });
     setAuthSession({
       apiBaseUrl: baseUrl,
       adminBaseUrl: loginSite.adminBaseUrl,
@@ -509,10 +534,10 @@ export function LoginPage() {
       avatarUrl: profile?.avatarUrl ?? tenant.avatarUrl,
       userType: profile?.userType ?? login.userType ?? undefined,
       spaceType: tenant.spaceContext?.spaceType ?? (isPersonal ? 1 : 2),
-      membershipRole: isPersonal ? undefined : tenant.membershipRole ?? selectedTenant?.membershipRole,
+      membershipRole: resolvedRole,
       roleLabel: isPersonal
         ? "个人空间"
-        : getAuthTenantRoleLabel(tenant.membershipRole ?? selectedTenant?.membershipRole),
+        : getAuthTenantRoleLabel(resolvedRole),
       tenants: login.tenants,
     });
   };
@@ -538,7 +563,7 @@ export function LoginPage() {
     <main className="login-page">
       <section className="login-panel auth-panel">
         <div className="auth-panel-heading">
-          <h1>LPP PC 客服客户端</h1>
+          <h1>lppchat</h1>
           <p>进入消息、在线客服和客户工作台。</p>
         </div>
 
@@ -656,4 +681,14 @@ async function fetchTenantInfo(baseUrl: string, tenantToken: string) {
 
 function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/$/, "");
+}
+
+function logAuthRoleEvent(event: string, context: Record<string, unknown>) {
+  writeRendererAppLog({
+    module: "auth",
+    event,
+    phase: "role",
+    result: "ok",
+    context,
+  });
 }

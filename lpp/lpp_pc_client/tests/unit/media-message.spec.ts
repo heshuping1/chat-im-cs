@@ -307,7 +307,7 @@ describe("message media upload presentation", () => {
     expect(fileMessageCard).toContain("message-file-icon-action");
     expect(fileMessageCard).toContain("message-file-source");
     expect(fileMessageCard).not.toContain("message-file-type-layer");
-    expect(fileMessageCard).not.toContain('sourceLabel = "LPP 客服客户端"');
+    expect(fileMessageCard).not.toContain('sourceLabel = "lppchat"');
     expect(fileMessageCard).toContain('sourceLabel = "客户端"');
     expect(fileMessageCard).toContain("!controlActive");
     expect(fileMessageCard).toContain("file-type-glyph");
@@ -336,7 +336,7 @@ describe("message media upload presentation", () => {
     expect(mediaCss).not.toContain(".message-file-control {\n  position: absolute;\n  inset: 0;");
     expect(appMetadata).toContain("__LPP_PC_PRODUCT_NAME__");
     expect(appMetadata).toContain("appProductName");
-    expect(packageJson.build?.productName).toBe("LPP 客服客户端");
+    expect(packageJson.build?.productName).toBe("lppchat");
     expect(viteConfig).toContain("buildProductName");
     expect(viteConfig).toContain("packageJson.build?.productName");
     expect(viteConfig).toContain("__LPP_PC_PRODUCT_NAME__");

@@ -83,6 +83,28 @@ describe("pc settings service shell", () => {
     });
   });
 
+  it("normalizes legacy timezone settings after migration", () => {
+    expect(
+      parseStoredPcSettings(
+        JSON.stringify({
+          timezone: "Asia/Shanghai",
+        }),
+      ),
+    ).toMatchObject({
+      timezone: "UTC+08:00",
+    });
+
+    expect(
+      parseStoredPcSettings(
+        JSON.stringify({
+          timezone: "UTC",
+        }),
+      ),
+    ).toMatchObject({
+      timezone: "UTC+00:00",
+    });
+  });
+
   it("returns defaults for malformed persisted settings", () => {
     expect(parseStoredPcSettings("{bad-json")).toEqual(defaultPcSettings);
   });

@@ -4,6 +4,11 @@ import {
   normalizeChatBackgroundPreset,
   type ChatBackgroundPresetId,
 } from "../../settings/models/chatBackgroundModel";
+import type { ApiTrafficLogLevel } from "../api/api-traffic-diagnostics";
+import {
+  normalizePcUserTimezone,
+  type PcSelectableUserTimezone,
+} from "../time/user-timezone";
 
 export interface PcSettings {
   settingsSchemaVersion: number;
@@ -25,7 +30,7 @@ export interface PcSettings {
   theme: "porcelain" | "business" | "classic-wechat" | "dark" | "high-contrast";
   skin: "jade" | "blue" | "graphite";
   language: "简体中文" | "English" | "العربية";
-  timezone: "系统默认" | "Asia/Shanghai" | "UTC";
+  timezone: PcSelectableUserTimezone;
   autoTranslate: boolean;
   enterToSend: boolean;
   screenshotShortcut: "Alt+A" | "Ctrl+Alt+A" | "Ctrl+Shift+A" | "None";
@@ -39,6 +44,7 @@ export interface PcSettings {
   sensitiveMasking: boolean;
   activeLine: "自动选择" | "主站" | "香港线路" | "新加坡线路";
   weakNetworkDiagnostics: boolean;
+  apiTrafficLogLevel: ApiTrafficLogLevel;
   reduceMotion: boolean;
   highContrastBoundary: boolean;
   keyboardFocusHint: boolean;
@@ -93,6 +99,7 @@ export const defaultPcSettings: PcSettings = {
   sensitiveMasking: true,
   activeLine: "自动选择",
   weakNetworkDiagnostics: true,
+  apiTrafficLogLevel: "summary",
   reduceMotion: false,
   highContrastBoundary: false,
   keyboardFocusHint: true,
@@ -157,6 +164,7 @@ export function mergePcSettings(partial: Partial<PcSettings> = {}): PcSettings {
     ...partial,
     settingsSchemaVersion: pcSettingsSchemaVersion,
     chatBackgroundPreset: normalizeChatBackgroundPreset(partial.chatBackgroundPreset),
+    timezone: normalizePcUserTimezone(partial.timezone),
   };
 }
 

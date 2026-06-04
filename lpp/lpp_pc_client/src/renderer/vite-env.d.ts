@@ -11,6 +11,7 @@ interface Window {
   __lppReminderDiagnostics?: import("./data/reminder/reminder-diagnostics").ReminderDiagnosticRecord[];
   __lppApiContractDiagnostics?: import("./data/api-contract/contract-diagnostics").ApiContractDiagnosticRecord[];
   __lppApiErrorDiagnostics?: import("./data/api/api-error-diagnostics").ApiErrorDiagnosticRecord[];
+  __lppApiTrafficDiagnostics?: import("./data/api/api-traffic-diagnostics").ApiTrafficDiagnosticRecord[];
   __lppSendDiagnostics?: import("./data/send/send-state-machine").ChatSendDiagnosticRecord[];
   __lppMessageCenterDiagnostics?: import("./messages/diagnostics/message-center-diagnostics").MessageCenterDiagnosticRecord[];
   __lppCustomerServiceStateDiagnostics?: import("./data/customer-service/cs-thread-state").CustomerServiceThreadStateDiagnosticRecord[];

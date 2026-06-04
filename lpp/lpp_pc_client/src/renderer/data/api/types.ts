@@ -73,6 +73,7 @@ export interface PlatformInvitationPreviewDto {
   expiresAt?: string | null;
   alreadyMember?: boolean;
   identityMatched?: boolean;
+  targetMembershipRole?: number | null;
 }
 
 export interface CaptchaChallenge {
@@ -153,6 +154,11 @@ export interface TenantInvitationDto {
   url?: string | null;
   targetIdentifier?: string | null;
   targetMembershipRole?: number | null;
+  targetRole?: number | string | null;
+  target_role?: number | string | null;
+  target_membership_role?: number | string | null;
+  membershipRole?: number | string | null;
+  role?: number | string | null;
   maxUses?: number | null;
   usedCount?: number | null;
   remainingUses?: number | null;
@@ -519,9 +525,7 @@ export interface FriendDto {
   groupName?: string | null;
   createdAt?: string;
   userType?: number;
-  lppId?: string;
-  lppNo?: string;
-  lppNumber?: string;
+  greenBubbleNo?: string | null;
 }
 
 export interface FriendProfileUpdateDto {
@@ -588,9 +592,7 @@ export interface FriendRequestDto {
 export interface TenantMemberDto {
   userId: string;
   platformUserId?: string;
-  lppId?: string | null;
-  lppNo?: string | null;
-  lppNumber?: string | null;
+  greenBubbleNo?: string | null;
   displayName: string;
   avatarUrl?: string | null;
   membershipRole?: number;

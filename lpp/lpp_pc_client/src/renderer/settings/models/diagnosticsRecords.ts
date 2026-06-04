@@ -3,6 +3,7 @@ export type DiagnosticsRecordModuleFilter =
   | "message"
   | "gateway"
   | "cs-routing"
+  | "api-traffic"
   | "api-error"
   | "settings"
   | "runtime";
@@ -44,6 +45,7 @@ type DiagnosticsTarget = Partial<Record<DiagnosticsWindowKey, unknown>>;
 
 type DiagnosticsWindowKey =
   | "__lppApiErrorDiagnostics"
+  | "__lppApiTrafficDiagnostics"
   | "__lppCustomerServiceCacheDiagnostics"
   | "__lppCustomerServiceStateDiagnostics"
   | "__lppGatewayDiagnostics"
@@ -72,6 +74,7 @@ export const diagnosticsRecordFilters: Array<{
   { id: "message", label: "消息链路" },
   { id: "gateway", label: "网关" },
   { id: "cs-routing", label: "客服路由" },
+  { id: "api-traffic", label: "API 请求" },
   { id: "api-error", label: "API 错误" },
   { id: "settings", label: "设置" },
   { id: "runtime", label: "运行时" },
@@ -101,6 +104,12 @@ const diagnosticsSources: DiagnosticsSource[] = [
     module: "cs-cache",
     moduleFilter: "cs-routing",
     moduleLabel: "客服路由",
+  },
+  {
+    key: "__lppApiTrafficDiagnostics",
+    module: "api-traffic",
+    moduleFilter: "api-traffic",
+    moduleLabel: "API 请求",
   },
   {
     key: "__lppApiErrorDiagnostics",
@@ -215,6 +224,7 @@ function recordMatchesFilter(
   if (filter === "message") return record.module === "message-center";
   if (filter === "gateway") return record.module === "gateway";
   if (filter === "cs-routing") return record.module === "cs-state" || record.module === "cs-cache";
+  if (filter === "api-traffic") return record.module === "api-traffic";
   if (filter === "api-error") return record.module === "api-error";
   if (filter === "settings") return record.module === "settings";
   return record.module === "runtime-error";

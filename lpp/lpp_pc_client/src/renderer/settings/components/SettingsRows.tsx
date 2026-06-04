@@ -16,14 +16,12 @@ export function InlineSettingsState({
 
 export function SwitchRow({
   checked,
-  capability = "available",
   desc,
   disabledReason,
   enabled = true,
   label,
   onChange,
   stateText,
-  statusLabel,
   visibleInMainList = true,
 }: {
   checked: boolean;
@@ -50,12 +48,10 @@ export function SwitchRow({
       onClick={() => onChange(!checked)}
     >
       <SettingsRowCopy
-        capability={capability}
         desc={desc}
         disabledReason={disabledReason}
         label={label}
         stateText={stateText}
-        statusLabel={statusLabel}
       />
       <span className={`setting-switch ${checked ? "on" : ""}`} aria-hidden="true">
         <i />
@@ -65,7 +61,6 @@ export function SwitchRow({
 }
 
 export function SelectRow<T extends string>({
-  capability = "available",
   desc,
   disabledReason,
   enabled = true,
@@ -74,7 +69,6 @@ export function SelectRow<T extends string>({
   optionLabels,
   options,
   stateText,
-  statusLabel,
   value,
   visibleInMainList = true,
 }: {
@@ -95,12 +89,10 @@ export function SelectRow<T extends string>({
   return (
     <label className={`setting-detail-row select ${enabled ? "" : "disabled"}`}>
       <SettingsRowCopy
-        capability={capability}
         desc={desc}
         disabledReason={disabledReason}
         label={label}
         stateText={stateText}
-        statusLabel={statusLabel}
       />
       <select
         aria-label={label}
@@ -120,7 +112,6 @@ export function SelectRow<T extends string>({
 
 export function ActionRow({
   action,
-  capability = "available",
   desc,
   disabledReason,
   enabled = true,
@@ -128,7 +119,6 @@ export function ActionRow({
   label,
   onClick,
   stateText,
-  statusLabel,
   visibleInMainList = true,
 }: {
   action: string;
@@ -152,12 +142,10 @@ export function ActionRow({
       onClick={onClick}
     >
       <SettingsRowCopy
-        capability={capability}
         desc={desc}
         disabledReason={disabledReason}
         label={label}
         stateText={stateText}
-        statusLabel={statusLabel}
       />
       <b>
         {icon}
@@ -169,12 +157,10 @@ export function ActionRow({
 }
 
 export function InfoRow({
-  capability = "available",
   desc,
   disabledReason,
   label,
   stateText,
-  statusLabel,
   visibleInMainList = true,
 }: {
   capability?: SettingCapability;
@@ -189,54 +175,33 @@ export function InfoRow({
   return (
     <div className="setting-detail-row info">
       <SettingsRowCopy
-        capability={capability}
         desc={desc}
         disabledReason={disabledReason}
         label={label}
         stateText={stateText}
-        statusLabel={statusLabel}
       />
     </div>
   );
 }
 
 function SettingsRowCopy({
-  capability,
   desc,
   disabledReason,
   label,
   stateText,
-  statusLabel,
 }: {
-  capability: SettingCapability;
   desc: string;
   disabledReason?: string;
   label: string;
   stateText?: string;
-  statusLabel?: string;
 }) {
-  const effectiveStatusLabel = statusLabel ?? statusText(capability);
   return (
     <span className="setting-row-copy">
       <span className="setting-row-title">
         <strong>{label}</strong>
-        {effectiveStatusLabel && (
-          <small className={`settings-status-pill ${capability}`}>
-            {effectiveStatusLabel}
-          </small>
-        )}
         {stateText && <small className="settings-state-pill">{stateText}</small>}
       </span>
       <em>{disabledReason ? `${desc} ${disabledReason}` : desc}</em>
     </span>
   );
-}
-
-function statusText(capability: SettingCapability) {
-  if (capability === "localEffective") return "本机生效";
-  if (capability === "recordOnly") return "状态展示";
-  if (capability === "missingBackendApi") return "缺少接口";
-  if (capability === "missingDesktopApi") return "缺少桌面能力";
-  if (capability === "missingRuntimeWiring") return "待接入流程";
-  return "";
 }

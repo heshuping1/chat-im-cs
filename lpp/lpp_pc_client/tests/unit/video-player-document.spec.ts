@@ -15,7 +15,7 @@ describe("video player document", () => {
 
       expect(document.fileUrl).toMatch(/^file:\/\//);
       expect(document.fileUrl).not.toContain("data:text/html");
-      expect(document.filePath).toContain("LPP Player");
+      expect(document.filePath).toContain("lppchat-player");
       await expect(readFile(document.filePath, "utf8")).resolves.toContain("<video>");
     } finally {
       await rm(userDataPath, { force: true, recursive: true });
