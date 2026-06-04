@@ -67,9 +67,15 @@ describe("reminder service", () => {
   });
 
   it("uses settings policy for realtime and desktop notifications", () => {
-    expect(shouldPushRealtimeReminder(defaultPcSettings, "serviceQueue")).toBe(true);
-    expect(shouldPushCustomerServiceQueueReminder(defaultPcSettings)).toBe(true);
-    expect(shouldPushCustomerServiceThreadMessageReminder(defaultPcSettings)).toBe(true);
+    expect(shouldPushRealtimeReminder(defaultPcSettings, "serviceQueue")).toBe(false);
+    expect(shouldPushCustomerServiceQueueReminder(defaultPcSettings)).toBe(false);
+    expect(shouldPushCustomerServiceThreadMessageReminder(defaultPcSettings)).toBe(false);
+    expect(
+      shouldPushCustomerServiceQueueReminder({
+        ...defaultPcSettings,
+        serviceQueueNotifications: true,
+      }),
+    ).toBe(true);
     expect(
       shouldPushCustomerServiceThreadMessageReminder({
         ...defaultPcSettings,
@@ -125,7 +131,16 @@ describe("reminder service", () => {
         serviceQueueNotifications: false,
       }),
     ).toBe(false);
-    expect(shouldShowDesktopNotification(defaultPcSettings, "serviceQueue")).toBe(true);
+    expect(shouldShowDesktopNotification(defaultPcSettings, "serviceQueue")).toBe(false);
+    expect(
+      shouldShowDesktopNotification(
+        {
+          ...defaultPcSettings,
+          serviceQueueNotifications: true,
+        },
+        "serviceQueue",
+      ),
+    ).toBe(true);
     expect(
       shouldShowDesktopNotification(
         {
@@ -161,8 +176,27 @@ describe("reminder service", () => {
         },
         "serviceQueue",
       ),
+    ).toBe(false);
+    expect(
+      shouldPushRealtimeReminder(
+        {
+          ...defaultPcSettings,
+          doNotDisturb: true,
+          serviceQueueNotifications: true,
+        },
+        "serviceQueue",
+      ),
     ).toBe(true);
-    expect(shouldPushRealtimeReminder(defaultPcSettings, "sla")).toBe(true);
+    expect(shouldPushRealtimeReminder(defaultPcSettings, "sla")).toBe(false);
+    expect(
+      shouldPushRealtimeReminder(
+        {
+          ...defaultPcSettings,
+          slaTimeoutNotifications: true,
+        },
+        "sla",
+      ),
+    ).toBe(true);
     expect(
       shouldPushRealtimeReminder(
         {
@@ -189,7 +223,7 @@ describe("reminder service", () => {
         targetModule: "onlineService",
         windowFocused: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldShowDesktopNotificationForTarget(defaultPcSettings, "serviceQueue", {
         activeModule: "messages",
@@ -198,6 +232,22 @@ describe("reminder service", () => {
         targetModule: "onlineService",
         windowFocused: true,
       }),
+    ).toBe(false);
+    expect(
+      shouldShowDesktopNotificationForTarget(
+        {
+          ...defaultPcSettings,
+          serviceQueueNotifications: true,
+        },
+        "serviceQueue",
+        {
+          activeModule: "messages",
+          activeTargetId: "t1",
+          targetId: "t1",
+          targetModule: "onlineService",
+          windowFocused: true,
+        },
+      ),
     ).toBe(true);
     expect(
       shouldShowCustomerServiceThreadMessageDesktopNotificationForTarget(

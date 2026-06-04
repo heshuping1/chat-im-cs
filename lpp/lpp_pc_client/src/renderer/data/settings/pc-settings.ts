@@ -62,10 +62,10 @@ export const pcSettingsSchemaVersion = 2;
 export const defaultPcSettings: PcSettings = {
   settingsSchemaVersion: pcSettingsSchemaVersion,
   imNotifications: true,
-  serviceQueueNotifications: true,
-  customerServiceMessageNotifications: true,
-  foregroundInAppCustomerServiceReminders: true,
-  slaTimeoutNotifications: true,
+  serviceQueueNotifications: false,
+  customerServiceMessageNotifications: false,
+  foregroundInAppCustomerServiceReminders: false,
+  slaTimeoutNotifications: false,
   desktopNotifications: true,
   notificationPreview: true,
   notificationSound: true,
@@ -75,7 +75,7 @@ export const defaultPcSettings: PcSettings = {
   autoReconnect: true,
   compactList: true,
   fontSize: "标准",
-  highDensityContext: true,
+  highDensityContext: false,
   theme: "porcelain",
   skin: "jade",
   language: "简体中文",
@@ -165,10 +165,6 @@ function migrateStoredPcSettings(partial: Partial<PcSettings> = {}): Partial<PcS
   if (version >= pcSettingsSchemaVersion) return partial;
   return {
     ...partial,
-    customerServiceMessageNotifications:
-      partial.customerServiceMessageNotifications === false
-        ? true
-        : partial.customerServiceMessageNotifications ?? defaultPcSettings.customerServiceMessageNotifications,
     settingsSchemaVersion: pcSettingsSchemaVersion,
   };
 }
