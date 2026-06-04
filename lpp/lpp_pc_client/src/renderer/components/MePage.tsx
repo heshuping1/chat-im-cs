@@ -24,6 +24,7 @@ import type { AuthSession } from "../data/auth/auth-session";
 import { useAuthSession, useClearAuthSession, useSetAuthSession } from "../data/auth/auth-store";
 import type { PcSettings } from "../data/settings/pc-settings";
 import { usePcSettings, useUpdatePcSetting } from "../data/settings/settings-store";
+import { pcUserTimezoneLabels, pcUserTimezoneOptions } from "../data/time/user-timezone";
 import { formatError, formatShortDate } from "../lib/format";
 import { PcAvatar } from "./PcAvatar";
 import { exportCurrentDiagnosticsPackage } from "../settings/runtime/diagnosticsExport";
@@ -376,7 +377,14 @@ function renderSection(
           <AppProfileInfoRow />
           <SettingsGroupLabel title="语言与时间" />
           <InfoRow {...settingRowProps("language")} desc={pcSettings.language} />
-          <InfoRow {...settingRowProps("timezone")} desc={pcSettings.timezone} />
+          <SelectRow
+            {...settingRowProps("timezone")}
+            capability="localEffective"
+            optionLabels={pcUserTimezoneLabels}
+            options={pcUserTimezoneOptions}
+            value={pcSettings.timezone}
+            onChange={(value) => setSetting("timezone", value)}
+          />
           <PlanningSupportBlock sectionId={section} />
         </>
       );

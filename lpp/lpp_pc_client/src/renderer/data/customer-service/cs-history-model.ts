@@ -3,6 +3,7 @@ import type {
   CustomerServiceThreadType,
   StaffServiceHistoryItem,
 } from "../api/types";
+import { formatMonthDayTime } from "../../lib/format";
 
 export function staffServiceHistoryItemToThread(
   item: StaffServiceHistoryItem,
@@ -68,10 +69,5 @@ function readStringField(source: unknown, key: string) {
 }
 
 function formatApiShortDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getMonth() + 1}/${date.getDate()} ${date
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+  return formatMonthDayTime(value);
 }

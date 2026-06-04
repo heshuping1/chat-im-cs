@@ -542,14 +542,19 @@ describe("settings catalog", () => {
     }
   });
 
-  it("keeps recorded language, timezone and diagnostics as status display", () => {
-    for (const rowId of ["language", "timezone", "runtimeStatus", "developmentDiagnostics"]) {
+  it("keeps recorded language and diagnostics as status display", () => {
+    for (const rowId of ["language", "runtimeStatus", "developmentDiagnostics"]) {
       expect(getSettingsRow(rowId)).toMatchObject({
         control: "info",
         capability: "recordOnly",
         visibleInMainList: true,
       });
     }
+    expect(getSettingsRow("timezone")).toMatchObject({
+      control: "select",
+      capability: "localEffective",
+      visibleInMainList: true,
+    });
   });
 
   it("promotes recent diagnostics records into the storage and diagnostics page", () => {
@@ -592,12 +597,12 @@ describe("settings catalog", () => {
     for (const key of [
       "activeLine",
       "language",
-      "timezone",
       "autoReconnect",
       "weakNetworkDiagnostics",
     ]) {
       expect(source).not.toContain(`setSetting("${key}"`);
     }
+    expect(source).toContain(`setSetting("timezone"`);
   });
 
   it("keeps privacy, diagnostics and profile runtime logic on their existing owners", () => {

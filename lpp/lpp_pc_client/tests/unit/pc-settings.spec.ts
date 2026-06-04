@@ -32,6 +32,7 @@ describe("pc settings service shell", () => {
     expect(defaultPcSettings.foregroundInAppCustomerServiceReminders).toBe(false);
     expect(defaultPcSettings.slaTimeoutNotifications).toBe(false);
     expect(defaultPcSettings.highDensityContext).toBe(false);
+    expect(defaultPcSettings.timezone).toBe("系统默认");
   });
 
   it("merges persisted settings over defaults", () => {

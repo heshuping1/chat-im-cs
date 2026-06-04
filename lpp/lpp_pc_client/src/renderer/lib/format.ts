@@ -1,4 +1,13 @@
 import { formatApiErrorForUser } from "../data/api/api-error-model";
+import { getPcSettingsSnapshot } from "../data/settings/settings-store";
+import {
+  formatUserChatMessageTime,
+  formatUserChatTime,
+  formatUserClockTime,
+  formatUserMonthDayTime,
+  formatUserShortDate,
+  type UserTimezoneFormattingOptions,
+} from "../data/time/user-timezone";
 
 export function formatError(error: unknown, fallback = "未知错误") {
   const apiMessage = formatApiErrorForUser(error, fallback);
@@ -22,62 +31,39 @@ export function formatBadgeCount(count?: number | null) {
   return value > 99 ? "99+" : String(value);
 }
 
-export function formatShortDate(value?: string | null) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate(),
-  ).padStart(2, "0")}`;
+export function formatShortDate(
+  value?: string | null,
+  options: UserTimezoneFormattingOptions = currentTimezoneOptions(),
+) {
+  return formatUserShortDate(value, options);
 }
 
-export function formatMonthDayTime(value?: string | null) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+export function formatMonthDayTime(
+  value?: string | null,
+  options: UserTimezoneFormattingOptions = currentTimezoneOptions(),
+) {
+  return formatUserMonthDayTime(value, options);
 }
 
-export function formatChatTime(value?: string | null) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  if (sameDay) {
-    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(
-      2,
-      "0",
-    )}`;
-  }
-  return `${date.getMonth() + 1}/${date.getDate()}`;
+export function formatChatTime(
+  value?: string | null,
+  options: UserTimezoneFormattingOptions = currentTimezoneOptions(),
+) {
+  return formatUserChatTime(value, options);
 }
 
-export function formatChatMessageTime(value?: string | null) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const now = new Date();
-  const time = `${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes(),
-  ).padStart(2, "0")}`;
-  if (date.toDateString() === now.toDateString()) return time;
-  return `${date.getMonth() + 1}/${date.getDate()} ${time}`;
+export function formatChatMessageTime(
+  value?: string | null,
+  options: UserTimezoneFormattingOptions = currentTimezoneOptions(),
+) {
+  return formatUserChatMessageTime(value, options);
 }
 
-export function formatClockTime(value?: string | null) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(
-    2,
-    "0",
-  )}`;
+export function formatClockTime(
+  value?: string | null,
+  options: UserTimezoneFormattingOptions = currentTimezoneOptions(),
+) {
+  return formatUserClockTime(value, options);
 }
 
 export function timestampFromDateValue(value?: string | number | Date | null) {
@@ -90,4 +76,8 @@ export function timestampFromDateValue(value?: string | number | Date | null) {
 export function currentIsoTimestamp(now: Date | number = Date.now()) {
   const date = now instanceof Date ? now : new Date(now);
   return Number.isFinite(date.getTime()) ? date.toISOString() : new Date().toISOString();
+}
+
+function currentTimezoneOptions(): UserTimezoneFormattingOptions {
+  return { timezone: getPcSettingsSnapshot().timezone };
 }

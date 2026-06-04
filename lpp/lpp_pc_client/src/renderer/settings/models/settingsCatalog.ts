@@ -217,7 +217,7 @@ export const settingsRows = [
   row("multiProfileIndicator", "common", "多开 profile 标识", "显示当前窗口 profile，避免多账号测试和多客服环境串号。", "system", "info", "recordOnly"),
 
   row("language", "common", "界面语言", "PC 客户端菜单和界面文案语言。", "local", "info", "recordOnly"),
-  row("timezone", "common", "时区", "统一聊天时间、客服 SLA、历史会话和报表时间。", "local", "info", "recordOnly"),
+  row("timezone", "common", "时区", "统一聊天时间、客服 SLA、历史会话和报表时间。", "local", "select", "localEffective"),
   row("currentEnvironment", "network", "当前连接环境", "显示当前测试环境地址，不展示 token、Authorization 或 Cookie。", "system", "info", "recordOnly"),
   row("activeLine", "network", "网络线路", "按 APP 线路管理规则自动或手动选择可用站点，切换后 API 与实时连接使用新线路。", "system", "action", "available"),
   row("lineLatencyTest", "network", "线路测速", "沿用 APP 根地址探测规则，测试所有候选线路延迟和可用状态。", "system", "action", "localEffective"),
