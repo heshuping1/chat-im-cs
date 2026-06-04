@@ -31,6 +31,12 @@ import {
 } from "../im-read-model";
 import { requireApiClient } from "../runtime";
 import { getReminderActions } from "../reminder/reminder-store";
+import {
+  isRendererWindowFocused,
+  notifyDesktopOrBrowser,
+  shouldShowDesktopNotification,
+} from "../reminder/reminder-service";
+import { getPcSettingsSnapshot } from "../settings/settings-store";
 import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 import { workspaceScopeFromSession } from "../workspace-scope";
@@ -184,6 +190,13 @@ export function mergeImGatewayMessage(
       message,
     },
   });
+  notifyImDesktopMessage({
+    active,
+    eventMessage,
+    message,
+    payload,
+    selfMessage,
+  });
 }
 
 export function mergeReadEvent(
@@ -326,6 +339,113 @@ function messageSenderDiagnostic(message: MessageItemDto) {
     senderPlatformUserId: message.senderPlatformUserId,
     senderUserId: message.senderUserId,
   };
+}
+
+function notifyImDesktopMessage(input: {
+  active: boolean;
+  eventMessage: boolean;
+  message: MessageItemDto;
+  payload: Record<string, unknown>;
+  selfMessage: boolean;
+}) {
+  const { active, eventMessage, message, payload, selfMessage } = input;
+  const settings = getPcSettingsSnapshot();
+  const windowFocused = isRendererWindowFocused();
+  const baseClassification = {
+    activeConversation: active,
+    conversationId: message.conversationId,
+    desktopNotifications: settings.desktopNotifications,
+    doNotDisturb: settings.doNotDisturb,
+    eventMessage,
+    imNotifications: settings.imNotifications,
+    messageId: message.messageId,
+    notificationPreview: settings.notificationPreview,
+    notificationSound: settings.notificationSound,
+    selfMessage,
+    windowFocused,
+  };
+
+  if (selfMessage) {
+    recordImDesktopNotifyDecision("skipped", "self-message", baseClassification);
+    return;
+  }
+  if (eventMessage) {
+    recordImDesktopNotifyDecision("skipped", "event-message", baseClassification);
+    return;
+  }
+  if (windowFocused && active) {
+    recordImDesktopNotifyDecision("skipped", "active-visible-conversation", baseClassification);
+    return;
+  }
+  if (!shouldShowDesktopNotification(settings, "im")) {
+    recordImDesktopNotifyDecision("skipped", "policy-disabled", baseClassification);
+    return;
+  }
+
+  recordImDesktopNotifyDecision("sent", "notify-desktop", baseClassification);
+  void notifyDesktopOrBrowser(
+    {
+      body: imDesktopNotificationBody(message),
+      channel: "im",
+      conversationId: message.conversationId,
+      targetId: message.conversationId,
+      targetModule: "messages",
+      title: imDesktopNotificationTitle(message, payload),
+    },
+    {
+      channel: "im",
+      settings,
+    },
+  );
+}
+
+function recordImDesktopNotifyDecision(
+  phase: "sent" | "skipped",
+  reason: string,
+  classification: Record<string, unknown>,
+) {
+  recordMessageReminderDiagnostic({
+    event: "im.desktop-notify.decision",
+    source: "gateway-im-side-effects",
+    phase,
+    route: "messages",
+    classification: {
+      ...classification,
+      reason,
+    },
+  });
+}
+
+function imDesktopNotificationTitle(message: MessageItemDto, payload: Record<string, unknown>) {
+  return (
+    payloadConversationTitle(payload) ||
+    safeMessageText(message.senderDisplayName) ||
+    "新消息"
+  );
+}
+
+function imDesktopNotificationBody(message: MessageItemDto) {
+  return safeMessageText(message.preview) || "收到一条新消息";
+}
+
+function safeMessageText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function payloadConversationTitle(payload: Record<string, unknown>) {
+  const conversation = payload.conversation;
+  const conversationRecord =
+    conversation && typeof conversation === "object"
+      ? (conversation as Record<string, unknown>)
+      : {};
+  return (
+    safeMessageText(conversationRecord.title) ||
+    safeMessageText(conversationRecord.name) ||
+    safeMessageText(conversationRecord.displayName) ||
+    safeMessageText(payload.conversationTitle) ||
+    safeMessageText(payload.title) ||
+    safeMessageText(payload.name)
+  );
 }
 
 function isSelfGatewayImMessage(

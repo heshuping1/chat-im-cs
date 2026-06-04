@@ -6,6 +6,16 @@ import { canAutoReadImConversation } from "../../src/renderer/messages/hooks/use
 const mocks = vi.hoisted(() => ({
   markConversationRead: vi.fn(),
   markImConversationReadLocally: vi.fn(),
+  notifyDesktopOrBrowser: vi.fn(),
+  pcSettings: {
+    desktopNotifications: true,
+    doNotDisturb: false,
+    imNotifications: true,
+    notificationPreview: true,
+    notificationSound: true,
+  },
+  recordMessageReminderDiagnostic: vi.fn(),
+  rendererWindowFocused: false,
   workspaceUiSnapshot: {
     activeImConversationId: "",
     activeImConversationVisibility: "hidden",
@@ -44,11 +54,30 @@ vi.mock("../../src/renderer/data/workspace-ui/workspace-ui-store", () => ({
   getWorkspaceUiSnapshot: () => mocks.workspaceUiSnapshot,
 }));
 
+vi.mock("../../src/renderer/data/settings/settings-store", () => ({
+  getPcSettingsSnapshot: () => mocks.pcSettings,
+}));
+
+vi.mock("../../src/renderer/data/diagnostics/message-reminder-diagnostics", () => ({
+  recordMessageReminderDiagnostic: mocks.recordMessageReminderDiagnostic,
+}));
+
 vi.mock("../../src/renderer/data/reminder/reminder-store", () => ({
   getReminderActions: () => ({
     dismissRealtimeRemindersForTarget: vi.fn(),
   }),
 }));
+
+vi.mock("../../src/renderer/data/reminder/reminder-service", async () => {
+  const actual = await vi.importActual<typeof import("../../src/renderer/data/reminder/reminder-service")>(
+    "../../src/renderer/data/reminder/reminder-service",
+  );
+  return {
+    ...actual,
+    isRendererWindowFocused: () => mocks.rendererWindowFocused,
+    notifyDesktopOrBrowser: mocks.notifyDesktopOrBrowser,
+  };
+});
 
 describe("gateway IM side effects", () => {
   const scopedConversationsKey = [
@@ -64,6 +93,14 @@ describe("gateway IM side effects", () => {
       activeImConversationVisibility: "hidden",
       activeModule: "messages",
     };
+    mocks.pcSettings = {
+      desktopNotifications: true,
+      doNotDisturb: false,
+      imNotifications: true,
+      notificationPreview: true,
+      notificationSound: true,
+    };
+    mocks.rendererWindowFocused = false;
     mocks.markConversationRead.mockResolvedValue(undefined);
   });
 
@@ -234,6 +271,180 @@ describe("gateway IM side effects", () => {
     ).toBe(0);
   });
 
+  it("sends a desktop notification for background peer IM messages", async () => {
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+    const queryClient = new QueryClient();
+    queryClient.setQueryData<ConversationListResponse>(scopedConversationsKey, {
+      items: [
+        {
+          conversationId: "direct-1",
+          conversationType: "direct",
+          lastMessageSeq: 0,
+          lastReadSeq: 0,
+          title: "Direct",
+          unreadCount: 0,
+        },
+      ],
+    });
+
+    mergeImGatewayMessage(
+      queryClient,
+      imTextPayload({
+        conversation: { title: "Alice" },
+        preview: "hello from Alice",
+      }),
+      "direct-1",
+      "direct",
+    );
+
+    expect(mocks.notifyDesktopOrBrowser).toHaveBeenCalledWith(
+      {
+        body: "hello from Alice",
+        channel: "im",
+        conversationId: "direct-1",
+        targetId: "direct-1",
+        targetModule: "messages",
+        title: "Alice",
+      },
+      {
+        channel: "im",
+        settings: mocks.pcSettings,
+      },
+    );
+    expect(mocks.recordMessageReminderDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "im.desktop-notify.decision",
+        phase: "sent",
+        classification: expect.objectContaining({
+          reason: "notify-desktop",
+          windowFocused: false,
+        }),
+      }),
+    );
+  });
+
+  it("does not notify for the active visible IM conversation while focused", async () => {
+    mocks.rendererWindowFocused = true;
+    mocks.workspaceUiSnapshot = {
+      activeImConversationId: "direct-1",
+      activeImConversationVisibility: "paneVisible",
+      activeModule: "messages",
+    };
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+
+    mergeImGatewayMessage(new QueryClient(), imTextPayload(), "direct-1", "direct");
+
+    expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+    expect(mocks.recordMessageReminderDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "im.desktop-notify.decision",
+        phase: "skipped",
+        classification: expect.objectContaining({
+          reason: "active-visible-conversation",
+          windowFocused: true,
+        }),
+      }),
+    );
+  });
+
+  it("does not notify for the current user's own IM gateway echo", async () => {
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+
+    mergeImGatewayMessage(
+      new QueryClient(),
+      imTextPayload({
+        messageId: "m-self",
+        senderUserId: "staff-1",
+      }),
+      "direct-1",
+      "direct",
+    );
+
+    expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+    expect(mocks.recordMessageReminderDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "im.desktop-notify.decision",
+        phase: "skipped",
+        classification: expect.objectContaining({
+          reason: "self-message",
+          selfMessage: true,
+        }),
+      }),
+    );
+  });
+
+  it("does not notify for IM event or system messages", async () => {
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+
+    mergeImGatewayMessage(
+      new QueryClient(),
+      imTextPayload({
+        messageId: "m-event",
+        messageType: "system",
+      }),
+      "direct-1",
+      "direct",
+    );
+
+    expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+    expect(mocks.recordMessageReminderDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "im.desktop-notify.decision",
+        phase: "skipped",
+        classification: expect.objectContaining({
+          eventMessage: true,
+          reason: "event-message",
+        }),
+      }),
+    );
+  });
+
+  it("does not notify when IM desktop policy is disabled", async () => {
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+    for (const disabledSettings of [
+      { desktopNotifications: false },
+      { imNotifications: false },
+      { doNotDisturb: true },
+    ]) {
+      vi.clearAllMocks();
+      mocks.pcSettings = {
+        ...mocks.pcSettings,
+        desktopNotifications: true,
+        doNotDisturb: false,
+        imNotifications: true,
+        ...disabledSettings,
+      };
+
+      mergeImGatewayMessage(
+        new QueryClient(),
+        imTextPayload({ messageId: `m-policy-${Object.keys(disabledSettings)[0]}` }),
+        "direct-1",
+        "direct",
+      );
+
+      expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
+      expect(mocks.recordMessageReminderDiagnostic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: "im.desktop-notify.decision",
+          phase: "skipped",
+          classification: expect.objectContaining({
+            reason: "policy-disabled",
+          }),
+        }),
+      );
+    }
+  });
+
   it("allows automatic read only for visible conversations with loaded messages", () => {
     expect(
       canAutoReadImConversation({
@@ -273,3 +484,20 @@ describe("gateway IM side effects", () => {
     ).toBe(true);
   });
 });
+
+function imTextPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    conversation: {
+      title: "Direct",
+    },
+    conversationId: "direct-1",
+    conversationSeq: 1,
+    conversationType: "direct",
+    messageId: "m-1",
+    messageType: "text",
+    preview: "hello",
+    senderDisplayName: "Alice",
+    senderUserId: "user-2",
+    ...overrides,
+  };
+}
