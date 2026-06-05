@@ -1206,12 +1206,13 @@
 }
 
 .composer-mention-panel {
-  position: absolute;
-  left: 22px;
-  bottom: calc(100% - 58px);
-  z-index: 45;
+  position: fixed;
+  z-index: 130;
+  box-sizing: border-box;
   display: grid;
-  min-width: 190px;
+  width: min(280px, calc(100vw - 24px));
+  max-height: min(236px, calc(100vh - 24px));
+  overflow: auto;
   padding: 6px;
   border: 1px solid rgba(211, 222, 234, 0.95);
   border-radius: 12px;
@@ -1220,14 +1221,18 @@
 }
 
 .composer-mention-panel button {
+  min-width: 0;
   min-height: 32px;
   padding: 0 10px;
+  overflow: hidden;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: #24354a;
   font-weight: 780;
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .composer-mention-panel button:hover {
@@ -2414,24 +2419,262 @@ body:has(.sidebar.collapsed)
     auto;
 }
 
-.group-info-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.group-management-pane { display: grid; gap: 10px; min-width: 0; }
+.message-info-panel .customer-info-card {
+  border-radius: 8px;
+}
+
+.group-profile-hero {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(190, 220, 214, 0.82);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(236, 253, 245, 0.94), rgba(239, 246, 255, 0.88) 64%, rgba(255, 255, 255, 0.96)),
+    #fff;
+}
+
+.group-profile-identity {
+  grid-template-columns: 50px minmax(0, 1fr);
+}
+
+.group-profile-identity .e-avatar-badge-host,
+.group-profile-identity .e-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 8px !important;
+}
+
+.group-profile-identity .e-avatar-badge-host {
+  display: block;
+}
+
+.group-profile-identity strong {
+  font-size: 15px;
+}
+
+.group-profile-identity p {
+  flex-wrap: wrap;
+}
+
+.group-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.group-profile-stat {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid rgba(210, 224, 235, 0.78);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.group-profile-stat em,
+.group-file-row em,
+.group-join-request-row em {
+  color: #73849a;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 720;
+}
+
+.group-profile-stat strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #152033;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-info-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+  gap: 4px;
+  margin: 12px 0;
+  padding: 4px;
+  border: 1px solid rgba(218, 228, 238, 0.92);
+  border-radius: 8px;
+  background: rgba(246, 249, 252, 0.92);
+}
+
+.group-info-tabs button {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.group-info-tabs button.active {
+  background: #fff;
+  color: #047857;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.group-info-tabs button.active::after {
+  display: none;
+}
+
+.group-management-pane {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
 .group-management-search,
 .group-management-inline-form,
-.group-management-compose { display: grid; gap: 7px; }
-.group-management-search span { color: #64748b; font-size: 12px; font-weight: 700; }
+.group-management-compose,
+.group-invite-box,
+.group-invite-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.group-management-search span {
+  color: #5e7188;
+  font-size: 12px;
+  font-weight: 820;
+}
+
 .group-management-search input,
 .group-management-inline-form input,
 .group-management-compose textarea,
 .group-announcement-item textarea {
-  width: 100%; min-width: 0; border: 1px solid rgba(211, 222, 234, 0.95);
-  border-radius: 8px; background: #fff; color: #111827; font-size: 12px; outline: 0;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(207, 219, 232, 0.96);
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
+  outline: 0;
 }
+
 .group-management-search input,
-.group-management-inline-form input { height: 34px; padding: 0 10px; }
+.group-management-inline-form input {
+  height: 34px;
+  padding: 0 10px;
+}
+
 .group-management-compose textarea,
-.group-announcement-item textarea { min-height: 72px; resize: vertical; padding: 9px 10px; }
-.group-management-inline-form { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.group-announcement-item textarea {
+  min-height: 76px;
+  padding: 9px 10px;
+  resize: vertical;
+}
+
+.group-management-inline-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.group-invite-picker,
+.group-management-settings {
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.group-invite-picker .e-search.compact {
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.group-invite-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.group-invite-picker-head strong,
+.group-management-settings h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.group-invite-contact-list,
+.group-member-list {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.group-invite-contact-list {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.group-invite-contact-list > button,
+.group-member-row,
+.group-announcement-item,
+.group-file-row {
+  border: 1px solid rgba(221, 230, 240, 0.92);
+  border-radius: 8px;
+  background: rgba(250, 252, 254, 0.92);
+}
+
+.group-invite-contact-list > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 8px;
+  color: #334155;
+  text-align: left;
+}
+
+.group-invite-contact-list > button:hover,
+.group-invite-contact-list > button.selected {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(236, 253, 245, 0.88);
+  color: #047857;
+}
+
+.group-invite-contact-list span,
+.group-invite-contact-list strong,
+.group-invite-contact-list small,
+.group-member-row strong,
+.group-member-row span,
+.group-file-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-invite-contact-list span {
+  display: grid;
+  gap: 2px;
+}
+
+.group-invite-contact-list strong {
+  font-size: 12px;
+}
+
+.group-invite-contact-list small,
+.group-member-row span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 720;
+}
+
 .group-management-inline-form button,
 .group-management-compose button,
 .group-member-actions button,
@@ -2440,10 +2683,20 @@ body:has(.sidebar.collapsed)
 .group-announcement-item button,
 .group-file-filters button,
 .group-join-request-row button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  min-height: 30px; padding: 0 9px; border: 1px solid rgba(211, 222, 234, 0.95);
-  border-radius: 8px; background: #fff; color: #475569; font-size: 12px; font-weight: 750;
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid rgba(207, 219, 232, 0.96);
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 820;
 }
+
 .group-management-inline-form button:hover,
 .group-management-compose button:hover,
 .group-member-actions button:hover,
@@ -2453,55 +2706,128 @@ body:has(.sidebar.collapsed)
 .group-file-filters button:hover,
 .group-file-filters button.active,
 .group-join-request-row button:hover {
-  border-color: rgba(16, 185, 129, 0.45); background: rgba(236, 253, 245, 0.88); color: #047857;
+  border-color: rgba(16, 185, 129, 0.48);
+  background: rgba(236, 253, 245, 0.92);
+  color: #047857;
 }
-.group-member-list { display: grid; gap: 8px; max-height: none; overflow: visible; margin-top: 0; }
+
+.group-member-list {
+  max-height: none;
+  overflow: visible;
+  margin-top: 0;
+}
+
 .group-member-row {
-  display: grid !important; grid-template-columns: auto minmax(0, 1fr) !important;
-  gap: 9px !important; align-items: center; min-height: 0 !important; padding: 9px !important;
-  border: 1px solid rgba(226, 232, 240, 0.9) !important; border-radius: 8px !important;
-  background: rgba(248, 250, 252, 0.75) !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  gap: 9px !important;
+  align-items: center;
+  min-height: 0 !important;
+  padding: 9px !important;
 }
-.group-member-row > div:nth-child(2) { min-width: 0; }
-.group-member-row strong,
-.group-member-row span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.group-member-row span { color: #64748b; font-size: 12px; font-weight: 650; }
-.group-member-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+
+.group-member-row > div:nth-child(2) {
+  min-width: 0;
+}
+
+.group-member-row strong {
+  display: block;
+  color: #142033;
+  font-size: 13px;
+  font-weight: 880;
+}
+
+.group-member-row span {
+  display: block;
+}
+
+.group-member-actions,
 .group-management-actions,
 .group-management-danger,
-.group-file-filters { display: flex; flex-wrap: wrap; gap: 7px; }
-.group-management-settings {
-  display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 8px; background: rgba(248, 250, 252, 0.75);
+.group-file-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
 }
-.group-management-settings h3 { margin: 0; color: #0f172a; font-size: 13px; }
+
+.group-member-actions {
+  grid-column: 1 / -1;
+}
+
+.group-management-settings {
+  display: grid;
+  gap: 8px;
+}
+
 .group-management-settings label,
 .group-join-request-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
-  gap: 8px; color: #475569; font-size: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 720;
 }
-.group-join-request-row { grid-template-columns: minmax(0, 1fr) auto auto; border-top: 1px solid rgba(226, 232, 240, 0.8); padding-top: 8px; }
-.group-join-request-row em { grid-column: 1 / -1; color: #64748b; font-style: normal; }
+
+.group-join-request-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding-top: 8px;
+  border-top: 1px solid rgba(226, 232, 240, 0.84);
+}
+
+.group-join-request-row em {
+  grid-column: 1 / -1;
+}
+
 .group-announcement-item {
-  display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 8px; background: rgba(248, 250, 252, 0.75);
+  display: grid;
+  gap: 8px;
+  padding: 10px;
 }
+
 .group-announcement-item header,
-.group-announcement-item footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.group-announcement-item p { margin: 0; color: #334155; font-size: 12px; line-height: 1.5; }
-.group-announcement-item footer span { color: #94a3b8; font-size: 11px; }
-.group-file-row {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
-  padding: 9px; border: 1px solid rgba(226, 232, 240, 0.9); border-radius: 8px;
-  background: rgba(248, 250, 252, 0.75); color: #334155; text-decoration: none;
+.group-announcement-item footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
-.group-file-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.group-file-row em { color: #94a3b8; font-size: 11px; font-style: normal; }
+
+.group-announcement-item p {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.group-announcement-item footer span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.group-file-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  color: #334155;
+  text-decoration: none;
+}
+
 .group-member-actions button.danger,
 .group-management-danger button.danger,
-.group-announcement-item button.danger { border-color: rgba(248, 113, 113, 0.42); color: #b91c1c; }
+.group-announcement-item button.danger {
+  border-color: rgba(248, 113, 113, 0.42);
+  color: #b91c1c;
+}
+
 .group-member-actions button:disabled,
 .group-management-actions button:disabled,
 .group-management-danger button:disabled,
 .group-management-settings input:disabled,
-.group-join-request-row button:disabled { cursor: not-allowed; opacity: 0.48; }
+.group-join-request-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}

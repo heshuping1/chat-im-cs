@@ -1,6 +1,7 @@
-import type { ConversationListItem, GroupDetailDto, GroupMemberDto } from "../../data/api-client";
+import type { ConversationListItem, GroupDetailDto, GroupMemberDto, GroupSettingsDto } from "../../data/api-client";
 
 export type GroupRole = "owner" | "admin" | "member";
+export type GroupInfoTabKey = "profile" | "members" | "announcements" | "files" | "management";
 
 export type GroupManagementPermissions = {
   canManageAnnouncements: boolean;
@@ -13,18 +14,23 @@ export type GroupManagementPermissions = {
   canLeave: boolean;
 };
 
+export type GroupInfoVisibilityInput = {
+  role: GroupRole;
+  settings?: Pick<GroupSettingsDto, "allowMemberViewMemberList"> | null;
+};
+
 export function normalizeGroupRole(role?: string | number | null): GroupRole {
   const value = `${role ?? ""}`.trim().toLowerCase();
-  if (value.includes("owner") || value.includes("群主")) return "owner";
-  if (value.includes("admin") || value.includes("管理员")) return "admin";
+  if (value.includes("owner") || value.includes("\u7fa4\u4e3b")) return "owner";
+  if (value.includes("admin") || value.includes("\u7ba1\u7406\u5458")) return "admin";
   return "member";
 }
 
 export function groupRoleLabel(role?: string | number | null) {
   const normalized = normalizeGroupRole(role);
-  if (normalized === "owner") return "群主";
-  if (normalized === "admin") return "管理员";
-  return "成员";
+  if (normalized === "owner") return "Owner";
+  if (normalized === "admin") return "Admin";
+  return "Member";
 }
 
 export function groupMemberRoleRank(member: GroupMemberDto) {
@@ -32,6 +38,34 @@ export function groupMemberRoleRank(member: GroupMemberDto) {
   if (role === "owner") return 0;
   if (role === "admin") return 1;
   return 2;
+}
+
+export function groupMemberDisplayName(member?: GroupMemberDto | null) {
+  if (!member) return "";
+  return (
+    usableGroupMemberName(member.groupNickname) ||
+    usableGroupMemberName(member.nickname) ||
+    usableGroupMemberName(member.displayName) ||
+    usableGroupMemberName((member as unknown as Record<string, unknown>).name) ||
+    usableGroupMemberName((member as unknown as Record<string, unknown>).userName) ||
+    member.userId ||
+    ""
+  );
+}
+
+export function groupMemberIdentityKeys(member: GroupMemberDto) {
+  return [
+    member.userId,
+    member.platformUserId,
+    member.lppId,
+    member.groupNickname,
+    member.nickname,
+    member.displayName,
+    (member as unknown as Record<string, unknown>).name,
+    (member as unknown as Record<string, unknown>).userName,
+  ]
+    .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
+    .filter(Boolean);
 }
 
 export function resolveMyGroupRole({
@@ -67,6 +101,23 @@ export function groupManagementPermissions(role: GroupRole): GroupManagementPerm
   };
 }
 
+export function canViewGroupManagement(role: GroupRole) {
+  return role === "owner" || role === "admin";
+}
+
+export function canViewGroupMemberList({ role, settings }: GroupInfoVisibilityInput) {
+  if (canViewGroupManagement(role)) return true;
+  return settings?.allowMemberViewMemberList !== false;
+}
+
+export function visibleGroupInfoTabs(input: GroupInfoVisibilityInput): GroupInfoTabKey[] {
+  const tabs: GroupInfoTabKey[] = ["profile"];
+  if (canViewGroupMemberList(input)) tabs.push("members");
+  tabs.push("announcements", "files");
+  if (canViewGroupManagement(input.role)) tabs.push("management");
+  return tabs;
+}
+
 export function canManageGroupMember({
   actorRole,
   targetRole,
@@ -87,6 +138,16 @@ export function canManageGroupMember({
 
 export function compactGroupNames(names: string[]) {
   const compact = names.filter(Boolean);
-  if (compact.length <= 3) return compact.join("、");
-  return `${compact.slice(0, 3).join("、")} 等 ${compact.length} 人`;
+  if (compact.length <= 3) return compact.join(", ");
+  return `${compact.slice(0, 3).join(", ")} and ${compact.length} people`;
+}
+
+function usableGroupMemberName(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  if (!text || text === "00000000-0000-0000-0000-000000000000") return undefined;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) {
+    return undefined;
+  }
+  return text;
 }

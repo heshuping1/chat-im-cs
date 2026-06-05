@@ -11,6 +11,7 @@ import type {
 } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
 import { requireApiClient } from "../../data/runtime";
+import { useI18n } from "../../i18n/useI18n";
 import {
   groupManagementPermissions,
   resolveMyGroupRole,
@@ -68,6 +69,7 @@ export function useMessageGroupManagement({
   setFileFilter: (filter: GroupFileFilter) => void;
   setNotice: (notice: string | null) => void;
 }): MessageGroupManagement {
+  const { t } = useI18n();
   const conversationId = activeConversation?.conversationId;
   const isGroup = activeConversation?.conversationType === "group";
   const enabled = Boolean(session && conversationId && isGroup);
@@ -78,9 +80,18 @@ export function useMessageGroupManagement({
     queryFn: async () => requireApiClient(session).getGroupDetail(conversationId!),
     staleTime: 30_000,
   });
+
+  const role = resolveMyGroupRole({
+    conversation: activeConversation,
+    currentUserId: session?.userId,
+    detail: detailQuery.data,
+    members: groupMembers,
+  });
+  const permissions = groupManagementPermissions(role);
+
   const settingsQuery = useQuery({
     queryKey: groupQueryKey("settings", session, conversationId),
-    enabled,
+    enabled: enabled && permissions.canManageSettings,
     queryFn: async () => requireApiClient(session).getGroupSettings(conversationId!),
     staleTime: 30_000,
   });
@@ -92,7 +103,7 @@ export function useMessageGroupManagement({
   });
   const joinRequestsQuery = useQuery({
     queryKey: groupQueryKey("join-requests", session, conversationId),
-    enabled,
+    enabled: enabled && permissions.canManageJoinRequests,
     queryFn: async () => requireApiClient(session).getGroupJoinRequests(conversationId!),
     staleTime: 15_000,
   });
@@ -107,14 +118,11 @@ export function useMessageGroupManagement({
     staleTime: 30_000,
   });
 
-  const role = resolveMyGroupRole({
-    conversation: activeConversation,
-    currentUserId: session?.userId,
-    detail: detailQuery.data,
-    members: groupMembers,
-  });
-  const permissions = groupManagementPermissions(role);
   const invalidate = () => invalidateGroupManagementQueries(queryClient, session, conversationId);
+  const groupManagementErrorText = (error: unknown) => {
+    if (error instanceof Error && error.message) return error.message;
+    return t("messages.groupManagement.failed");
+  };
   const run = <T,>(action: () => Promise<T>, success: string) => {
     void action()
       .then(() => {
@@ -155,53 +163,59 @@ export function useMessageGroupManagement({
     settings: settingsQuery.data ?? detailQuery.data?.settings ?? undefined,
     actions: {
       addMembers: (userIds) =>
-        mutate(() => api().addGroupMembers(id(), userIds), "已邀请成员加入群聊。"),
+        mutate(() => api().addGroupMembers(id(), userIds), t("messages.groupManagement.addMembers")),
       approveJoinRequest: (requestId) =>
-        mutate(() => api().approveGroupJoinRequest(id(), requestId), "已通过入群申请。"),
+        mutate(() => api().approveGroupJoinRequest(id(), requestId), t("messages.groupManagement.approveJoinRequest")),
       createAnnouncement: (content, title) =>
         mutate(
           () => api().createGroupAnnouncement(id(), { content, title, isPinned: false }),
-          "群公告已发布。",
+          t("messages.groupManagement.createAnnouncement"),
         ),
       deleteAnnouncement: (announcementId) =>
-        mutate(() => api().deleteGroupAnnouncement(id(), announcementId), "群公告已删除。"),
-      disbandGroup: () => run(() => api().disbandGroup(id()), "群聊已解散。"),
-      leaveGroup: () => run(() => api().leaveGroup(id()), "已退出群聊。"),
+        mutate(() => api().deleteGroupAnnouncement(id(), announcementId), t("messages.groupManagement.deleteAnnouncement")),
+      disbandGroup: () => run(() => api().disbandGroup(id()), t("messages.groupManagement.disbandGroup")),
+      leaveGroup: () => run(() => api().leaveGroup(id()), t("messages.groupManagement.leaveGroup")),
       rejectJoinRequest: (requestId) =>
-        mutate(() => api().rejectGroupJoinRequest(id(), requestId), "已拒绝入群申请。"),
+        mutate(() => api().rejectGroupJoinRequest(id(), requestId), t("messages.groupManagement.rejectJoinRequest")),
       removeMember: (userId) =>
-        mutate(() => api().removeGroupMember(id(), userId), "成员已移出群聊。"),
+        mutate(() => api().removeGroupMember(id(), userId), t("messages.groupManagement.removeMember")),
       setFileFilter,
       setMemberMute: (userId, muted) =>
         mutate(
           () => api().setGroupMemberMute(id(), userId, { muteMode: muted ? 1 : 0 }),
-          muted ? "成员已禁言。" : "成员已解除禁言。",
+          muted ? t("messages.groupManagement.memberMuted") : t("messages.groupManagement.memberUnmuted"),
         ),
       setMemberRole: (userId, nextRole) =>
         mutate(
           () => api().setGroupMemberRole(id(), userId, nextRole),
-          nextRole === "admin" ? "已设为管理员。" : "已取消管理员。",
+          nextRole === "admin" ? t("messages.groupManagement.setAdmin") : t("messages.groupManagement.unsetAdmin"),
         ),
       setMuted: (muted) =>
-        mutate(() => api().setGroupMuted(id(), muted), muted ? "已开启免打扰。" : "已关闭免打扰。"),
+        mutate(
+          () => api().setGroupMuted(id(), muted),
+          muted ? t("messages.groupManagement.muted") : t("messages.groupManagement.unmuted"),
+        ),
       setMuteMode: (enabled) =>
         mutate(
           () => api().setGroupMuteMode(id(), enabled ? 1 : 0),
-          enabled ? "已开启全员禁言。" : "已关闭全员禁言。",
+          enabled ? t("messages.groupManagement.allMuted") : t("messages.groupManagement.allUnmuted"),
         ),
       setPinned: (pinned) =>
-        mutate(() => api().setGroupPinned(id(), pinned), pinned ? "已置顶群聊。" : "已取消置顶。"),
+        mutate(
+          () => api().setGroupPinned(id(), pinned),
+          pinned ? t("messages.groupManagement.pinned") : t("messages.groupManagement.unpinned"),
+        ),
       transferOwner: (userId) =>
-        run(() => api().transferGroupOwner(id(), userId), "群主已转让。"),
+        run(() => api().transferGroupOwner(id(), userId), t("messages.groupManagement.transferOwner")),
       updateAnnouncement: (announcementId, content, title) =>
         mutate(
           () => api().updateGroupAnnouncement(id(), announcementId, { content, title }),
-          "群公告已更新。",
+          t("messages.groupManagement.updateAnnouncement"),
         ),
       updateGroupTitle: (title) =>
-        mutate(() => api().updateGroupDetail(id(), { title }), "群名称已更新。"),
+        mutate(() => api().updateGroupDetail(id(), { title }), t("messages.groupManagement.updateGroupTitle")),
       updateSettings: (settings) =>
-        mutate(() => api().updateGroupSettings(id(), settings), "群设置已更新。"),
+        mutate(() => api().updateGroupSettings(id(), settings), t("messages.groupManagement.updateSettings")),
     },
   };
 }
@@ -236,9 +250,4 @@ function groupQueryKey(scope: string, session?: AuthSession | null, conversation
     conversationId ?? "",
     scope,
   ] as const;
-}
-
-function groupManagementErrorText(error: unknown) {
-  if (error instanceof Error && error.message) return error.message;
-  return "群管理操作失败，请稍后重试。";
 }

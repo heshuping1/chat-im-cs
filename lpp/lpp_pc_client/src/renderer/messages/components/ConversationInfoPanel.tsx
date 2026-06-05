@@ -3,14 +3,19 @@ import {
   Check,
   Crown,
   FileText,
+  FolderOpen,
+  Info,
   LogOut,
   Megaphone,
   Pin,
+  Search,
+  Settings,
   Shield,
   ShieldOff,
   Trash2,
   UserMinus,
   UserPlus,
+  UsersRound,
   VolumeX,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
@@ -29,26 +34,36 @@ import type {
 import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
+import type { TranslationParams } from "../../i18n/dictionary";
+import { useI18n } from "../../i18n/useI18n";
 import { formatChatTime } from "../../lib/format";
 import { renderWechatEmojiText } from "../../lib/wechatEmoji";
 import type { MessageGroupManagement } from "../hooks/useMessageGroupManagement";
 import {
   canManageGroupMember,
-  compactGroupNames,
+  groupMemberDisplayName,
   groupMemberRoleRank,
-  groupRoleLabel,
   normalizeGroupRole,
+  visibleGroupInfoTabs,
+  type GroupInfoTabKey,
 } from "../models/groupManagementModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import { requestMessageCustomConfirmation } from "../runtime/messageConfirm";
 import { ConversationAvatar } from "./ConversationListParts";
 
-const groupInfoTabs = ["资料", "成员", "公告", "文件", "管理"] as const;
-type GroupInfoTab = (typeof groupInfoTabs)[number];
+type Translate = (key: string, params?: TranslationParams) => string;
+type ContactPickerItem = {
+  avatarUrl?: string | null;
+  id: string;
+  name: string;
+  source: string;
+  subtitle: string;
+};
 
 export function ConversationInfoPanel({
   avatarUrl,
   contact,
+  contactPickerItems = [],
   conversation,
   groupAvatar,
   groupManagement,
@@ -69,6 +84,7 @@ export function ConversationInfoPanel({
 }: {
   avatarUrl?: string | null;
   contact?: ContactItem | null;
+  contactPickerItems?: ContactPickerItem[];
   conversation?: ConversationListItem;
   groupAvatar?: GroupConversationAvatar;
   groupManagement?: MessageGroupManagement;
@@ -87,20 +103,21 @@ export function ConversationInfoPanel({
   profileLoading?: boolean;
   userIdentity?: CurrentUserIdentity | null;
 }) {
-  const [activeTab, setActiveTab] = useState<GroupInfoTab>("资料");
+  const { t } = useI18n();
+  const [activeTab, setActiveTab] = useState<GroupInfoTabKey>("profile");
   const [expanded, setExpanded] = useState(true);
 
   useEffect(() => {
-    setActiveTab("资料");
+    setActiveTab("profile");
   }, [conversation?.conversationId]);
 
   if (!conversation) {
     return (
       <aside className="e-profile-panel message-info-panel">
         <header className="customer-info-head">
-          <h2>会话信息</h2>
+          <h2>{t("messages.conversationInfo.title")}</h2>
         </header>
-        <PanelState text="请选择一个会话查看详情" />
+        <PanelState text={t("messages.conversationInfo.empty")} />
       </aside>
     );
   }
@@ -124,17 +141,25 @@ export function ConversationInfoPanel({
         profile={profile}
         profileActionPending={profileActionPending}
         profileExtra={profileExtra}
-        title="客户信息"
+        title={t("customerProfile.title")}
         variant="im"
       />
     );
   }
 
   const members = groupMembers ?? [];
+  const role = groupManagement?.role ?? normalizeGroupRole(conversation.myRole);
+  const visibleTabs = visibleGroupInfoTabs({
+    role,
+    settings: groupManagement?.settings ?? groupManagement?.detail?.settings,
+  });
   const unread = imConversationEffectiveUnreadCount(conversation, userIdentity, {
     activeConversationId: conversation.conversationId,
     visibility: "paneVisible",
   });
+
+  const safeActiveTab = visibleTabs.includes(activeTab) ? activeTab : "profile";
+
   return (
     <aside
       className="e-profile-panel customer-info-panel message-info-panel"
@@ -142,55 +167,69 @@ export function ConversationInfoPanel({
       onDrop={onDrop}
     >
       <header className="customer-info-head">
-        <h2>群聊资料</h2>
+        <h2>{t("messages.conversationInfo.groupProfileTitle")}</h2>
         {headerActions && <div className="customer-info-head-actions">{headerActions}</div>}
       </header>
       <section className="customer-info-card">
-        <div className="customer-info-identity">
-          <ConversationAvatar
-            avatarUrl={avatarUrl ?? conversation.avatarUrl}
-            groupAvatar={groupAvatar}
-            isGroup
-            title={conversation.title}
-            unread={unread}
-          />
-          <div>
-            <strong>{groupManagement?.detail?.title || conversation.title}</strong>
-            <p>
-              <span>群聊</span>
-              {unread > 0 && <span>{unread} 条未读</span>}
-            </p>
+        <div className="group-profile-hero">
+          <div className="customer-info-identity group-profile-identity">
+            <ConversationAvatar
+              avatarUrl={avatarUrl ?? conversation.avatarUrl}
+              groupAvatar={groupAvatar}
+              isGroup
+              title={conversation.title}
+              unread={unread}
+            />
+            <div>
+              <strong>{groupManagement?.detail?.title || conversation.title}</strong>
+              <p>
+                <span>{t("messages.conversationInfo.groupChat")}</span>
+                <span>{groupRoleText(role, t)}</span>
+                {unread > 0 && <span>{t("messages.conversationInfo.unreadCount", { count: unread })}</span>}
+              </p>
+            </div>
+          </div>
+          <div className="group-profile-stats">
+            <GroupStat label={t("messages.conversationInfo.fields.members")} value={groupMemberCountText(conversation, groupManagement, members)} />
+            <GroupStat label={t("messages.conversationInfo.fields.myRole")} value={groupRoleText(role, t)} />
+            <GroupStat label={t("messages.conversationInfo.fields.unread")} value={String(unread)} />
           </div>
         </div>
-        <nav className="customer-info-tabs group-info-tabs" aria-label="会话信息页签">
-          {groupInfoTabs.map((tab) => (
+        <nav className="customer-info-tabs group-info-tabs" aria-label={t("messages.conversationInfo.tabsAria")}>
+          {visibleTabs.map((tab) => (
             <button
-              className={activeTab === tab ? "active" : ""}
+              className={safeActiveTab === tab ? "active" : ""}
               type="button"
               key={tab}
               onClick={() => setActiveTab(tab)}
             >
-              {tab}
+              <GroupTabIcon tab={tab} />
+              {t(`messages.conversationInfo.tabs.${tab}`)}
             </button>
           ))}
         </nav>
         <GroupInfoTabContent
+          contactPickerItems={contactPickerItems}
           conversation={conversation}
           expanded={expanded}
           groupManagement={groupManagement}
           loadingGroupMembers={loadingGroupMembers}
           members={members}
-          tab={activeTab}
+          role={role}
+          tab={safeActiveTab}
+          t={t}
           unread={unread}
         />
       </section>
-      {activeTab === "资料" && (
+      {safeActiveTab === "profile" && (
         <button
           className="message-info-collapse"
           type="button"
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? "收起群聊信息" : "展开群聊信息"}
+          {expanded
+            ? t("messages.conversationInfo.collapse")
+            : t("messages.conversationInfo.expand")}
         </button>
       )}
     </aside>
@@ -198,39 +237,47 @@ export function ConversationInfoPanel({
 }
 
 function GroupInfoTabContent({
+  contactPickerItems,
   conversation,
   expanded,
   groupManagement,
   loadingGroupMembers,
   members,
+  role,
   tab,
+  t,
   unread,
 }: {
+  contactPickerItems: ContactPickerItem[];
   conversation: ConversationListItem;
   expanded: boolean;
   groupManagement?: MessageGroupManagement;
   loadingGroupMembers: boolean;
   members: GroupMemberDto[];
-  tab: GroupInfoTab;
+  role: "owner" | "admin" | "member";
+  tab: GroupInfoTabKey;
+  t: Translate;
   unread: number;
 }) {
-  if (tab === "成员") {
+  if (tab === "members") {
     return (
       <GroupMembersTab
+        contactPickerItems={contactPickerItems}
         groupManagement={groupManagement}
         loading={loadingGroupMembers}
         members={members}
+        t={t}
       />
     );
   }
-  if (tab === "公告") {
-    return <GroupAnnouncementsTab groupManagement={groupManagement} />;
+  if (tab === "announcements") {
+    return <GroupAnnouncementsTab groupManagement={groupManagement} t={t} />;
   }
-  if (tab === "文件") {
-    return <GroupFilesTab groupManagement={groupManagement} />;
+  if (tab === "files") {
+    return <GroupFilesTab groupManagement={groupManagement} t={t} />;
   }
-  if (tab === "管理") {
-    return <GroupManagementTab conversation={conversation} groupManagement={groupManagement} />;
+  if (tab === "management") {
+    return <GroupManagementTab conversation={conversation} groupManagement={groupManagement} t={t} />;
   }
   return (
     <>
@@ -238,15 +285,23 @@ function GroupInfoTabContent({
         conversation={conversation}
         groupManagement={groupManagement}
         members={members}
+        role={role}
+        t={t}
         unread={unread}
       />
       {expanded && (
         <section className="customer-info-block group-info-overview">
-          <h3>群聊概览</h3>
+          <h3>{t("messages.conversationInfo.overview")}</h3>
           <div className="customer-info-rows">
-            <InfoRow label="置顶" value={conversation.isPinned ? "已置顶" : "--"} />
-            <InfoRow label="未读" value={String(unread)} />
-            <InfoRow label="最后时间" value={formatChatTime(conversation.lastMessage?.sentAt)} />
+            <InfoRow
+              label={t("messages.conversationInfo.fields.pinned")}
+              value={conversation.isPinned ? t("messages.conversationInfo.pinned") : "--"}
+            />
+            <InfoRow label={t("messages.conversationInfo.fields.unread")} value={String(unread)} />
+            <InfoRow
+              label={t("messages.conversationInfo.fields.lastTime")}
+              value={formatChatTime(conversation.lastMessage?.sentAt)}
+            />
           </div>
         </section>
       )}
@@ -258,42 +313,57 @@ function GroupSummaryRows({
   conversation,
   groupManagement,
   members,
+  role,
+  t,
   unread,
 }: {
   conversation: ConversationListItem;
   groupManagement?: MessageGroupManagement;
   members: GroupMemberDto[];
+  role: "owner" | "admin" | "member";
+  t: Translate;
   unread: number;
 }) {
   const ownerName =
     groupManagement?.detail?.ownerDisplayName ||
     conversation.ownerDisplayName ||
-    members.find((member) => groupMemberRoleRank(member) === 0)?.displayName;
+    groupMemberDisplayName(members.find((member) => groupMemberRoleRank(member) === 0));
   const adminNames = members
     .filter((member) => groupMemberRoleRank(member) === 1)
-    .map((member) => member.displayName)
+    .map(groupMemberDisplayName)
     .filter(Boolean);
-  const role = groupManagement?.role ?? normalizeGroupRole(conversation.myRole);
   return (
     <>
       <div className="customer-info-rows">
-        <InfoRow label="会话类型" value="群聊" />
         <InfoRow
-          label="成员"
+          label={t("messages.conversationInfo.fields.conversationType")}
+          value={t("messages.conversationInfo.groupChat")}
+        />
+        <InfoRow
+          label={t("messages.conversationInfo.fields.members")}
           value={String(groupManagement?.detail?.memberCount ?? conversation.memberCount ?? (members.length || "--"))}
         />
-        <InfoRow label="群主" value={ownerName || "--"} />
-        <InfoRow label="群管理员" value={adminNames.length > 0 ? compactGroupNames(adminNames) : "--"} />
-        <InfoRow label="我的角色" value={groupRoleLabel(role)} />
-        <InfoRow label="免打扰" value={conversation.isMuted ? "已开启" : "未开启"} />
-        <InfoRow label="未读" value={String(unread)} />
-        <InfoRow label="最近消息" value={renderWechatEmojiText(conversation.lastMessage?.preview || "--")} />
+        <InfoRow label={t("messages.conversationInfo.fields.owner")} value={ownerName || "--"} />
+        <InfoRow
+          label={t("messages.conversationInfo.fields.admins")}
+          value={adminNames.length > 0 ? compactNames(adminNames, t) : "--"}
+        />
+        <InfoRow label={t("messages.conversationInfo.fields.myRole")} value={groupRoleText(role, t)} />
+        <InfoRow
+          label={t("messages.conversationInfo.fields.muted")}
+          value={conversation.isMuted ? t("messages.conversationInfo.enabled") : t("messages.conversationInfo.disabled")}
+        />
+        <InfoRow label={t("messages.conversationInfo.fields.unread")} value={String(unread)} />
+        <InfoRow
+          label={t("messages.conversationInfo.fields.latestMessage")}
+          value={renderWechatEmojiText(conversation.lastMessage?.preview || "--")}
+        />
       </div>
       <div className="customer-info-tags">
-        <span>群聊</span>
-        <span>{groupRoleLabel(role)}</span>
+        <span>{t("messages.conversationInfo.groupChat")}</span>
+        <span>{groupRoleText(role, t)}</span>
         {groupManagement?.detail?.muteMode === "all_muted" || groupManagement?.detail?.muteMode === 1 ? (
-          <span>全员禁言</span>
+          <span>{t("messages.conversationInfo.allMuted")}</span>
         ) : null}
       </div>
     </>
@@ -301,57 +371,129 @@ function GroupSummaryRows({
 }
 
 function GroupMembersTab({
+  contactPickerItems,
   groupManagement,
   loading,
   members,
+  t,
 }: {
+  contactPickerItems: ContactPickerItem[];
   groupManagement?: MessageGroupManagement;
   loading: boolean;
   members: GroupMemberDto[];
+  t: Translate;
 }) {
   const [keyword, setKeyword] = useState("");
+  const [inviteContactKeyword, setInviteContactKeyword] = useState("");
   const [inviteIds, setInviteIds] = useState("");
+  const [selectedInviteIds, setSelectedInviteIds] = useState<Set<string>>(() => new Set());
   const role = groupManagement?.role ?? "member";
+  const existingMemberIds = useMemo(() => groupMemberInviteIdSet(members), [members]);
   const visibleMembers = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
     const sorted = [...members].sort((left, right) => groupMemberRoleRank(left) - groupMemberRoleRank(right));
     if (!normalized) return sorted;
     return sorted.filter((member) =>
-      [member.displayName, member.lppId, member.userId].some((value) =>
+      [groupMemberDisplayName(member), member.groupNickname, member.nickname, member.displayName, member.lppId, member.userId].some((value) =>
         `${value ?? ""}`.toLowerCase().includes(normalized),
       ),
     );
   }, [keyword, members]);
+  const inviteCandidates = useMemo(() => {
+    return groupInviteCandidateItems({
+      contacts: contactPickerItems,
+      excludedIds: existingMemberIds,
+      keyword: inviteContactKeyword,
+    });
+  }, [contactPickerItems, existingMemberIds, inviteContactKeyword]);
+  const inviteTargetIds = useMemo(
+    () => uniqueGroupInviteIds([...parseGroupInviteIds(inviteIds), ...selectedInviteIds], existingMemberIds),
+    [existingMemberIds, inviteIds, selectedInviteIds],
+  );
   const submitInvite = () => {
-    const ids = inviteIds
-      .split(/[\s,，]+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const ids = inviteTargetIds;
     if (ids.length === 0) return;
     groupManagement?.actions.addMembers(ids);
     setInviteIds("");
+    setInviteContactKeyword("");
+    setSelectedInviteIds(new Set());
+  };
+  const toggleInviteContact = (id: string) => {
+    setSelectedInviteIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
   return (
     <div className="group-management-pane">
       <label className="group-management-search">
-        <span>搜索成员</span>
-        <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="昵称 / LPP ID" />
+        <span>{t("messages.conversationInfo.searchMembers")}</span>
+        <input
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder={t("messages.conversationInfo.memberSearchPlaceholder")}
+        />
       </label>
       {groupManagement?.permissions.canManageMembers && (
-        <div className="group-management-inline-form">
-          <input
-            value={inviteIds}
-            onChange={(event) => setInviteIds(event.target.value)}
-            placeholder="输入 userId，多个用逗号分隔"
-          />
-          <button type="button" onClick={submitInvite}>
-            <UserPlus size={14} />
-            邀请
-          </button>
+        <div className="group-invite-box">
+          <div className="group-management-inline-form">
+            <input
+              value={inviteIds}
+              onChange={(event) => setInviteIds(event.target.value)}
+              placeholder={t("messages.conversationInfo.invitePlaceholder")}
+            />
+            <button type="button" disabled={inviteTargetIds.length === 0} onClick={submitInvite}>
+              <UserPlus size={14} />
+              {inviteTargetIds.length > 0
+                ? t("messages.conversationInfo.inviteCount", { count: inviteTargetIds.length })
+                : t("messages.conversationInfo.invite")}
+            </button>
+          </div>
+          {contactPickerItems.length > 0 && (
+            <section className="group-invite-picker">
+              <label className="e-search compact">
+                <Search size={14} />
+                <input
+                  value={inviteContactKeyword}
+                  onChange={(event) => setInviteContactKeyword(event.target.value)}
+                  placeholder={t("messages.conversationInfo.inviteContactSearchPlaceholder")}
+                />
+              </label>
+              <div className="group-invite-picker-head">
+                <strong>{t("messages.conversationInfo.inviteFromContacts")}</strong>
+                <span>{t("messages.conversationInfo.inviteSelectedCount", { count: selectedInviteIds.size })}</span>
+              </div>
+              <div className="group-invite-contact-list">
+                {inviteCandidates.map((item) => {
+                  const selected = selectedInviteIds.has(item.id);
+                  return (
+                    <button
+                      className={selected ? "selected" : ""}
+                      type="button"
+                      key={`${item.source}-${item.id}`}
+                      onClick={() => toggleInviteContact(item.id)}
+                    >
+                      <PcAvatar avatarUrl={item.avatarUrl} className="e-avatar" name={item.name} />
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>{item.subtitle}</small>
+                      </span>
+                      {selected && <Check size={14} />}
+                    </button>
+                  );
+                })}
+                {inviteCandidates.length === 0 && (
+                  <PanelState text={t("messages.conversationInfo.emptyInviteContacts")} />
+                )}
+              </div>
+            </section>
+          )}
         </div>
       )}
-      {loading && <PanelState text="正在加载群成员..." />}
-      {!loading && visibleMembers.length === 0 && <PanelState text="暂无群成员" />}
+      {loading && <PanelState text={t("messages.conversationInfo.loadingMembers")} />}
+      {!loading && visibleMembers.length === 0 && <PanelState text={t("messages.conversationInfo.emptyMembers")} />}
       <div className="group-member-list">
         {visibleMembers.map((member) => (
           <GroupMemberRow
@@ -359,6 +501,7 @@ function GroupMembersTab({
             groupManagement={groupManagement}
             key={member.userId}
             member={member}
+            t={t}
           />
         ))}
       </div>
@@ -370,12 +513,15 @@ function GroupMemberRow({
   actorRole,
   groupManagement,
   member,
+  t,
 }: {
   actorRole: "owner" | "admin" | "member";
   groupManagement?: MessageGroupManagement;
   member: GroupMemberDto;
+  t: Translate;
 }) {
   const targetRole = normalizeGroupRole(member.role ?? member.memberRole);
+  const displayName = groupMemberDisplayName(member);
   const canRemove = canManageGroupMember({ actorRole, targetRole, action: "remove" });
   const canPromote = canManageGroupMember({ actorRole, targetRole, action: "promote" });
   const canDemote = canManageGroupMember({ actorRole, targetRole, action: "demote" });
@@ -383,40 +529,50 @@ function GroupMemberRow({
   const canTransfer = canManageGroupMember({ actorRole, targetRole, action: "transfer" });
   return (
     <div className="group-member-row">
-      <PcAvatar avatarUrl={member.avatarUrl} className="e-avatar" name={member.displayName} />
+      <PcAvatar avatarUrl={member.avatarUrl} className="e-avatar" name={displayName} />
       <div>
-        <strong>{member.displayName || "群成员"}</strong>
-        <span>{[groupRoleLabel(targetRole), member.isMuted ? "已禁言" : ""].filter(Boolean).join(" · ")}</span>
+        <strong>{displayName || t("messages.conversationInfo.memberFallback")}</strong>
+        <span>
+          {[groupRoleText(targetRole, t), member.isMuted ? t("messages.conversationInfo.memberMuted") : ""]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
       </div>
       <div className="group-member-actions">
         {canPromote && (
           <button type="button" onClick={() => groupManagement?.actions.setMemberRole(member.userId, "admin")}>
             <Shield size={13} />
-            设管理
+            {t("messages.conversationInfo.actions.promoteAdmin")}
           </button>
         )}
         {canDemote && (
           <button type="button" onClick={() => groupManagement?.actions.setMemberRole(member.userId, "member")}>
             <ShieldOff size={13} />
-            取消管理
+            {t("messages.conversationInfo.actions.demoteAdmin")}
           </button>
         )}
         {canMute && (
           <button type="button" onClick={() => groupManagement?.actions.setMemberMute(member.userId, !member.isMuted)}>
             <VolumeX size={13} />
-            {member.isMuted ? "解禁" : "禁言"}
+            {member.isMuted
+              ? t("messages.conversationInfo.actions.unmute")
+              : t("messages.conversationInfo.actions.mute")}
           </button>
         )}
         {canTransfer && (
           <button
             type="button"
             onClick={() =>
-              confirmDanger(`确认把群主转让给 ${member.displayName || "该成员"}？`) &&
+              confirmDanger(
+                t("messages.conversationInfo.confirm.transferOwner", {
+                  name: displayName || t("messages.conversationInfo.thisMember"),
+                }),
+              ) &&
               groupManagement?.actions.transferOwner(member.userId)
             }
           >
             <Crown size={13} />
-            转让
+            {t("messages.conversationInfo.actions.transfer")}
           </button>
         )}
         {canRemove && (
@@ -424,12 +580,16 @@ function GroupMemberRow({
             className="danger"
             type="button"
             onClick={() =>
-              confirmDanger(`确认将 ${member.displayName || "该成员"} 移出群聊？`) &&
+              confirmDanger(
+                t("messages.conversationInfo.confirm.removeMember", {
+                  name: displayName || t("messages.conversationInfo.thisMember"),
+                }),
+              ) &&
               groupManagement?.actions.removeMember(member.userId)
             }
           >
             <UserMinus size={13} />
-            移除
+            {t("messages.conversationInfo.actions.remove")}
           </button>
         )}
       </div>
@@ -437,7 +597,13 @@ function GroupMemberRow({
   );
 }
 
-function GroupAnnouncementsTab({ groupManagement }: { groupManagement?: MessageGroupManagement }) {
+function GroupAnnouncementsTab({
+  groupManagement,
+  t,
+}: {
+  groupManagement?: MessageGroupManagement;
+  t: Translate;
+}) {
   const [content, setContent] = useState("");
   const canManage = Boolean(groupManagement?.permissions.canManageAnnouncements);
   const submit = () => {
@@ -450,10 +616,14 @@ function GroupAnnouncementsTab({ groupManagement }: { groupManagement?: MessageG
     <div className="group-management-pane">
       {canManage && (
         <div className="group-management-compose">
-          <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="发布群公告" />
+          <textarea
+            value={content}
+            onChange={(event) => setContent(event.target.value)}
+            placeholder={t("messages.conversationInfo.announcementPlaceholder")}
+          />
           <button type="button" onClick={submit}>
             <Megaphone size={14} />
-            发布
+            {t("messages.conversationInfo.actions.publish")}
           </button>
         </div>
       )}
@@ -464,10 +634,11 @@ function GroupAnnouncementsTab({ groupManagement }: { groupManagement?: MessageG
             groupManagement={groupManagement}
             item={item}
             key={item.announcementId}
+            t={t}
           />
         ))
       ) : (
-        <PanelState text="暂无群公告" />
+        <PanelState text={t("messages.conversationInfo.emptyAnnouncements")} />
       )}
     </div>
   );
@@ -477,18 +648,20 @@ function GroupAnnouncementItem({
   canManage,
   groupManagement,
   item,
+  t,
 }: {
   canManage: boolean;
   groupManagement?: MessageGroupManagement;
   item: GroupAnnouncementDto;
+  t: Translate;
 }) {
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(item.content);
   return (
     <article className="group-announcement-item">
       <header>
-        <strong>{item.title || "群公告"}</strong>
-        {item.isPinned && <span>置顶</span>}
+        <strong>{item.title || t("messages.conversationInfo.announcementFallback")}</strong>
+        {item.isPinned && <span>{t("messages.conversationInfo.pinned")}</span>}
       </header>
       {editing ? (
         <textarea value={content} onChange={(event) => setContent(event.target.value)} />
@@ -506,17 +679,17 @@ function GroupAnnouncementItem({
                 setEditing((value) => !value);
               }}
             >
-              {editing ? "保存" : "编辑"}
+              {editing ? t("common.save") : t("common.edit")}
             </button>
             <button
               className="danger"
               type="button"
               onClick={() =>
-                confirmDanger("确认删除这条群公告？") &&
+                confirmDanger(t("messages.conversationInfo.confirm.deleteAnnouncement")) &&
                 groupManagement?.actions.deleteAnnouncement(item.announcementId)
               }
             >
-              删除
+              {t("common.delete")}
             </button>
           </>
         )}
@@ -525,7 +698,13 @@ function GroupAnnouncementItem({
   );
 }
 
-function GroupFilesTab({ groupManagement }: { groupManagement?: MessageGroupManagement }) {
+function GroupFilesTab({
+  groupManagement,
+  t,
+}: {
+  groupManagement?: MessageGroupManagement;
+  t: Translate;
+}) {
   const files = groupManagement?.files ?? [];
   return (
     <div className="group-management-pane">
@@ -537,11 +716,11 @@ function GroupFilesTab({ groupManagement }: { groupManagement?: MessageGroupMana
             key={filter}
             onClick={() => groupManagement?.actions.setFileFilter(filter)}
           >
-            {groupFileFilterLabel(filter)}
+            {groupFileFilterLabel(filter, t)}
           </button>
         ))}
       </div>
-      {files.length === 0 && <PanelState text="暂无群文件" />}
+      {files.length === 0 && <PanelState text={t("messages.conversationInfo.emptyFiles")} />}
       {files.map((file) => (
         <a className="group-file-row" href={file.url} target="_blank" rel="noreferrer" key={file.mediaId}>
           <FileText size={16} />
@@ -556,9 +735,11 @@ function GroupFilesTab({ groupManagement }: { groupManagement?: MessageGroupMana
 function GroupManagementTab({
   conversation,
   groupManagement,
+  t,
 }: {
   conversation: ConversationListItem;
   groupManagement?: MessageGroupManagement;
+  t: Translate;
 }) {
   const settings = groupManagement?.settings ?? {};
   const [title, setTitle] = useState(groupManagement?.detail?.title || conversation.title);
@@ -568,29 +749,57 @@ function GroupManagementTab({
   return (
     <div className="group-management-pane">
       <div className="group-management-inline-form">
-        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="群名称" />
+        <input
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder={t("messages.conversationInfo.groupNamePlaceholder")}
+        />
         <button
           type="button"
           disabled={!groupManagement?.permissions.canManageSettings || !title.trim()}
-          title={groupManagement?.permissions.canManageSettings ? "保存群名称" : "仅群主或管理员可修改"}
+          title={
+            groupManagement?.permissions.canManageSettings
+              ? t("messages.conversationInfo.saveGroupName")
+              : t("messages.conversationInfo.ownerAdminOnly")
+          }
           onClick={() => groupManagement?.actions.updateGroupTitle(title.trim())}
         >
-          保存
+          {t("common.save")}
         </button>
       </div>
       <div className="group-management-actions">
-        <ActionButton icon={<Pin size={14} />} label={conversation.isPinned ? "取消置顶" : "置顶群聊"} onClick={() => groupManagement?.actions.setPinned(!conversation.isPinned)} />
-        <ActionButton icon={<BellOff size={14} />} label={conversation.isMuted ? "关闭免打扰" : "开启免打扰"} onClick={() => groupManagement?.actions.setMuted(!conversation.isMuted)} />
+        <ActionButton
+          icon={<Pin size={14} />}
+          label={
+            conversation.isPinned
+              ? t("messages.conversationInfo.actions.unpin")
+              : t("messages.conversationInfo.actions.pin")
+          }
+          onClick={() => groupManagement?.actions.setPinned(!conversation.isPinned)}
+        />
+        <ActionButton
+          icon={<BellOff size={14} />}
+          label={
+            conversation.isMuted
+              ? t("messages.conversationInfo.actions.disableDnd")
+              : t("messages.conversationInfo.actions.enableDnd")
+          }
+          onClick={() => groupManagement?.actions.setMuted(!conversation.isMuted)}
+        />
         <ActionButton
           disabled={!groupManagement?.permissions.canManageSettings}
           icon={<VolumeX size={14} />}
-          label={isAllMuted(groupManagement) ? "关闭全员禁言" : "开启全员禁言"}
+          label={
+            isAllMuted(groupManagement)
+              ? t("messages.conversationInfo.actions.disableAllMute")
+              : t("messages.conversationInfo.actions.enableAllMute")
+          }
           onClick={() => groupManagement?.actions.setMuteMode(!isAllMuted(groupManagement))}
         />
       </div>
       <section className="group-management-settings">
-        <h3>群设置</h3>
-        {groupSettingRows(settings).map((row) => (
+        <h3>{t("messages.conversationInfo.groupSettings")}</h3>
+        {groupSettingRows(settings, t).map((row) => (
           <label key={row.key}>
             <span>{row.label}</span>
             <input
@@ -605,46 +814,46 @@ function GroupManagementTab({
         ))}
       </section>
       <section className="group-management-settings">
-        <h3>入群申请</h3>
+        <h3>{t("messages.conversationInfo.joinRequests")}</h3>
         {groupManagement?.joinRequests.length ? (
           groupManagement.joinRequests.map((request) => (
             <div className="group-join-request-row" key={request.requestId}>
-              <span>{request.applicantDisplayName || request.applicantUserId || "申请人"}</span>
-              <em>{request.message || "申请加入群聊"}</em>
+              <span>{request.applicantDisplayName || request.applicantUserId || t("messages.conversationInfo.applicant")}</span>
+              <em>{request.message || t("messages.conversationInfo.joinRequestFallback")}</em>
               <button
                 type="button"
                 disabled={!groupManagement.permissions.canManageJoinRequests}
                 onClick={() => groupManagement.actions.approveJoinRequest(request.requestId)}
               >
                 <Check size={13} />
-                通过
+                {t("messages.conversationInfo.actions.accept")}
               </button>
               <button
                 type="button"
                 disabled={!groupManagement.permissions.canManageJoinRequests}
                 onClick={() => groupManagement.actions.rejectJoinRequest(request.requestId)}
               >
-                拒绝
+                {t("messages.conversationInfo.actions.reject")}
               </button>
             </div>
           ))
         ) : (
-          <PanelState text="暂无入群申请" />
+          <PanelState text={t("messages.conversationInfo.emptyJoinRequests")} />
         )}
       </section>
       <div className="group-management-danger">
         <ActionButton
           disabled={!groupManagement?.permissions.canLeave}
           icon={<LogOut size={14} />}
-          label="退出群聊"
-          onClick={() => confirmDanger("确认退出该群聊？") && groupManagement?.actions.leaveGroup()}
+          label={t("messages.conversationInfo.actions.leaveGroup")}
+          onClick={() => confirmDanger(t("messages.conversationInfo.confirm.leaveGroup")) && groupManagement?.actions.leaveGroup()}
         />
         <ActionButton
           danger
           disabled={!groupManagement?.permissions.canDisband}
           icon={<Trash2 size={14} />}
-          label="解散群聊"
-          onClick={() => confirmDanger("确认解散该群聊？此操作不可恢复。") && groupManagement?.actions.disbandGroup()}
+          label={t("messages.conversationInfo.actions.disbandGroup")}
+          onClick={() => confirmDanger(t("messages.conversationInfo.confirm.disbandGroup")) && groupManagement?.actions.disbandGroup()}
         />
       </div>
     </div>
@@ -672,6 +881,23 @@ function ActionButton({
   );
 }
 
+function GroupTabIcon({ tab }: { tab: GroupInfoTabKey }) {
+  if (tab === "members") return <UsersRound size={14} />;
+  if (tab === "announcements") return <Megaphone size={14} />;
+  if (tab === "files") return <FolderOpen size={14} />;
+  if (tab === "management") return <Settings size={14} />;
+  return <Info size={14} />;
+}
+
+function GroupStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <span className="group-profile-stat">
+      <em>{label}</em>
+      <strong>{value || "--"}</strong>
+    </span>
+  );
+}
+
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="customer-info-row">
@@ -681,15 +907,75 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function groupSettingRows(settings: GroupSettingsDto) {
+function groupMemberCountText(
+  conversation: ConversationListItem,
+  groupManagement: MessageGroupManagement | undefined,
+  members: GroupMemberDto[],
+) {
+  return String(groupManagement?.detail?.memberCount ?? conversation.memberCount ?? (members.length || "--"));
+}
+
+function parseGroupInviteIds(value: string) {
+  return value
+    .split(/[\s,，]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function uniqueGroupInviteIds(values: Iterable<string>, excludedIds: Set<string>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  Array.from(values).forEach((value) => {
+    const id = value.trim();
+    const key = id.toLowerCase();
+    if (!id || excludedIds.has(key) || seen.has(key)) return;
+    seen.add(key);
+    result.push(id);
+  });
+  return result;
+}
+
+function groupMemberInviteIdSet(members: GroupMemberDto[]) {
+  const ids = new Set<string>();
+  members.forEach((member) => {
+    [member.userId, member.platformUserId, member.lppId].forEach((value) => {
+      const id = value?.trim().toLowerCase();
+      if (id) ids.add(id);
+    });
+  });
+  return ids;
+}
+
+function groupInviteCandidateItems({
+  contacts,
+  excludedIds,
+  keyword,
+  limit = 30,
+}: {
+  contacts: ContactPickerItem[];
+  excludedIds: Set<string>;
+  keyword: string;
+  limit?: number;
+}) {
+  const normalized = keyword.trim().toLowerCase();
+  return contacts
+    .filter((item) => item.id && !excludedIds.has(item.id.trim().toLowerCase()))
+    .filter((item) =>
+      !normalized ||
+      `${item.name} ${item.subtitle} ${item.id}`.toLowerCase().includes(normalized),
+    )
+    .slice(0, limit);
+}
+
+function groupSettingRows(settings: GroupSettingsDto, t: Translate) {
   return [
-    ["allowMemberInvite", "允许成员邀请", settings.allowMemberInvite],
-    ["allowMemberModifyTitle", "允许成员改群名", settings.allowMemberModifyTitle],
-    ["allowMemberAtAll", "允许成员 @所有人", settings.allowMemberAtAll],
-    ["allowMemberViewMemberList", "允许查看成员列表", settings.allowMemberViewMemberList],
-    ["allowQrCodeJoin", "允许二维码入群", settings.allowQrCodeJoin],
-    ["requireApproval", "入群需要审批", settings.requireApproval],
-    ["allowMemberAddFriend", "允许成员互加好友", settings.allowMemberAddFriend],
+    ["allowMemberInvite", t("messages.conversationInfo.settings.allowMemberInvite"), settings.allowMemberInvite],
+    ["allowMemberModifyTitle", t("messages.conversationInfo.settings.allowMemberModifyTitle"), settings.allowMemberModifyTitle],
+    ["allowMemberAtAll", t("messages.conversationInfo.settings.allowMemberAtAll"), settings.allowMemberAtAll],
+    ["allowMemberViewMemberList", t("messages.conversationInfo.settings.allowMemberViewMemberList"), settings.allowMemberViewMemberList],
+    ["allowQrCodeJoin", t("messages.conversationInfo.settings.allowQrCodeJoin"), settings.allowQrCodeJoin],
+    ["requireApproval", t("messages.conversationInfo.settings.requireApproval"), settings.requireApproval],
+    ["allowMemberAddFriend", t("messages.conversationInfo.settings.allowMemberAddFriend"), settings.allowMemberAddFriend],
   ].map(([key, label, value]) => ({
     key: key as keyof GroupSettingsDto,
     label: label as string,
@@ -697,12 +983,28 @@ function groupSettingRows(settings: GroupSettingsDto) {
   }));
 }
 
-function groupFileFilterLabel(filter: string) {
-  if (filter === "image") return "图片";
-  if (filter === "video") return "视频";
-  if (filter === "voice") return "语音";
-  if (filter === "file") return "文件";
-  return "全部";
+function groupFileFilterLabel(filter: string, t: Translate) {
+  if (filter === "image") return t("messages.conversationInfo.fileFilter.image");
+  if (filter === "video") return t("messages.conversationInfo.fileFilter.video");
+  if (filter === "voice") return t("messages.conversationInfo.fileFilter.voice");
+  if (filter === "file") return t("messages.conversationInfo.fileFilter.file");
+  return t("messages.conversationInfo.fileFilter.all");
+}
+
+function groupRoleText(role: string | number | null | undefined, t: Translate) {
+  const normalized = normalizeGroupRole(role);
+  if (normalized === "owner") return t("messages.conversationInfo.roles.owner");
+  if (normalized === "admin") return t("messages.conversationInfo.roles.admin");
+  return t("messages.conversationInfo.roles.member");
+}
+
+function compactNames(names: string[], t: Translate) {
+  const compact = names.filter(Boolean);
+  if (compact.length <= 3) return compact.join(t("messages.conversationInfo.listSeparator"));
+  return t("messages.conversationInfo.compactNames", {
+    names: compact.slice(0, 3).join(t("messages.conversationInfo.listSeparator")),
+    count: compact.length,
+  });
 }
 
 function formatFileSize(size?: number) {

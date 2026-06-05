@@ -53,5 +53,7 @@ function persistLocale(locale: AppLocale) {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(localeStorageKey, locale);
-  } catch {}
+  } catch {
+    // localStorage can be unavailable in restricted renderer contexts.
+  }
 }

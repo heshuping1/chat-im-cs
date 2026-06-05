@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   canManageGroupMember,
+  groupMemberDisplayName,
   groupManagementPermissions,
   groupMemberRoleRank,
   normalizeGroupRole,
+  visibleGroupInfoTabs,
 } from "../../src/renderer/messages/models/groupManagementModel";
 import type { GroupMemberDto } from "../../src/renderer/data/api-client";
 
@@ -61,6 +63,14 @@ describe("message group management", () => {
     ]);
   });
 
+  it("prefers group nickname for member display", () => {
+    expect(groupMemberDisplayName({
+      userId: "u1",
+      displayName: "Account name",
+      groupNickname: "Group nick",
+    } as GroupMemberDto)).toBe("Group nick");
+  });
+
   it("prevents admins from handling owners or other admins", () => {
     expect(canManageGroupMember({ actorRole: "admin", targetRole: "owner", action: "remove" })).toBe(false);
     expect(canManageGroupMember({ actorRole: "admin", targetRole: "admin", action: "remove" })).toBe(false);
@@ -68,12 +78,21 @@ describe("message group management", () => {
     expect(canManageGroupMember({ actorRole: "owner", targetRole: "admin", action: "demote" })).toBe(true);
   });
 
+  it("keeps group management visible only to owners and admins", () => {
+    expect(visibleGroupInfoTabs({ role: "owner" })).toContain("management");
+    expect(visibleGroupInfoTabs({ role: "admin" })).toContain("management");
+    expect(visibleGroupInfoTabs({ role: "member" })).not.toContain("management");
+    expect(visibleGroupInfoTabs({ role: "member", settings: { allowMemberViewMemberList: false } })).not.toContain(
+      "members",
+    );
+  });
+
   it("renders first-class group info tabs and owner danger actions", () => {
-    expect(conversationInfoPanel).toContain('"资料", "成员", "公告", "文件", "管理"');
-    expect(conversationInfoPanel).toContain("转让");
-    expect(conversationInfoPanel).toContain("解散群聊");
-    expect(conversationInfoPanel).toContain("入群申请");
-    expect(conversationInfoPanel).toContain("全员禁言");
+    expect(conversationInfoPanel).toContain("visibleGroupInfoTabs");
+    expect(conversationInfoPanel).toContain("actions.transfer");
+    expect(conversationInfoPanel).toContain("actions.disbandGroup");
+    expect(conversationInfoPanel).toContain("joinRequests");
+    expect(conversationInfoPanel).toContain("actions.enableAllMute");
   });
 
   it("declares the client group management endpoints and methods", () => {
