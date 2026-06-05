@@ -21,7 +21,10 @@ export function deriveContactDirectoryAccess(
   const membershipRole =
     finiteNumber(session.membershipRole) ?? currentTenantMembershipRole(session);
   const spaceType = finiteNumber(session.spaceType);
-  const isPersonalSpace = spaceType === 1 || session.roleLabel === "个人空间";
+  const isPersonalSpace =
+    spaceType === 1 ||
+    session.roleLabel === "Personal space" ||
+    session.roleLabel === "\u4e2a\u4eba\u7a7a\u95f4";
   const isCustomerTenantMember = userType === 1 || membershipRole === 0;
   const isOrganizationMember =
     userType === 2 || isKnownEmployeeRole(membershipRole);

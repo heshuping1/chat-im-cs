@@ -4,6 +4,7 @@ import type { AuthSession } from "../data/auth/auth-session";
 import { pcQueryKeys } from "../data/query-keys";
 import { requireApiClient } from "../data/runtime";
 import type { PcSettings } from "../data/settings/pc-settings";
+import { useI18n } from "../i18n/useI18n";
 import { formatError, formatShortDate } from "../lib/format";
 import {
   InlineSettingsState,
@@ -13,6 +14,14 @@ import {
 import { settingRowProps } from "../settings/models/settingsCatalog";
 
 type SettingKey = keyof PcSettings;
+type FriendRequestOption = "everyone" | "friends_of_friends" | "nobody";
+type ProfileVisibilityOption = "everyone" | "friends" | "nobody";
+
+const profileVisibilitySettingValues: Record<ProfileVisibilityOption, PcSettings["profileVisibility"]> = {
+  everyone: "\u6240\u6709\u4eba",
+  friends: "\u4ec5\u597d\u53cb",
+  nobody: "\u4e0d\u5141\u8bb8",
+};
 
 export function PrivacySettingsSection({
   actions,
@@ -27,6 +36,7 @@ export function PrivacySettingsSection({
   pcSettings: PcSettings;
   setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
 }) {
+  const { t } = useI18n();
   const privacyQuery = useQuery({
     queryKey: pcQueryKeys.accountPrivacy(
       actions.authSession?.apiBaseUrl,
@@ -46,9 +56,10 @@ export function PrivacySettingsSection({
           actions.authSession?.tenantToken,
         ),
       });
-      actions.setNotice("朋友权限已保存");
+      actions.setNotice(t("privacySettings.friendSaved"));
     },
-    onError: (error) => actions.setNotice(`朋友权限保存失败：${formatError(error)}`),
+    onError: (error) =>
+      actions.setNotice(t("privacySettings.friendSaveFailed", { error: formatError(error) })),
   });
   const data = privacyQuery.data;
   return (
@@ -56,11 +67,13 @@ export function PrivacySettingsSection({
       {privacyQuery.error && (
         <InlineSettingsState
           tone="error"
-          text={`朋友权限加载失败：${formatError(privacyQuery.error)}`}
+          text={t("privacySettings.friendLoadFailed", { error: formatError(privacyQuery.error) })}
         />
       )}
       <SwitchRow
         {...settingRowProps("allowMobileSearch")}
+        desc={t("privacySettings.allowMobileSearch.desc")}
+        label={t("privacySettings.allowMobileSearch.label")}
         checked={data?.searchableByMobile ?? pcSettings.allowMobileSearch}
         onChange={(value) => {
           setSetting("allowMobileSearch", value);
@@ -69,6 +82,8 @@ export function PrivacySettingsSection({
       />
       <SwitchRow
         {...settingRowProps("allowLppSearch")}
+        desc={t("privacySettings.allowLppSearch.desc")}
+        label={t("privacySettings.allowLppSearch.label")}
         checked={data?.searchableByLppId ?? pcSettings.allowLppSearch}
         onChange={(value) => {
           setSetting("allowLppSearch", value);
@@ -77,19 +92,33 @@ export function PrivacySettingsSection({
       />
       <SelectRow
         {...settingRowProps("friendRequestVerification")}
+        desc={t("privacySettings.friendRequestVerification.desc")}
+        label={t("privacySettings.friendRequestVerification.label")}
         value={friendRequestLabel(data?.allowFriendRequest, pcSettings.friendRequestVerification)}
-        options={["所有人", "有共同好友的人", "不允许"]}
+        options={["everyone", "friends_of_friends", "nobody"]}
+        optionLabels={{
+          everyone: t("privacySettings.option.everyone"),
+          friends_of_friends: t("privacySettings.option.friendsOfFriends"),
+          nobody: t("privacySettings.option.nobody"),
+        }}
         onChange={(value) => {
-          setSetting("friendRequestVerification", value !== "不允许");
+          setSetting("friendRequestVerification", value !== "nobody");
           updatePrivacy.mutate({ allowFriendRequest: friendRequestValue(value) });
         }}
       />
       <SelectRow
         {...settingRowProps("profileVisibility")}
+        desc={t("privacySettings.profileVisibility.desc")}
+        label={t("privacySettings.profileVisibility.label")}
         value={profileVisibilityLabel(data?.profileVisibility, pcSettings.profileVisibility)}
-        options={["所有人", "仅好友", "不允许"]}
+        options={["everyone", "friends", "nobody"]}
+        optionLabels={{
+          everyone: t("privacySettings.option.everyone"),
+          friends: t("privacySettings.option.friends"),
+          nobody: t("privacySettings.option.nobody"),
+        }}
         onChange={(value) => {
-          setSetting("profileVisibility", value);
+          setSetting("profileVisibility", profileVisibilitySettingValues[value]);
           updatePrivacy.mutate({ profileVisibility: profileVisibilityValue(value) });
         }}
       />
@@ -107,6 +136,7 @@ function BlacklistBlock({
     queryClient: QueryClient;
   };
 }) {
+  const { t } = useI18n();
   const blocklistRow = settingRowProps("blocklist");
   const blocklistQuery = useQuery({
     queryKey: pcQueryKeys.accountBlocklist(
@@ -127,26 +157,27 @@ function BlacklistBlock({
           actions.authSession?.tenantToken,
         ),
       });
-      actions.setNotice("已移出黑名单");
+      actions.setNotice(t("privacySettings.blocklist.removed"));
     },
-    onError: (error) => actions.setNotice(`移出黑名单失败：${formatError(error)}`),
+    onError: (error) =>
+      actions.setNotice(t("privacySettings.blocklist.removeFailed", { error: formatError(error) })),
   });
   const list = blocklistQuery.data ?? [];
   return (
     <div className="settings-sub-card">
       <header>
-        <strong>{blocklistRow.label}</strong>
-        <span>{list.length} 人</span>
+        <strong>{t("privacySettings.blocklist.label")}</strong>
+        <span>{t("privacySettings.blocklist.count", { count: list.length })}</span>
       </header>
-      {blocklistQuery.isLoading && <InlineSettingsState text="正在读取黑名单..." />}
+      {blocklistQuery.isLoading && <InlineSettingsState text={t("privacySettings.blocklist.loading")} />}
       {blocklistQuery.error && (
         <InlineSettingsState
           tone="error"
-          text={`黑名单加载失败：${formatError(blocklistQuery.error)}`}
+          text={t("privacySettings.blocklist.loadFailed", { error: formatError(blocklistQuery.error) })}
         />
       )}
       {!blocklistQuery.isLoading && list.length === 0 && (
-        <InlineSettingsState text="暂无黑名单用户" />
+        <InlineSettingsState text={t("privacySettings.blocklist.empty")} />
       )}
       {list.map((item) => (
         <div className="settings-list-row" key={item.blockedUserId}>
@@ -159,7 +190,7 @@ function BlacklistBlock({
             disabled={unblock.isPending}
             onClick={() => unblock.mutate(item.blockedUserId)}
           >
-            移出
+            {t("privacySettings.blocklist.remove")}
           </button>
         </div>
       ))}
@@ -170,31 +201,29 @@ function BlacklistBlock({
 function friendRequestLabel(
   value: ProfilePrivacySettingsDto["allowFriendRequest"],
   fallback: boolean,
-) {
-  if (value === "nobody") return "不允许";
-  if (value === "friends_of_friends") return "有共同好友的人";
-  if (value === "everyone") return "所有人";
-  return fallback ? "所有人" : "不允许";
+): FriendRequestOption {
+  if (value === "nobody") return "nobody";
+  if (value === "friends_of_friends") return "friends_of_friends";
+  if (value === "everyone") return "everyone";
+  return fallback ? "everyone" : "nobody";
 }
 
-function friendRequestValue(value: string) {
-  if (value === "不允许") return "nobody";
-  if (value === "有共同好友的人") return "friends_of_friends";
-  return "everyone";
+function friendRequestValue(value: FriendRequestOption) {
+  return value;
 }
 
 function profileVisibilityLabel(
   value: ProfilePrivacySettingsDto["profileVisibility"],
   fallback: PcSettings["profileVisibility"],
-) {
-  if (value === "everyone") return "所有人";
-  if (value === "nobody") return "不允许";
-  if (value === "friends") return "仅好友";
-  return fallback;
+): ProfileVisibilityOption {
+  if (value === "everyone") return "everyone";
+  if (value === "nobody") return "nobody";
+  if (value === "friends") return "friends";
+  if (fallback === "\u6240\u6709\u4eba") return "everyone";
+  if (fallback === "\u4e0d\u5141\u8bb8") return "nobody";
+  return "friends";
 }
 
-function profileVisibilityValue(value: string) {
-  if (value === "所有人") return "everyone";
-  if (value === "不允许") return "nobody";
-  return "friends";
+function profileVisibilityValue(value: ProfileVisibilityOption) {
+  return value;
 }

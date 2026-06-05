@@ -117,7 +117,7 @@ export function normalizeImMessageDto(
     const derivedPreview = messagePreviewFromBody(body, type);
     const preview =
       stringField(record, "preview", "text", "message") ||
-      (derivedPreview === "暂不支持的消息类型：text" ? "" : derivedPreview) ||
+      (derivedPreview === "Unsupported message type: text" ? "" : derivedPreview) ||
       "[消息]";
     const dto: MessageItemDto = {
       messageId: id,

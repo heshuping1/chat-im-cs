@@ -7,6 +7,7 @@ import type { AuthSession } from "../../data/auth/auth-session";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import type { PcSettings } from "../../data/settings/pc-settings";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 import { settingRowProps, type SettingsSectionId } from "../models/settingsCatalog";
 import { InfoRow, InlineSettingsState, SwitchRow } from "./SettingsRows";
@@ -104,6 +105,7 @@ export function NotificationSettingsSection({
   setNotice: (notice: string) => void;
   setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const notificationQuery = useQuery({
     queryKey: pcQueryKeys.accountNotificationSettings(
@@ -124,9 +126,10 @@ export function NotificationSettingsSection({
           authSession?.tenantToken,
         ),
       });
-      setNotice("提醒设置已保存");
+      setNotice(t("me.notificationSettings.saved"));
     },
-    onError: (error) => setNotice(`提醒设置保存失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("me.notificationSettings.saveFailed", { error: formatError(error) })),
   });
 
   useEffect(() => {
@@ -149,12 +152,14 @@ export function NotificationSettingsSection({
   return (
     <>
       {notificationQuery.isLoading && (
-        <InlineSettingsState text="正在读取账号提醒设置..." />
+        <InlineSettingsState text={t("me.notificationSettings.loading")} />
       )}
       {notificationQuery.error && (
         <InlineSettingsState
           tone="error"
-          text={`提醒设置加载失败：${formatError(notificationQuery.error)}。当前控件会先保存在本机，接口恢复后可再次同步。`}
+          text={t("me.notificationSettings.loadFailed", {
+            error: formatError(notificationQuery.error),
+          })}
         />
       )}
       {notificationSectionRows[sectionId].map((rowId) => {
@@ -163,7 +168,11 @@ export function NotificationSettingsSection({
             <InfoRow
               key={rowId}
               {...settingRowProps(rowId)}
-              desc={`新的好友申请跟随 IM 消息提醒策略。当前：${pcSettings.imNotifications ? "开启" : "关闭"}`}
+              desc={t("me.notificationSettings.friendRequestDesc", {
+                state: pcSettings.imNotifications
+                  ? t("me.notificationSettings.on")
+                  : t("me.notificationSettings.off"),
+              })}
             />
           );
         }

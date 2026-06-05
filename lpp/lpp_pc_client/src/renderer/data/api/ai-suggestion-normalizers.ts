@@ -92,7 +92,7 @@ export function formatAiSuggestionError(error: unknown) {
     if (error.status === 403 || error.code === "CUSTOMER_SERVICE_STAFF_REQUIRED") {
       return "当前账号无客服 AI 权限";
     }
-    if (error.code === "CS_THREAD_TYPE_INVALID") return "当前会话类型暂不支持 AI 草稿";
+    if (error.code === "CS_THREAD_TYPE_INVALID") return "当前会话类型暂不支持 AI 起草";
   }
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error.trim()) return error;

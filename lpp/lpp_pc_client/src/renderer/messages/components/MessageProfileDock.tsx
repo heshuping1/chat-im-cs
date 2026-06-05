@@ -3,14 +3,17 @@ import type { CurrentUserIdentity } from "../../data/message-display";
 import { GripVertical, Pin, PinOff } from "lucide-react";
 import type { DragEvent } from "react";
 import type { ContactItem } from "../../data/types";
+import { useI18n } from "../../i18n/useI18n";
 import { startHorizontalPaneResize } from "../../lib/paneResize";
 import { ConversationInfoPanel } from "./ConversationInfoPanel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import type { MessageGroupManagement } from "../hooks/useMessageGroupManagement";
+import type { ContactPickerItem } from "./MessageStartDialogs";
 
 export function MessageProfileDock({
   avatarUrl,
   contact,
+  contactPickerItems = [],
   conversation,
   groupAvatar,
   groupManagement,
@@ -27,6 +30,7 @@ export function MessageProfileDock({
 }: {
   avatarUrl?: string | null;
   contact?: ContactItem | null;
+  contactPickerItems?: ContactPickerItem[];
   conversation?: ConversationListItem;
   groupAvatar?: GroupConversationAvatar;
   groupManagement?: MessageGroupManagement;
@@ -47,12 +51,14 @@ export function MessageProfileDock({
   onResize: (width: number) => void;
   onTogglePin: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
       <div
         className="resizer profile-resizer"
         role="separator"
-        aria-label="调整客户资料宽度"
+        aria-label={t("message.profileDock.resizeProfile")}
         onPointerDown={(event) =>
           startHorizontalPaneResize(event, {
             initialWidth: profilePaneWidth,
@@ -65,6 +71,7 @@ export function MessageProfileDock({
       <ConversationInfoPanel
         avatarUrl={avatarUrl}
         contact={contact}
+        contactPickerItems={contactPickerItems}
         conversation={conversation}
         groupAvatar={groupAvatar}
         groupManagement={groupManagement}
@@ -75,8 +82,8 @@ export function MessageProfileDock({
               className="context-pane-drag"
               type="button"
               draggable
-              title="拖拽排序"
-              aria-label="拖拽排序"
+              title={t("message.profileDock.dragSort")}
+              aria-label={t("message.profileDock.dragSort")}
               onDragOver={onDragOverContextPane}
               onDragStart={(event) => onDragStartContextPane(event, "profile")}
             >
@@ -85,8 +92,8 @@ export function MessageProfileDock({
             <button
               className={`context-pane-pin ${pinned ? "active" : ""}`}
               type="button"
-              title={pinned ? "取消固定" : "固定资料面板"}
-              aria-label={pinned ? "取消固定" : "固定资料面板"}
+              title={pinned ? t("message.profileDock.unpin") : t("message.profileDock.pin")}
+              aria-label={pinned ? t("message.profileDock.unpin") : t("message.profileDock.pin")}
               aria-pressed={pinned}
               onClick={onTogglePin}
             >

@@ -12,7 +12,7 @@ const ledger = existsSync(join(repoRoot, ledgerPath))
 const rows = roots
   .flatMap((root) => listFiles(join(repoRoot, root)))
   .map((file) => {
-    const relativeFile = relative(repoRoot, file);
+    const relativeFile = normalizePath(relative(repoRoot, file));
     const kind = classify(relativeFile);
     const lines = lineCount(readFileSync(file, "utf8"));
     return {
@@ -75,6 +75,10 @@ function statSafe(path) {
   } catch {
     return null;
   }
+}
+
+function normalizePath(path) {
+  return path.replace(/\\/g, "/");
 }
 
 function classify(file) {

@@ -29,6 +29,8 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import type { TranslationParams } from "../i18n/dictionary";
+import { useI18n } from "../i18n/useI18n";
 import { formatError } from "../lib/format";
 import {
   type WechatEmojiItem,
@@ -65,6 +67,8 @@ export type MessageComposerHandle = {
   focus: () => void;
   insertText: (text: string) => void;
 };
+
+type Translate = (key: string, params?: TranslationParams) => string;
 
 type MessageComposerProps = {
   placeholder: string;
@@ -129,6 +133,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   onSendText,
   onSendMedia,
 }, ref) {
+  const { t } = useI18n();
   const [internalDraft, setInternalDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [attachmentsByScope, setAttachmentsByScope] = useState<
@@ -143,6 +148,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   );
   const [moreOpen, setMoreOpen] = useState(false);
   const [morePanelPosition, setMorePanelPosition] = useState<FloatingPanelPosition | null>(null);
+  const [mentionPanelPosition, setMentionPanelPosition] = useState<FloatingPanelPosition | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [recentEmojis, setRecentEmojis] = useState<WechatEmojiItem[]>([]);
   const [draftTranslation, setDraftTranslation] = useState<{
@@ -156,6 +162,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lexicalInputRef = useRef<LexicalChatInputHandle | null>(null);
   const composerRef = useRef<HTMLElement | null>(null);
+  const mentionPanelRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
   const morePanelRef = useRef<HTMLDivElement | null>(null);
   const previewUrlsRef = useRef<string[]>([]);
@@ -205,6 +212,33 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
           );
     setMorePanelPosition({ left, top });
   }, []);
+
+  const updateMentionPanelPosition = useCallback(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    const composerRect = composer.getBoundingClientRect();
+    const margin = 12;
+    const gap = 10;
+    const panelWidth = Math.min(
+      280,
+      Math.max(210, Math.min(composerRect.width - 28, window.innerWidth - margin * 2)),
+    );
+    const panelHeight =
+      mentionPanelRef.current?.getBoundingClientRect().height ??
+      Math.min(236, 12 + mentionCandidates.length * 34);
+    const maxLeft = Math.max(margin, window.innerWidth - panelWidth - margin);
+    const left = Math.min(maxLeft, Math.max(margin, composerRect.left + 22));
+    const topAbove = composerRect.top - panelHeight - gap;
+    const topBelow = composerRect.bottom + gap;
+    const top =
+      topAbove >= margin
+        ? topAbove
+        : Math.min(
+            Math.max(margin, topBelow),
+            Math.max(margin, window.innerHeight - panelHeight - margin),
+          );
+    setMentionPanelPosition({ left, top });
+  }, [mentionCandidates.length]);
 
   useImperativeHandle(
     ref,
@@ -262,13 +296,13 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
     try {
       const text = (await onTranslateDraft(content))?.trim();
       if (!text) {
-        setError("翻译服务没有返回内容。");
+        setError(t("composer.translateEmpty"));
         setDraftTranslation(null);
         return;
       }
       setDraftTranslation({ source: content, text });
     } catch (err) {
-      setError(`翻译失败：${formatError(err)}`);
+      setError(t("composer.translateFailed", { error: formatError(err) }));
       setDraftTranslation(null);
     } finally {
       setTranslatingDraft(false);
@@ -325,6 +359,22 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       window.removeEventListener("scroll", updateMorePanelPosition, true);
     };
   }, [moreOpen, updateMorePanelPosition]);
+
+  useEffect(() => {
+    if (mentionCandidates.length === 0) {
+      setMentionPanelPosition(null);
+      return undefined;
+    }
+    updateMentionPanelPosition();
+    const raf = window.requestAnimationFrame(updateMentionPanelPosition);
+    window.addEventListener("resize", updateMentionPanelPosition);
+    window.addEventListener("scroll", updateMentionPanelPosition, true);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateMentionPanelPosition);
+      window.removeEventListener("scroll", updateMentionPanelPosition, true);
+    };
+  }, [mentionCandidates.length, updateMentionPanelPosition]);
 
   const sendDraft = async () => {
     if (compactComposer) {
@@ -407,7 +457,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   };
 
   const rejectDragUpload = () => {
-    setError("文件拖拽上传已在设置中关闭，可使用文件按钮选择上传。");
+    setError(t("composer.dragUploadDisabled"));
   };
 
   const captureScreenshot = async () => {
@@ -522,8 +572,8 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
         <button
           className="composer-resize-handle"
           type="button"
-          aria-label="调整输入区高度"
-          title="拖动调整输入区高度"
+          aria-label={t("composer.resizeAria")}
+          title={t("composer.resizeTitle")}
           onPointerDown={onResizeStart}
         />
       )}
@@ -537,22 +587,22 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
             setMoreOpen(false);
           }}
           aria-expanded={emojiOpen}
-          aria-label="表情"
-          title="表情"
+          aria-label={t("composer.emoji.panelAria")}
+          title={t("composer.emoji.panelAria")}
         >
           <Smile size={16} />
-          <span className={dense ? "tool-label" : ""}>表情</span>
+          <span className={dense ? "tool-label" : ""}>{t("composer.emoji.short")}</span>
         </button>
         {combinedAttachmentTool ? (
           <button
             type="button"
             disabled={disabled}
             onClick={() => attachmentInputRef.current?.click()}
-            aria-label="文件"
-            title="选择图片或文件"
+            aria-label={t("composer.attachment.file")}
+            title={t("composer.attachment.chooseImageOrFile")}
           >
             <Paperclip size={16} />
-            <span className={dense ? "tool-label" : ""}>文件</span>
+            <span className={dense ? "tool-label" : ""}>{t("composer.attachment.file")}</span>
           </button>
         ) : (
           <>
@@ -560,32 +610,32 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
               type="button"
               disabled={disabled}
               onClick={() => imageInputRef.current?.click()}
-              aria-label="图片"
-              title="图片"
+              aria-label={t("composer.attachment.image")}
+              title={t("composer.attachment.image")}
             >
               <FileImage size={16} />
-              <span className={dense ? "tool-label" : ""}>图片</span>
+              <span className={dense ? "tool-label" : ""}>{t("composer.attachment.image")}</span>
             </button>
             <button
               type="button"
               disabled={disabled}
               onClick={() => fileInputRef.current?.click()}
-              aria-label="文件"
-              title="文件"
+              aria-label={t("composer.attachment.file")}
+              title={t("composer.attachment.file")}
             >
               <Folder size={16} />
-              <span className={dense ? "tool-label" : ""}>文件</span>
+              <span className={dense ? "tool-label" : ""}>{t("composer.attachment.file")}</span>
             </button>
           </>
         )}
         <button
           type="button"
           disabled={disabled}
-          aria-label="截图"
+          aria-label={t("composer.screenshot")}
           title={
             shortcutHints && screenshotShortcut !== "None"
-              ? `截图 ${screenshotShortcut}`
-              : "截图"
+              ? t("composer.screenshotWithShortcut", { shortcut: screenshotShortcut })
+              : t("composer.screenshot")
           }
           onClick={() => void captureScreenshot()}
         >
@@ -602,18 +652,19 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
           <button
             type="button"
             disabled={disabled}
-            aria-label="话术"
-            title="话术"
+            aria-label={t("composer.quickReplyShort")}
+            title={t("composer.quickReplyShort")}
           >
             <MessageSquareQuote size={16} />
-            <span className={dense ? "tool-label" : ""}>话术</span>
+            <span className={dense ? "tool-label" : ""}>{t("composer.quickReplyShort")}</span>
           </button>
         )}
         {renderComposerExtraTools({
           extraTools,
           disabled: disabled || translatingDraft || !draft.trim(),
           onClick: onTranslateDraft ? () => void translateDraft() : undefined,
-          title: translatingDraft ? "翻译中" : undefined,
+          title: translatingDraft ? t("composer.translating") : undefined,
+          t,
         })}
         <button
           ref={moreButtonRef}
@@ -625,11 +676,11 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
             setEmojiOpen(false);
           }}
           aria-expanded={moreOpen}
-          aria-label="更多功能"
-          title="更多功能"
+          aria-label={t("composer.more")}
+          title={t("composer.more")}
         >
           <Plus size={16} />
-          <span className={dense ? "tool-label" : ""}>更多</span>
+          <span className={dense ? "tool-label" : ""}>{t("composer.moreShort")}</span>
         </button>
       </div>
       {emojiOpen && (
@@ -645,30 +696,30 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
             ref={morePanelRef}
             className="composer-plus-panel composer-plus-note"
             role="menu"
-            aria-label="发送内容"
+            aria-label={t("composer.morePanelAria")}
             style={{
               left: morePanelPosition?.left ?? 0,
               top: morePanelPosition?.top ?? 0,
               visibility: morePanelPosition ? "visible" : "hidden",
             } satisfies CSSProperties}
           >
-            <strong>发送内容</strong>
+            <strong>{t("composer.morePanelTitle")}</strong>
             <div className="composer-plus-grid">
               <button className="composer-plus-item is-disabled" type="button" disabled>
                 <Mic size={17} />
-                <span>语音</span>
-                <em>待接入</em>
+                <span>{t("composer.voice")}</span>
+                <em>{t("composer.pendingIntegration")}</em>
               </button>
               <button className="composer-plus-item is-disabled" type="button" disabled>
                 <Video size={17} />
-                <span>视频</span>
-                <em>待接入</em>
+                <span>{t("composer.video")}</span>
+                <em>{t("composer.pendingIntegration")}</em>
               </button>
               {contactCardToolVisible && (
                 <button
                   className="composer-plus-item is-primary"
                   type="button"
-                  aria-label="发送联系人名片"
+                  aria-label={t("composer.contactCard.send")}
                   disabled={disabled}
                   onClick={() => {
                     setMoreOpen(false);
@@ -676,8 +727,8 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
                   }}
                 >
                   <UserRound size={17} />
-                  <span>名片</span>
-                  <em>发送联系人名片</em>
+                  <span>{t("composer.contactCard.card")}</span>
+                  <em>{t("composer.contactCard.send")}</em>
                 </button>
               )}
             </div>
@@ -686,18 +737,32 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
         )
       )}
       {mentionCandidates.length > 0 && (
-        <div className="composer-mention-panel" role="listbox" aria-label="选择提醒对象">
-          {mentionCandidates.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              role="option"
-              onClick={() => insertMention(item.label)}
-            >
-              @{item.label}
-            </button>
-          ))}
-        </div>
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={mentionPanelRef}
+            className="composer-mention-panel"
+            role="listbox"
+            aria-label={t("composer.mentionAria")}
+            style={{
+              left: mentionPanelPosition?.left ?? 0,
+              top: mentionPanelPosition?.top ?? 0,
+              visibility: mentionPanelPosition ? "visible" : "hidden",
+            } satisfies CSSProperties}
+          >
+            {mentionCandidates.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                role="option"
+                onClick={() => insertMention(item.label)}
+              >
+                @{item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )
       )}
       <MessageComposerFileInputs
         attachmentInputRef={attachmentInputRef}
@@ -726,10 +791,10 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
               setDraftTranslation(null);
             }}
           >
-            替换输入
+            {t("composer.replaceInput")}
           </button>
           <button type="button" onClick={() => setDraftTranslation(null)}>
-            关闭
+            {t("common.close")}
           </button>
         </div>
       )}
@@ -818,11 +883,13 @@ function renderComposerExtraTools({
   extraTools,
   disabled,
   onClick,
+  t,
   title,
 }: {
   extraTools: ReactNode;
   disabled: boolean;
   onClick?: () => void;
+  t: Translate;
   title?: string;
 }): ReactNode {
   if (!extraTools) return extraTools;
@@ -838,7 +905,7 @@ function renderComposerExtraTools({
       element.props.onClick?.(event);
       if (!event.defaultPrevented) onClick?.();
     },
-    title: title ?? (disabled ? "请输入内容后翻译" : element.props.title),
+    title: title ?? (disabled ? t("composer.translateDisabled") : element.props.title),
   });
 }
 

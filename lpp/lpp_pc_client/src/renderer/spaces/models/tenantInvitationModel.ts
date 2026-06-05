@@ -1,31 +1,36 @@
 export type TenantInvitationTargetRole = 0 | 1 | 2 | 3;
 
 export interface TenantInvitationRoleOption {
+  label?: string;
   role: TenantInvitationTargetRole;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
 }
 
 const roleOptions: TenantInvitationRoleOption[] = [
   {
     role: 0,
     label: "成员",
-    description: "接受后进入企业空间，但不会获得员工工作台权限。",
+    labelKey: "tenantInvitation.roles.member",
+    descriptionKey: "tenantInvitation.roleDescription.member",
   },
   {
     role: 1,
     label: "技术支持",
-    description: "接受后成为技术支持，可使用技术相关协作能力。",
+    labelKey: "tenantInvitation.roles.technicalSupport",
+    descriptionKey: "tenantInvitation.roleDescription.technicalSupport",
   },
   {
     role: 2,
     label: "客服",
-    description: "接受后成为客服，可进入在线客服工作台处理客户会话。",
+    labelKey: "tenantInvitation.roles.staff",
+    descriptionKey: "tenantInvitation.roleDescription.staff",
   },
   {
     role: 3,
     label: "管理员",
-    description: "管理员将拥有成员和空间管理权限，请只发送给可信员工。",
+    labelKey: "tenantInvitation.roles.admin",
+    descriptionKey: "tenantInvitation.roleDescription.admin",
   },
 ];
 
@@ -36,7 +41,9 @@ export function tenantInvitationRoleOptionsFor(
     ? Number(creatorMembershipRole)
     : 0;
   if (role === 4) return roleOptions;
-  if (role === 3) return roleOptions.filter((option) => option.role === 0 || option.role === 1 || option.role === 2);
+  if (role === 3) {
+    return roleOptions.filter((option) => option.role === 0 || option.role === 1 || option.role === 2);
+  }
   return [];
 }
 
@@ -58,6 +65,13 @@ export function createTenantInvitationDefaults(creatorMembershipRole?: number | 
   };
 }
 
+export function invitationRoleLabelKey(role?: number | null) {
+  if (role === 3) return "tenantInvitation.roles.admin";
+  if (role === 2) return "tenantInvitation.roles.staff";
+  if (role === 1) return "tenantInvitation.roles.technicalSupport";
+  return "tenantInvitation.roles.member";
+}
+
 export function invitationRoleLabel(role?: number | null) {
   if (role === 3) return "管理员";
   if (role === 2) return "客服";
@@ -65,16 +79,30 @@ export function invitationRoleLabel(role?: number | null) {
   return "成员";
 }
 
-export function invitationCreateButtonLabel(role?: number | null) {
-  return `创建${invitationRoleLabel(role)}邀请`;
+export function invitationCreateButtonLabelKey(role?: number | null) {
+  return role === 3 ? "tenantInvitation.createAdmin" : "tenantInvitation.create";
 }
 
-export function invitationAcceptedRoleText(role?: number | null) {
-  return `接受后成为${invitationRoleLabel(role)}`;
+export function invitationCreateButtonLabel(role?: number | null) {
+  return role === 3 ? "创建管理员邀请" : `创建${invitationRoleLabel(role)}邀请`;
+}
+
+export function invitationAcceptedRoleTextKey() {
+  return "tenantInvitation.acceptedRole";
+}
+
+export function invitationRoleDescriptionKey(role?: number | null) {
+  return (
+    roleOptions.find((option) => option.role === role)?.descriptionKey ??
+    roleOptions[0].descriptionKey
+  );
 }
 
 export function invitationRoleDescription(role?: number | null) {
-  return roleOptions.find((option) => option.role === role)?.description ?? roleOptions[0].description;
+  if (role === 3) return "管理员将拥有成员和空间管理权限。";
+  if (role === 2) return "接受后进入企业空间，并获得客服工作台权限。";
+  if (role === 1) return "接受后进入企业空间，并获得技术支持权限。";
+  return "接受后进入企业空间，但不会获得员工工作台权限。";
 }
 
 interface TenantInvitationRoleSource {
@@ -123,16 +151,31 @@ export function normalizeTenantInvitationRoleFields<T extends TenantInvitationRo
       };
 }
 
-export function tenantInvitationStatusLabel(status?: string | number | null) {
-  if (status === 1) return "有效";
-  if (status === 0) return "已撤销";
-  if (status === 3) return "已用完";
+export function tenantInvitationStatusLabelKey(status?: string | number | null) {
+  if (status === 1) return "tenantInvitation.status.active";
+  if (status === 0) return "tenantInvitation.status.revoked";
+  if (status === 3) return "tenantInvitation.status.usedUp";
 
   const normalized = String(status ?? "").toLowerCase();
-  if (normalized.includes("revoked") || normalized.includes("cancel")) return "已撤销";
-  if (normalized.includes("expired")) return "已过期";
-  if (normalized.includes("used_up") || normalized.includes("exhausted")) return "已用完";
-  if (normalized.includes("active") || normalized.includes("valid")) return "有效";
+  if (normalized.includes("revoked") || normalized.includes("cancel")) {
+    return "tenantInvitation.status.revoked";
+  }
+  if (normalized.includes("expired")) return "tenantInvitation.status.expired";
+  if (normalized.includes("used_up") || normalized.includes("exhausted")) {
+    return "tenantInvitation.status.usedUp";
+  }
+  if (normalized.includes("active") || normalized.includes("valid")) {
+    return "tenantInvitation.status.active";
+  }
+  return "tenantInvitation.status.unsynced";
+}
+
+export function tenantInvitationStatusLabel(status?: string | number | null) {
+  const key = tenantInvitationStatusLabelKey(status);
+  if (key === "tenantInvitation.status.active") return "有效";
+  if (key === "tenantInvitation.status.revoked") return "已撤销";
+  if (key === "tenantInvitation.status.expired") return "已过期";
+  if (key === "tenantInvitation.status.usedUp") return "已用完";
   return "状态待同步";
 }
 
@@ -168,19 +211,9 @@ export function invitationCopyTarget(invitation: TenantInvitationCopySource) {
     invitation.code ||
     invitation.token ||
     "";
-  if (code) {
-    return {
-      value: code,
-      kind: "code" as const,
-      label: "邀请码",
-      buttonLabel: "复制邀请码",
-      copiedNotice: "邀请码已复制",
-    };
-  }
-
   return {
-    value: "",
-    kind: "none" as const,
+    value: code,
+    kind: code ? ("code" as const) : ("none" as const),
     label: "邀请码",
     buttonLabel: "复制邀请码",
     copiedNotice: "邀请码已复制",

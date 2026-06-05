@@ -366,7 +366,7 @@ function ensureConversation(
     conversation ?? {
       conversationId: event.conversationId,
       conversationType: event.conversationType,
-      title: "新会话",
+      title: "New conversation",
       unreadCount: 0,
       lastReadSeq: 0,
       lastMessageSeq: 0,

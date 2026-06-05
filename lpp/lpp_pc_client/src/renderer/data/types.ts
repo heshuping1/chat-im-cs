@@ -117,9 +117,9 @@ export interface CustomerProfile {
 export interface WorkbenchShortcut {
   id: string;
   roles: WorkspaceRole[];
-  group: string;
-  title: string;
-  description: string;
+  groupKey: "admin" | "customerService" | "owner";
+  titleKey: string;
+  descriptionKey: string;
   state: "available" | "readonly" | "no_permission" | "pending_api";
   metric?: string;
 }

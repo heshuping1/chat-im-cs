@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ChevronRight, Copy, QrCode } from "lucide-react";
 import type { FriendInviteQrDto } from "../data/api-client";
+import { useI18n } from "../i18n/useI18n";
 import { formatError, formatShortDate } from "../lib/format";
 
 export type AccountPanel = "qrcode" | null;
@@ -42,8 +43,9 @@ export function AccountDetailPanel({
   onCopy: (text: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const titleMap = {
-    qrcode: "我的二维码",
+    qrcode: t("account.qrcode.title"),
   } satisfies Record<Exclude<AccountPanel, null>, string>;
 
   return (
@@ -51,29 +53,29 @@ export function AccountDetailPanel({
       <div className="account-detail-head">
         <strong>{titleMap[panel]}</strong>
         <button type="button" onClick={onClose}>
-          收起
+          {t("common.collapse")}
         </button>
       </div>
       {panel === "qrcode" && (
         <div className="account-detail-body">
-          {inviteQrsLoading && <AccountInlineState text="正在读取二维码..." />}
+          {inviteQrsLoading && <AccountInlineState text={t("account.qrcode.loading")} />}
           {Boolean(inviteQrsError) && (
             <AccountInlineState
               tone="error"
-              text={`二维码加载失败：${formatError(inviteQrsError)}`}
+              text={t("account.qrcode.loadFailed", { error: formatError(inviteQrsError) })}
             />
           )}
           {inviteQrs.length > 0 ? (
             inviteQrs.map((item) => (
               <div className="account-real-card" key={item.tokenId || item.token}>
-                <InfoLine label="状态" value={item.status ?? "--"} />
-                <InfoLine label="有效期" value={formatShortDate(item.expiresAt)} />
+                <InfoLine label={t("account.qrcode.status")} value={item.status ?? "--"} />
+                <InfoLine label={t("account.qrcode.expiresAt")} value={formatShortDate(item.expiresAt)} />
                 <InfoLine
-                  label="使用次数"
+                  label={t("account.qrcode.usageCount")}
                   value={`${item.usedCount ?? 0}/${item.maxUses ?? 0}`}
                 />
                 <InfoLine
-                  label="二维码内容"
+                  label={t("account.qrcode.payload")}
                   value={item.qrPayload ?? "--"}
                   action={item.qrPayload ? () => onCopy(item.qrPayload!) : undefined}
                 />
@@ -84,8 +86,8 @@ export function AccountDetailPanel({
             !Boolean(inviteQrsError) && (
               <div className="account-detail-empty">
                 <QrCode size={18} />
-                <strong>暂无有效二维码</strong>
-                <span>可以通过接口生成一个新的加好友二维码。</span>
+                <strong>{t("account.qrcode.emptyTitle")}</strong>
+                <span>{t("account.qrcode.emptyText")}</span>
               </div>
             )
           )}
@@ -96,7 +98,7 @@ export function AccountDetailPanel({
             onClick={onCreateInviteQr}
           >
             <QrCode size={14} />
-            {creatingInviteQr ? "生成中..." : "生成二维码"}
+            {creatingInviteQr ? t("account.qrcode.creating") : t("account.qrcode.create")}
           </button>
         </div>
       )}
@@ -128,12 +130,13 @@ function InfoLine({
   value: string;
   action?: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="account-info-line">
       <span>{label}</span>
       <strong>{value || "--"}</strong>
       {action && (
-        <button type="button" onClick={action} aria-label={`复制${label}`}>
+        <button type="button" onClick={action} aria-label={t("common.copyNamed", { name: label })}>
           <Copy size={13} />
         </button>
       )}

@@ -14,6 +14,8 @@ export interface NormalizedApiError {
   kind: ApiErrorKind;
   message: string;
   userMessage: string;
+  userMessageKey: string;
+  userMessageParams?: Record<string, string | number>;
   code?: string;
   requestId?: string;
   status?: number;
@@ -25,7 +27,8 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
     return {
       kind: "aborted",
       message: error.message || "Request aborted",
-      userMessage: "操作已取消",
+      userMessage: userMessageFallbackForApiError("aborted", error.message),
+      userMessageKey: userMessageKeyForApiError("aborted", error.message),
       name: error.name,
     };
   }
@@ -38,13 +41,18 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
   const message =
     error instanceof Error && error.message
       ? error.message
-      : stringValue(record.message) || stringValue(error) || "未知错误";
+      : stringValue(record.message) || stringValue(error) || "Unknown error";
   const kind = inferApiErrorKind({ status, code, message, name });
+  const userMessageKey = userMessageKeyForApiError(kind, message, code);
 
   return {
     kind,
     message,
-    userMessage: userMessageForApiError(kind, message, code),
+    userMessage: userMessageFallbackForApiError(kind, message, code),
+    userMessageKey,
+    userMessageParams: userMessageKey === "apiError.raw"
+      ? { message: sanitizeApiErrorMessage(message) }
+      : undefined,
     code,
     requestId,
     status,
@@ -52,9 +60,9 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
   };
 }
 
-export function formatApiErrorForUser(error: unknown, fallback = "未知错误") {
+export function formatApiErrorForUser(error: unknown, fallback = "Unknown error") {
   const normalized = normalizeApiError(error);
-  if (normalized.kind === "unknown" && normalized.message === "未知错误") {
+  if (normalized.kind === "unknown" && normalized.message === "Unknown error") {
     return fallback;
   }
   return normalized.userMessage || fallback;
@@ -65,33 +73,85 @@ export function userMessageForApiError(
   message: string,
   errorCode?: string,
 ) {
+  return userMessageFallbackForApiError(kind, message, errorCode);
+}
+
+export function userMessageKeyForApiError(
+  kind: ApiErrorKind,
+  message: string,
+  errorCode?: string,
+) {
   const code = (errorCode || message).toUpperCase();
   if (
     code.includes("TENANT_JOIN_REQUEST_PENDING") ||
     message.toLowerCase().includes("join request is already pending")
   ) {
-    return "已提交加入申请，正在等待管理员审核";
+    return "apiError.tenantJoinPending";
   }
-  if (code.includes("TENANT_ALREADY_MEMBER")) return "你已在该企业中，可直接切换进入";
-  if (code.includes("TENANT_NOT_FOUND")) return "未找到该企业，请确认企业码是否正确";
+  if (code.includes("TENANT_ALREADY_MEMBER")) return "error.tenantAlreadyMember";
+  if (code.includes("TENANT_NOT_FOUND")) return "apiError.tenantNotFound";
   if (code.includes("JOIN_DISABLED_IN_BINDING_MODE")) {
-    return "该企业暂不支持自助加入，请联系企业管理员邀请你加入";
+    return "apiError.tenantJoinDisabled";
   }
-  if (code.includes("MSG_MEMBER_FORBIDDEN")) return "你不在该会话中，无法发送消息";
-  if (code.includes("MSG_CONVERSATION_FROZEN")) return "该会话已被冻结，暂时无法发送";
-  if (code.includes("MSG_GROUP_MUTED")) return "群聊已开启全员禁言，暂时无法发送";
-  if (code.includes("MSG_MEMBER_MUTED")) return "你已被禁言，暂时无法发言";
-  if (code.includes("MSG_USER_MUTED")) return "当前账号已被禁言，暂时无法发送";
-  if (kind === "unauthorized") return "登录状态已失效，请重新登录";
-  if (kind === "forbidden") return "当前账号没有权限执行此操作";
-  if (kind === "not_found") return "目标内容不存在或已被删除";
-  if (kind === "rate_limited") return "操作过于频繁，请稍后再试";
-  if (kind === "server") return "服务暂时不可用，请稍后重试";
-  if (kind === "network") return "网络连接异常，请检查网络后重试";
-  if (kind === "aborted") return "操作已取消";
-  if (kind === "validation") return sanitizeApiErrorMessage(message);
-  if (kind === "conflict") return sanitizeApiErrorMessage(message);
-  return sanitizeApiErrorMessage(message);
+  if (code.includes("MSG_MEMBER_FORBIDDEN")) return "apiError.messageMemberForbidden";
+  if (code.includes("MSG_CONVERSATION_FROZEN")) return "apiError.messageConversationFrozen";
+  if (code.includes("MSG_GROUP_MUTED")) return "apiError.messageGroupMuted";
+  if (code.includes("MSG_MEMBER_MUTED")) return "apiError.messageMemberMuted";
+  if (code.includes("MSG_USER_MUTED")) return "apiError.messageUserMuted";
+  if (kind === "unauthorized") return "error.unauthorized";
+  if (kind === "forbidden") return "error.forbidden";
+  if (kind === "not_found") return "apiError.notFound";
+  if (kind === "rate_limited") return "apiError.rateLimited";
+  if (kind === "server") return "apiError.server";
+  if (kind === "network") return "error.network";
+  if (kind === "aborted") return "apiError.aborted";
+  if (kind === "validation") return "apiError.raw";
+  if (kind === "conflict") return "apiError.raw";
+  return "apiError.raw";
+}
+
+function userMessageFallbackForApiError(
+  kind: ApiErrorKind,
+  message: string,
+  errorCode?: string,
+) {
+  const key = userMessageKeyForApiError(kind, message, errorCode);
+  switch (key) {
+    case "apiError.tenantJoinPending":
+      return "已提交加入申请，正在等待管理员审核";
+    case "error.tenantAlreadyMember":
+      return "你已在该企业中，可以直接切换进入";
+    case "apiError.tenantNotFound":
+      return "未找到企业，请检查企业码是否正确";
+    case "apiError.tenantJoinDisabled":
+      return "该企业不支持自主加入，请联系管理员邀请";
+    case "apiError.messageMemberForbidden":
+      return "你不在该会话中，无法发送消息";
+    case "apiError.messageConversationFrozen":
+      return "该会话已被冻结，暂时无法发送消息";
+    case "apiError.messageGroupMuted":
+      return "群已开启全员禁言，当前账号无发言权限";
+    case "apiError.messageMemberMuted":
+      return "你已被禁言，暂时无法发言";
+    case "apiError.messageUserMuted":
+      return "当前账号已被禁言，暂时无法发送消息";
+    case "error.unauthorized":
+      return "登录状态已失效，请重新登录";
+    case "error.forbidden":
+      return "当前账号没有权限执行此操作";
+    case "apiError.notFound":
+      return "目标内容不存在或已被删除";
+    case "apiError.rateLimited":
+      return "操作过于频繁，请稍后再试";
+    case "apiError.server":
+      return "服务暂时不可用，请稍后重试";
+    case "error.network":
+      return "网络连接异常，请检查网络后重试";
+    case "apiError.aborted":
+      return "操作已取消";
+    default:
+      return sanitizeApiErrorMessage(message);
+  }
 }
 
 function inferApiErrorKind(input: {
@@ -114,7 +174,11 @@ function inferApiErrorKind(input: {
   }
   if (input.status === 429 || code.includes("RATE_LIMIT")) return "rate_limited";
   if (input.status && input.status >= 500) return "server";
-  if (message.includes("network") || message.includes("网络错误") || message.includes("failed to fetch")) {
+  if (
+    message.includes("network") ||
+    message.includes("\u7f51\u7edc\u9519\u8bef") ||
+    message.includes("failed to fetch")
+  ) {
     return "network";
   }
   return "unknown";
@@ -122,7 +186,7 @@ function inferApiErrorKind(input: {
 
 function sanitizeApiErrorMessage(message: string) {
   const trimmed = message.trim();
-  if (!trimmed) return "未知错误";
+  if (!trimmed) return "Unknown error";
   return trimmed
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer ***")
     .replace(/requestId=[^\s]+/gi, "")

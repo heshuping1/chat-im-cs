@@ -27,7 +27,7 @@ export function createApiClient(session: AuthSession) {
 
 export function requireApiClient(session?: AuthSession | null) {
   if (!session) {
-    throw new Error('登录状态已失效，请重新登录');
+    throw new Error('Sign-in state expired. Sign in again.');
   }
   return createApiClient(session);
 }

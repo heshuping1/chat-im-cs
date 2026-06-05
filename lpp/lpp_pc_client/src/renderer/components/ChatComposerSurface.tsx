@@ -12,6 +12,7 @@ import {
   type ScreenshotShortcut,
 } from "./MessageComposer";
 import type { ComposerMediaKind } from "../composer/domain/detectComposerMediaKind";
+import { useI18n } from "../i18n/useI18n";
 
 export type { MessageComposerHandle };
 
@@ -71,10 +72,11 @@ export const ChatComposerSurface = forwardRef<
   showAiTools = false,
   showKnowledgeTools = false,
 }, ref) {
+  const { t } = useI18n();
   const serviceMode = toolMode === "customerService";
   const showServiceTools = serviceMode || showKnowledgeTools;
   const showServiceAiTool = serviceMode || showAiTools;
-  const quickReplyLabel = serviceMode ? "快捷话术" : "快捷话术";
+  const quickReplyLabel = t("composer.quickReply");
 
   return (
     <MessageComposer
@@ -88,7 +90,7 @@ export const ChatComposerSurface = forwardRef<
       enableScreenshot
       enterToSend={enterToSend}
       mentionOptions={mentionOptions}
-      placeholder={placeholder ?? (serviceMode ? "输入回复..." : "输入消息...")}
+      placeholder={placeholder ?? (serviceMode ? t("composer.replyPlaceholder") : t("composer.messagePlaceholder"))}
       screenshotShortcut={screenshotShortcut}
       shortcutHints={shortcutHints}
       showDefaultQuickReplyTool={!showServiceTools}
@@ -107,20 +109,26 @@ export const ChatComposerSurface = forwardRef<
                 type="button"
                 aria-label={quickReplyLabel}
                 title={quickReplyLabel}
-                onClick={onQuickReply}
+                disabled={disabled}
+                onClick={() => {
+                  if (!disabled) onQuickReply?.();
+                }}
               >
                 <MessageSquareQuote size={16} />
-                <span>话术</span>
+                <span>{t("composer.quickReplyShort")}</span>
               </button>
               <button
                 className="composer-advanced-tool"
                 type="button"
-                aria-label="知识库"
-                title="知识库"
-                onClick={onKnowledgeBase}
+                aria-label={t("knowledge.title")}
+                title={t("knowledge.title")}
+                disabled={disabled}
+                onClick={() => {
+                  if (!disabled) onKnowledgeBase?.();
+                }}
               >
                 <ClipboardList size={16} />
-                <span>知识库</span>
+                <span>{t("knowledge.title")}</span>
               </button>
             </>
           )}
@@ -128,12 +136,15 @@ export const ChatComposerSurface = forwardRef<
             <button
               className="composer-advanced-tool"
               type="button"
-              aria-label="AI 起草"
-              title="AI 起草"
-              onClick={onAiDraft}
+              aria-label={t("composer.aiDraft")}
+              title={t("composer.aiDraft")}
+              disabled={disabled}
+              onClick={() => {
+                if (!disabled) onAiDraft?.();
+              }}
             >
               <Sparkles size={16} />
-              <span>AI起草</span>
+              <span>{t("composer.aiDraftCompact")}</span>
             </button>
           )}
         </>
@@ -142,11 +153,11 @@ export const ChatComposerSurface = forwardRef<
         <button
           className="composer-advanced-tool"
           type="button"
-          aria-label="翻译"
-          title="翻译"
+          aria-label={t("composer.translate")}
+          title={t("composer.translate")}
         >
           <Languages size={16} />
-          <span>翻译</span>
+          <span>{t("composer.translate")}</span>
         </button>
       }
       onSendText={onSendText}

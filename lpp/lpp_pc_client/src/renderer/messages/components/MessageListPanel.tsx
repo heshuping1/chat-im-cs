@@ -20,6 +20,7 @@ import type { ConversationListItem, GroupMemberDto, MessageItemDto } from "../..
 import { createChatMessageViewModel } from "../../data/message/message-view-model";
 import { formatChatMessageTime, formatChatTime } from "../../lib/format";
 import type { UploadActionHandler } from "../../components/MessageBodyView";
+import { useI18n } from "../../i18n/useI18n";
 import type { HistoryFilterKey } from "../models/messageListModel";
 import { messageActionPreview } from "../models/messageListModel";
 import { chatMessageRenderKey } from "../models/messageRenderKey";
@@ -88,17 +89,17 @@ export interface MessageListPanelProps {
 
 const historyFilterTabs: Array<{
   key: HistoryFilterKey;
-  label: string;
+  labelKey: string;
   icon: typeof Clock3;
 }> = [
-  { key: "all", label: "\u5168\u90e8", icon: Clock3 },
-  { key: "text", label: "\u6587\u5b57", icon: TextCursorInput },
-  { key: "image", label: "\u56fe\u7247", icon: FileImage },
-  { key: "file", label: "\u6587\u4ef6", icon: FileText },
-  { key: "voice", label: "\u8bed\u97f3", icon: MessageSquarePlus },
-  { key: "video", label: "\u89c6\u9891", icon: PanelRight },
-  { key: "link", label: "\u94fe\u63a5", icon: Search },
-  { key: "favorite", label: "\u6536\u85cf", icon: Star },
+  { key: "all", labelKey: "messages.listPanel.filter.all", icon: Clock3 },
+  { key: "text", labelKey: "messages.listPanel.filter.text", icon: TextCursorInput },
+  { key: "image", labelKey: "messages.listPanel.filter.image", icon: FileImage },
+  { key: "file", labelKey: "messages.listPanel.filter.file", icon: FileText },
+  { key: "voice", labelKey: "messages.listPanel.filter.voice", icon: MessageSquarePlus },
+  { key: "video", labelKey: "messages.listPanel.filter.video", icon: PanelRight },
+  { key: "link", labelKey: "messages.listPanel.filter.link", icon: Search },
+  { key: "favorite", labelKey: "messages.listPanel.filter.favorite", icon: Star },
 ];
 
 export function MessageListPanel({
@@ -148,6 +149,7 @@ export function MessageListPanel({
   shouldShowInlineStatus: _shouldShowInlineStatus,
   isMineMessage,
 }: MessageListPanelProps) {
+  const { t } = useI18n();
   const [expandedOlderCount, setExpandedOlderCount] = useState(0);
   const lastWindowDiagnosticKeyRef = useRef("");
   const lookupOpen = messageSearchOpen || historyOpen;
@@ -194,7 +196,7 @@ export function MessageListPanel({
   return (
     <section
       className="e-message-stage"
-      aria-label="消息内容"
+      aria-label={t("messages.listPanel.stageAria")}
       onLoadCapture={onLoadCapture}
       onScroll={onMessageStageScroll}
       ref={messageStageRef}
@@ -211,32 +213,42 @@ export function MessageListPanel({
                 onKeyDown={(event) => {
                   if (event.key === "Escape") onCloseMessageLookup();
                 }}
-                placeholder="搜索当前聊天内容"
+                placeholder={t("messages.listPanel.searchPlaceholder")}
                 autoFocus
               />
               {messageSearchKeyword && (
-                <button type="button" aria-label="清空查找" onClick={onClearMessageSearch}>
+                <button
+                  type="button"
+                  aria-label={t("messages.listPanel.clearSearch")}
+                  onClick={onClearMessageSearch}
+                >
                   <X size={14} />
                 </button>
               )}
             </label>
-            <button type="button" aria-label="关闭查找" onClick={onCloseMessageLookup}>
-              关闭查找
+            <button
+              type="button"
+              aria-label={t("messages.listPanel.closeSearch")}
+              onClick={onCloseMessageLookup}
+            >
+              {t("messages.listPanel.closeSearch")}
             </button>
           </div>
           <div className="chat-lookup-summary">
-            <strong>聊天记录</strong>
+            <strong>{t("messages.listPanel.historyTitle")}</strong>
             <span>
               {messageSearchKeyword
-                ? `${messages.length} 条匹配`
-                : `已加载 ${loadedMessages.length} 条消息`}
-              {loadedMessages[0]?.sentAt ? ` · 最早 ${formatChatTime(loadedMessages[0].sentAt)}` : ""}
+                ? t("messages.listPanel.matchCount", { count: messages.length })
+                : t("messages.listPanel.loadedCount", { count: loadedMessages.length })}
+              {loadedMessages[0]?.sentAt
+                ? ` · ${t("messages.listPanel.earliest", { time: formatChatTime(loadedMessages[0].sentAt) })}`
+                : ""}
               {loadedMessages[loadedMessages.length - 1]?.sentAt
-                ? ` · 最新 ${formatChatTime(loadedMessages[loadedMessages.length - 1].sentAt)}`
+                ? ` · ${t("messages.listPanel.latest", { time: formatChatTime(loadedMessages[loadedMessages.length - 1].sentAt) })}`
                 : ""}
             </span>
           </div>
-          <div className="chat-history-tags" aria-label="Chat history filters">
+          <div className="chat-history-tags" aria-label={t("messages.listPanel.filtersAria")}>
             {historyFilterTabs.map((tab) => {
               const Icon = tab.icon;
               const count = historyCounts[tab.key] ?? 0;
@@ -249,14 +261,14 @@ export function MessageListPanel({
                   disabled={tab.key !== "all" && count === 0}
                 >
                   <Icon size={14} />
-                  {tab.label}
+                  {t(tab.labelKey)}
                   <em>{count}</em>
                 </button>
               );
             })}
           </div>
           {(historyFilter !== "all" || messageSearchKeyword.trim()) && (
-            <div className="chat-history-results" aria-label="Chat history results">
+            <div className="chat-history-results" aria-label={t("messages.listPanel.resultsAria")}>
               {messages.slice(0, 8).map((message) => (
                 <button
                   type="button"
@@ -267,7 +279,7 @@ export function MessageListPanel({
                   <strong>{messageActionPreview(message)}</strong>
                 </button>
               ))}
-              {messages.length === 0 && <PanelState text="没有匹配的聊天记录" />}
+              {messages.length === 0 && <PanelState text={t("messages.listPanel.noMatches")} />}
             </div>
           )}
         </div>
@@ -276,16 +288,16 @@ export function MessageListPanel({
       {unreadJump?.conversationId === conversation.conversationId && (
         <button className="pc-chat-unread-jump" type="button" onClick={onUnreadJump}>
           <ChevronsUp size={15} aria-hidden="true" />
-          ↑ {unreadJump.count} 条新消息
+          {t("messages.listPanel.newMessages", { count: unreadJump.count })}
         </button>
       )}
       {pendingNewMessageCount > 0 && (
         <button className="pc-chat-latest-jump" type="button" onClick={onJumpToLatest}>
-          ↓ {pendingNewMessageCount} 条新消息
+          {t("messages.listPanel.newMessages", { count: pendingNewMessageCount })}
         </button>
       )}
-      <div className="e-day-divider">今天</div>
-      {loading && <PanelState text="正在加载聊天记录..." />}
+      <div className="e-day-divider">{t("messages.listPanel.today")}</div>
+      {loading && <PanelState text={t("messages.listPanel.loading")} />}
       {!loading && messageRenderWindow.hiddenBeforeCount > 0 && (
         <button
           className="pc-chat-load-earlier"
@@ -294,7 +306,9 @@ export function MessageListPanel({
             setExpandedOlderCount((current) => current + messageRenderWindowExpandStep)
           }
         >
-          查看更早 {messageRenderWindow.hiddenBeforeCount} 条消息
+          {t("messages.listPanel.loadEarlier", {
+            count: messageRenderWindow.hiddenBeforeCount,
+          })}
         </button>
       )}
       {!loading &&
@@ -330,7 +344,9 @@ export function MessageListPanel({
                 <button
                   className="pc-chat-select-check"
                   type="button"
-                  aria-label={`选择消息 ${messageActionPreview(message)}`}
+                  aria-label={t("messages.listPanel.selectMessage", {
+                    preview: messageActionPreview(message),
+                  })}
                   aria-pressed={selectedMessageIds.has(message.messageId)}
                   onClick={() => onSelectMessageToggle(message.messageId)}
                 >

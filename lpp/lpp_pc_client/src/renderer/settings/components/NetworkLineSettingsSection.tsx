@@ -1,18 +1,19 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { Check, Globe2, RefreshCw, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import type { AuthSession } from "../../data/auth/auth-session";
 import { useSetAuthSession } from "../../data/auth/auth-store";
 import {
   type AppSiteLine,
-  latencyText,
   latencyTone,
   measureSiteLatency,
   siteLineManager,
 } from "../../data/network/site-line-manager";
-import { settingRowProps } from "../models/settingsCatalog";
+import { useI18n } from "../../i18n/useI18n";
 
 type LatencyValue = number | null | undefined;
+type Translate = ReturnType<typeof useI18n>["t"];
 
 export function NetworkLineSettingsSection({
   authSession,
@@ -23,6 +24,7 @@ export function NetworkLineSettingsSection({
   queryClient: QueryClient;
   setNotice: (notice: string) => void;
 }) {
+  const { t } = useI18n();
   const setAuthSession = useSetAuthSession();
   const [lineState, setLineState] = useState(siteLineManager.getSnapshot());
   const [latencies, setLatencies] = useState<Record<string, LatencyValue>>({});
@@ -46,16 +48,20 @@ export function NetworkLineSettingsSection({
   const handleSelect = (site: AppSiteLine) => {
     const selected = siteLineManager.selectSite(site);
     applySiteToSession(selected);
-    setNotice(`已切换到 ${selected.name}`);
+    setNotice(t("me.networkLine.switched", { name: selected.name }));
   };
 
   const handleRefresh = async () => {
     try {
       const result = await siteLineManager.refresh();
       applySiteToSession(result.currentSite);
-      setNotice(result.refreshedConfig ? "线路配置已刷新" : "已检查本地线路配置");
+      setNotice(
+        result.refreshedConfig
+          ? t("me.networkLine.configRefreshed")
+          : t("me.networkLine.localChecked"),
+      );
     } catch {
-      setNotice("刷新线路配置失败，请稍后重试");
+      setNotice(t("me.networkLine.refreshFailed"));
     }
   };
 
@@ -75,41 +81,39 @@ export function NetworkLineSettingsSection({
 
   const testAll = async () => {
     await Promise.all(lineState.switchableSites.map((site) => testOne(site)));
-    setNotice("线路测速已完成");
+    setNotice(t("me.networkLine.testCompleted"));
   };
 
   return (
-    <section className="settings-network-lines" aria-label="网络线路">
+    <section className="settings-network-lines" aria-label={t("me.networkLine.aria")}>
       <div className="settings-network-current">
         <span className="settings-network-current-icon">
           <Globe2 size={20} />
         </span>
         <div>
-          <span className="settings-network-kicker">当前站点</span>
+          <span className="settings-network-kicker">{t("me.networkLine.currentSite")}</span>
           <strong>{lineState.currentSite.name}</strong>
           <em>{lineState.currentSite.apiBaseUrl}</em>
         </div>
         <span className="settings-network-status">
           <i />
-          可用
+          {t("me.networkLine.available")}
         </span>
       </div>
 
       <div className="settings-network-toolbar">
         <div>
-          <strong>可切换站点</strong>
-          <span>
-            {lineState.switchableSites.length} 条线路，S3 仅作为兜底配置源，不显示在线路列表。
-          </span>
+          <strong>{t("me.networkLine.switchableSites")}</strong>
+          <span>{t("me.networkLine.switchableSummary", { count: lineState.switchableSites.length })}</span>
         </div>
         <div className="settings-network-actions">
           <button type="button" onClick={() => void handleRefresh()} disabled={lineState.isRefreshing}>
             <RefreshCw size={14} />
-            {lineState.isRefreshing ? "刷新中" : "刷新站点"}
+            {lineState.isRefreshing ? t("me.networkLine.refreshing") : t("me.networkLine.refresh")}
           </button>
           <button type="button" onClick={() => void testAll()} disabled={testingIds.size > 0}>
             <Wifi size={14} />
-            {testingIds.size > 0 ? "测速中" : "全部测速"}
+            {testingIds.size > 0 ? t("me.networkLine.testing") : t("me.networkLine.testAll")}
           </button>
         </div>
       </div>
@@ -132,12 +136,12 @@ export function NetworkLineSettingsSection({
                 </span>
               </button>
               <span className={`settings-network-latency ${latencyTone(latency)}`}>
-                {latencyText(latency, testing)}
+                {latencyDisplayText(latency, testing, t)}
               </span>
               <button
                 className="settings-network-test"
                 type="button"
-                aria-label={`测试 ${site.name}`}
+                aria-label={t("me.networkLine.testNamed", { name: site.name })}
                 onClick={(event) => {
                   event.stopPropagation();
                   void testOne(site);
@@ -156,9 +160,18 @@ export function NetworkLineSettingsSection({
       </div>
 
       <p className="settings-network-note">
-        {settingRowProps("activeLine").label} 会真实切换 PC 当前 API 与实时连接基址；
-        {settingRowProps("lineLatencyTest").label} 沿用 APP 根地址探测规则，不携带 token、Authorization 或 Cookie。
+        {t("me.networkLine.note", {
+          activeLine: t("me.networkLine.activeLine"),
+          latencyTest: t("me.networkLine.latencyTest"),
+        })}
       </p>
     </section>
   );
+}
+
+function latencyDisplayText(value: LatencyValue, testing: boolean, t: Translate) {
+  if (testing) return t("me.networkLine.latency.testing");
+  if (value === undefined) return t("me.networkLine.latency.untested");
+  if (value === null) return t("me.networkLine.latency.unavailable");
+  return t("me.networkLine.latency.ms", { value });
 }

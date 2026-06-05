@@ -69,11 +69,11 @@ export function useMessageTextSendController({
   const retryTextMessage = useCallback(
     (message: MessageItemDto) => {
       if (!session || !activeConversation || !activeConversationType) {
-        throw new Error("请选择一个普通 IM 会话");
+        throw new Error("Select a regular IM conversation.");
       }
       const retryAction = failedMessageRetryAction(message);
       if (!retryAction || (retryAction.type !== "text" && retryAction.type !== "contact_card")) {
-        throw new Error("该消息暂时无法重发");
+        throw new Error("This message cannot be resent right now.");
       }
       const conversation = activeConversation;
       const conversationType = activeConversationType;
@@ -241,7 +241,7 @@ export function useMessageTextSendController({
   const sendTextOptimistically = useCallback(
     (content: string) => {
       if (!session || !activeConversation || !activeConversationType) {
-        throw new Error("请选择一个普通 IM 会话");
+        throw new Error("Select a regular IM conversation.");
       }
       const conversation = activeConversation;
       const conversationType = activeConversationType;
@@ -483,10 +483,10 @@ export function useMessageTextSendController({
   const sendContactCardOptimistically = useCallback(
     (card: NormalizedContactCard) => {
       if (!session || !activeConversation || !activeConversationType) {
-        throw new Error("请选择一个普通 IM 会话");
+        throw new Error("Select a regular IM conversation.");
       }
       if (!card.userId) {
-        throw new Error("这张名片缺少用户 ID，暂时无法发送");
+        throw new Error("This contact card is missing a user ID and cannot be sent right now.");
       }
       const conversation = activeConversation;
       const conversationType = activeConversationType;

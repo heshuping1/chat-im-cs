@@ -934,6 +934,7 @@ export const en: MessageDictionary = {
       conversationListNoMatch: 'No matching conversations',
       directConversationFallback: 'Direct IM conversation',
       dragSort: 'Drag to reorder',
+      groupAllMutedReadOnly: 'All members are muted. Only the owner, admins, and customer service can send.',
       insertedToComposer: 'Inserted into the input box. Confirm to send.',
       knowledgeBase: 'Knowledge base',
       knowledgeEmpty: 'This knowledge item has no insertable text.',
@@ -1046,6 +1047,16 @@ export const en: MessageDictionary = {
       updateAnnouncement: 'Group announcement updated.',
       updateGroupTitle: 'Group name updated.',
       updateSettings: 'Group settings updated.',
+    },
+    conversationActions: {
+      deleted: 'Conversation deleted.',
+      failed: 'Conversation action failed: {error}',
+      hidden: 'Conversation hidden.',
+      muted: 'Do not disturb enabled.',
+      pinned: 'Conversation pinned.',
+      restored: 'Conversation restored.',
+      unmuted: 'Do not disturb disabled.',
+      unpinned: 'Conversation unpinned.',
     },
     conversationInfo: conversationInfoFallback,
     chatHeader: {
@@ -2335,7 +2346,7 @@ export const en: MessageDictionary = {
   apiError: {
     aborted: 'Operation canceled',
     messageConversationFrozen: 'This conversation is frozen and cannot send messages for now',
-    messageGroupMuted: 'This group chat is muted for all members and cannot send messages for now',
+    messageGroupMuted: 'This group is muted for all members. The current account has no permission to send.',
     messageMemberForbidden: 'You are not in this conversation and cannot send messages',
     messageMemberMuted: 'You are muted and cannot speak for now',
     messageUserMuted: 'The current account is muted and cannot send messages for now',

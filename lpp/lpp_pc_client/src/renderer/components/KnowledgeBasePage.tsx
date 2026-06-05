@@ -23,6 +23,7 @@ import {
 } from "../data/api/knowledge-normalizers";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
+import { useI18n } from "../i18n/useI18n";
 import { formatError, formatShortDate } from "../lib/format";
 
 type KnowledgeSelection =
@@ -31,6 +32,7 @@ type KnowledgeSelection =
   | null;
 
 export function KnowledgeBasePage() {
+  const { t } = useI18n();
   const session = useAuthSession();
   const client = useMemo(
     () => (session ? createApiClient(session) : null),
@@ -100,8 +102,8 @@ export function KnowledgeBasePage() {
       <section className="knowledge-left">
         <header className="knowledge-title">
           <span className="eyebrow">KNOWLEDGE</span>
-          <h1>知识库</h1>
-          <p>客服查规则、找流程、引用标准答案的统一入口。</p>
+          <h1>{t("knowledge.title")}</h1>
+          <p>{t("knowledge.description")}</p>
         </header>
 
         <form
@@ -115,24 +117,27 @@ export function KnowledgeBasePage() {
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索客户问题、业务规则、处理流程"
+            placeholder={t("knowledge.searchPlaceholder")}
           />
-          <button type="submit">检索</button>
+          <button type="submit">{t("knowledge.search")}</button>
         </form>
 
         <section className="knowledge-base-panel">
           <div className="knowledge-section-head">
-            <strong>知识库</strong>
+            <strong>{t("knowledge.baseListTitle")}</strong>
             <span>{bases.length}</span>
           </div>
           {basesQuery.isLoading ? (
-            <KnowledgeState text="正在读取知识库..." />
+            <KnowledgeState text={t("knowledge.loadingBases")} />
           ) : basesQuery.error ? (
-            <KnowledgeState error text={`知识库加载失败：${formatError(basesQuery.error)}`} />
+            <KnowledgeState
+              error
+              text={t("knowledge.baseLoadFailed", { error: formatError(basesQuery.error) })}
+            />
           ) : bases.length === 0 ? (
-            <KnowledgeState text="暂无可用知识库" />
+            <KnowledgeState text={t("knowledge.noBases")} />
           ) : (
-            <div className="knowledge-base-list" aria-label="知识库列表">
+            <div className="knowledge-base-list" aria-label={t("knowledge.baseListAria")}>
               {bases.map((base) => {
                 const active = effectiveBaseId === base.knowledgeBaseId;
                 return (
@@ -148,8 +153,8 @@ export function KnowledgeBasePage() {
                     <span>
                       <LibraryBig size={16} />
                     </span>
-                    <strong>{baseTitle(base)}</strong>
-                    <em>{base.description || base.summary || "已启用"}</em>
+                    <strong>{baseTitle(base, t("knowledge.untitledBase"))}</strong>
+                    <em>{base.description || base.summary || t("knowledge.enabled")}</em>
                     <ChevronRight size={14} />
                   </button>
                 );
@@ -162,19 +167,19 @@ export function KnowledgeBasePage() {
       <section className="knowledge-center">
         <header className="knowledge-center-head">
           <div>
-            <h2>{trimmedKeyword ? "检索结果" : "知识文档"}</h2>
+            <h2>{trimmedKeyword ? t("knowledge.searchResults") : t("knowledge.documents")}</h2>
             <p>
               {trimmedKeyword
-                ? `关键词：${trimmedKeyword}`
+                ? t("knowledge.keyword", { keyword: trimmedKeyword })
                 : selectedBase
-                  ? baseTitle(selectedBase)
-                  : "选择知识库后查看文档"}
+                  ? baseTitle(selectedBase, t("knowledge.untitledBase"))
+                  : t("knowledge.selectBaseHint")}
             </p>
           </div>
           <span>
             {trimmedKeyword
-              ? `${searchResults.length} 条`
-              : `${documents.length} 篇`}
+              ? t("knowledge.resultCount", { count: searchResults.length })
+              : t("knowledge.documentCount", { count: documents.length })}
           </span>
         </header>
 
@@ -215,11 +220,12 @@ function SearchResultList({
   selection: KnowledgeSelection;
   onSelect: (item: KnowledgeSearchResultDto) => void;
 }) {
-  if (loading) return <KnowledgeState text="正在检索知识库..." />;
-  if (error) return <KnowledgeState error text={`检索失败：${formatError(error)}`} />;
-  if (results.length === 0) return <KnowledgeState text="暂无匹配结果" />;
+  const { t } = useI18n();
+  if (loading) return <KnowledgeState text={t("knowledge.searching")} />;
+  if (error) return <KnowledgeState error text={t("knowledge.searchFailed", { error: formatError(error) })} />;
+  if (results.length === 0) return <KnowledgeState text={t("knowledge.noSearchResults")} />;
   return (
-    <div className="knowledge-result-list" aria-label="知识库检索结果">
+    <div className="knowledge-result-list" aria-label={t("knowledge.searchResultListAria")}>
       {results.map((item, index) => {
         const active =
           selection?.type === "search" &&
@@ -236,11 +242,11 @@ function SearchResultList({
               <FileSearch size={16} />
             </span>
             <div>
-              <strong>{searchTitle(item)}</strong>
+              <strong>{searchTitle(item, t("knowledge.untitledResult"))}</strong>
               <p>{item.snippet || item.summary || item.contentPreview || "--"}</p>
               <em>
-                {item.knowledgeBaseName || "知识库"}
-                {item.score != null && ` · 匹配度 ${Math.round(item.score * 100)}%`}
+                {item.knowledgeBaseName || t("knowledge.untitledBase")}
+                {item.score != null && ` · ${t("knowledge.matchScore", { score: Math.round(item.score * 100) })}`}
               </em>
             </div>
           </button>
@@ -263,11 +269,12 @@ function DocumentList({
   selection: KnowledgeSelection;
   onSelect: (item: KnowledgeDocumentDto) => void;
 }) {
-  if (loading) return <KnowledgeState text="正在读取文档..." />;
-  if (error) return <KnowledgeState error text={`文档加载失败：${formatError(error)}`} />;
-  if (documents.length === 0) return <KnowledgeState text="当前知识库暂无启用文档" />;
+  const { t } = useI18n();
+  if (loading) return <KnowledgeState text={t("knowledge.loadingDocuments")} />;
+  if (error) return <KnowledgeState error text={t("knowledge.documentLoadFailed", { error: formatError(error) })} />;
+  if (documents.length === 0) return <KnowledgeState text={t("knowledge.noDocuments")} />;
   return (
-    <div className="knowledge-result-list" aria-label="知识库文档列表">
+    <div className="knowledge-result-list" aria-label={t("knowledge.documentListAria")}>
       {documents.map((item) => {
         const documentId = item.documentId || item.id || item.title || item.name || "";
         const active =
@@ -284,9 +291,9 @@ function DocumentList({
               <FileText size={16} />
             </span>
             <div>
-              <strong>{documentTitle(item)}</strong>
-              <p>{item.summary || item.contentPreview || "暂无摘要"}</p>
-              <em>{shortDate(item.updatedAt) || "未提供更新时间"}</em>
+              <strong>{documentTitle(item, t("knowledge.untitledDocument"))}</strong>
+              <p>{item.summary || item.contentPreview || t("knowledge.noSummary")}</p>
+              <em>{shortDate(item.updatedAt) || t("knowledge.noUpdatedAt")}</em>
             </div>
           </button>
         );
@@ -302,6 +309,7 @@ function KnowledgePreview({
   selection: KnowledgeSelection;
   selectedBase?: KnowledgeBaseDto;
 }) {
+  const { t } = useI18n();
   if (!selection) {
     return (
       <aside className="knowledge-preview">
@@ -312,8 +320,8 @@ function KnowledgePreview({
   const isSearch = selection.type === "search";
   const item = selection.item;
   const title = isSearch
-    ? searchTitle(item as KnowledgeSearchResultDto)
-    : documentTitle(item as KnowledgeDocumentDto);
+    ? searchTitle(item as KnowledgeSearchResultDto, t("knowledge.untitledResult"))
+    : documentTitle(item as KnowledgeDocumentDto, t("knowledge.untitledDocument"));
   const summary = isSearch
     ? searchSnippet(item as KnowledgeSearchResultDto)
     : documentSummary(item as KnowledgeDocumentDto);
@@ -328,10 +336,10 @@ function KnowledgePreview({
           <strong>{title}</strong>
           <p>
             {isSearch
-              ? (item as KnowledgeSearchResultDto).knowledgeBaseName || "检索命中"
+              ? (item as KnowledgeSearchResultDto).knowledgeBaseName || t("knowledge.searchHit")
               : selectedBase
-                ? baseTitle(selectedBase)
-                : "知识文档"}
+                ? baseTitle(selectedBase, t("knowledge.untitledBase"))
+                : t("knowledge.document")}
           </p>
         </div>
       </header>
@@ -342,12 +350,12 @@ function KnowledgePreview({
           </div>
         )}
         <h2>{title}</h2>
-        <p>{summary || "暂无内容预览"}</p>
+        <p>{summary || t("knowledge.noPreview")}</p>
       </section>
       <footer>
-        <span>{isSearch ? "检索片段" : "文档预览"}</span>
-        <button type="button" disabled title="完整详情接口未提供">
-          打开全文
+        <span>{isSearch ? t("knowledge.searchChunk") : t("knowledge.documentPreview")}</span>
+        <button type="button" disabled title={t("knowledge.fullDetailUnavailable")}>
+          {t("knowledge.openFullText")}
         </button>
       </footer>
     </aside>
@@ -355,13 +363,14 @@ function KnowledgePreview({
 }
 
 function KnowledgePreviewEmpty() {
+  const { t } = useI18n();
   return (
     <div className="knowledge-preview-empty">
       <span>
         <DatabaseZap size={26} />
       </span>
-      <h2>选择一条知识内容</h2>
-      <p>左侧选择知识库，中间点击文档或检索结果后，这里会展示摘要、命中片段和来源。</p>
+      <h2>{t("knowledge.previewEmptyTitle")}</h2>
+      <p>{t("knowledge.previewEmptyText")}</p>
     </div>
   );
 }
@@ -375,12 +384,12 @@ function KnowledgeState({ text, error = false }: { text: string; error?: boolean
   );
 }
 
-function baseTitle(base: KnowledgeBaseDto) {
-  return base.name || base.title || "知识库";
+function baseTitle(base: KnowledgeBaseDto, fallback: string) {
+  return base.name || base.title || fallback;
 }
 
-function documentTitle(document: KnowledgeDocumentDto) {
-  return document.title || document.name || "知识文档";
+function documentTitle(document: KnowledgeDocumentDto, fallback: string) {
+  return document.title || document.name || fallback;
 }
 
 function documentIdOf(document: KnowledgeDocumentDto) {
@@ -391,8 +400,8 @@ function documentSummary(document: KnowledgeDocumentDto) {
   return document.summary || document.contentPreview || "";
 }
 
-function searchTitle(item: KnowledgeSearchResultDto) {
-  return item.documentTitle || item.title || "知识结果";
+function searchTitle(item: KnowledgeSearchResultDto, fallback: string) {
+  return item.documentTitle || item.title || fallback;
 }
 
 function searchSnippet(item: KnowledgeSearchResultDto) {

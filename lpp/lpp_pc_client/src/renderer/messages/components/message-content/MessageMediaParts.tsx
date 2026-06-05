@@ -49,6 +49,7 @@ import {
 } from "../../runtime/messageMediaDesktopActions";
 import type { MessageMediaCacheContext } from "./FileMessageContent";
 import { formatError } from "../../../lib/format";
+import { useI18n } from "../../../i18n/useI18n";
 
 export function ImagePart({
   authToken,
@@ -61,6 +62,7 @@ export function ImagePart({
   uploadState?: LocalUploadState;
   onUploadAction?: UploadActionHandler;
 }) {
+  const { t } = useI18n();
   const media = item?.media;
   const src = item?.sourceUrl;
   const imageActionSrc =
@@ -181,7 +183,7 @@ export function ImagePart({
   return (
     <div className="message-media">
       <ImageMessageFrame
-        altText={fileName || "图片消息"}
+        altText={fileName || t("messages.mediaContent.imageMessage")}
         actionBusy={imageActionBusy}
         actionNotice={imageActionNotice}
         fileName={fileName}
@@ -192,7 +194,7 @@ export function ImagePart({
             ? () =>
                 runImageAction(
                   () => copyCurrentMessageImage(imageActionPayload),
-                  "图片已复制",
+                  t("messages.mediaContent.imageCopied"),
                 )
             : undefined
         }
@@ -216,7 +218,7 @@ export function ImagePart({
             ? () =>
                 runImageAction(
                   () => revealCurrentMessageImageInFolder(imageActionPayload),
-                  "已打开文件位置",
+                  t("messages.mediaContent.revealedInFolder"),
                 )
             : undefined
         }
@@ -225,7 +227,7 @@ export function ImagePart({
             ? () =>
                 runImageAction(
                   () => saveCurrentMessageImageAs(imageActionPayload),
-                  "已另存图片",
+                  t("messages.mediaContent.imageSaved"),
                 )
             : undefined
         }
@@ -250,6 +252,7 @@ export function VoicePart({
   authToken?: string;
   media?: MediaResourceDto;
 }) {
+  const { t } = useI18n();
   const src = resolveMediaUrl(
     media,
     assetBaseUrl,
@@ -269,19 +272,19 @@ export function VoicePart({
     <div className="message-audio-card">
       <Mic size={20} />
       <div>
-        <strong>语音消息</strong>
-        <em>{formatDuration(media?.durationSeconds)}</em>
+        <strong>{t("messages.mediaContent.voiceMessage")}</strong>
+        <em>{formatDuration(media?.durationSeconds, t)}</em>
       </div>
       {displaySrc && !failed ? (
         <audio
-          aria-label="语音消息播放器"
+          aria-label={t("messages.mediaContent.voicePlayer")}
           controls
           preload="metadata"
           src={displaySrc}
           onError={loadAuthenticatedMedia}
         />
       ) : (
-        <span className="message-media-unavailable">暂无音频地址</span>
+        <span className="message-media-unavailable">{t("messages.mediaContent.noAudio")}</span>
       )}
     </div>
   );
@@ -300,6 +303,7 @@ export function VideoPart({
   uploadState?: LocalUploadState;
   onUploadAction?: UploadActionHandler;
 }) {
+  const { t } = useI18n();
   const media = item?.media;
   const remoteSrc = item?.remoteSourceUrl;
   const src = item?.sourceUrl;
@@ -421,7 +425,7 @@ export function VideoPart({
     <div className="message-video-card wechat-video-card" style={videoCardStyle}>
       <VideoMessagePreview
         aspectRatio={videoAspectRatio}
-        durationText={formatVideoDuration(duration)}
+        durationText={formatVideoDuration(duration, t)}
         failed={failed}
         frameReady={frameReady}
         hasStarted={hasStarted}
@@ -540,15 +544,15 @@ function logVideoOpenDiagnostic(
   });
 }
 
-function formatDuration(value?: number | null) {
-  if (!value || value <= 0) return "未知时长";
+function formatDuration(value: number | null | undefined, t: ReturnType<typeof useI18n>["t"]) {
+  if (!value || value <= 0) return t("messages.mediaContent.unknownDuration");
   const seconds = Math.round(value);
-  if (seconds < 60) return `${seconds} 秒`;
+  if (seconds < 60) return t("messages.mediaContent.durationSeconds", { seconds });
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function formatVideoDuration(value?: number | null) {
-  if (!value || value <= 0) return "未知时长";
+function formatVideoDuration(value: number | null | undefined, t: ReturnType<typeof useI18n>["t"]) {
+  if (!value || value <= 0) return t("messages.mediaContent.unknownDuration");
   const seconds = Math.round(value);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

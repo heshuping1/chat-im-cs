@@ -5,10 +5,9 @@ import { useAuthSession } from "../../data/auth/auth-store";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import { useSetActiveImConversation } from "../../data/workspace-ui/workspace-ui-store";
-import {
-  contactCardActionErrorText,
-  resolveUserRelation,
-} from "../../messages/models/contactCardModel";
+import { useI18n } from "../../i18n/useI18n";
+import { resolveUserRelation } from "../../messages/models/contactCardModel";
+import { contactCardActionErrorText } from "../../messages/presentation/contactCardActionNotice";
 import { pendingIncomingFriendRequests } from "../models/friendRequestReminderModel";
 
 export function useContactAddFriendController({
@@ -19,6 +18,7 @@ export function useContactAddFriendController({
   setNotice: (notice: string | null) => void;
 }) {
   const session = useAuthSession();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const setActiveConversation = useSetActiveImConversation();
   const [localOutgoingUserIds, setLocalOutgoingUserIds] = useState<string[]>([]);
@@ -45,7 +45,7 @@ export function useContactAddFriendController({
   const searchUsersMutation = useMutation({
     mutationFn: async (searchKeyword: string) =>
       requireApiClient(session).searchUsers(searchKeyword),
-    onError: (error) => setNotice(contactCardActionErrorText(error, "搜索用户失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.searchFailed", t)),
   });
 
   const createDirectChatMutation = useMutation({
@@ -54,13 +54,13 @@ export function useContactAddFriendController({
     onSuccess: (chat) => {
       const conversationId = createdConversationId(chat);
       if (!conversationId) {
-        setNotice("打开会话失败：服务端未返回会话 ID");
+        setNotice(t("contacts.notice.openConversationMissingId"));
         return;
       }
       setActiveConversation(conversationId);
       onDirectChatCreated?.(conversationId);
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "打开会话失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.openConversationFailed", t)),
   });
 
   const sendFriendRequestMutation = useMutation({
@@ -80,10 +80,10 @@ export function useContactAddFriendController({
           ? current
           : [...current, variables.userId],
       );
-      setNotice("好友申请已发送");
+      setNotice(t("contacts.notice.friendRequestSent"));
       await refreshContactRelations(queryClient, session);
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "发送好友申请失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.sendFriendRequestFailed", t)),
     onSettled: () => {
       setPendingFriendRequestUserId("");
     },
@@ -98,22 +98,26 @@ export function useContactAddFriendController({
       action: "accept" | "reject";
     }) => requireApiClient(session).handleFriendRequest(requestId, action),
     onSuccess: async (_result, variables) => {
-      setNotice(variables.action === "accept" ? "已通过好友申请" : "已拒绝好友申请");
+      setNotice(
+        variables.action === "accept"
+          ? t("contacts.notice.friendRequestAccepted")
+          : t("contacts.notice.friendRequestRejected"),
+      );
       await queryClient.invalidateQueries({ queryKey: ["pc-friend-requests"] });
       await queryClient.invalidateQueries({ queryKey: ["pc-friends"] });
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "处理好友申请失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.handleFriendRequestFailed", t)),
   });
 
   const createInviteQrMutation = useMutation({
     mutationFn: async () => requireApiClient(session).createFriendInviteQr(),
     onSuccess: async () => {
-      setNotice("好友二维码已生成");
+      setNotice(t("contacts.notice.friendQrCreated"));
       await queryClient.invalidateQueries({
         queryKey: pcQueryKeys.accountInviteQrs(session?.apiBaseUrl, session?.tenantToken),
       });
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "生成二维码失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.createFriendQrFailed", t)),
   });
 
   const pendingIncomingRequestCount = useMemo(
@@ -140,7 +144,7 @@ export function useContactAddFriendController({
     const trimmedKeyword = searchKeyword.trim();
     if (!trimmedKeyword) {
       searchUsersMutation.reset();
-      setNotice("请输入绿泡泡号、手机号或邮箱。");
+      setNotice(t("contacts.notice.enterSearchKeyword"));
       return;
     }
     searchUsersMutation.mutate(trimmedKeyword);
@@ -148,7 +152,7 @@ export function useContactAddFriendController({
 
   const sendFriendRequest = (userId: string, message: string) => {
     if (!userId) {
-      setNotice("当前联系人缺少用户 ID，无法发送好友申请。");
+      setNotice(t("contacts.notice.missingUserIdForFriendRequest"));
       return;
     }
     sendFriendRequestMutation.mutate({ userId, message });

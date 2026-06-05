@@ -5,6 +5,7 @@ import {
   useRealtimeReminders,
 } from "../data/reminder/reminder-store";
 import type { ModuleKey } from "../data/types";
+import { useI18n } from "../i18n/useI18n";
 import {
   useSetActiveImConversation,
   useSetContactFilter,
@@ -29,6 +30,7 @@ interface ReminderItem {
 }
 
 export function ReminderCenter() {
+  const { t } = useI18n();
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const setActiveModule = useSetActiveModule();
   const openCustomerServiceThread = useOpenCustomerServiceThread();
@@ -44,12 +46,12 @@ export function ReminderCenter() {
         ...item,
         actionLabel:
           item.targetModule === "messages"
-            ? "查看消息"
+            ? t("reminder.action.viewMessage")
             : item.targetModule === "contacts"
-              ? "处理申请"
+              ? t("reminder.action.handleRequest")
               : item.targetModule === "enterpriseSwitch"
-                ? "进入企业"
-                : "查看会话",
+                ? t("reminder.action.enterEnterprise")
+                : t("reminder.action.viewConversation"),
         severity: item.severity ?? "info",
         icon:
           item.icon ??
@@ -63,7 +65,7 @@ export function ReminderCenter() {
       })),
       ...buildReminders(),
     ] satisfies ReminderItem[],
-    [realtimeReminders],
+    [realtimeReminders, t],
   );
   const visibleReminders = reminders.filter((item) => !dismissed.has(item.id));
 
@@ -88,7 +90,7 @@ export function ReminderCenter() {
   };
 
   return (
-    <aside className="reminder-stack" role="region" aria-label="提醒中心">
+    <aside className="reminder-stack" role="region" aria-label={t("reminder.center")}>
       {visibleReminders.slice(0, 3).map((item) => {
         const Icon =
           item.icon === "im"
@@ -122,7 +124,7 @@ export function ReminderCenter() {
               <button
                 type="button"
                 onClick={() => openReminder(item)}
-                aria-label={`查看 ${item.title}`}
+                aria-label={t("reminder.viewNamed", { title: item.title })}
               >
                 {item.actionLabel}
               </button>
@@ -130,7 +132,7 @@ export function ReminderCenter() {
             <button
               className="reminder-close"
               type="button"
-              aria-label={`关闭 ${item.title}`}
+              aria-label={t("reminder.closeNamed", { title: item.title })}
               onClick={() => {
                 dismissRealtimeReminder(item.id);
                 setDismissed((current) => new Set(current).add(item.id));

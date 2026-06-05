@@ -6,16 +6,19 @@ import {
 } from "../../components/ChatComposerSurface";
 import type { ScreenshotShortcut } from "../../components/MessageComposer";
 import type { ComposerMediaKind } from "../../composer/domain/detectComposerMediaKind";
+import { useI18n } from "../../i18n/useI18n";
 
 export const MessageComposerSurface = forwardRef<
   MessageComposerHandle,
   {
     attachmentScopeKey: string;
+    disabled?: boolean;
     draftEditorState?: string;
     draftValue?: string;
     dragUpload: boolean;
     enterToSend: boolean;
     mentionOptions: Array<{ id: string; label: string }>;
+    placeholder?: string;
     screenshotShortcut: ScreenshotShortcut;
     shortcutHints: boolean;
     onAiDraft: () => void;
@@ -34,11 +37,13 @@ export const MessageComposerSurface = forwardRef<
   }
 >(function MessageComposerSurface({
   attachmentScopeKey,
+  disabled = false,
   draftEditorState,
   draftValue,
   dragUpload,
   enterToSend,
   mentionOptions,
+  placeholder,
   screenshotShortcut,
   shortcutHints,
   onAiDraft,
@@ -55,6 +60,8 @@ export const MessageComposerSurface = forwardRef<
   showAiTools,
   showKnowledgeTools,
 }, ref) {
+  const { t } = useI18n();
+
   return (
     <ChatComposerSurface
       ref={ref}
@@ -63,8 +70,8 @@ export const MessageComposerSurface = forwardRef<
       enterToSend={enterToSend}
       screenshotShortcut={screenshotShortcut}
       shortcutHints={shortcutHints}
-      placeholder="输入消息..."
-      disabled={false}
+      placeholder={placeholder ?? t("composer.messagePlaceholder")}
+      disabled={disabled}
       draftValue={draftValue}
       draftEditorState={draftEditorState}
       mentionOptions={mentionOptions}

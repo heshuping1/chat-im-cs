@@ -2,15 +2,19 @@ import { Activity } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   getRecentMessageTraceSamples,
-  messageTraceStageLabel,
   summarizeRecentMessageTraceGroups,
   type MessageTraceGroupSummary,
   type MessageTraceSample,
+  type MessageTraceStage,
 } from "../../data/diagnostics/message-trace-diagnostics";
+import { useI18n } from "../../i18n/useI18n";
 import { InfoRow } from "./SettingsRows";
 import { settingRowProps } from "../models/settingsCatalog";
 
+type Translate = ReturnType<typeof useI18n>["t"];
+
 export function RuntimeStatusSettingsSection() {
+  const { locale, t } = useI18n();
   const [samples, setSamples] = useState<MessageTraceSample[]>(() =>
     getRecentMessageTraceSamples(500),
   );
@@ -26,98 +30,113 @@ export function RuntimeStatusSettingsSection() {
   const newest = groups[0];
 
   return (
-    <section className="runtime-status-panel" aria-label="运行情况">
+    <section className="runtime-status-panel" aria-label={t("me.runtimeStatus.aria")}>
       <InfoRow
         {...settingRowProps("runtimeStatus")}
-        desc={newest ? runtimeStatusSummary(newest) : "暂无消息耗时采样，发送或接收消息后会自动显示。"}
-        stateText={newest ? "实时采样" : "等待采样"}
+        desc={newest ? runtimeStatusSummary(newest, t) : t("me.runtimeStatus.emptyDesc")}
+        stateText={newest ? t("me.runtimeStatus.realtime") : t("me.runtimeStatus.waiting")}
       />
       <div className="runtime-status-card">
         <header>
           <span>
             <Activity size={16} />
-            <strong>最近消息耗时</strong>
+            <strong>{t("me.runtimeStatus.recentLatency")}</strong>
           </span>
-          <em>仅展示本机可观测阶段</em>
+          <em>{t("me.runtimeStatus.localOnly")}</em>
         </header>
         {groups.length ? (
           <ul>
             {groups.map((group) => (
               <li key={group.traceId}>
                 <div className="runtime-status-title">
-                  <strong>{traceTitle(group)}</strong>
-                  <em>{formatClock(group.lastAt)}</em>
+                  <strong>{traceTitle(group, t)}</strong>
+                  <em>{formatClock(group.lastAt, locale)}</em>
                 </div>
                 <div className="runtime-status-metrics">
-                  {metric("服务端到长连接", group.serverToGatewayMs)}
-                  {metric("长连接到缓存", group.gatewayToCacheMs)}
-                  {metric("长连接到窗口", group.gatewayToUiMs)}
-                  {metric("发送请求", group.sendHttpMs)}
-                  {metric("提交到确认", group.sendToAckMs)}
+                  {metric(t("me.runtimeStatus.metric.serverToGateway"), group.serverToGatewayMs, t)}
+                  {metric(t("me.runtimeStatus.metric.gatewayToCache"), group.gatewayToCacheMs, t)}
+                  {metric(t("me.runtimeStatus.metric.gatewayToUi"), group.gatewayToUiMs, t)}
+                  {metric(t("me.runtimeStatus.metric.sendHttp"), group.sendHttpMs, t)}
+                  {metric(t("me.runtimeStatus.metric.sendToAck"), group.sendToAckMs, t)}
                 </div>
-                <p>{latestStageText(group)}</p>
+                <p>{latestStageText(group, t)}</p>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="runtime-status-empty">暂无采样</p>
+          <p className="runtime-status-empty">{t("me.runtimeStatus.empty")}</p>
         )}
       </div>
     </section>
   );
 }
 
-function runtimeStatusSummary(group: MessageTraceGroupSummary) {
+function runtimeStatusSummary(group: MessageTraceGroupSummary, t: Translate) {
   if (group.serverToGatewayMs !== undefined) {
-    return `最近一条长连接消息：服务端时间到本机收到 ${formatMs(group.serverToGatewayMs)}。`;
+    return t("me.runtimeStatus.summary.serverToGateway", {
+      duration: formatMs(group.serverToGatewayMs, t),
+    });
   }
   if (group.sendHttpMs !== undefined) {
-    return `最近一次发送请求耗时 ${formatMs(group.sendHttpMs)}。`;
+    return t("me.runtimeStatus.summary.sendHttp", {
+      duration: formatMs(group.sendHttpMs, t),
+    });
   }
   if (group.queryDiscoveredAt) {
-    return "最近一条消息由主动查询发现。";
+    return t("me.runtimeStatus.summary.queryDiscovered");
   }
-  return "已记录最近消息运行轨迹。";
+  return t("me.runtimeStatus.summary.recorded");
 }
 
-function traceTitle(group: MessageTraceGroupSummary) {
-  const owner = group.owner === "customerService" ? "在线客服" : "IM";
+function traceTitle(group: MessageTraceGroupSummary, t: Translate) {
+  const owner =
+    group.owner === "customerService"
+      ? t("me.runtimeStatus.owner.customerService")
+      : t("me.runtimeStatus.owner.im");
   const id = shortId(group.messageId || group.clientMsgId || group.traceId);
-  return `${owner} 消息 ${id}`;
+  return t("me.runtimeStatus.traceTitle", { owner, id });
 }
 
-function latestStageText(group: MessageTraceGroupSummary) {
+function latestStageText(group: MessageTraceGroupSummary, t: Translate) {
   const latest = group.stages[group.stages.length - 1];
-  const channel = latest.sourceChannel === "gateway"
-    ? "长连接"
-    : latest.sourceChannel === "http-query"
-      ? "主动查询"
-      : "发送链路";
-  return `${channel}，最新阶段：${messageTraceStageLabel(latest.stage)}`;
+  const channel =
+    latest.sourceChannel === "gateway"
+      ? t("me.runtimeStatus.channel.gateway")
+      : latest.sourceChannel === "http-query"
+        ? t("me.runtimeStatus.channel.httpQuery")
+        : t("me.runtimeStatus.channel.send");
+  return t("me.runtimeStatus.latestStage", {
+    channel,
+    stage: t(stageLabelKey(latest.stage)),
+  });
 }
 
-function metric(label: string, value: number | undefined) {
+function metric(label: string, value: number | undefined, t: Translate) {
   if (value === undefined) return null;
   return (
     <span key={label}>
       <b>{label}</b>
-      <em>{formatMs(value)}</em>
+      <em>{formatMs(value, t)}</em>
     </span>
   );
 }
 
-function formatMs(value: number) {
-  if (value >= 1000) return `${(value / 1000).toFixed(2)} 秒`;
-  return `${Math.round(value)} 毫秒`;
+function formatMs(value: number, t: Translate) {
+  if (value >= 1000) return t("me.runtimeStatus.seconds", { value: (value / 1000).toFixed(2) });
+  return t("me.runtimeStatus.milliseconds", { value: Math.round(value) });
 }
 
-function formatClock(value: string) {
+function formatClock(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("zh-CN", { hour12: false });
+  return date.toLocaleTimeString(locale, { hour12: false });
 }
 
 function shortId(value: string) {
   if (value.length <= 8) return value;
   return value.slice(-8);
+}
+
+function stageLabelKey(stage: MessageTraceStage) {
+  return `me.runtimeStatus.stage.${stage.replace(/\./g, "_")}`;
 }

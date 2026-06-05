@@ -147,7 +147,7 @@ export class ApiBaseClient {
               : undefined,
         });
       };
-      xhr.onerror = () => rejectWithDiagnostic(new ApiError(`网络错误 ${path}`));
+      xhr.onerror = () => rejectWithDiagnostic(new ApiError(`Network error ${path}`));
       xhr.onabort = () =>
         rejectWithDiagnostic(new DOMException("Upload aborted", "AbortError"));
       xhr.onload = () => {

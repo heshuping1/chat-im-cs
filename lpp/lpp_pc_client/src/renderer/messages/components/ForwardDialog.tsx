@@ -5,6 +5,7 @@ import type { ConversationListItem, MessageItemDto } from "../../data/api-client
 import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { conversationMetaText } from "../../data/message-display";
+import { useI18n } from "../../i18n/useI18n";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import { ConversationAvatar } from "./ConversationListParts";
 
@@ -31,27 +32,31 @@ export function ForwardDialog({
   onClose: () => void;
   onForward: (conversationId: string) => void;
 }) {
+  const { t } = useI18n();
   const [keyword, setKeyword] = useState("");
   const preview =
-    messages.length > 1 ? `${messages.length} 条消息` : resolveMessagePreview(messages[0]);
+    messages.length > 1
+      ? t("messages.forwardDialog.multiPreview", { count: messages.length })
+      : resolveMessagePreview(messages[0]);
   const targets = conversations
     .filter((item) => item.conversationId !== activeConversationId)
     .filter((item) => item.title.toLowerCase().includes(keyword.trim().toLowerCase()));
+
   return (
     <div className="pc-modal-backdrop" role="presentation" onClick={onClose}>
       <section
         className="pc-forward-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="转发消息"
+        aria-label={t("messages.forwardDialog.aria")}
         onClick={(event) => event.stopPropagation()}
       >
         <header>
           <div>
-            <h3>转发消息</h3>
+            <h3>{t("messages.forwardDialog.title")}</h3>
             <p>{preview}</p>
           </div>
-          <button type="button" aria-label="关闭" onClick={onClose}>
+          <button type="button" aria-label={t("common.close")} onClick={onClose}>
             <X size={16} />
           </button>
         </header>
@@ -60,7 +65,7 @@ export function ForwardDialog({
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索会话"
+            placeholder={t("messages.forwardDialog.searchPlaceholder")}
             autoFocus
           />
         </label>
@@ -85,7 +90,9 @@ export function ForwardDialog({
               </span>
             </button>
           ))}
-          {targets.length === 0 && <p className="panel-state">没有可转发的会话</p>}
+          {targets.length === 0 && (
+            <p className="panel-state">{t("messages.forwardDialog.empty")}</p>
+          )}
         </div>
       </section>
     </div>

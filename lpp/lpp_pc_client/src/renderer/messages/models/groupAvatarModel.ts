@@ -4,6 +4,7 @@ import type {
   GroupAvatarCell,
   GroupConversationAvatar,
 } from "./groupAvatarTypes";
+import { groupMemberDisplayName } from "./groupManagementModel";
 
 export function resolveGroupConversationAvatar(
   conversation?: ConversationListItem,
@@ -64,7 +65,7 @@ export function groupCompositeAvatarCells(
       avatarUrl: firstStringField(member, "avatarUrl", "avatar", "photoUrl", "headUrl"),
       name:
         firstStringField(member, "displayName", "name", "nickname", "userName") ||
-        `成员${index + 1}`,
+        `Member ${index + 1}`,
     });
   });
 
@@ -74,12 +75,12 @@ export function groupCompositeAvatarCells(
     .forEach((member, index) => {
       cells.push({
         avatarUrl: member.avatarUrl,
-        name: usablePersonName(member.displayName) || member.userId || `成员${index + 1}`,
+        name: groupMemberDisplayName(member) || member.userId || `Member ${index + 1}`,
       });
     });
 
   arrayStringField(record, "memberAvatarUrls", "memberAvatars", "avatarUrls").forEach((url, index) => {
-    cells.push({ avatarUrl: url, name: `成员${index + 1}` });
+    cells.push({ avatarUrl: url, name: `Member ${index + 1}` });
   });
 
   return uniqueGroupAvatarCells(cells).slice(0, 9);
@@ -104,8 +105,8 @@ function compareGroupAvatarMemberPriority(left: GroupMemberDto, right: GroupMemb
 
 function groupMemberRoleRank(member: GroupMemberDto) {
   const role = `${member.role ?? member.memberRole ?? ""}`.toLowerCase();
-  if (role.includes("owner") || role.includes("??")) return 0;
-  if (role.includes("admin") || role.includes("???")) return 1;
+  if (role.includes("owner") || role.includes("\u7fa4\u4e3b")) return 0;
+  if (role.includes("admin") || role.includes("\u7ba1\u7406\u5458")) return 1;
   return 2;
 }
 
@@ -162,5 +163,7 @@ function uniqueGroupAvatarCells(values: GroupAvatarCell[]) {
 }
 
 function isLikelyMojibakeText(text: string) {
-  return /[ÃÂ�]|(鎴|瀵|瀹|鎵|鎾|鉼|鐢|鍙|瑙|鏄|鍚|涓|浠|缇|濂|鑱|璐|鎬|鏉|钀|绾|€)/.test(text);
+  return /[\u8119\u8117\ufffd\u7d54]|(\u95b9|\u78e1|\u940e|\u7959|\u7dd7|\u95b4|\u95bb|\ue562|\u95b8|\u941f|\u95ba|\u5255|\u6bb0|\u5a11|\u6422|\u5a34|\u7218|\u7f02|\u5a75|\u95bc|\u7727|\u9420|\u6077|\u745b|\u58cb|\u95bd|\u20ac|\u7f01|\u9207)/.test(
+    text,
+  );
 }

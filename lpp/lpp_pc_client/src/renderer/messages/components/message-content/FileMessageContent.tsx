@@ -5,9 +5,11 @@ import { FileMessageCard } from "../../../media/components/FileMessageCard";
 import type { ImMediaItem } from "../../../media/domain/mediaMessage";
 import type {
   LocalUploadState,
+  UploadAction,
   UploadActionHandler,
 } from "../../../media/runtime/uploadState";
 import { fileMessageCardState } from "../../../media/runtime/uploadState";
+import { useI18n } from "../../../i18n/useI18n";
 import { getCurrentMediaActionCapabilities } from "../../runtime/mediaActionCapabilities";
 import { openCurrentMessageFileMedia } from "../../runtime/messageMediaDesktopActions";
 
@@ -15,6 +17,8 @@ export type MessageMediaCacheContext = {
   accountId?: string;
   conversationId?: string;
 };
+
+type Translate = ReturnType<typeof useI18n>["t"];
 
 export function FileMessageContent({
   authToken,
@@ -31,19 +35,22 @@ export function FileMessageContent({
   uploadState?: LocalUploadState;
   onUploadAction?: UploadActionHandler;
 }) {
+  const { t } = useI18n();
   const media = item?.media;
   const href = item?.sourceUrl;
   const openUrl = item?.localOpenUrl || href;
-  const fileName = item?.fileName || "文件消息";
+  const fileName = item?.fileName || t("messages.fileContent.fileMessage");
   const [openError, setOpenError] = useState<string | null>(null);
   const { canOpenMediaFile } = getCurrentMediaActionCapabilities();
   const fileCardState = fileMessageCardState(uploadState);
+  const translatedStatusText = uploadStatusText(uploadState, t);
+  const displayStatusText = translatedStatusText || statusText || "";
+  const uploadBlocked = Boolean(displayStatusText);
+
   const handleFileOpen = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setOpenError(null);
-    if (uploadBlocked) {
-      return;
-    }
+    if (uploadBlocked) return;
     if (!openUrl) return;
     if (canOpenMediaFile && !/^blob:/i.test(openUrl)) {
       try {
@@ -57,7 +64,7 @@ export function FileMessageContent({
         });
         if (opened) return;
       } catch (error) {
-        setOpenError(`文件打开失败：${formatInlineError(error)}`);
+        setOpenError(t("messages.fileContent.openFailed", { error: formatInlineError(error, t) }));
         return;
       }
     }
@@ -75,7 +82,7 @@ export function FileMessageContent({
       triggerFileDownload(objectUrl, fileName);
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5_000);
     } catch (error) {
-      setOpenError(`文件打开失败：${formatInlineError(error)}`);
+      setOpenError(t("messages.fileContent.openFailed", { error: formatInlineError(error, t) }));
     }
   };
   const handleFileControlClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -86,16 +93,14 @@ export function FileMessageContent({
     onUploadAction?.(uploadState.taskId, fileCardState.controlAction);
   };
 
-  const displayStatusText = statusText || fileCardState.metaText;
-  const uploadBlocked = Boolean(displayStatusText);
   const sending =
     uploadState?.status === "uploading" ||
     uploadState?.status === "queued" ||
-    displayStatusText === "上传中" ||
-    Boolean(displayStatusText?.startsWith("上传中 "));
-  const failed = Boolean(displayStatusText?.startsWith("发送失败"));
+    uploadState?.status === "sending";
+  const failed = uploadState?.status === "failed";
   const paused = uploadState?.status === "paused";
   const canceled = uploadState?.status === "canceled";
+
   return (
     <span className="message-file-wrap">
       <FileMessageCard
@@ -103,12 +108,12 @@ export function FileMessageContent({
           paused ? " paused" : ""
         }${canceled ? " canceled" : ""}`}
         onClick={handleFileOpen}
-        ariaLabel={`文件消息 ${fileName}`}
-        controlLabel={fileCardState.controlLabel}
+        ariaLabel={t("messages.fileContent.aria", { name: fileName })}
+        controlLabel={uploadControlLabel(fileCardState.controlAction, uploadState, t)}
         controlProgress={fileCardState.controlProgress}
         controlState={fileCardState.controlState}
         fileName={fileName}
-        metaText={displayStatusText || formatSize(media?.sizeBytes)}
+        metaText={displayStatusText || formatSize(media?.sizeBytes, t)}
         onControlClick={fileCardState.controlAction ? handleFileControlClick : undefined}
         sourceLabel={appProductName}
       />
@@ -117,10 +122,32 @@ export function FileMessageContent({
   );
 }
 
-function formatInlineError(error: unknown) {
+function uploadControlLabel(action: UploadAction | undefined, uploadState: LocalUploadState | undefined, t: Translate) {
+  if (action === "pause") return t("messages.fileContent.pauseUpload");
+  if (action === "resume") return t("messages.fileContent.resumeUpload");
+  if (action === "retry") return t("messages.fileContent.retryUpload");
+  if (uploadState?.status === "queued" || uploadState?.phase === "preparing") {
+    return t("messages.fileContent.waitingUpload");
+  }
+  if (uploadState?.status === "sending") return t("messages.fileContent.sending");
+  return undefined;
+}
+
+function uploadStatusText(uploadState: LocalUploadState | undefined, t: Translate) {
+  if (!uploadState?.status || uploadState.status === "sent") return "";
+  if (uploadState.status === "queued") return t("messages.fileContent.waitingUpload");
+  if (uploadState.status === "uploading") return t("messages.fileContent.uploading");
+  if (uploadState.status === "paused") return t("messages.fileContent.paused");
+  if (uploadState.status === "sending") return t("messages.fileContent.sending");
+  if (uploadState.status === "failed") return t("messages.fileContent.failed");
+  if (uploadState.status === "canceled") return t("messages.fileContent.canceled");
+  return "";
+}
+
+function formatInlineError(error: unknown, t: Translate) {
   if (error instanceof Error && error.message.trim()) return error.message.trim();
   if (typeof error === "string" && error.trim()) return error.trim();
-  return "请稍后重试";
+  return t("messages.fileContent.tryAgain");
 }
 
 function triggerFileDownload(url: string, fileName: string) {
@@ -132,8 +159,8 @@ function triggerFileDownload(url: string, fileName: string) {
   link.remove();
 }
 
-function formatSize(value?: number | null) {
-  if (!value || value <= 0) return "未知大小";
+function formatSize(value: number | null | undefined, t: Translate) {
+  if (!value || value <= 0) return t("messages.fileContent.unknownSize");
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / 1024 / 1024).toFixed(1)} MB`;

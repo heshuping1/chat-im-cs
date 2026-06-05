@@ -4,7 +4,11 @@ import type {
   MessageItemDto,
 } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
-import { resendConfirmPreview } from "../../data/message/message-retry-model";
+import {
+  failedMessageRetryAction,
+  sendFailurePresentation,
+} from "../../data/message/message-retry-model";
+import { useI18n } from "../../i18n/useI18n";
 import { ForwardDialog } from "./ForwardDialog";
 import { InviteQrDialog } from "./InviteQrDialog";
 import {
@@ -17,6 +21,7 @@ import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import type { CreateGroupChatPayload } from "../models/groupCreateModel";
 
 type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
+type Translate = ReturnType<typeof useI18n>["t"];
 
 export function MessageDialogsLayer({
   activeConversationId,
@@ -149,24 +154,44 @@ function MessageResendConfirmDialog({
   onClose: () => void;
   onResend: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="pc-modal-backdrop resend" role="presentation" onClick={onClose}>
       <section
-        aria-label="重发消息确认"
+        aria-label={t("messages.resendDialog.aria")}
         aria-modal="true"
         className="pc-resend-confirm-dialog"
         role="dialog"
         onClick={(event) => event.stopPropagation()}
       >
-        <h3>重发该消息?</h3>
-        <p>{resendConfirmPreview(message)}</p>
+        <h3>{t("messages.resendDialog.title")}</h3>
+        <p>{resendConfirmPreviewText(message, t)}</p>
         <footer>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="button" onClick={onClose}>
+            {t("common.cancel")}
+          </button>
           <button className="primary" type="button" onClick={onResend}>
-            重新发送
+            {t("messages.resendDialog.resend")}
           </button>
         </footer>
       </section>
     </div>
   );
+}
+
+function resendConfirmPreviewText(message: MessageItemDto, t: Translate) {
+  const failure = sendFailurePresentation(localErrorFromMessage(message));
+  if (failure.kind === "blocked") return t("messages.resendDialog.blocked");
+
+  const action = failedMessageRetryAction(message);
+  if (!action) return t("messages.resendDialog.unavailable");
+  if (action.type === "text") return action.content;
+  if (action.type === "contact_card") return t("messages.resendDialog.contactCardPreview");
+  return t("messages.resendDialog.uploadPreview");
+}
+
+function localErrorFromMessage(message: MessageItemDto) {
+  const value = (message as unknown as Record<string, unknown>).localError;
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

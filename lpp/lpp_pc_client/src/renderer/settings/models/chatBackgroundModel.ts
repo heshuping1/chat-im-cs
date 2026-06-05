@@ -19,12 +19,24 @@ export interface ChatBackgroundPreset {
   wash: string;
 }
 
+export interface ChatBackgroundImageSetting {
+  type: "image";
+  name: string;
+  dataUrl: string;
+}
+
+export type ChatBackgroundSetting =
+  | ChatBackgroundPresetId
+  | { type: "preset"; presetId: ChatBackgroundPresetId }
+  | ChatBackgroundImageSetting;
+
 export const defaultChatBackgroundPreset: ChatBackgroundPresetId = "default";
+export const maxChatBackgroundImageDataUrlLength = 3_500_000;
 
 export const chatBackgroundPresets = [
   {
     id: "default",
-    label: "微信浅灰",
+    label: "WeChat light gray",
     color: "#ece9e4",
     preview:
       "linear-gradient(135deg, #f5f2ec 0%, #e9e5dc 100%)",
@@ -34,7 +46,7 @@ export const chatBackgroundPresets = [
   },
   {
     id: "white",
-    label: "宣纸白",
+    label: "Rice paper white",
     color: "#f8f7f2",
     preview:
       "linear-gradient(135deg, #fffdfa 0%, #f0eee7 100%)",
@@ -44,7 +56,7 @@ export const chatBackgroundPresets = [
   },
   {
     id: "light-gray",
-    label: "雾面灰",
+    label: "Matte gray",
     color: "#e8ebed",
     preview:
       "linear-gradient(135deg, #f4f6f7 0%, #dfe5e9 100%)",
@@ -54,7 +66,7 @@ export const chatBackgroundPresets = [
   },
   {
     id: "beige",
-    label: "暖米纹理",
+    label: "Warm beige texture",
     color: "#efe7d8",
     preview:
       "linear-gradient(135deg, #fbf4e8 0%, #e7dcc8 100%)",
@@ -64,7 +76,7 @@ export const chatBackgroundPresets = [
   },
   {
     id: "light-blue",
-    label: "雨后蓝",
+    label: "After-rain blue",
     color: "#e5f1f5",
     preview:
       "linear-gradient(135deg, #f1fbff 0%, #d6e9ef 100%)",
@@ -74,7 +86,7 @@ export const chatBackgroundPresets = [
   },
   {
     id: "light-green",
-    label: "竹青",
+    label: "Bamboo green",
     color: "#e2f0e5",
     preview:
       "linear-gradient(135deg, #eff9ee 0%, #d3e6d5 100%)",
@@ -84,7 +96,7 @@ export const chatBackgroundPresets = [
   },
   {
     id: "light-pink",
-    label: "淡樱",
+    label: "Light cherry",
     color: "#f6e8eb",
     preview:
       "linear-gradient(135deg, #fff2f5 0%, #ead7dd 100%)",
@@ -94,7 +106,7 @@ export const chatBackgroundPresets = [
   },
   {
     id: "light-purple",
-    label: "浅藤",
+    label: "Light wisteria",
     color: "#eee9f3",
     preview:
       "linear-gradient(135deg, #f8f3ff 0%, #ded8e8 100%)",
@@ -111,9 +123,38 @@ const chatBackgroundPresetIds = new Set<string>(
 export function normalizeChatBackgroundPreset(
   value: unknown,
 ): ChatBackgroundPresetId {
+  if (isChatBackgroundImageSetting(value)) return defaultChatBackgroundPreset;
+  if (
+    value &&
+    typeof value === "object" &&
+    (value as { type?: unknown }).type === "preset"
+  ) {
+    return normalizeChatBackgroundPreset((value as { presetId?: unknown }).presetId);
+  }
   return typeof value === "string" && chatBackgroundPresetIds.has(value)
     ? (value as ChatBackgroundPresetId)
     : defaultChatBackgroundPreset;
+}
+
+export function normalizeChatBackgroundSetting(value: unknown): ChatBackgroundSetting {
+  if (isChatBackgroundImageSetting(value)) {
+    return {
+      type: "image",
+      dataUrl: value.dataUrl,
+      name: safeImageName(value.name),
+    };
+  }
+  if (
+    value &&
+    typeof value === "object" &&
+    (value as { type?: unknown }).type === "preset"
+  ) {
+    return {
+      type: "preset",
+      presetId: normalizeChatBackgroundPreset((value as { presetId?: unknown }).presetId),
+    };
+  }
+  return normalizeChatBackgroundPreset(value);
 }
 
 export function chatBackgroundPresetById(value: unknown): ChatBackgroundPreset {
@@ -125,7 +166,17 @@ export function chatBackgroundPresetById(value: unknown): ChatBackgroundPreset {
 }
 
 export function chatBackgroundStyleVariables(value: unknown): CSSProperties {
-  const preset = chatBackgroundPresetById(value);
+  const setting = normalizeChatBackgroundSetting(value);
+  if (typeof setting === "object" && setting.type === "image") {
+    return {
+      "--chat-stage-background": "#ece9e4",
+      "--chat-stage-background-image": cssUrl(setting.dataUrl),
+      "--chat-stage-background-size": "cover",
+      "--chat-stage-background-wash": "rgba(255, 255, 255, 0.18)",
+      "--chat-background-preview": cssUrl(setting.dataUrl),
+    } as CSSProperties;
+  }
+  const preset = chatBackgroundPresetById(setting);
   return {
     "--chat-stage-background": preset.color,
     "--chat-stage-background-image": preset.image,
@@ -133,4 +184,33 @@ export function chatBackgroundStyleVariables(value: unknown): CSSProperties {
     "--chat-stage-background-wash": preset.wash,
     "--chat-background-preview": preset.preview,
   } as CSSProperties;
+}
+
+export function isChatBackgroundImageSetting(
+  value: unknown,
+): value is ChatBackgroundImageSetting {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<ChatBackgroundImageSetting>;
+  return (
+    record.type === "image" &&
+    typeof record.name === "string" &&
+    typeof record.dataUrl === "string" &&
+    isSafeImageDataUrl(record.dataUrl)
+  );
+}
+
+export function isSafeImageDataUrl(value: string) {
+  return (
+    value.length > 0 &&
+    value.length <= maxChatBackgroundImageDataUrlLength &&
+    /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(value)
+  );
+}
+
+function safeImageName(value: string) {
+  return value.trim().slice(0, 96) || "chat-background";
+}
+
+function cssUrl(value: string) {
+  return `url("${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
 }

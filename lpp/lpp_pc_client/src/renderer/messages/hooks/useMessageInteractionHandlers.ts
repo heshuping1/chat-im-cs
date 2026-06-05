@@ -8,6 +8,7 @@ import type {
   MessageItemDto,
 } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { useI18n } from "../../i18n/useI18n";
 import {
   buildAvatarProfilePopover,
   buildGroupMemberMap,
@@ -17,7 +18,12 @@ import {
   normalizeContactCard,
   type AnchoredContactCardProfile,
 } from "../models/contactCardModel";
-import { requestMessageDangerConfirmation } from "../runtime/messageConfirm";
+import {
+  messageDangerConfirmationDescriptor,
+  requestMessageDangerConfirmation,
+  type MessageDangerConfirmAction,
+} from "../runtime/messageConfirm";
+import type { ConversationContextAction } from "../models/messageConversationActionModel";
 
 type MessageMenuState = {
   message: MessageItemDto;
@@ -38,47 +44,41 @@ const CONTACT_CARD_PROFILE_POPOVER_SIZE = { width: 340, height: 372 };
 
 export function useMessageInteractionHandlers({
   activeConversation,
-  activeConversationId,
-  deleteMessage,
+  deleteMessages,
   groupMemberMap,
   messageListScrollRegistry,
   profile,
   profileExtra,
+  runConversationAction,
   selectedMessageIds,
   session,
-  setActiveConversation,
   setAvatarProfilePopover,
   setContactCardProfile,
   setConversationMenu,
-  setLocalHiddenConversationIds,
-  setLocalMutedConversationIds,
   setMessageMenu,
-  setMultiSelectMode,
   setNotice,
-  setSelectedMessageIds,
 }: {
   activeConversation?: ConversationListItem;
-  activeConversationId: string | null | undefined;
-  deleteMessage: (messageId: string) => Promise<unknown>;
+  deleteMessages: (messageIds: string[]) => Promise<unknown>;
   groupMemberMap: ReturnType<typeof buildGroupMemberMap>;
   messageListScrollRegistry: {
     scrollToMessage: (messageId: string, onMissing?: () => void) => void;
   };
   profile?: CustomerProfileCard;
   profileExtra?: FriendProfileExtraDto;
+  runConversationAction: (
+    action: ConversationContextAction,
+    conversation: ConversationListItem,
+  ) => void;
   selectedMessageIds: Set<string>;
   session: AuthSession | null;
-  setActiveConversation: (conversationId: string) => void;
   setAvatarProfilePopover: Dispatch<SetStateAction<AvatarProfilePopoverState | null>>;
   setContactCardProfile: Dispatch<SetStateAction<AnchoredContactCardProfile | null>>;
   setConversationMenu: Dispatch<SetStateAction<ConversationMenuState>>;
-  setLocalHiddenConversationIds: Dispatch<SetStateAction<Set<string>>>;
-  setLocalMutedConversationIds: Dispatch<SetStateAction<Set<string>>>;
   setMessageMenu: Dispatch<SetStateAction<MessageMenuState>>;
-  setMultiSelectMode: Dispatch<SetStateAction<boolean>>;
   setNotice: Dispatch<SetStateAction<string | null>>;
-  setSelectedMessageIds: Dispatch<SetStateAction<Set<string>>>;
 }) {
+  const { t } = useI18n();
   const openMessageMenu = useCallback(
     (event: MouseEvent<HTMLElement>, message: MessageItemDto) => {
       event.preventDefault();
@@ -106,51 +106,13 @@ export function useMessageInteractionHandlers({
   );
 
   const handleConversationMenuAction = useCallback(
-    (action: "mute" | "hide" | "delete", conversation: ConversationListItem) => {
+    (action: ConversationContextAction, conversation: ConversationListItem) => {
       setConversationMenu(null);
-      if (action === "mute") {
-        setLocalMutedConversationIds((current) => {
-          const next = new Set(current);
-          if (conversation.isMuted || next.has(conversation.conversationId)) {
-            next.delete(conversation.conversationId);
-            setNotice("已在本机取消免打扰；服务端同步需要接口支持");
-          } else {
-            next.add(conversation.conversationId);
-            setNotice("已在本机开启免打扰；服务端同步需要接口支持");
-          }
-          return next;
-        });
-        return;
-      }
-      if (action === "hide" || action === "delete") {
-        if (
-          action === "delete" &&
-          !requestMessageDangerConfirmation({ action: "delete-conversation" })
-        ) {
-          return;
-        }
-        setLocalHiddenConversationIds((current) => {
-          const next = new Set(current);
-          next.add(conversation.conversationId);
-          return next;
-        });
-        if (activeConversationId === conversation.conversationId) {
-          setActiveConversation("");
-        }
-        setNotice(
-          action === "delete"
-            ? "会话已在本机隐藏；服务端删除需要接口支持"
-            : "会话已在本机隐藏",
-        );
-      }
+      runConversationAction(action, conversation);
     },
     [
-      activeConversationId,
-      setActiveConversation,
+      runConversationAction,
       setConversationMenu,
-      setLocalHiddenConversationIds,
-      setLocalMutedConversationIds,
-      setNotice,
     ],
   );
 
@@ -213,10 +175,10 @@ export function useMessageInteractionHandlers({
   const scrollToMessage = useCallback(
     (messageId: string) => {
       messageListScrollRegistry.scrollToMessage(messageId, () => {
-        setNotice("该消息尚未加载，请调整筛选或加载更多历史");
+        setNotice(t("messages.interactions.messageNotLoaded"));
       });
     },
-    [messageListScrollRegistry, setNotice],
+    [messageListScrollRegistry, setNotice, t],
   );
 
   const handleBatchDeleteSelected = useCallback(async () => {
@@ -226,27 +188,20 @@ export function useMessageInteractionHandlers({
       !requestMessageDangerConfirmation({
         action: "batch-delete-messages",
         count: messageIds.length,
+        message: confirmMessageDangerText("batch-delete-messages", t, messageIds.length),
       })
     ) {
       return;
     }
-    const results = await Promise.allSettled(
-      messageIds.map((messageId) => deleteMessage(messageId)),
-    );
-    const failedCount = results.filter((result) => result.status === "rejected").length;
-    setMultiSelectMode(false);
-    setSelectedMessageIds(new Set());
-    if (failedCount > 0) {
-      setNotice(`已删除 ${messageIds.length - failedCount} 条，${failedCount} 条失败，请稍后重试`);
-    } else {
-      setNotice(`已删除 ${messageIds.length} 条消息`);
+    try {
+      await deleteMessages(messageIds);
+    } catch {
+      // Mutation owns the user-facing failure notice.
     }
   }, [
-    deleteMessage,
+    deleteMessages,
     selectedMessageIds,
-    setMultiSelectMode,
-    setNotice,
-    setSelectedMessageIds,
+    t,
   ]);
 
   return {
@@ -258,6 +213,17 @@ export function useMessageInteractionHandlers({
     openMessageMenu,
     scrollToMessage,
   };
+}
+
+type MessageInteractionTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+function confirmMessageDangerText(
+  action: MessageDangerConfirmAction,
+  t: MessageInteractionTranslate,
+  count?: number,
+) {
+  const descriptor = messageDangerConfirmationDescriptor(action, count);
+  return t(descriptor.key, descriptor.params);
 }
 
 function resolveFloatingProfilePosition(

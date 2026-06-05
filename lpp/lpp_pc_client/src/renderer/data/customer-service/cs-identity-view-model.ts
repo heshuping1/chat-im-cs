@@ -23,11 +23,11 @@ export function createCustomerServiceIdentityViewModel(input: {
     usableIdentityName(input.profile?.nickname) ||
     usableIdentityName(input.thread?.title) ||
     input.fallbackName ||
-    (input.history ? "访客" : "未知客户");
+    (input.history ? "customerService.visitor" : "customerService.threadList.unknownCustomer");
 
   return {
-    ariaName: displayName || "客户",
-    avatarName: displayName || "客户",
+    ariaName: displayName || "customerService.customer",
+    avatarName: displayName || "customerService.customer",
     avatarTone: isVip ? "gold" : "indigo",
     avatarUrl: input.profile?.avatarUrl || input.thread?.customerAvatarUrl || input.thread?.avatarUrl,
     displayName,
@@ -37,6 +37,6 @@ export function createCustomerServiceIdentityViewModel(input: {
 
 function usableIdentityName(value?: string | null) {
   const name = value?.trim();
-  if (!name || name.startsWith("历史会话")) return undefined;
+  if (!name || name.startsWith("\u5386\u53f2\u4f1a\u8bdd")) return undefined;
   return name;
 }

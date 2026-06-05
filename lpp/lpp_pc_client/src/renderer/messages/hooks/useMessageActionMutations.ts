@@ -3,7 +3,12 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import {
+  messageBatchFailedCount,
+  messageBatchSucceededCount,
+} from "../../data/message/message-batch-action-result";
 import { requireApiClient } from "../../data/runtime";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 import {
   appendForwardedMessagesToCache,
@@ -38,36 +43,40 @@ export function useMessageActionMutations({
   setNotice: Dispatch<SetStateAction<string | null>>;
   setSelectedMessageIds: Dispatch<SetStateAction<Set<string>>>;
 }) {
+  const { t } = useI18n();
+
   const recallMutation = useMutation({
     mutationFn: async (messageId: string) => {
-      if (!session) throw new Error("请先登录");
+      if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
       return requireApiClient(session).recallMessage(messageId);
     },
     onSuccess: async (_result, messageId) => {
       markMessageRecalledInCache(queryClient, messageId);
-      setNotice("消息已撤回");
+      setNotice(t("messages.actionMutations.recallSuccess"));
       await invalidateMessages(queryClient);
     },
-    onError: (error) => setNotice(`撤回失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("messages.actionMutations.recallFailed", { error: formatError(error) })),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (messageId: string) => {
-      if (!session) throw new Error("请先登录");
+      if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
       return requireApiClient(session).deleteMessage(messageId);
     },
     onSuccess: async (_result, messageId) => {
       removeMessageFromCache(queryClient, messageId);
-      setNotice("消息已删除");
+      setNotice(t("messages.actionMutations.deleteSuccess"));
       await invalidateMessages(queryClient);
     },
-    onError: (error) => setNotice(`删除失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("messages.actionMutations.deleteFailed", { error: formatError(error) })),
   });
 
   const favoriteMutation = useMutation({
     mutationFn: async (message: MessageItemDto) => {
       if (!session || !activeConversation) {
-        throw new Error("请选择一个普通 IM 会话");
+        throw new Error(t("messages.actionMutations.selectNormalConversation"));
       }
       return requireApiClient(session).addFavoriteMessage({
         messageId: message.messageId,
@@ -80,20 +89,50 @@ export function useMessageActionMutations({
         message.messageId,
         (result as { favoriteId?: string }).favoriteId,
       );
-      setNotice("已收藏");
+      setNotice(t("messages.actionMutations.favoriteSuccess"));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["pc-im-messages"] }),
         queryClient.invalidateQueries({ queryKey: ["pc-account-favorites"] }),
         queryClient.invalidateQueries({ queryKey: ["pc-account-favorites-summary"] }),
       ]);
     },
-    onError: (error) => setNotice(`收藏失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("messages.actionMutations.favoriteFailed", { error: formatError(error) })),
+  });
+
+  const batchDeleteMutation = useMutation({
+    mutationFn: async (messageIds: string[]) => {
+      if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
+      return requireApiClient(session).batchDeleteMessages(messageIds);
+    },
+    onSuccess: async (result) => {
+      result.successIds.forEach((messageId) => removeMessageFromCache(queryClient, messageId));
+      const succeeded = messageBatchSucceededCount(result);
+      const failed = messageBatchFailedCount(result);
+      if (succeeded > 0) {
+        setMultiSelectMode(false);
+        setSelectedMessageIds(new Set());
+        await invalidateMessages(queryClient);
+      }
+      if (failed > 0) {
+        setNotice(
+          t("messages.interactions.batchDeletePartial", {
+            failed,
+            succeeded,
+          }),
+        );
+        return;
+      }
+      setNotice(t("messages.interactions.batchDeleteSuccess", { count: succeeded }));
+    },
+    onError: (error) =>
+      setNotice(t("messages.actionMutations.deleteFailed", { error: formatError(error) })),
   });
 
   const translateMutation = useMutation({
     mutationFn: async (message: MessageItemDto) => {
-      if (!session) throw new Error("请先登录");
-      if (!message.messageId) throw new Error("当前消息缺少 messageId，无法翻译");
+      if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
+      if (!message.messageId) throw new Error(t("messages.actionMutations.missingMessageId"));
       const apiClient = requireApiClient(session);
       const messageText = extractMessageText(message);
       let text: string | undefined;
@@ -119,14 +158,14 @@ export function useMessageActionMutations({
           delete next[messageId];
           return next;
         });
-        setNotice("翻译服务未返回内容");
+        setNotice(t("messages.actionMutations.translateEmpty"));
         return;
       }
       setMessageAnnotations((current) => ({
         ...current,
-        [messageId]: `译文：${text}`,
+        [messageId]: t("messages.actionMutations.translationAnnotation", { text }),
       }));
-      setNotice("已翻译");
+      setNotice(t("messages.actionMutations.translateSuccess"));
     },
     onError: (error, message) => {
       setMessageAnnotations((current) => {
@@ -134,13 +173,13 @@ export function useMessageActionMutations({
         delete next[message.messageId];
         return next;
       });
-      setNotice(`翻译失败：${formatError(error)}`);
+      setNotice(t("messages.actionMutations.translateFailed", { error: formatError(error) }));
     },
   });
 
   const voiceToTextMutation = useMutation({
     mutationFn: async (message: MessageItemDto) => {
-      if (!session) throw new Error("请先登录");
+      if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
       return {
         messageId: message.messageId,
         text: extractActionResultText(
@@ -150,16 +189,17 @@ export function useMessageActionMutations({
     },
     onSuccess: ({ messageId, text }) => {
       if (!text) {
-        setNotice("语音转文字未返回内容");
+        setNotice(t("messages.actionMutations.voiceToTextEmpty"));
         return;
       }
       setMessageAnnotations((current) => ({
         ...current,
-        [messageId]: `转文字：${text}`,
+        [messageId]: t("messages.actionMutations.voiceToTextAnnotation", { text }),
       }));
-      setNotice("已转为文字");
+      setNotice(t("messages.actionMutations.voiceToTextSuccess"));
     },
-    onError: (error) => setNotice(`语音转文字失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("messages.actionMutations.voiceToTextFailed", { error: formatError(error) })),
   });
 
   const forwardMutation = useMutation({
@@ -170,30 +210,28 @@ export function useMessageActionMutations({
       messages: MessageItemDto[];
       targetConversationId: string;
     }) => {
-      if (!session) throw new Error("请先登录");
+      if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
       const client = requireApiClient(session);
-      const results = await Promise.allSettled(
-        messages.map((message) =>
-          client.forwardMessage({
-            sourceMessageId: message.messageId,
-            targetConversationId,
-          }).then(() => message),
-        ),
-      );
-      const succeededMessages = results
-        .filter(
-          (result): result is PromiseFulfilledResult<MessageItemDto> =>
-            result.status === "fulfilled",
-        )
-        .map((result) => result.value);
-      const failedCount = results.length - succeededMessages.length;
-      if (succeededMessages.length === 0) {
-        const firstFailure = results.find(
-          (result): result is PromiseRejectedResult =>
-            result.status === "rejected",
-        );
-        throw firstFailure?.reason ?? new Error("转发失败");
+      let succeededMessages: MessageItemDto[];
+      let failedCount = 0;
+      if (messages.length > 1) {
+        const result = await client.batchForwardMessages({
+          messageIds: messages.map((message) => message.messageId),
+          targetConversationId,
+        });
+        const successIds = new Set(result.successIds.map((messageId) => messageId.toLowerCase()));
+        succeededMessages = messages.filter((message) => successIds.has(message.messageId.toLowerCase()));
+        failedCount = messageBatchFailedCount(result);
+      } else {
+        const message = messages[0];
+        if (!message) throw new Error(t("messages.actionMutations.forwardFailedFallback"));
+        await client.forwardMessage({
+          sourceMessageId: message.messageId,
+          targetConversationId,
+        });
+        succeededMessages = [message];
       }
+      if (succeededMessages.length === 0) throw new Error(t("messages.actionMutations.forwardFailedFallback"));
       return { failedCount, succeededMessages, targetConversationId };
     },
     onSuccess: async ({ failedCount, succeededMessages }, variables) => {
@@ -213,17 +251,24 @@ export function useMessageActionMutations({
       setSelectedMessageIds(new Set());
       setNotice(
         failedCount > 0
-          ? `已转发 ${succeededMessages.length} 条，${failedCount} 条失败，请稍后重试`
+          ? t("messages.actionMutations.forwardPartial", {
+              failed: failedCount,
+              succeeded: succeededMessages.length,
+            })
           : succeededMessages.length > 1
-            ? `已转发 ${succeededMessages.length} 条消息`
-            : "已转发",
+            ? t("messages.actionMutations.forwardManySuccess", {
+                count: succeededMessages.length,
+              })
+            : t("messages.actionMutations.forwardSuccess"),
       );
       await invalidateMessages(queryClient);
     },
-    onError: (error) => setNotice(`转发失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("messages.actionMutations.forwardFailed", { error: formatError(error) })),
   });
 
   return {
+    batchDeleteMutation,
     deleteMutation,
     favoriteMutation,
     forwardMutation,

@@ -698,6 +698,7 @@ export const vi: MessageDictionary = {
       conversationListNoMatch: 'No matching conversations',
       directConversationFallback: 'Direct IM conversation',
       dragSort: 'Drag to reorder',
+      groupAllMutedReadOnly: 'All members are muted. Only the owner, admins, and customer service can send.',
       insertedToComposer: 'Inserted into the input box. Confirm to send.',
       knowledgeBase: 'Knowledge base',
       knowledgeEmpty: 'This knowledge item has no insertable text.',
@@ -810,6 +811,16 @@ export const vi: MessageDictionary = {
       updateAnnouncement: 'Group announcement updated.',
       updateGroupTitle: 'Group name updated.',
       updateSettings: 'Group settings updated.',
+    },
+    conversationActions: {
+      deleted: 'Conversation deleted.',
+      failed: 'Conversation action failed: {error}',
+      hidden: 'Conversation hidden.',
+      muted: 'Do not disturb enabled.',
+      pinned: 'Conversation pinned.',
+      restored: 'Conversation restored.',
+      unmuted: 'Do not disturb disabled.',
+      unpinned: 'Conversation unpinned.',
     },
     conversationInfo: conversationInfoFallback,
     chatHeader: {
@@ -1201,7 +1212,7 @@ export const vi: MessageDictionary = {
   apiError: {
     aborted: 'Thao tác đã bị hủy',
     messageConversationFrozen: 'Hội thoại này đã bị đóng băng, hiện chưa thể gửi tin nhắn',
-    messageGroupMuted: 'Nhóm đã bật cấm nói toàn bộ, hiện chưa thể gửi tin nhắn',
+    messageGroupMuted: 'This group is muted for all members. The current account has no permission to send.',
     messageMemberForbidden: 'Bạn không ở trong hội thoại này nên không thể gửi tin nhắn',
     messageMemberMuted: 'Bạn đã bị cấm nói, hiện chưa thể phát biểu',
     messageUserMuted: 'Tài khoản hiện tại đã bị cấm nói, hiện chưa thể gửi tin nhắn',

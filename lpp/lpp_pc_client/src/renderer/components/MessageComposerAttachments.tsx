@@ -3,9 +3,9 @@ import type { ChangeEvent, MutableRefObject } from "react";
 import type { ComposerMediaKind } from "../composer/domain/detectComposerMediaKind";
 import {
   composerFileAttachmentVisual,
-  composerMediaKindLabel,
   formatComposerFileSize,
 } from "../composer/presentation/composerAttachmentPresentation";
+import { useI18n } from "../i18n/useI18n";
 
 export interface PendingAttachment {
   id: string;
@@ -23,15 +23,16 @@ export function MessageComposerAttachmentList({
   attachments: PendingAttachment[];
   onRemove: (attachment: PendingAttachment) => void;
 }) {
+  const { t } = useI18n();
   if (attachments.length === 0) return null;
   return (
-    <div className="composer-attachments" aria-label="待发送附件">
+    <div className="composer-attachments" aria-label={t("composer.attachments.pendingAria")}>
       {attachments.map((item) => {
         const visual = composerFileAttachmentVisual(item.file.name);
         return (
           <article className="composer-attachment" key={item.id}>
             {item.kind === "image" && item.previewUrl ? (
-              <img src={item.previewUrl} alt={item.file.name || "待发送图片"} />
+              <img src={item.previewUrl} alt={item.file.name || t("composer.attachments.pendingImage")} />
             ) : (
               <span
                 className={`composer-attachment-icon ${visual.kind}`}
@@ -41,12 +42,12 @@ export function MessageComposerAttachmentList({
               </span>
             )}
             <span>
-              <strong>{item.file.name || composerMediaKindLabel(item.kind)}</strong>
+              <strong>{item.file.name || t(composerMediaKindLabelKey(item.kind))}</strong>
               <small>{formatComposerFileSize(item.file.size)}</small>
             </span>
             <button
               type="button"
-              aria-label={`移除 ${item.file.name || "附件"}`}
+              aria-label={t("composer.attachments.remove", { name: item.file.name || t("composer.attachments.attachment") })}
               onClick={() => onRemove(item)}
             >
               <X size={13} />
@@ -112,28 +113,35 @@ export function MessageComposerAttachmentPreview({
   attachment: PendingAttachment | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   if (!attachment?.previewUrl) return null;
   return (
     <div
       className="composer-attachment-preview"
       role="dialog"
       aria-modal="true"
-      aria-label="待发送图片预览"
+      aria-label={t("composer.attachments.pendingImagePreview")}
       onClick={onClose}
     >
       <button
         className="composer-attachment-preview-close"
         type="button"
-        aria-label="关闭待发送图片预览"
+        aria-label={t("composer.attachments.closePendingImagePreview")}
         onClick={onClose}
       >
         <X size={18} />
       </button>
       <img
         src={attachment.previewUrl}
-        alt={attachment.file.name || "待发送图片"}
+        alt={attachment.file.name || t("composer.attachments.pendingImage")}
         onClick={(event) => event.stopPropagation()}
       />
     </div>
   );
+}
+
+function composerMediaKindLabelKey(kind: ComposerMediaKind) {
+  if (kind === "image") return "media.message.image";
+  if (kind === "video") return "media.message.video";
+  return "media.message.file";
 }

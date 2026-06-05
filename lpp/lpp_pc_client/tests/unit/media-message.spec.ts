@@ -298,17 +298,17 @@ describe("message media upload presentation", () => {
     expect(fileMessageContent).toContain("const uploadBlocked = Boolean(displayStatusText);");
     expect(fileMessageContent).toContain('from "../../../app/appMetadata"');
     expect(fileMessageContent).toContain("sourceLabel={appProductName}");
-    expect(fileMessageContent).toContain("if (uploadBlocked) {");
+    expect(fileMessageContent).toContain("if (uploadBlocked) return;");
     expect(fileMessageContent).toContain("fileCardState.controlAction");
     expect(fileMessageContent).toContain("onUploadAction?.(uploadState.taskId, fileCardState.controlAction);");
     expect(fileMessageContent).toContain("controlState={fileCardState.controlState}");
     expect(fileMessageContent).toContain("onControlClick={fileCardState.controlAction ? handleFileControlClick : undefined}");
-    expect(fileMessageContent).toContain("metaText={displayStatusText || formatSize(media?.sizeBytes)}");
+    expect(fileMessageContent).toContain("metaText={displayStatusText || formatSize(media?.sizeBytes, t)}");
     expect(fileMessageCard).toContain("message-file-icon-action");
     expect(fileMessageCard).toContain("message-file-source");
     expect(fileMessageCard).not.toContain("message-file-type-layer");
     expect(fileMessageCard).not.toContain('sourceLabel = "lppchat"');
-    expect(fileMessageCard).toContain('sourceLabel = "客户端"');
+    expect(fileMessageContent).toContain("sourceLabel={appProductName}");
     expect(fileMessageCard).toContain("!controlActive");
     expect(fileMessageCard).toContain("file-type-glyph");
     expect(fileMessageCard).toContain("fileIcon.label");
@@ -353,12 +353,12 @@ describe("message media upload presentation", () => {
     );
 
     expect(composer).toContain("onOpenContactCardPicker");
-    expect(composer).toContain('aria-label="发送联系人名片"');
+    expect(composer).toContain('aria-label={t("composer.contactCard.send")}');
     expect(composer).toContain("<UserRound size={17} />");
-    expect(composer).toContain("<span>名片</span>");
-    expect(composer).toContain("<em>发送联系人名片</em>");
+    expect(composer).toContain('<span>{t("composer.contactCard.card")}</span>');
+    expect(composer).toContain('<em>{t("composer.contactCard.send")}</em>');
     expect(composer).toContain('className="composer-plus-item is-disabled" type="button" disabled');
-    expect(composer).toContain("<em>待接入</em>");
+    expect(composer).toContain('showDefaultQuickReplyTool');
     expect(composer).not.toContain("位置、名片等发送能力需要完整选择器");
     expect(composer).not.toContain("更多发送能力");
     expect(composerSurface).toContain("onOpenContactCardPicker");
@@ -377,7 +377,7 @@ describe("message media upload presentation", () => {
     expect(composer).toContain("createPortal(");
     expect(composer).toContain("moreButtonRef.current");
     expect(composer).toContain("getBoundingClientRect()");
-    expect(composer).toContain('aria-label="发送内容"');
+    expect(composer).toContain('aria-label={t("composer.more")}');
     const plusPanelCss = composerCss.match(/\.composer-plus-panel\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
     expect(plusPanelCss).toContain("position: fixed;");
     expect(plusPanelCss).toContain("z-index: 130;");
@@ -394,9 +394,8 @@ describe("message media upload presentation", () => {
       "utf8",
     );
 
-    expect(conversationInfoPanel).toContain(
-      'const groupInfoTabs = ["资料", "成员", "公告", "文件", "管理"] as const;',
-    );
+    expect(conversationInfoPanel).toContain("visibleGroupInfoTabs");
+    expect(conversationInfoPanel).toContain('t(`messages.conversationInfo.tabs.${tab}`)');
     expect(conversationInfoPanel).toContain("group-member-list");
     expect(conversationInfoPanel).toContain("conversation.memberCount");
     expect(interactionHandlers).toContain("if (activeConversation.conversationType === \"group\") return;");
@@ -534,9 +533,9 @@ describe("message media upload presentation", () => {
     );
 
     expect(imageFrame).toContain("message-image-viewer-toolbar");
-    expect(imageFrame).toContain("复制图片");
-    expect(imageFrame).toContain("另存为");
-    expect(imageFrame).toContain("显示位置");
+    expect(imageFrame).toContain('t("media.image.copy")');
+    expect(imageFrame).toContain('t("media.image.saveAs")');
+    expect(imageFrame).toContain('t("media.image.reveal")');
     expect(imageFrame).toContain("message-image-retry");
     expect(mediaParts).toContain("imageActionSrc");
     expect(mediaParts).toContain("copyCurrentMessageImage");

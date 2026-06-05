@@ -19,6 +19,7 @@ import type {
   AnchoredContactCardProfile,
   ContactCardRelation,
 } from "../models/contactCardModel";
+import type { ConversationContextAction } from "../models/messageConversationActionModel";
 import type { UserProfileDto } from "../../data/api-client";
 
 type MessageMenuState = {
@@ -32,8 +33,6 @@ type ConversationMenuState = {
   x: number;
   y: number;
 } | null;
-
-type ConversationContextAction = "mute" | "hide" | "delete";
 
 export function MessageOverlayLayer({
   avatarProfilePopover,
@@ -104,6 +103,7 @@ export function MessageOverlayLayer({
       )}
       {conversationMenu && (
         <ConversationContextMenu
+          isPinned={Boolean(conversationMenu.conversation.isPinned)}
           isMuted={Boolean(conversationMenu.conversation.isMuted)}
           onAction={(action) => onConversationAction(action, conversationMenu.conversation)}
           position={{ x: conversationMenu.x, y: conversationMenu.y }}

@@ -62,7 +62,7 @@ export function resendConfirmPreview(message: MessageItemDto) {
   const action = failedMessageRetryAction(message);
   if (!action) return "该消息暂时无法重发";
   if (action.type === "text") return action.content;
-  if (action.type === "contact_card") return "重新发送这张名片";
+  if (action.type === "contact_card") return "重新发送这张个人名片";
   return "重新上传并发送这条媒体消息";
 }
 
@@ -126,12 +126,12 @@ function isBlockedSendFailure(reason: string) {
     upper.includes("MSG_GROUP_MUTED") ||
     upper.includes("MSG_MEMBER_MUTED") ||
     upper.includes("MSG_USER_MUTED") ||
-    reason.includes("权限") ||
-    reason.includes("不在该会话") ||
-    reason.includes("禁言") ||
-    reason.includes("冻结") ||
-    reason.includes("不可回复") ||
-    reason.includes("不可发送")
+    reason.includes("\u6743\u9650") ||
+    reason.includes("\u4e0d\u5728\u8be5\u4f1a\u8bdd") ||
+    reason.includes("\u7981\u8a00") ||
+    reason.includes("\u51bb\u7ed3") ||
+    reason.includes("\u4e0d\u53ef\u56de\u590d") ||
+    reason.includes("\u4e0d\u53ef\u53d1\u9001")
   );
 }
 
@@ -147,9 +147,9 @@ function isRetryableSendFailure(reason: string) {
     upper.includes("502") ||
     upper.includes("503") ||
     upper.includes("504") ||
-    reason.includes("网络") ||
-    reason.includes("超时") ||
-    reason.includes("中断") ||
-    reason.includes("服务暂不可用")
+    reason.includes("\u7f51\u7edc") ||
+    reason.includes("\u8d85\u65f6") ||
+    reason.includes("\u4e2d\u65ad") ||
+    reason.includes("\u670d\u52a1\u6682\u4e0d\u53ef\u7528")
   );
 }

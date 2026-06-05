@@ -271,7 +271,7 @@ export function deriveConversationReadView(state: ConversationReadState): Conver
     conversationType: state.conversationType,
     unreadCount,
     hasUnread: unreadCount > 0,
-    titleUnreadText: unreadCount > 0 ? `${unreadCount} 条未读` : "暂无未读",
+    titleUnreadText: unreadCount > 0 ? `${unreadCount} unread` : "No unread",
     showNewMessageJump: unreadCount > 0,
   };
 }

@@ -1,8 +1,8 @@
 import { logSettingsDiagnostic } from "./settings-diagnostics";
 import {
   defaultChatBackgroundPreset,
-  normalizeChatBackgroundPreset,
-  type ChatBackgroundPresetId,
+  normalizeChatBackgroundSetting,
+  type ChatBackgroundSetting,
 } from "../../settings/models/chatBackgroundModel";
 import type { ApiTrafficLogLevel } from "../api/api-traffic-diagnostics";
 import {
@@ -25,24 +25,24 @@ export interface PcSettings {
   launchAtStartup: boolean;
   autoReconnect: boolean;
   compactList: boolean;
-  fontSize: "小" | "标准" | "大" | "超大";
+  fontSize: "\u5c0f" | "\u6807\u51c6" | "\u5927" | "\u8d85\u5927";
   highDensityContext: boolean;
   theme: "porcelain" | "business" | "classic-wechat" | "dark" | "high-contrast";
   skin: "jade" | "blue" | "graphite";
-  language: "简体中文" | "English" | "العربية";
+  language: "\u7b80\u4f53\u4e2d\u6587" | "English" | "العربية";
   timezone: PcSelectableUserTimezone;
   autoTranslate: boolean;
   enterToSend: boolean;
   screenshotShortcut: "Alt+A" | "Ctrl+Alt+A" | "Ctrl+Shift+A" | "None";
   dragUpload: boolean;
-  chatBackgroundPreset: ChatBackgroundPresetId;
+  chatBackgroundPreset: ChatBackgroundSetting;
   localMessageCache: boolean;
   allowLppSearch: boolean;
   allowMobileSearch: boolean;
   friendRequestVerification: boolean;
-  profileVisibility: "所有人" | "仅好友" | "不允许";
+  profileVisibility: "\u6240\u6709\u4eba" | "\u4ec5\u597d\u53cb" | "\u4e0d\u5141\u8bb8";
   sensitiveMasking: boolean;
-  activeLine: "自动选择" | "主站" | "香港线路" | "新加坡线路";
+  activeLine: "\u81ea\u52a8\u9009\u62e9" | "\u4e3b\u7ad9" | "\u9999\u6e2f\u7ebf\u8def" | "\u65b0\u52a0\u5761\u7ebf\u8def";
   weakNetworkDiagnostics: boolean;
   apiTrafficLogLevel: ApiTrafficLogLevel;
   reduceMotion: boolean;
@@ -80,11 +80,11 @@ export const defaultPcSettings: PcSettings = {
   launchAtStartup: false,
   autoReconnect: true,
   compactList: true,
-  fontSize: "标准",
+  fontSize: "\u6807\u51c6",
   highDensityContext: false,
   theme: "porcelain",
   skin: "jade",
-  language: "简体中文",
+  language: "\u7b80\u4f53\u4e2d\u6587",
   timezone: "系统默认",
   autoTranslate: false,
   enterToSend: true,
@@ -95,9 +95,9 @@ export const defaultPcSettings: PcSettings = {
   allowLppSearch: true,
   allowMobileSearch: true,
   friendRequestVerification: true,
-  profileVisibility: "仅好友",
+  profileVisibility: "\u4ec5\u597d\u53cb",
   sensitiveMasking: true,
-  activeLine: "自动选择",
+  activeLine: "\u81ea\u52a8\u9009\u62e9",
   weakNetworkDiagnostics: true,
   apiTrafficLogLevel: "summary",
   reduceMotion: false,
@@ -163,7 +163,7 @@ export function mergePcSettings(partial: Partial<PcSettings> = {}): PcSettings {
     ...defaultPcSettings,
     ...partial,
     settingsSchemaVersion: pcSettingsSchemaVersion,
-    chatBackgroundPreset: normalizeChatBackgroundPreset(partial.chatBackgroundPreset),
+    chatBackgroundPreset: normalizeChatBackgroundSetting(partial.chatBackgroundPreset),
     timezone: normalizePcUserTimezone(partial.timezone),
   };
 }

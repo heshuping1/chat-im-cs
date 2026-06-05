@@ -122,13 +122,13 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
   const title =
     stringField(asRecord(payload.thread), "title", "customerName", "visitorName") ||
     stringField(payload, "threadTitle", "customerName", "visitorName", "title") ||
-    "新的在线客服会话";
+    "新的客服会话";
   const source =
     stringField(payload, "source", "channel", "sourceChannel", "entryChannel") ||
     stringField(asRecord(payload.thread), "source", "channel", "sourceChannel", "entryChannel");
   const body = source
     ? `来自 ${source} 的访客正在排队，等待接入`
-    : "有访客正在排队，等待接入";
+    : "访客正在排队，等待接入";
   const presentation = buildCustomerServiceNotificationPresentation({
     fallbackTitle: title,
     payload,
@@ -185,8 +185,8 @@ function notifyCustomerServiceMessage(
     message,
     payload,
   });
-  const body = options.active && presentation.preview === "[消息]"
-    ? "当前在线客服会话有新消息"
+  const body = options.active && presentation.preview === "[Message]"
+    ? "The current customer service conversation has a new message"
     : presentation.body;
   const nextTargetId = targetId || presentation.targetId;
   const reminderDecision = consumeCustomerServiceMessageReminder({

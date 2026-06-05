@@ -3,7 +3,7 @@ import type { CSSProperties, MouseEvent, Ref } from "react";
 import { PanelState } from "../../components/PanelState";
 import type { CustomerServiceThread } from "../../data/api-client";
 import type { MessageItemDto } from "../../data/api-client";
-import type { CustomerServiceWorkspaceInlineState } from "../../data/customer-service/cs-workspace-view-model";
+import { useI18n } from "../../i18n/useI18n";
 import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
 import {
   ServiceMessageContextMenu,
@@ -17,6 +17,12 @@ type ServiceMessageMenuState = {
   x: number;
   y: number;
 } | null;
+
+type TranslatedWorkspaceInlineState = {
+  kind: "empty" | "error" | "loading";
+  text: string;
+  tone: "error" | "muted";
+};
 
 export function CustomerServiceMessageStage({
   accountId,
@@ -47,7 +53,7 @@ export function CustomerServiceMessageStage({
   messageAnnotations: Record<string, string>;
   messageMenu: ServiceMessageMenuState;
   messages: MessageItemDto[];
-  messageStageState?: CustomerServiceWorkspaceInlineState;
+  messageStageState?: TranslatedWorkspaceInlineState;
   pendingNewMessageCount: number;
   selectedThread: CustomerServiceThread;
   stageRef: Ref<HTMLElement>;
@@ -57,11 +63,12 @@ export function CustomerServiceMessageStage({
   onScroll: () => void;
   onUploadAction: (localTaskId: string, action: "pause" | "resume" | "cancel" | "retry") => void;
 }) {
+  const { t } = useI18n();
   return (
     <>
       <section
         className="h-message-stage"
-        aria-label="在线客服聊天"
+        aria-label={t("customerService.messageStage.aria")}
         onScroll={onScroll}
         ref={stageRef}
         style={chatBackgroundStyleVariables(chatBackgroundPreset) as CSSProperties}
@@ -72,7 +79,7 @@ export function CustomerServiceMessageStage({
             type="button"
             onClick={jumpToLatest}
           >
-            ↓ {pendingNewMessageCount} 条新消息
+            {t("customerService.messageStage.newMessages", { count: pendingNewMessageCount })}
           </button>
         )}
         {messageStageState && (
@@ -92,7 +99,7 @@ export function CustomerServiceMessageStage({
                 accountId,
                 conversationId: selectedThread.threadId || selectedThread.conversationId,
               }}
-              conversationFallbackName={title || "客"}
+              conversationFallbackName={title || t("customerService.messageStage.customerFallback")}
               senderFallback={title}
               onContextMenu={onContextMenu}
               onUploadAction={onUploadAction}

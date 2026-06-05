@@ -124,7 +124,7 @@ export function sendOutboxRecordToMessage(
     messageType: record.messageType,
     preview: previewFromOutboxBody(record.messageType, record.body),
     senderAvatarUrl: identity?.avatarUrl ?? null,
-    senderDisplayName: identity?.displayName || "Me",
+    senderDisplayName: identity?.displayName || "我",
     senderLppId: identity?.lppId ?? undefined,
     senderUserId: identity?.userId || identity?.platformUserId || undefined,
     sentAt: new Date(record.createdAt).toISOString(),

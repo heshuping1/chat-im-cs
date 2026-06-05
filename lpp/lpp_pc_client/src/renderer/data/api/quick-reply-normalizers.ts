@@ -74,7 +74,7 @@ export function compareQuickReplies(
 }
 
 export function quickReplyCategory(reply: CustomerServiceQuickReplyDto) {
-  return reply.category?.trim() || "未分组";
+  return reply.category?.trim() || "Ungrouped";
 }
 
 function normalizeQuickReply(payload: unknown): CustomerServiceQuickReplyDto | null {

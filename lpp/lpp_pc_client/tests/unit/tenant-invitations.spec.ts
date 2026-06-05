@@ -114,16 +114,16 @@ describe("tenant employee invitations", () => {
 
   it("renders invitation management in enterprise space with refresh and revoke flow", () => {
     expect(accountSpaceSource).toContain("<TenantInvitationPanel isPersonalSpace={isPersonalSpace} />");
-    expect(tenantInvitationPanelSource).toContain("邀请员工");
-    expect(tenantInvitationPanelSource).toContain("入职角色");
-    expect(tenantInvitationPanelSource).toContain("管理员将拥有成员和空间管理权限");
+    expect(tenantInvitationPanelSource).toContain("tenantInvitation.title");
+    expect(tenantInvitationPanelSource).toContain("tenantInvitation.role");
+    expect(tenantInvitationPanelSource).toContain("tenantInvitation.adminWarning");
     expect(tenantInvitationPanelSource).toContain("tenantInvitations");
     expect(tenantInvitationPanelSource).toContain("tenant-invitation-code");
-    expect(tenantInvitationPanelSource).toContain("邀请码：");
-    expect(tenantInvitationPanelSource).toContain("复制邀请码");
+    expect(tenantInvitationPanelSource).toContain("tenantInvitation.codeValue");
+    expect(tenantInvitationPanelSource).toContain("tenantInvitation.copyCode");
     expect(tenantInvitationPanelSource).toContain("invalidateQueries({");
     expect(tenantInvitationPanelSource).toContain("queryKey: pcQueryKeys.tenantInvitations");
-    expect(tenantInvitationPanelSource).toContain("confirm(\"撤销后，已复制的邀请码将无法继续使用。确认撤销？\")");
+    expect(tenantInvitationPanelSource).toContain("tenantInvitation.revokeConfirm");
     expect(tenantInvitationPanelSource).not.toContain("创建所有者邀请");
     expect(tenantInvitationPanelSource).not.toContain("下载客户端");
     expect(tenantInvitationPanelSource).not.toContain("qrPayload");

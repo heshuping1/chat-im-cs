@@ -698,6 +698,7 @@ export const th: MessageDictionary = {
       conversationListNoMatch: 'No matching conversations',
       directConversationFallback: 'Direct IM conversation',
       dragSort: 'Drag to reorder',
+      groupAllMutedReadOnly: 'All members are muted. Only the owner, admins, and customer service can send.',
       insertedToComposer: 'Inserted into the input box. Confirm to send.',
       knowledgeBase: 'Knowledge base',
       knowledgeEmpty: 'This knowledge item has no insertable text.',
@@ -810,6 +811,16 @@ export const th: MessageDictionary = {
       updateAnnouncement: 'Group announcement updated.',
       updateGroupTitle: 'Group name updated.',
       updateSettings: 'Group settings updated.',
+    },
+    conversationActions: {
+      deleted: 'Conversation deleted.',
+      failed: 'Conversation action failed: {error}',
+      hidden: 'Conversation hidden.',
+      muted: 'Do not disturb enabled.',
+      pinned: 'Conversation pinned.',
+      restored: 'Conversation restored.',
+      unmuted: 'Do not disturb disabled.',
+      unpinned: 'Conversation unpinned.',
     },
     conversationInfo: conversationInfoFallback,
     chatHeader: {
@@ -1201,7 +1212,7 @@ export const th: MessageDictionary = {
   apiError: {
     aborted: 'ยกเลิกการดำเนินการแล้ว',
     messageConversationFrozen: 'การสนทนานี้ถูกระงับชั่วคราว จึงยังส่งข้อความไม่ได้',
-    messageGroupMuted: 'กลุ่มนี้ปิดการพูดคุยสำหรับสมาชิกทั้งหมด จึงยังส่งข้อความไม่ได้',
+    messageGroupMuted: 'This group is muted for all members. The current account has no permission to send.',
     messageMemberForbidden: 'คุณไม่ได้อยู่ในการสนทนานี้ จึงส่งข้อความไม่ได้',
     messageMemberMuted: 'คุณถูกปิดเสียง จึงยังพูดคุยไม่ได้',
     messageUserMuted: 'บัญชีปัจจุบันถูกปิดเสียง จึงยังส่งข้อความไม่ได้',

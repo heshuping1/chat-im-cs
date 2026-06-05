@@ -20,10 +20,13 @@ describe("customer service close confirmation model", () => {
         pendingMessageCount: 0,
       }),
     ).toEqual({
-      confirmLabel: "确认关闭",
-      detail: "关闭后，本次服务会话将进入历史记录，输入区会变为只读。",
-      riskText: "访客后续再次咨询时，将按服务端规则重新排队或生成新的客服线程。",
-      title: "关闭「访客 12」的会话？",
+      confirmLabel: { key: "customerService.closeConfirm.confirm" },
+      detail: { key: "customerService.closeConfirm.detail" },
+      riskText: { key: "customerService.closeConfirm.risk" },
+      title: {
+        key: "customerService.closeConfirm.title",
+        params: { customer: "访客 12" },
+      },
       warningText: null,
     });
   });
@@ -34,7 +37,10 @@ describe("customer service close confirmation model", () => {
         customerTitle: "Mouse 客户",
         pendingMessageCount: 2,
       }).warningText,
-    ).toBe("当前还有 2 条消息未完成发送，建议处理后再关闭。");
+    ).toEqual({
+      key: "customerService.closeConfirm.pendingWarning",
+      params: { count: 2 },
+    });
   });
 
   it("counts close-blocking local send states inside the close domain model", () => {

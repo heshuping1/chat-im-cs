@@ -134,14 +134,14 @@ function finiteNumber(value: unknown) {
 }
 
 function isPersonalSpace(roleLabel: string) {
-  return roleLabel.includes("个人空间") || roleLabel.includes("personal");
+  return roleLabel.includes("\u4e2a\u4eba\u7a7a\u95f4") || roleLabel.includes("personal");
 }
 
 function isAdminOrOwner(roleLabel: string) {
   return (
-    roleLabel.includes("管理员") ||
+    roleLabel.includes("\u7ba1\u7406\u5458") ||
     roleLabel.includes("admin") ||
-    roleLabel.includes("所有者") ||
+    roleLabel.includes("\u6240\u6709\u8005") ||
     roleLabel.includes("owner")
   );
 }
@@ -152,11 +152,11 @@ function isAdminOrOwnerRole(role: number) {
 
 function isExplicitlyDeniedRole(roleLabel: string) {
   return (
-    roleLabel.includes("客服") ||
+    roleLabel.includes("\u5ba2\u670d") ||
     roleLabel.includes("customer_service") ||
-    roleLabel.includes("成员") ||
+    roleLabel.includes("\u6210\u5458") ||
     roleLabel.includes("member") ||
-    roleLabel.includes("技术支持") ||
+    roleLabel.includes("\u6280\u672f\u652f\u6301") ||
     roleLabel.includes("support")
   );
 }

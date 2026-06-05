@@ -87,7 +87,7 @@
 
 ## 服务端/环境缺口
 
-1. Gateway CORS / Origin：真实浏览器 UI 中 `/ws/client/negotiate` 被 CORS 拦截，实时 push 链路不能认定真可用。已补充到 [服务端支持.md](/Users/treesoft/Downloads/lpp-flutte/lpp/lpp_pc_client/docs/服务端支持.md)。
+1. Gateway CORS / Origin：真实浏览器 UI 中 `/ws/client/negotiate` 被 CORS 拦截，实时 push 链路不能认定真可用。已补充到 [05-服务端支持.md](../05-服务端支持.md)。
 2. 真实测试数据：当前员工测试账号初始没有好友、没有群聊；必须先通过真实好友申请建立测试数据，群聊相关能力仍缺真实群数据。
 3. 服务端历史消息字段：真实历史返回 `senderDisplayName` 和 `preview` 为空，PC 当前能靠会话/身份和 body 展示文本、图片、文件，但 sender 可读性、会话预览质量依赖服务端字段补齐或前端更强兜底。
 4. Electron 打包态：本次验证覆盖本地浏览器页面；Electron 下文件选择器、下载路径、系统通知、Gateway Origin 仍需人工或 Electron E2E 确认。

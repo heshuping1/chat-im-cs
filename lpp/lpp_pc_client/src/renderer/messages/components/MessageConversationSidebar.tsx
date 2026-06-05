@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
 import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
+import { useI18n } from "../../i18n/useI18n";
 import { startHorizontalPaneResize } from "../../lib/paneResize";
 import { getImConversationType } from "../hooks/useMessageCenterViewModel";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
@@ -85,6 +86,8 @@ export function MessageConversationSidebar({
   setListPaneWidth: (width: number) => void;
   setPlusMenuOpen: Dispatch<SetStateAction<boolean>>;
 }) {
+  const { t } = useI18n();
+
   return (
     <>
       <MessageConversationListPanel
@@ -138,7 +141,7 @@ export function MessageConversationSidebar({
       <div
         className="resizer list-resizer"
         role="separator"
-        aria-label="调整消息列表宽度"
+        aria-label={t("message.profileDock.resizeList")}
         onPointerDown={(event) =>
           startHorizontalPaneResize(event, {
             initialWidth: listPaneWidth,

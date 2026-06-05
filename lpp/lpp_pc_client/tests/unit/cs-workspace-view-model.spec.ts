@@ -86,12 +86,12 @@ describe("customer service workspace view model", () => {
   it("centralizes no-thread, loading, error and empty states", () => {
     expect(createCustomerServiceNoThreadState()).toMatchObject({
       kind: "empty",
-      text: "选择排队、进行中或历史会话后开始处理。",
+      text: { key: "customerService.workspace.inline.noThread" },
       tone: "muted",
     });
     expect(createCustomerServiceMessageStageState({ loading: true, messageCount: 0 })).toMatchObject({
       kind: "loading",
-      text: "正在加载会话...",
+      text: { key: "customerService.workspace.inline.loading" },
       tone: "muted",
     });
     expect(
@@ -101,12 +101,15 @@ describe("customer service workspace view model", () => {
       }),
     ).toMatchObject({
       kind: "error",
-      text: "会话加载失败：network",
+      text: {
+        key: "customerService.workspace.inline.loadFailed",
+        params: { error: "network" },
+      },
       tone: "error",
     });
     expect(createCustomerServiceMessageStageState({ messageCount: 0 })).toMatchObject({
       kind: "empty",
-      text: "暂无消息记录，可先查看客户资料或等待访客发起对话。",
+      text: { key: "customerService.workspace.inline.emptyMessages" },
       tone: "muted",
     });
     expect(createCustomerServiceMessageStageState({ messageCount: 1 })).toBeUndefined();
@@ -118,18 +121,31 @@ describe("customer service workspace view model", () => {
       selectedThread: thread({ status: "queued" }),
     });
     expect(queued).toMatchObject({
-      composerDisabledText: "当前会话仍在排队中，请先点击“接入”。",
-      modeLabel: "当前接待",
-      receptionText: "客户正在排队 · 来自 网页 · 接入后才能人工回复",
+      composerDisabledText: { key: "customerService.workspace.composerDisabled.claim" },
+      modeLabel: { key: "customerService.workspace.mode.current" },
+      receptionText: {
+        key: "customerService.workspace.reception.queued",
+        params: { source: "网页" },
+      },
     });
 
     const closed = createCustomerServiceWorkspaceViewModel({
       selectedThread: thread({ status: "closed_by_staff", unreadCount: 2 }),
     });
-    expect(closed.closedUnreadNoticeText).toBe("有 2 条关闭前未读消息");
-    expect(closed.composerDisabledText).toBe("会话已结束，无法继续回复");
-    expect(closed.modeLabel).toBe("历史会话");
-    expect(closed.receptionText).toBe("会话已结束 · 客服关闭");
+    expect(closed.closedUnreadNoticeText).toEqual({
+      key: "customerService.workspace.closedUnreadNotice",
+      params: { count: 2 },
+    });
+    expect(closed.composerDisabledText).toEqual({
+      key: "customerService.workspace.composerDisabled.readonly",
+    });
+    expect(closed.modeLabel).toEqual({
+      key: "customerService.workspace.mode.history",
+    });
+    expect(closed.receptionText).toEqual({
+      key: "customerService.workspace.reception.ended",
+      params: { status: "customerService.threadList.historyStatus.closedByStaff" },
+    });
   });
 });
 

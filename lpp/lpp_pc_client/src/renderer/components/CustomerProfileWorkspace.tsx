@@ -28,20 +28,25 @@ import type {
 } from "../data/api-client";
 import type { ContactItem } from "../data/types";
 import { useSetActiveModule } from "../data/workspace-ui/workspace-ui-store";
+import type { TranslationParams } from "../i18n/dictionary";
+import { useI18n } from "../i18n/useI18n";
 import { CustomerProfileTagList } from "./CustomerProfileBits";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
 import {
   buildCustomerModel,
+  createCustomerModelCopy,
   isKnown,
   normalizeRecord,
   sectionToItems,
   tabCount,
   textValue,
+  type CustomerModelCopy,
   type CustomerModel,
   type ExternalSection,
 } from "./CustomerProfileModel";
 
+type Translate = (key: string, params?: TranslationParams) => string;
 type CustomerTab =
   | "overview"
   | "trading"
@@ -54,15 +59,17 @@ type CustomerTab =
 type CustomerProfileVariant = "im" | "customerService";
 type CustomerProfileErrorMode = "silent" | "inline" | "blocking";
 
-const tabs: Array<{ key: CustomerTab; label: string; icon: LucideIcon }> = [
-  { key: "overview", label: "总览", icon: Tags },
-  { key: "trading", label: "交易记录", icon: ReceiptText },
-  { key: "funds", label: "资金流水", icon: WalletCards },
-  { key: "sessions", label: "会话", icon: MessageCircleMore },
-  { key: "tickets", label: "工单", icon: ClipboardList },
-  { key: "touch", label: "触达", icon: Radio },
-  { key: "compliance", label: "KYC/合规", icon: ShieldCheck },
-  { key: "agentDevice", label: "代理/设备", icon: Smartphone },
+const DEFAULT_TITLE = "\u5ba2\u6237\u4fe1\u606f";
+
+const tabs: Array<{ key: CustomerTab; icon: LucideIcon }> = [
+  { key: "overview", icon: Tags },
+  { key: "trading", icon: ReceiptText },
+  { key: "funds", icon: WalletCards },
+  { key: "sessions", icon: MessageCircleMore },
+  { key: "tickets", icon: ClipboardList },
+  { key: "touch", icon: Radio },
+  { key: "compliance", icon: ShieldCheck },
+  { key: "agentDevice", icon: Smartphone },
 ];
 const primaryTabs = tabs.slice(0, 5);
 const overflowTabs = tabs.slice(5);
@@ -83,7 +90,7 @@ export function CustomerProfileWorkspace({
   profileActionPending = false,
   profileExtra,
   profile,
-  title = "客户信息",
+  title = DEFAULT_TITLE,
   variant = "customerService",
 }: {
   avatarUrl?: string | null;
@@ -104,13 +111,15 @@ export function CustomerProfileWorkspace({
   title?: string;
   variant?: CustomerProfileVariant;
 }) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<CustomerTab>("overview");
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const setActiveModule = useSetActiveModule();
+  const customerModelCopy = useMemo(() => createCustomerModelCopy(t), [t]);
   const model = useMemo(
-    () => buildCustomerModel({ avatarUrl, conversation, contact, profile, profileExtra }),
-    [avatarUrl, conversation, contact, profile, profileExtra],
+    () => buildCustomerModel({ avatarUrl, conversation, contact, copy: customerModelCopy, profile, profileExtra }),
+    [avatarUrl, conversation, contact, customerModelCopy, profile, profileExtra],
   );
   const activeOverflowTab = overflowTabs.find((tab) => tab.key === activeTab);
   const visibleTabs = overflowMenuOpen ? tabs : primaryTabs;
@@ -130,7 +139,7 @@ export function CustomerProfileWorkspace({
       onDrop={onDrop}
     >
       <header className="customer-info-head">
-        <h2>{title}</h2>
+        <h2>{title === DEFAULT_TITLE ? t("customerProfile.title") : title}</h2>
         {headerActions && (
           <div className="customer-info-head-actions">{headerActions}</div>
         )}
@@ -139,25 +148,26 @@ export function CustomerProfileWorkspace({
       <CustomerIdentityHero
         model={model}
         onOpenFullProfile={() => setActiveModule("customerDetail")}
+        t={t}
       />
-      <CustomerStatusChips model={model} />
+      <CustomerStatusChips model={model} t={t} />
 
-      {loading && <PanelState text="正在加载客户资料..." />}
+      {loading && <PanelState text={t("customerProfile.loading")} />}
       {showBlockingError && (
         <PanelState
           tone="error"
-          text="客户资料暂不可用，已展示会话和通讯录中的基础信息。"
+          text={t("customerProfile.blockingError")}
         />
       )}
       {showInlineError && (
-        <PanelState text="部分客户画像暂未同步，已展示当前可用资料。" />
+        <PanelState text={t("customerProfile.inlineError")} />
       )}
 
       {activeTab === "overview" && (
         <>
           <section className="customer-360-priority-grid">
-            <AccountOverviewCard model={model} />
-            <AssetStructureCard model={model} />
+            <AccountOverviewCard model={model} t={t} />
+            <AssetStructureCard model={model} t={t} />
             <ServiceActionPanel
               model={model}
               notice={actionNotice}
@@ -170,15 +180,16 @@ export function CustomerProfileWorkspace({
               onPendingAction={setActionNotice}
               onUpdateRemark={onUpdateRemark}
               onUpdateTags={onUpdateTags}
+              t={t}
             />
-            <LanguageBridgeCard model={model} />
-            <RecentTrading7dCard model={model} />
+            <LanguageBridgeCard model={model} t={t} />
+            <RecentTrading7dCard model={model} t={t} />
           </section>
         </>
       )}
 
       <section className={`customer-profile-tabbox ${overflowMenuOpen ? "menu-open" : ""}`}>
-        <nav className="customer-profile-tabs" aria-label="客户资料页签">
+        <nav className="customer-profile-tabs" aria-label={t("customerProfile.tabsAria")}>
           {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -194,7 +205,7 @@ export function CustomerProfileWorkspace({
                 }}
               >
                 <Icon size={15} />
-                {tab.label}
+                {t(`customerProfile.tabs.${tab.key}`)}
                 {tabCount(tab.key, model) > 0 && <em>{tabCount(tab.key, model)}</em>}
               </button>
             );
@@ -206,7 +217,7 @@ export function CustomerProfileWorkspace({
             onClick={() => setOverflowMenuOpen((open) => !open)}
           >
             <ChevronDown size={14} />
-            更多
+            {t("customerProfile.more")}
             {activeOverflowTab && tabCount(activeOverflowTab.key, model) > 0 && (
               <em>{tabCount(activeOverflowTab.key, model)}</em>
             )}
@@ -215,7 +226,7 @@ export function CustomerProfileWorkspace({
       </section>
 
       {activeTab !== "overview" && (
-        <section className="customer-profile-content">{renderTab(activeTab, model)}</section>
+        <section className="customer-profile-content">{renderTab(activeTab, model, t, customerModelCopy)}</section>
       )}
     </aside>
   );
@@ -224,22 +235,24 @@ export function CustomerProfileWorkspace({
 function CustomerIdentityHero({
   model,
   onOpenFullProfile,
+  t,
 }: {
   model: CustomerModel;
   onOpenFullProfile: () => void;
+  t: Translate;
 }) {
-  const displayName = isKnown(model.lppId) ? `${model.name}（${model.lppId}）` : model.name;
+  const displayName = isKnown(model.lppId) ? `${model.name} (${model.lppId})` : model.name;
   const infoItems = [
-    ["绿泡泡号", model.lppId],
-    ["用户ID", model.customerId],
-    ["来源", model.source],
-    ["渠道应用", model.channelApp],
+    [t("customerProfile.fields.lppId"), model.lppId],
+    [t("customerProfile.fields.userId"), model.customerId],
+    [t("customerProfile.fields.source"), model.source],
+    [t("customerProfile.fields.channelApp"), model.channelApp],
   ];
   return (
     <section className="customer-360-hero">
       <div className="customer-360-avatar-wrap">
         <PcAvatar avatarUrl={model.avatarUrl} className="e-avatar" name={model.name} />
-        {model.onlineStatus === "在线" && <span className="customer-360-online-dot" />}
+        {model.isOnline && <span className="customer-360-online-dot" />}
       </div>
       <div className="customer-360-identity-main">
         <div className="customer-360-name-row">
@@ -264,15 +277,15 @@ function CustomerIdentityHero({
         onClick={onOpenFullProfile}
       >
         <ExternalLink size={13} />
-        完整档案
+        {t("customerProfile.fullProfile")}
       </button>
     </section>
   );
 }
 
-function CustomerStatusChips({ model }: { model: CustomerModel }) {
+function CustomerStatusChips({ model, t }: { model: CustomerModel; t: Translate }) {
   return (
-    <section className="customer-360-status-chips" aria-label="客户状态">
+    <section className="customer-360-status-chips" aria-label={t("customerProfile.statusAria")}>
       {model.statusChips.map((chip) => (
         <span data-empty={chip.empty} data-tone={chip.tone} key={`${chip.tone}-${chip.label}`}>
           {chip.label}
@@ -282,18 +295,22 @@ function CustomerStatusChips({ model }: { model: CustomerModel }) {
   );
 }
 
-function AccountOverviewCard({ model }: { model: CustomerModel }) {
+function AccountOverviewCard({ model, t }: { model: CustomerModel; t: Translate }) {
   return (
     <PanelBlock
       className="customer-360-account"
-      title="账户总览"
-      meta={isKnown(model.lastProfileUpdatedAt) ? `更新 ${model.lastProfileUpdatedAt}` : "更新 --"}
+      title={t("customerProfile.cards.accountOverview")}
+      meta={
+        isKnown(model.lastProfileUpdatedAt)
+          ? t("customerProfile.updatedAt", { time: model.lastProfileUpdatedAt })
+          : t("customerProfile.updatedEmpty")
+      }
       icon={<WalletCards size={16} />}
     >
       <div className="customer-360-account-grid">
-        <AccountMetric label="账户余额" value={model.accountBalance} />
-        <AccountMetric label="净入金" value={model.netDeposit} />
-        <AccountMetric label="累计入金" value={model.totalDeposit} />
+        <AccountMetric label={t("customerProfile.fields.accountBalance")} value={model.accountBalance} />
+        <AccountMetric label={t("customerProfile.fields.netDeposit")} value={model.netDeposit} />
+        <AccountMetric label={t("customerProfile.fields.totalDeposit")} value={model.totalDeposit} />
       </div>
     </PanelBlock>
   );
@@ -314,10 +331,10 @@ function AccountMetric({
   );
 }
 
-function AssetStructureCard({ model }: { model: CustomerModel }) {
+function AssetStructureCard({ model, t }: { model: CustomerModel; t: Translate }) {
   const gradient = donutGradient(model.assetRows);
   return (
-    <PanelBlock className="customer-360-asset" title="资产结构" icon={<ReceiptText size={16} />}>
+    <PanelBlock className="customer-360-asset" title={t("customerProfile.cards.assetStructure")} icon={<ReceiptText size={16} />}>
       <div className="customer-360-asset-layout">
         <div
           className="customer-360-donut"
@@ -328,7 +345,7 @@ function AssetStructureCard({ model }: { model: CustomerModel }) {
             <strong data-empty={!isKnown(model.accountBalance)}>
               {isKnown(model.accountBalance) ? model.accountBalance : "--"}
             </strong>
-            <span>总资产</span>
+            <span>{t("customerProfile.fields.totalAssets")}</span>
           </div>
         </div>
         <div className="customer-360-asset-list">
@@ -356,6 +373,7 @@ function ServiceActionPanel({
   onUpdateRemark,
   onUpdateTags,
   pending,
+  t,
 }: {
   model: CustomerModel;
   notice: string;
@@ -364,6 +382,7 @@ function ServiceActionPanel({
   onUpdateRemark?: (remarkName: string) => Promise<void> | void;
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
   pending: boolean;
+  t: Translate;
 }) {
   const ticketCount = model.tickets.length;
   const editable = isKnown(model.friendUserId);
@@ -382,45 +401,54 @@ function ServiceActionPanel({
 
   const saveRemark = async () => {
     if (!editable || !onUpdateRemark) {
-      onPendingAction("当前客户缺少好友 ID，无法编辑备注");
+      onPendingAction(t("customerProfile.notice.missingFriendForRemark"));
       return;
     }
     try {
       await onUpdateRemark(remarkDraft.trim());
       setEditingRemark(false);
-      onPendingAction("备注已更新");
+      onPendingAction(t("customerProfile.notice.remarkUpdated"));
     } catch (error) {
-      onPendingAction(error instanceof Error ? `备注更新失败：${error.message}` : "备注更新失败");
+      onPendingAction(
+        error instanceof Error
+          ? t("customerProfile.notice.remarkUpdateFailedWithError", { error: error.message })
+          : t("customerProfile.notice.remarkUpdateFailed"),
+      );
     }
   };
 
   const saveTags = async () => {
     if (!editable || !onUpdateTags) {
-      onPendingAction("当前客户缺少好友 ID，无法编辑标签");
+      onPendingAction(t("customerProfile.notice.missingFriendForTags"));
       return;
     }
     try {
       await onUpdateTags(parseCompactTagDraft(tagDraft));
       setEditingTags(false);
-      onPendingAction("标签已更新");
+      onPendingAction(t("customerProfile.notice.tagsUpdated"));
     } catch (error) {
-      onPendingAction(error instanceof Error ? `标签更新失败：${error.message}` : "标签更新失败");
+      onPendingAction(
+        error instanceof Error
+          ? t("customerProfile.notice.tagsUpdateFailedWithError", { error: error.message })
+          : t("customerProfile.notice.tagsUpdateFailed"),
+      );
     }
   };
 
   return (
-    <PanelBlock className="customer-360-actions" title="服务动作" icon={<CalendarClock size={16} />}>
+    <PanelBlock className="customer-360-actions" title={t("customerProfile.cards.serviceActions")} icon={<CalendarClock size={16} />}>
       <section
         className="customer-360-action-list"
-        aria-label="客户处理"
+        aria-label={t("customerProfile.actionAria")}
         data-testid="customer-profile-actions"
       >
         {editingTags ? (
           <CompactInlineRow
             actionKey="tags"
             icon={<Tags size={15} />}
-            label="标签"
+            label={t("customerProfile.fields.tags")}
             pending={pending}
+            t={t}
             value={tagDraft}
             onCancel={() => setEditingTags(false)}
             onChange={setTagDraft}
@@ -430,7 +458,7 @@ function ServiceActionPanel({
           <div className="customer-360-action-row" data-action-row="tags">
             <span className="customer-360-action-label">
               <Tags size={15} />
-              标签
+              {t("customerProfile.fields.tags")}
             </span>
             <div className="customer-360-action-value">
               <CustomerProfileTagList
@@ -451,32 +479,37 @@ function ServiceActionPanel({
                 onPendingAction("");
               }}
             >
-              编辑
+              {t("customerProfile.actions.edit")}
             </button>
           </div>
         )}
         <CompactActionRow
-          actionLabel="设置"
+          actionLabel={t("customerProfile.actions.set")}
           actionKey="follow-up"
           icon={<CalendarClock size={15} />}
-          label="跟进"
-          onAction={() => onPendingAction("跟进接口待接入")}
-          value={isKnown(model.nextFollowUp) ? model.nextFollowUp : "未设置跟进"}
+          label={t("customerProfile.fields.followUp")}
+          onAction={() => onPendingAction(t("customerProfile.notice.followUpPending"))}
+          value={isKnown(model.nextFollowUp) ? model.nextFollowUp : t("customerProfile.empty.followUp")}
         />
         <CompactActionRow
-          actionLabel="查看"
+          actionLabel={t("customerProfile.actions.view")}
           actionKey="tickets"
           icon={<ClipboardList size={15} />}
-          label="工单"
+          label={t("customerProfile.fields.ticket")}
           onAction={onOpenTickets}
-          value={ticketCount > 0 ? `待处理 ${ticketCount}` : "暂无工单"}
+          value={
+            ticketCount > 0
+              ? t("customerProfile.pendingTickets", { count: ticketCount })
+              : t("customerProfile.empty.tickets")
+          }
         />
         {editingRemark ? (
           <CompactInlineRow
             actionKey="remark"
             icon={<PencilLine size={15} />}
-            label="备注"
+            label={t("customerProfile.fields.remark")}
             pending={pending}
+            t={t}
             value={remarkDraft}
             onCancel={() => setEditingRemark(false)}
             onChange={setRemarkDraft}
@@ -484,16 +517,16 @@ function ServiceActionPanel({
           />
         ) : (
           <CompactActionRow
-            actionLabel="编辑"
+            actionLabel={t("customerProfile.actions.edit")}
             actionKey="remark"
             icon={<PencilLine size={15} />}
-            label="备注"
+            label={t("customerProfile.fields.remark")}
             onAction={() => {
               setRemarkDraft(isKnown(model.remark) ? model.remark : "");
               setEditingRemark(true);
               onPendingAction("");
             }}
-            value={isKnown(model.remark) ? model.remark : "暂无备注"}
+            value={isKnown(model.remark) ? model.remark : t("customerProfile.empty.remark")}
           />
         )}
         {notice && (
@@ -543,6 +576,7 @@ function CompactInlineRow({
   onChange,
   onSave,
   pending,
+  t,
   value,
 }: {
   actionKey: string;
@@ -552,6 +586,7 @@ function CompactInlineRow({
   onChange: (value: string) => void;
   onSave: () => Promise<void> | void;
   pending: boolean;
+  t: Translate;
   value: string;
 }) {
   return (
@@ -561,7 +596,7 @@ function CompactInlineRow({
         {label}
       </span>
       <input
-        aria-label={`编辑${label}`}
+        aria-label={t("customerProfile.actions.editField", { field: label })}
         className="customer-360-action-input"
         disabled={pending}
         value={value}
@@ -572,10 +607,20 @@ function CompactInlineRow({
         }}
       />
       <span className="customer-360-editor-actions">
-        <button type="button" aria-label={`保存${label}`} disabled={pending} onClick={() => void onSave()}>
+        <button
+          type="button"
+          aria-label={t("customerProfile.actions.saveField", { field: label })}
+          disabled={pending}
+          onClick={() => void onSave()}
+        >
           <Check size={13} />
         </button>
-        <button type="button" aria-label={`取消${label}编辑`} disabled={pending} onClick={onCancel}>
+        <button
+          type="button"
+          aria-label={t("customerProfile.actions.cancelFieldEdit", { field: label })}
+          disabled={pending}
+          onClick={onCancel}
+        >
           <X size={13} />
         </button>
       </span>
@@ -583,15 +628,25 @@ function CompactInlineRow({
   );
 }
 
-function LanguageBridgeCard({ model }: { model: CustomerModel }) {
+function LanguageBridgeCard({ model, t }: { model: CustomerModel; t: Translate }) {
   return (
-    <PanelBlock className="customer-360-language" title="语言桥" icon={<Languages size={16} />}>
+    <PanelBlock className="customer-360-language" title={t("customerProfile.cards.languageBridge")} icon={<Languages size={16} />}>
       <div className="customer-360-language-flow">
-        <LanguageBox eyebrow="客户接收" main={model.customerLanguage} sub={model.language} />
+        <LanguageBox
+          eyebrow={t("customerProfile.fields.customerReceive")}
+          main={model.customerLanguage}
+          sub={model.language}
+          t={t}
+        />
         <span className="customer-360-language-switch">
           <ArrowLeftRight size={18} />
         </span>
-        <LanguageBox eyebrow="客服查看" main={model.staffLanguage} sub={model.translateMode} />
+        <LanguageBox
+          eyebrow={t("customerProfile.fields.staffView")}
+          main={model.staffLanguage}
+          sub={model.translateMode}
+          t={t}
+        />
       </div>
     </PanelBlock>
   );
@@ -601,32 +656,34 @@ function LanguageBox({
   eyebrow,
   main,
   sub,
+  t,
 }: {
   eyebrow: string;
   main: string;
   sub: string;
+  t: Translate;
 }) {
   return (
     <div className="customer-360-language-box">
       <span>{eyebrow}</span>
-      <strong>{isKnown(main) ? main : "未设置"}</strong>
-      <em>{isKnown(sub) ? sub : "未设置"}</em>
+      <strong>{isKnown(main) ? main : t("customerProfile.empty.notSet")}</strong>
+      <em>{isKnown(sub) ? sub : t("customerProfile.empty.notSet")}</em>
     </div>
   );
 }
 
-function RecentTrading7dCard({ model }: { model: CustomerModel }) {
+function RecentTrading7dCard({ model, t }: { model: CustomerModel; t: Translate }) {
   const trading = model.recent7dTrading;
   const maxValue = Math.max(...trading.bars.map((day) => day.value), 0);
   return (
-    <PanelBlock className="customer-360-trading7d" title="交易历史（近7天）" icon={<ReceiptText size={16} />}>
+    <PanelBlock className="customer-360-trading7d" title={t("customerProfile.cards.recentTrading7d")} icon={<ReceiptText size={16} />}>
       <div className="customer-360-trading-grid">
         <div className="customer-360-trading-stats">
-          <TradingStat label="入金" value={trading.deposit} tone="deposit" />
-          <TradingStat label="出金" value={trading.withdrawal} tone="withdrawal" />
-          <TradingStat label="交易额" value={trading.volume} tone="volume" />
+          <TradingStat label={t("customerProfile.fields.deposit")} value={trading.deposit} tone="deposit" />
+          <TradingStat label={t("customerProfile.fields.withdrawal")} value={trading.withdrawal} tone="withdrawal" />
+          <TradingStat label={t("customerProfile.fields.tradingVolume")} value={trading.volume} tone="volume" />
         </div>
-        <div className="customer-360-bars" aria-label="近7天交易柱状图">
+        <div className="customer-360-bars" aria-label={t("customerProfile.recentTrading7dAria")}>
           {trading.bars.map((day) => (
             <span data-empty={day.empty} key={day.label}>
               <i
@@ -639,7 +696,7 @@ function RecentTrading7dCard({ model }: { model: CustomerModel }) {
         </div>
       </div>
       <p className="customer-360-latest-trade" data-empty={!isKnown(trading.latest)}>
-        {isKnown(trading.latest) ? trading.latest : "最近一次交易 --"}
+        {isKnown(trading.latest) ? trading.latest : t("customerProfile.empty.latestTrade")}
       </p>
     </PanelBlock>
   );
@@ -673,64 +730,64 @@ function parseCompactTagDraft(value: string) {
   );
 }
 
-function renderTab(tab: CustomerTab, model: CustomerModel) {
+function renderTab(tab: CustomerTab, model: CustomerModel, t: Translate, customerModelCopy: CustomerModelCopy) {
   if (tab === "overview") {
     return (
       <>
-        <PanelBlock title="核心身份" icon={<Tags size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.coreIdentity")} icon={<Tags size={16} />}>
           <InfoGrid
             rows={[
-              ["客户 ID", model.customerId],
-              ["绿泡泡号", model.lppId],
-              ["姓名", model.name],
-              ["客户等级", model.level],
+              [t("customerProfile.fields.customerId"), model.customerId],
+              [t("customerProfile.fields.lppId"), model.lppId],
+              [t("customerProfile.fields.name"), model.name],
+              [t("customerProfile.fields.customerLevel"), model.level],
             ]}
           />
         </PanelBlock>
-        <PanelBlock title="联系方式" icon={<Smartphone size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.contactInfo")} icon={<Smartphone size={16} />}>
           <InfoGrid
             rows={[
-              ["手机", model.phoneMasked],
-              ["邮箱", model.emailMasked],
-              ["国家/地区", model.country],
-              ["语言", model.language],
+              [t("customerProfile.fields.mobile"), model.phoneMasked],
+              [t("customerProfile.fields.email"), model.emailMasked],
+              [t("customerProfile.fields.countryRegion"), model.country],
+              [t("customerProfile.fields.language"), model.language],
             ]}
           />
         </PanelBlock>
-        <PanelBlock title="风控合规" icon={<ShieldCheck size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.riskCompliance")} icon={<ShieldCheck size={16} />}>
           <InfoGrid
             rows={[
               ["KYC", model.kyc],
-              ["风险", model.risk],
-              ["资料可见性", model.profileVisibility],
-              ["合规备注", model.complianceNote],
+              [t("customerProfile.fields.risk"), model.risk],
+              [t("customerProfile.fields.profileVisibility"), model.profileVisibility],
+              [t("customerProfile.fields.complianceNote"), model.complianceNote],
             ]}
           />
         </PanelBlock>
-        <PanelBlock title="业务归属" icon={<BriefcaseBusiness size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.businessOwnership")} icon={<BriefcaseBusiness size={16} />}>
           <InfoGrid
             rows={[
-              ["渠道应用", model.appName],
-              ["来源渠道", model.source],
-              ["业务线", model.businessLine],
-              ["归属客服", model.assignedStaff],
-              ["注册时间", model.registeredAt],
-              ["最后活跃", model.lastActive],
+              [t("customerProfile.fields.channelApp"), model.appName],
+              [t("customerProfile.fields.sourceChannel"), model.source],
+              [t("customerProfile.fields.businessLine"), model.businessLine],
+              [t("customerProfile.fields.assignedStaff"), model.assignedStaff],
+              [t("customerProfile.fields.registeredAt"), model.registeredAt],
+              [t("customerProfile.fields.lastActive"), model.lastActive],
             ]}
           />
         </PanelBlock>
-        <PanelBlock title="语言" icon={<Languages size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.language")} icon={<Languages size={16} />}>
           <InfoGrid
             rows={[
-              ["客户接收", model.customerLanguage],
-              ["客服查看", model.staffLanguage],
-              ["翻译模式", model.translateMode],
+              [t("customerProfile.fields.customerReceive"), model.customerLanguage],
+              [t("customerProfile.fields.staffView"), model.staffLanguage],
+              [t("customerProfile.fields.translateMode"), model.translateMode],
             ]}
           />
         </PanelBlock>
         {model.sections.other.length > 0 && (
-          <PanelBlock title="扩展资料" icon={<BadgeCheck size={16} />}>
-            <ExternalSectionList empty="暂无扩展资料" sections={model.sections.other} />
+          <PanelBlock title={t("customerProfile.blocks.externalProfile")} icon={<BadgeCheck size={16} />}>
+        <ExternalSectionList copy={customerModelCopy} empty={t("customerProfile.empty.externalProfile")} sections={model.sections.other} />
           </PanelBlock>
         )}
       </>
@@ -739,26 +796,33 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
   if (tab === "trading") {
     return (
       <>
-        <PanelBlock title="历史交易概况" icon={<ReceiptText size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.tradingSummary")} icon={<ReceiptText size={16} />}>
           <InfoGrid
             rows={[
-              ["总订单", model.totalOrders],
-              ["交易产品", model.tradeProduct],
-              ["胜率", model.winRate],
-              ["最近交易时间", model.recentTradeTime],
-              ["账户状态", model.accountStatus],
-              ["注册日期", model.registeredAt],
+              [t("customerProfile.fields.totalOrders"), model.totalOrders],
+              [t("customerProfile.fields.tradeProduct"), model.tradeProduct],
+              [t("customerProfile.fields.winRate"), model.winRate],
+              [t("customerProfile.fields.recentTradeTime"), model.recentTradeTime],
+              [t("customerProfile.fields.accountStatus"), model.accountStatus],
+              [t("customerProfile.fields.registeredAt"), model.registeredAt],
             ]}
           />
         </PanelBlock>
-        <ExternalSectionList empty="暂无交易明细" sections={model.sections.trading} />
-        <PanelBlock title="临时订单" icon={<ReceiptText size={16} />}>
+        <ExternalSectionList copy={customerModelCopy} empty={t("customerProfile.empty.tradingDetails")} sections={model.sections.trading} />
+        <PanelBlock title={t("customerProfile.blocks.temporaryOrders")} icon={<ReceiptText size={16} />}>
           <ItemList
-            empty="暂无临时订单"
+            empty={t("customerProfile.empty.temporaryOrders")}
             items={model.temporaryOrders.map((order, index) => ({
-              title: textValue(order.product ?? order.symbol ?? order.orderNo ?? order.id ?? `临时订单 ${index + 1}`),
-              meta: [order.status, order.createdAt, order.riskHint].map(textValue).filter(isKnown),
-              fields: normalizeRecord(order),
+              title: textValue(
+                order.product
+                  ?? order.symbol
+                  ?? order.orderNo
+                  ?? order.id
+                  ?? t("customerProfile.temporaryOrderTitle", { index: index + 1 }),
+                customerModelCopy,
+              ),
+              meta: [order.status, order.createdAt, order.riskHint].map((value) => textValue(value, customerModelCopy)).filter(isKnown),
+              fields: normalizeRecord(order, customerModelCopy),
             }))}
           />
         </PanelBlock>
@@ -768,61 +832,61 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
   if (tab === "funds") {
     return (
       <>
-        <PanelBlock title="资金概览" icon={<WalletCards size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.fundsOverview")} icon={<WalletCards size={16} />}>
           <InfoGrid
             rows={[
-              ["账户余额", model.accountBalance],
-              ["累计入金", model.totalDeposit],
-              ["净入金", model.netDeposit],
-              ["最近资金变动", model.latestFundTime],
+              [t("customerProfile.fields.accountBalance"), model.accountBalance],
+              [t("customerProfile.fields.totalDeposit"), model.totalDeposit],
+              [t("customerProfile.fields.netDeposit"), model.netDeposit],
+              [t("customerProfile.fields.latestFundTime"), model.latestFundTime],
             ]}
           />
         </PanelBlock>
-        <ExternalSectionList empty="暂无资金流水" sections={model.sections.funds} />
+        <ExternalSectionList copy={customerModelCopy} empty={t("customerProfile.empty.fundRecords")} sections={model.sections.funds} />
       </>
     );
   }
   if (tab === "sessions") {
     return (
-      <PanelBlock title="会话历史" icon={<MessageCircleMore size={16} />}>
+      <PanelBlock title={t("customerProfile.blocks.sessionHistory")} icon={<MessageCircleMore size={16} />}>
         <InfoGrid
           rows={[
-            ["会话数量", model.sessionCount],
-            ["未读消息", model.unreadCount],
-            ["最近消息", model.lastMessage],
-            ["最后时间", model.lastMessageTime],
+            [t("customerProfile.fields.sessionCount"), model.sessionCount],
+            [t("customerProfile.fields.unreadCount"), model.unreadCount],
+            [t("customerProfile.fields.lastMessage"), model.lastMessage],
+            [t("customerProfile.fields.lastMessageTime"), model.lastMessageTime],
           ]}
         />
-        <ExternalSectionList empty="暂无会话历史摘要" sections={model.sections.sessions} />
+        <ExternalSectionList copy={customerModelCopy} empty={t("customerProfile.empty.sessionSummary")} sections={model.sections.sessions} />
       </PanelBlock>
     );
   }
   if (tab === "tickets") {
     const ticketItems = model.tickets.map((ticket, index) => ({
-      title: textValue(ticket.title ?? ticket.id ?? `工单 ${index + 1}`),
-      meta: [ticket.status, ticket.priority, ticket.updatedAt].map(textValue).filter(isKnown),
-      fields: normalizeRecord(ticket),
+      title: textValue(ticket.title ?? ticket.id ?? t("customerProfile.ticketTitle", { index: index + 1 }), customerModelCopy),
+      meta: [ticket.status, ticket.priority, ticket.updatedAt].map((value) => textValue(value, customerModelCopy)).filter(isKnown),
+      fields: normalizeRecord(ticket, customerModelCopy),
     }));
     return (
-      <PanelBlock title="工单摘要" icon={<ClipboardList size={16} />}>
-        <ItemList empty="暂无工单" items={ticketItems} />
+      <PanelBlock title={t("customerProfile.blocks.ticketSummary")} icon={<ClipboardList size={16} />}>
+        <ItemList empty={t("customerProfile.empty.tickets")} items={ticketItems} />
       </PanelBlock>
     );
   }
   if (tab === "touch") {
     return (
       <>
-        <PanelBlock title="触达与营销" icon={<Radio size={16} />}>
+        <PanelBlock title={t("customerProfile.blocks.touchMarketing")} icon={<Radio size={16} />}>
           <InfoGrid
             rows={[
-              ["营销同意", model.marketingConsent],
-              ["最近触达渠道", model.latestTouchChannel],
-              ["触达次数", model.touchCount],
-              ["下次跟进", model.nextFollowUp],
+              [t("customerProfile.fields.marketingConsent"), model.marketingConsent],
+              [t("customerProfile.fields.latestTouchChannel"), model.latestTouchChannel],
+              [t("customerProfile.fields.touchCount"), model.touchCount],
+              [t("customerProfile.fields.nextFollowUp"), model.nextFollowUp],
             ]}
           />
         </PanelBlock>
-        <ExternalSectionList empty="暂无触达记录" sections={model.sections.touch} />
+        <ExternalSectionList copy={customerModelCopy} empty={t("customerProfile.empty.touchRecords")} sections={model.sections.touch} />
       </>
     );
   }
@@ -832,39 +896,39 @@ function renderTab(tab: CustomerTab, model: CustomerModel) {
         <PanelBlock title="KYC/AML" icon={<ShieldCheck size={16} />}>
           <InfoGrid
             rows={[
-              ["KYC 状态", model.kyc],
-              ["风险等级", model.risk],
-              ["资料可见性", model.profileVisibility],
-              ["合规备注", model.complianceNote],
+              [t("customerProfile.fields.kycStatus"), model.kyc],
+              [t("customerProfile.fields.riskLevel"), model.risk],
+              [t("customerProfile.fields.profileVisibility"), model.profileVisibility],
+              [t("customerProfile.fields.complianceNote"), model.complianceNote],
             ]}
           />
         </PanelBlock>
-        <ExternalSectionList empty="暂无 KYC/合规数据" sections={model.sections.compliance} />
+        <ExternalSectionList copy={customerModelCopy} empty={t("customerProfile.empty.complianceData")} sections={model.sections.compliance} />
       </>
     );
   }
   return (
     <>
-      <PanelBlock title="归属代理" icon={<BriefcaseBusiness size={16} />}>
+      <PanelBlock title={t("customerProfile.blocks.agentOwnership")} icon={<BriefcaseBusiness size={16} />}>
         <InfoGrid
           rows={[
-            ["归属代理", model.agent],
-            ["代理类型", model.agentType],
-            ["佣金比例", model.commissionRate],
-            ["建立时间", model.agentCreatedAt],
+            [t("customerProfile.fields.agent"), model.agent],
+            [t("customerProfile.fields.agentType"), model.agentType],
+            [t("customerProfile.fields.commissionRate"), model.commissionRate],
+            [t("customerProfile.fields.createdAt"), model.agentCreatedAt],
           ]}
         />
       </PanelBlock>
-      <PanelBlock title="设备与安全" icon={<Smartphone size={16} />}>
+      <PanelBlock title={t("customerProfile.blocks.deviceSecurity")} icon={<Smartphone size={16} />}>
         <InfoGrid
           rows={[
-            ["最后设备", model.lastDevice],
-            ["最后 IP", model.lastIp],
+            [t("customerProfile.fields.lastDevice"), model.lastDevice],
+            [t("customerProfile.fields.lastIp"), model.lastIp],
             ["2FA", model.twoFactor],
-            ["异地登录提醒", model.remoteLoginAlert],
+            [t("customerProfile.fields.remoteLoginAlert"), model.remoteLoginAlert],
           ]}
         />
-        <ExternalSectionList empty="暂无设备记录" sections={model.sections.device} />
+        <ExternalSectionList copy={customerModelCopy} empty={t("customerProfile.empty.deviceRecords")} sections={model.sections.device} />
       </PanelBlock>
     </>
   );
@@ -927,13 +991,15 @@ function InfoGrid({ rows }: { rows: Array<[string, string]> }) {
 }
 
 function ExternalSectionList({
+  copy,
   empty,
   sections,
 }: {
+  copy: CustomerModelCopy;
   empty: string;
   sections: ExternalSection[];
 }) {
-  const items = sections.flatMap(sectionToItems);
+  const items = sections.flatMap((section) => sectionToItems(section, copy));
   return <ItemList empty={empty} items={items} />;
 }
 

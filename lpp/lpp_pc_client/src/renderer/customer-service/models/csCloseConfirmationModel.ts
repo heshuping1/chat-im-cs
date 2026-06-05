@@ -1,12 +1,17 @@
 import type { CustomerServiceThreadAction } from "../../data/customer-service/cs-action-service";
 import type { MessageItemDto } from "../../data/api/types";
 
+export interface CustomerServiceCloseConfirmationText {
+  key: string;
+  params?: Record<string, string | number>;
+}
+
 export interface CustomerServiceCloseConfirmation {
-  confirmLabel: string;
-  detail: string;
-  riskText: string;
-  title: string;
-  warningText: string | null;
+  confirmLabel: CustomerServiceCloseConfirmationText;
+  detail: CustomerServiceCloseConfirmationText;
+  riskText: CustomerServiceCloseConfirmationText;
+  title: CustomerServiceCloseConfirmationText;
+  warningText: CustomerServiceCloseConfirmationText | null;
 }
 
 export interface CustomerServiceCloseConfirmationInput {
@@ -25,13 +30,19 @@ export function createCustomerServiceCloseConfirmation({
   pendingMessageCount,
 }: CustomerServiceCloseConfirmationInput): CustomerServiceCloseConfirmation {
   return {
-    confirmLabel: "确认关闭",
-    detail: "关闭后，本次服务会话将进入历史记录，输入区会变为只读。",
-    riskText: "访客后续再次咨询时，将按服务端规则重新排队或生成新的客服线程。",
-    title: `关闭「${customerTitle || "当前客户"}」的会话？`,
+    confirmLabel: { key: "customerService.closeConfirm.confirm" },
+    detail: { key: "customerService.closeConfirm.detail" },
+    riskText: { key: "customerService.closeConfirm.risk" },
+    title: {
+      key: "customerService.closeConfirm.title",
+      params: { customer: customerTitle || "customerService.workspace.currentCustomer" },
+    },
     warningText:
       pendingMessageCount > 0
-        ? `当前还有 ${pendingMessageCount} 条消息未完成发送，建议处理后再关闭。`
+        ? {
+            key: "customerService.closeConfirm.pendingWarning",
+            params: { count: pendingMessageCount },
+          }
         : null,
   };
 }

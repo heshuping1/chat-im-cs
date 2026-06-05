@@ -3,6 +3,7 @@ import type { MouseEvent } from "react";
 import { ChatMessageBubble } from "../../components/ChatMessageBubble";
 import type { MessageItemDto } from "../../data/api-client";
 import { createChatMessageViewModel } from "../../data/message/message-view-model";
+import { useI18n } from "../../i18n/useI18n";
 import { formatChatMessageTime } from "../../lib/format";
 
 export function ServiceMessageBubble({
@@ -33,12 +34,14 @@ export function ServiceMessageBubble({
   translationText?: string;
   threadType?: string;
 }) {
+  const { t } = useI18n();
+  const fallbackSender = senderFallback || t("customerService.visitor");
   const messageViewModel = createChatMessageViewModel({
     conversationFallbackName,
     conversationType: threadType,
     message,
     mine,
-    senderFallback: senderFallback || "访客",
+    senderFallback: fallbackSender,
     timeText: formatChatMessageTime(message.sentAt),
     translationText,
   });
@@ -53,7 +56,7 @@ export function ServiceMessageBubble({
       mediaCacheContext={mediaCacheContext}
       onContextMenu={onContextMenu}
       onUploadAction={onUploadAction}
-      senderFallback={senderFallback || "访客"}
+      senderFallback={fallbackSender}
       timeText={formatChatMessageTime(message.sentAt)}
       translationText={translationText}
       viewModel={messageViewModel}

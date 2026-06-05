@@ -25,9 +25,11 @@ import { resolveCustomerServiceThreadReadVisibility } from "../data/customer-ser
 import type { CurrentUserIdentity } from "../data/message-display";
 import {
   createCustomerServiceNoThreadState,
+  type CustomerServiceWorkspaceTextDescriptor,
 } from "../data/customer-service/cs-workspace-view-model";
 import { isMineCustomerServiceMessage } from "../data/customer-service/cs-reminder-model";
 import { workspaceScopeFromSession } from "../data/workspace-scope";
+import { useI18n } from "../i18n/useI18n";
 import { formatError } from "../lib/format";
 import {
   hasOpenableMessageMedia,
@@ -72,6 +74,7 @@ import { useCustomerServiceWorkspaceController } from "../customer-service/hooks
 import {
   countPendingCustomerServiceCloseMessages,
   createCustomerServiceCloseConfirmation,
+  type CustomerServiceCloseConfirmationText,
   type CustomerServiceCloseConfirmation,
   shouldConfirmCustomerServiceCloseAction,
 } from "../customer-service/models/csCloseConfirmationModel";
@@ -106,6 +109,7 @@ export function ChatWorkspace({
   onOpenCustomerContext?: () => void;
   onToggleAssistantPane?: (pane: Exclude<ServiceAssistantPane, null>) => void;
 }) {
+  const { t } = useI18n();
   const selectedThreadId = useActiveThreadId();
   const activeModule = useActiveModule();
   const activeThreadOpenSource = useActiveThreadOpenSource();
@@ -153,6 +157,30 @@ export function ChatWorkspace({
     threadState,
     title,
   } = workspaceViewModel;
+  const translatedIdentity = useMemo(
+    () => ({
+      ...identity,
+      ariaName: translateCustomerServiceValue(identity.ariaName, t),
+      avatarName: translateCustomerServiceValue(identity.avatarName, t),
+      displayName: translateCustomerServiceValue(identity.displayName, t),
+    }),
+    [identity, t],
+  );
+  const translatedClosedUnreadNoticeText = closedUnreadNoticeText
+    ? formatCustomerServiceWorkspaceText(closedUnreadNoticeText, t)
+    : undefined;
+  const translatedComposerDisabledText = composerDisabledText
+    ? formatCustomerServiceWorkspaceText(composerDisabledText, t)
+    : undefined;
+  const translatedMessageStageState = messageStageState
+    ? {
+        ...messageStageState,
+        text: formatCustomerServiceWorkspaceText(messageStageState.text, t),
+      }
+    : undefined;
+  const translatedModeLabel = formatCustomerServiceWorkspaceText(modeLabel, t);
+  const translatedReceptionText = formatCustomerServiceWorkspaceText(receptionText, t);
+  const translatedTitle = translateCustomerServiceValue(title, t);
   const readVisibility = resolveCustomerServiceThreadReadVisibility({
     activeModule,
     activeThreadId: selectedThreadId,
@@ -197,7 +225,7 @@ export function ChatWorkspace({
     readOnly,
     selectedThread,
     session,
-    title,
+    title: translatedTitle,
   });
   const autoTranslateConversationModeKey =
     selectedThread?.threadId || selectedThread?.conversationId;
@@ -248,44 +276,44 @@ export function ChatWorkspace({
   const insertKnowledgeReply = useCallback((payload: KnowledgeInsertPayload) => {
     const text = payload.text.trim();
     if (!text) {
-      setNotice("这条知识内容暂无可插入文本。");
+      setNotice(t("customerService.workspace.emptyKnowledgeContent"));
       return;
     }
     composerRef.current?.insertText(text);
     setKnowledgeDrawerOpen(false);
-    setNotice("已插入输入框，确认后可发送给客户。");
+    setNotice(t("customerService.workspace.insertedNotice"));
     requestAnimationFrame(() => composerRef.current?.focus());
-  }, []);
+  }, [t]);
 
   const insertAiDraftReply = useCallback((text: string) => {
     const next = text.trim();
     if (!next) {
-      setNotice("这条 AI 回复建议暂无可插入文本。");
+      setNotice(t("customerService.workspace.emptyAiDraft"));
       return;
     }
     composerRef.current?.insertText(next);
     setAiDraftDrawer(null);
-    setNotice("AI 回复建议已插入输入框，确认后可发送给客户。");
+    setNotice(t("customerService.workspace.aiDraftInsertedNotice"));
     requestAnimationFrame(() => composerRef.current?.focus());
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const handleAssistantInsert = (event: Event) => {
       const text = readCustomerServiceAssistantInsertText(event);
       if (!text) {
-        setNotice("这条辅助内容暂无可插入文本。");
+        setNotice(t("customerService.workspace.emptyAssistantContent"));
         return;
       }
       composerRef.current?.insertText(text);
       setKnowledgeDrawerOpen(false);
       setAiDraftDrawer(null);
-      setNotice("已插入输入框，确认后可发送给客户。");
+      setNotice(t("customerService.workspace.insertedNotice"));
       requestAnimationFrame(() => composerRef.current?.focus());
     };
     window.addEventListener(customerServiceAssistantInsertEvent, handleAssistantInsert);
     return () =>
       window.removeEventListener(customerServiceAssistantInsertEvent, handleAssistantInsert);
-  }, []);
+  }, [t]);
 
   const openServiceMessageMenu = useCallback(
     (event: MouseEvent<HTMLElement>, message: MessageItemDto) => {
@@ -316,7 +344,7 @@ export function ChatWorkspace({
       }
       const url = resolveMessageMediaUrl(message, session?.apiBaseUrl);
       if (!url) {
-        setNotice("这条媒体消息没有可处理的地址。");
+        setNotice(t("customerService.workspace.mediaNoUrl"));
         return;
       }
       const accountId =
@@ -333,16 +361,16 @@ export function ChatWorkspace({
               conversationId,
               fileName: messageMediaFileName(message),
             });
-            setNotice("图片已复制。");
+            setNotice(t("customerService.workspace.imageCopied"));
           } else {
             await copyMessageMediaFile(message, url, session?.tenantToken, {
               accountId,
               conversationId,
             });
-            setNotice("文件已复制。");
+            setNotice(t("customerService.workspace.fileCopied"));
           }
         } catch (error) {
-          setNotice(`复制失败：${formatError(error)}`);
+          setNotice(t("common.copyFailed", { error: formatError(error) }));
         }
         return;
       }
@@ -352,39 +380,39 @@ export function ChatWorkspace({
             accountId,
             conversationId,
           });
-          if (savedPath) setNotice("已另存为。");
+          if (savedPath) setNotice(t("customerService.workspace.savedAs"));
         } else if (action === "reveal_in_folder") {
           await revealMessageMediaInFolder(message, url, session?.tenantToken, {
             accountId,
             conversationId,
           });
-          setNotice(isMacPlatform() ? "已在 Finder 中显示。" : "已在文件夹中显示。");
+          setNotice(isMacPlatform() ? t("customerService.workspace.revealedInFinder") : t("customerService.workspace.revealedInFolder"));
         } else if (action === "open_media") {
           await openMessageMediaFile(message, url, session?.tenantToken, {
             accountId,
             conversationId,
           });
-          setNotice("已打开。");
+          setNotice(t("customerService.workspace.opened"));
         } else {
           await editMessageMediaFile(message, url, session?.tenantToken, {
             accountId,
             conversationId,
           });
-          setNotice("已打开编辑。");
+          setNotice(t("customerService.workspace.openedForEdit"));
         }
       } catch (error) {
         const prefix =
           action === "save_media_as"
-            ? "另存为失败"
+            ? t("customerService.workspace.saveAsFailed")
             : action === "reveal_in_folder"
-              ? "显示文件位置失败"
+              ? t("customerService.workspace.revealFailed")
               : action === "open_media"
-                ? "打开失败"
-                : "编辑失败";
-        setNotice(`${prefix}：${formatError(error)}`);
+                ? t("customerService.workspace.openFailed")
+                : t("customerService.workspace.editFailed");
+        setNotice(t("customerService.workspace.actionFailed", { action: prefix, error: formatError(error) }));
       }
     },
-    [selectedThread?.conversationId, selectedThread?.threadId, session],
+    [selectedThread?.conversationId, selectedThread?.threadId, session, t],
   );
 
   const {
@@ -408,33 +436,41 @@ export function ChatWorkspace({
         return;
       }
       if (!selectedThread) {
-        setNotice("请选择在线客服会话");
+        setNotice(t("customerService.workspace.selectThread"));
         return;
       }
       setCloseConfirmation({
         model: createCustomerServiceCloseConfirmation({
-          customerTitle: title || selectedThread.title || "当前客户",
+          customerTitle:
+            translatedTitle || selectedThread.title || t("customerService.workspace.currentCustomer"),
           pendingMessageCount: countPendingCustomerServiceCloseMessages(messages),
         }),
         threadId: selectedThread.threadId,
       });
     },
-    [messages, selectedThread, threadActionMutation, title],
+    [messages, selectedThread, threadActionMutation, translatedTitle, t],
   );
 
   const confirmCloseThread = useCallback(() => {
     if (!closeConfirmation || closeConfirmation.threadId !== selectedThread?.threadId) {
       setCloseConfirmation(null);
-      setNotice("当前会话已变化，请重新确认关闭。");
+      setNotice(t("customerService.workspace.threadChangedConfirmAgain"));
       return;
     }
     setCloseConfirmation(null);
     threadActionMutation.mutate("close");
-  }, [closeConfirmation, selectedThread?.threadId, threadActionMutation]);
+  }, [closeConfirmation, selectedThread?.threadId, threadActionMutation, t]);
 
   if (!selectedThread) {
     const noThreadState = createCustomerServiceNoThreadState();
-    return <main className="h-chat-workspace"><PanelState {...noThreadState} /></main>;
+    return (
+      <main className="h-chat-workspace">
+        <PanelState
+          text={formatCustomerServiceWorkspaceText(noThreadState.text, t)}
+          tone={noThreadState.tone}
+        />
+      </main>
+    );
   }
 
   return (
@@ -443,13 +479,13 @@ export function ChatWorkspace({
       style={{ "--composer-height": `${composerHeight}px` } as CSSProperties}
     >
       <CustomerServiceWorkspaceHeader
-        identity={identity}
-        modeLabel={modeLabel}
+        identity={translatedIdentity}
+        modeLabel={translatedModeLabel}
         readOnly={readOnly}
         replyGate={replyGate}
         risky={isRiskyCustomerServiceThread(selectedThread)}
         source={source}
-        title={title}
+        title={translatedTitle}
         autoTranslateEffective={autoTranslateEffective}
         autoTranslateMode={autoTranslateConversationMode}
         unreadCount={selectedThread.unreadCount}
@@ -464,7 +500,7 @@ export function ChatWorkspace({
       <CustomerServiceReceptionStrip
         pending={threadActionMutation.isPending}
         readOnly={readOnly}
-        receptionText={receptionText}
+        receptionText={translatedReceptionText}
         selectedStatus={selectedThread.status}
         status={status || selectedThread.status}
         threadState={threadState}
@@ -489,14 +525,18 @@ export function ChatWorkspace({
             <header>
               <span className="cs-close-confirm-mark" aria-hidden="true">!</span>
               <div>
-                <h3 id="cs-close-confirm-title">{closeConfirmation.model.title}</h3>
-                <p>{closeConfirmation.model.detail}</p>
+                <h3 id="cs-close-confirm-title">
+                  {formatCustomerServiceCloseConfirmText(closeConfirmation.model.title, t)}
+                </h3>
+                <p>{formatCustomerServiceCloseConfirmText(closeConfirmation.model.detail, t)}</p>
               </div>
             </header>
-            <p className="cs-close-confirm-risk">{closeConfirmation.model.riskText}</p>
+            <p className="cs-close-confirm-risk">
+              {formatCustomerServiceCloseConfirmText(closeConfirmation.model.riskText, t)}
+            </p>
             {closeConfirmation.model.warningText && (
               <p className="cs-close-confirm-warning">
-                {closeConfirmation.model.warningText}
+                {formatCustomerServiceCloseConfirmText(closeConfirmation.model.warningText, t)}
               </p>
             )}
             <footer>
@@ -505,7 +545,7 @@ export function ChatWorkspace({
                 disabled={threadActionMutation.isPending}
                 onClick={() => setCloseConfirmation(null)}
               >
-                取消
+                {t("common.cancel")}
               </button>
               <button
                 className="danger"
@@ -514,16 +554,16 @@ export function ChatWorkspace({
                 onClick={confirmCloseThread}
               >
                 {threadActionMutation.isPending
-                  ? "关闭中..."
-                  : closeConfirmation.model.confirmLabel}
+                  ? t("customerService.workspace.closing")
+                  : formatCustomerServiceCloseConfirmText(closeConfirmation.model.confirmLabel, t)}
               </button>
             </footer>
           </section>
         </div>
       )}
 
-      {closedUnreadNoticeText && (
-        <div className="composer-disabled-note">{closedUnreadNoticeText}</div>
+      {translatedClosedUnreadNoticeText && (
+        <div className="composer-disabled-note">{translatedClosedUnreadNoticeText}</div>
       )}
 
       <CustomerServiceMessageStage
@@ -541,11 +581,11 @@ export function ChatWorkspace({
         messageAnnotations={messageAnnotations}
         messageMenu={messageMenu}
         messages={messages}
-        messageStageState={messageStageState}
+        messageStageState={translatedMessageStageState}
         pendingNewMessageCount={pendingNewMessageCount}
         selectedThread={selectedThread}
         stageRef={messageStageRef}
-        title={title}
+        title={translatedTitle}
         onContextMenu={openServiceMessageMenu}
         onMenuAction={(action, message) =>
           void handleServiceMessageMenuAction(action, message)
@@ -599,7 +639,7 @@ export function ChatWorkspace({
             await sendTextMutation.mutateAsync(content);
           }}
           onTranslateDraft={async (content) => {
-            if (!client) throw new Error("请先登录");
+            if (!client) throw new Error(t("auth.login"));
             return extractActionResultText(await client.translateText(content));
           }}
           onSendMedia={sendServiceMediaOptimistically}
@@ -619,12 +659,12 @@ export function ChatWorkspace({
       {aiDraftDrawer && canReply && selectedThread && (
         <AiReplySuggestionDrawer
           customerMessageId={aiDraftDrawer.customerMessageId}
-          disabledReason={composerDisabledText || undefined}
+          disabledReason={translatedComposerDisabledText || undefined}
           session={session}
           threadId={selectedThread.threadId}
-          threadTitle={selectedThread.title || title}
+          threadTitle={selectedThread.title || translatedTitle}
           threadType={selectedThread.threadType}
-          subtitle="客服会话"
+          subtitle={t("customerService.workspace.serviceConversation")}
           onClose={() => {
             setAiDraftDrawer(null);
             requestAnimationFrame(() => composerRef.current?.focus());
@@ -633,8 +673,8 @@ export function ChatWorkspace({
           onNotice={setNotice}
         />
       )}
-      {composerDisabledText && (
-        <div className="composer-disabled-note">{composerDisabledText}</div>
+      {translatedComposerDisabledText && (
+        <div className="composer-disabled-note">{translatedComposerDisabledText}</div>
       )}
     </main>
   );
@@ -642,4 +682,50 @@ export function ChatWorkspace({
 
 function isMineMessage(message: MessageItemDto, identity?: CurrentUserIdentity | null) {
   return isMineCustomerServiceMessage(message, identity);
+}
+
+type ChatWorkspaceTranslate = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string;
+
+function formatCustomerServiceWorkspaceText(
+  descriptor: CustomerServiceWorkspaceTextDescriptor,
+  t: ChatWorkspaceTranslate,
+) {
+  const params = descriptor.params
+    ? Object.fromEntries(
+        Object.entries(descriptor.params).map(([key, value]) => [
+          key,
+          typeof value === "string" ? translateCustomerServiceValue(value, t) : value,
+        ]),
+      )
+    : undefined;
+  return t(descriptor.key, params);
+}
+
+function translateCustomerServiceValue(value: string, t: ChatWorkspaceTranslate) {
+  if (
+    value.startsWith("customerService.") ||
+    value.startsWith("sidebar.") ||
+    value.startsWith("channel.")
+  ) {
+    return t(value);
+  }
+  return value;
+}
+
+function formatCustomerServiceCloseConfirmText(
+  descriptor: CustomerServiceCloseConfirmationText,
+  t: ChatWorkspaceTranslate,
+) {
+  const params = descriptor.params
+    ? Object.fromEntries(
+        Object.entries(descriptor.params).map(([key, value]) => [
+          key,
+          typeof value === "string" ? translateCustomerServiceValue(value, t) : value,
+        ]),
+      )
+    : undefined;
+  return t(descriptor.key, params);
 }

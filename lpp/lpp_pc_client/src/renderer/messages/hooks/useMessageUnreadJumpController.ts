@@ -11,6 +11,7 @@ import {
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { pcQueryKeys } from "../../data/query-keys";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
+import { useI18n } from "../../i18n/useI18n";
 import {
   findFirstUnreadLoadedMessage,
   type UnreadJumpState,
@@ -54,6 +55,7 @@ export function useMessageUnreadJumpController({
   unreadIdentity: CurrentUserIdentity | null;
   unreadJump: UnreadJumpState | null;
 }) {
+  const { t } = useI18n();
   const autoSelectedConversationIdsRef = useRef(new Set<string>());
   const [selectionSources, setSelectionSources] = useState<
     Record<string, ActiveImConversationSource>
@@ -215,11 +217,11 @@ export function useMessageUnreadJumpController({
     }
     const target = findFirstUnreadLoadedMessage(messages, unreadJump, session);
     if (!target) {
-      setNotice("第一条未读消息尚未加载，请加载更多历史后重试");
+      setNotice(t("messages.unreadJump.notLoaded"));
       return;
     }
     messageListScrollRegistry.scrollToMessage(target.messageId, () => {
-      setNotice("第一条未读消息不在当前筛选结果中，请清空搜索后重试");
+      setNotice(t("messages.unreadJump.filteredOut"));
     });
     setUnreadJump(null);
   }, [
@@ -232,6 +234,7 @@ export function useMessageUnreadJumpController({
     setMessageSearchOpen,
     setNotice,
     setUnreadJump,
+    t,
     unreadJump,
   ]);
 

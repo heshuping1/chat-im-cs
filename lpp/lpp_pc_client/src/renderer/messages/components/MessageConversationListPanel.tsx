@@ -3,6 +3,7 @@ import type { MouseEvent } from "react";
 
 import type { ConversationListItem } from "../../data/api-client";
 import { PanelState } from "../../components/PanelState";
+import { useI18n } from "../../i18n/useI18n";
 import { formatBadgeCount } from "../../lib/format";
 import { MessagePlusMenu, type MessagePlusAction } from "./MessageStartDialogs";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
@@ -44,12 +45,12 @@ export interface MessageConversationListPanelProps {
 
 const filterTabs: Array<{
   key: MessageConversationFilterKey;
-  label: string;
+  labelKey: string;
 }> = [
-  { key: "all", label: "全部" },
-  { key: "unread", label: "未读" },
-  { key: "friends", label: "好友" },
-  { key: "groups", label: "群聊" },
+  { key: "all", labelKey: "messages.conversationList.filter.all" },
+  { key: "unread", labelKey: "messages.conversationList.filter.unread" },
+  { key: "friends", labelKey: "messages.conversationList.filter.friends" },
+  { key: "groups", labelKey: "messages.conversationList.filter.groups" },
 ];
 
 export function MessageConversationListPanel({
@@ -77,6 +78,8 @@ export function MessageConversationListPanel({
   resolveConversationIsGroup,
   resolveConversationUnread,
 }: MessageConversationListPanelProps) {
+  const { t } = useI18n();
+
   return (
     <section className={`e-panel e-conversation-panel ${conversationDrawerOpen ? "drawer-open" : ""}`}>
       <header className="e-message-list-top">
@@ -85,7 +88,7 @@ export function MessageConversationListPanel({
           <input
             value={keyword}
             onChange={(event) => onKeywordChange(event.target.value)}
-            placeholder="搜索"
+            placeholder={t("messages.conversationList.searchPlaceholder")}
           />
         </label>
         <div className="message-plus-wrap" onClick={(event) => event.stopPropagation()}>
@@ -94,10 +97,12 @@ export function MessageConversationListPanel({
             type="button"
             aria-label={
               friendRequestCount > 0
-                ? `打开消息操作菜单，${friendRequestCount} 条好友申请`
-                : "打开消息操作菜单"
+                ? t("messages.conversationList.plusMenuWithRequests", {
+                    count: friendRequestCount,
+                  })
+                : t("messages.conversationList.plusMenu")
             }
-            title="创建与添加"
+            title={t("messages.conversationList.createAndAdd")}
             aria-haspopup="menu"
             aria-expanded={plusMenuOpen}
             onClick={onTogglePlusMenu}
@@ -119,7 +124,7 @@ export function MessageConversationListPanel({
         </div>
       </header>
 
-      <nav className="e-filter-row" aria-label="Message filters">
+      <nav className="e-filter-row" aria-label={t("messages.conversationList.filtersAria")}>
         {filterTabs.map((tab) => (
           <button
             className={conversationFilter === tab.key ? "selected" : ""}
@@ -127,7 +132,7 @@ export function MessageConversationListPanel({
             type="button"
             onClick={() => onFilterChange(tab.key)}
           >
-            {tab.label}
+            {t(tab.labelKey)}
             {tab.key === "unread" && <em>{formatBadgeCount(unreadCount)}</em>}
           </button>
         ))}
@@ -135,8 +140,8 @@ export function MessageConversationListPanel({
 
       {errorText && <p className="message-notice error">{errorText}</p>}
 
-      <div className="e-conversation-list" aria-label="消息会话列表">
-        {loading && <PanelState text="正在加载消息..." />}
+      <div className="e-conversation-list" aria-label={t("messages.conversationList.listAria")}>
+        {loading && <PanelState text={t("messages.conversationList.loading")} />}
         {!loading &&
           conversations.map((item) => (
             <ConversationRow

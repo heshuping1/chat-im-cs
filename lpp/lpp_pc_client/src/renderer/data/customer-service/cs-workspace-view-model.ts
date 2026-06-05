@@ -6,7 +6,7 @@ import {
   type MessageItemDto,
   type StaffServiceHistoryItem,
 } from "../api/types";
-import { customerServiceHistoryStatusLabel } from "../customer-service-display";
+import { customerServiceHistoryStatusKey } from "../customer-service-display";
 import { staffServiceHistoryItemToThread } from "./cs-history-model";
 import {
   createCustomerServiceThreadState,
@@ -54,20 +54,25 @@ export type CustomerServiceWorkspaceInlineStateKind = "empty" | "error" | "loadi
 
 export interface CustomerServiceWorkspaceInlineState {
   kind: CustomerServiceWorkspaceInlineStateKind;
-  text: string;
+  text: CustomerServiceWorkspaceTextDescriptor;
   tone: "error" | "muted";
+}
+
+export interface CustomerServiceWorkspaceTextDescriptor {
+  key: string;
+  params?: Record<string, string | number>;
 }
 
 export interface CustomerServiceWorkspaceViewModel {
   canReply: boolean;
-  closedUnreadNoticeText?: string;
-  composerDisabledText?: string;
+  closedUnreadNoticeText?: CustomerServiceWorkspaceTextDescriptor;
+  composerDisabledText?: CustomerServiceWorkspaceTextDescriptor;
   identity: CustomerServiceIdentityViewModel;
   messageStageState?: CustomerServiceWorkspaceInlineState;
-  modeLabel: string;
+  modeLabel: CustomerServiceWorkspaceTextDescriptor;
   messages: MessageItemDto[];
   readOnly: boolean;
-  receptionText: string;
+  receptionText: CustomerServiceWorkspaceTextDescriptor;
   replyGate: CustomerServiceReplyGate;
   selectedThread?: CustomerServiceThread;
   selectedThreadIsLive: boolean;
@@ -99,7 +104,7 @@ export function createCustomerServiceWorkspaceViewModel(
     usableThreadTitle(input.profile?.displayName) ||
     usableThreadTitle(input.detail?.title) ||
     usableThreadTitle(selectedThread?.title) ||
-    (readOnly ? "访客" : "未知客户");
+    (readOnly ? "customerService.visitor" : "customerService.threadList.unknownCustomer");
   const source =
     input.detail?.sourceChannel ??
     input.detail?.source ??
@@ -108,7 +113,7 @@ export function createCustomerServiceWorkspaceViewModel(
     selectedThread?.sourceChannel ??
     selectedThread?.source ??
     selectedThread?.channel;
-  const sourceLabel = input.formatSourceLabel?.(source) ?? source ?? "未知来源";
+  const sourceLabel = input.formatSourceLabel?.(source) ?? source ?? "customerService.workspace.unknownSource";
   const identity = createCustomerServiceIdentityViewModel({
     fallbackName: title,
     history: readOnly,
@@ -130,7 +135,9 @@ export function createCustomerServiceWorkspaceViewModel(
       messageCount: messages.length,
     }),
     messages,
-    modeLabel: readOnly ? "历史会话" : "当前接待",
+    modeLabel: {
+      key: readOnly ? "customerService.workspace.mode.history" : "customerService.workspace.mode.current",
+    },
     readOnly,
     receptionText: createCustomerServiceReceptionText({
       readOnly,
@@ -155,7 +162,7 @@ export function createCustomerServiceWorkspaceViewModel(
 export function createCustomerServiceNoThreadState(): CustomerServiceWorkspaceInlineState {
   return {
     kind: "empty",
-    text: "选择排队、进行中或历史会话后开始处理。",
+    text: { key: "customerService.workspace.inline.noThread" },
     tone: "muted",
   };
 }
@@ -168,21 +175,21 @@ export function createCustomerServiceMessageStageState(input: {
   if (input.loading) {
     return {
       kind: "loading",
-      text: "正在加载会话...",
+      text: { key: "customerService.workspace.inline.loading" },
       tone: "muted",
     };
   }
   if (input.errorText) {
     return {
       kind: "error",
-      text: `会话加载失败：${input.errorText}`,
+      text: { key: "customerService.workspace.inline.loadFailed", params: { error: input.errorText } },
       tone: "error",
     };
   }
   if (input.messageCount === 0) {
     return {
       kind: "empty",
-      text: "暂无消息记录，可先查看客户资料或等待访客发起对话。",
+      text: { key: "customerService.workspace.inline.emptyMessages" },
       tone: "muted",
     };
   }
@@ -240,7 +247,7 @@ function dedupeCustomerServiceThreads(threads: CustomerServiceThread[]) {
 
 function usableThreadTitle(value?: string | null) {
   const title = value?.trim();
-  if (!title || title.startsWith("历史会话")) return undefined;
+  if (!title || title.startsWith("\u5386\u53f2\u4f1a\u8bdd")) return undefined;
   return title;
 }
 
@@ -249,21 +256,26 @@ function createCustomerServiceReceptionText(input: {
   replyGate: CustomerServiceReplyGate;
   sourceLabel: string;
   status: string;
-}) {
-  if (input.readOnly) return `会话已结束 · ${customerServiceHistoryStatusLabel(input.status)}`;
+}): CustomerServiceWorkspaceTextDescriptor {
+  if (input.readOnly) {
+    return {
+      key: "customerService.workspace.reception.ended",
+      params: { status: customerServiceHistoryStatusKey(input.status) },
+    };
+  }
   if (input.replyGate === "claim") {
-    return `客户正在排队 · 来自 ${input.sourceLabel} · 接入后才能人工回复`;
+    return { key: "customerService.workspace.reception.queued", params: { source: input.sourceLabel } };
   }
   if (input.replyGate === "takeover") {
-    return `当前由 AI 接待 · 来自 ${input.sourceLabel} · 接管后才能人工回复`;
+    return { key: "customerService.workspace.reception.ai", params: { source: input.sourceLabel } };
   }
-  return `会话已接入 · 来自 ${input.sourceLabel} · 可继续沟通`;
+  return { key: "customerService.workspace.reception.serving", params: { source: input.sourceLabel } };
 }
 
 function createCustomerServiceComposerDisabledText(replyGate: CustomerServiceReplyGate) {
-  if (replyGate === "claim") return "当前会话仍在排队中，请先点击“接入”。";
-  if (replyGate === "takeover") return "当前会话仍由 AI 接待，请先点击“人工接管”。";
-  if (replyGate === "readonly") return "会话已结束，无法继续回复";
+  if (replyGate === "claim") return { key: "customerService.workspace.composerDisabled.claim" };
+  if (replyGate === "takeover") return { key: "customerService.workspace.composerDisabled.takeover" };
+  if (replyGate === "readonly") return { key: "customerService.workspace.composerDisabled.readonly" };
   return undefined;
 }
 
@@ -273,5 +285,5 @@ function createCustomerServiceClosedUnreadNoticeText(input: {
 }) {
   const unreadCount = Math.max(0, Number(input.unreadCount ?? 0));
   if (!input.readOnly || unreadCount <= 0) return undefined;
-  return `有 ${unreadCount} 条关闭前未读消息`;
+  return { key: "customerService.workspace.closedUnreadNotice", params: { count: unreadCount } };
 }

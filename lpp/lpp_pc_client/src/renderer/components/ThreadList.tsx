@@ -16,8 +16,7 @@ import {
 } from "../data/api-client";
 import { useAuthSession } from "../data/auth/auth-store";
 import {
-  customerServiceHistoryStatusLabel,
-  customerServiceThreadStatusLabel,
+  createCustomerServiceThreadStatusDescriptor,
   isQueuedCustomerServiceThread,
 } from "../data/customer-service-display";
 import { createCustomerServiceIdentityViewModel } from "../data/customer-service/cs-identity-view-model";
@@ -33,14 +32,14 @@ import {
   type ServiceThreadFilter,
 } from "../data/workspace-ui/workspace-ui-store";
 import {
-  createServiceHistoryThreadStatusText,
+  createServiceHistoryThreadStatusDescriptor,
   createServiceHistoryTabBadge,
   createServiceThreadListCounts,
-  createServiceThreadListEmptyState,
   isRiskyCustomerServiceThread,
-  type ServiceThreadListEmptyState,
+  type ServiceTextDescriptor,
   type ServiceThreadListMode,
 } from "../customer-service/models/serviceWorkbenchModel";
+import { useI18n } from "../i18n/useI18n";
 import {
   createThreadRenderWindow,
   threadRenderWindowExpandStep,
@@ -50,8 +49,17 @@ import { ChannelBadge } from "./ChannelBadge";
 import { PcAvatar } from "./PcAvatar";
 
 type ThreadMode = ServiceThreadListMode;
+type ThreadListEmptyAction = "clearSearch" | "viewAll" | "viewQueued";
+
+interface ThreadListEmptyStateView {
+  action?: ThreadListEmptyAction;
+  actionLabel?: string;
+  description: string;
+  title: string;
+}
 
 export function ThreadList() {
+  const { t } = useI18n();
   const [mode, setMode] = useState<ThreadMode>("current");
   const [query, setQuery] = useState("");
   const [expandedThreadCount, setExpandedThreadCount] = useState(0);
@@ -180,23 +188,28 @@ export function ThreadList() {
   const listError = threadsQuery.error || historyQuery.error;
   const emptyState = useMemo(
     () =>
-      createServiceThreadListEmptyState({
+      createThreadListEmptyStateView({
         currentCounts,
         filter,
         historyCount: historyThreads.length,
         mode,
         query,
+        t,
       }),
-    [currentCounts, filter, historyThreads.length, mode, query],
+    [currentCounts, filter, historyThreads.length, mode, query, t],
   );
 
   return (
     <section className="h-service-list">
       <header className="h-service-head">
         <div>
-          <h1>会话池</h1>
+          <h1>{t("customerService.threadList.title")}</h1>
           <p>
-            当前 {currentCounts.all} · 排队 {currentCounts.queued} · 历史 {historyThreads.length}
+            {t("customerService.threadList.summary", {
+              current: currentCounts.all,
+              queued: currentCounts.queued,
+              history: historyThreads.length,
+            })}
           </p>
         </div>
       </header>
@@ -204,26 +217,26 @@ export function ThreadList() {
       <label className="e-search">
         <Search size={17} />
         <input
-          placeholder="搜索客户、渠道、会话内容"
+          placeholder={t("customerService.threadList.searchPlaceholder")}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
       </label>
 
-      <nav className="h-switch-tabs" aria-label="当前和历史">
+      <nav className="h-switch-tabs" aria-label={t("customerService.threadList.modeTabsAria")}>
         <button
           className={mode === "current" ? "selected" : ""}
           type="button"
           onClick={() => setMode("current")}
         >
-          当前 <em>{currentThreads.length}</em>
+          {t("customerService.threadList.current")} <em>{currentThreads.length}</em>
         </button>
         <button
           className={mode === "history" ? "selected" : ""}
           type="button"
           onClick={() => setMode("history")}
         >
-          历史 <em>{historyTabBadge.threadCount}</em>
+          {t("customerService.threadList.history")} <em>{historyTabBadge.threadCount}</em>
           {historyTabBadge.unreadCount > 0 && (
             <span className="h-switch-tabs-unread">
               {formatBadgeCount(historyTabBadge.unreadCount)}
@@ -233,23 +246,23 @@ export function ThreadList() {
       </nav>
 
       {mode === "current" && (
-        <nav className="e-filter-row compact" aria-label="在线客服筛选">
+        <nav className="e-filter-row compact" aria-label={t("customerService.threadList.filterAria")}>
           <FilterButton
-            label="全部"
+            label={t("customerService.threadList.filterAll")}
             count={currentCounts.all}
             value="all"
             selected={filter === "all"}
             onSelect={setFilter}
           />
           <FilterButton
-            label="排队"
+            label={t("customerService.threadList.filterQueued")}
             count={currentCounts.queued}
             value="queued"
             selected={filter === "queued"}
             onSelect={setFilter}
           />
           <FilterButton
-            label="进行中"
+            label={t("customerService.threadList.filterServing")}
             count={currentCounts.serving}
             value="serving"
             selected={filter === "serving"}
@@ -266,15 +279,15 @@ export function ThreadList() {
       )}
 
       <div className="h-thread-list">
-        {listLoading && <div className="e-empty-state">正在加载会话...</div>}
-        {listError && <div className="e-empty-state">会话加载失败，请稍后重试</div>}
+        {listLoading && <div className="e-empty-state">{t("customerService.threadList.loading")}</div>}
+        {listError && <div className="e-empty-state">{t("customerService.threadList.loadFailed")}</div>}
         {!listLoading && !listError && visibleThreads.length === 0 && (
           <ThreadListEmptyState
             state={emptyState}
             onAction={() => {
-              if (emptyState.actionLabel === "清空搜索") {
+              if (emptyState.action === "clearSearch") {
                 setQuery("");
-              } else if (emptyState.actionLabel === "查看排队") {
+              } else if (emptyState.action === "viewQueued") {
                 setFilter("queued");
               } else {
                 setFilter("all");
@@ -287,7 +300,7 @@ export function ThreadList() {
           threadRenderWindow.renderedThreads.map((thread) => {
             const entity = chatConversationEntityFromCustomerServiceThread(thread);
             const identity = createCustomerServiceIdentityViewModel({
-              fallbackName: entity.title || (mode === "history" ? "访客" : "未知客户"),
+              fallbackName: entity.title || (mode === "history" ? t("customerService.visitor") : t("customerService.threadList.unknownCustomer")),
               history: mode === "history",
               thread,
             });
@@ -300,8 +313,8 @@ export function ThreadList() {
               <article
                 aria-label={`${identity.ariaName}，${
                   mode === "history"
-                    ? customerServiceHistoryStatusLabel(thread.status)
-                    : customerServiceThreadStatusLabel(thread)
+                    ? formatServiceText(createServiceHistoryThreadStatusDescriptor(thread), t)
+                    : formatServiceText(createCustomerServiceThreadStatusDescriptor(thread), t)
                 }`}
                 aria-pressed={selectedThreadId === thread.threadId}
                 className={`h-thread-card ${
@@ -334,11 +347,11 @@ export function ThreadList() {
                   <small>
                     <Headphones size={12} />
                     {mode === "history"
-                      ? createServiceHistoryThreadStatusText(thread)
-                      : customerServiceThreadStatusLabel(thread)}
+                      ? formatServiceText(createServiceHistoryThreadStatusDescriptor(thread), t)
+                      : formatServiceText(createCustomerServiceThreadStatusDescriptor(thread), t)}
                     <ChannelBadge source={thread.source ?? thread.sourceChannel} compact />
                   </small>
-                  <p>{entity.lastMessage?.preview || (mode === "history" ? "历史会话" : "暂无消息")}</p>
+                  <p>{entity.lastMessage?.preview || (mode === "history" ? t("customerService.threadList.historyThread") : t("customerService.threadList.noMessage"))}</p>
                 </span>
                 <span className="h-thread-sla">
                   {queued ? (
@@ -351,10 +364,10 @@ export function ThreadList() {
                         claimThreadMutation.mutate(thread);
                       }}
                       onKeyDown={(event) => event.stopPropagation()}
-                      title="手动接入该访客会话"
+                      title={t("customerService.threadList.claimTitle")}
                     >
                       <LogIn size={13} />
-                      {claiming ? "接入中" : "接入"}
+                      {claiming ? t("customerService.threadList.claiming") : t("customerService.threadList.claim")}
                     </button>
                   ) : (
                     <>
@@ -364,7 +377,7 @@ export function ThreadList() {
                       )}
                       <Clock3 size={14} />
                       {mode === "history"
-                        ? "只读"
+                        ? t("customerService.threadList.readonly")
                         : formatChatTime(thread.lastMessageAt ?? thread.updatedAt ?? thread.assignedAt)}
                     </>
                   )}
@@ -380,7 +393,7 @@ export function ThreadList() {
               setExpandedThreadCount((count) => count + threadRenderWindowExpandStep)
             }
           >
-            显示更多 {threadRenderWindow.hiddenAfterCount} 个会话
+            {t("customerService.threadList.showMore", { count: threadRenderWindow.hiddenAfterCount })}
           </button>
         )}
       </div>
@@ -430,7 +443,7 @@ function ThreadListEmptyState({
   state,
 }: {
   onAction: () => void;
-  state: ServiceThreadListEmptyState;
+  state: ThreadListEmptyStateView;
 }) {
   return (
     <div className="e-empty-state service-thread-empty-state">
@@ -445,4 +458,89 @@ function ThreadListEmptyState({
   );
 }
 
+function createThreadListEmptyStateView({
+  currentCounts,
+  filter,
+  historyCount,
+  mode,
+  query,
+  t,
+}: {
+  currentCounts: { all: number };
+  filter: ServiceThreadFilter;
+  historyCount: number;
+  mode: ThreadMode;
+  query?: string;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}): ThreadListEmptyStateView {
+  const hasQuery = Boolean(query?.trim());
+  if (hasQuery) {
+    return {
+      action: "clearSearch",
+      actionLabel: t("customerService.threadList.empty.clearSearch"),
+      description: t(
+        mode === "history"
+          ? "customerService.threadList.empty.searchHistoryDescription"
+          : "customerService.threadList.empty.searchCurrentDescription",
+      ),
+      title: t("customerService.threadList.empty.searchTitle"),
+    };
+  }
+  if (mode === "history") {
+    return {
+      description: t(
+        historyCount > 0
+          ? "customerService.threadList.empty.historyFilteredDescription"
+          : "customerService.threadList.empty.noHistoryDescription",
+      ),
+      title: t(
+        historyCount > 0
+          ? "customerService.threadList.empty.historyFilteredTitle"
+          : "customerService.threadList.empty.noHistoryTitle",
+      ),
+    };
+  }
+  if (currentCounts.all === 0) {
+    return {
+      description: t("customerService.threadList.empty.noCurrentDescription"),
+      title: t("customerService.threadList.empty.noCurrentTitle"),
+    };
+  }
+  if (filter === "serving") {
+    return {
+      action: "viewQueued",
+      actionLabel: t("customerService.threadList.empty.viewQueued"),
+      description: t("customerService.threadList.empty.servingDescription"),
+      title: t("customerService.threadList.empty.filteredTitle"),
+    };
+  }
+  if (filter === "sla") {
+    return {
+      action: "viewAll",
+      actionLabel: t("customerService.threadList.empty.viewAll"),
+      description: t("customerService.threadList.empty.slaDescription"),
+      title: t("customerService.threadList.empty.noSlaTitle"),
+    };
+  }
+  if (filter === "queued") {
+    return {
+      action: "viewAll",
+      actionLabel: t("customerService.threadList.empty.viewAll"),
+      description: t("customerService.threadList.empty.queuedDescription"),
+      title: t("customerService.threadList.empty.filteredTitle"),
+    };
+  }
+  return {
+    description: t("customerService.threadList.empty.filteredDescription"),
+    title: t("customerService.threadList.empty.filteredTitle"),
+  };
+}
+
 export { isRiskyCustomerServiceThread as isRiskyThread };
+
+function formatServiceText(
+  descriptor: ServiceTextDescriptor,
+  translate: (key: string, params?: Record<string, string | number>) => string,
+) {
+  return translate(descriptor.key, descriptor.params);
+}

@@ -5,6 +5,7 @@ import {
   normalizeMessageType,
   normalizeMessageParts,
 } from "../data/im-message-normalize";
+import { useI18n } from "../i18n/useI18n";
 import { renderWechatEmojiText } from "../lib/wechatEmoji";
 import { normalizeMediaPart } from "../media/domain/mediaMessage";
 import {
@@ -44,8 +45,10 @@ export function MessageBodyView({
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
   onUploadAction?: UploadActionHandler;
 }) {
+  const { t } = useI18n();
+
   if (message.isRecalled || message.status === "recalled") {
-    return <p className="message-recalled-text">消息已撤回</p>;
+    return <p className="message-recalled-text">{t("messages.body.recalled")}</p>;
   }
   const parts = normalizeMessageParts(message);
 
@@ -76,10 +79,11 @@ export function MessageBodyView({
 type MediaCacheContext = MessageMediaCacheContext;
 
 function UnsupportedPart({ message }: { message: MessageItemDto }) {
+  const { t } = useI18n();
   const type = normalizeMessageType(message) || message.messageType || "";
   const text = message.preview
     ? renderWechatEmojiText(message.preview)
-    : `暂不支持的消息类型${type ? `：${type}` : ""}`;
+    : t("messages.body.unsupported", { type });
   return <p>{text}</p>;
 }
 
@@ -169,7 +173,7 @@ function MarkdownPart({ text }: { text: string }) {
         if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
           return (
             <div className="message-markdown-list-item" key={`${trimmed}-${index}`}>
-              <span>•</span>
+              <span aria-hidden="true">•</span>
               <p>{renderInlineMarkdown(trimmed.slice(2))}</p>
             </div>
           );

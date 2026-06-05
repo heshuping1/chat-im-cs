@@ -19,14 +19,21 @@ export async function getAppInstanceHeaders() {
 }
 
 export function formatAppInstanceLabel(profile: Pick<AppInstanceProfilePayload, "profileName">) {
-  return profile.profileName || "主客户端";
+  return profile.profileName || "Primary client";
 }
 
 export async function openAppProfile(profileId?: string) {
   if (typeof window === "undefined" || !window.desktopApi?.openAppProfile) {
-    throw new Error("当前运行环境不支持打开新客户端");
+    throw new Error("The current runtime does not support opening a new client.");
   }
   await window.desktopApi.openAppProfile(profileId);
+}
+
+export async function quitApp() {
+  if (typeof window === "undefined" || !window.desktopApi?.quitApp) {
+    return;
+  }
+  await window.desktopApi.quitApp();
 }
 
 async function resolveAppInstanceProfile(): Promise<AppInstanceProfilePayload> {
@@ -36,7 +43,7 @@ async function resolveAppInstanceProfile(): Promise<AppInstanceProfilePayload> {
 
   return {
     profileId: null,
-    profileName: "浏览器调试",
+    profileName: "Browser debug",
     deviceId: readOrCreateBrowserId(fallbackDeviceIdKey),
     clientInstanceId: readOrCreateBrowserId(fallbackClientInstanceIdKey),
   };

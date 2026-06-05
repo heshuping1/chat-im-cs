@@ -24,10 +24,8 @@ import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { normalizeKnowledgeBasesResponse } from "../data/api/knowledge-normalizers";
 import { createApiClient } from "../data/runtime";
-import { customerServiceReceptionStatusLabel } from "../data/customer-service-display";
 import {
   roleFromSession,
-  roleLabels,
   workbenchShortcuts,
 } from "../data/static-config";
 import type {
@@ -38,13 +36,8 @@ import type {
 } from "../data/api-client";
 import type { ModuleKey, WorkbenchShortcut } from "../data/types";
 import { useSetActiveModule } from "../data/workspace-ui/workspace-ui-store";
+import { useI18n } from "../i18n/useI18n";
 import { formatError, formatMonthDayTime } from "../lib/format";
-
-const groupIcons: Record<string, LucideIcon> = {
-  客服工作台: MessageSquareText,
-  管理工作台: ShieldCheck,
-  所有者工作台: Building2,
-};
 
 const shortcutIcons: Record<string, LucideIcon> = {
   "wb-cs-notices": Megaphone,
@@ -56,25 +49,12 @@ const shortcutIcons: Record<string, LucideIcon> = {
   "wb-owner-broadcast": Radio,
 };
 
-const stateLabels: Record<WorkbenchShortcut["state"], string> = {
-  available: "可用",
-  readonly: "只读",
-  no_permission: "无权限",
-  pending_api: "待接入",
-};
-
-const stateHints: Record<WorkbenchShortcut["state"], string> = {
-  available: "可以进入或查看",
-  readonly: "只读查看",
-  no_permission: "当前角色不可用",
-  pending_api: "入口已保留，等待页面或接口接入",
-};
-
 const shortcutRoutes: Partial<Record<string, ModuleKey>> = {
   "wb-cs-quick-replies": "knowledgeBase",
 };
 
 export function WorkbenchPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const authSession = useAuthSession();
   const setActiveModule = useSetActiveModule();
@@ -101,7 +81,7 @@ export function WorkbenchPage() {
 
   const grouped = visibleItems.reduce<Record<string, WorkbenchShortcut[]>>(
     (result, item) => {
-      result[item.group] = [...(result[item.group] ?? []), item];
+      result[item.groupKey] = [...(result[item.groupKey] ?? []), item];
       return result;
     },
     {},
@@ -134,15 +114,15 @@ export function WorkbenchPage() {
     mutationFn: async (announcementId: string) =>
       client!.markEnterpriseAnnouncementRead(announcementId),
     onSuccess: async () => {
-      setNotice("公告已标记为已读");
+      setNotice(t("workbench.notice.readSuccess"));
       await queryClient.invalidateQueries({
         queryKey: ["pc-workbench-announcements"],
       });
     },
-    onError: (error) => setNotice(`已读上报失败：${formatError(error)}`),
+    onError: (error) => setNotice(t("workbench.notice.readFailed", { error: formatError(error) })),
   });
 
-  const roleLabel = roleLabels[currentWorkspaceRole];
+  const roleLabel = t(`workbench.role.${currentWorkspaceRole}`);
   const summary = threadsQuery.data?.summary;
   const announcementCount = announcementsQuery.data?.length;
   const receptionStatus = receptionQuery.data?.serviceStatus;
@@ -163,14 +143,17 @@ export function WorkbenchPage() {
       <header className="workbench-hero">
         <div>
           <span className="eyebrow">ROLE WORKBENCH</span>
-          <h1>{roleLabel}工作台</h1>
+          <h1>{t("workbench.heroTitle", { role: roleLabel })}</h1>
           <p>
-            {authSession?.tenantName ?? "当前企业"} · {roleLabel}入口。消息、通讯录和在线客服保持独立，工作台只放角色任务和管理入口。
+            {t("workbench.heroSubtitle", {
+              role: roleLabel,
+              tenant: authSession?.tenantName ?? t("workbench.currentEnterprise"),
+            })}
           </p>
         </div>
-        <div className="role-card" aria-label="当前角色">
+        <div className="role-card" aria-label={t("workbench.currentRole")}>
           <UsersRound size={20} />
-          <span>当前角色</span>
+          <span>{t("workbench.currentRole")}</span>
           <strong>{roleLabel}</strong>
         </div>
       </header>
@@ -181,33 +164,36 @@ export function WorkbenchPage() {
         </p>
       )}
 
-      <section className="workbench-summary" aria-label="工作台摘要">
+      <section className="workbench-summary" aria-label={t("workbench.summaryAria")}>
         <MetricCard
           icon={Megaphone}
-          label="企业公告"
+          label={t("workbench.summary.announcements")}
           value={formatMetric(announcementCount)}
-          hint={announcementsQuery.isError ? "公告加载失败" : "已发布且未过期"}
+          hint={announcementsQuery.isError ? t("workbench.announcementLoadFailed") : t("workbench.summary.announcementsHint")}
         />
         <MetricCard
           icon={BookOpenText}
-          label="常用话术"
-          value="入口"
-          hint="复用知识库与话术能力"
+          label={t("workbench.summary.quickReplies")}
+          value={t("workbench.entry")}
+          hint={t("workbench.summary.quickRepliesHint")}
         />
         <MetricCard
           icon={Headphones}
-          label="接待状态"
-          value={customerServiceReceptionStatusLabel(receptionStatus)}
-          hint="进入工作台不会自动改变状态"
+          label={t("workbench.summary.receptionStatus")}
+          value={workbenchReceptionStatusLabel(receptionStatus, t)}
+          hint={t("workbench.summary.receptionStatusHint")}
         />
         <MetricCard
           icon={BarChart3}
-          label="当前会话"
+          label={t("workbench.summary.currentConversations")}
           value={formatMetric(summary?.allCount)}
           hint={
             threadsQuery.isError
-              ? "效能数据加载失败"
-              : `排队 ${formatMetric(summary?.queuedCount)} · 进行中 ${formatMetric(summary?.activeCount)}`
+              ? t("workbench.performanceLoadFailed")
+              : t("workbench.summary.threadHint", {
+                  active: formatMetric(summary?.activeCount),
+                  queue: formatMetric(summary?.queuedCount),
+                })
           }
         />
       </section>
@@ -215,12 +201,13 @@ export function WorkbenchPage() {
       <section className="workbench-main-grid">
         <div className="workbench-left">
           {Object.entries(grouped).map(([group, items]) => {
-            const Icon = groupIcons[group] ?? MessageSquareText;
+            const groupKey = group as WorkbenchShortcut["groupKey"];
+            const Icon = workbenchGroupIcon(groupKey);
             return (
               <section className="workbench-section" key={group}>
                 <h2>
                   <Icon size={17} />
-                  {group}
+                  {workbenchGroupLabel(groupKey, t)}
                 </h2>
                 <div className="workbench-grid">
                   {items.map((item) => (
@@ -233,6 +220,7 @@ export function WorkbenchPage() {
                         setNotice(null);
                       }}
                       onAction={() => handleShortcutAction(item)}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -241,7 +229,7 @@ export function WorkbenchPage() {
           })}
         </div>
 
-        <aside className="workbench-detail" aria-label="工作台详情">
+        <aside className="workbench-detail" aria-label={t("workbench.detailAria")}>
           {selectedShortcut ? (
             <WorkbenchDetail
               announcements={announcementsQuery.data ?? []}
@@ -264,18 +252,64 @@ export function WorkbenchPage() {
               threadsError={
                 threadsQuery.isError ? formatError(threadsQuery.error) : ""
               }
+              t={t}
             />
           ) : (
             <EmptyBlock
               icon={LockKeyhole}
-              title="暂无可用工作台入口"
-              text="当前角色没有配置工作台能力。"
+              title={t("workbench.emptyNoEntryTitle")}
+              text={t("workbench.emptyNoEntryText")}
             />
           )}
         </aside>
       </section>
     </main>
   );
+}
+
+type WorkbenchTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+function workbenchGroupIcon(group: WorkbenchShortcut["groupKey"]) {
+  switch (group) {
+    case "customerService":
+      return MessageSquareText;
+    case "admin":
+      return ShieldCheck;
+    case "owner":
+      return Building2;
+    default:
+      return MessageSquareText;
+  }
+}
+
+function workbenchGroupLabel(group: WorkbenchShortcut["groupKey"], t: WorkbenchTranslate) {
+  return t(`workbench.group.${group}`);
+}
+
+function workbenchStateLabel(state: WorkbenchShortcut["state"], t: WorkbenchTranslate) {
+  return t(`workbench.state.${state}.label`);
+}
+
+function workbenchStateHint(state: WorkbenchShortcut["state"], t: WorkbenchTranslate) {
+  return t(`workbench.state.${state}.hint`);
+}
+
+function workbenchShortcutTitle(item: WorkbenchShortcut, t: WorkbenchTranslate) {
+  return t(item.titleKey);
+}
+
+function workbenchShortcutDescription(item: WorkbenchShortcut, t: WorkbenchTranslate) {
+  return t(item.descriptionKey);
+}
+
+function workbenchReceptionStatusLabel(value: unknown, t: WorkbenchTranslate) {
+  const normalized = String(value ?? "").toLowerCase();
+  if (normalized === "online" || normalized === "1") return t("sidebar.service.status.online");
+  if (normalized === "busy" || normalized === "2") return t("sidebar.service.status.busy");
+  if (normalized === "break" || normalized === "away" || normalized === "3") {
+    return t("sidebar.service.status.break");
+  }
+  return t("sidebar.service.status.offline");
 }
 
 function MetricCard({
@@ -304,11 +338,13 @@ function ShortcutCard({
   selected,
   onClick,
   onAction,
+  t,
 }: {
   item: WorkbenchShortcut;
   selected: boolean;
   onClick: () => void;
   onAction: () => void;
+  t: WorkbenchTranslate;
 }) {
   const Icon = shortcutIcons[item.id] ?? MessageSquareText;
   const disabled = item.state === "no_permission";
@@ -323,15 +359,15 @@ function ShortcutCard({
         </span>
         <span className="card-state">
           {item.state === "no_permission" && <LockKeyhole size={13} />}
-          {stateLabels[item.state]}
+          {workbenchStateLabel(item.state, t)}
         </span>
       </div>
-      <strong>{item.title}</strong>
-      <p>{item.description}</p>
+      <strong>{workbenchShortcutTitle(item, t)}</strong>
+      <p>{workbenchShortcutDescription(item, t)}</p>
       <footer>
-        <em>{item.metric ?? stateHints[item.state]}</em>
+        <em>{item.metric ?? workbenchStateHint(item.state, t)}</em>
         <button
-          aria-label={`打开${item.title}`}
+          aria-label={t("workbench.openShortcut", { title: workbenchShortcutTitle(item, t) })}
           disabled={disabled}
           onClick={(event) => {
             event.stopPropagation();
@@ -355,6 +391,7 @@ function WorkbenchDetail({
   knowledgeError,
   onOpenModule,
   reception,
+  t,
   threads,
   threadsError,
 }: {
@@ -366,17 +403,18 @@ function WorkbenchDetail({
   knowledgeError: string;
   onOpenModule: (module: ModuleKey) => void;
   reception?: StaffReceptionStatusDto;
+  t: WorkbenchTranslate;
   threads?: CustomerServiceThreadsResponse;
   threadsError: string;
 }) {
   if (item.id === "wb-cs-notices") {
     return (
       <>
-        <DetailHeader icon={Megaphone} item={item} />
+        <DetailHeader icon={Megaphone} item={item} t={t} />
         {announcementsError ? (
           <EmptyBlock
             icon={TriangleAlert}
-            title="公告加载失败"
+            title={t("workbench.announcementLoadFailed")}
             text={announcementsError}
           />
         ) : announcements.length > 0 ? (
@@ -385,7 +423,7 @@ function WorkbenchDetail({
               <article className="workbench-list-item" key={announcement.announcementId}>
                 <div>
                   <span className={`priority ${announcement.priority ?? "normal"}`}>
-                    {announcement.priority === "important" ? "重要" : "普通"}
+                    {announcement.priority === "important" ? t("workbench.priority.important") : t("workbench.priority.normal")}
                   </span>
                   <strong>{announcement.title}</strong>
                   <p>{announcement.content}</p>
@@ -395,7 +433,7 @@ function WorkbenchDetail({
                   onClick={() => markRead(announcement.announcementId)}
                   type="button"
                 >
-                  已读
+                  {t("workbench.markRead")}
                 </button>
               </article>
             ))}
@@ -403,8 +441,8 @@ function WorkbenchDetail({
         ) : (
           <EmptyBlock
             icon={Megaphone}
-            title="暂无企业公告"
-            text="当前企业没有已发布且未过期的公告。"
+            title={t("workbench.emptyAnnouncementsTitle")}
+            text={t("workbench.emptyAnnouncementsText")}
           />
         )}
       </>
@@ -414,9 +452,9 @@ function WorkbenchDetail({
   if (item.id === "wb-cs-quick-replies") {
     return (
       <>
-        <DetailHeader icon={BookOpenText} item={item} />
+        <DetailHeader icon={BookOpenText} item={item} t={t} />
         {knowledgeError ? (
-          <EmptyBlock icon={TriangleAlert} title="话术加载失败" text={knowledgeError} />
+          <EmptyBlock icon={TriangleAlert} title={t("workbench.knowledgeLoadFailed")} text={knowledgeError} />
         ) : knowledgeBases.length ? (
           <div className="workbench-list">
             {knowledgeBases.slice(0, 5).map((base) => (
@@ -425,17 +463,17 @@ function WorkbenchDetail({
                 key={base.knowledgeBaseId || base.id || base.name}
               >
                 <div>
-                  <span className="priority normal">知识库</span>
-                  <strong>{base.name || base.title || "未命名知识库"}</strong>
-                  <p>{base.description || base.summary || "暂无摘要"}</p>
+                  <span className="priority normal">{t("workbench.knowledgeBase")}</span>
+                  <strong>{base.name || base.title || t("workbench.unnamedKnowledgeBase")}</strong>
+                  <p>{base.description || base.summary || t("workbench.noSummary")}</p>
                   <small>
                     {base.documentCount != null
-                      ? `${base.documentCount} 篇内容`
-                      : "内容数 --"}
+                      ? t("workbench.documentCount", { count: base.documentCount })
+                      : t("workbench.documentCountEmpty")}
                   </small>
                 </div>
                 <button onClick={() => onOpenModule("knowledgeBase")} type="button">
-                  打开
+                  {t("common.open")}
                 </button>
               </article>
             ))}
@@ -443,8 +481,8 @@ function WorkbenchDetail({
         ) : (
           <EmptyBlock
             icon={BookOpenText}
-            title="暂无常用话术"
-            text="服务端未返回可用知识库或话术内容。"
+            title={t("workbench.emptyQuickRepliesTitle")}
+            text={t("workbench.emptyQuickRepliesText")}
           />
         )}
         <button
@@ -452,7 +490,7 @@ function WorkbenchDetail({
           onClick={() => onOpenModule("knowledgeBase")}
           type="button"
         >
-          打开知识库
+          {t("workbench.openKnowledgeBase")}
           <ArrowRight size={15} />
         </button>
       </>
@@ -462,22 +500,22 @@ function WorkbenchDetail({
   if (item.id === "wb-cs-performance") {
     return (
       <>
-        <DetailHeader icon={BarChart3} item={item} />
+        <DetailHeader icon={BarChart3} item={item} t={t} />
         {threadsError ? (
-          <EmptyBlock icon={TriangleAlert} title="效能数据加载失败" text={threadsError} />
+          <EmptyBlock icon={TriangleAlert} title={t("workbench.performanceLoadFailed")} text={threadsError} />
         ) : (
           <div className="workbench-detail-grid">
             <InfoRow
-              label="我的在线客服状态"
-              value={customerServiceReceptionStatusLabel(reception?.serviceStatus)}
+              label={t("workbench.myServiceStatus")}
+              value={workbenchReceptionStatusLabel(reception?.serviceStatus, t)}
             />
             <InfoRow
-              label="接入模式"
-              value={reception?.queueAcceptEnabled ? "自动分配" : "手动接入"}
+              label={t("workbench.accessMode")}
+              value={reception?.queueAcceptEnabled ? t("workbench.autoAssign") : t("workbench.manualAccess")}
             />
-            <InfoRow label="当前全部会话" value={formatMetric(threads?.summary?.allCount)} />
-            <InfoRow label="排队" value={formatMetric(threads?.summary?.queuedCount)} />
-            <InfoRow label="进行中" value={formatMetric(threads?.summary?.activeCount)} />
+            <InfoRow label={t("workbench.allConversations")} value={formatMetric(threads?.summary?.allCount)} />
+            <InfoRow label={t("workbench.queued")} value={formatMetric(threads?.summary?.queuedCount)} />
+            <InfoRow label={t("workbench.active")} value={formatMetric(threads?.summary?.activeCount)} />
             <InfoRow label="VIP" value={formatMetric(threads?.summary?.vipCount)} />
           </div>
         )}
@@ -486,7 +524,7 @@ function WorkbenchDetail({
           onClick={() => onOpenModule("onlineService")}
           type="button"
         >
-          打开在线客服
+          {t("workbench.openOnlineService")}
           <ArrowRight size={15} />
         </button>
       </>
@@ -495,16 +533,16 @@ function WorkbenchDetail({
 
   return (
     <>
-      <DetailHeader icon={shortcutIcons[item.id] ?? ClipboardList} item={item} />
+      <DetailHeader icon={shortcutIcons[item.id] ?? ClipboardList} item={item} t={t} />
       <EmptyBlock
         icon={CheckCircle2}
-        title="入口已放好"
-        text="这里先保留角色化入口和权限边界；后续接入对应页面或接口后再填充真实数据。"
+        title={t("workbench.entryReservedTitle")}
+        text={t("workbench.entryReservedText")}
       />
       <div className="workbench-detail-grid">
-        <InfoRow label="角色范围" value={item.roles.map((role) => roleLabels[role]).join("、")} />
-        <InfoRow label="当前状态" value={stateLabels[item.state]} />
-        <InfoRow label="数据口径" value="不造假；无接口时显示空态" />
+        <InfoRow label={t("workbench.roleScope")} value={item.roles.map((role) => t(`workbench.role.${role}`)).join(t("workbench.listSeparator"))} />
+        <InfoRow label={t("workbench.currentState")} value={workbenchStateLabel(item.state, t)} />
+        <InfoRow label={t("workbench.dataScope")} value={t("workbench.dataScopeValue")} />
       </div>
     </>
   );
@@ -513,20 +551,22 @@ function WorkbenchDetail({
 function DetailHeader({
   icon: Icon,
   item,
+  t,
 }: {
   icon: LucideIcon;
   item: WorkbenchShortcut;
+  t: WorkbenchTranslate;
 }) {
   return (
     <header className="workbench-detail-head">
       <div>
         <span>
           <Icon size={17} />
-          {item.group}
+          {workbenchGroupLabel(item.groupKey, t)}
         </span>
-        <h2>{item.title}</h2>
+        <h2>{workbenchShortcutTitle(item, t)}</h2>
       </div>
-      <em>{stateLabels[item.state]}</em>
+      <em>{workbenchStateLabel(item.state, t)}</em>
     </header>
   );
 }

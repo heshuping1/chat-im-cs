@@ -82,7 +82,7 @@ export function useImSendOutboxRestore({
           });
         } else if (isMediaRecord(record) && record.localTaskId) {
           await storage.patchRecord(scopeKey, record.localMessageId, {
-            localError: "本地文件已失效，请重新选择",
+            localError: "本地文件已过期，请重新选择。",
             status: "failed",
             updatedAt: Date.now(),
           });

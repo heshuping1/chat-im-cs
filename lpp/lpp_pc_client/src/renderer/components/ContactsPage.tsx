@@ -17,25 +17,16 @@ import { ContactDetailContent } from "./ContactDetailViews";
 import { ContactsInviteQrCard } from "./ContactsInviteQrCard";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
-import { useQuery } from "@tanstack/react-query";
 import {
   type FriendInviteQrDto,
   type FriendRequestDto,
 } from "../data/api-client";
-import { useAuthSession } from "../data/auth/auth-store";
 import {
-  contactDirectoryEmptyText,
-  contactDirectorySearchPlaceholder,
   type ContactDirectoryEntry,
-  contactKindBadge,
-  contactRowHint,
-  contactRowSubtitle,
+  type ContactDirectoryViewMode,
   createContactDirectoryEntries,
   groupOrganizationContactsByRole,
-  requestStatusLabel,
 } from "../data/contact-directory";
-import { pcQueryKeys } from "../data/query-keys";
-import { requireApiClient } from "../data/runtime";
 import type { ContactFilter, ContactItem } from "../data/types";
 import {
   useActiveContactId,
@@ -44,11 +35,27 @@ import {
   useSetContactFilter,
 } from "../data/workspace-ui/workspace-ui-store";
 import { useContactsDirectoryController } from "../contacts/hooks/useContactsDirectoryController";
+import type { TranslationParams } from "../i18n/dictionary";
+import { useI18n } from "../i18n/useI18n";
 import { formatError, formatShortDate } from "../lib/format";
-import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
+import {
+  messageDangerConfirmationDescriptor,
+  requestMessageDangerConfirmation,
+  type MessageDangerConfirmAction,
+} from "../messages/runtime/messageConfirm";
+
+type Translate = (key: string, params?: TranslationParams) => string;
+
+const ROLE_LABEL = {
+  admin: "contacts.page.role.admin",
+  customerService: "contacts.page.role.customerService",
+  member: "contacts.page.role.member",
+  owner: "contacts.page.role.owner",
+  technicalSupport: "contacts.page.role.technicalSupport",
+} as const;
 
 export function ContactsPage() {
-  const session = useAuthSession();
+  const { t } = useI18n();
   const activeContactId = useActiveContactId();
   const setActiveContact = useSetActiveContact();
   const contactFilter = useContactFilter();
@@ -57,6 +64,8 @@ export function ContactsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState("");
   const {
+    activeContact,
+    activeContactDetail,
     activeRequest,
     blockContact,
     contactAccess,
@@ -81,6 +90,7 @@ export function ContactsPage() {
     visibleContacts,
     visibleRequests,
   } = useContactsDirectoryController({
+    activeContactId,
     contactFilter,
     keyword,
     selectedRequestId,
@@ -103,34 +113,18 @@ export function ContactsPage() {
     ],
   );
   const effectiveFilter = effectiveContactFilter;
-  const searchPlaceholder = contactDirectorySearchPlaceholder({
+  const searchPlaceholder = translateContactSearchPlaceholder({
     viewMode: directoryViewMode,
     canReadOrganization: contactAccess.canReadOrganization,
+    t,
   });
-  const emptyText = contactDirectoryEmptyText({
-    filter: effectiveFilter,
-    viewMode: directoryViewMode,
-  });
-  const activeContact =
-    visibleContacts.find((item) => item.id === activeContactId) ??
-    visibleContacts[0];
-  const activeTenantMemberUserId =
-    activeContact?.kind === "staff" && activeContact.userId ? activeContact.userId : "";
-  const tenantMemberProfileQuery = useQuery({
-    queryKey: pcQueryKeys.tenantMemberProfile(
-      session?.apiBaseUrl,
-      session?.tenantToken,
-      activeTenantMemberUserId,
-    ),
-    enabled: Boolean(activeTenantMemberUserId && !activeContact?.greenBubbleNo && session),
-    queryFn: async () => requireApiClient(session).getTenantMemberProfile(activeTenantMemberUserId),
-  });
-  const activeContactDetail = useMemo(() => {
-    const greenBubbleNo = tenantMemberProfileQuery.data?.greenBubbleNo;
-    if (!activeContact || activeContact.greenBubbleNo || !greenBubbleNo) return activeContact;
-    return { ...activeContact, greenBubbleNo };
-  }, [activeContact, tenantMemberProfileQuery.data?.greenBubbleNo]);
-
+  const translatedDirectoryEntries = useMemo(
+    () => ({
+      fixed: directoryEntries.fixed.map((entry) => translateDirectoryEntry(entry, t)),
+      shortcuts: directoryEntries.shortcuts.map((entry) => translateDirectoryEntry(entry, t)),
+    }),
+    [directoryEntries.fixed, directoryEntries.shortcuts, t],
+  );
   const showProfilePanel =
     directoryViewMode === "staff" &&
     activeContactDetail &&
@@ -141,24 +135,24 @@ export function ContactsPage() {
   const handleAddContact = () => {
     setContactFilter("requests");
     setSelectedRequestId("");
-    setNotice("添加联系人可通过好友二维码、名片或收到的好友申请完成；申请会在这里集中处理。");
+    setNotice(t("contacts.page.notice.addContact"));
   };
 
   const onDeleteFriend = (contact: ContactItem) => {
     if (!contact.userId) {
-      setNotice("当前联系人缺少用户 ID，无法删除好友。");
+      setNotice(t("contacts.page.notice.missingUserDelete"));
       return;
     }
-    if (!requestMessageDangerConfirmation({ action: "delete-friend" })) return;
+    if (!confirmMessageDanger("delete-friend", t)) return;
     deleteFriend(contact);
   };
 
   const onBlockContact = (contact: ContactItem) => {
     if (!contact.userId) {
-      setNotice("当前联系人缺少用户 ID，无法加入黑名单。");
+      setNotice(t("contacts.page.notice.missingUserBlock"));
       return;
     }
-    if (!requestMessageDangerConfirmation({ action: "block-user" })) return;
+    if (!confirmMessageDanger("block-user", t)) return;
     blockContact(contact);
   };
 
@@ -168,13 +162,13 @@ export function ContactsPage() {
         <header className="contacts-b-head">
           <div>
             <span>CONTACTS</span>
-            <h1>通讯录</h1>
+            <h1>{t("contacts.page.title")}</h1>
           </div>
           <button
             className="contacts-icon-button"
             type="button"
-            aria-label="添加联系人"
-            title="添加好友与处理申请"
+            aria-label={t("contacts.page.addContact")}
+            title={t("contacts.page.addContactTitle")}
             onClick={handleAddContact}
           >
             <UserPlus size={17} />
@@ -190,8 +184,8 @@ export function ContactsPage() {
           />
         </label>
 
-        <nav className="contacts-entry-list" aria-label="通讯录入口">
-          {[...directoryEntries.fixed, ...directoryEntries.shortcuts].map((entry) => (
+        <nav className="contacts-entry-list" aria-label={t("contacts.page.entryAria")}>
+          {[...translatedDirectoryEntries.fixed, ...translatedDirectoryEntries.shortcuts].map((entry) => (
             <ContactEntryButton
               active={effectiveFilter === entry.key}
               entry={entry}
@@ -206,32 +200,34 @@ export function ContactsPage() {
         </nav>
 
         {notice && <PanelState text={notice} />}
-        {directoryLoading && <PanelState text="正在加载通讯录..." />}
+        {directoryLoading && <PanelState text={t("contacts.page.loading")} />}
         {directoryError && (
           <PanelState
             tone="error"
-            text={`通讯录接口失败：${formatError(directoryError)}`}
+            text={t("contacts.page.directoryError", { error: formatError(directoryError) })}
           />
         )}
         {effectiveFilter === "requests" && requestListError && (
           <PanelState
             tone="error"
-            text={`好友申请加载失败：${formatError(requestListError)}`}
+            text={t("contacts.page.requestError", { error: formatError(requestListError) })}
           />
         )}
 
-        <div className="contacts-list" aria-label="通讯录列表">
+        <div className="contacts-list" aria-label={t("contacts.page.listAria")}>
           {effectiveFilter === "organization" ? (
             <OrganizationList
               contacts={visibleContacts}
               activeContactId={activeContact?.id}
               onSelect={setActiveContact}
+              t={t}
             />
           ) : effectiveFilter === "requests" ? (
             <RequestList
               requests={visibleRequests}
               selectedRequestId={activeRequest?.requestId}
               onSelect={setSelectedRequestId}
+              t={t}
             />
           ) : (
             visibleContacts.map((contact) => (
@@ -240,16 +236,17 @@ export function ContactsPage() {
                 key={contact.id}
                 active={activeContact?.id === contact.id}
                 onClick={() => setActiveContact(contact.id)}
+                t={t}
               />
             ))
           )}
           {effectiveFilter !== "requests" && visibleContacts.length === 0 && (
-            <PanelState text={emptyText} />
+            <PanelState text={translateContactEmptyText(effectiveFilter, directoryViewMode, t)} />
           )}
           {effectiveFilter === "requests" &&
             !requestListError &&
             visibleRequests.length === 0 && (
-            <PanelState text={emptyText} />
+            <PanelState text={translateContactEmptyText(effectiveFilter, directoryViewMode, t)} />
           )}
         </div>
       </section>
@@ -266,6 +263,7 @@ export function ContactsPage() {
             onAccept={(requestId) => handleRequest(requestId, "accept")}
             onCreateInviteQr={onCreateInviteQr}
             onReject={(requestId) => handleRequest(requestId, "reject")}
+            t={t}
           />
         ) : activeContactDetail ? (
           <>
@@ -281,14 +279,14 @@ export function ContactsPage() {
               <button className="primary" onClick={() => openMessage(activeContactDetail)} type="button">
                 <MessageSquare size={16} />
                 {createDirectChatPending
-                  ? "打开中..."
+                  ? t("contacts.page.action.opening")
                   : activeContactDetail.kind === "group"
-                    ? "进入群聊"
-                    : "发消息"}
+                    ? t("contacts.page.action.openGroup")
+                    : t("contacts.page.action.message")}
               </button>
               {activeContactDetail.kind === "customer" && (
-                <button type="button" onClick={() => setNotice("右侧已展示当前客户资料")}>
-                  客户画像
+                <button type="button" onClick={() => setNotice(t("contacts.page.notice.profileShown"))}>
+                  {t("contacts.page.action.customerProfile")}
                 </button>
               )}
               {relationshipActionsAvailable && (
@@ -299,7 +297,7 @@ export function ContactsPage() {
                   type="button"
                 >
                   <Trash2 size={15} />
-                  删除好友
+                  {t("contacts.page.action.deleteFriend")}
                 </button>
               )}
               {relationshipActionsAvailable && (
@@ -310,7 +308,7 @@ export function ContactsPage() {
                   type="button"
                 >
                   <Ban size={15} />
-                  加入黑名单
+                  {t("contacts.page.action.blockUser")}
                 </button>
               )}
             </div>
@@ -319,8 +317,8 @@ export function ContactsPage() {
           </>
         ) : (
           <div className="contacts-empty-detail">
-            <h2>暂无通讯录数据</h2>
-            <p>请选择客户、好友、组织成员、群聊或申请查看详情。</p>
+            <h2>{t("contacts.page.emptyDetailTitle")}</h2>
+            <p>{t("contacts.page.emptyDetailText")}</p>
           </div>
         )}
       </section>
@@ -370,43 +368,185 @@ function contactEntryIcon(key: ContactFilter) {
   return UsersRound;
 }
 
+function translateDirectoryEntry(
+  entry: ContactDirectoryEntry,
+  t: Translate,
+): ContactDirectoryEntry {
+  return {
+    ...entry,
+    label: entry.label.startsWith("contacts.") ? t(entry.label) : t(`contacts.page.entry.${entry.key}`),
+  };
+}
+
+function translateContactSearchPlaceholder({
+  viewMode,
+  canReadOrganization,
+  t,
+}: {
+  viewMode: ContactDirectoryViewMode;
+  canReadOrganization: boolean;
+  t: Translate;
+}) {
+  if (viewMode === "customer") return t("contacts.page.search.customerMode");
+  return canReadOrganization
+    ? t("contacts.page.search.staffWithOrganization")
+    : t("contacts.page.search.staffBasic");
+}
+
+function translateContactEmptyText(
+  filter: ContactFilter,
+  viewMode: ContactDirectoryViewMode,
+  t: Translate,
+) {
+  if (filter === "requests") return t("contacts.page.empty.requests");
+  if (viewMode === "customer") {
+    if (filter === "friend") return t("contacts.page.empty.customerFriend");
+    if (filter === "group") return t("contacts.page.empty.customerGroup");
+    return t("contacts.page.empty.customerAll");
+  }
+  if (filter === "customer") return t("contacts.page.empty.customer");
+  if (filter === "organization") return t("contacts.page.empty.organization");
+  if (filter === "group") return t("contacts.page.empty.group");
+  if (filter === "friend") return t("contacts.page.empty.friend");
+  return t("contacts.page.empty.all");
+}
+
+function translateRequestStatus(status: string | undefined, t: Translate) {
+  if (status === "accepted") return t("contacts.page.requestStatus.accepted");
+  if (status === "rejected") return t("contacts.page.requestStatus.rejected");
+  return t("contacts.page.requestStatus.pending");
+}
+
+function confirmMessageDanger(
+  action: MessageDangerConfirmAction,
+  t: Translate,
+  count?: number,
+) {
+  const descriptor = messageDangerConfirmationDescriptor(action, count);
+  return requestMessageDangerConfirmation({
+    action,
+    count,
+    message: t(descriptor.key, descriptor.params),
+  });
+}
+
+function translateRoleLabel(label: string | undefined, t: Translate) {
+  if (label?.startsWith("contacts.")) return t(label);
+  if (label === ROLE_LABEL.owner) return t("contacts.page.role.owner");
+  if (label === ROLE_LABEL.admin) return t("contacts.page.role.admin");
+  if (label === ROLE_LABEL.customerService) return t("contacts.page.role.customerService");
+  if (label === ROLE_LABEL.technicalSupport) return t("contacts.page.role.technicalSupport");
+  if (label === ROLE_LABEL.member || !label) return t("contacts.page.role.member");
+  return label;
+}
+
+function translateContactValue(value: string | undefined | null, t: Translate) {
+  if (!value) return value || "";
+  if (value.startsWith("contacts.page.addedAt:")) {
+    return t("contacts.page.addedAt", { time: value.slice("contacts.page.addedAt:".length) });
+  }
+  if (value.startsWith("contacts.page.groupMemberBadge:")) {
+    return t("contacts.page.groupMemberBadge", { count: value.slice("contacts.page.groupMemberBadge:".length) });
+  }
+  return value.startsWith("contacts.") ? t(value) : value;
+}
+
+function contactKindLabel(contact: ContactItem, t: Translate) {
+  if (contact.kind === "customer") return t("contacts.page.kind.customer");
+  if (contact.kind === "friend") return t("contacts.page.kind.friend");
+  if (contact.kind === "group") return t("contacts.page.kind.group");
+  return t("contacts.page.kind.staff");
+}
+
+function contactRowSubtitleText(contact: ContactItem, t: Translate) {
+  if (contact.kind === "customer") {
+    return [t("contacts.page.kind.customer"), contact.groupName].filter(Boolean).join(" · ");
+  }
+  if (contact.kind === "staff") {
+    return [
+      contact.departmentName || t("contacts.page.role.enterpriseMember"),
+      contact.position,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (contact.kind === "group") {
+    return t("contacts.page.groupSubtitle", {
+      count: contact.members ?? "--",
+      reminder: contact.muted
+        ? t("contacts.reminder.muted")
+        : t("contacts.reminder.normal"),
+    });
+  }
+  return [t("contacts.page.kind.friend"), contact.groupName].filter(Boolean).join(" · ");
+}
+
+function contactRowHintText(contact: ContactItem, t: Translate) {
+  if (contact.kind === "customer") {
+    return contact.createdAt
+      ? t("contacts.page.addedAt", { time: formatShortDate(contact.createdAt) })
+      : t("contacts.detail.customerFriend");
+  }
+  if (contact.kind === "staff") {
+    return [contact.position, contact.greenBubbleNo].filter(Boolean).join(" · ")
+      || t("contacts.page.role.enterpriseMember");
+  }
+  if (contact.kind === "group") {
+    return contact.lastMessagePreview || t("contacts.page.noRecentMessage");
+  }
+  return translateContactValue(contact.remark, t) || t("contacts.page.friendRelationship");
+}
+
+function contactKindBadgeText(contact: ContactItem, t: Translate) {
+  if (contact.kind === "staff") return translateRoleLabel(contact.roleLabel, t);
+  if (contact.kind === "group") {
+    return contact.members
+      ? t("contacts.page.groupMemberBadge", { count: contact.members })
+      : t("contacts.page.kind.group");
+  }
+  return contactKindLabel(contact, t);
+}
+
 function ContactRow({
   contact,
   active,
   compact = false,
   onClick,
+  t,
 }: {
   contact: ContactItem;
   active: boolean;
   compact?: boolean;
   onClick: () => void;
+  t: Translate;
 }) {
   const roleOnly = contact.kind === "staff";
   const nameOnly = compact || contact.kind === "customer" || roleOnly;
+  const displayName = translateContactValue(contact.name, t);
   return (
     <button
       className={`contacts-row ${nameOnly ? "name-only" : ""} ${roleOnly ? "role-only" : ""} ${active ? "active" : ""}`}
       onClick={onClick}
       type="button"
     >
-      <ContactAvatar contact={contact} />
+      <ContactAvatar contact={{ ...contact, name: displayName }} />
       <span className="contacts-row-copy">
         <span className="contacts-name-line">
-          <strong>{contact.name}</strong>
+          <strong>{displayName}</strong>
           {roleOnly && (
-            <span className="contacts-role-chip">{contact.roleLabel || "成员"}</span>
+            <span className="contacts-role-chip">{translateRoleLabel(contact.roleLabel, t)}</span>
           )}
         </span>
-        {roleOnly && <em>{contactRowSubtitle(contact)}</em>}
+        {roleOnly && <em>{contactRowSubtitleText(contact, t)}</em>}
         {!nameOnly && (
           <>
-            <em>{contactRowSubtitle(contact)}</em>
-            <small>{contactRowHint(contact)}</small>
+            <em>{contactRowSubtitleText(contact, t)}</em>
+            <small>{contactRowHintText(contact, t)}</small>
           </>
         )}
       </span>
       {!nameOnly && (
-        <span className="contacts-kind">{contactKindBadge(contact)}</span>
+        <span className="contacts-kind">{contactKindBadgeText(contact, t)}</span>
       )}
     </button>
   );
@@ -434,10 +574,12 @@ function OrganizationList({
   contacts,
   activeContactId,
   onSelect,
+  t,
 }: {
   contacts: ContactItem[];
   activeContactId?: string;
   onSelect: (id: string) => void;
+  t: Translate;
 }) {
   const roleGroups = useMemo(() => groupOrganizationContactsByRole(contacts), [contacts]);
 
@@ -447,8 +589,8 @@ function OrganizationList({
         <section className="org-section" key={group.key}>
           <div className="org-section-head">
             <UsersRound size={15} />
-            <strong>{group.label}</strong>
-            <em>{group.count} 人</em>
+            <strong>{translateRoleLabel(group.label, t)}</strong>
+            <em>{t("contacts.memberCount", { count: group.count })}</em>
           </div>
           {group.contacts.map((contact) => (
             <ContactRow
@@ -457,6 +599,7 @@ function OrganizationList({
               contact={contact}
               key={contact.id}
               onClick={() => onSelect(contact.id)}
+              t={t}
             />
           ))}
         </section>
@@ -469,10 +612,12 @@ function RequestList({
   requests,
   selectedRequestId,
   onSelect,
+  t,
 }: {
   requests: FriendRequestDto[];
   selectedRequestId?: string;
   onSelect: (id: string) => void;
+  t: Translate;
 }) {
   return (
     <>
@@ -486,13 +631,13 @@ function RequestList({
           <PcAvatar
             avatarUrl={request.fromAvatarUrl}
             className="contacts-avatar friend"
-            name={request.fromDisplayName || "好友申请"}
+            name={request.fromDisplayName || t("contacts.page.friendRequestFallback")}
           />
           <span className="contacts-row-copy">
-            <strong>{request.fromDisplayName || "好友申请"}</strong>
-            <em>{request.message || "请求添加你为好友"}</em>
+            <strong>{request.fromDisplayName || t("contacts.page.friendRequestFallback")}</strong>
+            <em>{request.message || t("contacts.page.requestDefaultMessage")}</em>
           </span>
-          <span className="contacts-kind">{requestStatusLabel(request.status)}</span>
+          <span className="contacts-kind">{translateRequestStatus(request.status, t)}</span>
         </button>
       ))}
     </>
@@ -509,6 +654,7 @@ function RequestDetail({
   onAccept,
   onCreateInviteQr,
   onReject,
+  t,
 }: {
   creatingInviteQr: boolean;
   inviteQrError: unknown;
@@ -519,13 +665,14 @@ function RequestDetail({
   onAccept: (requestId: string) => void;
   onCreateInviteQr: () => void;
   onReject: (requestId: string) => void;
+  t: Translate;
 }) {
   if (!request) {
     return (
       <>
         <div className="contacts-empty-detail">
-          <h2>暂无好友申请</h2>
-          <p>新的好友申请会在这里处理，不进入在线客服临时会话。</p>
+          <h2>{t("contacts.page.emptyRequestsTitle")}</h2>
+          <p>{t("contacts.page.emptyRequestsText")}</p>
         </div>
         <ContactsInviteQrCard
           creating={creatingInviteQr}
@@ -543,11 +690,11 @@ function RequestDetail({
         <PcAvatar
           avatarUrl={request.fromAvatarUrl}
           className="contacts-avatar friend large"
-          name={request.fromDisplayName || "好友申请"}
+          name={request.fromDisplayName || t("contacts.page.friendRequestFallback")}
         />
         <div>
-          <h2>{request.fromDisplayName || "好友申请"}</h2>
-          <p>{formatShortDate(request.createdAt)} · {requestStatusLabel(request.status)}</p>
+          <h2>{request.fromDisplayName || t("contacts.page.friendRequestFallback")}</h2>
+          <p>{formatShortDate(request.createdAt)} · {translateRequestStatus(request.status, t)}</p>
         </div>
       </div>
       <div className="contacts-actions">
@@ -558,7 +705,7 @@ function RequestDetail({
           type="button"
         >
           <UserCheck size={16} />
-          通过
+          {t("contacts.page.action.accept")}
         </button>
         <button
           disabled={pending || request.status !== "pending"}
@@ -566,30 +713,30 @@ function RequestDetail({
           type="button"
         >
           <UserRoundX size={16} />
-          拒绝
+          {t("contacts.page.action.reject")}
         </button>
       </div>
       <section className="contacts-section-card">
         <h3>
           <MessageSquare size={16} />
-          验证信息
+          {t("contacts.page.verificationTitle")}
         </h3>
         <p className="contacts-request-message">
-          {request.message || "对方没有填写验证信息。"}
+          {request.message || t("contacts.page.noVerificationMessage")}
         </p>
       </section>
       <section className="contacts-section-card">
         <h3>
           <X size={16} />
-          处理规则
+          {t("contacts.page.ruleTitle")}
         </h3>
         <div className="contacts-mini-rows">
           <div>
-            <span>申请人</span>
+            <span>{t("contacts.page.applicant")}</span>
             <strong>{request.fromUserId || "--"}</strong>
           </div>
           <div>
-            <span>接收人</span>
+            <span>{t("contacts.page.recipient")}</span>
             <strong>{request.toDisplayName || request.toUserId || "--"}</strong>
           </div>
         </div>

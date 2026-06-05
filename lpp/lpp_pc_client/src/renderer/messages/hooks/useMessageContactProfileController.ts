@@ -7,13 +7,14 @@ import type {
   FriendProfileUpdateDto,
 } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { useI18n } from "../../i18n/useI18n";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import {
   resolveContactCardRelation,
-  contactCardActionErrorText,
   type AnchoredContactCardProfile,
 } from "../models/contactCardModel";
+import { contactCardActionErrorText } from "../presentation/contactCardActionNotice";
 
 export function useMessageContactProfileController({
   activeConversation,
@@ -34,6 +35,7 @@ export function useMessageContactProfileController({
   setContactCardProfile: (profile: AnchoredContactCardProfile | null) => void;
   setNotice: (notice: string | null) => void;
 }) {
+  const { t } = useI18n();
   const [localOutgoingContactRequestIds, setLocalOutgoingContactRequestIds] =
     useState<Set<string>>(() => new Set());
 
@@ -128,15 +130,15 @@ export function useMessageContactProfileController({
     mutationFn: async (friendUserId: string) =>
       requireApiClient(session).deleteFriend(friendUserId),
     onSuccess: async () => {
-      setNotice("已删除好友");
+      setNotice(t("contacts.notice.friendDeleted"));
       await refreshContactRelation();
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "删除好友失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.deleteFriendFailed", t)),
   });
 
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (message: string) => {
-      if (!contactCardProfile?.userId) throw new Error("名片缺少用户 ID");
+      if (!contactCardProfile?.userId) throw new Error(t("contacts.notice.cardMissingUserId"));
       return requireApiClient(session).sendFriendRequest(contactCardProfile.userId, message);
     },
     onSuccess: async () => {
@@ -144,30 +146,34 @@ export function useMessageContactProfileController({
       if (targetUserId) {
         setLocalOutgoingContactRequestIds((current) => new Set(current).add(targetUserId));
       }
-      setNotice("好友申请已发送");
+      setNotice(t("contacts.notice.friendRequestSent"));
       await refreshContactRelation();
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "发送好友申请失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.sendFriendRequestFailed", t)),
   });
 
   const handleFriendRequestMutation = useMutation({
     mutationFn: async (payload: { action: "accept" | "reject"; requestId: string }) =>
       requireApiClient(session).handleFriendRequest(payload.requestId, payload.action),
     onSuccess: async (_result, payload) => {
-      setNotice(payload.action === "accept" ? "已通过好友申请" : "已拒绝好友申请");
+      setNotice(
+        payload.action === "accept"
+          ? t("contacts.notice.friendRequestAccepted")
+          : t("contacts.notice.friendRequestRejected"),
+      );
       await refreshContactRelation();
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "处理好友申请失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.handleFriendRequestFailed", t)),
   });
 
   const blockUserMutation = useMutation({
     mutationFn: async (userId: string) => requireApiClient(session).blockUser(userId),
     onSuccess: async () => {
-      setNotice("已加入黑名单");
+      setNotice(t("contacts.notice.blockUserSuccess"));
       setContactCardProfile(null);
       await refreshContactRelation();
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "加入黑名单失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.blockUserFailed", t)),
   });
 
   const updateFriendProfileMutation = useMutation({
@@ -193,12 +199,12 @@ export function useMessageContactProfileController({
         }),
       ]);
     },
-    onError: (error) => setNotice(contactCardActionErrorText(error, "客户资料更新失败")),
+    onError: (error) => setNotice(contactCardActionErrorText(error, "contacts.notice.updateCustomerProfileFailed", t)),
   });
 
   const updateCustomerRemark = useCallback(
     async (note: string) => {
-      if (!activeFriendUserId) throw new Error("当前客户缺少好友 ID，无法编辑备注");
+      if (!activeFriendUserId) throw new Error(t("contacts.notice.missingFriendIdForRemark"));
       await updateFriendProfileMutation.mutateAsync({
         friendUserId: activeFriendUserId,
         payload: { note },
@@ -209,7 +215,7 @@ export function useMessageContactProfileController({
 
   const updateCustomerTags = useCallback(
     async (tags: string[]) => {
-      if (!activeFriendUserId) throw new Error("当前客户缺少好友 ID，无法编辑标签");
+      if (!activeFriendUserId) throw new Error(t("contacts.notice.missingFriendIdForTags"));
       await updateFriendProfileMutation.mutateAsync({
         friendUserId: activeFriendUserId,
         payload: { tags },

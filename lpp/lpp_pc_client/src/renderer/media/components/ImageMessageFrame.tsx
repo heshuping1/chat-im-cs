@@ -1,6 +1,7 @@
 import { Copy, Download, FolderOpen, ImageIcon, X } from "lucide-react";
 import { useEffect } from "react";
 import type { SyntheticEvent } from "react";
+import { useI18n } from "../../i18n/useI18n";
 
 export function ImageMessageFrame({
   altText,
@@ -37,6 +38,7 @@ export function ImageMessageFrame({
   src?: string;
   sourceAvailable: boolean;
 }) {
+  const { t } = useI18n();
   useEffect(() => {
     if (!previewOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -52,13 +54,13 @@ export function ImageMessageFrame({
         <button
           className={`message-image-frame ${imageLoaded ? "loaded" : ""}`}
           type="button"
-          aria-label={fileName ? `预览图片 ${fileName}` : "预览图片"}
+          aria-label={fileName ? t("media.image.previewNamed", { name: fileName }) : t("media.image.preview")}
           onClick={onOpenPreview}
         >
           {!imageLoaded && (
-            <span className="message-image-loading" aria-label="图片加载中">
+            <span className="message-image-loading" aria-label={t("media.image.loading")}>
               <ImageIcon size={22} />
-              <em>图片加载中</em>
+              <em>{t("media.image.loading")}</em>
             </span>
           )}
           {src && (
@@ -74,10 +76,10 @@ export function ImageMessageFrame({
       ) : (
         <span className="message-media-empty">
           <ImageIcon size={18} />
-          <em>{fileName || "图片消息"}</em>
+          <em>{fileName || t("media.image.message")}</em>
           {onRetryImage && (
             <button className="message-image-retry" type="button" onClick={onRetryImage}>
-              重新加载
+              {t("media.image.reload")}
             </button>
           )}
         </span>
@@ -87,13 +89,13 @@ export function ImageMessageFrame({
           className="message-image-preview"
           role="dialog"
           aria-modal="true"
-          aria-label={fileName ? `图片预览 ${fileName}` : "图片预览"}
+          aria-label={fileName ? t("media.image.viewerNamed", { name: fileName }) : t("media.image.viewer")}
           onClick={onClosePreview}
         >
           <button
             className="message-image-preview-close"
             type="button"
-            aria-label="关闭图片预览"
+            aria-label={t("media.image.closePreview")}
             onClick={onClosePreview}
           >
             <X size={20} />
@@ -108,7 +110,7 @@ export function ImageMessageFrame({
               type="button"
             >
               <Copy size={16} />
-              复制图片
+              {t("media.image.copy")}
             </button>
             <button
               disabled={actionBusy || !onSaveImageAs}
@@ -116,7 +118,7 @@ export function ImageMessageFrame({
               type="button"
             >
               <Download size={16} />
-              另存为
+              {t("media.image.saveAs")}
             </button>
             <button
               disabled={actionBusy || !onRevealImage}
@@ -124,7 +126,7 @@ export function ImageMessageFrame({
               type="button"
             >
               <FolderOpen size={16} />
-              显示位置
+              {t("media.image.reveal")}
             </button>
           </div>
           {actionNotice && (
@@ -137,7 +139,7 @@ export function ImageMessageFrame({
           )}
           <img
             src={src}
-            alt={fileName || "图片预览"}
+            alt={fileName || t("media.image.viewer")}
             onClick={(event) => event.stopPropagation()}
           />
         </div>

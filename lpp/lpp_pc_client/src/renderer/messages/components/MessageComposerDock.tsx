@@ -22,7 +22,9 @@ export function MessageComposerDock({
   activeConversation,
   activeConversationDraft,
   activeConversationType,
+  composerDisabled,
   composerHeight,
+  composerPlaceholder,
   draftEditorState,
   groupMembers,
   isMessageStageNearBottom,
@@ -56,7 +58,9 @@ export function MessageComposerDock({
   activeConversation: ConversationListItem;
   activeConversationDraft?: string;
   activeConversationType?: "direct" | "group";
+  composerDisabled?: boolean;
   composerHeight: number;
+  composerPlaceholder?: string;
   draftEditorState?: string;
   groupMembers: GroupMemberDto[];
   isMessageStageNearBottom: (distance?: number) => boolean;
@@ -114,8 +118,10 @@ export function MessageComposerDock({
         ref={composerRef}
         attachmentScopeKey={conversationId}
         draftValue={activeConversationDraft}
+        disabled={composerDisabled}
         dragUpload={dragUpload}
         enterToSend={enterToSend}
+        placeholder={composerPlaceholder}
         draftEditorState={draftEditorState}
         mentionOptions={
           activeConversationType === "group" ? buildMentionOptions(groupMembers) : []

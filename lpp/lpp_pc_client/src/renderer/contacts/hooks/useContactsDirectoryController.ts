@@ -21,20 +21,24 @@ import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import type { ContactFilter, ContactItem } from "../../data/types";
 import { useSetActiveImConversation } from "../../data/workspace-ui/workspace-ui-store";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 
 export function useContactsDirectoryController({
+  activeContactId,
   contactFilter,
   keyword,
   selectedRequestId,
   setNotice,
 }: {
+  activeContactId?: string;
   contactFilter: ContactFilter;
   keyword: string;
   selectedRequestId: string;
   setNotice: (notice: string | null) => void;
 }) {
   const session = useAuthSession();
+  const { t } = useI18n();
   const setActiveConversation = useSetActiveImConversation();
   const queryClient = useQueryClient();
   const contactAccess = useMemo(
@@ -108,7 +112,8 @@ export function useContactsDirectoryController({
     mutationFn: async (peerUserId: string) =>
       requireApiClient(session).createDirectChat(peerUserId),
     onSuccess: (chat) => setActiveConversation(chat.chatId),
-    onError: (error) => setNotice(`打开会话失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("contacts.notice.openConversationFailedWithError", { error: formatError(error) })),
   });
   const requestMutation = useMutation({
     mutationFn: async ({
@@ -119,38 +124,46 @@ export function useContactsDirectoryController({
       action: "accept" | "reject";
     }) => requireApiClient(session).handleFriendRequest(requestId, action),
     onSuccess: async (_result, variables) => {
-      setNotice(variables.action === "accept" ? "已通过好友申请" : "已拒绝好友申请");
+      setNotice(
+        variables.action === "accept"
+          ? t("contacts.notice.friendRequestAccepted")
+          : t("contacts.notice.friendRequestRejected"),
+      );
       await queryClient.invalidateQueries({ queryKey: ["pc-friend-requests"] });
       await queryClient.invalidateQueries({ queryKey: ["pc-friends"] });
     },
-    onError: (error) => setNotice(`处理申请失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("contacts.notice.handleRequestFailedWithError", { error: formatError(error) })),
   });
   const deleteFriendMutation = useMutation({
     mutationFn: async (friendUserId: string) =>
       requireApiClient(session).deleteFriend(friendUserId),
     onSuccess: async () => {
-      setNotice("已删除好友");
+      setNotice(t("contacts.notice.friendDeleted"));
       await refreshContactRelations(queryClient, session);
     },
-    onError: (error) => setNotice(`删除好友失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("contacts.notice.deleteFriendFailedWithError", { error: formatError(error) })),
   });
   const blockUserMutation = useMutation({
     mutationFn: async (userId: string) => requireApiClient(session).blockUser(userId),
     onSuccess: async () => {
-      setNotice("已加入黑名单");
+      setNotice(t("contacts.notice.blockUserSuccess"));
       await refreshContactRelations(queryClient, session);
     },
-    onError: (error) => setNotice(`加入黑名单失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("contacts.notice.blockUserFailedWithError", { error: formatError(error) })),
   });
   const createInviteQrMutation = useMutation({
     mutationFn: async () => requireApiClient(session).createFriendInviteQr(),
     onSuccess: async () => {
-      setNotice("好友二维码已生成");
+      setNotice(t("contacts.notice.friendQrCreated"));
       await queryClient.invalidateQueries({
         queryKey: pcQueryKeys.accountInviteQrs(session?.apiBaseUrl, session?.tenantToken),
       });
     },
-    onError: (error) => setNotice(`生成二维码失败：${formatError(error)}`),
+    onError: (error) =>
+      setNotice(t("contacts.notice.createFriendQrFailedWithError", { error: formatError(error) })),
   });
 
   const directoryContacts = useMemo(
@@ -195,6 +208,26 @@ export function useContactsDirectoryController({
     () => filterRequests(requestsQuery.data ?? [], keyword),
     [keyword, requestsQuery.data],
   );
+
+  const activeContact =
+    visibleContacts.find((item) => item.id === activeContactId) ??
+    visibleContacts[0];
+  const activeTenantMemberUserId =
+    activeContact?.kind === "staff" && activeContact.userId ? activeContact.userId : "";
+  const tenantMemberProfileQuery = useQuery({
+    queryKey: pcQueryKeys.tenantMemberProfile(
+      session?.apiBaseUrl,
+      session?.tenantToken,
+      activeTenantMemberUserId,
+    ),
+    enabled: Boolean(activeTenantMemberUserId && !activeContact?.greenBubbleNo && session),
+    queryFn: async () => requireApiClient(session).getTenantMemberProfile(activeTenantMemberUserId),
+  });
+  const activeContactDetail = useMemo(() => {
+    const greenBubbleNo = tenantMemberProfileQuery.data?.greenBubbleNo;
+    if (!activeContact || activeContact.greenBubbleNo || !greenBubbleNo) return activeContact;
+    return { ...activeContact, greenBubbleNo };
+  }, [activeContact, tenantMemberProfileQuery.data?.greenBubbleNo]);
 
   const activeRequest =
     visibleRequests.find((item) => item.requestId === selectedRequestId) ??
@@ -242,6 +275,8 @@ export function useContactsDirectoryController({
   };
 
   return {
+    activeContact,
+    activeContactDetail,
     activeRequest,
     blockContact,
     contactAccess,

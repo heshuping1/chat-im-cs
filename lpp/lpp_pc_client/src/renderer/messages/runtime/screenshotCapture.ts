@@ -6,11 +6,11 @@ import {
 
 export async function captureScreenshotFile() {
   if (!window.desktopApi?.captureScreenshot) {
-    throw new Error("截图仅在 Electron 客户端可用。");
+    throw new Error("Screenshot is only available in the Electron client.");
   }
   try {
     const result = await window.desktopApi.captureScreenshot();
-    return screenshotDataUrlToFile(result.dataUrl, result.fileName || "截图.png");
+    return screenshotDataUrlToFile(result.dataUrl, result.fileName || "screenshot.png");
   } catch (error) {
     const normalizedError = new Error(formatScreenshotCaptureError(error));
     (normalizedError as Error & { cause?: unknown }).cause = error;

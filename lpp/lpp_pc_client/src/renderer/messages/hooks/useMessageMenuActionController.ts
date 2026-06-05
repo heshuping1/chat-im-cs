@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 import {
   messageMediaFileName,
@@ -28,7 +29,11 @@ import {
   revealMessageMediaInFolder,
   saveMessageMediaAs,
 } from "../runtime/messageMediaActions";
-import { requestMessageDangerConfirmation } from "../runtime/messageConfirm";
+import {
+  messageDangerConfirmationDescriptor,
+  requestMessageDangerConfirmation,
+  type MessageDangerConfirmAction,
+} from "../runtime/messageConfirm";
 
 type MessageMenuState = {
   message: MessageItemDto;
@@ -69,6 +74,8 @@ export function useMessageMenuActionController({
   translateMessage: (message: MessageItemDto) => void;
   voiceToTextMessage: (message: MessageItemDto) => void;
 }) {
+  const { t } = useI18n();
+
   return useCallback(
     async (action: MessageContextAction, message: MessageItemDto) => {
       setMessageMenu(null);
@@ -76,23 +83,23 @@ export function useMessageMenuActionController({
       if (action === "multi_select") {
         setMultiSelectMode(true);
         setSelectedMessageIds(new Set([message.messageId]));
-        setNotice("已进入多选模式");
+        setNotice(t("messages.menuActions.multiSelectEntered"));
         return;
       }
       if (action === "copy") {
         const text = extractMessageText(message);
         if (!text) {
-          setNotice("当前消息没有可复制的文本");
+          setNotice(t("messages.menuActions.noCopyableText"));
           return;
         }
         await navigator.clipboard.writeText(text);
-        setNotice("已复制");
+        setNotice(t("common.copied"));
         return;
       }
       if (action === "copy_image" || action === "copy_media") {
         const url = resolveMessageMediaUrl(message, session?.apiBaseUrl);
         if (!url) {
-          setNotice("当前媒体消息没有可复制的文件地址");
+          setNotice(t("messages.menuActions.noCopyableMedia"));
           return;
         }
         try {
@@ -107,13 +114,13 @@ export function useMessageMenuActionController({
           };
           if (action === "copy_image") {
             await copyMessageImage(url, session?.tenantToken, context);
-            setNotice("图片已复制");
+            setNotice(t("messages.mediaContent.imageCopied"));
           } else {
             await copyMessageMediaFile(message, url, session?.tenantToken, context);
-            setNotice("文件已复制");
+            setNotice(t("messages.menuActions.fileCopied"));
           }
         } catch (error) {
-          setNotice(`复制失败：${formatError(error)}`);
+          setNotice(t("common.copyFailed", { error: formatError(error) }));
         }
         return;
       }
@@ -121,8 +128,8 @@ export function useMessageMenuActionController({
         setReplyTarget({
           messageId: message.messageId,
           sender: isMineMessage(message, session)
-            ? "我"
-            : message.senderDisplayName || activeConversation?.title || "对方",
+            ? t("messages.menuActions.me")
+            : message.senderDisplayName || activeConversation?.title || t("messages.menuActions.peer"),
           preview: messageActionPreview(message),
         });
         return;
@@ -130,7 +137,7 @@ export function useMessageMenuActionController({
       if (action === "translate") {
         setMessageAnnotations((current) => ({
           ...current,
-          [message.messageId]: "译文：翻译中...",
+          [message.messageId]: t("messages.menuActions.translatingAnnotation"),
         }));
         translateMessage(message);
         return;
@@ -147,7 +154,7 @@ export function useMessageMenuActionController({
       ) {
         const url = resolveMessageMediaUrl(message, session?.apiBaseUrl);
         if (!url) {
-          setNotice("当前媒体消息没有可用地址");
+          setNotice(t("messages.menuActions.noUsableMedia"));
           return;
         }
         try {
@@ -161,10 +168,14 @@ export function useMessageMenuActionController({
           };
           if (action === "save_media_as") {
             const savedPath = await saveMessageMediaAs(message, url, session?.tenantToken, context);
-            if (savedPath) setNotice("已另存为");
+            if (savedPath) setNotice(t("messages.menuActions.savedAs"));
           } else if (action === "reveal_in_folder") {
             await revealMessageMediaInFolder(message, url, session?.tenantToken, context);
-            setNotice(isMacPlatform() ? "已在 Finder 中显示" : "已在文件夹中显示");
+            setNotice(
+              isMacPlatform()
+                ? t("messages.menuActions.revealedInFinder")
+                : t("messages.mediaContent.revealedInFolder"),
+            );
           } else if (action === "open_media") {
             const openedInVideoPlayer = isVideoMessage(message)
               ? await openMessageVideoPlayer(message, url, session?.tenantToken, context)
@@ -172,21 +183,17 @@ export function useMessageMenuActionController({
             if (!openedInVideoPlayer) {
               await openMessageMediaFile(message, url, session?.tenantToken, context);
             }
-            setNotice("已打开");
+            setNotice(t("messages.menuActions.opened"));
           } else {
             await editMessageMediaFile(message, url, session?.tenantToken, context);
-            setNotice("已打开编辑器");
+            setNotice(t("messages.menuActions.editorOpened"));
           }
         } catch (error) {
-          const prefix =
-            action === "save_media_as"
-              ? "另存为失败"
-              : action === "reveal_in_folder"
-                ? "在文件夹中显示失败"
-                : action === "open_media"
-                  ? "打开失败"
-                  : "编辑失败";
-          setNotice(`${prefix}：${formatError(error)}`);
+          setNotice(
+            t(`messages.menuActions.${mediaActionFailedKey(action)}`, {
+              error: formatError(error),
+            }),
+          );
         }
         return;
       }
@@ -199,12 +206,12 @@ export function useMessageMenuActionController({
         return;
       }
       if (action === "recall") {
-        if (!requestMessageDangerConfirmation({ action: "recall-message" })) return;
+        if (!confirmMessageDanger("recall-message", t)) return;
         recallMessage(message.messageId);
         return;
       }
       if (action === "delete") {
-        if (!requestMessageDangerConfirmation({ action: "delete-message" })) return;
+        if (!confirmMessageDanger("delete-message", t)) return;
         deleteMessage(message.messageId);
       }
     },
@@ -222,8 +229,31 @@ export function useMessageMenuActionController({
       setNotice,
       setReplyTarget,
       setSelectedMessageIds,
+      t,
       translateMessage,
       voiceToTextMessage,
     ],
   );
+}
+
+type MessageMenuTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+function confirmMessageDanger(
+  action: MessageDangerConfirmAction,
+  t: MessageMenuTranslate,
+  count?: number,
+) {
+  const descriptor = messageDangerConfirmationDescriptor(action, count);
+  return requestMessageDangerConfirmation({
+    action,
+    count,
+    message: t(descriptor.key, descriptor.params),
+  });
+}
+
+function mediaActionFailedKey(action: MessageContextAction) {
+  if (action === "save_media_as") return "saveAsFailed";
+  if (action === "reveal_in_folder") return "revealFailed";
+  if (action === "open_media") return "openFailed";
+  return "editFailed";
 }

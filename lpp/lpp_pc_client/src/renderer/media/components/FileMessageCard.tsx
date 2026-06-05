@@ -1,5 +1,6 @@
 import type { CSSProperties, MouseEventHandler } from "react";
 import { composerFileAttachmentVisual } from "../../composer/presentation/composerAttachmentPresentation";
+import { useI18n } from "../../i18n/useI18n";
 import type { FileUploadControlState } from "../runtime/uploadState";
 
 export function FileMessageCard({
@@ -12,7 +13,7 @@ export function FileMessageCard({
   metaText,
   onClick,
   onControlClick,
-  sourceLabel = "客户端",
+  sourceLabel,
 }: {
   ariaLabel: string;
   className?: string;
@@ -25,7 +26,9 @@ export function FileMessageCard({
   onControlClick?: MouseEventHandler<HTMLButtonElement>;
   sourceLabel?: string;
 }) {
+  const { t } = useI18n();
   const fileIcon = composerFileAttachmentVisual(fileName);
+  const resolvedSourceLabel = sourceLabel ?? t("media.file.client");
   const progressValue = typeof controlProgress === "number" && Number.isFinite(controlProgress)
     ? Math.max(0, Math.min(100, Math.round(controlProgress)))
     : controlState === "retry"
@@ -77,7 +80,7 @@ export function FileMessageCard({
           type="button"
           className="message-file-icon-action"
           onClick={onControlClick}
-          aria-label={controlLabel || "文件上传操作"}
+          aria-label={controlLabel || t("media.file.uploadAction")}
         >
           {icon}
         </button>
@@ -88,7 +91,7 @@ export function FileMessageCard({
         <span className="message-file-source-mark" aria-hidden="true">
           ●●
         </span>
-        <span>{sourceLabel}</span>
+        <span>{resolvedSourceLabel}</span>
       </span>
     </span>
   );

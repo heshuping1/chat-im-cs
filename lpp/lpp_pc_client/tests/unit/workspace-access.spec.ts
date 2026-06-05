@@ -222,7 +222,7 @@ describe("workspace access integration closure", () => {
   it("renders the light sidebar brand and bottom status center without cyclic status toggles", () => {
     expect(sidebarSource).toContain("sidebar-brand");
     expect(sidebarSource).toContain("appProductName");
-    expect(sidebarSource).toContain("专业版 · v");
+    expect(sidebarSource).toContain('t("sidebar.productVersion"');
     expect(sidebarSource).toContain("sidebar-status-center");
     expect(sidebarSource).toContain("sidebar-footer-account-entry");
     expect(sidebarSource).toContain('<div className="sidebar-footer">');
@@ -232,7 +232,7 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).toContain("accountAvatarDisplayUrl");
     expect(sidebarSource).toContain("profileQuery.dataUpdatedAt");
     expect(sidebarSource).toContain("enabled: Boolean(authSession)");
-    expect(sidebarSource).toContain("状态：${imStatusLabel}");
+    expect(sidebarSource).toContain('t("sidebar.account.entryAria"');
     expect(sidebarSource).not.toContain("IM ${imStatusLabel}");
     expect(sidebarSource).toContain("account-chevron");
     expect(sidebarSource).toContain("tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl");
@@ -255,7 +255,7 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).toContain("onMutate");
     expect(onlineServicePageSource).toContain("confirmedQueueAcceptEnabled");
     expect(onlineServicePageSource).toContain("onMutate");
-    expect(sidebarSource).toContain("状态未同步");
+    expect(sidebarSource).toContain('t("sidebar.service.syncFailed"');
     expect(sidebarSource).not.toContain("serviceAutoSidebarCollapsed");
     expect(sidebarSource).not.toContain("sidebarCollapsed || serviceAutoSidebarCollapsed");
     expect(sidebarSource).not.toContain("useServiceLayoutMode");
@@ -271,24 +271,24 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).toContain('(["manual", "auto"] as ReceptionQueueMode[]).map');
     expect(sidebarSource).toContain("sidebar-queue-mode-option");
     expect(sidebarSource).toContain("updateReceptionStatus");
-    expect(sidebarSource).toContain("接入模式");
+    expect(sidebarSource).toContain('t("sidebar.service.accessModeAria")');
     expect(sidebarSource).not.toContain('mode === "auto" && serviceStatus !== "online"');
     expect(sidebarSource).not.toContain("disabledByStatus");
     expect(sidebarSource).toContain("workspaceAccess.canReadServiceWorkbench &&");
     expect(sidebarSource).toContain("serviceStatusCounters");
     expect(sidebarSource).toContain("serviceStatusCompactDetail");
     expect(sidebarSource).toContain("serviceStatusFullDetail");
-    expect(sidebarSource).toContain("`接待 ${receptionSummary.sessionText}");
+    expect(sidebarSource).toContain('t("sidebar.service.fullDetail"');
     expect(sidebarSource).not.toContain("? receptionSummary.queueModeLabel");
     expect(sidebarSource).not.toContain("<b>{receptionSummary.queueModeLabel}</b>");
     expect(sidebarSource).not.toContain("receptionStatus?.activeSessionCount ??\n      (hasServiceThreadData ? activeTempSessions.length : null)");
     expect(sidebarSource).toContain("const activeReceptionCount = receptionStatus?.activeSessionCount ?? null");
-    expect(sidebarSource).toContain('label: "接"');
+    expect(sidebarSource).toContain('label: t("sidebar.service.counterReceptionShort")');
     expect(sidebarSource).toContain('value: activeReceptionCount ?? "--"');
-    expect(sidebarSource).toContain('label: "排"');
-    expect(sidebarSource).toContain('label: "未"');
-    expect(sidebarSource).toContain("name: \"接待中\"");
-    expect(sidebarSource).toContain("name: \"排队\"");
+    expect(sidebarSource).toContain('label: t("sidebar.service.counterQueueShort")');
+    expect(sidebarSource).toContain('label: t("sidebar.service.counterUnreadShort")');
+    expect(sidebarSource).toContain('name: t("sidebar.service.counterReception")');
+    expect(sidebarSource).toContain('name: t("sidebar.service.counterQueue")');
     expect(sidebarSource).toContain("activeServiceUnreadCount > 0");
     expect(sidebarSource).toContain("sidebar-service-counters");
     expect(sidebarSource).toContain("sidebar-service-counter");
@@ -367,7 +367,7 @@ describe("workspace access integration closure", () => {
   });
 
   it("uses shared settings copy without customer-service-only reminders", () => {
-    expect(mePageSource).toContain("设置中心");
+    expect(mePageSource).toContain('t("me.title")');
     expect(mePageSource).toContain("settingsSections");
     expect(mePageSource).toContain("NotificationSettingsSection");
     expect(mePageSource).not.toContain('label="在线客服排队提醒"');
@@ -424,7 +424,7 @@ describe("workspace access integration closure", () => {
     expect(messageCenterSource).not.toContain('setActiveModule("aiAssistant")');
     expect(aiReplyDrawerSource).toContain("generateAiSuggestion");
     expect(aiReplyDrawerSource).toContain("adoptAiSuggestion");
-    expect(aiReplyDrawerSource).toContain("插入回复");
+    expect(aiReplyDrawerSource).toContain('t("aiDraft.insertReply")');
   });
 
   it("opens customer-service knowledge as an in-chat drawer and inserts into composer draft", () => {
@@ -434,7 +434,7 @@ describe("workspace access integration closure", () => {
     expect(serviceWorkspaceSource).not.toContain(
       'onKnowledgeBase={() => setActiveModule("knowledgeBase")}',
     );
-    expect(serviceKnowledgeDrawerSource).toContain("插入回复");
+    expect(serviceKnowledgeDrawerSource).toContain('t("aiDraft.insertReply")');
     expect(serviceKnowledgeDrawerSource).toContain("searchKnowledge");
     expect(serviceQuickReplyDrawerSource).toContain("getQuickReplies");
     expect(serviceQuickReplyDrawerSource).toContain("filterQuickRepliesForScope");

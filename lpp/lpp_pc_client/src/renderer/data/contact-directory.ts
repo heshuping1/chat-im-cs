@@ -27,16 +27,16 @@ export interface OrganizationRoleGroup {
 }
 
 export const contactKindLabels: Record<ContactKind, string> = {
-  friend: "好友",
-  group: "群聊",
-  customer: "客户",
-  staff: "员工",
+  friend: "contacts.page.kind.friend",
+  group: "contacts.page.kind.group",
+  customer: "contacts.page.kind.customer",
+  staff: "contacts.page.kind.staff",
 };
 
 export function requestStatusLabel(status?: string) {
-  if (status === "accepted") return "已通过";
-  if (status === "rejected") return "已拒绝";
-  return "待处理";
+  if (status === "accepted") return "contacts.page.requestStatus.accepted";
+  if (status === "rejected") return "contacts.page.requestStatus.rejected";
+  return "contacts.page.requestStatus.pending";
 }
 
 export function normalizeContactDirectoryFilter(filter: ContactFilter): ContactFilter {
@@ -74,29 +74,29 @@ export function createContactDirectoryEntries({
 }) {
   const counts = countContactsByFilter(contacts);
   const fixed: ContactDirectoryEntry[] = [
-    { key: "requests", label: "新的朋友", count: requestCount, kind: "fixed" },
-    { key: "all", label: "全部联系人", count: counts.all, kind: "fixed" },
+    { key: "requests", label: "contacts.page.entry.requests", count: requestCount, kind: "fixed" },
+    { key: "all", label: "contacts.page.entry.all", count: counts.all, kind: "fixed" },
   ];
   const shortcuts: ContactDirectoryEntry[] =
     viewMode === "customer"
       ? [
-          { key: "friend", label: "好友", count: counts.friend, kind: "shortcut" },
-          { key: "group", label: "群聊", count: counts.group, kind: "shortcut" },
+          { key: "friend", label: "contacts.page.entry.friend", count: counts.friend, kind: "shortcut" },
+          { key: "group", label: "contacts.page.entry.group", count: counts.group, kind: "shortcut" },
         ]
       : [
-          { key: "customer", label: "客户", count: counts.customer, kind: "shortcut" },
-          { key: "friend", label: "好友", count: counts.friend, kind: "shortcut" },
+          { key: "customer", label: "contacts.page.entry.customer", count: counts.customer, kind: "shortcut" },
+          { key: "friend", label: "contacts.page.entry.friend", count: counts.friend, kind: "shortcut" },
           ...(canReadOrganization
             ? [
                 {
                   key: "organization" as ContactFilter,
-                  label: "组织",
+                  label: "contacts.page.entry.organization",
                   count: counts.organization,
                   kind: "shortcut" as const,
                 },
               ]
             : []),
-          { key: "group", label: "群聊", count: counts.group, kind: "shortcut" },
+          { key: "group", label: "contacts.page.entry.group", count: counts.group, kind: "shortcut" },
         ];
   return { fixed, shortcuts };
 }
@@ -108,8 +108,8 @@ export function contactDirectorySearchPlaceholder({
   viewMode: ContactDirectoryViewMode;
   canReadOrganization: boolean;
 }) {
-  if (viewMode === "customer") return "搜索好友、群聊";
-  return canReadOrganization ? "搜索客户、好友、组织、群聊" : "搜索客户、好友、群聊";
+  if (viewMode === "customer") return "contacts.page.search.customerMode";
+  return canReadOrganization ? "contacts.page.search.staffWithOrganization" : "contacts.page.search.staffBasic";
 }
 
 export function contactDirectoryEmptyText({
@@ -119,17 +119,17 @@ export function contactDirectoryEmptyText({
   filter: ContactFilter;
   viewMode: ContactDirectoryViewMode;
 }) {
-  if (filter === "requests") return "暂无好友申请";
+  if (filter === "requests") return "contacts.page.empty.requests";
   if (viewMode === "customer") {
-    if (filter === "friend") return "暂无好友，可以通过新的朋友添加联系人。";
-    if (filter === "group") return "暂无群聊。";
-    return "暂无联系人，可以先处理新的朋友或添加好友。";
+    if (filter === "friend") return "contacts.page.empty.customerFriend";
+    if (filter === "group") return "contacts.page.empty.customerGroup";
+    return "contacts.page.empty.customerAll";
   }
-  if (filter === "customer") return "暂无客户联系人";
-  if (filter === "organization") return "暂无组织成员";
-  if (filter === "group") return "暂无群聊";
-  if (filter === "friend") return "暂无好友";
-  return "暂无通讯录数据";
+  if (filter === "customer") return "contacts.page.empty.customer";
+  if (filter === "organization") return "contacts.page.empty.organization";
+  if (filter === "group") return "contacts.page.empty.group";
+  if (filter === "friend") return "contacts.page.empty.friend";
+  return "contacts.page.empty.all";
 }
 
 export function filterContacts(contacts: ContactItem[], keyword: string) {
@@ -220,10 +220,10 @@ export function mapContacts({
       conversationId: item.conversationId,
       kind: "group",
       directoryFilters: ["group"],
-      name: item.title || "未命名群聊",
-      subtitle: `群聊 · ${item.memberCount ?? "--"} 人`,
-      remark: item.lastMessage?.preview ?? "群聊会话",
-      tags: ["群聊", item.isMuted ? "免打扰" : "正常提醒"],
+      name: item.title || "contacts.page.unnamedGroup",
+      subtitle: "contacts.page.kind.group",
+      remark: item.lastMessage?.preview ?? "contacts.page.groupConversation",
+      tags: ["contacts.page.kind.group", item.isMuted ? "contacts.reminder.muted" : "contacts.reminder.normal"],
       members: item.memberCount ?? undefined,
       avatarUrl: item.avatarUrl,
       lastMessagePreview: item.lastMessage?.preview,
@@ -248,10 +248,10 @@ export function mapContacts({
       conversationId: directByPeer.get(friend.friendUserId),
       kind,
       directoryFilters,
-      name: friend.remarkName || friend.displayName || "好友",
-      subtitle: `${kind === "customer" ? "客户" : "好友"}${friend.groupName ? ` · ${friend.groupName}` : ""}`,
-      remark: friend.createdAt ? `添加于 ${formatShortDate(friend.createdAt)}` : "好友关系",
-      tags: [kind === "customer" ? "客户" : "好友", friend.groupName ?? ""].filter(Boolean),
+      name: friend.remarkName || friend.displayName || "contacts.page.kind.friend",
+      subtitle: kind === "customer" ? "contacts.page.kind.customer" : "contacts.page.kind.friend",
+      remark: "contacts.page.friendRelationship",
+      tags: [kind === "customer" ? "contacts.page.kind.customer" : "contacts.page.kind.friend", friend.groupName ?? ""].filter(Boolean),
       avatarUrl: friend.avatarUrl,
       groupName: friend.groupName,
       createdAt: friend.createdAt,
@@ -269,10 +269,10 @@ export function mapContacts({
         conversationId: directByPeer.get(member.userId),
         kind: "staff",
         directoryFilters: ["organization"],
-        name: member.displayName || "企业成员",
-        subtitle: `员工 · ${membershipRoleLabel(member.membershipRole)}`,
-        remark: member.joinedAt ? `加入于 ${formatShortDate(member.joinedAt)}` : "企业成员",
-        tags: ["员工", membershipRoleLabel(member.membershipRole)],
+        name: member.displayName || "contacts.page.role.enterpriseMember",
+        subtitle: "contacts.page.kind.staff",
+        remark: "contacts.page.role.enterpriseMember",
+        tags: ["contacts.page.kind.staff", membershipRoleLabel(member.membershipRole)],
         avatarUrl: member.avatarUrl,
         departmentId: department?.id,
         departmentName: department?.name,
@@ -280,7 +280,7 @@ export function mapContacts({
         roleLabel: membershipRoleLabel(member.membershipRole),
         roleRank: membershipRoleRank(member.membershipRole),
         joinedAt: member.joinedAt,
-        source: "企业组织",
+        source: "contacts.page.enterpriseOrganization",
       };
     });
 
@@ -310,30 +310,30 @@ export function sourceLabel(contact: ContactItem) {
 }
 
 export function contactRowSubtitle(contact: ContactItem) {
-  if (contact.kind === "customer") return ["客户", contact.groupName].filter(Boolean).join(" · ");
+  if (contact.kind === "customer") return ["contacts.page.kind.customer", contact.groupName].filter(Boolean).join(" · ");
   if (contact.kind === "staff") {
-    return [contact.departmentName || "企业成员", contact.position].filter(Boolean).join(" · ");
+    return [contact.departmentName || "contacts.page.role.enterpriseMember", contact.position].filter(Boolean).join(" · ");
   }
   if (contact.kind === "group") {
-    return `${contact.members ?? "--"} 人 · ${contact.muted ? "免打扰" : "正常提醒"}`;
+    return "contacts.page.groupSubtitle";
   }
-  return ["好友", contact.groupName].filter(Boolean).join(" · ");
+  return ["contacts.page.kind.friend", contact.groupName].filter(Boolean).join(" · ");
 }
 
 export function contactRowHint(contact: ContactItem) {
   if (contact.kind === "customer") {
-    return contact.createdAt ? `添加于 ${formatShortDate(contact.createdAt)}` : "客户好友";
+    return contact.createdAt ? `contacts.page.addedAt:${formatShortDate(contact.createdAt)}` : "contacts.detail.customerFriend";
   }
   if (contact.kind === "staff") {
-    return [contact.position, contact.greenBubbleNo].filter(Boolean).join(" · ") || "企业成员";
+    return [contact.position, contact.greenBubbleNo].filter(Boolean).join(" · ") || "contacts.page.role.enterpriseMember";
   }
-  if (contact.kind === "group") return contact.lastMessagePreview || "暂无最近消息";
-  return contact.remark || "好友关系";
+  if (contact.kind === "group") return contact.lastMessagePreview || "contacts.page.noRecentMessage";
+  return contact.remark || "contacts.page.friendRelationship";
 }
 
 export function contactKindBadge(contact: ContactItem) {
-  if (contact.kind === "staff") return contact.roleLabel || "员工";
-  if (contact.kind === "group") return contact.members ? `${contact.members}人` : "群聊";
+  if (contact.kind === "staff") return contact.roleLabel || "contacts.page.kind.staff";
+  if (contact.kind === "group") return contact.members ? `contacts.page.groupMemberBadge:${contact.members}` : "contacts.page.kind.group";
   return contactKindLabels[contact.kind];
 }
 
@@ -345,7 +345,7 @@ export function groupOrganizationContactsByRole(
     { rank: number; label: string; contacts: ContactItem[] }
   >();
   for (const contact of contacts) {
-    const label = contact.roleLabel || "成员";
+    const label = contact.roleLabel || "contacts.page.role.member";
     const group = roleGroups.get(label);
     if (group) {
       group.contacts.push(contact);
@@ -376,11 +376,11 @@ export function groupOrganizationContactsByRole(
 }
 
 function membershipRoleLabel(role?: number) {
-  if (role === 4) return "所有者";
-  if (role === 3) return "管理员";
-  if (role === 2) return "客服";
-  if (role === 1) return "技术支持";
-  return "成员";
+  if (role === 4) return "contacts.page.role.owner";
+  if (role === 3) return "contacts.page.role.admin";
+  if (role === 2) return "contacts.page.role.customerService";
+  if (role === 1) return "contacts.page.role.technicalSupport";
+  return "contacts.page.role.member";
 }
 
 function membershipRoleRank(role?: number) {
@@ -392,10 +392,10 @@ function membershipRoleRank(role?: number) {
 }
 
 function roleLabelRank(label: string) {
-  if (label === "所有者") return 10;
-  if (label === "管理员") return 20;
-  if (label === "客服") return 30;
-  if (label === "技术支持") return 40;
-  if (label === "成员") return 50;
+  if (label === "contacts.page.role.owner") return 10;
+  if (label === "contacts.page.role.admin") return 20;
+  if (label === "contacts.page.role.customerService") return 30;
+  if (label === "contacts.page.role.technicalSupport") return 40;
+  if (label === "contacts.page.role.member") return 50;
   return 90;
 }

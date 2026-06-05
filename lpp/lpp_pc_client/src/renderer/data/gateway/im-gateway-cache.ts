@@ -262,7 +262,7 @@ function gatewayConversation(
     stringField(raw, "title", "name", "displayName") ||
     stringField(payload, "conversationTitle", "title") ||
     input.message.senderDisplayName ||
-    "新会话";
+    "New conversation";
   return {
     conversationId: input.conversationId,
     conversationType,

@@ -1,4 +1,10 @@
 import type { ContactFilter, ContactItem } from "../data/types";
+import { useI18n } from "../i18n/useI18n";
+
+function contactValue(value: string | undefined | null, t: (key: string, params?: Record<string, string | number>) => string) {
+  if (!value) return value || "";
+  return value.startsWith("contacts.") ? t(value) : value;
+}
 
 export function ContactSidePanel({
   filter,
@@ -7,16 +13,17 @@ export function ContactSidePanel({
   filter: ContactFilter;
   contact?: ContactItem;
 }) {
+  const { t } = useI18n();
   if (contact?.kind === "staff") {
     return (
       <aside className="contacts-profile-panel contacts-side-empty">
-        <h2>组织成员资料</h2>
-        <p>组织成员只展示部门、职位、角色和会话入口，不展示客户画像或好友危险操作。</p>
+        <h2>{t("contacts.side.staffTitle")}</h2>
+        <p>{t("contacts.side.staffText")}</p>
         <div className="contacts-mini-rows">
-          <InfoLine label="姓名" value={contact.name} />
-          <InfoLine label="身份" value="企业成员" />
-          <InfoLine label="角色" value={contact.roleLabel || "--"} />
-          <InfoLine label="部门" value={contact.departmentName || "--"} />
+          <InfoLine label={t("contacts.field.name")} value={contactValue(contact.name, t)} />
+          <InfoLine label={t("contacts.field.identity")} value={t("contacts.identity.enterpriseMember")} />
+          <InfoLine label={t("contacts.field.role")} value={contactValue(contact.roleLabel, t) || "--"} />
+          <InfoLine label={t("contacts.field.department")} value={contactValue(contact.departmentName, t) || "--"} />
         </div>
       </aside>
     );
@@ -24,23 +31,23 @@ export function ContactSidePanel({
   if (contact?.kind === "group") {
     return (
       <aside className="contacts-profile-panel contacts-side-empty">
-        <h2>群聊资料</h2>
-        <p>群聊展示成员、提醒和最近消息；成员管理、群公告、群文件等待群详情接口接入。</p>
+        <h2>{t("contacts.side.groupTitle")}</h2>
+        <p>{t("contacts.side.groupText")}</p>
         <div className="contacts-mini-rows">
-          <InfoLine label="群名" value={contact.name} />
-          <InfoLine label="成员数" value={contact.members ? `${contact.members} 人` : "--"} />
-          <InfoLine label="提醒" value={contact.muted ? "免打扰" : "正常提醒"} />
+          <InfoLine label={t("contacts.field.groupName")} value={contactValue(contact.name, t)} />
+          <InfoLine label={t("contacts.field.memberCount")} value={contact.members ? t("contacts.memberCount", { count: contact.members }) : "--"} />
+          <InfoLine label={t("contacts.field.reminder")} value={contact.muted ? t("contacts.reminder.muted") : t("contacts.reminder.normal")} />
         </div>
       </aside>
     );
   }
   return (
     <aside className="contacts-profile-panel contacts-side-empty">
-      <h2>{filter === "requests" ? "申请说明" : "资料"}</h2>
+      <h2>{filter === "requests" ? t("contacts.side.requestTitle") : t("contacts.side.profileTitle")}</h2>
       <p>
         {filter === "requests"
-          ? "好友申请支持通过或拒绝，处理后会刷新申请列表。"
-          : "请选择联系人查看资料。"}
+          ? t("contacts.side.requestText")
+          : t("contacts.side.profileText")}
       </p>
     </aside>
   );

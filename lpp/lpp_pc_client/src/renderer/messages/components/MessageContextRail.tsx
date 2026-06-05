@@ -1,6 +1,8 @@
 import { LibraryBig, MessageSquareText } from "lucide-react";
+import type { ReactNode } from "react";
 
 import type { ConversationListItem } from "../../data/api-client";
+import { useI18n } from "../../i18n/useI18n";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 
 export type MessageContextPane = "aiDraft" | "knowledge" | "quickReply" | null;
@@ -22,9 +24,13 @@ export function MessageContextRail({
   onToggleAssistantPane: (pane: Exclude<MessageContextPane, null>) => void;
   onToggleProfile: () => void;
 }) {
-  const profileTooltip = profileOpen ? "收起用户信息" : "展开用户信息";
+  const { t } = useI18n();
+  const profileTooltip = profileOpen
+    ? t("messages.contextRail.collapseProfile")
+    : t("messages.contextRail.expandProfile");
+
   return (
-    <aside className="message-context-rail" aria-label="消息右侧工具栏">
+    <aside className="message-context-rail" aria-label={t("messages.contextRail.railAria")}>
       <button
         className={`message-context-rail-avatar ${profileOpen ? "active" : ""}`}
         type="button"
@@ -43,26 +49,18 @@ export function MessageContextRail({
         {conversation && <span className="message-context-status-dot" />}
       </button>
 
-      <div className="message-context-rail-actions" aria-label="消息工具">
-        <button
-          className={activeAssistantPane === "quickReply" ? "active" : ""}
-          type="button"
-          title="快捷话术"
-          data-tooltip="快捷话术"
-          aria-label="快捷话术"
-          aria-pressed={activeAssistantPane === "quickReply"}
+      <div className="message-context-rail-actions" aria-label={t("messages.contextRail.toolsAria")}>
+        <MessageContextRailButton
+          active={activeAssistantPane === "quickReply"}
+          label={t("messages.contextRail.quickReply")}
           onClick={() => onToggleAssistantPane("quickReply")}
         >
           <MessageSquareText size={18} />
-        </button>
+        </MessageContextRailButton>
         {showAiTools && (
-          <button
-            className={activeAssistantPane === "aiDraft" ? "active" : ""}
-            type="button"
-            title="AI 起草"
-            data-tooltip="AI 起草"
-            aria-label="AI 起草"
-            aria-pressed={activeAssistantPane === "aiDraft"}
+          <MessageContextRailButton
+            active={activeAssistantPane === "aiDraft"}
+            label={t("messages.contextRail.aiDraft")}
             onClick={() => onToggleAssistantPane("aiDraft")}
           >
             <img
@@ -71,20 +69,42 @@ export function MessageContextRail({
               alt=""
               aria-hidden="true"
             />
-          </button>
+          </MessageContextRailButton>
         )}
-        <button
-          className={activeAssistantPane === "knowledge" ? "active" : ""}
-          type="button"
-          title="知识库"
-          data-tooltip="知识库"
-          aria-label="知识库"
-          aria-pressed={activeAssistantPane === "knowledge"}
+        <MessageContextRailButton
+          active={activeAssistantPane === "knowledge"}
+          label={t("messages.contextRail.knowledge")}
           onClick={() => onToggleAssistantPane("knowledge")}
         >
           <LibraryBig size={18} />
-        </button>
+        </MessageContextRailButton>
       </div>
     </aside>
+  );
+}
+
+function MessageContextRailButton({
+  active,
+  children,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={active ? "active" : ""}
+      type="button"
+      title={label}
+      data-tooltip={label}
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }

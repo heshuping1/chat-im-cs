@@ -11,6 +11,7 @@ import {
   Languages,
   Reply,
   Star,
+  Pin,
   TextCursorInput,
   Trash2,
   Undo2,
@@ -23,6 +24,10 @@ import {
   type MessageContextAction,
   type MessageContextMenuState,
 } from "../models/messageContextMenuModel";
+import type { ConversationContextAction } from "../models/messageConversationActionModel";
+import { useI18n } from "../../i18n/useI18n";
+
+type Translate = ReturnType<typeof useI18n>["t"];
 
 type MessageMenuItem = {
   action: MessageContextAction;
@@ -40,7 +45,8 @@ export function MessageContextMenu({
   position: { x: number; y: number };
   state: MessageContextMenuState;
 }) {
-  const items = buildMessageContextMenuItems(state);
+  const { t } = useI18n();
+  const items = buildMessageContextMenuItems(state, t);
 
   return (
     <div
@@ -66,14 +72,18 @@ export function MessageContextMenu({
 }
 
 export function ConversationContextMenu({
+  isPinned,
   isMuted,
   onAction,
   position,
 }: {
+  isPinned: boolean;
   isMuted: boolean;
-  onAction: (action: "mute" | "hide" | "delete") => void;
+  onAction: (action: ConversationContextAction) => void;
   position: { x: number; y: number };
 }) {
+  const { t } = useI18n();
+
   return (
     <div
       className="message-context-menu"
@@ -81,46 +91,62 @@ export function ConversationContextMenu({
       style={{ left: position.x, top: position.y }}
       onClick={(event) => event.stopPropagation()}
     >
+      <button type="button" role="menuitem" onClick={() => onAction("pin")}>
+        <Pin size={15} />
+        <span>
+          {isPinned
+            ? t("messages.conversationInfo.actions.unpin")
+            : t("messages.conversationInfo.actions.pin")}
+        </span>
+      </button>
       <button type="button" role="menuitem" onClick={() => onAction("mute")}>
         <BellOff size={15} />
-        <span>{isMuted ? "取消免打扰" : "消息免打扰"}</span>
+        <span>
+          {isMuted
+            ? t("messages.contextMenu.conversation.unmute")
+            : t("messages.contextMenu.conversation.mute")}
+        </span>
       </button>
       <button type="button" role="menuitem" onClick={() => onAction("hide")}>
         <X size={15} />
-        <span>隐藏会话</span>
+        <span>{t("messages.contextMenu.conversation.hide")}</span>
       </button>
       <button className="danger" type="button" role="menuitem" onClick={() => onAction("delete")}>
         <Trash2 size={15} />
-        <span>删除会话</span>
+        <span>{t("messages.contextMenu.conversation.delete")}</span>
       </button>
     </div>
   );
 }
 
-function buildMessageContextMenuItems(state: MessageContextMenuState) {
+function buildMessageContextMenuItems(state: MessageContextMenuState, t: Translate) {
   const actions = getMessageContextActionAvailability(state);
   const fallbackItems: MessageMenuItem[] = [
     ...(actions.multi_select
       ? [
           {
             action: "multi_select" as const,
-            label: "多选",
+            label: t("messages.contextMenu.action.multiSelect"),
             icon: <CheckSquare size={15} />,
           },
-          { action: "reply" as const, label: "引用", icon: <Reply size={15} /> },
+          { action: "reply" as const, label: t("messages.contextMenu.action.reply"), icon: <Reply size={15} /> },
         ]
       : []),
     ...(actions.copy
       ? [
-          { action: "copy" as const, label: "复制", icon: <Copy size={15} /> },
-          { action: "translate" as const, label: "翻译", icon: <Languages size={15} /> },
+          { action: "copy" as const, label: t("messages.contextMenu.action.copy"), icon: <Copy size={15} /> },
+          {
+            action: "translate" as const,
+            label: t("messages.contextMenu.action.translate"),
+            icon: <Languages size={15} />,
+          },
         ]
       : []),
     ...(actions.copy_image
       ? [
           {
             action: "copy_image" as const,
-            label: "复制图片",
+            label: t("messages.contextMenu.action.copyImage"),
             icon: <FileImage size={15} />,
           },
         ]
@@ -129,86 +155,104 @@ function buildMessageContextMenuItems(state: MessageContextMenuState) {
       ? [
           {
             action: "voice_to_text" as const,
-            label: "语音转文字",
+            label: t("messages.contextMenu.action.voiceToText"),
             icon: <TextCursorInput size={15} />,
           },
         ]
       : []),
     ...(actions.save_media_as
       ? [
-          { action: "save_media_as" as const, label: "另存为", icon: <Download size={15} /> },
+          {
+            action: "save_media_as" as const,
+            label: t("messages.contextMenu.action.saveAs"),
+            icon: <Download size={15} />,
+          },
           {
             action: "reveal_in_folder" as const,
-            label: state.revealInFolderLabel,
+            label: t("messages.contextMenu.action.revealInFolder"),
             icon: <FolderOpen size={15} />,
           },
         ]
       : []),
     ...(actions.forward
       ? [
-          { action: "forward" as const, label: "转发", icon: <Forward size={15} /> },
-          { action: "favorite" as const, label: "收藏", icon: <Star size={15} /> },
+          { action: "forward" as const, label: t("messages.contextMenu.action.forward"), icon: <Forward size={15} /> },
+          { action: "favorite" as const, label: t("messages.contextMenu.action.favorite"), icon: <Star size={15} /> },
         ]
       : []),
     ...(actions.recall
       ? [
           {
             action: "recall" as const,
-            label: "撤回",
+            label: t("messages.contextMenu.action.recall"),
             icon: <Undo2 size={15} />,
             danger: true,
           },
         ]
       : []),
-    { action: "delete", label: "删除", icon: <Trash2 size={15} />, danger: true },
+    { action: "delete", label: t("messages.contextMenu.action.delete"), icon: <Trash2 size={15} />, danger: true },
   ];
   const mediaItems: MessageMenuItem[] = [
     ...(actions.copy_image || actions.copy_media
       ? [
           {
             action: state.isImage ? ("copy_image" as const) : ("copy_media" as const),
-            label: "复制",
+            label: t("messages.contextMenu.action.copy"),
             icon: state.isImage ? <FileImage size={15} /> : <Copy size={15} />,
           },
         ]
       : []),
     ...(actions.save_media_as
-      ? [{ action: "save_media_as" as const, label: "另存为...", icon: <Download size={15} /> }]
+      ? [
+          {
+            action: "save_media_as" as const,
+            label: t("messages.contextMenu.action.saveAsEllipsis"),
+            icon: <Download size={15} />,
+          },
+        ]
       : []),
     ...(actions.open_media
-      ? [{ action: "open_media" as const, label: "打开", icon: <FileText size={15} /> }]
+      ? [{ action: "open_media" as const, label: t("messages.contextMenu.action.open"), icon: <FileText size={15} /> }]
       : []),
     ...(actions.edit_media
-      ? [{ action: "edit_media" as const, label: "编辑", icon: <Edit3 size={15} /> }]
+      ? [{ action: "edit_media" as const, label: t("messages.contextMenu.action.edit"), icon: <Edit3 size={15} /> }]
       : []),
     ...(actions.reveal_in_folder
       ? [
           {
             action: "reveal_in_folder" as const,
-            label: state.revealInFolderLabel,
+            label: t("messages.contextMenu.action.revealInFolder"),
             icon: <FolderOpen size={15} />,
           },
         ]
       : []),
     ...(actions.forward
       ? [
-          { action: "forward" as const, label: "转发...", icon: <Forward size={15} /> },
-          { action: "favorite" as const, label: "收藏", icon: <Star size={15} /> },
-          { action: "multi_select" as const, label: "多选", icon: <CheckSquare size={15} /> },
-          { action: "reply" as const, label: "引用", icon: <Reply size={15} /> },
+          {
+            action: "forward" as const,
+            label: t("messages.contextMenu.action.forwardEllipsis"),
+            icon: <Forward size={15} />,
+          },
+          { action: "favorite" as const, label: t("messages.contextMenu.action.favorite"), icon: <Star size={15} /> },
+          {
+            action: "multi_select" as const,
+            label: t("messages.contextMenu.action.multiSelect"),
+            icon: <CheckSquare size={15} />,
+          },
+          { action: "reply" as const, label: t("messages.contextMenu.action.reply"), icon: <Reply size={15} /> },
         ]
       : []),
     ...(actions.recall
       ? [
           {
             action: "recall" as const,
-            label: "撤回",
+            label: t("messages.contextMenu.action.recall"),
             icon: <Undo2 size={15} />,
             danger: true,
           },
         ]
       : []),
-    { action: "delete", label: "删除", icon: <Trash2 size={15} />, danger: true },
+    { action: "delete", label: t("messages.contextMenu.action.delete"), icon: <Trash2 size={15} />, danger: true },
   ];
 
   if (!state.hasMedia) return fallbackItems;

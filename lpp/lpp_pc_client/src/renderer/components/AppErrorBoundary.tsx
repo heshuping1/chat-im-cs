@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { logRuntimeErrorDiagnostic } from '../data/diagnostics/runtime-error-diagnostics';
+import { I18nContext } from '../i18n/I18nProvider';
 
 interface AppErrorBoundaryProps {
   activeModule?: string;
@@ -18,9 +19,9 @@ export interface AppErrorFallbackModel {
   referenceCode: string;
 }
 
-const appErrorTitle = 'PC 客户端暂时无法加载';
+const appErrorTitle = 'PC \u5ba2\u6237\u7aef\u6682\u65f6\u65e0\u6cd5\u52a0\u8f7d';
 const appErrorMessage =
-  '界面渲染出现异常。请先重试界面，若仍失败再重新加载客户端。';
+  '\u754c\u9762\u6e32\u67d3\u51fa\u73b0\u5f02\u5e38\u3002\u8bf7\u5148\u91cd\u8bd5\u754c\u9762\uff0c\u82e5\u4ecd\u5931\u8d25\u518d\u91cd\u65b0\u52a0\u8f7d\u5ba2\u6237\u7aef\u3002';
 
 export class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,
@@ -73,21 +74,28 @@ export class AppErrorBoundary extends Component<
     const fallback = createAppErrorFallbackModel(this.state.error);
     const referenceCode = this.state.referenceCode ?? fallback.referenceCode;
     return (
-      <main className="app-error-fallback" role="alert">
-        <section>
-          <h1>{fallback.title}</h1>
-          <p>{fallback.message}</p>
-          <small>错误编号：{referenceCode}</small>
-          <div className="app-error-actions">
-            <button type="button" onClick={this.retryRender}>
-              重试界面
-            </button>
-            <button type="button" onClick={this.reloadClient}>
-              重新加载
-            </button>
-          </div>
-        </section>
-      </main>
+      <I18nContext.Consumer>
+        {(i18n) => (
+          <main className="app-error-fallback" role="alert">
+            <section>
+              <h1>{i18n?.t('app.errorTitle') ?? fallback.title}</h1>
+              <p>{i18n?.t('app.errorMessage') ?? fallback.message}</p>
+              <small>
+                {i18n?.t('app.errorReference', { referenceCode }) ??
+                  `\u9519\u8bef\u7f16\u53f7\uff1a${referenceCode}`}
+              </small>
+              <div className="app-error-actions">
+                <button type="button" onClick={this.retryRender}>
+                  {i18n?.t('app.errorRetry') ?? '\u91cd\u8bd5\u754c\u9762'}
+                </button>
+                <button type="button" onClick={this.reloadClient}>
+                  {i18n?.t('app.reload') ?? '\u91cd\u65b0\u52a0\u8f7d'}
+                </button>
+              </div>
+            </section>
+          </main>
+        )}
+      </I18nContext.Consumer>
     );
   }
 }
@@ -107,7 +115,10 @@ export function createAppErrorReferenceCode(error: Error | null) {
 }
 
 function sanitizeAppErrorText(value: string) {
-  return value.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+|token=[^&\s]+|password=[^&\s]+/gi, '[redacted]');
+  return value.replace(
+    /Bearer\s+[A-Za-z0-9._~+/=-]+|token=[^&\s]+|password=[^&\s]+/gi,
+    '[redacted]',
+  );
 }
 
 function hashAppErrorText(value: string) {

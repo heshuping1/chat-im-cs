@@ -1,4 +1,5 @@
 import type { ContactItem } from "../data/types";
+import { useI18n } from "../i18n/useI18n";
 import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
 
 export function CustomerInfoPanel({
@@ -8,11 +9,13 @@ export function CustomerInfoPanel({
   className: string;
   contact?: ContactItem | null;
 }) {
+  const { t } = useI18n();
+
   return (
     <CustomerProfileWorkspace
       className={className}
       contact={contact}
-      title="客户信息"
+      title={t("customerProfile.title")}
     />
   );
 }

@@ -159,7 +159,7 @@ export function messageTraceStageLabel(stage: MessageTraceStage) {
     case "send.compose.submit":
       return "提交发送";
     case "send.local_echo.written":
-      return "本地显示";
+      return "本地消息写入";
     case "send.http.start":
       return "发送请求开始";
     case "send.http.done":
@@ -171,13 +171,13 @@ export function messageTraceStageLabel(stage: MessageTraceStage) {
     case "receive.gateway.observed":
       return "长连接收到";
     case "receive.cache.written":
-      return "写入本机缓存";
+      return "本地缓存写入";
     case "receive.ui.observed":
-      return "窗口状态收到";
+      return "界面状态收到";
     case "receive.paint.observed":
-      return "窗口绘制完成";
+      return "界面完成渲染";
     case "query.message.discovered":
-      return "主动查询发现";
+      return "查询发现消息";
   }
 }
 

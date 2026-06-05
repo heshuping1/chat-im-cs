@@ -1,33 +1,57 @@
 import { customerServiceStatuses } from "./static-config";
 import type { CustomerServiceThread } from "./api-client";
 
+export interface CustomerServiceTextDescriptor {
+  key: string;
+  params?: Record<string, string | number>;
+}
+
 export function isQueuedCustomerServiceThread(thread: CustomerServiceThread) {
   const status = normalizeStatus(thread.status);
   return status === "queued" || status.includes("queue") || status.includes("waiting");
 }
 
-export function customerServiceThreadStatusLabel(thread: CustomerServiceThread) {
-  if (isQueuedCustomerServiceThread(thread)) return "客户排队中";
+export function createCustomerServiceThreadStatusDescriptor(
+  thread: CustomerServiceThread,
+): CustomerServiceTextDescriptor {
+  if (isQueuedCustomerServiceThread(thread)) {
+    return { key: "customerService.status.queueing" };
+  }
   const status = normalizeStatus(thread.status);
-  if (status.includes("ai")) return "AI 转人工";
-  return "人工服务中";
+  if (status.includes("ai")) return { key: "customerService.status.aiTransfer" };
+  return { key: "customerService.status.serving" };
 }
 
-export function customerServiceHistoryStatusLabel(status: string | number) {
+export function customerServiceHistoryStatusKey(status: string | number) {
   const normalized = normalizeStatus(status);
-  if (normalized === "5" || normalized === "closed_by_visitor") return "访客关闭";
-  if (normalized === "6" || normalized === "closed_by_staff") return "客服关闭";
-  if (normalized === "7" || normalized === "closed_timeout") return "超时关闭";
-  if (normalized === "8" || normalized === "closed_system") return "系统关闭";
-  if (normalized === "9" || normalized === "archived") return "已归档";
-  if (normalized.startsWith("closed")) return "已结束";
-  return "已结束";
+  if (normalized === "5" || normalized === "closed_by_visitor") {
+    return "customerService.threadList.historyStatus.closedByVisitor";
+  }
+  if (normalized === "6" || normalized === "closed_by_staff") {
+    return "customerService.threadList.historyStatus.closedByStaff";
+  }
+  if (normalized === "7" || normalized === "closed_timeout") {
+    return "customerService.threadList.historyStatus.closedTimeout";
+  }
+  if (normalized === "8" || normalized === "closed_system") {
+    return "customerService.threadList.historyStatus.closedSystem";
+  }
+  if (normalized === "9" || normalized === "archived") {
+    return "customerService.threadList.historyStatus.archived";
+  }
+  return "customerService.threadList.historyStatus.ended";
 }
 
-export function customerServiceReceptionStatusLabel(value?: string | null) {
+export function createCustomerServiceHistoryStatusDescriptor(
+  status: string | number,
+): CustomerServiceTextDescriptor {
+  return { key: customerServiceHistoryStatusKey(status) };
+}
+
+export function customerServiceReceptionStatusLabelKey(value?: string | null) {
   return (
-    customerServiceStatuses.find((item) => item.value === value)?.label ??
-    "--"
+    customerServiceStatuses.find((item) => item.value === value)?.labelKey ??
+    "sidebar.service.statusUnsynced"
   );
 }
 

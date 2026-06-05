@@ -36,6 +36,7 @@ import {
   type SendOutboxStatus,
 } from "../../data/send/send-outbox";
 import { currentIsoTimestamp, formatError } from "../../lib/format";
+import { useI18n } from "../../i18n/useI18n";
 import {
   createVideoPoster,
   registerVideoPosterForMedia,
@@ -89,6 +90,7 @@ export function useCustomerServiceSendController({
   session: AuthSession | null;
   setNotice: (notice: string | null) => void;
 }) {
+  const { t } = useI18n();
   const mediaUploadTasksRef = useRef(new Map<string, LocalServiceUploadTask>());
   useEffect(() => {
     if (!selectedThread || !session) return undefined;
@@ -128,14 +130,14 @@ export function useCustomerServiceSendController({
           });
         } else if (isCustomerServiceMediaRecord(record) && record.localTaskId) {
           await storage.patchRecord(scopeKey, record.localMessageId, {
-            localError: "本地文件已失效，请重新选择",
+            localError: t("customerService.send.localFileExpired"),
             status: "failed",
             updatedAt: Date.now(),
           });
         }
         if (["queued", "uploading", "sending", "paused"].includes(record.status)) {
           await storage.patchRecord(scopeKey, record.localMessageId, {
-            localError: "发送中断，点击重试",
+            localError: t("customerService.send.sendInterruptedRetry"),
             status: "failed",
             updatedAt: Date.now(),
             uploadProgress: undefined,
@@ -147,11 +149,13 @@ export function useCustomerServiceSendController({
       canceled = true;
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [queryClient, selectedThread, session]);
+  }, [queryClient, selectedThread, session, t]);
 
   const sendTextMutation = useMutation({
     mutationFn: async (content: string) => {
-      if (!client || !selectedThread || !session) throw new Error("请选择在线客服会话");
+      if (!client || !selectedThread || !session) {
+        throw new Error(t("customerService.send.selectThread"));
+      }
       const runtime = createChatSendRuntime({
         channel: "customer_service",
         session,
@@ -255,7 +259,7 @@ export function useCustomerServiceSendController({
         },
       });
       if (isTerminalCustomerServiceWriteError(error)) {
-        setNotice("会话已结束，已切换为只读状态。");
+        setNotice(t("customerService.send.threadClosedReadonly"));
         void invalidateCustomerServiceQueries(queryClient);
       }
     },
@@ -269,9 +273,13 @@ export function useCustomerServiceSendController({
       file: File;
       kind: ComposerMediaKind;
     }) => {
-      if (!client || !selectedThread) throw new Error("请选择在线客服会话");
+      if (!client || !selectedThread) {
+        throw new Error(t("customerService.send.selectThread"));
+      }
       const videoPoster = kind === "video" ? await createVideoPoster(file) : undefined;
-      if (kind === "video" && !videoPoster) throw new Error("视频封面生成失败");
+      if (kind === "video" && !videoPoster) {
+        throw new Error(t("customerService.send.videoPosterFailed"));
+      }
       const uploadedMedia = normalizeUploadedMedia(await client.uploadMedia(file, kind), file);
       const posterUpload = await uploadVideoPosterForSend({
         kind,
@@ -314,7 +322,7 @@ export function useCustomerServiceSendController({
     },
     onError: (error) => {
       if (isTerminalCustomerServiceWriteError(error)) {
-        setNotice("会话已结束，已切换为只读状态。");
+        setNotice(t("customerService.send.threadClosedReadonly"));
         void invalidateCustomerServiceQueries(queryClient);
       }
     },
@@ -379,7 +387,7 @@ export function useCustomerServiceSendController({
         try {
           if (task.kind === "video" && !task.videoPoster) {
             const videoPoster = await createVideoPoster(task.file);
-            if (!videoPoster) throw new Error("视频封面生成失败");
+            if (!videoPoster) throw new Error(t("customerService.send.videoPosterFailed"));
             task.videoPoster = videoPoster;
             const localMedia = localMediaResourceForSend({
               file: task.file,
@@ -562,7 +570,7 @@ export function useCustomerServiceSendController({
           if (controller.signal.aborted && task.controlState) return;
           const failedAt = Date.now();
           if (isTerminalCustomerServiceWriteError(error)) {
-            setNotice("会话已结束，已切换为只读状态。");
+            setNotice(t("customerService.send.threadClosedReadonly"));
             void invalidateCustomerServiceQueries(queryClient);
           }
           logChatSendDiagnostic({
@@ -601,7 +609,9 @@ export function useCustomerServiceSendController({
 
   const sendServiceMediaOptimistically = useCallback(
     async (file: File, kind: ComposerMediaKind) => {
-      if (!selectedThread || !session) throw new Error("请选择在线客服会话");
+      if (!selectedThread || !session) {
+        throw new Error(t("customerService.send.selectThread"));
+      }
       const runtime = createChatSendRuntime({
         channel: "customer_service",
         session,
@@ -643,7 +653,10 @@ export function useCustomerServiceSendController({
           return undefined;
         });
       const videoPoster = kind === "video" ? await createVideoPoster(file) : undefined;
-      const posterError = kind === "video" && !videoPoster ? "视频封面生成失败" : undefined;
+      const posterError =
+        kind === "video" && !videoPoster
+          ? t("customerService.send.videoPosterFailed")
+          : undefined;
       const initialStatus = posterError ? "failed" : initialChatSendStatusForKind(kind);
       const localMedia = localMediaResourceForSend({
         file,

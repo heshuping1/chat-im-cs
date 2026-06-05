@@ -18,7 +18,7 @@
 - `isSelfLastMessage` 覆盖 `senderUserId`、`senderId`、`fromUserId`、`senderPlatformUserId`、`platformUserId`、`senderLppId`、`lppId`、嵌套 sender/from/author/user、`isSelf`、`isMine`、`direction: "out"` 等字段。
 - Gateway 收到自己消息时不增加 unread，不推提醒，并按当前账号本地已读处理。
 - 本机 local echo 发送 text/image/file 后同步更新会话最近消息，强制 `unreadCount: 0`。
-- 如果服务端返回“最后一条是自己消息但 unreadCount > 0”，前端展示层强制按 0 处理，并已在 `docs/服务端支持.md` 记录服务端一致性缺口。
+- 如果服务端返回“最后一条是自己消息但 unreadCount > 0”，前端展示层强制按 0 处理，并已在 `docs/05-服务端支持.md` 记录服务端一致性缺口。
 
 ## 专项覆盖
 
@@ -52,7 +52,7 @@
 
 - 截图场景复核：当前账号自己发送图片后，消息气泡显示为“我/已发送”，会话列表不应出现红点。
 - 对应专项已覆盖：`Push自己图片`、`Pull自己图片`、当前会话发送 `paste-image.png` 后断言 `Jason` 会话无 `.e-avatar-unread` 且无“↑↑”新消息提示。
-- 需要真实环境继续观察：服务端若仍返回 self lastMessage 携带 `unreadCount > 0`，前端已兜底，但服务端应按 `docs/服务端支持.md` 修正，避免多端状态不一致。
+- 需要真实环境继续观察：服务端若仍返回 self lastMessage 携带 `unreadCount > 0`，前端已兜底，但服务端应按 `docs/05-服务端支持.md` 修正，避免多端状态不一致。
 
 ## 必跑命令
 

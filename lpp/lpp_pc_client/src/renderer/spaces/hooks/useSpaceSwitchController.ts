@@ -35,7 +35,7 @@ export function useSpaceSwitchController({
   const switchSpaceMutation = useMutation({
     mutationFn: async (space: SpaceSwitchTarget) => {
       if (!authSession?.platformToken) {
-        throw new Error("当前登录未保留平台会话，请重新登录后切换空间");
+        throw new Error("The current sign-in did not keep a platform session. Sign in again before switching spaces.");
       }
       const client = new ApiClient({
         baseUrl: authSession.apiBaseUrl,
@@ -114,13 +114,13 @@ function buildSwitchedAuthSession(
     membershipRole: sessionRole,
     platformUserId: profile?.platformUserId ?? tenant.platformUserId,
     refreshToken: tenant.refreshToken,
-    roleLabel: space ? roleLabel(space.membershipRole) : "个人空间",
+    roleLabel: space ? roleLabel(space.membershipRole) : "Personal space",
     spaceType: tenant.spaceContext?.spaceType ?? (space ? 2 : 1),
     tenantCode: currentTenant?.tenantCode ?? space?.tenantCode,
     tenantId: isPersonalSpace ? undefined : tenant.tenantId,
     tenantLogoUrl: currentTenant?.logoUrl ?? space?.logoUrl,
     tenantName: isPersonalSpace
-      ? "个人空间"
+      ? "Personal space"
       : currentTenant?.tenantName ?? space?.tenantName ?? authSession.tenantName,
     tenantToken: tenant.accessToken,
     userId: profile?.userId ?? tenant.userId,

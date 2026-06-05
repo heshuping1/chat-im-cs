@@ -98,9 +98,9 @@ function buildContactPickerItems(
     items.set(friend.friendUserId, {
       avatarUrl: friend.avatarUrl,
       id: friend.friendUserId,
-      name: friend.remarkName || friend.displayName || "好友",
+      name: friend.remarkName || friend.displayName || "Friend",
       source: "friend",
-      subtitle: friend.groupName ? `好友 · ${friend.groupName}` : "好友",
+      subtitle: friend.groupName ? `Friend · ${friend.groupName}` : "Friend",
     });
   });
   members.forEach((member) => {
@@ -109,9 +109,9 @@ function buildContactPickerItems(
     items.set(member.userId, {
       avatarUrl: member.avatarUrl,
       id: member.userId,
-      name: member.displayName || "成员",
+      name: member.displayName || "Member",
       source: "member",
-      subtitle: "企业成员",
+      subtitle: "Enterprise member",
     });
   });
   departmentMembers.forEach((member) => {
@@ -120,9 +120,9 @@ function buildContactPickerItems(
     items.set(member.userId, {
       avatarUrl: member.avatarUrl,
       id: member.userId,
-      name: member.displayName || "成员",
+      name: member.displayName || "Member",
       source: "department",
-      subtitle: member.departmentName ? `部门成员 · ${member.departmentName}` : "部门成员",
+      subtitle: member.departmentName ? `Department member · ${member.departmentName}` : "Department member",
     });
   });
   return Array.from(items.values()).sort((left, right) =>

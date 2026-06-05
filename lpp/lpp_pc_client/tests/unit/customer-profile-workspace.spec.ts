@@ -13,17 +13,17 @@ describe("customer profile workspace copy", () => {
   );
 
   it("uses channel application instead of package jargon for business ownership", () => {
-    expect(workspaceSource).toContain('["渠道应用", model.appName]');
+    expect(workspaceSource).toContain('[t("customerProfile.fields.channelApp"), model.appName]');
     expect(workspaceSource).not.toContain('["马甲包", model.appName]');
   });
 
   it("keeps customer source and channel in the identity summary", () => {
-    expect(workspaceSource).toContain('["来源渠道", model.source]');
+    expect(workspaceSource).toContain('[t("customerProfile.fields.sourceChannel"), model.source]');
     expect(workspaceSource).not.toContain("model.level, model.kyc, model.risk, model.source");
-    expect(workspaceSource).toContain('["绿泡泡号", model.lppId]');
-    expect(workspaceSource).toContain('["用户ID", model.customerId]');
-    expect(workspaceSource).toContain('["来源", model.source]');
-    expect(workspaceSource).toContain('["渠道应用", model.channelApp]');
+    expect(workspaceSource).toContain('[t("customerProfile.fields.lppId"), model.lppId]');
+    expect(workspaceSource).toContain('[t("customerProfile.fields.userId"), model.customerId]');
+    expect(workspaceSource).toContain('[t("customerProfile.fields.source"), model.source]');
+    expect(workspaceSource).toContain('[t("customerProfile.fields.channelApp"), model.channelApp]');
   });
 
   it("keeps a fixed VIP badge slot in the hero", () => {
@@ -35,33 +35,33 @@ describe("customer profile workspace copy", () => {
   it("renders four compact customer handling rows", () => {
     expect(workspaceSource).not.toContain("<CustomerProfileActionRows");
     expect(workspaceSource).toContain('className="customer-360-action-list"');
-    expect(workspaceSource).toContain('aria-label="客户处理"');
-    expect(workspaceSource).toContain('label="标签"');
-    expect(workspaceSource).toContain('label="备注"');
-    expect(workspaceSource).toContain('label="跟进"');
-    expect(workspaceSource).toContain('label="工单"');
+    expect(workspaceSource).toContain('aria-label={t("customerProfile.actionAria")}');
+    expect(workspaceSource).toContain('label={t("customerProfile.fields.tags")}');
+    expect(workspaceSource).toContain('label={t("customerProfile.fields.remark")}');
+    expect(workspaceSource).toContain('label={t("customerProfile.fields.followUp")}');
+    expect(workspaceSource).toContain('label={t("customerProfile.fields.ticket")}');
   });
 
   it("shows explicit empty states for handling rows", () => {
-    expect(workspaceSource).toContain('"暂无备注"');
-    expect(workspaceSource).toContain('"未设置跟进"');
-    expect(workspaceSource).toContain('"暂无工单"');
-    expect(bitsSource).toContain("暂无标签");
+    expect(workspaceSource).toContain('t("customerProfile.empty.remark")');
+    expect(workspaceSource).toContain('t("customerProfile.empty.followUp")');
+    expect(workspaceSource).toContain('t("customerProfile.empty.tickets")');
+    expect(bitsSource).toContain('t("customerProfile.noTags")');
   });
 
   it("wires remark and tag rows to real update callbacks instead of placeholder-only actions", () => {
     expect(workspaceSource).toContain("onUpdateRemark");
     expect(workspaceSource).toContain("onUpdateTags");
-    expect(workspaceSource).toContain("当前客户缺少好友 ID，无法编辑备注");
-    expect(workspaceSource).toContain("当前客户缺少好友 ID，无法编辑标签");
-    expect(workspaceSource).toContain('aria-label={`编辑${label}`}');
+    expect(workspaceSource).toContain('t("customerProfile.notice.missingFriendForRemark")');
+    expect(workspaceSource).toContain('t("customerProfile.notice.missingFriendForTags")');
+    expect(workspaceSource).toContain('aria-label={t("customerProfile.actions.editField", { field: label })}');
     expect(workspaceSource).toContain("parseCompactTagDraft");
     expect(workspaceSource).not.toContain("备注编辑接口待接入");
     expect(workspaceSource).not.toContain("标签编辑接口待接入");
   });
 
   it("uses a plus affordance for tags instead of an ambiguous add button label", () => {
-    expect(bitsSource).toContain('aria-label="添加标签"');
+    expect(bitsSource).toContain('aria-label={t("customerProfile.addTag")}');
     expect(bitsSource).toContain("+");
     expect(bitsSource).not.toContain("+ 添加");
   });
@@ -69,13 +69,13 @@ describe("customer profile workspace copy", () => {
   it("keeps the ticket quick row wired to the existing ticket tab", () => {
     expect(workspaceSource).toContain('onOpenTickets={() =>');
     expect(workspaceSource).toContain('setActiveTab("tickets")');
-    expect(workspaceSource).toContain('{ key: "tickets", label: "工单"');
+    expect(workspaceSource).toContain('{ key: "tickets", icon: ClipboardList }');
   });
 
   it("expands more tabs inline instead of using a nested more menu", () => {
     expect(workspaceSource).toContain("const visibleTabs = overflowMenuOpen ? tabs : primaryTabs");
     expect(workspaceSource).toContain("{visibleTabs.map((tab) =>");
-    expect(workspaceSource).toContain("更多");
+    expect(workspaceSource).toContain('t("customerProfile.more")');
     expect(workspaceSource).not.toContain("customer-profile-tabs-menu");
     expect(workspaceSource).not.toContain('aria-haspopup="menu"');
   });

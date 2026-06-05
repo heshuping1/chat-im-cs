@@ -89,9 +89,9 @@ describe("contact directory model", () => {
         greenBubbleNo: "lpp-u1",
         name: "小周",
         position: "一线客服",
-        roleLabel: "客服",
+        roleLabel: "contacts.page.role.customerService",
         roleRank: 30,
-        source: "企业组织",
+        source: "contacts.page.enterpriseOrganization",
       }),
     ]);
   });
@@ -186,21 +186,25 @@ describe("contact directory model", () => {
       "utf8",
     );
 
-    expect(source).toContain('InfoLine label="绿泡泡号" value={contact.greenBubbleNo || "--"}');
-    expect(source).toContain('<InfoLine label="身份" value="企业成员" />');
-    expect(source).toContain('<InfoLine label="角色" value={contact.roleLabel || "--"} />');
-    expect(source).not.toContain('InfoLine label="用户 ID"');
+    expect(source).toContain('InfoLine label={t("contacts.detail.greenBubbleNo")} value={contact.greenBubbleNo || "--"}');
+    expect(source).toContain('InfoLine label={t("contacts.detail.identity")} value={t("contacts.detail.enterpriseMember")}');
+    expect(source).toContain('InfoLine label={t("contacts.detail.role")} value={contactValue(contact.roleLabel, t) || "--"}');
+    expect(source).not.toContain('contacts.detail.userId');
   });
 
   it("enriches selected organization contacts from user profile instead of UI alias guessing", () => {
-    const source = readFileSync(
+    const pageSource = readFileSync(
       resolve(process.cwd(), "src/renderer/components/ContactsPage.tsx"),
       "utf8",
     );
+    const controllerSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/contacts/hooks/useContactsDirectoryController.ts"),
+      "utf8",
+    );
 
-    expect(source).toContain("getTenantMemberProfile(activeTenantMemberUserId)");
-    expect(source).toContain("activeContactDetail");
-    expect(source).not.toContain("lppId");
+    expect(controllerSource).toContain("getTenantMemberProfile(activeTenantMemberUserId)");
+    expect(pageSource).toContain("activeContactDetail");
+    expect(pageSource).not.toContain("lppId");
   });
 
   it("groups organization contacts by role for the organization list", () => {
@@ -222,13 +226,13 @@ describe("contact directory model", () => {
     const groups = groupOrganizationContactsByRole(contacts);
 
     expect(groups.map((group) => group.label)).toEqual([
-      "管理员",
-      "客服",
-      "技术支持",
-      "成员",
+      "contacts.page.role.admin",
+      "contacts.page.role.customerService",
+      "contacts.page.role.technicalSupport",
+      "contacts.page.role.member",
     ]);
     expect(groups.map((group) => group.count)).toEqual([1, 1, 1, 1]);
-    expect(groups.find((group) => group.label === "客服")?.contacts[0].name).toBe("客服");
+    expect(groups.find((group) => group.label === "contacts.page.role.customerService")?.contacts[0].name).toBe("客服");
   });
 
   it("keeps customer friends as customers for staff but displays them as friends for customer users", () => {
@@ -247,12 +251,12 @@ describe("contact directory model", () => {
     expect(mapContacts({ ...shared, viewMode: "staff" })[0]).toMatchObject({
       directoryFilters: ["customer", "friend"],
       kind: "customer",
-      subtitle: "客户",
+      subtitle: "contacts.page.kind.customer",
     });
     expect(mapContacts({ ...shared, viewMode: "staff" })[0]).not.toHaveProperty("source");
     expect(mapContacts({ ...shared, viewMode: "customer" })[0]).toMatchObject({
       kind: "friend",
-      subtitle: "好友",
+      subtitle: "contacts.page.kind.friend",
     });
     expect(mapContacts({ ...shared, viewMode: "customer" })[0]).not.toHaveProperty("source");
   });
@@ -271,10 +275,10 @@ describe("contact directory model", () => {
       viewMode: "staff",
     });
 
-    expect(contactRowSubtitle(withoutGroup)).toBe("客户");
-    expect(contactRowSubtitle(withGroup)).toBe("客户 · VIP");
-    expect(withoutGroup.subtitle).toBe("客户");
-    expect(withGroup.subtitle).toBe("客户 · VIP");
+    expect(contactRowSubtitle(withoutGroup)).toBe("contacts.page.kind.customer");
+    expect(contactRowSubtitle(withGroup)).toBe("contacts.page.kind.customer · VIP");
+    expect(withoutGroup.subtitle).toBe("contacts.page.kind.customer");
+    expect(withGroup.subtitle).toBe("contacts.page.kind.customer");
   });
 
   it("counts customer friends in both customer and friend shortcuts without duplicating all contacts", () => {
@@ -332,7 +336,12 @@ describe("contact directory model", () => {
       canReadOrganization: false,
     });
     expect([...customerEntries.fixed, ...customerEntries.shortcuts].map((item) => item.label))
-      .toEqual(["新的朋友", "全部联系人", "好友", "群聊"]);
+      .toEqual([
+        "contacts.page.entry.requests",
+        "contacts.page.entry.all",
+        "contacts.page.entry.friend",
+        "contacts.page.entry.group",
+      ]);
     expect(customerEntries.shortcuts.map((item) => item.key)).not.toContain("customer");
     expect(customerEntries.shortcuts.map((item) => item.key)).not.toContain("organization");
 
@@ -353,7 +362,14 @@ describe("contact directory model", () => {
       canReadOrganization: true,
     });
     expect([...staffEntries.fixed, ...staffEntries.shortcuts].map((item) => item.label))
-      .toEqual(["新的朋友", "全部联系人", "客户", "好友", "组织", "群聊"]);
+      .toEqual([
+        "contacts.page.entry.requests",
+        "contacts.page.entry.all",
+        "contacts.page.entry.customer",
+        "contacts.page.entry.friend",
+        "contacts.page.entry.organization",
+        "contacts.page.entry.group",
+      ]);
   });
 
   it("uses customer-specific search and empty copy", () => {
@@ -362,19 +378,19 @@ describe("contact directory model", () => {
         viewMode: "customer",
         canReadOrganization: false,
       }),
-    ).toBe("搜索好友、群聊");
+    ).toBe("contacts.page.search.customerMode");
     expect(
       contactDirectorySearchPlaceholder({
         viewMode: "staff",
         canReadOrganization: true,
       }),
-    ).toBe("搜索客户、好友、组织、群聊");
+    ).toBe("contacts.page.search.staffWithOrganization");
     expect(
       contactDirectoryEmptyText({
         filter: "all",
         viewMode: "customer",
       }),
-    ).toContain("新的朋友");
+    ).toContain("contacts.page.empty.customerAll");
   });
 });
 
@@ -416,7 +432,7 @@ describe("contacts page closure", () => {
     expect(contactsPage).toContain("directoryViewMode");
     expect(contactsPage).toContain("createContactDirectoryEntries");
     expect(contactsPage).toContain("contactAccess.canReadOrganization");
-    expect(contactsPage).toContain("contactDirectorySearchPlaceholder");
+    expect(contactsPage).toContain("translateContactSearchPlaceholder");
     expect(contactsPage).toContain('directoryViewMode === "staff"');
   });
 

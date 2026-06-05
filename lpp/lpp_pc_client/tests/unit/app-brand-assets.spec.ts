@@ -25,7 +25,7 @@ describe("app brand assets", () => {
   const iconVerifySource = readFileSync(resolve(root, "scripts/verify-packaged-icon.mjs"), "utf8");
   const startPackagedSource = readFileSync(resolve(root, "scripts/start-packaged.mjs"), "utf8");
   const fixTaskbarSource = readFileSync(resolve(root, "scripts/fix-taskbar-icon.mjs"), "utf8");
-  const iconManual = readFileSync(resolve(root, "docs/PC图标统一管理手册.md"), "utf8");
+  const iconManual = readFileSync(resolve(root, "docs/release/04-PC图标统一管理手册.md"), "utf8");
   const readPngMetadata = (file: string) => {
     const bytes = readFileSync(resolve(root, file));
     return {

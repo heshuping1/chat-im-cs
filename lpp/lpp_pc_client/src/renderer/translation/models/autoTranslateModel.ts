@@ -10,7 +10,11 @@ export interface AutoTranslateCandidate {
 
 export function autoTranslateTargetLanguage(language: unknown) {
   if (language === "English") return "en-US";
-  if (language === "العربية") return "ar";
+  if (language === "\u65e5\u672c\u8a9e") return "ja-JP";
+  if (language === "Ti\u1ebfng Vi\u1ec7t") return "vi-VN";
+  if (language === "\u0e44\u0e17\u0e22") return "th-TH";
+  if (language === "\u7e41\u9ad4\u4e2d\u6587") return "zh-TW";
+  if (language === "\u0627\u0644\u0639\u0631\u0628\u064a\u0629") return "ar";
   return "zh-CN";
 }
 
@@ -60,7 +64,7 @@ export function autoTranslateCandidate({
   if (!text) return null;
   const taskKey = autoTranslateTaskKey(conversationKey, message, text);
   if (activeTaskKeys.has(taskKey)) return null;
-  if (annotation?.startsWith("译文：")) return null;
+  if (isTranslationAnnotation(annotation)) return null;
   return {
     message,
     taskKey,
@@ -94,4 +98,12 @@ function isAutoTranslatableMessageType(message: MessageItemDto) {
   if (type === "text" || type === "markdown") return true;
   if (type) return false;
   return Boolean(extractMessageText(message));
+}
+
+function isTranslationAnnotation(annotation?: string) {
+  return Boolean(
+    annotation?.startsWith("Translation:") ||
+      annotation?.startsWith("\u8bd1\u6587\uff1a") ||
+      annotation?.startsWith("\u8b6f\u6587\uff1a"),
+  );
 }

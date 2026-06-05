@@ -11,6 +11,7 @@ import type {
 } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import type { ContactItem } from "../../data/types";
+import { useI18n } from "../../i18n/useI18n";
 import {
   buildContactCardProfilePopover,
   type AvatarProfilePopoverState,
@@ -22,10 +23,12 @@ import type {
 } from "../models/contactCardModel";
 import { resolveGroupConversationAvatar } from "../models/groupAvatarModel";
 import { ConversationInfoPanel } from "./ConversationInfoPanel";
+import type { ContactPickerItem } from "./MessageStartDialogs";
 
 export function StandaloneConversationInfoView({
   avatarUrl,
   contact,
+  contactPickerItems = [],
   conversation,
   groupAvatarSnapshot,
   groupManagement,
@@ -44,6 +47,7 @@ export function StandaloneConversationInfoView({
 }: {
   avatarUrl?: string | null;
   contact?: ContactItem | null;
+  contactPickerItems?: ContactPickerItem[];
   conversation?: ConversationListItem;
   groupAvatarSnapshot?: string;
   groupManagement?: MessageGroupManagement;
@@ -60,18 +64,25 @@ export function StandaloneConversationInfoView({
   profileLoading?: boolean;
   userIdentity?: CurrentUserIdentity | null;
 }) {
+  const { t } = useI18n();
+
   return (
     <section className="message-info-standalone">
       <header className="message-info-standalone-head">
-        <button type="button" onClick={onBack} aria-label="返回聊天">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label={t("messages.conversationViews.backToChat")}
+        >
           <ChevronLeft size={20} />
-          <span>返回聊天</span>
+          <span>{t("messages.conversationViews.backToChat")}</span>
         </button>
-        <strong>客户信息</strong>
+        <strong>{t("messages.conversationViews.customerInfo")}</strong>
       </header>
       <ConversationInfoPanel
         avatarUrl={avatarUrl}
         contact={contact}
+        contactPickerItems={contactPickerItems}
         conversation={conversation}
         groupAvatar={
           conversation
@@ -102,18 +113,20 @@ export function AvatarProfilePopover({
   onClose: () => void;
   profile: AvatarProfilePopoverState;
 }) {
+  const { t } = useI18n();
+
   return (
     <aside
       className="pc-avatar-profile-popover"
       style={{ left: profile.x, top: profile.y }}
       role="dialog"
-      aria-label="头像资料"
+      aria-label={t("messages.conversationViews.avatarProfile")}
       onClick={(event) => event.stopPropagation()}
     >
       <button
         className="pc-avatar-profile-close"
         type="button"
-        aria-label="关闭头像资料"
+        aria-label={t("messages.conversationViews.closeAvatarProfile")}
         onClick={onClose}
       >
         <X size={14} />
@@ -138,7 +151,7 @@ export function AvatarProfilePopover({
         ))}
       </div>
       {profile.tags && profile.tags.length > 0 && (
-        <div className="pc-avatar-profile-tags" aria-label="标签">
+        <div className="pc-avatar-profile-tags" aria-label={t("messages.conversationViews.tags")}>
           {profile.tags.map((tag) => (
             <span key={tag}>{tag}</span>
           ))}
@@ -177,7 +190,10 @@ export function ContactCardProfileDialog({
   profileLoading?: boolean;
   relation: ContactCardRelation;
 }) {
-  const [requestMessage, setRequestMessage] = useState("你好，我想添加你为好友");
+  const { t } = useI18n();
+  const [requestMessage, setRequestMessage] = useState(() =>
+    t("messages.conversationViews.defaultFriendRequest"),
+  );
   const cardProfile = buildContactCardProfilePopover({
     profile,
     value: card as unknown as Record<string, unknown>,
@@ -185,96 +201,105 @@ export function ContactCardProfileDialog({
     y: card.y,
   });
   const title = cardProfile.title;
+
   return (
     <aside
-        aria-label="名片资料"
-        className="pc-avatar-profile-popover contact-card-profile-dialog"
-        role="dialog"
-        style={{ left: cardProfile.x, top: cardProfile.y }}
-        onClick={(event) => event.stopPropagation()}
+      aria-label={t("messages.conversationViews.contactCardProfile")}
+      className="pc-avatar-profile-popover contact-card-profile-dialog"
+      role="dialog"
+      style={{ left: cardProfile.x, top: cardProfile.y }}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <button
+        className="contact-card-profile-close"
+        type="button"
+        aria-label={t("messages.conversationViews.closeContactCardProfile")}
+        onClick={onClose}
       >
-        <button
-          className="contact-card-profile-close"
-          type="button"
-          aria-label="关闭名片资料"
-          onClick={onClose}
-        >
-          <X size={15} />
-        </button>
-        <header className="pc-avatar-profile-head">
-          <PcAvatar
-            avatarUrl={cardProfile.avatarUrl}
-            className="pc-avatar-profile-image"
-            name={title}
-          />
-          <div>
-            <strong>{title}</strong>
-            <span>{cardProfile.subtitle}</span>
-          </div>
-        </header>
-        <div className="pc-avatar-profile-rows contact-card-profile-rows">
-          {cardProfile.rows.map((row) => (
-            <div key={row.label}>
-              <span>{row.label}</span>
-              <strong>{row.value || "--"}</strong>
-            </div>
-          ))}
+        <X size={15} />
+      </button>
+      <header className="pc-avatar-profile-head">
+        <PcAvatar
+          avatarUrl={cardProfile.avatarUrl}
+          className="pc-avatar-profile-image"
+          name={title}
+        />
+        <div>
+          <strong>{title}</strong>
+          <span>{cardProfile.subtitle}</span>
         </div>
-        {profileLoading && <p className="contact-card-profile-hint">正在读取资料...</p>}
-        {!profileLoading && Boolean(profileError) && (
-          <p className="contact-card-profile-hint">对方资料受隐私保护，已显示名片基础信息。</p>
+      </header>
+      <div className="pc-avatar-profile-rows contact-card-profile-rows">
+        {cardProfile.rows.map((row) => (
+          <div key={row.label}>
+            <span>{row.label}</span>
+            <strong>{row.value || "--"}</strong>
+          </div>
+        ))}
+      </div>
+      {profileLoading && (
+        <p className="contact-card-profile-hint">{t("messages.conversationViews.loadingProfile")}</p>
+      )}
+      {!profileLoading && Boolean(profileError) && (
+        <p className="contact-card-profile-hint">
+          {t("messages.conversationViews.profilePrivacyHint")}
+        </p>
+      )}
+      {relation.status === "none" && (
+        <label className="contact-card-profile-request">
+          <span>{t("messages.conversationViews.verificationMessage")}</span>
+          <textarea
+            value={requestMessage}
+            maxLength={120}
+            onChange={(event) => setRequestMessage(event.target.value)}
+          />
+        </label>
+      )}
+      <footer>
+        {relation.status === "self" && (
+          <button type="button" disabled>
+            {t("messages.conversationViews.self")}
+          </button>
+        )}
+        {relation.status === "friend" && (
+          <>
+            <button className="primary" type="button" disabled={actionPending} onClick={onStartChat}>
+              {t("messages.conversationViews.sendMessage")}
+            </button>
+            <button type="button" disabled={actionPending} onClick={onDeleteFriend}>
+              {t("messages.conversationViews.deleteFriend")}
+            </button>
+            <button className="danger" type="button" disabled={actionPending} onClick={onBlock}>
+              {t("messages.conversationViews.block")}
+            </button>
+          </>
         )}
         {relation.status === "none" && (
-          <label className="contact-card-profile-request">
-            <span>验证信息</span>
-            <textarea
-              value={requestMessage}
-              maxLength={120}
-              onChange={(event) => setRequestMessage(event.target.value)}
-            />
-          </label>
+          <button
+            className="primary"
+            type="button"
+            disabled={actionPending}
+            onClick={() => onSendRequest(requestMessage)}
+          >
+            {t("messages.conversationViews.addToContacts")}
+          </button>
         )}
-        <footer>
-          {relation.status === "self" && (
-            <button type="button" disabled>这是你自己</button>
-          )}
-          {relation.status === "friend" && (
-            <>
-              <button className="primary" type="button" disabled={actionPending} onClick={onStartChat}>
-                发消息
-              </button>
-              <button type="button" disabled={actionPending} onClick={onDeleteFriend}>
-                删除好友
-              </button>
-              <button className="danger" type="button" disabled={actionPending} onClick={onBlock}>
-                加入黑名单
-              </button>
-            </>
-          )}
-          {relation.status === "none" && (
-            <button
-              className="primary"
-              type="button"
-              disabled={actionPending}
-              onClick={() => onSendRequest(requestMessage)}
-            >
-              添加到通讯录
+        {relation.status === "outgoingPending" && (
+          <button type="button" disabled>
+            {t("messages.conversationViews.requestSent")}
+          </button>
+        )}
+        {relation.status === "incomingPending" && (
+          <>
+            <button type="button" disabled={actionPending} onClick={onReject}>
+              {t("messages.conversationViews.reject")}
             </button>
-          )}
-          {relation.status === "outgoingPending" && (
-            <button type="button" disabled>好友申请已发送</button>
-          )}
-          {relation.status === "incomingPending" && (
-            <>
-              <button type="button" disabled={actionPending} onClick={onReject}>
-                拒绝
-              </button>
-              <button className="primary" type="button" disabled={actionPending} onClick={onAccept}>
-                通过
-              </button>
-            </>
-          )}
-        </footer>
+            <button className="primary" type="button" disabled={actionPending} onClick={onAccept}>
+              {t("messages.conversationViews.accept")}
+            </button>
+          </>
+        )}
+      </footer>
     </aside>
   );
 }

@@ -50,7 +50,7 @@ interface DateParts {
 }
 
 export const pcUserTimezoneLabels: Record<PcSelectableUserTimezone, string> = {
-  系统默认: "系统默认",
+  "系统默认": "系统默认",
   "UTC-12:00": "UTC-12:00",
   "UTC-11:00": "UTC-11:00",
   "UTC-10:00": "UTC-10:00",
@@ -78,6 +78,8 @@ export const pcUserTimezoneLabels: Record<PcSelectableUserTimezone, string> = {
 };
 
 export function normalizePcUserTimezone(value: unknown): PcSelectableUserTimezone {
+  if (value === "\u7cfb\u7edf\u9ed8\u8ba4") return systemTimezone;
+  if (value === "System default") return systemTimezone;
   if (value === "Asia/Shanghai") return "UTC+08:00";
   if (value === "UTC") return "UTC+00:00";
   return pcUserTimezoneOptions.includes(value as PcSelectableUserTimezone)

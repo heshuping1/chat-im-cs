@@ -24,6 +24,7 @@ import {
 } from "../data/api/ai-suggestion-normalizers";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
+import { useI18n } from "../i18n/useI18n";
 import { formatError, formatMonthDayTime } from "../lib/format";
 
 const suggestionLimit = 20;
@@ -93,6 +94,7 @@ export function AiReplySuggestionPanel({
   threadType?: CustomerServiceThreadType | null;
   variant?: "drawer" | "panel";
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
@@ -122,34 +124,34 @@ export function AiReplySuggestionPanel({
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      if (!client || !threadType || !threadId) throw new Error("当前会话暂不支持 AI 起草");
+      if (!client || !threadType || !threadId) throw new Error(t("aiDraft.unsupported"));
       return client.generateAiSuggestion(threadType, threadId, customerMessageId);
     },
     onSuccess: async (suggestion) => {
       if (suggestion.suggestionId) setSelectedSuggestionId(suggestion.suggestionId);
-      onNotice("AI 回复建议已生成，客户不会收到任何消息。");
+      onNotice(t("aiDraft.generatedNotice"));
       await queryClient.invalidateQueries({ queryKey: suggestionsKey });
     },
-    onError: (error) => onNotice(`AI 起草失败：${formatAiSuggestionError(error)}`),
+    onError: (error) => onNotice(t("aiDraft.generateFailed", { error: formatAiSuggestionError(error) })),
   });
 
   const adoptMutation = useMutation({
     mutationFn: async (suggestion: AiSuggestionDto) => {
-      if (!client) throw new Error("请先登录");
+      if (!client) throw new Error(t("auth.login"));
       if (!suggestion.suggestionId) return suggestion;
       return client.adoptAiSuggestion(suggestion.suggestionId);
     },
-    onError: (error) => onNotice(`采纳失败：${formatAiSuggestionError(error)}`),
+    onError: (error) => onNotice(t("aiDraft.adoptFailed", { error: formatAiSuggestionError(error) })),
   });
 
   const insertSuggestion = async () => {
     if (!selectedSuggestion) {
-      onNotice("请先生成一条 AI 回复建议。");
+      onNotice(t("aiDraft.generateFirst"));
       return;
     }
     const text = selectedText.trim();
     if (!text) {
-      onNotice("服务端未返回可插入的建议文本。");
+      onNotice(t("aiDraft.noInsertableText"));
       return;
     }
     const adopted = await adoptMutation.mutateAsync(selectedSuggestion);
@@ -160,35 +162,35 @@ export function AiReplySuggestionPanel({
     if (!selectedText.trim()) return;
     try {
       await navigator.clipboard.writeText(selectedText.trim());
-      onNotice("AI 回复建议已复制。");
+      onNotice(t("aiDraft.copiedNotice"));
     } catch (error) {
-      onNotice(`复制失败：${formatError(error)}`);
+      onNotice(t("common.copyFailed", { error: formatError(error) }));
     }
   };
 
   return (
     <aside
       className={variant === "panel" ? "cs-ai-drawer cs-ai-panel" : "cs-ai-drawer"}
-      aria-label="AI 回复建议"
+      aria-label={t("aiDraft.title")}
     >
       <header className="cs-ai-drawer-head">
         <span>
           <Bot size={18} />
         </span>
         <div>
-          <strong>AI 回复建议</strong>
-          <p>{threadTitle || "当前会话"}{subtitle ? ` · ${subtitle}` : ""}</p>
+          <strong>{t("aiDraft.title")}</strong>
+          <p>{threadTitle || t("aiDraft.currentThread")}{subtitle ? ` · ${subtitle}` : ""}</p>
         </div>
-        <button type="button" aria-label="关闭 AI 回复建议" title="关闭" onClick={onClose}>
+        <button type="button" aria-label={t("aiDraft.close")} title={t("common.close")} onClick={onClose}>
           <X size={17} />
         </button>
       </header>
 
       <section className="cs-ai-context">
-        <strong>基于当前会话上下文生成草稿</strong>
+        <strong>{t("aiDraft.contextTitle")}</strong>
         <p>
-          AI 只负责起草，内容会先写入输入框，必须由客服人工确认后发送。
-          {customerMessageId ? " 本次会优先参考右键选中的客户消息。" : ""}
+          {t("aiDraft.contextText")}
+          {customerMessageId ? ` ${t("aiDraft.selectedMessageHint")}` : ""}
         </p>
       </section>
 
@@ -199,7 +201,7 @@ export function AiReplySuggestionPanel({
           onClick={() => generateMutation.mutate()}
         >
           {generateMutation.isPending ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-          {selectedSuggestion ? "重新生成" : "生成建议"}
+          {selectedSuggestion ? t("aiDraft.regenerate") : t("aiDraft.generate")}
         </button>
         <button
           className="secondary"
@@ -208,23 +210,23 @@ export function AiReplySuggestionPanel({
           onClick={() => void insertSuggestion()}
         >
           <CornerDownLeft size={15} />
-          插入回复
+          {t("aiDraft.insertReply")}
         </button>
       </div>
 
       {disabledReason ? (
         <AiDrawerState error text={disabledReason} />
       ) : suggestionsQuery.isLoading ? (
-        <AiDrawerState text="正在读取历史建议..." />
+        <AiDrawerState text={t("aiDraft.loadingHistory")} />
       ) : suggestionsQuery.error ? (
         <AiDrawerState
           error
-          text={`历史建议读取失败：${formatAiSuggestionError(suggestionsQuery.error)}`}
+          text={t("aiDraft.historyFailed", { error: formatAiSuggestionError(suggestionsQuery.error) })}
         />
       ) : suggestions.length === 0 ? (
-        <AiDrawerState text="暂无建议，点击生成建议开始起草。" />
+        <AiDrawerState text={t("aiDraft.empty")} />
       ) : (
-        <section className="cs-ai-suggestion-list" aria-label="AI 历史建议">
+        <section className="cs-ai-suggestion-list" aria-label={t("aiDraft.historyAria")}>
           {suggestions.map((suggestion, index) => {
             const active =
               (selectedSuggestion?.suggestionId || "") === (suggestion.suggestionId || "") ||
@@ -237,7 +239,7 @@ export function AiReplySuggestionPanel({
                 onClick={() => setSelectedSuggestionId(suggestion.suggestionId)}
               >
                 <strong>{aiSuggestionSourceLabel(suggestion.source)}</strong>
-                <p>{suggestionText(suggestion) || "暂无建议文本"}</p>
+                <p>{suggestionText(suggestion) || t("aiDraft.noSuggestionText")}</p>
                 <em>
                   {aiSuggestionStatusLabel(suggestion.status)}
                   {suggestion.createdAt ? ` · ${formatMonthDayTime(suggestion.createdAt)}` : ""}
@@ -252,10 +254,10 @@ export function AiReplySuggestionPanel({
         {selectedSuggestion ? (
           <>
             <div className="cs-ai-preview-title">
-              <strong>建议预览</strong>
+              <strong>{t("aiDraft.previewTitle")}</strong>
               <span>{aiSuggestionSourceLabel(selectedSuggestion.source)}</span>
             </div>
-            <p>{selectedText || "服务端未返回建议文本"}</p>
+            <p>{selectedText || t("aiDraft.noSuggestionText")}</p>
             <SourceList sources={selectedSuggestion.sources ?? []} />
             <div className="cs-ai-actions">
               <button
@@ -264,7 +266,7 @@ export function AiReplySuggestionPanel({
                 onClick={() => void insertSuggestion()}
               >
                 <CornerDownLeft size={15} />
-                插入回复
+                {t("aiDraft.insertReply")}
               </button>
               <button
                 className="secondary"
@@ -273,7 +275,7 @@ export function AiReplySuggestionPanel({
                 onClick={() => void copySuggestion()}
               >
                 <Copy size={15} />
-                复制
+                {t("common.copy")}
               </button>
               <button
                 className="ghost"
@@ -282,12 +284,12 @@ export function AiReplySuggestionPanel({
                 onClick={() => generateMutation.mutate()}
               >
                 <RefreshCw size={15} />
-                重新生成
+                {t("aiDraft.regenerate")}
               </button>
             </div>
           </>
         ) : (
-          <AiDrawerState text="生成或选择建议后在这里预览。" />
+          <AiDrawerState text={t("aiDraft.previewEmpty")} />
         )}
       </section>
     </aside>
@@ -295,16 +297,17 @@ export function AiReplySuggestionPanel({
 }
 
 function SourceList({ sources }: { sources: AiSuggestionSourceDto[] }) {
+  const { t } = useI18n();
   if (sources.length === 0) return null;
   return (
-    <div className="cs-ai-sources" aria-label="建议依据">
+    <div className="cs-ai-sources" aria-label={t("aiDraft.sourcesAria")}>
       {sources.slice(0, 3).map((source, index) => (
         <div key={`${source.documentTitle ?? source.knowledgeBaseName ?? index}`}>
           <FileSearch size={13} />
           <span>
-            <strong>{source.documentTitle || source.knowledgeBaseName || "知识依据"}</strong>
+            <strong>{source.documentTitle || source.knowledgeBaseName || t("aiDraft.sourceFallback")}</strong>
             <em>
-              {source.knowledgeBaseName || "知识库"}
+              {source.knowledgeBaseName || t("knowledge.title")}
               {headingPathText(source.headingPath) && ` · ${headingPathText(source.headingPath)}`}
             </em>
           </span>

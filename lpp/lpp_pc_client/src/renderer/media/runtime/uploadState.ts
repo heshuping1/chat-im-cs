@@ -138,7 +138,7 @@ export function fileMessageCardState(uploadState?: LocalUploadState): FileMessag
   if (status === "failed") {
     return {
       controlAction: uploadState.taskId ? "retry" : undefined,
-      controlLabel: "重新发送",
+      controlLabel: "重试",
       controlState: "retry",
       metaText: "发送失败，点击重试",
     };

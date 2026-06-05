@@ -78,7 +78,7 @@ export class CustomerServiceApiClient extends MessagesApiClient {
 
   private async issueAdminToken() {
     const tenantId = this.options.tenantId?.trim();
-    if (!tenantId) throw new Error("缺少租户 ID，无法签发管理端 Token");
+    if (!tenantId) throw new Error("Missing tenant ID. Cannot issue admin token.");
     const cacheKey = adminTokenCacheKey({
       baseUrl: this.options.baseUrl,
       platformToken: this.options.platformToken,
@@ -94,7 +94,7 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       },
     );
     const accessToken = readString(response.accessToken);
-    if (!accessToken) throw new Error("管理端 Token 签发响应缺少 accessToken");
+    if (!accessToken) throw new Error("Admin token issue response is missing accessToken.");
     adminTokenCache.set(cacheKey, accessToken);
     return accessToken;
   }
@@ -531,7 +531,7 @@ function normalizeAdminTempSessionDetail(
     status: "closed_timeout",
     threadId: fallbackSessionId,
     threadType: "temp_session" as const,
-    title: "访客",
+    title: "Visitor",
   };
   const rawMessages = readMessages(detail.messages) ?? [];
   const messages = normalizeCustomerServiceMessagesFromContract(rawMessages, {
@@ -572,7 +572,7 @@ function adminTempSessionItemToCustomerServiceThread(
       readString(item.visitorName) ||
       readString(item.title) ||
       readString(item.displayName) ||
-      "访客",
+      "Visitor",
     unreadCount: readNumber(item.unreadCount),
     updatedAt: readString(item.updatedAt) || readString(item.createdAt) || null,
   };
@@ -918,9 +918,9 @@ function previewFromMessage(message?: MessageItemDto) {
   const text = body.text;
   if (typeof text === "string" && text.trim()) return text.trim();
   const type = String(message.messageType ?? body.messageType ?? "").toLowerCase();
-  if (type === "image" || body.image) return "[图片]";
-  if (type === "file" || body.file) return "[文件]";
-  if (type === "voice" || body.voice) return "[语音]";
-  if (type === "video" || body.video) return "[视频]";
-  return "[消息]";
+  if (type === "image" || body.image) return "[Image]";
+  if (type === "file" || body.file) return "[File]";
+  if (type === "voice" || body.voice) return "[Voice]";
+  if (type === "video" || body.video) return "[Video]";
+  return "[Message]";
 }

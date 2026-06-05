@@ -1,5 +1,6 @@
 import type { WechatEmojiItem } from "../lib/wechatEmoji";
 import { wechatEmojiItems } from "../lib/wechatEmoji";
+import { useI18n } from "../i18n/useI18n";
 
 export function MessageComposerEmojiPanel({
   onPick,
@@ -8,17 +9,18 @@ export function MessageComposerEmojiPanel({
   onPick: (emoji: WechatEmojiItem) => void;
   recentEmojis: WechatEmojiItem[];
 }) {
+  const { t } = useI18n();
   return (
-    <div className="composer-emoji-panel" role="dialog" aria-label="表情选择">
+    <div className="composer-emoji-panel" role="dialog" aria-label={t("composer.emoji.panelAria")}>
       <section>
-        <h4>最近使用</h4>
+        <h4>{t("composer.emoji.recent")}</h4>
         {recentEmojis.length > 0 && (
           <div className="composer-emoji-grid">
             {recentEmojis.slice(0, 8).map((emoji) => (
               <button
                 type="button"
                 key={emoji.id}
-                aria-label={`表情 ${emoji.label}`}
+                aria-label={t("composer.emoji.itemAria", { label: emoji.label })}
                 title={emoji.label}
                 onClick={() => onPick(emoji)}
               >
@@ -29,13 +31,13 @@ export function MessageComposerEmojiPanel({
         )}
       </section>
       <section>
-        <h4>所有表情</h4>
+        <h4>{t("composer.emoji.all")}</h4>
         <div className="composer-emoji-grid">
           {wechatEmojiItems.map((emoji) => (
             <button
               type="button"
               key={emoji.id}
-              aria-label={`表情 ${emoji.label}`}
+              aria-label={t("composer.emoji.itemAria", { label: emoji.label })}
               title={emoji.label}
               onClick={() => onPick(emoji)}
             >

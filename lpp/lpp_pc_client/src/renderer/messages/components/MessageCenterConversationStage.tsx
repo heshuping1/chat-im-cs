@@ -77,6 +77,8 @@ export function MessageCenterConversationStage({
   canOpenAiAssistant,
   canOpenKnowledgeBase,
   composerDialog,
+  composerDisabled,
+  composerDisabledReason,
   composerHeight,
   contactPickerItems,
   conversationMenu,
@@ -213,6 +215,8 @@ export function MessageCenterConversationStage({
   canOpenAiAssistant: boolean;
   canOpenKnowledgeBase: boolean;
   composerDialog: "direct" | "group" | "qr" | "card" | null;
+  composerDisabled?: boolean;
+  composerDisabledReason?: string;
   composerHeight: number;
   contactPickerItems: ContactPickerItem[];
   conversationMenu: MessageOverlayProps["conversationMenu"];
@@ -399,6 +403,7 @@ export function MessageCenterConversationStage({
             {profileStandaloneOpen ? (
               <StandaloneConversationInfoView
                 contact={activeConversationContact}
+                contactPickerItems={contactPickerItems}
                 conversation={activeConversation}
                 groupAvatarSnapshot={groupAvatarSnapshotFor(activeConversation)}
                 groupManagement={groupManagement}
@@ -529,7 +534,9 @@ export function MessageCenterConversationStage({
                 activeConversation={activeConversation}
                 activeConversationDraft={activeConversationDraft}
                 activeConversationType={activeConversationType}
+                composerDisabled={composerDisabled}
                 composerHeight={composerHeight}
+                composerPlaceholder={composerDisabledReason}
                 draftEditorState={
                   draftEditorStatesByConversation[activeConversation.conversationId]
                 }
@@ -624,6 +631,7 @@ export function MessageCenterConversationStage({
         <MessageProfileDock
           avatarUrl={userAvatarRegistry.resolveConversationAvatar(activeConversation)}
           contact={activeConversationContact}
+          contactPickerItems={contactPickerItems}
           conversation={activeConversation}
           groupAvatar={resolveGroupConversationAvatar(
             activeConversation,

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { GripVertical, LibraryBig, MessageSquareText, Pin, PinOff, UserRound } from "lucide-react";
+
 import {
   isTerminalCustomerServiceThreadStatus,
   normalizeCustomerServiceThreadType,
@@ -13,17 +14,16 @@ import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import { useActiveThreadId } from "../data/workspace-ui/workspace-ui-store";
+import { useI18n } from "../i18n/useI18n";
 import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
 
 const customerInfoEntryIcon = "/customer-info-entry.svg";
+type Translate = ReturnType<typeof useI18n>["t"];
 
 export function useCustomerContextPanelModel() {
   const session = useAuthSession();
   const selectedThreadId = useActiveThreadId();
-  const client = useMemo(
-    () => (session ? createApiClient(session) : null),
-    [session],
-  );
+  const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken];
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
 
@@ -112,18 +112,15 @@ export function CustomerContextPanel({
   onTogglePin?: () => void;
   pinned?: boolean;
 }) {
-  const {
-    profileError,
-    profileForPanel,
-    profileLoading,
-    selectedThread,
-  } = useCustomerContextPanelModel();
+  const { t } = useI18n();
+  const { profileError, profileForPanel, profileLoading, selectedThread } =
+    useCustomerContextPanelModel();
 
   if (!selectedThread) {
     return (
       <aside className="h-context-panel customer-info-panel">
         <header className="customer-info-head">
-          <h2>客户信息</h2>
+          <h2>{t("customerService.contextPanel.title")}</h2>
           {onTogglePin && (
             <div className="customer-info-head-actions">
               {renderCustomerContextActions({
@@ -131,13 +128,14 @@ export function CustomerContextPanel({
                 onDragStartContextPane,
                 onTogglePin,
                 pinned,
+                t,
               })}
             </div>
           )}
         </header>
         <div className="customer-context-empty-state panel-state muted">
-          <strong>未选择客户</strong>
-          <span>从会话池选择排队、进行中或历史会话后查看客户资料。</span>
+          <strong>{t("customerService.contextPanel.emptyTitle")}</strong>
+          <span>{t("customerService.contextPanel.emptyText")}</span>
         </div>
       </aside>
     );
@@ -155,6 +153,7 @@ export function CustomerContextPanel({
               onDragStartContextPane,
               onTogglePin,
               pinned,
+              t,
             })
           : undefined
       }
@@ -162,7 +161,7 @@ export function CustomerContextPanel({
       onDragOver={onDragOverContextPane}
       onDrop={(event) => onDropContextPane?.(event, "customer")}
       profile={profileForPanel}
-      title="客户信息"
+      title={t("customerService.contextPanel.title")}
     />
   );
 }
@@ -178,15 +177,16 @@ export function CustomerContextRail({
   onToggleCustomerPane: () => void;
   onToggleAssistantPane: (pane: "aiDraft" | "knowledge" | "quickReply") => void;
 }) {
+  const { t } = useI18n();
   const { selectedThread } = useCustomerContextPanelModel();
   const customerTooltip = selectedThread
     ? customerPaneCollapsed
-      ? "展开客户信息"
-      : "收起客户信息"
-    : "选择会话后查看客户信息";
+      ? t("customerService.contextPanel.expandCustomer")
+      : t("customerService.contextPanel.collapseCustomer")
+    : t("customerService.contextPanel.selectFirst");
 
   return (
-    <aside className="service-customer-rail" aria-label="客户上下文快捷栏">
+    <aside className="service-customer-rail" aria-label={t("customerService.contextPanel.railAria")}>
       <button
         className={`service-customer-rail-avatar ${!customerPaneCollapsed ? "active" : ""}`}
         type="button"
@@ -208,25 +208,20 @@ export function CustomerContextRail({
         )}
         {selectedThread && <span className="service-customer-status-dot" />}
       </button>
-      <div className="service-customer-rail-actions" aria-label="客服工具">
-        <button
-          className={activeAssistantPane === "quickReply" ? "active" : ""}
-          type="button"
-          title="快捷话术"
-          data-tooltip="快捷话术"
-          aria-label="快捷话术"
-          aria-pressed={activeAssistantPane === "quickReply"}
+      <div
+        className="service-customer-rail-actions"
+        aria-label={t("customerService.contextPanel.toolsAria")}
+      >
+        <CustomerContextRailButton
+          active={activeAssistantPane === "quickReply"}
+          label={t("customerService.contextPanel.quickReply")}
           onClick={() => onToggleAssistantPane("quickReply")}
         >
           <MessageSquareText size={18} />
-        </button>
-        <button
-          className={activeAssistantPane === "aiDraft" ? "active" : ""}
-          type="button"
-          title="AI 起草"
-          data-tooltip="AI 起草"
-          aria-label="AI 起草"
-          aria-pressed={activeAssistantPane === "aiDraft"}
+        </CustomerContextRailButton>
+        <CustomerContextRailButton
+          active={activeAssistantPane === "aiDraft"}
+          label={t("customerService.contextPanel.aiDraft")}
           onClick={() => onToggleAssistantPane("aiDraft")}
         >
           <img
@@ -235,20 +230,42 @@ export function CustomerContextRail({
             alt=""
             aria-hidden="true"
           />
-        </button>
-        <button
-          className={activeAssistantPane === "knowledge" ? "active" : ""}
-          type="button"
-          title="知识库"
-          data-tooltip="知识库"
-          aria-label="知识库"
-          aria-pressed={activeAssistantPane === "knowledge"}
+        </CustomerContextRailButton>
+        <CustomerContextRailButton
+          active={activeAssistantPane === "knowledge"}
+          label={t("customerService.contextPanel.knowledge")}
           onClick={() => onToggleAssistantPane("knowledge")}
         >
           <LibraryBig size={18} />
-        </button>
+        </CustomerContextRailButton>
       </div>
     </aside>
+  );
+}
+
+function CustomerContextRailButton({
+  active,
+  children,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={active ? "active" : ""}
+      type="button"
+      title={label}
+      data-tooltip={label}
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -257,6 +274,7 @@ function renderCustomerContextActions({
   onDragStartContextPane,
   onTogglePin,
   pinned,
+  t,
 }: {
   onDragOverContextPane?: (event: DragEvent<HTMLElement>) => void;
   onDragStartContextPane?: (
@@ -265,15 +283,20 @@ function renderCustomerContextActions({
   ) => void;
   onTogglePin: () => void;
   pinned: boolean;
+  t: Translate;
 }) {
+  const pinLabel = pinned
+    ? t("customerService.contextPanel.unpin")
+    : t("customerService.contextPanel.pin");
+
   return (
     <>
       <button
         className="context-pane-drag"
         type="button"
         draggable
-        title="拖拽排序"
-        aria-label="拖拽排序"
+        title={t("customerService.contextPanel.dragSort")}
+        aria-label={t("customerService.contextPanel.dragSort")}
         onDragOver={onDragOverContextPane}
         onDragStart={(event) => onDragStartContextPane?.(event, "customer")}
       >
@@ -282,8 +305,8 @@ function renderCustomerContextActions({
       <button
         className={`context-pane-pin ${pinned ? "active" : ""}`}
         type="button"
-        title={pinned ? "取消固定" : "固定客户信息"}
-        aria-label={pinned ? "取消固定" : "固定客户信息"}
+        title={pinLabel}
+        aria-label={pinLabel}
         aria-pressed={pinned}
         onClick={onTogglePin}
       >

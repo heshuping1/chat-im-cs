@@ -144,7 +144,7 @@ export function useImReadCommandExecutor({
             return queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
           })
           .catch((error) => {
-            setNotice(`已在本机标记已读；服务端同步失败：${formatError(error)}`);
+            setNotice(`Marked as read locally; server sync failed: ${formatError(error)}`);
           });
       });
     },

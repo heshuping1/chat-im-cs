@@ -72,7 +72,7 @@ export function logApiTrafficDiagnostic(input: ApiTrafficDiagnosticInput) {
       errorSummary: diagnosticObjectValue(record.error, "summary") ?? null,
     },
   });
-  void target.desktopApi?.recordApiTrafficDiagnostic(record).catch((error) => {
+  void target.desktopApi?.recordApiTrafficDiagnostic?.(record).catch((error) => {
     console.warn("[lpp:api-traffic] persist failed", error);
   });
   if (level === "body") {
@@ -107,7 +107,7 @@ export function createApiTrafficDiagnosticRecord(
   });
   return {
     at: new Date(timestamp).toISOString(),
-    level: input.result === "failed" ? "error" : "info",
+    level: apiTrafficRecordLevel(input.result, level),
     event: input.result === "failed" ? "api.request.failed" : "api.request.completed",
     source: "api-base-client",
     traceId: createApiTrafficTraceId(input.phase),
@@ -126,6 +126,15 @@ export function createApiTrafficDiagnosticRecord(
     response,
     error,
   };
+}
+
+function apiTrafficRecordLevel(
+  result: ApiTrafficResult,
+  level: ApiTrafficLogLevel,
+): ApiTrafficDiagnosticRecord["level"] {
+  if (result === "failed") return "error";
+  if (level === "body") return "debug";
+  return "info";
 }
 
 export function summarizeRequestBody(body: BodyInit | null | undefined) {

@@ -128,7 +128,7 @@ export function useCustomerServiceWorkspaceController({
 
   const threadActionMutation = useMutation({
     mutationFn: async (action: CustomerServiceThreadAction) => {
-      if (!client || !selectedThread) throw new Error("请选择在线客服会话");
+      if (!client || !selectedThread) throw new Error("Select a customer service conversation.");
       return executeCustomerServiceThreadAction({ action, client, thread: selectedThread });
     },
     onSuccess: async (result, action) => {
@@ -158,7 +158,7 @@ export function useCustomerServiceWorkspaceController({
 }
 
 function actionSuccessText(action: CustomerServiceThreadAction) {
-  if (action === "claim") return "已接入会话。";
-  if (action === "takeover") return "已人工接管会话。";
-  return "会话已关闭。";
+  if (action === "claim") return "Conversation claimed.";
+  if (action === "takeover") return "Conversation taken over.";
+  return "Conversation closed.";
 }

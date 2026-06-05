@@ -3,6 +3,7 @@ import { ChannelBadge } from "../../components/ChannelBadge";
 import { PcAvatar } from "../../components/PcAvatar";
 import type { CustomerServiceIdentityViewModel } from "../../data/customer-service/cs-identity-view-model";
 import type { CustomerServiceReplyGate } from "../../data/customer-service/cs-thread-state";
+import { useI18n } from "../../i18n/useI18n";
 import type { AutoTranslateConversationMode } from "../../translation/models/autoTranslatePreferences";
 
 export function CustomerServiceWorkspaceHeader({
@@ -32,14 +33,15 @@ export function CustomerServiceWorkspaceHeader({
   onCycleAutoTranslateMode: () => void;
   onOpenCustomerContext?: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <header className="h-chat-head">
       <div className="h-customer-title">
         <button
           className="h-customer-avatar-button"
           type="button"
-          aria-label="打开客户信息"
-          title="打开客户信息"
+          aria-label={t("customerService.header.openCustomerInfo")}
+          title={t("customerService.header.openCustomerInfo")}
           onClick={onOpenCustomerContext}
         >
           <PcAvatar
@@ -50,35 +52,39 @@ export function CustomerServiceWorkspaceHeader({
         </button>
         <div>
           <h2>{title}</h2>
-          <div className="chat-header-meta-chips" aria-label="客服会话状态">
-            <span>在线客服</span>
+          <div className="chat-header-meta-chips" aria-label={t("customerService.header.statusAria")}>
+            <span>{t("nav.onlineService")}</span>
             <ChannelBadge source={source} compact />
-            <span>{identity.isVip ? "VIP 客户" : "普通客户"}</span>
+            <span>{identity.isVip ? t("customerService.header.vipCustomer") : t("customerService.header.normalCustomer")}</span>
             <span>{modeLabel}</span>
             <button
               className={`chat-meta-action ${autoTranslateEffective ? "active" : ""}`}
               type="button"
-              aria-label={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
-              title={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
+              aria-label={t("customerService.header.autoTranslateNamed", {
+                state: autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective, t),
+              })}
+              title={t("customerService.header.autoTranslateNamed", {
+                state: autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective, t),
+              })}
               aria-pressed={autoTranslateEffective}
               onClick={onCycleAutoTranslateMode}
             >
               <Languages size={12} />
-              翻译
+              {t("composer.translate")}
             </button>
             <span className={`reply-gate-${replyGate}`}>
-              {replyGateLabel(replyGate, readOnly)}
+              {replyGateLabel(replyGate, readOnly, t)}
             </span>
             {unreadCount > 0 && (
               <span className="attention">
                 <Mail size={12} />
-                未读 {unreadCount}
+                {t("customerService.header.unread", { count: unreadCount })}
               </span>
             )}
             {risky && (
               <span className="danger">
                 <ShieldAlert size={12} />
-                SLA 风险
+                {t("customerService.header.slaRisk")}
               </span>
             )}
           </div>
@@ -91,15 +97,22 @@ export function CustomerServiceWorkspaceHeader({
 function autoTranslateModeLabel(
   mode: AutoTranslateConversationMode,
   effective: boolean,
+  t: (key: string) => string,
 ) {
-  if (mode === "enabled") return "本会话开启";
-  if (mode === "disabled") return "本会话关闭";
-  return effective ? "跟随全局，已开启" : "跟随全局，已关闭";
+  if (mode === "enabled") return t("customerService.header.autoTranslateEnabled");
+  if (mode === "disabled") return t("customerService.header.autoTranslateDisabled");
+  return effective
+    ? t("customerService.header.autoTranslateGlobalEnabled")
+    : t("customerService.header.autoTranslateGlobalDisabled");
 }
 
-function replyGateLabel(replyGate: CustomerServiceReplyGate, readOnly?: boolean) {
-  if (readOnly || replyGate === "readonly") return "只读";
-  if (replyGate === "claim") return "待接入";
-  if (replyGate === "takeover") return "待接管";
-  return "可回复";
+function replyGateLabel(
+  replyGate: CustomerServiceReplyGate,
+  readOnly: boolean | undefined,
+  t: (key: string) => string,
+) {
+  if (readOnly || replyGate === "readonly") return t("customerService.header.readonly");
+  if (replyGate === "claim") return t("customerService.header.pendingClaim");
+  if (replyGate === "takeover") return t("customerService.header.pendingTakeover");
+  return t("customerService.header.replyable");
 }

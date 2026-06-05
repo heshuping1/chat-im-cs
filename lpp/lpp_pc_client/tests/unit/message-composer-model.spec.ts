@@ -27,16 +27,19 @@ describe("messageComposerModel", () => {
 
   it("builds mention options and extracts mentioned members", () => {
     const members = [
-      { userId: "u1", displayName: "Alice" },
+      { userId: "u1", displayName: "Alice", groupNickname: "A-one" },
       { platformUserId: "p2", displayName: "Bob" },
     ] as GroupMemberDto[];
 
     expect(buildMentionOptions(members)).toEqual([
-      { id: "u1", label: "Alice" },
+      { id: "u1", label: "A-one" },
       { id: "p2", label: "Bob" },
     ]);
-    expect(extractMentions("@Alice hi", members)).toEqual([
-      { userId: "u1", displayName: "Alice" },
+    expect(extractMentions("@A-one hi", members)).toEqual([
+      { userId: "u1", displayName: "A-one" },
+    ]);
+    expect(extractMentions("@alice hi", members)).toEqual([
+      { userId: "u1", displayName: "A-one" },
     ]);
   });
 

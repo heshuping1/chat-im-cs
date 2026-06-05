@@ -16,13 +16,13 @@ describe("customer context panel empty state", () => {
   });
 
   it("shows a customer empty state without rendering customer cards", () => {
-    expect(source).toContain("未选择客户");
-    expect(source).toContain("从会话池选择排队、进行中或历史会话后查看客户资料。");
+    expect(source).toContain('t("customerService.contextPanel.emptyTitle")');
+    expect(source).toContain('t("customerService.contextPanel.emptyText")');
     expect(source).toContain('className="customer-context-empty-state panel-state muted"');
   });
 
   it("uses a quiet rail affordance before a customer is selected", () => {
-    expect(source).toContain("选择会话后查看客户信息");
+    expect(source).toContain('t("customerService.contextPanel.selectFirst")');
     expect(source).toContain("{selectedThread ? (");
     expect(source).toContain("<UserRound size={18}");
     expect(source).not.toContain('src="/customer-info-entry.svg"');

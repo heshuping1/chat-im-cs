@@ -22,7 +22,7 @@ export function aiReplyTargetForServiceThread(
 ): AiReplyThreadTarget {
   if (!thread?.threadId) {
     return {
-      disabledReason: "请选择一个可接待的客服会话后再使用 AI 起草。",
+      disabledReason: "请选择可接待的客服会话后再使用 AI 草稿。",
       sourceModule: "onlineService",
       threadTitle: fallbackTitle,
     };
@@ -47,7 +47,7 @@ export function aiReplyTargetForDirectConversation({
 }): AiReplyThreadTarget {
   if (!conversation?.conversationId) {
     return {
-      disabledReason: "请选择一个私聊会话后再使用 AI 起草。",
+      disabledReason: "请选择私聊会话后再使用 AI 草稿。",
       sourceModule: "messages",
       threadTitle: title || "当前会话",
     };

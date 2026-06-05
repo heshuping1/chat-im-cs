@@ -7,6 +7,7 @@ import {
   type ChatMessageViewModel,
 } from "../data/message/message-view-model";
 import { nextChatMessageStatusRefreshDelay } from "../data/message/message-status-model";
+import { useI18n } from "../i18n/useI18n";
 import { useEffect, useState, type MouseEvent } from "react";
 
 export function ChatMessageBubble({
@@ -51,6 +52,7 @@ export function ChatMessageBubble({
   translationText?: string;
   viewModel?: ChatMessageViewModel;
 }) {
+  const { t } = useI18n();
   const [statusNowMs, setStatusNowMs] = useState(() => Date.now());
   const localSendStartedAt = localSendStartedAtMs(message);
   const localFailedAt = localFailedAtMs(message);
@@ -109,15 +111,15 @@ export function ChatMessageBubble({
           ? () => onFailedMessageClick(message)
           : undefined
       }
-      tooltip={model.status.failureTooltip || "发送失败，点击重试"}
+      tooltip={model.status.failureTooltip || t("chat.sendFailedRetry")}
     />
   ) : null;
   const avatar = (
     <button
       className="pc-chat-avatar-button"
       type="button"
-      aria-label={mine ? "查看我的资料" : "查看对方资料"}
-      title={mine ? "查看我的资料" : `查看${senderName}资料`}
+      aria-label={mine ? t("chat.viewMyProfile") : t("chat.viewTheirProfile")}
+      title={mine ? t("chat.viewMyProfile") : t("chat.viewSenderProfile", { name: senderName })}
       onClick={(event) => onAvatarClick?.(event, message, mine)}
     >
       <PcAvatar
@@ -195,8 +197,14 @@ function MessageSendStatusSlot({
 }
 
 function SendingStatusMarker() {
+  const { t } = useI18n();
   return (
-    <span aria-label="正在发送" className="pc-chat-sending-marker" role="status" title="正在发送">
+    <span
+      aria-label={t("chat.sending")}
+      className="pc-chat-sending-marker"
+      role="status"
+      title={t("chat.sending")}
+    >
       <span aria-hidden="true" />
     </span>
   );

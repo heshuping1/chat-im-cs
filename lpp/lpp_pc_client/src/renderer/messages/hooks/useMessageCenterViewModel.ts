@@ -14,6 +14,7 @@ import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conver
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { chatConversationEntityFromImConversation } from "../../data/conversation/conversation-domain";
 import { formatChatTime, formatError } from "../../lib/format";
+import { useI18n } from "../../i18n/useI18n";
 import {
   getImConversationType,
   type MessageCenterConversationType,
@@ -68,8 +69,24 @@ export interface CreateMessageCenterViewModelInput {
 }
 
 export function useMessageCenterViewModel(input: CreateMessageCenterViewModelInput) {
+  const { t } = useI18n();
+  const copy = useMemo<MessageCenterViewModelCopy>(
+    () => ({
+      contactCustomer: t("contacts.page.kind.customer"),
+      contactFriend: t("contacts.page.kind.friend"),
+      conversationListEmpty: t("messages.center.conversationListEmpty"),
+      conversationListNoMatch: t("messages.center.conversationListNoMatch"),
+      directConversationFallback: t("messages.center.directConversationFallback"),
+      friendRelationship: t("contacts.detail.friendRelationship"),
+      messageListEmpty: t("messages.center.messageListEmpty"),
+      messageListFailed: t("messages.center.messageListFailed"),
+      messageListNoMatch: t("messages.center.messageListNoMatch"),
+      selectedConversationEmpty: t("messages.center.selectedConversationEmpty"),
+    }),
+    [t],
+  );
   return useMemo(
-    () => createMessageCenterViewModel(input),
+    () => createMessageCenterViewModel(input, copy),
     [
       input.activeConversationId,
       input.activeConversationMessagesLoaded,
@@ -88,12 +105,14 @@ export function useMessageCenterViewModel(input: CreateMessageCenterViewModelInp
       input.unreadIdentity,
       input.visibleConversations,
       input.visibleMessagesLength,
+      copy,
     ],
   );
 }
 
 export function createMessageCenterViewModel(
   input: CreateMessageCenterViewModelInput,
+  copy: MessageCenterViewModelCopy = defaultMessageCenterViewModelCopy,
 ): MessageCenterViewModel {
   const activeConversation = input.activeConversationId
     ? input.visibleConversations.find(
@@ -112,6 +131,7 @@ export function createMessageCenterViewModel(
     activeConversationContact: buildDirectConversationContact(
       activeConversation,
       input.friends,
+      copy,
     ),
     activeConversationDraft: activeConversation
       ? input.draftsByConversation[activeConversation.conversationId] ?? ""
@@ -128,7 +148,9 @@ export function createMessageCenterViewModel(
       : undefined,
     activeConversationType,
     conversationList: {
-      emptyText: input.keyword?.trim() ? "没有匹配的会话" : "暂无会话",
+      emptyText: input.keyword?.trim()
+        ? copy.conversationListNoMatch
+        : copy.conversationListEmpty,
       loading: Boolean(input.conversationListLoading),
     },
     counts: getConversationCounts(
@@ -138,17 +160,43 @@ export function createMessageCenterViewModel(
       input.activeConversationMessagesLoaded,
       input.activeConversationVisibility,
     ),
-    errorText: messageCenterErrorText(input),
+    errorText: messageCenterErrorText(input, copy),
     messageList: {
       emptyText: input.messageSearchKeyword?.trim()
-        ? "没有匹配的消息"
-        : "暂无消息，发送第一条消息开始聊天。",
+        ? copy.messageListNoMatch
+        : copy.messageListEmpty,
       loading: Boolean(input.messagesLoading),
     },
     selectedConversation: Boolean(activeConversation),
-    selectedConversationEmptyText: "请选择一个会话",
+    selectedConversationEmptyText: copy.selectedConversationEmpty,
   };
 }
+
+interface MessageCenterViewModelCopy {
+  contactCustomer: string;
+  contactFriend: string;
+  conversationListEmpty: string;
+  conversationListNoMatch: string;
+  directConversationFallback: string;
+  friendRelationship: string;
+  messageListEmpty: string;
+  messageListFailed: string;
+  messageListNoMatch: string;
+  selectedConversationEmpty: string;
+}
+
+const defaultMessageCenterViewModelCopy: MessageCenterViewModelCopy = {
+  contactCustomer: "客户",
+  contactFriend: "好友",
+  conversationListEmpty: "暂无会话",
+  conversationListNoMatch: "没有匹配的会话",
+  directConversationFallback: "私聊会话",
+  friendRelationship: "好友关系",
+  messageListEmpty: "暂无消息，发送第一条消息开始聊天。",
+  messageListFailed: "消息加载失败",
+  messageListNoMatch: "没有匹配的消息",
+  selectedConversationEmpty: "请选择一个会话",
+};
 
 function conversationHeaderTitle(
   activeConversation: ConversationListItem | undefined,
@@ -169,6 +217,7 @@ function conversationHeaderTitle(
 function buildDirectConversationContact(
   conversation: ConversationListItem | undefined,
   friends: FriendDto[],
+  copy: MessageCenterViewModelCopy,
 ): ContactItem | null {
   if (!conversation || getImConversationType(conversation) !== "direct") return null;
   const entity = chatConversationEntityFromImConversation(conversation);
@@ -177,10 +226,10 @@ function buildDirectConversationContact(
     return {
       id: `conversation-${conversation.conversationId}`,
       kind: conversation.peerUserType === 1 ? "customer" : "friend",
-      name: entity.title || "好友",
-      subtitle: conversation.peerUserType === 1 ? "客户" : "好友",
-      remark: entity.lastMessage?.preview || "普通 IM 会话",
-      tags: [conversation.peerUserType === 1 ? "客户" : "好友"],
+      name: entity.title || copy.contactFriend,
+      subtitle: conversation.peerUserType === 1 ? copy.contactCustomer : copy.contactFriend,
+      remark: entity.lastMessage?.preview || copy.directConversationFallback,
+      tags: [conversation.peerUserType === 1 ? copy.contactCustomer : copy.contactFriend],
       userId: entity.im?.peerUserId ?? undefined,
       greenBubbleNo: conversation.peerLppId ?? undefined,
       conversationId: entity.im?.conversationId ?? conversation.conversationId,
@@ -194,10 +243,15 @@ function buildDirectConversationContact(
   return {
     id: `friend-${friend.friendUserId}`,
     kind,
-    name: friend.remarkName || friend.displayName || entity.title || "好友",
-    subtitle: `${kind === "customer" ? "客户" : "好友"}${friend.groupName ? ` · ${friend.groupName}` : ""}`,
-    remark: friend.createdAt ? `添加于 ${formatChatTime(friend.createdAt)}` : "好友关系",
-    tags: [kind === "customer" ? "客户" : "好友", friend.groupName ?? ""].filter(Boolean),
+    name: friend.remarkName || friend.displayName || entity.title || copy.contactFriend,
+    subtitle: `${kind === "customer" ? copy.contactCustomer : copy.contactFriend}${friend.groupName ? ` · ${friend.groupName}` : ""}`,
+    remark: friend.createdAt
+      ? formatChatTime(friend.createdAt)
+      : copy.friendRelationship,
+    tags: [
+      kind === "customer" ? copy.contactCustomer : copy.contactFriend,
+      friend.groupName ?? "",
+    ].filter(Boolean),
     userId: friend.friendUserId,
     greenBubbleNo: friend.greenBubbleNo || conversation.peerLppId || undefined,
     conversationId: entity.im?.conversationId ?? conversation.conversationId,
@@ -229,12 +283,15 @@ function getConversationCounts(
   };
 }
 
-function messageCenterErrorText(input: CreateMessageCenterViewModelInput) {
+function messageCenterErrorText(
+  input: CreateMessageCenterViewModelInput,
+  copy: MessageCenterViewModelCopy,
+) {
   if (input.conversationListError) {
     return `Conversation list failed: ${formatError(input.conversationListError)}`;
   }
   if (input.messagesError) {
-    return `消息加载失败：${formatError(input.messagesError)}`;
+    return `${copy.messageListFailed}: ${formatError(input.messagesError)}`;
   }
   return null;
 }

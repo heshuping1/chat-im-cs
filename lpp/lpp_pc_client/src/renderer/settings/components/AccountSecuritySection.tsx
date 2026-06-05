@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AuthSession } from "../../data/auth/auth-session";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError, formatShortDate } from "../../lib/format";
 import { ActionRow, InlineSettingsState } from "./SettingsRows";
 import { settingRowProps } from "../models/settingsCatalog";
@@ -17,6 +18,7 @@ export function AccountSecuritySection({
   clearAuthSession: () => void;
   setNotice: (notice: string) => void;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -24,7 +26,7 @@ export function AccountSecuritySection({
   const [deactivateReason, setDeactivateReason] = useState("");
   const changePassword = useMutation({
     mutationFn: async () => {
-      if (!oldPassword || !newPassword) throw new Error("请输入旧密码和新密码");
+      if (!oldPassword || !newPassword) throw new Error(t("settings.accountSecurity.error.passwordRequired"));
       return requireApiClient(authSession).changePassword({
         oldPassword,
         newPassword,
@@ -33,23 +35,23 @@ export function AccountSecuritySection({
     onSuccess: () => {
       setOldPassword("");
       setNewPassword("");
-      setNotice("密码已修改");
+      setNotice(t("settings.accountSecurity.notice.passwordChanged"));
     },
-    onError: (error) => setNotice(`修改密码失败：${formatError(error)}`),
+    onError: (error) => setNotice(t("settings.accountSecurity.notice.passwordChangeFailed", { error: formatError(error) })),
   });
   const deactivate = useMutation({
     mutationFn: async () => {
-      if (!verificationCode.trim()) throw new Error("请输入注销验证码");
+      if (!verificationCode.trim()) throw new Error(t("settings.accountSecurity.error.deactivateCodeRequired"));
       return requireApiClient(authSession).deactivateAccount({
         verificationCode,
         reason: deactivateReason,
       });
     },
     onSuccess: () => {
-      setNotice("注销申请已提交，账号进入冷静期");
+      setNotice(t("settings.accountSecurity.notice.deactivateSubmitted"));
       clearAuthSession();
     },
-    onError: (error) => setNotice(`注销失败：${formatError(error)}`),
+    onError: (error) => setNotice(t("settings.accountSecurity.notice.deactivateFailed", { error: formatError(error) })),
   });
   const devicesQuery = useQuery({
     queryKey: pcQueryKeys.accountDevices(
@@ -70,30 +72,30 @@ export function AccountSecuritySection({
           authSession?.platformToken,
         ),
       });
-      setNotice("已下线该设备");
+      setNotice(t("settings.accountSecurity.notice.deviceRevoked"));
     },
-    onError: (error) => setNotice(`下线设备失败：${formatError(error)}`),
+    onError: (error) => setNotice(t("settings.accountSecurity.notice.deviceRevokeFailed", { error: formatError(error) })),
   });
   return (
     <>
       <div className="settings-sub-card">
         <header>
-          <strong>修改密码</strong>
+          <strong>{t("settings.accountSecurity.passwordTitle")}</strong>
           <span className="settings-sub-card-meta">
-            <em>账号登录密码</em>
+            <em>{t("settings.accountSecurity.passwordMeta")}</em>
           </span>
         </header>
         <div className="settings-form-grid">
           <input
             type="password"
             value={oldPassword}
-            placeholder="旧密码"
+            placeholder={t("settings.accountSecurity.oldPassword")}
             onChange={(event) => setOldPassword(event.target.value)}
           />
           <input
             type="password"
             value={newPassword}
-            placeholder="新密码"
+            placeholder={t("settings.accountSecurity.newPassword")}
             onChange={(event) => setNewPassword(event.target.value)}
           />
           <button
@@ -101,29 +103,29 @@ export function AccountSecuritySection({
             disabled={changePassword.isPending}
             onClick={() => changePassword.mutate()}
           >
-            {changePassword.isPending ? "提交中" : "修改密码"}
+            {changePassword.isPending ? t("settings.accountSecurity.submitting") : t("settings.accountSecurity.changePassword")}
           </button>
         </div>
       </div>
       <ActionRow
         {...settingRowProps("logoutAccount")}
-        action="退出"
+        action={t("settings.accountSecurity.logout")}
         onClick={() => {
           clearAuthSession();
-          setNotice("已退出登录");
+          setNotice(t("settings.accountSecurity.notice.loggedOut"));
         }}
       />
       <div className="settings-sub-card">
         <header>
-          <strong>登录设备</strong>
+          <strong>{t("settings.accountSecurity.devicesTitle")}</strong>
           <span className="settings-sub-card-meta">
             <MonitorSmartphone size={14} />
-            <em>账号安全</em>
+            <em>{t("settings.accountSecurity.devicesMeta")}</em>
           </span>
         </header>
         <ActionRow
           {...settingRowProps("loginDevices")}
-          action={devicesQuery.isFetching ? "刷新中" : "刷新"}
+          action={devicesQuery.isFetching ? t("settings.accountSecurity.refreshing") : t("settings.accountSecurity.refresh")}
           enabled={Boolean(authSession?.platformToken)}
           icon={<RefreshCw size={14} />}
           onClick={() => void devicesQuery.refetch()}
@@ -131,13 +133,13 @@ export function AccountSecuritySection({
         {!authSession?.platformToken && (
           <InlineSettingsState
             tone="error"
-            text="当前会话缺少平台 Token，请重新登录后查看登录设备。"
+            text={t("settings.accountSecurity.missingTokenForDevices")}
           />
         )}
         {devicesQuery.error && (
           <InlineSettingsState
             tone="error"
-            text={`登录设备加载失败：${formatError(devicesQuery.error)}`}
+            text={t("settings.accountSecurity.devicesLoadFailed", { error: formatError(devicesQuery.error) })}
           />
         )}
         <div className="settings-device-list">
@@ -145,7 +147,7 @@ export function AccountSecuritySection({
             const deviceName =
               device.deviceName ||
               device.deviceType ||
-              `设备 ${device.deviceId.slice(0, 8)}`;
+              t("settings.accountSecurity.deviceFallback", { id: device.deviceId.slice(0, 8) });
             return (
               <article
                 className={`settings-device-row ${device.isCurrent ? "current" : ""}`}
@@ -157,12 +159,14 @@ export function AccountSecuritySection({
                 <span>
                   <strong>
                     {deviceName}
-                    {device.isCurrent ? "（当前设备）" : ""}
+                    {device.isCurrent ? t("settings.accountSecurity.currentDeviceSuffix") : ""}
                   </strong>
-                  <em>{device.tenantName || authSession?.tenantName || "当前企业"}</em>
+                  <em>{device.tenantName || authSession?.tenantName || t("settings.accountSecurity.currentTenant")}</em>
                   <small>
-                    最后活跃 {formatShortDate(device.lastActiveAt)} · 会话{" "}
-                    {device.activeSessionCount ?? 1}
+                    {t("settings.accountSecurity.deviceActivity", {
+                      time: formatShortDate(device.lastActiveAt),
+                      count: device.activeSessionCount ?? 1,
+                    })}
                   </small>
                 </span>
                 <button
@@ -171,32 +175,32 @@ export function AccountSecuritySection({
                   onClick={() => revokeDevice.mutate(device.deviceId)}
                 >
                   <ShieldX size={14} />
-                  下线
+                  {t("settings.accountSecurity.revokeDevice")}
                 </button>
               </article>
             );
           })}
         </div>
         {devicesQuery.data?.length === 0 && (
-          <InlineSettingsState text="暂无其他登录设备。" />
+          <InlineSettingsState text={t("settings.accountSecurity.noOtherDevices")} />
         )}
       </div>
       <div className="settings-sub-card danger">
         <header>
-          <strong>注销账户</strong>
+          <strong>{t("settings.accountSecurity.deactivateTitle")}</strong>
           <span className="settings-sub-card-meta">
-            <em>提交后进入 7 天冷静期</em>
+            <em>{t("settings.accountSecurity.deactivateMeta")}</em>
           </span>
         </header>
         <div className="settings-form-grid">
           <input
             value={verificationCode}
-            placeholder="注销验证码"
+            placeholder={t("settings.accountSecurity.deactivateCode")}
             onChange={(event) => setVerificationCode(event.target.value)}
           />
           <input
             value={deactivateReason}
-            placeholder="注销原因，可选"
+            placeholder={t("settings.accountSecurity.deactivateReason")}
             onChange={(event) => setDeactivateReason(event.target.value)}
           />
           <button
@@ -205,13 +209,13 @@ export function AccountSecuritySection({
             onClick={() => deactivate.mutate()}
           >
             <Trash2 size={14} />
-            {deactivate.isPending ? "提交中" : "申请注销"}
+            {deactivate.isPending ? t("settings.accountSecurity.submitting") : t("settings.accountSecurity.deactivate")}
           </button>
         </div>
         {!authSession?.platformToken && (
           <InlineSettingsState
             tone="error"
-            text="当前会话缺少平台 Token，请重新登录后再注销账户。"
+            text={t("settings.accountSecurity.missingTokenForDeactivate")}
           />
         )}
       </div>

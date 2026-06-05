@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { AuthSession } from "../../data/auth/auth-session";
 import type { PcSettings } from "../../data/settings/pc-settings";
 import { requireApiClient } from "../../data/runtime";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 import {
   buildChatArchiveBackup,
@@ -15,10 +16,15 @@ import {
   type ChatArchiveSessionScope,
 } from "../models/chatArchiveModel";
 import { settingRowProps } from "../models/settingsCatalog";
-import { openChatArchiveFile, saveChatArchiveFile } from "../runtime/chatArchiveFileRuntime";
+import {
+  isChatArchiveFileRuntimeAvailable,
+  openChatArchiveFile,
+  saveChatArchiveFile,
+} from "../runtime/chatArchiveFileRuntime";
 import { ActionRow, InlineSettingsState } from "./SettingsRows";
 
 type SettingKey = keyof PcSettings;
+type Translate = ReturnType<typeof useI18n>["t"];
 
 export function ChatArchiveSection({
   authSession,
@@ -29,24 +35,31 @@ export function ChatArchiveSection({
   setNotice: (notice: string) => void;
   setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
 }) {
-  const [state, setState] = useState("本地归档不会同步到云端，也不会写入服务端消息。");
+  const { t } = useI18n();
+  const [state, setState] = useState(() => t("me.chatArchive.initialState"));
   const [pendingAction, setPendingAction] = useState<"export" | "backup" | "restore" | null>(
     null,
   );
 
   const runArchiveAction = async (action: "export" | "backup" | "restore") => {
     if (pendingAction) return;
+    if (!isChatArchiveFileRuntimeAvailable()) {
+      const message = t("me.chatArchive.error.desktopApiUnavailable");
+      setState(message);
+      setNotice(message);
+      return;
+    }
     setPendingAction(action);
     try {
       if (action === "restore") {
-        await restoreChatArchive(authSession);
-        setState("已导入本地备份归档，真实会话列表和未读状态未被修改。");
-        setNotice("聊天记录备份已导入本机归档");
+        await restoreChatArchive(authSession, t);
+        setState(t("me.chatArchive.restoreSuccessState"));
+        setNotice(t("me.chatArchive.restoreSuccessNotice"));
         return;
       }
 
-      const archive = await loadChatArchiveConversations(authSession);
-      const scope = chatArchiveScope(authSession);
+      const archive = await loadChatArchiveConversations(authSession, t);
+      const scope = chatArchiveScope(authSession, t);
       const generatedAt = new Date().toISOString();
       const fileName = archiveFileName(action, generatedAt);
       const content =
@@ -67,16 +80,24 @@ export function ChatArchiveSection({
         kind: action,
       });
       if (!result) {
-        setState("已取消聊天记录文件保存。");
-        setNotice("已取消聊天记录文件保存");
+        setState(t("me.chatArchive.cancelledState"));
+        setNotice(t("me.chatArchive.cancelledNotice"));
         return;
       }
       const partialText =
-        archive.failedCount > 0 ? `，${archive.failedCount} 个会话因接口失败未导出` : "";
+        archive.failedCount > 0
+          ? t("me.chatArchive.partialFailed", { count: archive.failedCount })
+          : "";
       setState(
-        `${action === "backup" ? "备份" : "导出"} ${archive.conversationCount} 个会话、${archive.messageCount} 条消息${partialText}。`,
+        t(action === "backup" ? "me.chatArchive.backupSuccessState" : "me.chatArchive.exportSuccessState", {
+          conversations: archive.conversationCount,
+          messages: archive.messageCount,
+          partial: partialText,
+        }),
       );
-      setNotice(action === "backup" ? "聊天记录备份已保存" : "聊天记录已导出");
+      setNotice(
+        t(action === "backup" ? "me.chatArchive.backupSuccessNotice" : "me.chatArchive.exportSuccessNotice"),
+      );
     } catch (error) {
       const message = formatError(error);
       setState(message);
@@ -87,23 +108,23 @@ export function ChatArchiveSection({
   };
 
   return (
-    <section className="settings-chat-archive" aria-label="聊天记录管理">
+    <section className="settings-chat-archive" aria-label={t("me.chatArchive.aria")}>
       <InlineSettingsState text={state} />
       <ActionRow
         {...settingRowProps("chatExport")}
-        action={pendingAction === "export" ? "导出中" : "导出"}
+        action={pendingAction === "export" ? t("me.chatArchive.exporting") : t("me.chatArchive.export")}
         enabled={!pendingAction}
         onClick={() => void runArchiveAction("export")}
       />
       <ActionRow
         {...settingRowProps("chatBackup")}
-        action={pendingAction === "backup" ? "备份中" : "备份"}
+        action={pendingAction === "backup" ? t("me.chatArchive.backingUp") : t("me.chatArchive.backup")}
         enabled={!pendingAction}
         onClick={() => void runArchiveAction("backup")}
       />
       <ActionRow
         {...settingRowProps("chatRestore")}
-        action={pendingAction === "restore" ? "导入中" : "导入"}
+        action={pendingAction === "restore" ? t("me.chatArchive.restoring") : t("me.chatArchive.restore")}
         enabled={!pendingAction}
         onClick={() => void runArchiveAction("restore")}
       />
@@ -111,7 +132,7 @@ export function ChatArchiveSection({
   );
 }
 
-async function loadChatArchiveConversations(authSession: AuthSession | null) {
+async function loadChatArchiveConversations(authSession: AuthSession | null, t: Translate) {
   const apiClient = requireApiClient(authSession);
   const page = await apiClient.getConversations({ limit: 50 });
   const conversations: ChatArchiveConversation[] = [];
@@ -138,7 +159,11 @@ async function loadChatArchiveConversations(authSession: AuthSession | null) {
     0,
   );
   if (!conversations.length) {
-    throw new Error(failedCount > 0 ? "会话消息接口不可用，未能导出聊天记录。" : "暂无可导出的聊天记录。");
+    throw new Error(
+      failedCount > 0
+        ? t("me.chatArchive.error.messageApiUnavailable")
+        : t("me.chatArchive.error.noExportableMessages"),
+    );
   }
   return {
     conversationCount: conversations.length,
@@ -148,18 +173,18 @@ async function loadChatArchiveConversations(authSession: AuthSession | null) {
   };
 }
 
-async function restoreChatArchive(authSession: AuthSession | null) {
-  if (!authSession) throw new Error("登录状态已失效，请重新登录");
+async function restoreChatArchive(authSession: AuthSession | null, t: Translate) {
+  if (!authSession) throw new Error(t("me.chatArchive.error.loginExpired"));
   const result = await openChatArchiveFile();
   if (!result) return;
   const backup = parseChatArchiveBackup(result.content);
-  const preflight = preflightChatArchiveRestore(backup, chatArchiveScope(authSession));
-  if (!preflight.ok) throw new Error(preflight.reason ?? "备份文件无法恢复");
+  const preflight = preflightChatArchiveRestore(backup, chatArchiveScope(authSession, t));
+  if (!preflight.ok) throw new Error(preflight.reason ?? t("me.chatArchive.error.restoreInvalid"));
   persistRestoredChatArchive(backup);
 }
 
-function chatArchiveScope(authSession: AuthSession | null): ChatArchiveSessionScope {
-  if (!authSession) throw new Error("登录状态已失效，请重新登录");
+function chatArchiveScope(authSession: AuthSession | null, t: Translate): ChatArchiveSessionScope {
+  if (!authSession) throw new Error(t("me.chatArchive.error.loginExpired"));
   return {
     apiBaseUrl: authSession.apiBaseUrl,
     displayName: authSession.displayName,

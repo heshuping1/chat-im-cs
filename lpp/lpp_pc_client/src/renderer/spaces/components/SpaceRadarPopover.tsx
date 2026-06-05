@@ -3,6 +3,7 @@ import { AlertCircle, BellRing, Building2, Check, ChevronRight, Search } from "l
 
 import { formatBadgeCount, formatError } from "../../lib/format";
 import { PcAvatar } from "../../components/PcAvatar";
+import { useI18n } from "../../i18n/useI18n";
 import {
   spaceRadarItemReminderPresentation,
   spaceRadarNewReminderSummary,
@@ -13,6 +14,7 @@ import { targetForSpaceRadarItem } from "../hooks/useSpaceRadarController";
 import type { SpaceSwitchTarget } from "../hooks/useSpaceSwitchController";
 
 type SpaceRadarFilter = "alerts" | "all" | "recent";
+type SpaceRadarTranslate = (key: string, params?: Record<string, string | number>) => string;
 
 export function SpaceRadarPopover({
   canSwitch,
@@ -39,6 +41,7 @@ export function SpaceRadarPopover({
   unreadSummaryLoading: boolean;
   viewModel: SpaceRadarViewModel;
 }) {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<SpaceRadarFilter>("all");
   const [keyword, setKeyword] = useState("");
   const visibleItems = useMemo(
@@ -53,20 +56,20 @@ export function SpaceRadarPopover({
     <div
       className="sidebar-status-popover sidebar-space-status-popover sidebar-space-radar-popover"
       role="dialog"
-      aria-label="空间"
+      aria-label={t("spaceRadar.title")}
     >
       <header className="space-radar-head">
         <div className="space-radar-title">
           <BellRing size={16} aria-hidden="true" />
           <div>
-            <strong>空间</strong>
-            <span>查看各空间消息提醒，切换后查看详情</span>
+            <strong>{t("spaceRadar.title")}</strong>
+            <span>{t("spaceRadar.subtitle")}</span>
           </div>
         </div>
         {newReminderSummary && (
-          <div className="space-radar-totals" aria-label={`新提醒 ${totalReminderText}`}>
+          <div className="space-radar-totals" aria-label={t("spaceRadar.newReminderAria", { count: totalReminderText })}>
             <b>{totalReminderText}</b>
-            <em>{newReminderSummary.reminderSpaceCount} 个空间</em>
+            <em>{t("spaceRadar.spaceCount", { count: newReminderSummary.reminderSpaceCount })}</em>
           </div>
         )}
       </header>
@@ -74,44 +77,44 @@ export function SpaceRadarPopover({
       {newReminderSummary && (
         <div className="space-radar-alert-strip" role="status">
           <BellRing size={14} aria-hidden="true" />
-          <strong>{totalReminderText} 条跨空间新消息</strong>
-          <span>切换空间后查看消息详情</span>
+          <strong>{t("spaceRadar.crossSpaceNewMessages", { count: totalReminderText })}</strong>
+          <span>{t("spaceRadar.switchToViewDetail")}</span>
         </div>
       )}
 
       {!canSwitch && (
         <p className="space-radar-inline-state error">
-          当前登录未保留平台会话，请重新登录后切换空间。
+          {t("spaceRadar.missingPlatformSession")}
         </p>
       )}
       {Boolean(unreadSummaryError) && (
         <p className="space-radar-inline-state error">
-          跨空间未读同步失败：{String(formatError(unreadSummaryError))}
+          {t("spaceRadar.unreadSyncFailed", { error: String(formatError(unreadSummaryError)) })}
         </p>
       )}
       {Boolean(spacesError) && (
         <p className="space-radar-inline-state error">
-          空间列表同步失败：{String(formatError(spacesError))}
+          {t("spaceRadar.spacesSyncFailed", { error: String(formatError(spacesError)) })}
         </p>
       )}
       {Boolean(switchError) && (
         <p className="space-radar-inline-state error">
-          空间切换失败：{String(formatError(switchError))}
+          {t("spaceRadar.switchFailed", { error: String(formatError(switchError)) })}
         </p>
       )}
       {unreadSummaryLoading && (
-        <p className="space-radar-inline-state">正在同步跨空间红点...</p>
+        <p className="space-radar-inline-state">{t("spaceRadar.syncingUnread")}</p>
       )}
 
-      <div className="space-radar-filters" role="tablist" aria-label="空间筛选">
+      <div className="space-radar-filters" role="tablist" aria-label={t("spaceRadar.filterAria")}>
         <SpaceRadarFilterButton active={filter === "alerts"} onClick={() => setFilter("alerts")}>
-          新消息
+          {t("spaceRadar.filter.alerts")}
         </SpaceRadarFilterButton>
         <SpaceRadarFilterButton active={filter === "all"} onClick={() => setFilter("all")}>
-          全部
+          {t("spaceRadar.filter.all")}
         </SpaceRadarFilterButton>
         <SpaceRadarFilterButton active={filter === "recent"} onClick={() => setFilter("recent")}>
-          最近
+          {t("spaceRadar.filter.recent")}
         </SpaceRadarFilterButton>
       </div>
 
@@ -120,17 +123,17 @@ export function SpaceRadarPopover({
         <input
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="搜索空间 / 企业码"
+          placeholder={t("spaceRadar.searchPlaceholder")}
         />
       </label>
 
       <div className="space-radar-list" role="list">
-        {spacesLoading && <p className="space-radar-inline-state">正在读取空间列表...</p>}
+        {spacesLoading && <p className="space-radar-inline-state">{t("spaceRadar.loadingSpaces")}</p>}
         {visibleItems.length === 0 ? (
           <div className="space-radar-empty">
             <Building2 size={17} />
-            <strong>{hasAlerts ? "未找到匹配空间" : "暂无新消息"}</strong>
-            <span>{hasAlerts ? "换个关键词试试。" : "切换空间后查看对应空间详情。"}</span>
+            <strong>{hasAlerts ? t("spaceRadar.noMatch") : t("spaceRadar.noNewMessages")}</strong>
+            <span>{hasAlerts ? t("spaceRadar.tryAnotherKeyword") : t("spaceRadar.switchToViewSpace")}</span>
           </div>
         ) : (
           visibleItems.map((item) => (
@@ -141,6 +144,7 @@ export function SpaceRadarPopover({
               onManageSpaces={onManageSpaces}
               onSwitchSpace={onSwitchSpace}
               switching={switchingIdentityKey === item.identityKey}
+              t={t}
             />
           ))
         )}
@@ -148,7 +152,7 @@ export function SpaceRadarPopover({
 
       <footer className="space-radar-actions">
         <button type="button" onClick={onManageSpaces}>
-          加入 / 管理空间
+          {t("spaceRadar.manageSpaces")}
         </button>
       </footer>
     </div>
@@ -161,12 +165,14 @@ function SpaceRadarRow({
   onManageSpaces,
   onSwitchSpace,
   switching,
+  t,
 }: {
   currentSpaceBadgeCount: number;
   item: SpaceRadarItem;
   onManageSpaces: () => void;
   onSwitchSpace: (target: SpaceSwitchTarget) => void;
   switching: boolean;
+  t: SpaceRadarTranslate;
 }) {
   const target = targetForSpaceRadarItem(item);
   const canSwitch = item.canSwitch && Boolean(target) && !item.current;
@@ -198,13 +204,13 @@ function SpaceRadarRow({
           {item.syncState === "error" && (
             <b className="warning">
               <AlertCircle size={11} />
-              同步失败
+              {t("spaceRadar.syncFailed")}
             </b>
           )}
         </span>
       </div>
       {item.current ? (
-        <span className="space-radar-current" aria-label="当前空间">
+        <span className="space-radar-current" aria-label={t("spaceRadar.currentSpace")}>
           <Check size={14} />
         </span>
       ) : (
@@ -220,7 +226,7 @@ function SpaceRadarRow({
             onManageSpaces();
           }}
         >
-          {switching ? "切换中" : canSwitch ? "切换" : "管理"}
+          {switching ? t("spaceRadar.switching") : canSwitch ? t("spaceRadar.switch") : t("spaceRadar.manage")}
           <ChevronRight size={13} />
         </button>
       )}

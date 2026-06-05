@@ -167,7 +167,7 @@ export function useMessageMediaSendController({
           const client = requireApiClient(session);
           if (task.kind === "video" && !task.videoPoster) {
             const videoPoster = await createVideoPoster(task.file);
-            if (!videoPoster) throw new Error("视频封面生成失败");
+            if (!videoPoster) throw new Error("Failed to generate video poster.");
             task.videoPoster = videoPoster;
             const localMedia = localMediaResourceForSend({
               file: task.file,
@@ -481,7 +481,7 @@ export function useMessageMediaSendController({
   const sendMediaOptimistically = useCallback(
     async (file: File, kind: ComposerMediaKind) => {
       if (!session || !activeConversation || !activeConversationType) {
-        throw new Error("请选择一个普通 IM 会话");
+        throw new Error("Select a regular IM conversation.");
       }
       const conversation = activeConversation;
       const conversationType = activeConversationType;
@@ -527,7 +527,7 @@ export function useMessageMediaSendController({
           return undefined;
         });
       const videoPoster = kind === "video" ? await createVideoPoster(file) : undefined;
-      const posterError = kind === "video" && !videoPoster ? "视频封面生成失败" : undefined;
+      const posterError = kind === "video" && !videoPoster ? "Failed to generate video poster." : undefined;
       const initialStatus = posterError ? "failed" : initialChatSendStatusForKind(kind);
       const localMedia = localMediaResourceForSend({
         file,

@@ -83,7 +83,7 @@ export async function openDesktopVideoPlayer({
     height: videoSize?.height ?? media?.height,
     durationSeconds,
     sizeBytes: media?.sizeBytes,
-    title: "原视频",
+    title: "Original video",
   });
   return true;
 }

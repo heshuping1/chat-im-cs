@@ -136,8 +136,8 @@ type TextReplacement = string | ((substring: string, ...args: string[]) => strin
 
 const sensitiveTextPatterns: Array<[RegExp, TextReplacement]> = [
   [/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer ***"],
-  [/(Authorization|Cookie)\s*:\s*[^\s,;，。]+/gi, "$1: [redacted]"],
-  [/\b(?:token|authorization|cookie|password|secret|credential)=?[^\s,;，。]+/gi, "[redacted]"],
+  [/(Authorization|Cookie)\s*:\s*[^\s,;\u3002\uff0c]+/gi, "$1: [redacted]"],
+  [/\b(?:token|authorization|cookie|password|secret|credential)=?[^\s,;\u3002\uff0c]+/gi, "[redacted]"],
   [/\b1[3-9]\d{9}\b/g, (value: string) => `${value.slice(0, 3)}****${value.slice(-4)}`],
 ];
 
@@ -330,7 +330,7 @@ function formatLogLine(record: Omit<DiagnosticRecordViewModel, "logLine">) {
 function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime()) || date.getTime() === 0) return "--:--:--";
-  return date.toLocaleTimeString("zh-CN", { hour12: false });
+  return date.toLocaleTimeString("en-US", { hour12: false });
 }
 
 function isFailedResult(result: string) {

@@ -3,6 +3,7 @@ import {
 } from "../../data/customer-service/cs-thread-state";
 import { getCustomerServiceActionPermission } from "../../data/customer-service/cs-action-permissions";
 import type { CustomerServiceThreadAction } from "../../data/customer-service/cs-action-service";
+import { useI18n } from "../../i18n/useI18n";
 
 export function CustomerServiceThreadActionButton({
   onAction,
@@ -15,6 +16,7 @@ export function CustomerServiceThreadActionButton({
   selectedStatus?: string;
   status?: string;
 }) {
+  const { t } = useI18n();
   const threadState = createCustomerServiceThreadState(status);
   const selectedThreadState = createCustomerServiceThreadState(selectedStatus);
   const hasThread = Boolean(status || selectedStatus);
@@ -30,7 +32,7 @@ export function CustomerServiceThreadActionButton({
         disabled={pending || !claimPermission.enabled}
         onClick={() => onAction("claim")}
       >
-        接入
+        {t("customerService.action.claim")}
       </button>
     );
   }
@@ -46,7 +48,7 @@ export function CustomerServiceThreadActionButton({
         disabled={pending || !takeoverPermission.enabled}
         onClick={() => onAction("takeover")}
       >
-        人工接管
+        {t("customerService.action.takeover")}
       </button>
     );
   }
@@ -63,7 +65,7 @@ export function CustomerServiceThreadActionButton({
       disabled={pending || !closePermission.enabled}
       onClick={() => onAction("close")}
     >
-      关闭会话
+      {t("customerService.action.closeThread")}
     </button>
   );
 }

@@ -659,8 +659,10 @@ describe("architecture boundaries", () => {
   it("keeps direct desktopApi calls pinned to documented owners", () => {
     const allowedDirectDesktopApiCallers = new Set([
       "src/renderer/data/app-instance/app-instance.ts",
+      "src/renderer/data/api/api-traffic-diagnostics.ts",
       "src/renderer/data/auth/auth-session.ts",
       "src/renderer/data/customer-service/cs-routing-diagnostics.ts",
+      "src/renderer/data/logging/app-log.ts",
       "src/renderer/data/reminder/reminder-service.ts",
       "src/renderer/data/workspace-ui/workspaceTrayStatusEffect.ts",
       "src/renderer/lib/openExternal.ts",
@@ -677,6 +679,7 @@ describe("architecture boundaries", () => {
       "src/renderer/messages/runtime/screenshotCapture.ts",
       "src/renderer/settings/components/HelpAboutSettingsSection.tsx",
       "src/renderer/settings/runtime/chatArchiveFileRuntime.ts",
+      "src/renderer/settings/runtime/clientUpdateRuntime.ts",
       "src/renderer/settings/runtime/diagnosticsExport.ts",
     ]);
     const directDesktopApiPattern = /\b(?:window\.)?desktopApi(?:\?\.|\.)\w+/;

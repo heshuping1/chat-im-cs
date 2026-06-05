@@ -17,6 +17,7 @@ import type {
   UploadAction,
   VideoUploadOverlayState,
 } from "../runtime/uploadState";
+import { useI18n } from "../../i18n/useI18n";
 
 export function VideoMessagePreview({
   durationText,
@@ -71,6 +72,7 @@ export function VideoMessagePreview({
   uploadOverlay?: VideoUploadOverlayState;
   videoRef: RefObject<HTMLVideoElement>;
 }) {
+  const { t } = useI18n();
   const [posterLoadState, setPosterLoadState] = useState<
     "idle" | "loading" | "ready" | "failed"
   >(() => initialVideoPosterLoadState({ posterKey, posterReadyHint, posterSrc }));
@@ -85,7 +87,7 @@ export function VideoMessagePreview({
     return (
       <div className="message-video-fallback">
         <Video size={24} />
-        <span>视频消息</span>
+        <span>{t("media.video.message")}</span>
       </div>
     );
   }
@@ -167,10 +169,10 @@ export function VideoMessagePreview({
       }
       aria-label={
         uploadActive
-          ? uploadOverlay?.label || "视频上传中"
+          ? uploadOverlay?.label || t("media.video.uploading")
           : canAttemptOpen
-            ? "打开视频"
-            : "视频暂不可播放"
+            ? t("media.video.open")
+            : t("media.video.unplayable")
       }
       aria-disabled={uploadActive && !uploadAction ? true : undefined}
       onClick={handleFrameClick}
@@ -192,7 +194,7 @@ export function VideoMessagePreview({
       {src && !failed && (
         <video
           ref={videoRef}
-          aria-label="视频消息"
+          aria-label={t("media.video.message")}
           className="message-video-player"
           preload={preloadMode}
           playsInline
@@ -212,7 +214,7 @@ export function VideoMessagePreview({
       )}
       {showFrameLoading && (
         <span className="message-video-loading" aria-hidden="true">
-          视频加载中
+          {t("media.video.loading")}
         </span>
       )}
       {uploadActive ? (
@@ -221,7 +223,7 @@ export function VideoMessagePreview({
             type="button"
             className="message-video-upload-control"
             disabled={!uploadAction}
-            aria-label={uploadOverlay?.label || "视频上传中"}
+            aria-label={uploadOverlay?.label || t("media.video.uploading")}
             onClick={handleUploadActionClick}
           >
             <span
@@ -270,9 +272,9 @@ export function VideoMessagePreview({
           )}
         </span>
       )}
-      {!uploadActive && loading && <span className="message-video-error">正在打开</span>}
+      {!uploadActive && loading && <span className="message-video-error">{t("media.video.opening")}</span>}
       {!uploadActive && openError && !loading && (
-        <span className="message-video-error">打开失败</span>
+        <span className="message-video-error">{t("media.video.openFailed")}</span>
       )}
       <small>{durationText}</small>
     </div>

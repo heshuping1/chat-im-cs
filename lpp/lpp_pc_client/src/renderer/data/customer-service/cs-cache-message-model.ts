@@ -44,7 +44,7 @@ export function customerServiceMessageFromSendResult(params: {
     senderId: params.identity?.userId || undefined,
     senderPlatformUserId: params.identity?.platformUserId || undefined,
     senderLppId: params.identity?.lppId || undefined,
-    senderDisplayName: params.identity?.displayName || "我",
+    senderDisplayName: params.identity?.displayName || "Me",
     senderAvatarUrl:
       typeof (params.identity as { avatarUrl?: unknown } | null | undefined)?.avatarUrl ===
       "string"

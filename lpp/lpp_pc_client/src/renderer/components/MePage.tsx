@@ -25,6 +25,8 @@ import { useAuthSession, useClearAuthSession, useSetAuthSession } from "../data/
 import type { PcSettings } from "../data/settings/pc-settings";
 import { usePcSettings, useUpdatePcSetting } from "../data/settings/settings-store";
 import { pcUserTimezoneLabels, pcUserTimezoneOptions } from "../data/time/user-timezone";
+import { localeLabels, supportedLocales, type AppLocale } from "../i18n/locales";
+import { useI18n } from "../i18n/useI18n";
 import { formatError, formatShortDate } from "../lib/format";
 import { PcAvatar } from "./PcAvatar";
 import { exportCurrentDiagnosticsPackage } from "../settings/runtime/diagnosticsExport";
@@ -37,6 +39,9 @@ import {
 } from "../settings/components/SettingsRows";
 import {
   settingRowProps,
+  settingsCapabilityLabel,
+  settingsRowDescription,
+  settingsRowLabel,
   settingsSections,
   settingsRowsForSection,
   type SettingsRowCatalog,
@@ -54,6 +59,7 @@ import { RuntimeStatusSettingsSection } from "../settings/components/RuntimeStat
 import { PrivacySettingsSection } from "./MePrivacySections";
 
 type SettingKey = keyof PcSettings;
+type MeTranslate = (key: string, params?: Record<string, string | number>) => string;
 
 const sectionIcons = {
   account: UserRound,
@@ -74,9 +80,10 @@ export function MePage() {
   const clearAuthSession = useClearAuthSession();
   const setAuthSession = useSetAuthSession();
   const updatePcSetting = useUpdatePcSetting();
+  const { locale, setLocale, t } = useI18n();
   const [activeSectionId, setActiveSectionId] =
     useState<SettingsSectionId>("account");
-  const [notice, setNotice] = useState("设置更改后会自动保存");
+  const [notice, setNotice] = useState("");
   const activeSection = useMemo(
     () =>
       settingsSections.find((section) => section.id === activeSectionId) ??
@@ -86,12 +93,12 @@ export function MePage() {
 
   const setSetting = <K extends SettingKey>(key: K, value: PcSettings[K]) => {
     updatePcSetting(key, value);
-    setNotice("已保存");
+    setNotice(t("me.notice.saved"));
   };
 
   const exportDiagnostics = async () => {
     const result = await exportCurrentDiagnosticsPackage();
-    setNotice(result ? "诊断包已导出" : "已取消导出诊断包");
+    setNotice(result ? t("me.notice.diagnosticsExported") : t("me.notice.diagnosticsExportCancelled"));
   };
 
   const ActiveIcon = sectionIcons[activeSection.id];
@@ -110,11 +117,11 @@ export function MePage() {
 
   return (
     <main className="module-page me-page settings-page-v2">
-      <aside className="settings-nav" aria-label="设置分组">
+      <aside className="settings-nav" aria-label={t("me.navAria")}>
         <div className="settings-nav-header">
           <span className="settings-nav-kicker">SETTINGS</span>
-          <strong>设置中心</strong>
-          <p>按账户、企业、消息、隐私、在线客服、线路、通用、诊断和关于组织设置。</p>
+          <strong>{t("me.title")}</strong>
+          <p>{t("me.navSubtitle")}</p>
         </div>
         <div className="settings-nav-list">
           {settingsSections.map((section) => {
@@ -128,8 +135,8 @@ export function MePage() {
               >
                 <Icon size={16} />
                 <span>
-                  <strong>{section.title}</strong>
-                  <em>{section.desc}</em>
+                  <strong>{settingsSectionTitle(section.id, t)}</strong>
+                  <em>{settingsSectionDescription(section.id, t)}</em>
                 </span>
               </button>
             );
@@ -141,14 +148,12 @@ export function MePage() {
         <section className="settings-hero-panel settings-hero-compact">
           <div>
             <span className="eyebrow">lppchat</span>
-            <h1>设置中心</h1>
-            <p>
-              按清晰领域管理 PC 客服工作环境，聊天、通知和外观等共用能力统一收进通用设置。
-            </p>
+            <h1>{t("me.title")}</h1>
+            <p>{t("me.heroSubtitle")}</p>
           </div>
           <div className="settings-health">
             <CheckCircle2 size={18} />
-            <span>{notice}</span>
+              <span>{notice || t("me.notice.autoSave")}</span>
           </div>
         </section>
 
@@ -159,13 +164,13 @@ export function MePage() {
                 <ActiveIcon size={22} />
               </span>
               <div>
-                <h2>{activeSection.title}</h2>
-                <p>{activeSection.desc}</p>
+                <h2>{settingsSectionTitle(activeSection.id, t)}</h2>
+                <p>{settingsSectionDescription(activeSection.id, t)}</p>
               </div>
             </div>
-            <div className="settings-detail-statusbar" aria-label="当前设置状态">
+            <div className="settings-detail-statusbar" aria-label={t("me.currentStatus")}>
               <CheckCircle2 size={15} />
-              <span>{sectionStatusSummary(activeSection.id, notice, authSession)}</span>
+              <span>{sectionStatusSummary(activeSection.id, notice, authSession, t)}</span>
             </div>
           </header>
           <div className="settings-detail-body">
@@ -177,9 +182,12 @@ export function MePage() {
               tenantInfo: tenantInfoQuery.data,
               profileLoading: profileQuery.isLoading,
               profileError: profileQuery.error,
+              locale,
+              setLocale,
               queryClient,
               clearAuthSession,
               setAuthSession,
+              t,
             })}
           </div>
         </section>
@@ -200,15 +208,19 @@ function renderSection(
     tenantInfo?: TenantInfoDto;
     profileLoading: boolean;
     profileError: unknown;
+    locale: AppLocale;
+    setLocale: (locale: AppLocale) => void;
     queryClient: QueryClient;
     clearAuthSession: () => void;
     setAuthSession: (session: AuthSession) => void;
+    t: MeTranslate;
   },
 ) {
+  const { t } = actions;
   switch (section) {
     case "account":
       return (
-        <section className="settings-account-layout" aria-label="账户设置">
+        <section className="settings-account-layout" aria-label={t("me.section.account.title")}>
           <div className="settings-account-profile-column">
             <ProfileSettingsSection {...actions} />
           </div>
@@ -234,7 +246,7 @@ function renderSection(
       );
     case "privacy":
       return (
-        <section className="settings-privacy-layout" aria-label="隐私设置">
+        <section className="settings-privacy-layout" aria-label={t("me.section.privacy.title")}>
           <PrivacySettingsSection
             actions={actions}
             pcSettings={pcSettings}
@@ -267,7 +279,24 @@ function renderSection(
     case "common":
       return (
         <>
-          <SettingsGroupLabel title="通知" />
+          <SettingsGroupLabel title={t("me.group.languageTime")} />
+          <SelectRow
+            {...settingRowProps("language")}
+            capability="localEffective"
+            optionLabels={localeLabels}
+            options={[...supportedLocales]}
+            value={actions.locale}
+            onChange={actions.setLocale}
+          />
+          <SelectRow
+            {...settingRowProps("timezone")}
+            capability="localEffective"
+            optionLabels={pcUserTimezoneLabels}
+            options={[...pcUserTimezoneOptions]}
+            value={pcSettings.timezone}
+            onChange={(value) => setSetting("timezone", value)}
+          />
+          <SettingsGroupLabel title={t("me.group.notifications")} />
           <NotificationSettingsSection
             authSession={actions.authSession}
             pcSettings={pcSettings}
@@ -275,7 +304,7 @@ function renderSection(
             setNotice={actions.setNotice}
             setSetting={setSetting}
           />
-          <SettingsGroupLabel title="输入" />
+          <SettingsGroupLabel title={t("me.group.input")} />
           <SwitchRow
             {...settingRowProps("enterToSend")}
             checked={pcSettings.enterToSend}
@@ -289,7 +318,7 @@ function renderSection(
               "Alt+A": "Alt + A",
               "Ctrl+Alt+A": "Ctrl + Alt + A",
               "Ctrl+Shift+A": "Ctrl + Shift + A",
-              None: "不启用",
+              None: t("me.option.disabled"),
             }}
             onChange={(value) => setSetting("screenshotShortcut", value)}
           />
@@ -303,14 +332,14 @@ function renderSection(
             checked={pcSettings.shortcutHints}
             onChange={(value) => setSetting("shortcutHints", value)}
           />
-          <SettingsGroupLabel title="翻译" />
+          <SettingsGroupLabel title={t("me.group.translation")} />
           <SwitchRow
             {...settingRowProps("autoTranslate")}
             checked={pcSettings.autoTranslate}
-            stateText="会话级按钮可设为跟随、开启或关闭。"
+            stateText={t("me.state.autoTranslate")}
             onChange={(value) => setSetting("autoTranslate", value)}
           />
-          <SettingsGroupLabel title="聊天" />
+          <SettingsGroupLabel title={t("me.group.chat")} />
           <ChatBackgroundSection
             pcSettings={pcSettings}
             setNotice={actions.setNotice}
@@ -322,17 +351,17 @@ function renderSection(
             setNotice={actions.setNotice}
             setSetting={setSetting}
           />
-          <SettingsGroupLabel title="外观" />
+          <SettingsGroupLabel title={t("me.group.appearance")} />
           <SelectRow
             {...settingRowProps("theme")}
             value={pcSettings.theme}
             options={["porcelain", "business", "classic-wechat", "dark", "high-contrast"]}
             optionLabels={{
-              porcelain: "白瓷",
-              business: "专业商务",
-              "classic-wechat": "经典微信",
-              dark: "深色",
-              "high-contrast": "高对比",
+              porcelain: t("me.option.theme.porcelain"),
+              business: t("me.option.theme.business"),
+              "classic-wechat": t("me.option.theme.classicWechat"),
+              dark: t("me.option.theme.dark"),
+              "high-contrast": t("me.option.theme.highContrast"),
             }}
             onChange={(value) => setSetting("theme", value)}
           />
@@ -341,16 +370,22 @@ function renderSection(
             value={pcSettings.skin}
             options={["jade", "blue", "graphite"]}
             optionLabels={{
-              jade: "翡翠绿",
-              blue: "商务蓝",
-              graphite: "石墨灰",
+              jade: t("me.option.skin.jade"),
+              blue: t("me.option.skin.blue"),
+              graphite: t("me.option.skin.graphite"),
             }}
             onChange={(value) => setSetting("skin", value)}
           />
           <SelectRow
             {...settingRowProps("fontSize")}
             value={pcSettings.fontSize}
-            options={["小", "标准", "大", "超大"]}
+            options={["\u5c0f", "\u6807\u51c6", "\u5927", "\u8d85\u5927"]}
+            optionLabels={{
+              "\u5c0f": t("me.option.fontSize.small"),
+              "\u6807\u51c6": t("me.option.fontSize.standard"),
+              "\u5927": t("me.option.fontSize.large"),
+              "\u8d85\u5927": t("me.option.fontSize.extraLarge"),
+            }}
             onChange={(value) => setSetting("fontSize", value)}
           />
           <SwitchRow
@@ -373,7 +408,7 @@ function renderSection(
             checked={pcSettings.keyboardFocusHint}
             onChange={(value) => setSetting("keyboardFocusHint", value)}
           />
-          <SettingsGroupLabel title="桌面" />
+          <SettingsGroupLabel title={t("me.group.desktop")} />
           <MinimizeToTraySwitch
             pcSettings={pcSettings}
             setNotice={actions.setNotice}
@@ -385,16 +420,6 @@ function renderSection(
             setSetting={setSetting}
           />
           <AppProfileInfoRow />
-          <SettingsGroupLabel title="语言与时间" />
-          <InfoRow {...settingRowProps("language")} desc={pcSettings.language} />
-          <SelectRow
-            {...settingRowProps("timezone")}
-            capability="localEffective"
-            optionLabels={pcUserTimezoneLabels}
-            options={[...pcUserTimezoneOptions]}
-            value={pcSettings.timezone}
-            onChange={(value) => setSetting("timezone", value)}
-          />
           <PlanningSupportBlock sectionId={section} />
         </>
       );
@@ -403,7 +428,7 @@ function renderSection(
         <>
           <InfoRow
             {...settingRowProps("currentEnvironment")}
-            desc={formatEnvironment(actions.authSession?.apiBaseUrl)}
+            desc={formatEnvironment(actions.authSession?.apiBaseUrl, t)}
           />
           <NetworkLineSettingsSection
             authSession={actions.authSession}
@@ -412,11 +437,11 @@ function renderSection(
           />
           <InfoRow
             {...settingRowProps("autoReconnect")}
-            desc={pcSettings.autoReconnect ? "已启用，网络恢复后自动重连接口和实时消息。" : "已关闭。"}
+            desc={pcSettings.autoReconnect ? t("me.network.autoReconnectOn") : t("me.network.off")}
           />
           <InfoRow
             {...settingRowProps("weakNetworkDiagnostics")}
-            desc={pcSettings.weakNetworkDiagnostics ? "已记录弱网线索，可随诊断包导出。" : "未记录弱网线索。"}
+            desc={pcSettings.weakNetworkDiagnostics ? t("me.network.weakNetworkOn") : t("me.network.weakNetworkOff")}
           />
           <PlanningSupportBlock sectionId={section} />
         </>
@@ -426,10 +451,10 @@ function renderSection(
         <>
           <ActionRow
             {...settingRowProps("clearLocalCache")}
-            action="清理"
+            action={t("me.action.clean")}
             onClick={() => {
               localStorage.removeItem("lpp.pc.message-cache");
-              actions.setNotice("已清理聊天缓存");
+              actions.setNotice(t("me.notice.chatCacheCleared"));
             }}
           />
           <ConnectivityHealthSection authSession={actions.authSession} />
@@ -438,10 +463,10 @@ function renderSection(
             value={pcSettings.apiTrafficLogLevel}
             options={["off", "errors", "summary", "body"]}
             optionLabels={{
-              off: "关闭",
-              errors: "仅失败",
-              summary: "全部摘要",
-              body: "完整脱敏",
+              off: t("me.option.apiLog.off"),
+              errors: t("me.option.apiLog.errors"),
+              summary: t("me.option.apiLog.summary"),
+              body: t("me.option.apiLog.body"),
             }}
             onChange={(value) => setSetting("apiTrafficLogLevel", value)}
           />
@@ -474,30 +499,40 @@ function SettingsGroupLabel({ title }: { title: string }) {
   );
 }
 
+function settingsSectionTitle(sectionId: SettingsSectionId, t: MeTranslate) {
+  return t(`me.section.${sectionId}.title`);
+}
+
+function settingsSectionDescription(sectionId: SettingsSectionId, t: MeTranslate) {
+  return t(`me.section.${sectionId}.desc`);
+}
+
 function sectionStatusSummary(
   sectionId: SettingsSectionId,
   notice: string,
   authSession: AuthSession | null,
+  t: MeTranslate,
 ) {
-  if (notice && notice !== "已保存" && notice !== "设置更改后会自动保存") return notice;
-  if (!authSession && sectionId !== "about") return "登录状态未恢复，账号类设置会在重新登录后读取。";
-  if (sectionId === "common") return "通用设置已按通知、输入、聊天、外观、桌面、语言时间分组。";
-  if (sectionId === "customerService") return "客服提醒和客户上下文设置会服务当前接待工作台。";
-  if (sectionId === "storageDiagnostics") return "诊断和体检信息只展示脱敏后的本机可观测状态。";
-  return "设置项会在当前页面自动保存并显示最新状态。";
+  if (notice && notice !== t("me.notice.saved") && notice !== t("me.notice.autoSave")) return notice;
+  if (!authSession && sectionId !== "about") return t("me.status.notLoggedIn");
+  if (sectionId === "common") return t("me.status.common");
+  if (sectionId === "customerService") return t("me.status.customerService");
+  if (sectionId === "storageDiagnostics") return t("me.status.storageDiagnostics");
+  return t("me.status.default");
 }
 
 function PlanningSupportBlock({ sectionId }: { sectionId: SettingsSectionId }) {
+  const { t } = useI18n();
   const plannedRows = settingsRowsForSection(sectionId).filter(
     (rowItem) => !rowItem.visibleInMainList,
   );
   if (!plannedRows.length) return null;
 
   return (
-    <section className="settings-pending-support" aria-label="规划能力">
+    <section className="settings-pending-support" aria-label={t("me.planning.aria")}>
       <div>
-        <strong>规划能力</strong>
-        <p>这些能力已有明确产品位置和接入条件，暂不伪装成可生效开关。</p>
+        <strong>{t("me.planning.title")}</strong>
+        <p>{t("me.planning.subtitle")}</p>
       </div>
       <div className="settings-plan-grid">
         {plannedRows.map((rowItem) => (
@@ -509,25 +544,26 @@ function PlanningSupportBlock({ sectionId }: { sectionId: SettingsSectionId }) {
 }
 
 function PlanningCapabilityCard({ rowItem }: { rowItem: SettingsRowCatalog }) {
+  const { t } = useI18n();
   return (
     <article className="settings-plan-card">
       <header>
-        <strong>{rowItem.label}</strong>
-        <em>{rowItem.statusLabel ?? "计划接入"}</em>
+        <strong>{settingsRowLabel(rowItem, t)}</strong>
+        <em>{settingsCapabilityLabel(rowItem.statusLabel, t) ?? t("me.planning.planned")}</em>
       </header>
-      <p>{rowItem.desc}</p>
+      <p>{settingsRowDescription(rowItem, t)}</p>
       <dl>
         <div>
-          <dt>价值</dt>
-          <dd>{rowItem.productValue ?? "完善 PC 客服端设置能力。"}</dd>
+          <dt>{t("me.planning.value")}</dt>
+          <dd>{rowItem.productValue ?? t("me.planning.defaultValue")}</dd>
         </div>
         <div>
-          <dt>依赖</dt>
-          <dd>{rowItem.dependency ?? "需要补齐产品、接口或桌面端基础能力。"}</dd>
+          <dt>{t("me.planning.dependency")}</dt>
+          <dd>{rowItem.dependency ?? t("me.planning.defaultDependency")}</dd>
         </div>
         <div>
-          <dt>下一步</dt>
-          <dd>{rowItem.nextAction ?? "完成依赖拆分后接入。"}</dd>
+          <dt>{t("me.planning.next")}</dt>
+          <dd>{rowItem.nextAction ?? t("me.planning.defaultNext")}</dd>
         </div>
       </dl>
     </article>
@@ -551,6 +587,7 @@ function ProfileSettingsSection({
   setAuthSession: (session: AuthSession) => void;
   setNotice: (notice: string) => void;
 }) {
+  const { t } = useI18n();
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const displayName = profile?.displayName || authSession?.displayName || "--";
@@ -563,20 +600,20 @@ function ProfileSettingsSection({
       const client = requireApiClient(authSession);
       const uploaded = await client.uploadMedia(file, "image");
       const nextAvatarUrl = uploadedAvatarUrl(uploaded);
-      if (!nextAvatarUrl) throw new Error("头像上传成功，但服务端未返回图片地址");
+      if (!nextAvatarUrl) throw new Error(t("me.profile.error.avatarNoUrl"));
       await client.updateMyProfile({ avatarUrl: nextAvatarUrl });
       const updatedProfile = await client.getMyProfile();
       const confirmedAvatarUrl = normalizeAvatarUrl(updatedProfile.avatarUrl);
       const previousAvatarUrl = normalizeAvatarUrl(profile?.avatarUrl || authSession?.avatarUrl);
       if (!confirmedAvatarUrl) {
-        throw new Error("头像已上传，但服务端个人资料未返回头像地址");
+        throw new Error(t("me.profile.error.avatarProfileNoUrl"));
       }
       if (
         previousAvatarUrl &&
         !sameAvatarResource(nextAvatarUrl, previousAvatarUrl) &&
         sameAvatarResource(confirmedAvatarUrl, previousAvatarUrl)
       ) {
-        throw new Error("头像已上传，但服务端个人资料未写入新头像");
+        throw new Error(t("me.profile.error.avatarProfileUnchanged"));
       }
       const refreshedAvatarUrl = avatarUrlWithCacheBuster(confirmedAvatarUrl);
       return {
@@ -610,15 +647,15 @@ function ProfileSettingsSection({
           userType: updatedProfile.userType ?? authSession.userType,
         });
       }
-      setNotice("头像已更新");
+      setNotice(t("me.profile.avatarUpdated"));
     },
-    onError: (error) => setNotice(`头像更新失败：${formatError(error)}`),
+    onError: (error) => setNotice(t("me.profile.avatarUpdateFailed", { error: formatError(error) })),
   });
   const updateProfile = useMutation({
     mutationFn: async () => {
       const nextDisplayName = displayNameDraft.trim();
       const nextSignature = signatureDraft.trim();
-      if (!nextDisplayName) throw new Error("昵称不能为空");
+      if (!nextDisplayName) throw new Error(t("me.profile.error.emptyDisplayName"));
       const updatedProfile = await requireApiClient(authSession).updateMyProfile({
         displayName: nextDisplayName,
         signature: nextSignature || null,
@@ -653,9 +690,9 @@ function ProfileSettingsSection({
           userType: updatedProfile.userType ?? authSession.userType,
         });
       }
-      setNotice("个人资料已保存");
+      setNotice(t("me.profile.saved"));
     },
-    onError: (error) => setNotice(`个人资料保存失败：${formatError(error)}`),
+    onError: (error) => setNotice(t("me.profile.saveFailed", { error: formatError(error) })),
   });
 
   useEffect(() => {
@@ -676,34 +713,34 @@ function ProfileSettingsSection({
   const handleAvatarFileChange = (file?: File) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setNotice("请选择图片文件作为头像");
+      setNotice(t("me.profile.selectImageFile"));
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setNotice("头像图片不能超过 5 MB");
+      setNotice(t("me.profile.avatarTooLarge"));
       return;
     }
     setAvatarFile(file);
-    setNotice("已选择头像，点击保存后生效");
+    setNotice(t("me.profile.avatarSelected"));
   };
 
   return (
     <>
-      {profileLoading && <InlineSettingsState text="正在读取个人资料..." />}
+      {profileLoading && <InlineSettingsState text={t("me.profile.loading")} />}
       {profileError && (
         <InlineSettingsState
           tone="error"
-          text={`个人资料加载失败：${formatError(profileError)}`}
+          text={t("me.profile.loadFailed", { error: formatError(profileError) })}
         />
       )}
       <div className="settings-account-profile-grid">
         <div className="settings-account-overview-stack">
           <div className="settings-sub-card settings-avatar-card">
             <header>
-              <strong>个人头像</strong>
+              <strong>{t("me.profile.avatar")}</strong>
               <span className="settings-sub-card-meta">
                 <Camera size={14} />
-                <em>JPG、PNG、WebP，最大 5 MB</em>
+                <em>{t("me.profile.avatarFormat")}</em>
               </span>
             </header>
             <div className="settings-avatar-editor">
@@ -714,7 +751,7 @@ function ProfileSettingsSection({
               />
               <div className="settings-avatar-actions">
                 <strong>{displayName}</strong>
-                <em>{avatarFile ? avatarFile.name : "当前头像会同步到会话、联系人和侧边栏展示。"}</em>
+                <em>{avatarFile ? avatarFile.name : t("me.profile.avatarSyncHint")}</em>
                 <div>
                   <label className="settings-avatar-upload-button">
                     <input
@@ -725,7 +762,7 @@ function ProfileSettingsSection({
                         event.currentTarget.value = "";
                       }}
                     />
-                    选择图片
+                    {t("me.profile.chooseImage")}
                   </label>
                   <button
                     type="button"
@@ -734,7 +771,7 @@ function ProfileSettingsSection({
                       if (avatarFile) updateAvatar.mutate(avatarFile);
                     }}
                   >
-                    {updateAvatar.isPending ? "保存中" : "保存头像"}
+                    {updateAvatar.isPending ? t("common.saving") : t("me.profile.saveAvatar")}
                   </button>
                   {avatarFile && (
                     <button
@@ -742,45 +779,45 @@ function ProfileSettingsSection({
                       disabled={updateAvatar.isPending}
                       onClick={() => {
                         setAvatarFile(null);
-                        setNotice("已取消头像更改");
+                        setNotice(t("me.profile.avatarCancelled"));
                       }}
                     >
-                      取消
+                      {t("common.cancel")}
                     </button>
                   )}
                 </div>
               </div>
             </div>
             {!authSession && (
-              <InlineSettingsState tone="error" text="登录状态已失效，请重新登录后设置头像。" />
+              <InlineSettingsState tone="error" text={t("me.profile.loginExpiredAvatar")} />
             )}
           </div>
-          <InfoRow label="LPP 号" desc={profile?.lppId || authSession?.lppId || "--"} />
-          <InfoRow label="角色" desc={authSession?.roleLabel || "成员"} />
+          <InfoRow label={t("me.profile.lppId")} desc={profile?.lppId || authSession?.lppId || "--"} />
+          <InfoRow label={t("me.profile.role")} desc={authSession?.roleLabel || t("me.profile.member")} />
         </div>
         <div className="settings-sub-card settings-profile-form">
           <header>
-            <strong>资料信息</strong>
+            <strong>{t("me.profile.info")}</strong>
             <span className="settings-sub-card-meta">
               <UserRound size={14} />
-              <em>昵称和签名会同步到个人名片</em>
+              <em>{t("me.profile.infoHint")}</em>
             </span>
           </header>
           <label>
-            <span>昵称</span>
+            <span>{t("me.profile.displayName")}</span>
             <input
               maxLength={32}
-              placeholder="请输入昵称"
+              placeholder={t("me.profile.displayNamePlaceholder")}
               value={displayNameDraft}
               disabled={updateProfile.isPending || !authSession}
               onChange={(event) => setDisplayNameDraft(event.target.value)}
             />
           </label>
           <label>
-            <span>签名</span>
+            <span>{t("me.profile.signature")}</span>
             <textarea
               maxLength={120}
-              placeholder="添加一句工作状态或个人签名"
+              placeholder={t("me.profile.signaturePlaceholder")}
               value={signatureDraft}
               disabled={updateProfile.isPending || !authSession}
               onChange={(event) => setSignatureDraft(event.target.value)}
@@ -792,7 +829,7 @@ function ProfileSettingsSection({
               disabled={updateProfile.isPending || !authSession}
               onClick={() => updateProfile.mutate()}
             >
-              {updateProfile.isPending ? "保存中" : "保存资料"}
+              {updateProfile.isPending ? t("common.saving") : t("me.profile.saveProfile")}
             </button>
             <button
               type="button"
@@ -800,20 +837,20 @@ function ProfileSettingsSection({
               onClick={() => {
                 setDisplayNameDraft(displayName === "--" ? "" : displayName);
                 setSignatureDraft(profileSignature);
-                setNotice("已还原资料编辑");
+                setNotice(t("me.profile.reverted"));
               }}
             >
-              还原
+              {t("me.profile.revert")}
             </button>
           </div>
         </div>
       </div>
       <div className="settings-account-info-grid">
-        <InfoRow label="登录名" desc={profile?.loginName || "--"} />
-        <InfoRow label="用户 ID" desc={profile?.userId || authSession?.userId || "--"} />
-        <InfoRow label="手机号" desc={maskMobile(profile?.mobile)} />
-        <InfoRow label="邮箱" desc={maskEmail(profile?.email)} />
-        <InfoRow label="创建时间" desc={formatShortDate(profile?.createdAt)} />
+        <InfoRow label={t("me.profile.loginName")} desc={profile?.loginName || "--"} />
+        <InfoRow label={t("me.profile.userId")} desc={profile?.userId || authSession?.userId || "--"} />
+        <InfoRow label={t("me.profile.mobile")} desc={maskMobile(profile?.mobile)} />
+        <InfoRow label={t("me.profile.email")} desc={maskEmail(profile?.email)} />
+        <InfoRow label={t("me.profile.createdAt")} desc={formatShortDate(profile?.createdAt)} />
       </div>
     </>
   );
@@ -864,12 +901,13 @@ function EnterpriseIdentitySection({
   authSession: AuthSession | null;
   tenantInfo?: TenantInfoDto;
 }) {
+  const { t } = useI18n();
   const tenantCode = tenantInfo?.tenantCode || authSession?.tenantCode || "mouse-corp";
   const tenantName = tenantInfo?.tenantName || authSession?.tenantName || "mouse_corp";
   return (
     <div className="settings-sub-card">
       <header>
-        <strong>当前企业</strong>
+        <strong>{t("me.enterprise.current")}</strong>
         <span className="settings-sub-card-meta">
           <Building2 size={14} />
           <em>{tenantCode}</em>
@@ -877,7 +915,11 @@ function EnterpriseIdentitySection({
       </header>
       <InfoRow
         {...settingRowProps("enterpriseIdentity")}
-        desc={`${tenantName} / 企业号 ${tenantCode} / ${authSession?.roleLabel || "成员"}`}
+        desc={t("me.enterprise.identity", {
+          code: tenantCode,
+          name: tenantName,
+          role: authSession?.roleLabel || t("me.profile.member"),
+        })}
       />
     </div>
   );
@@ -892,6 +934,7 @@ function LaunchAtStartupSwitch({
   setNotice: (notice: string) => void;
   setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
 }) {
+  const { t } = useI18n();
   const desktopApi = typeof window === "undefined" ? undefined : window.desktopApi;
   const hasDesktopCapability = Boolean(
     desktopApi?.getLaunchAtStartup && desktopApi?.setLaunchAtStartup,
@@ -921,7 +964,7 @@ function LaunchAtStartupSwitch({
 
   const updateLaunchAtStartup = async (value: boolean) => {
     if (!desktopApi?.setLaunchAtStartup) {
-      setNotice("当前浏览器调试环境不支持开机自启");
+      setNotice(t("me.desktop.launchUnsupported"));
       return;
     }
     const previous = checked ?? pcSettings.launchAtStartup;
@@ -932,11 +975,11 @@ function LaunchAtStartupSwitch({
       setChecked(nextValue);
       setSetting("launchAtStartup", nextValue);
       setFailed(false);
-      setNotice(nextValue ? "已开启开机自启" : "已关闭开机自启");
+      setNotice(nextValue ? t("me.desktop.launchEnabled") : t("me.desktop.launchDisabled"));
     } catch (error) {
       setChecked(previous);
       setFailed(true);
-      setNotice(`开机自启设置失败：${formatError(error)}`);
+      setNotice(t("me.desktop.launchFailed", { error: formatError(error) }));
     } finally {
       setPending(false);
     }
@@ -950,9 +993,9 @@ function LaunchAtStartupSwitch({
       stateText={
         hasDesktopCapability
           ? failed
-            ? "状态读取失败"
+            ? t("me.desktop.statusReadFailed")
             : undefined
-          : "浏览器调试不可用"
+          : t("me.desktop.browserUnavailable")
       }
       onChange={(value) => void updateLaunchAtStartup(value)}
     />
@@ -968,6 +1011,7 @@ function MinimizeToTraySwitch({
   setNotice: (notice: string) => void;
   setSetting: <K extends SettingKey>(key: K, value: PcSettings[K]) => void;
 }) {
+  const { t } = useI18n();
   const desktopApi = typeof window === "undefined" ? undefined : window.desktopApi;
   const hasDesktopCapability = Boolean(
     desktopApi?.getMinimizeToTray && desktopApi?.setMinimizeToTray,
@@ -998,7 +1042,7 @@ function MinimizeToTraySwitch({
 
   const updateMinimizeToTray = async (value: boolean) => {
     if (!desktopApi?.setMinimizeToTray) {
-      setNotice("当前浏览器调试环境不支持最小化到托盘");
+      setNotice(t("me.desktop.trayUnsupported"));
       return;
     }
     const previous = checked ?? pcSettings.minimizeToTray;
@@ -1009,11 +1053,11 @@ function MinimizeToTraySwitch({
       setChecked(nextValue);
       setSetting("minimizeToTray", nextValue);
       setFailed(false);
-      setNotice(nextValue ? "已开启最小化到托盘" : "已关闭最小化到托盘");
+      setNotice(nextValue ? t("me.desktop.trayEnabled") : t("me.desktop.trayDisabled"));
     } catch (error) {
       setChecked(previous);
       setFailed(true);
-      setNotice(`最小化到托盘设置失败：${formatError(error)}`);
+      setNotice(t("me.desktop.trayFailed", { error: formatError(error) }));
     } finally {
       setPending(false);
     }
@@ -1027,9 +1071,9 @@ function MinimizeToTraySwitch({
       stateText={
         hasDesktopCapability
           ? failed
-            ? "状态同步失败"
+            ? t("me.desktop.statusSyncFailed")
             : undefined
-          : "浏览器调试不可用"
+          : t("me.desktop.browserUnavailable")
       }
       onChange={(value) => void updateMinimizeToTray(value)}
     />
@@ -1037,6 +1081,7 @@ function MinimizeToTraySwitch({
 }
 
 function AppProfileInfoRow() {
+  const { t } = useI18n();
   const [profile, setProfile] = useState<AppInstanceProfilePayload | null>(null);
 
   useEffect(() => {
@@ -1049,20 +1094,21 @@ function AppProfileInfoRow() {
       desc={
         profile
           ? `${profile.profileName} / ${profile.clientInstanceId.slice(0, 8)}`
-          : "正在读取当前窗口 profile..."
+          : t("me.development.loadingProfile")
       }
     />
   );
 }
 
 function DevelopmentDiagnosticsSection({ authSession }: { authSession: AuthSession | null }) {
-  const [version, setVersion] = useState("浏览器调试");
+  const { t } = useI18n();
+  const [version, setVersion] = useState(t("me.development.browserDebug"));
   const [profile, setProfile] = useState<AppInstanceProfilePayload | null>(null);
 
   useEffect(() => {
-    void window.desktopApi?.getAppVersion?.().then(setVersion).catch(() => setVersion("未知版本"));
+    void window.desktopApi?.getAppVersion?.().then(setVersion).catch(() => setVersion(t("me.development.unknownVersion")));
     void getAppInstanceProfile().then(setProfile).catch(() => setProfile(null));
-  }, []);
+  }, [t]);
 
   const diagnosticsCount =
     (window.__lppSettingsDiagnostics?.length ?? 0) +
@@ -1073,22 +1119,22 @@ function DevelopmentDiagnosticsSection({ authSession }: { authSession: AuthSessi
   return (
     <div className="settings-sub-card settings-dev-diagnostics">
       <header>
-        <strong>开发诊断</strong>
+        <strong>{t("me.development.title")}</strong>
         <span className="settings-sub-card-meta">
           <LockKeyhole size={14} />
-          <em>仅开发/测试环境显示</em>
+          <em>{t("me.development.visibleHint")}</em>
         </span>
       </header>
-      <InfoRow {...settingRowProps("developmentDiagnostics")} desc="诊断信息默认脱敏，不展示密码、token、Authorization、Cookie 或完整手机号。" />
-      <InfoRow label="当前环境" desc={import.meta.env.DEV ? "开发/测试运行" : "测试连接或内部开关"} />
-      <InfoRow label="版本" desc={version} />
-      <InfoRow label="API 地址" desc={formatEnvironment(authSession?.apiBaseUrl)} />
-      <InfoRow label="实时连接" desc="随诊断包采集 WebSocket 与消息网关状态。" />
+      <InfoRow {...settingRowProps("developmentDiagnostics")} desc={t("me.development.redactedHint")} />
+      <InfoRow label={t("me.development.currentEnvironment")} desc={import.meta.env.DEV ? t("me.development.devRuntime") : t("me.development.testConnection")} />
+      <InfoRow label={t("me.development.version")} desc={version} />
+      <InfoRow label={t("me.development.apiUrl")} desc={formatEnvironment(authSession?.apiBaseUrl, t)} />
+      <InfoRow label={t("me.development.realtime")} desc={t("me.development.realtimeHint")} />
       <InfoRow
         label="Profile"
-        desc={profile ? `${profile.profileName} / ${profile.deviceId.slice(0, 8)}` : "浏览器调试"}
+        desc={profile ? `${profile.profileName} / ${profile.deviceId.slice(0, 8)}` : t("me.development.browserDebug")}
       />
-      <InfoRow label="最近诊断记录" desc={`${diagnosticsCount} 条，可导出诊断包给研发定位。`} />
+      <InfoRow label={t("me.development.recentDiagnostics")} desc={t("me.development.recentDiagnosticsCount", { count: diagnosticsCount })} />
     </div>
   );
 }
@@ -1101,13 +1147,14 @@ function shouldShowDevelopmentDiagnostics(authSession: AuthSession | null) {
   return /(?:localhost|127\.0\.0\.1|test|dev|staging|qa)/i.test(authSession?.apiBaseUrl ?? "");
 }
 
-function formatEnvironment(value?: string | null) {
-  if (!value) return "当前代码默认测试环境";
+function formatEnvironment(value: string | null | undefined, t?: MeTranslate) {
+  const translate = t ?? ((key: string) => key);
+  if (!value) return translate("me.development.defaultEnvironment");
   try {
     const url = new URL(value);
-    return `${url.origin}（已隐藏 token、Authorization、Cookie）`;
+    return translate("me.development.environmentOrigin", { origin: url.origin });
   } catch {
-    return "当前连接环境（已隐藏敏感信息）";
+    return translate("me.development.environmentMasked");
   }
 }
 

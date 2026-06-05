@@ -243,11 +243,11 @@ export function conversationMetaText(
     currentDisplayName,
   );
   const parts = [
-    item.conversationType === "group" ? "群聊" : "好友私聊",
+    item.conversationType === "group" ? "Group chat" : "Direct chat",
     item.conversationType === "group" && item.memberCount
-      ? `${item.memberCount} 人`
+      ? `${item.memberCount} people`
       : undefined,
-    unread > 0 ? `${unread} 条未读` : "暂无未读",
+    unread > 0 ? `${unread} unread` : "No unread",
   ].filter(Boolean);
   return parts.join(" · ");
 }

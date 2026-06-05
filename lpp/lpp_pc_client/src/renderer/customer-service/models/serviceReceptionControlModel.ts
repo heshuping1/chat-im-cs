@@ -5,8 +5,10 @@ export type ReceptionQueueMode = "manual" | "auto";
 export type ReceptionControlLayout = "full" | "compact" | "header";
 
 export type ReceptionControlStatusOption = {
-  description: string;
-  label: string;
+  description?: string;
+  descriptionKey: string;
+  label?: string;
+  labelKey: string;
   primary: boolean;
   tone: "online" | "busy" | "away" | "offline";
   value: CustomerServiceStatus;
@@ -14,28 +16,32 @@ export type ReceptionControlStatusOption = {
 
 export const receptionControlStatusOptions: ReceptionControlStatusOption[] = [
   {
-    description: "可接入新会话，参与自动分配。",
+    descriptionKey: "customerService.reception.statusOption.online.description",
+    labelKey: "customerService.reception.statusOption.online.label",
     label: "在线",
     primary: true,
     tone: "online",
     value: "online",
   },
   {
-    description: "暂停自动接入，继续处理当前会话。",
+    descriptionKey: "customerService.reception.statusOption.busy.description",
+    labelKey: "customerService.reception.statusOption.busy.label",
     label: "忙碌",
     primary: true,
     tone: "busy",
     value: "busy",
   },
   {
-    description: "短时间离开坐席，不接收新的排队会话。",
+    descriptionKey: "customerService.reception.statusOption.break.description",
+    labelKey: "customerService.reception.statusOption.break.label",
     label: "短暂离开",
     primary: false,
     tone: "away",
     value: "break",
   },
   {
-    description: "不参与接待，建议先处理或转交当前会话。",
+    descriptionKey: "customerService.reception.statusOption.offline.description",
+    labelKey: "customerService.reception.statusOption.offline.label",
     label: "离线",
     primary: true,
     tone: "offline",
@@ -67,25 +73,36 @@ export function getReceptionQueueMode(
   return queueAcceptEnabled ? "auto" : "manual";
 }
 
-export function getReceptionQueueModeLabel(mode: ReceptionQueueMode) {
-  return mode === "auto" ? "自动分配" : "手动接入";
-}
-
-export function getReceptionQueueModeDescription(mode: ReceptionQueueMode) {
+export function getReceptionQueueModeLabelKey(mode: ReceptionQueueMode) {
   return mode === "auto"
-    ? "服务端按规则把排队会话分配给在线客服。"
-    : "排队会话保留在会话池，客服手动点击接入。";
+    ? "customerService.reception.queueMode.auto.label"
+    : "customerService.reception.queueMode.manual.label";
 }
 
-export function getQueueAutoDisabledReason(
+export function getReceptionQueueModeDescriptionKey(mode: ReceptionQueueMode) {
+  return mode === "auto"
+    ? "customerService.reception.queueMode.auto.description"
+    : "customerService.reception.queueMode.manual.description";
+}
+
+export function getQueueAutoDisabledReasonKey(
   status?: string | null,
 ): string | null {
   if (!receptionControlStatusOptions.some((item) => item.value === status)) {
-    return "接待状态未同步，暂不能启用自动分配。";
+    return "customerService.reception.queueMode.auto.disabledUnsynced";
   }
   return normalizeReceptionStatus(status) === "online"
     ? null
-    : "仅在线状态可以启用自动分配。";
+    : "customerService.reception.queueMode.auto.disabledOffline";
+}
+
+export function getQueueAutoDisabledReason(status?: string | null): string | null {
+  const key = getQueueAutoDisabledReasonKey(status);
+  if (!key) return null;
+  if (key === "customerService.reception.queueMode.auto.disabledUnsynced") {
+    return "接待状态未同步，暂不能启用自动分配。";
+  }
+  return "仅在线状态可以启用自动分配。";
 }
 
 export function resolveReceptionQueueModePatch(
@@ -127,8 +144,9 @@ export function getReceptionControlSummary(input: {
   const status = statusSynced
     ? getReceptionStatusOption(input.serviceStatus)
     : {
-        description: "接待状态正在同步，默认忙碌不接入。",
-        label: getReceptionStatusOption("busy").label,
+        descriptionKey: "customerService.reception.statusOption.unsynced.description",
+        labelKey: getReceptionStatusOption("busy").labelKey,
+        label: "忙碌",
         primary: false,
         tone: "busy" as const,
         value: "busy" as CustomerServiceStatus,
@@ -140,11 +158,13 @@ export function getReceptionControlSummary(input: {
       : `${input.activeSessions}/${input.maxSessions ?? "--"}`;
   return {
     queueMode,
-    queueModeDescription: getReceptionQueueModeDescription(queueMode),
-    queueModeLabel: getReceptionQueueModeLabel(queueMode),
+    queueModeDescriptionKey: getReceptionQueueModeDescriptionKey(queueMode),
+    queueModeLabelKey: getReceptionQueueModeLabelKey(queueMode),
+    queueModeLabel: queueMode === "auto" ? "自动分配" : "手动接入",
     sessionText,
     status,
     statusSynced,
-    summaryText: `${status.label} · ${getReceptionQueueModeLabel(queueMode)} · ${sessionText}`,
+    summaryTextKey: "customerService.reception.summary",
+    summaryText: `${status.label ?? "忙碌"} · ${queueMode === "auto" ? "自动分配" : "手动接入"} · ${sessionText}`,
   };
 }

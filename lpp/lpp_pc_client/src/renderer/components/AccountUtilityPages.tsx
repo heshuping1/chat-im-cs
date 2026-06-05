@@ -32,6 +32,7 @@ import { pcQueryKeys } from "../data/query-keys";
 import { createTraceId } from "../data/runtime";
 import { requireApiClient } from "../data/runtime";
 import { formatError, formatShortDate } from "../lib/format";
+import { useI18n } from "../i18n/useI18n";
 import { TenantInvitationPanel } from "../spaces/components/TenantInvitationPanel";
 import { useSpaceSwitchController } from "../spaces/hooks/useSpaceSwitchController";
 import {
@@ -49,6 +50,7 @@ interface UtilityNotice {
 }
 
 export function EnterpriseSwitchPage() {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const authSession = useAuthSession();
   const setAuthSession = useSetAuthSession();
@@ -58,8 +60,8 @@ export function EnterpriseSwitchPage() {
   const [notice, setNotice] = useState<UtilityNotice | null>(null);
   const isPersonalSpace =
     authSession?.spaceType === 1 ||
-    authSession?.roleLabel === "个人空间" ||
-    authSession?.tenantName === "个人空间" ||
+    authSession?.roleLabel === "\u4e2a\u4eba\u7a7a\u95f4" ||
+    authSession?.tenantName === "\u4e2a\u4eba\u7a7a\u95f4" ||
     isPersonalTenantPlaceholder(authSession?.tenantId);
   const tenantInfoQuery = useQuery({
     queryKey: pcQueryKeys.accountTenant(authSession?.apiBaseUrl, authSession?.tenantToken),
@@ -89,8 +91,8 @@ export function EnterpriseSwitchPage() {
   });
   const tenantInfo = tenantInfoQuery.data;
   const tenantName = isPersonalSpace
-    ? "个人空间"
-    : tenantInfo?.tenantName || authSession?.tenantName || "当前企业";
+    ? t("accountUtility.space.personalSpace")
+    : tenantInfo?.tenantName || authSession?.tenantName || t("accountUtility.space.currentEnterprise");
   const tenantCode = isPersonalSpace ? "--" : tenantInfo?.tenantCode || authSession?.tenantCode || "--";
   const tenantId = isPersonalSpace ? "--" : tenantInfo?.tenantId || authSession?.tenantId || "--";
   const logoUrl = isPersonalSpace ? undefined : tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl;
@@ -111,30 +113,30 @@ export function EnterpriseSwitchPage() {
     return map;
   }, [spaces]);
   const { switchSpaceMutation } = useSpaceSwitchController({
-    onError: (error) => setNotice(errorNotice("空间切换失败", formatError(error))),
+    onError: (error) => setNotice(errorNotice(t("accountUtility.space.switchFailed"), formatError(error))),
     onSuccess: () =>
       setNotice({
         tone: "success",
-        title: "空间已切换",
-        detail: "当前会话身份和企业上下文已同步更新。",
+        title: t("accountUtility.space.switchSuccess"),
+        detail: t("accountUtility.space.switchSuccessDetail"),
       }),
   });
   const tenantSearchMutation = useMutation({
     mutationFn: async (code: string) => {
       if (!authSession?.platformToken) {
-        throw new Error("当前登录未保留平台会话，请重新登录后预览企业");
+        throw new Error(t("accountUtility.space.missingPlatformPreview"));
       }
       return requireApiClient(authSession).previewTenantByCode(code);
     },
     onSuccess: () => {
       setJoinMessage("");
     },
-    onError: (error) => setNotice(errorNotice("企业码预览失败", formatError(error))),
+    onError: (error) => setNotice(errorNotice(t("accountUtility.space.previewFailed"), formatError(error))),
   });
   const joinMutation = useMutation({
     mutationFn: async (tenant: TenantCodePreviewDto) => {
       if (!authSession?.platformToken) {
-        throw new Error("当前登录未保留平台会话，请重新登录后加入企业");
+        throw new Error(t("accountUtility.space.missingPlatformJoin"));
       }
       const result = await requireApiClient(authSession).joinTenantByCode({
         tenantCode: tenant.tenantCode,
@@ -148,20 +150,20 @@ export function EnterpriseSwitchPage() {
         await applyJoinedTenantSession(result, tenant);
         setNotice({
           tone: "success",
-          title: "已加入企业并进入空间",
-          detail: "当前空间列表和会话身份已刷新。",
+          title: t("accountUtility.space.joinSuccess"),
+          detail: t("accountUtility.space.joinSuccessDetail"),
         });
         return;
       }
       setNotice({
         tone: "warning",
-        title: "申请已提交，等待管理员审核",
-        detail: "审核通过后，该企业会出现在可切换空间中。系统会每 5 分钟自动检查一次。",
+        title: t("accountUtility.space.joinPending"),
+        detail: t("accountUtility.space.joinPendingDetail"),
       });
       await joinRequestsQuery.refetch();
       await spacesQuery.refetch();
     },
-    onError: (error) => setNotice(tenantJoinErrorNotice(error)),
+    onError: (error) => setNotice(tenantJoinErrorNotice(error, t)),
   });
   const previewTenant = tenantSearchMutation.data ?? null;
   const handleTenantSearch = () => {
@@ -169,8 +171,8 @@ export function EnterpriseSwitchPage() {
     if (!code) {
       setNotice({
         tone: "info",
-        title: "请输入企业码后再预览",
-        detail: "先确认企业名称、审批方式和成员状态，再提交加入申请。",
+        title: t("accountUtility.space.enterCodeBeforePreview"),
+        detail: t("accountUtility.space.enterCodeBeforePreviewDetail"),
       });
       return;
     }
@@ -194,8 +196,8 @@ export function EnterpriseSwitchPage() {
     }
     setNotice({
       tone: "warning",
-      title: "成员身份已确认，空间列表暂未同步",
-      detail: "请刷新空间列表或重新登录后进入该企业。",
+      title: t("accountUtility.space.memberConfirmedUnsynced"),
+      detail: t("accountUtility.space.memberConfirmedUnsyncedDetail"),
     });
   };
   const applyJoinedTenantSession = async (
@@ -242,11 +244,11 @@ export function EnterpriseSwitchPage() {
       <section className="account-utility-hero enterprise-switch-hero">
         <div>
           <span className="eyebrow">SPACES</span>
-          <h1>空间切换</h1>
-          <p>管理个人空间和企业空间，加入企业前先查询并确认目标企业。</p>
+          <h1>{t("accountUtility.space.title")}</h1>
+          <p>{t("accountUtility.space.subtitle")}</p>
         </div>
         <div className="space-hero-summary">
-          <span>当前账号</span>
+          <span>{t("accountUtility.space.currentAccount")}</span>
           <strong>{authSession?.displayName || "--"}</strong>
           <em>{authSession?.lppId ?? authSession?.platformUserId ?? "--"}</em>
         </div>
@@ -256,42 +258,42 @@ export function EnterpriseSwitchPage() {
       <section className="account-utility-card enterprise-space-panel">
           <header>
             <Building2 size={18} />
-            <strong>当前空间</strong>
+            <strong>{t("accountUtility.space.currentSpace")}</strong>
           </header>
-          {!isPersonalSpace && tenantInfoQuery.isLoading && <InlineState text="正在读取企业信息..." />}
+          {!isPersonalSpace && tenantInfoQuery.isLoading && <InlineState text={t("accountUtility.space.loadingTenant")} />}
           {!isPersonalSpace && tenantInfoQuery.error && (
-            <InlineState tone="error" text={`企业信息加载失败：${formatError(tenantInfoQuery.error)}`} />
+            <InlineState tone="error" text={t("accountUtility.space.tenantLoadFailed", { error: formatError(tenantInfoQuery.error) })} />
           )}
           <div className="enterprise-current-card">
             <PcAvatar
               avatarUrl={logoUrl}
               className="tenant-logo large"
               kind={isPersonalSpace ? "person" : "tenant"}
-              name={isPersonalSpace ? authSession?.displayName ?? "我" : tenantName}
+              name={isPersonalSpace ? authSession?.displayName ?? t("accountUtility.space.me") : tenantName}
             />
             <div>
               <strong>{tenantName}</strong>
               <span>{tenantCode}</span>
             </div>
-            <span className="current-pill">当前使用中</span>
+            <span className="current-pill">{t("accountUtility.space.currentlyUsing")}</span>
           </div>
           <div className="enterprise-current-meta">
-            <InfoLine label="空间码" value={tenantCode} copyable />
-            <InfoLine label="空间 ID" value={tenantId} copyable={!isPersonalSpace && tenantId !== "--"} />
-            <InfoLine label="当前角色" value={isPersonalSpace ? "个人空间" : authSession?.roleLabel || "成员"} />
+            <InfoLine label={t("accountUtility.space.spaceCode")} value={tenantCode} copyable />
+            <InfoLine label={t("accountUtility.space.spaceId")} value={tenantId} copyable={!isPersonalSpace && tenantId !== "--"} />
+            <InfoLine label={t("accountUtility.space.currentRole")} value={isPersonalSpace ? t("accountUtility.space.personalSpace") : authSession?.roleLabel || t("accountUtility.space.member")} />
           </div>
 
           <div className="space-panel-section">
             <header>
               <Building2 size={18} />
-              <strong>可切换空间</strong>
+              <strong>{t("accountUtility.space.switchableSpaces")}</strong>
             </header>
             {!authSession?.platformToken && (
-              <InlineState tone="error" text="当前会话缺少平台 Token，请重新登录后切换空间。" />
+              <InlineState tone="error" text={t("accountUtility.space.missingPlatformSwitch")} />
             )}
-            {spacesQuery.isLoading && <InlineState text="正在读取空间列表..." />}
+            {spacesQuery.isLoading && <InlineState text={t("accountUtility.space.loadingSpaces")} />}
             {spacesQuery.error && (
-              <InlineState tone="error" text={`空间列表加载失败：${formatError(spacesQuery.error)}`} />
+              <InlineState tone="error" text={t("accountUtility.space.spacesLoadFailed", { error: formatError(spacesQuery.error) })} />
             )}
             <div className="space-page-list">
               <button
@@ -300,12 +302,12 @@ export function EnterpriseSwitchPage() {
                 disabled={switchSpaceMutation.isPending || !authSession?.platformToken}
                 onClick={() => switchSpaceMutation.mutate("personal")}
               >
-                <PcAvatar className="tenant-logo large" kind="person" name={authSession?.displayName ?? "我"} />
+                <PcAvatar className="tenant-logo large" kind="person" name={authSession?.displayName ?? t("accountUtility.space.me")} />
                 <span>
-                  <strong>个人空间</strong>
+                  <strong>{t("accountUtility.space.personalSpace")}</strong>
                   <em>{authSession?.lppId ?? authSession?.platformUserId ?? "--"}</em>
                 </span>
-                {authSession?.roleLabel === "个人空间" ? <Check size={16} /> : <ChevronHint />}
+                {authSession?.roleLabel === "\u4e2a\u4eba\u7a7a\u95f4" ? <Check size={16} /> : <ChevronHint />}
               </button>
               {spaces.map((space) => (
                 <button
@@ -329,7 +331,7 @@ export function EnterpriseSwitchPage() {
           <div className="space-panel-section enterprise-join-panel">
           <header>
             <Building2 size={18} />
-            <strong>企业码预览并加入</strong>
+            <strong>{t("accountUtility.space.previewAndJoin")}</strong>
           </header>
           <form
             className="space-search-form"
@@ -346,7 +348,7 @@ export function EnterpriseSwitchPage() {
                   setTenantKeyword(event.target.value);
                   setNotice(null);
                 }}
-                placeholder="输入企业码"
+                placeholder={t("accountUtility.space.codePlaceholder")}
               />
             </label>
             <button
@@ -354,24 +356,24 @@ export function EnterpriseSwitchPage() {
               disabled={tenantSearchMutation.isPending || !authSession?.platformToken}
               onClick={handleTenantSearch}
             >
-              {tenantSearchMutation.isPending ? "预览中" : "预览企业"}
+              {tenantSearchMutation.isPending ? t("accountUtility.space.previewing") : t("accountUtility.space.previewEnterprise")}
             </button>
           </form>
           {!authSession?.platformToken && (
-            <InlineState tone="error" text="当前会话缺少平台 Token，请重新登录后预览和加入企业。" />
+            <InlineState tone="error" text={t("accountUtility.space.missingPlatformPreviewJoin")} />
           )}
           {pendingJoinRequests.length > 0 && (
             <InlineState
-              text={`已有 ${pendingJoinRequests.length} 个加入申请待审核，系统会每 5 分钟自动检查一次。`}
+              text={t("accountUtility.space.pendingRequests", { count: pendingJoinRequests.length })}
             />
           )}
           {tenantSearchMutation.error && (
-            <InlineState tone="error" text={`企业码预览失败：${formatError(tenantSearchMutation.error)}`} />
+            <InlineState tone="error" text={t("accountUtility.space.previewFailedWithError", { error: formatError(tenantSearchMutation.error) })} />
           )}
           {!tenantPreviewStarted && (
             <div className="utility-empty space-search-empty">
-              <strong>先输入企业码预览企业</strong>
-              <span>确认企业名称、审批方式和成员状态后，再提交加入申请。</span>
+              <strong>{t("accountUtility.space.previewEmptyTitle")}</strong>
+              <span>{t("accountUtility.space.previewEmptyDetail")}</span>
             </div>
           )}
           {tenantPreviewStarted &&
@@ -379,11 +381,11 @@ export function EnterpriseSwitchPage() {
             !tenantSearchMutation.error &&
             !previewTenant && (
             <div className="utility-empty space-search-empty">
-              <strong>未找到该企业码</strong>
-              <span>请确认企业码是否完整。企业码精确匹配，大小写由服务端兼容。</span>
+              <strong>{t("accountUtility.space.notFoundTitle")}</strong>
+              <span>{t("accountUtility.space.notFoundDetail")}</span>
             </div>
           )}
-          {tenantSearchMutation.isPending && <InlineState text="正在预览企业..." />}
+          {tenantSearchMutation.isPending && <InlineState text={t("accountUtility.space.previewLoading")} />}
           {previewTenant && (
             <div className="tenant-search-results">
               {(() => {
@@ -407,20 +409,20 @@ export function EnterpriseSwitchPage() {
                       <span>{[tenant.tenantCode, tenant.industry].filter(Boolean).join(" · ") || tenant.tenantId}</span>
                       {tenant.tenantDescription && <p>{tenant.tenantDescription}</p>}
                       <div className="tenant-search-tags">
-                        {typeof tenant.memberCount === "number" && <em>{tenant.memberCount} 人</em>}
+                        {typeof tenant.memberCount === "number" && <em>{t("accountUtility.space.memberCount", { count: tenant.memberCount })}</em>}
                         <em>
                           {joinApprovalMode === "manual"
-                            ? "申请后需管理员审批"
-                            : "确认后可直接加入"}
+                            ? t("accountUtility.space.manualApproval")
+                            : t("accountUtility.space.autoApproval")}
                         </em>
-                        {isCurrentTenant && <em>当前使用中</em>}
-                        {tenant.alreadyMember && <em>已加入</em>}
+                        {isCurrentTenant && <em>{t("accountUtility.space.currentlyUsing")}</em>}
+                        {tenant.alreadyMember && <em>{t("accountUtility.space.alreadyJoined")}</em>}
                       </div>
                     </div>
                     <div className="tenant-search-actions">
                       {isCurrentTenant ? (
                         <button type="button" disabled>
-                          当前使用中
+                          {t("accountUtility.space.currentlyUsing")}
                         </button>
                       ) : canEnter ? (
                         <button
@@ -428,7 +430,7 @@ export function EnterpriseSwitchPage() {
                           disabled={switchSpaceMutation.isPending}
                           onClick={() => void handleEnterPreviewTenant(tenant)}
                         >
-                          {existingSpace ? "切换进入" : "进入"}
+                          {existingSpace ? t("accountUtility.space.switchEnter") : t("accountUtility.space.enter")}
                         </button>
                       ) : (
                         <button
@@ -438,10 +440,10 @@ export function EnterpriseSwitchPage() {
                           onClick={() => joinMutation.mutate(tenant)}
                         >
                           {joinMutation.isPending
-                            ? "提交中"
+                            ? t("accountUtility.space.submitting")
                             : joinApprovalMode === "manual"
-                              ? "申请加入"
-                              : "加入企业"}
+                              ? t("accountUtility.space.applyJoin")
+                              : t("accountUtility.space.joinEnterprise")}
                         </button>
                       )}
                     </div>
@@ -450,7 +452,7 @@ export function EnterpriseSwitchPage() {
                         <textarea
                           value={joinMessage}
                           onChange={(event) => setJoinMessage(event.target.value)}
-                          placeholder="申请说明，可选"
+                          placeholder={t("accountUtility.space.joinMessagePlaceholder")}
                           rows={3}
                         />
                         <button
@@ -460,10 +462,10 @@ export function EnterpriseSwitchPage() {
                           onClick={() => joinMutation.mutate(tenant)}
                         >
                           {joinMutation.isPending
-                            ? "提交中"
+                            ? t("accountUtility.space.submitting")
                             : joinApprovalMode === "manual"
-                              ? "申请加入"
-                              : "加入企业"}
+                              ? t("accountUtility.space.applyJoin")
+                              : t("accountUtility.space.joinEnterprise")}
                         </button>
                       </div>
                     )}
@@ -480,6 +482,7 @@ export function EnterpriseSwitchPage() {
 }
 
 export function FavoritesPage() {
+  const { t } = useI18n();
   const authSession = useAuthSession();
   const [category, setCategory] = useState("all");
   const [keyword, setKeyword] = useState("");
@@ -510,8 +513,8 @@ export function FavoritesPage() {
     <main className="module-page account-utility-page">
       <section className="account-utility-hero">
         <span className="eyebrow">FAVORITES</span>
-        <h1>收藏</h1>
-        <p>按 App 口径统一查看文字、图片、视频、语音、文件、其他收藏和标签。</p>
+        <h1>{t("accountUtility.favorites.title")}</h1>
+        <p>{t("accountUtility.favorites.subtitle")}</p>
       </section>
 
       <section className="favorite-summary-grid">
@@ -522,7 +525,7 @@ export function FavoritesPage() {
             key={item.key}
             onClick={() => setCategory(item.key)}
           >
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
             <strong>{favoriteCount(item.key, summary, favorites.length)}</strong>
           </button>
         ))}
@@ -534,31 +537,31 @@ export function FavoritesPage() {
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索收藏内容、会话、发送人"
+            placeholder={t("accountUtility.favorites.searchPlaceholder")}
           />
         </div>
         <div className="favorite-tag-list">
           <Tag size={15} />
-          {tags.length === 0 ? <span>暂无标签</span> : tags.map((tag) => <button type="button" key={tag}>{tag}</button>)}
+          {tags.length === 0 ? <span>{t("accountUtility.favorites.noTags")}</span> : tags.map((tag) => <button type="button" key={tag}>{tag}</button>)}
         </div>
       </section>
 
       <section className="account-utility-card">
         <header>
           <Star size={18} />
-          <strong>收藏列表</strong>
+          <strong>{t("accountUtility.favorites.list")}</strong>
         </header>
-        {(summaryQuery.isLoading || favoritesQuery.isLoading) && <InlineState text="正在读取收藏..." />}
+        {(summaryQuery.isLoading || favoritesQuery.isLoading) && <InlineState text={t("accountUtility.favorites.loading")} />}
         {(summaryQuery.error || favoritesQuery.error) && (
           <InlineState
             tone="error"
-            text={`收藏加载失败：${formatError(summaryQuery.error || favoritesQuery.error)}`}
+            text={t("accountUtility.favorites.loadFailed", { error: formatError(summaryQuery.error || favoritesQuery.error) })}
           />
         )}
         {!summaryQuery.isLoading && !favoritesQuery.isLoading && favorites.length === 0 && (
           <div className="utility-empty">
-            <strong>暂无收藏内容</strong>
-            <span>服务端当前返回为空。</span>
+            <strong>{t("accountUtility.favorites.emptyTitle")}</strong>
+            <span>{t("accountUtility.favorites.emptyDetail")}</span>
           </div>
         )}
         {favorites.length > 0 && (
@@ -586,13 +589,13 @@ export function FavoritesPage() {
 }
 
 const favoriteCategories = [
-  { key: "all", label: "全部" },
-  { key: "text", label: "文字" },
-  { key: "image", label: "图片" },
-  { key: "video", label: "视频" },
-  { key: "voice", label: "语音" },
-  { key: "file", label: "文件" },
-  { key: "other", label: "其他" },
+  { key: "all", labelKey: "accountUtility.favorites.category.all" },
+  { key: "text", labelKey: "accountUtility.favorites.category.text" },
+  { key: "image", labelKey: "accountUtility.favorites.category.image" },
+  { key: "video", labelKey: "accountUtility.favorites.category.video" },
+  { key: "voice", labelKey: "accountUtility.favorites.category.voice" },
+  { key: "file", labelKey: "accountUtility.favorites.category.file" },
+  { key: "other", labelKey: "accountUtility.favorites.category.other" },
 ];
 
 function normalizeSpaces(
@@ -645,7 +648,8 @@ function favoriteIcon(type?: string | null) {
 }
 
 function ChevronHint() {
-  return <span className="space-page-chevron">进入</span>;
+  const { t } = useI18n();
+  return <span className="space-page-chevron">{t("accountUtility.space.enter")}</span>;
 }
 
 function UtilityNoticeBanner({ notice }: { notice: UtilityNotice }) {
@@ -683,27 +687,29 @@ function errorNotice(title: string, detail: string): UtilityNotice {
   };
 }
 
-function tenantJoinErrorNotice(error: unknown): UtilityNotice {
+type AccountUtilityTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+function tenantJoinErrorNotice(error: unknown, t: AccountUtilityTranslate): UtilityNotice {
   const message = formatError(error);
   if (isTenantJoinPendingMessage(message)) {
     return {
       tone: "warning",
-      title: "申请已在审核中",
-      detail: "你已提交过加入申请，管理员审核通过后会出现在可切换空间中。",
+      title: t("accountUtility.space.joinAlreadyPending"),
+      detail: t("accountUtility.space.joinAlreadyPendingDetail"),
     };
   }
-  if (message.includes("你已在该企业中")) {
+  if (message.includes("\u4f60\u5df2\u5728\u8be5\u4f01\u4e1a\u4e2d")) {
     return {
       tone: "info",
-      title: "你已在该企业中",
-      detail: "请从可切换空间进入，或刷新空间列表后再试。",
+      title: t("accountUtility.space.alreadyInEnterprise"),
+      detail: t("accountUtility.space.alreadyInEnterpriseDetail"),
     };
   }
-  return errorNotice("加入企业失败", message);
+  return errorNotice(t("accountUtility.space.joinFailed"), message);
 }
 
 function isTenantJoinPendingMessage(message: string) {
-  return message.includes("已提交加入申请") || message.includes("等待管理员审核");
+  return message.includes("\u5df2\u63d0\u4ea4\u52a0\u5165\u7533\u8bf7") || message.includes("\u7b49\u5f85\u7ba1\u7406\u5458\u5ba1\u6838");
 }
 
 function InfoLine({
@@ -715,6 +721,7 @@ function InfoLine({
   value: string;
   copyable?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="account-info-line">
       <span>{label}</span>
@@ -722,7 +729,7 @@ function InfoLine({
       {copyable && value && value !== "--" && (
         <button
           type="button"
-          aria-label={`复制${label}`}
+          aria-label={t("accountUtility.copyLabel", { label })}
           onClick={() => void navigator.clipboard?.writeText(value).catch(() => undefined)}
         >
           <Copy size={13} />

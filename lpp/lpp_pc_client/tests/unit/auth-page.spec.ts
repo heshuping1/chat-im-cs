@@ -27,8 +27,8 @@ describe("auth page contract", () => {
     ).toBe(true);
     expect(source).toContain('from "./auth/AuthPageParts"');
     expect(authSource).toContain("auth-mode-switch");
-    expect(authSource).toContain("登录");
-    expect(authSource).toContain("注册");
+    expect(authSource).toContain("auth.login");
+    expect(authSource).toContain("auth.register");
     expect(authSource).toContain('onChange("register")');
     expect(source).toContain("platformRegister");
   });
@@ -37,7 +37,7 @@ describe("auth page contract", () => {
     expect(source).toContain("registerAvatarOptions");
     expect(source).toContain("selectedRegisterAvatarUrl");
     expect(source).toContain("avatarUrl: selectedRegisterAvatarUrl");
-    expect(authSource).toContain("选择头像");
+    expect(authSource).toContain("auth.avatar");
     expect(authSource).toContain("visibleAvatarOptions");
     expect(authSource).toContain("showAllAvatarOptions");
     expect(authSource).toContain("auth-avatar-option");
@@ -47,42 +47,42 @@ describe("auth page contract", () => {
 
   it("moves technical configuration behind advanced settings", () => {
     expect(authSource).toContain("<details");
-    expect(authSource).toContain("高级设置");
-    expect(authSource).toContain("服务地址（高级）");
-    expect(authSource).not.toContain("企业 tenantId，可选");
+    expect(authSource).toContain("auth.advancedSettings");
+    expect(authSource).toContain("auth.serviceUrlAdvanced");
+    expect(authSource).not.toContain("auth.tenantId");
     expect(authSource).not.toContain("onTenantIdChange");
     expect(source).not.toContain("tenantId={tenantId}");
     expect(source).not.toContain("VITE_TENANT_ID");
-    expect(authSource).not.toContain("<span>服务地址</span>");
+    expect(authSource).not.toContain("<span>{t(\"auth.serviceUrl\")}</span>");
   });
 
   it("does not expose a production login default account", () => {
     expect(authSource).not.toContain("lpp_gs9fn2c7");
-    expect(authSource).toContain("请输入 LPP 号 / 邮箱 / 手机号");
+    expect(authSource).toContain("auth.identifierPlaceholder");
   });
 
   it("uses a post-login space picker instead of forcing tenant id in the main form", () => {
     expect(source).toContain("pendingLogin");
-    expect(authSource).toContain("选择进入空间");
+    expect(authSource).toContain("auth.chooseSpaceTitle");
     expect(source).toContain("createAuthSpaceChoices");
     expect(source).toContain("handleSelectTenant");
   });
 
   it("supports optional invitation code for existing-login and new-registration join flows", () => {
-    expect(authSource).toContain("邀请码（可选）");
+    expect(authSource).toContain("auth.invitationOptional");
     expect(authSource).toContain("auth-invitation-field");
     expect(authSource).toContain("auth-invitation-preview-card");
     expect(authSource).toContain("将加入企业");
     expect(authSource).toContain("无法确认邀请码");
-    expect(authSource).toContain("已有账号可登录后加入被邀请的企业，不会修改已加入企业的角色。");
-    expect(authSource).not.toContain("<summary>已有邀请码？</summary>");
+    expect(authSource).toContain("auth.invitationHelp");
+    expect(authSource).not.toContain("<summary>{t(\"auth.hasInvitation\")}</summary>");
     expect(source).toContain("invitationCode");
     expect(source).toContain("invitationPreview");
     expect(source).toContain("createInvitationPreviewView");
     expect(source).toContain("createInvitationPreviewErrorView");
     expect(source).toContain("getPlatformInvitationPreview");
     expect(source).toContain("acceptPlatformInvitation");
-    expect(source).toContain("已加入企业，正在进入工作台");
+    expect(source).toContain("auth.joinedEnteringWorkbench");
     expect(source).toContain("applySelectedTenantSession(baseUrl, login, tenant, null)");
     expect(source).not.toContain("inviteCode:");
     expect(source).not.toContain("invitationCode:");
@@ -93,11 +93,11 @@ describe("auth page contract", () => {
     expect(source).toContain("registerCountryDialCode");
     expect(source).toContain("registerPhoneCountryOptions");
     expect(authSource).toContain("auth-contact-mode");
-    expect(authSource).toContain("邮箱");
-    expect(authSource).toContain("手机号");
-    expect(authSource).toContain("国家/地区");
-    expect(authSource).toContain("请输入有效邮箱");
-    expect(authSource).toContain("请输入手机号");
+    expect(authSource).toContain("auth.email");
+    expect(authSource).toContain("auth.mobile");
+    expect(authSource).toContain("auth.countryRegion");
+    expect(authSource).toContain("auth.emailPlaceholder");
+    expect(authSource).toContain("auth.mobilePlaceholder");
   });
 
   it("styles auth modes, space picker and advanced settings locally", () => {

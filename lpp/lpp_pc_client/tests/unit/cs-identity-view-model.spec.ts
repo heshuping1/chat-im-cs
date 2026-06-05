@@ -41,12 +41,12 @@ describe("customer service identity view model", () => {
     ).toMatchObject({
       avatarTone: "indigo",
       avatarUrl: "customer.png",
-      displayName: "未知客户",
+      displayName: "customerService.threadList.unknownCustomer",
     });
 
     expect(createCustomerServiceIdentityViewModel({ history: true })).toMatchObject({
-      avatarName: "访客",
-      displayName: "访客",
+      avatarName: "customerService.visitor",
+      displayName: "customerService.visitor",
     });
   });
 });

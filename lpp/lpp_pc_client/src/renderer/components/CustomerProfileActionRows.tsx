@@ -8,12 +8,16 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import type { TranslationParams } from "../i18n/dictionary";
+import { useI18n } from "../i18n/useI18n";
 
 import {
   isKnown,
   type CustomerModel,
 } from "./CustomerProfileModel";
 import { CustomerProfileTagList } from "./CustomerProfileBits";
+
+type Translate = (key: string, params?: TranslationParams) => string;
 
 export function CustomerProfileActionRows({
   model,
@@ -32,6 +36,7 @@ export function CustomerProfileActionRows({
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
   pending?: boolean;
 }) {
+  const { t } = useI18n();
   const ticketCount = model.tickets.length;
   const [editingRemark, setEditingRemark] = useState(false);
   const [remarkDraft, setRemarkDraft] = useState("");
@@ -49,44 +54,53 @@ export function CustomerProfileActionRows({
 
   const saveRemark = async () => {
     if (!editable || !onUpdateRemark) {
-      onPendingAction("当前客户缺少好友 ID，无法编辑备注");
+      onPendingAction(t("customerProfile.notice.missingFriendForRemark"));
       return;
     }
     try {
       await onUpdateRemark(remarkDraft.trim());
       setEditingRemark(false);
-      onPendingAction("备注已更新");
+      onPendingAction(t("customerProfile.notice.remarkUpdated"));
     } catch (error) {
-      onPendingAction(error instanceof Error ? `备注更新失败：${error.message}` : "备注更新失败");
+      onPendingAction(
+        error instanceof Error
+          ? t("customerProfile.notice.remarkUpdateFailedWithError", { error: error.message })
+          : t("customerProfile.notice.remarkUpdateFailed"),
+      );
     }
   };
 
   const saveTags = async () => {
     if (!editable || !onUpdateTags) {
-      onPendingAction("当前客户缺少好友 ID，无法编辑标签");
+      onPendingAction(t("customerProfile.notice.missingFriendForTags"));
       return;
     }
     try {
       await onUpdateTags(parseTagDraft(tagDraft));
       setEditingTags(false);
-      onPendingAction("标签已更新");
+      onPendingAction(t("customerProfile.notice.tagsUpdated"));
     } catch (error) {
-      onPendingAction(error instanceof Error ? `标签更新失败：${error.message}` : "标签更新失败");
+      onPendingAction(
+        error instanceof Error
+          ? t("customerProfile.notice.tagsUpdateFailedWithError", { error: error.message })
+          : t("customerProfile.notice.tagsUpdateFailed"),
+      );
     }
   };
 
   return (
     <section
       className="customer-profile-actions"
-      aria-label="客户处理"
+      aria-label={t("customerProfile.actionAria")}
       data-testid="customer-profile-actions"
     >
       {editingRemark ? (
         <CustomerProfileInlineEditor
           actionKey="remark"
           icon={<PencilLine size={15} />}
-          label="备注"
+          label={t("customerProfile.fields.remark")}
           pending={pending}
+          t={t}
           value={remarkDraft}
           onCancel={() => setEditingRemark(false)}
           onChange={setRemarkDraft}
@@ -94,27 +108,27 @@ export function CustomerProfileActionRows({
         />
       ) : (
         <CustomerProfileActionRow
-          actionLabel="编辑"
+          actionLabel={t("customerProfile.actions.edit")}
           actionKey="remark"
           icon={<PencilLine size={15} />}
-          label="备注"
+          label={t("customerProfile.fields.remark")}
           onAction={() => {
             setRemarkDraft(isKnown(model.remark) ? model.remark : "");
             setEditingRemark(true);
             onPendingAction("");
           }}
-          value={isKnown(model.remark) ? model.remark : "暂无备注"}
+          value={isKnown(model.remark) ? model.remark : t("customerProfile.empty.remark")}
         />
       )}
       <div className="customer-profile-action-row" data-action-row="tags">
         <span className="customer-profile-action-label">
           <Tags size={15} />
-          标签
+          {t("customerProfile.fields.tags")}
         </span>
         <div className="customer-profile-action-value">
           {editingTags ? (
             <input
-              aria-label="编辑标签"
+              aria-label={t("customerProfile.actions.editField", { field: t("customerProfile.fields.tags") })}
               className="customer-profile-action-input"
               disabled={pending}
               value={tagDraft}
@@ -139,7 +153,7 @@ export function CustomerProfileActionRows({
           <span className="customer-profile-editor-actions">
             <button
               type="button"
-              aria-label="保存标签"
+              aria-label={t("customerProfile.actions.saveField", { field: t("customerProfile.fields.tags") })}
               disabled={pending}
               onClick={() => void saveTags()}
             >
@@ -147,7 +161,7 @@ export function CustomerProfileActionRows({
             </button>
             <button
               type="button"
-              aria-label="取消标签编辑"
+              aria-label={t("customerProfile.actions.cancelFieldEdit", { field: t("customerProfile.fields.tags") })}
               disabled={pending}
               onClick={() => setEditingTags(false)}
             >
@@ -157,20 +171,24 @@ export function CustomerProfileActionRows({
         )}
       </div>
       <CustomerProfileActionRow
-        actionLabel="设置"
+        actionLabel={t("customerProfile.actions.set")}
         actionKey="follow-up"
         icon={<CalendarClock size={15} />}
-        label="跟进"
-        onAction={() => onPendingAction("跟进接口待接入")}
-        value={isKnown(model.nextFollowUp) ? model.nextFollowUp : "未设置跟进"}
+        label={t("customerProfile.fields.followUp")}
+        onAction={() => onPendingAction(t("customerProfile.notice.followUpPending"))}
+        value={isKnown(model.nextFollowUp) ? model.nextFollowUp : t("customerProfile.empty.followUp")}
       />
       <CustomerProfileActionRow
-        actionLabel="查看"
+        actionLabel={t("customerProfile.actions.view")}
         actionKey="tickets"
         icon={<ClipboardList size={15} />}
-        label="工单"
+        label={t("customerProfile.fields.ticket")}
         onAction={onOpenTickets}
-        value={ticketCount > 0 ? `待处理 ${ticketCount}` : "暂无工单"}
+        value={
+          ticketCount > 0
+            ? t("customerProfile.pendingTickets", { count: ticketCount })
+            : t("customerProfile.empty.tickets")
+        }
       />
       {notice && (
         <p className="customer-profile-action-notice" role="status">
@@ -189,6 +207,7 @@ function CustomerProfileInlineEditor({
   onChange,
   onSave,
   pending,
+  t,
   value,
 }: {
   actionKey: string;
@@ -198,6 +217,7 @@ function CustomerProfileInlineEditor({
   onChange: (value: string) => void;
   onSave: () => Promise<void> | void;
   pending: boolean;
+  t: Translate;
   value: string;
 }) {
   return (
@@ -207,7 +227,7 @@ function CustomerProfileInlineEditor({
         {label}
       </span>
       <input
-        aria-label={`编辑${label}`}
+        aria-label={t("customerProfile.actions.editField", { field: label })}
         className="customer-profile-action-input"
         disabled={pending}
         value={value}
@@ -220,7 +240,7 @@ function CustomerProfileInlineEditor({
       <span className="customer-profile-editor-actions">
         <button
           type="button"
-          aria-label={`保存${label}`}
+          aria-label={t("customerProfile.actions.saveField", { field: label })}
           disabled={pending}
           onClick={() => void onSave()}
         >
@@ -228,7 +248,7 @@ function CustomerProfileInlineEditor({
         </button>
         <button
           type="button"
-          aria-label={`取消${label}编辑`}
+          aria-label={t("customerProfile.actions.cancelFieldEdit", { field: label })}
           disabled={pending}
           onClick={onCancel}
         >

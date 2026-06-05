@@ -120,9 +120,9 @@ npx playwright test tests/browser/workspace-smoke.spec.ts -g "PC ordinary IM clo
 回滚后处理：
 
 - 保留问题现场截图、日志、会话 ID、消息 ID、requestId。
-- 按 [PC普通IM试用反馈闭环.md](/Users/treesoft/Downloads/lpp-flutte/lpp/lpp_pc_client/docs/PC普通IM试用反馈闭环.md) 分级和归因。
+- 按 [release/03-PC普通IM试用反馈闭环.md](../release/03-PC普通IM试用反馈闭环.md) 分级和归因。
 - 前端问题补最小专项测试后再修复。
-- 服务端缺口更新 [服务端支持.md](/Users/treesoft/Downloads/lpp-flutte/lpp/lpp_pc_client/docs/服务端支持.md)。
+- 服务端缺口更新 [05-服务端支持.md](../05-服务端支持.md)。
 
 ## 反馈入口和责任人分工模板
 
@@ -148,7 +148,7 @@ npx playwright test tests/browser/workspace-smoke.spec.ts -g "PC ordinary IM clo
 
 ## 相关文档
 
-- [PC普通IM试用说明.md](/Users/treesoft/Downloads/lpp-flutte/lpp/lpp_pc_client/docs/PC普通IM试用说明.md)
-- [PC普通IM试用反馈闭环.md](/Users/treesoft/Downloads/lpp-flutte/lpp/lpp_pc_client/docs/PC普通IM试用反馈闭环.md)
-- [PC普通IM发布候选检查.md](/Users/treesoft/Downloads/lpp-flutte/lpp/lpp_pc_client/docs/PC普通IM发布候选检查.md)
-- [服务端支持.md](/Users/treesoft/Downloads/lpp-flutte/lpp/lpp_pc_client/docs/服务端支持.md)
+- [release/02-PC普通IM试用说明.md](../release/02-PC普通IM试用说明.md)
+- [release/03-PC普通IM试用反馈闭环.md](../release/03-PC普通IM试用反馈闭环.md)
+- [release/01-PC普通IM发布候选检查.md](../release/01-PC普通IM发布候选检查.md)
+- [05-服务端支持.md](../05-服务端支持.md)

@@ -1,11 +1,12 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CustomerServiceStatus } from "../../data/types";
+import { useI18n } from "../../i18n/useI18n";
 import {
-  getQueueAutoDisabledReason,
+  getQueueAutoDisabledReasonKey,
   getReceptionControlSummary,
-  getReceptionQueueModeDescription,
-  getReceptionQueueModeLabel,
+  getReceptionQueueModeDescriptionKey,
+  getReceptionQueueModeLabelKey,
   receptionControlStatusOptions,
   type ReceptionControlLayout,
   type ReceptionQueueMode,
@@ -36,6 +37,7 @@ export function ServiceReceptionControl({
   queueAcceptEnabled,
   serviceStatus,
 }: ServiceReceptionControlProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const summary = getReceptionControlSummary({
@@ -44,7 +46,7 @@ export function ServiceReceptionControl({
     queueAcceptEnabled,
     serviceStatus,
   });
-  const autoDisabledReason = getQueueAutoDisabledReason(serviceStatus);
+  const autoDisabledReasonKey = getQueueAutoDisabledReasonKey(serviceStatus);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -78,16 +80,16 @@ export function ServiceReceptionControl({
         onClick={() => setOpen((value) => !value)}
       >
         <span className={`service-reception-dot ${summary.status.tone}`} />
-        <strong>{summary.status.label}</strong>
-        <em>{summary.queueModeLabel}</em>
+        <strong>{t(summary.status.labelKey)}</strong>
+        <em>{t(summary.queueModeLabelKey)}</em>
         <b>{summary.sessionText}</b>
         <ChevronDown size={14} />
       </button>
 
       {open && (
-        <div className="service-reception-popover" role="dialog" aria-label="接待控制">
+        <div className="service-reception-popover" role="dialog" aria-label={t("customerService.reception.control")}>
           <section>
-            <strong>接待状态</strong>
+            <strong>{t("customerService.reception.status")}</strong>
             <div className="service-reception-options">
               {receptionControlStatusOptions.map((item) => (
                 <button
@@ -103,8 +105,8 @@ export function ServiceReceptionControl({
                 >
                   <span className={`service-reception-dot ${item.tone}`} />
                   <span>
-                    <b>{item.label}</b>
-                    <em>{item.description}</em>
+                    <b>{t(item.labelKey)}</b>
+                    <em>{t(item.descriptionKey)}</em>
                   </span>
                   {summary.statusSynced && summary.status.value === item.value && (
                     <Check size={15} />
@@ -115,14 +117,14 @@ export function ServiceReceptionControl({
           </section>
 
           <section>
-            <strong>接入模式</strong>
+            <strong>{t("customerService.reception.mode")}</strong>
             <div className="service-reception-options">
               {(["manual", "auto"] as ReceptionQueueMode[]).map((mode) => {
                 const selected = summary.queueMode === mode;
                 const modeDescription =
-                  mode === "auto" && autoDisabledReason
-                    ? "点击后切换为在线状态，并启用自动分配。"
-                    : getReceptionQueueModeDescription(mode);
+                  mode === "auto" && autoDisabledReasonKey
+                    ? t("customerService.reception.autoEnableHint")
+                    : t(getReceptionQueueModeDescriptionKey(mode));
                 return (
                   <button
                     className={selected ? "selected" : ""}
@@ -133,7 +135,7 @@ export function ServiceReceptionControl({
                     onClick={() => setQueueMode(mode)}
                   >
                     <span>
-                      <b>{getReceptionQueueModeLabel(mode)}</b>
+                      <b>{t(getReceptionQueueModeLabelKey(mode))}</b>
                       <em>{modeDescription}</em>
                     </span>
                     {selected && <Check size={15} />}

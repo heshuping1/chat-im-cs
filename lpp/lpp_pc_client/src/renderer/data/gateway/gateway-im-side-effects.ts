@@ -420,12 +420,12 @@ function imDesktopNotificationTitle(message: MessageItemDto, payload: Record<str
   return (
     payloadConversationTitle(payload) ||
     safeMessageText(message.senderDisplayName) ||
-    "新消息"
+    "New message"
   );
 }
 
 function imDesktopNotificationBody(message: MessageItemDto) {
-  return safeMessageText(message.preview) || "收到一条新消息";
+  return safeMessageText(message.preview) || "Received a new message";
 }
 
 function safeMessageText(value: unknown) {

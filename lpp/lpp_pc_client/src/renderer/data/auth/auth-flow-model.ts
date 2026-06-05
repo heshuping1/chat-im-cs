@@ -7,7 +7,7 @@ export type RegisterContactType = "email" | "mobile";
 export type RegisterPhoneCountryOption = {
   country: string;
   dialCode: string;
-  label: string;
+  labelKey: string;
 };
 
 export type AuthSpaceChoice = {
@@ -30,17 +30,17 @@ export type InvitationPreviewView =
       name: string;
       targetMembershipRole?: number | null;
       targetRoleText: string;
-      title: "将加入企业";
+      title: string;
     }
   | {
       kind: "loading";
       message: string;
-      title: "正在确认邀请";
+      title: string;
     }
   | {
       kind: "error";
       message: string;
-      title: "无法确认邀请码";
+      title: string;
     };
 
 export type RegisterFormDraft = {
@@ -53,16 +53,16 @@ export type RegisterFormDraft = {
 };
 
 export const registerPhoneCountryOptions: RegisterPhoneCountryOption[] = [
-  { country: "CN", dialCode: "+86", label: "中国 +86" },
-  { country: "US", dialCode: "+1", label: "美国/加拿大 +1" },
-  { country: "JP", dialCode: "+81", label: "日本 +81" },
-  { country: "KR", dialCode: "+82", label: "韩国 +82" },
-  { country: "SG", dialCode: "+65", label: "新加坡 +65" },
-  { country: "GB", dialCode: "+44", label: "英国 +44" },
-  { country: "AU", dialCode: "+61", label: "澳大利亚 +61" },
-  { country: "HK", dialCode: "+852", label: "中国香港 +852" },
-  { country: "MO", dialCode: "+853", label: "中国澳门 +853" },
-  { country: "TW", dialCode: "+886", label: "中国台湾 +886" },
+  { country: "CN", dialCode: "+86", labelKey: "auth.countryOptions.CN" },
+  { country: "US", dialCode: "+1", labelKey: "auth.countryOptions.US" },
+  { country: "JP", dialCode: "+81", labelKey: "auth.countryOptions.JP" },
+  { country: "KR", dialCode: "+82", labelKey: "auth.countryOptions.KR" },
+  { country: "SG", dialCode: "+65", labelKey: "auth.countryOptions.SG" },
+  { country: "GB", dialCode: "+44", labelKey: "auth.countryOptions.GB" },
+  { country: "AU", dialCode: "+61", labelKey: "auth.countryOptions.AU" },
+  { country: "HK", dialCode: "+852", labelKey: "auth.countryOptions.HK" },
+  { country: "MO", dialCode: "+853", labelKey: "auth.countryOptions.MO" },
+  { country: "TW", dialCode: "+886", labelKey: "auth.countryOptions.TW" },
 ];
 
 export function inferLoginType(identifier: string) {
@@ -88,7 +88,7 @@ export function createAuthSpaceChoices(login: PlatformLoginResult): AuthSpaceCho
     .map((tenant) => ({
       id: tenant.tenantId,
       kind: "tenant" as const,
-      name: tenant.tenantName || tenant.tenantCode || "企业空间",
+      name: tenant.tenantName || tenant.tenantCode || "auth.enterpriseSpace",
       code: tenant.tenantCode || tenant.tenantId,
       roleLabel: getAuthTenantRoleLabel(tenant.membershipRole),
     }));
@@ -132,11 +132,11 @@ export function createInvitationPreviewView(
   preview: PlatformInvitationPreviewDto,
 ): InvitationPreviewView {
   const name = preview.tenantName?.trim() || "企业邀请";
-  const targetRoleText = `将以 ${invitationPreviewTargetRoleLabel(preview.targetMembershipRole)} 身份加入`;
+  const targetRoleText = invitationPreviewTargetRoleLabel(preview.targetMembershipRole);
   const badges = [
     targetRoleText,
     preview.alreadyMember ? "已在企业中" : undefined,
-    preview.identityMatched ? "定向匹配" : preview.identityMatched === false ? "定向不匹配" : undefined,
+    preview.identityMatched ? "定向匹配" : preview.identityMatched === false ? "非定向账号" : undefined,
     preview.expiresAt ? `有效至 ${formatInvitationDate(preview.expiresAt)}` : undefined,
   ].filter(Boolean) as string[];
   return {
@@ -144,7 +144,7 @@ export function createInvitationPreviewView(
     alreadyMember: preview.alreadyMember,
     badges,
     codeText: preview.tenantCode || preview.tenantId || "--",
-    description: preview.tenantDescription?.trim() || "登录或注册后将加入该企业空间。",
+    description: preview.tenantDescription?.trim() || "确认后将加入该企业空间。",
     identityMatched: preview.identityMatched,
     logoUrl: preview.logoUrl,
     name,
@@ -157,8 +157,8 @@ export function createInvitationPreviewView(
 export function createInvitationPreviewLoadingView(): InvitationPreviewView {
   return {
     kind: "loading",
-    message: "正在读取邀请码对应的企业信息",
-    title: "正在确认邀请",
+    message: "正在确认邀请码...",
+    title: "确认邀请码",
   };
 }
 
@@ -201,38 +201,38 @@ export function mapAuthErrorMessage(error: unknown, mode: AuthMode = "login") {
     code === "AUTH_PASSWORD_INVALID" ||
     text.includes("invalid credentials") ||
     text.includes("bad password") ||
-    text.includes("密码错误")
+    text.includes("\u5bc6\u7801\u9519\u8bef")
   ) {
     return "账号或密码不正确";
   }
   if (code === "INVITATION_INVALID") return "邀请码无效，请确认后重试";
   if (code === "INVITATION_EXPIRED") return "邀请码已过期，请联系邀请人重新生成";
   if (code === "INVITATION_TARGET_MISMATCH") return "该邀请码仅限指定账号使用";
-  if (code === "TENANT_ALREADY_MEMBER") return "你已在该企业中，角色不会因邀请码变更";
+  if (code === "TENANT_ALREADY_MEMBER") return "你已在该企业中，可以直接切换进入";
   if (
     code === "AUTH_EMAIL_EXISTS" ||
     text.includes("email already registered") ||
-    text.includes("邮箱已注册")
+    text.includes("\u90ae\u7bb1\u5df2\u6ce8\u518c")
   ) {
     return "该邮箱已注册，请直接登录";
   }
   if (
     code === "AUTH_MOBILE_EXISTS" ||
     text.includes("mobile already registered") ||
-    text.includes("手机号已注册")
+    text.includes("\u624b\u673a\u53f7\u5df2\u6ce8\u518c")
   ) {
     return "该手机号已注册，请直接登录";
   }
   if (
     text.includes("verification") ||
-    text.includes("验证码") ||
-    text.includes("短信") ||
-    text.includes("邮箱")
+    text.includes("\u9a8c\u8bc1\u7801") ||
+    text.includes("\u77ed\u4fe1") ||
+    text.includes("\u90ae\u7bb1")
   ) {
-    return "当前环境需要验证码，请按提示完成验证后再继续";
+    return "需要完成验证码验证";
   }
-  if (text.includes("not found") || text.includes("不存在")) {
-    return mode === "register" ? "注册失败，请检查账号信息" : "账号或密码不正确";
+  if (text.includes("not found") || text.includes("\u4e0d\u5b58\u5728")) {
+    return mode === "register" ? "请检查账号信息后重试" : "账号或密码不正确";
   }
   return mode === "register" ? "注册失败，请稍后重试" : "登录失败，请稍后重试";
 }
@@ -268,10 +268,8 @@ function normalizeMobileNumber(value: string, countryDialCode = "+86") {
 }
 
 function invitationPreviewTargetRoleLabel(role?: number | null) {
-  if (role === 3) return "管理员";
-  if (role === 2) return "客服";
-  if (role === 1) return "技术";
-  return "普通成员";
+  const roleText = role === 3 ? "管理员" : role === 2 ? "客服" : role === 1 ? "技术支持" : "成员";
+  return `将以 ${roleText} 身份加入`;
 }
 
 function formatInvitationDate(value: string) {

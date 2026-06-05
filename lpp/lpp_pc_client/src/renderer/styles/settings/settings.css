@@ -588,7 +588,36 @@
 }
 
 .settings-chat-background {
+  align-items: stretch;
+  gap: 18px;
+  min-height: 116px;
+}
+
+.settings-chat-background-control {
+  display: grid;
+  grid-template-columns: 124px minmax(132px, auto);
+  grid-template-rows: auto auto;
   align-items: center;
+  gap: 10px 12px;
+  flex: 0 0 auto;
+}
+
+.settings-chat-background-preview {
+  grid-row: span 2;
+  width: 124px;
+  height: 76px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, var(--chat-stage-background-wash), rgba(255, 255, 255, 0) 60px),
+    var(--chat-stage-background-image),
+    var(--chat-stage-background);
+  background-position: center;
+  background-size:
+    auto,
+    var(--chat-stage-background-size),
+    auto;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .settings-chat-background-swatches {
@@ -617,6 +646,35 @@
   box-shadow:
     inset 0 0 0 2px rgba(255, 255, 255, 0.74),
     0 0 0 3px rgba(20, 184, 166, 0.16);
+}
+
+.settings-chat-background-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-chat-background-actions input {
+  display: none;
+}
+
+.settings-chat-background-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--pc-text-secondary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.settings-chat-background-actions button:hover {
+  border-color: rgba(15, 118, 110, 0.42);
+  background: rgba(236, 253, 245, 0.74);
+  color: var(--pc-primary-strong);
 }
 
 .runtime-status-panel {
@@ -2180,8 +2238,13 @@
   }
 
   .setting-detail-row select,
+  .settings-chat-background-control,
   .settings-chat-background-swatches {
     width: 100%;
+  }
+
+  .settings-chat-background-control {
+    grid-template-columns: 124px minmax(0, 1fr);
   }
 
   .settings-account-info-grid {

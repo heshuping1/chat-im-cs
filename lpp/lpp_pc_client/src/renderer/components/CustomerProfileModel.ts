@@ -8,6 +8,31 @@ import { formatChatTime, formatShortDate } from "../lib/format";
 import { channelLabel } from "./ChannelBadge";
 
 export type ExternalSection = NonNullable<CustomerProfileCard["externalSections"]>[number];
+export type CustomerModelTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+export interface CustomerModelCopy {
+  assetRows: string[];
+  booleans: {
+    no: string;
+    yes: string;
+  };
+  enumLabels: Record<string, string>;
+  fieldLabels: Record<string, string>;
+  latestTradePrefix: string;
+  lotUnit: string;
+  recordTitle: string;
+  sectionDetailTitle: string;
+  statuses: {
+    active: string;
+    inactive: string;
+    offline: string;
+    online: string;
+    registered: string;
+    unregistered: string;
+    unverified: string;
+    verified: string;
+  };
+}
 
 export interface CustomerAssetMixItem {
   name: string;
@@ -93,6 +118,7 @@ export interface CustomerModel {
   netDepositDelta: string;
   nextFollowUp: string;
   lppId: string;
+  isOnline: boolean;
   onlineStatus: string;
   phoneMasked: string;
   profileVisibility: string;
@@ -124,14 +150,115 @@ export interface CustomerModel {
   winRate: string;
 }
 
+const defaultCustomerModelCopy: CustomerModelCopy = {
+  assetRows: ["黄金", "外汇", "指数", "大宗商品"],
+  booleans: {
+    no: "否",
+    yes: "是",
+  },
+  enumLabels: {
+    accepted: "已接受",
+    active: "已激活",
+    app: "自有应用",
+    blocked: "已拉黑",
+    busy: "忙碌",
+    closed: "已关闭",
+    disabled: "已禁用",
+    enabled: "已启用",
+    everyone: "所有人",
+    failed: "失败",
+    friends: "仅好友",
+    high: "高",
+    low: "低",
+    medium: "中",
+    mobile_app: "移动应用",
+    native: "自有应用",
+    no: "否",
+    nobody: "不允许",
+    offline: "离线",
+    online: "在线",
+    own_app: "自有应用",
+    pending: "待处理",
+    rejected: "已拒绝",
+    reviewed: "已审核",
+    success: "成功",
+    unknown: "未知",
+    unverified: "未认证",
+    verified: "已认证",
+    web: "网页",
+    website: "网页",
+    yes: "是",
+  },
+  fieldLabels: {
+    accountBalance: "账户余额",
+    amount: "金额",
+    createdAt: "创建时间",
+    netDeposit: "净入金",
+    product: "产品",
+    status: "状态",
+    symbol: "品种",
+    totalDeposit: "总入金",
+    type: "类型",
+    updatedAt: "更新时间",
+  },
+  latestTradePrefix: "最近交易",
+  lotUnit: "手",
+  recordTitle: "记录 {index}",
+  sectionDetailTitle: "详情",
+  statuses: {
+    active: "已激活",
+    inactive: "未激活",
+    offline: "离线",
+    online: "在线",
+    registered: "已注册",
+    unregistered: "未注册",
+    unverified: "未认证",
+    verified: "已认证",
+  },
+};
+
+export function createCustomerModelCopy(translate: CustomerModelTranslate): CustomerModelCopy {
+  const enumKeys = Object.keys(defaultCustomerModelCopy.enumLabels);
+  const fieldKeys = Object.keys(defaultCustomerModelCopy.fieldLabels);
+  return {
+    assetRows: [0, 1, 2, 3].map((index) => translate(`customerProfile.model.assetRows.${index}`)),
+    booleans: {
+      no: translate("customerProfile.model.booleans.no"),
+      yes: translate("customerProfile.model.booleans.yes"),
+    },
+    enumLabels: Object.fromEntries(
+      enumKeys.map((key) => [key, translate(`customerProfile.model.enumLabels.${key}`)]),
+    ),
+    fieldLabels: Object.fromEntries(
+      fieldKeys.map((key) => [key, translate(`customerProfile.model.fieldLabels.${key}`)]),
+    ),
+    latestTradePrefix: translate("customerProfile.model.latestTradePrefix"),
+    lotUnit: translate("customerProfile.model.lotUnit"),
+    recordTitle: translate("customerProfile.model.recordTitle", { index: "{index}" }),
+    sectionDetailTitle: translate("customerProfile.model.sectionDetailTitle"),
+    statuses: {
+      active: translate("customerProfile.model.statuses.active"),
+      inactive: translate("customerProfile.model.statuses.inactive"),
+      offline: translate("customerProfile.model.statuses.offline"),
+      online: translate("customerProfile.model.statuses.online"),
+      registered: translate("customerProfile.model.statuses.registered"),
+      unregistered: translate("customerProfile.model.statuses.unregistered"),
+      unverified: translate("customerProfile.model.statuses.unverified"),
+      verified: translate("customerProfile.model.statuses.verified"),
+    },
+  };
+}
+
 export function buildCustomerModel({
   avatarUrl,
+  copy = defaultCustomerModelCopy,
   conversation,
   contact,
   profile,
   profileExtra,
 }: {
   avatarUrl?: string | null;
+  copy?: CustomerModelCopy;
   conversation?: ConversationListItem;
   contact?: ContactItem | null;
   profile?: CustomerProfileCard;
@@ -163,8 +290,8 @@ export function buildCustomerModel({
     conversation?.peerLppNumber,
     conversation?.peerUserNo,
     contact?.lppId,
-    valueAt(external, ["identity", "profile", "customer", "客户", "核心身份"], [
-      "绿泡泡号",
+    valueAt(external, ["identity", "profile", "customer", "\u5ba2\u6237", "\u6838\u5fc3\u8eab\u4efd"], [
+      "\u7eff\u6ce1\u6ce1\u53f7",
       "lppId",
       "lppNo",
       "lppNumber",
@@ -187,34 +314,37 @@ export function buildCustomerModel({
       "tenant_app_name",
     ]),
   );
-  const activationStatus = normalizeActivationStatus(firstKnownValue(profileValue(profile, ["activationStatus", "activatedStatus", "isActivated", "activeStatus"]), profile?.accountStatus, tradingSummary.accountStatus));
-  const kyc = textValue(firstKnownValue(profile?.kycStatus, profile?.kyc, profile?.kycLevel, profile?.complianceStatus, valueAt(external, ["kyc", "compliance", "合规"], ["状态", "status", "kycStatus", "kyc"])));
-  const recent7dTrading = buildRecent7dTrading(profile, external);
-  const risk = textValue(firstKnownValue(profile?.riskLevel, profile?.risk, profile?.riskStatus, valueAt(external, ["risk", "kyc", "compliance", "风险", "合规"], ["风险", "risk", "riskLevel", "riskStatus"])));
-  const tagsClean = Array.from(new Set(tags.map(textValue).filter(isKnown).filter((tag) => !isVipLabel(tag))));
-  const verificationStatus = normalizeVerificationStatus(firstKnownValue(profileValue(profile, ["verificationStatus", "verifiedStatus", "isVerified"]), profile?.kycStatus, profile?.complianceStatus));
+  const activationStatus = normalizeActivationStatus(firstKnownValue(profileValue(profile, ["activationStatus", "activatedStatus", "isActivated", "activeStatus"]), profile?.accountStatus, tradingSummary.accountStatus), copy);
+  const kyc = textValue(firstKnownValue(profile?.kycStatus, profile?.kyc, profile?.kycLevel, profile?.complianceStatus, valueAt(external, ["kyc", "compliance", "\u5408\u89c4"], ["\u72b6\u6001", "status", "kycStatus", "kyc"])));
+  const recent7dTrading = buildRecent7dTrading(profile, external, copy);
+  const risk = textValue(firstKnownValue(profile?.riskLevel, profile?.risk, profile?.riskStatus, valueAt(external, ["risk", "kyc", "compliance", "\u98ce\u9669", "\u5408\u89c4"], ["\u98ce\u9669", "risk", "riskLevel", "riskStatus"])));
+  const tagsClean = Array.from(new Set(tags.map((tag) => textValue(tag, copy)).filter(isKnown).filter((tag) => !isVipLabel(tag))));
+  const verificationStatus = normalizeVerificationStatus(firstKnownValue(profileValue(profile, ["verificationStatus", "verifiedStatus", "isVerified"]), profile?.kycStatus, profile?.complianceStatus), copy);
   const registeredAtRaw = firstKnownValue(profile?.registeredAt, tradingSummary.registeredAt);
   const registrationStatus = normalizeRegistrationStatus(
     firstKnownValue(profileValue(profile, ["registrationStatus", "registeredStatus", "isRegistered", "registered"]), registeredAtRaw),
     registeredAtRaw,
+    copy,
   );
+  const onlineStatusRaw = firstKnownValue(profileValue(profile, ["onlineStatus", "presence", "isOnline"]), contact?.online);
+  const onlineStatus = normalizeOnlineStatus(onlineStatusRaw, copy);
   return {
     accountBalance: textValue(profile?.accountBalance),
     accountBalanceDelta: textValue(firstKnownValue(profileValue(profile, ["accountBalanceDelta", "balanceDelta", "balance7dDelta"]), tradingSummary.accountBalanceDelta)),
     accountStatus: textValue(profile?.accountStatus ?? tradingSummary.accountStatus),
     activationStatus,
     agent,
-    agentCreatedAt: shortDate(valueAt(external, ["ib", "agent", "代理"], ["建立时间", "createdAt"])),
-    agentType: textValue(valueAt(external, ["ib", "agent", "代理"], ["类型", "agentType"])),
+    agentCreatedAt: shortDate(valueAt(external, ["ib", "agent", "\u4ee3\u7406"], ["\u5efa\u7acb\u65f6\u95f4", "createdAt"])),
+    agentType: textValue(valueAt(external, ["ib", "agent", "\u4ee3\u7406"], ["\u7c7b\u578b", "agentType"])),
     appName,
     assetMix,
-    assetRows: buildAssetRows(assetMix),
+    assetRows: buildAssetRows(assetMix, copy),
     assignedStaff: textValue(profile?.assignedAgentName ?? profileValue(profile, ["assignedStaffName", "assignedStaffDisplayName"])),
     avatarUrl: profile?.avatarUrl || avatarUrl || conversation?.avatarUrl || contact?.avatarUrl,
     businessLine: textValue(profileValue(profile, ["businessLine", "business", "line"])),
     channelApp: appName,
-    commissionRate: textValue(valueAt(external, ["ib", "agent", "代理"], ["佣金比例", "commissionRate"])),
-    complianceNote: textValue(valueAt(external, ["kyc", "compliance", "合规"], ["备注", "note"])),
+    commissionRate: textValue(valueAt(external, ["ib", "agent", "\u4ee3\u7406"], ["\u4f63\u91d1\u6bd4\u4f8b", "commissionRate"])),
+    complianceNote: textValue(valueAt(external, ["kyc", "compliance", "\u5408\u89c4"], ["\u5907\u6ce8", "note"])),
     country: textValue(profile?.country),
     customerId: textValue(firstKnownValue(profile?.customerUserId, profile?.customerId, profile?.userId, conversation?.peerUserId, contact?.userId, contact?.id)),
     customerLanguage: textValue(profileValue(profile, ["customerLanguage", "receiveLanguage", "preferredLanguage"]) ?? profile?.language),
@@ -225,21 +355,22 @@ export function buildCustomerModel({
     kyc,
     language: textValue(profileValue(profile, ["language", "customerLanguage", "preferredLanguage"])),
     lastActive: shortDate(profile?.lastActiveAt ?? contact?.lastMessageAt),
-    lastDevice: textValue(valueAt(external, ["device", "设备"], ["设备", "device", "name"])),
-    lastIp: textValue(valueAt(external, ["device", "设备"], ["IP", "ip", "lastIp"])),
+    lastDevice: textValue(valueAt(external, ["device", "\u8bbe\u5907"], ["\u8bbe\u5907", "device", "name"])),
+    lastIp: textValue(valueAt(external, ["device", "\u8bbe\u5907"], ["IP", "ip", "lastIp"])),
     lastMessage: textValue(conversation?.lastMessage?.preview),
     lastMessageTime: formatChatTime(conversation?.lastMessage?.sentAt),
     lastProfileUpdatedAt: shortTime(firstKnownValue(profileValue(profile, ["updatedAt", "lastUpdatedAt", "profileUpdatedAt"]), tradingSummary.updatedAt)),
-    latestFundTime: shortDate(valueAt(external, ["fund", "资金", "cash"], ["最近时间", "updatedAt", "createdAt"])),
-    latestTouchChannel: textValue(valueAt(external, ["touch", "触达", "marketing"], ["渠道", "channel"])),
+    latestFundTime: shortDate(valueAt(external, ["fund", "\u8d44\u91d1", "cash"], ["\u6700\u8fd1\u65f6\u95f4", "updatedAt", "createdAt"])),
+    latestTouchChannel: textValue(valueAt(external, ["touch", "\u89e6\u8fbe", "marketing"], ["\u6e20\u9053", "channel"])),
     level,
-    marketingConsent: textValue(valueAt(external, ["marketing", "consent", "营销"], ["同意", "consent"])),
+    marketingConsent: textValue(valueAt(external, ["marketing", "consent", "\u8425\u9500"], ["\u540c\u610f", "consent"])),
     name: textValue(firstKnownValue(profile?.displayName, profile?.customerDisplayName, profile?.customerName, profile?.nickname, contact?.name, conversation?.peerDisplayName, conversation?.title)),
     netDeposit: textValue(profile?.netDeposit),
     netDepositDelta: textValue(firstKnownValue(profileValue(profile, ["netDepositDelta", "netDeposit7dDelta"]), tradingSummary.netDepositDelta)),
-    nextFollowUp: textValue(valueAt(external, ["touch", "触达", "marketing"], ["下次跟进", "nextFollowUp"])),
+    nextFollowUp: textValue(valueAt(external, ["touch", "\u89e6\u8fbe", "marketing"], ["\u4e0b\u6b21\u8ddf\u8fdb", "nextFollowUp"])),
     lppId: textValue(lppId),
-    onlineStatus: normalizeOnlineStatus(firstKnownValue(profileValue(profile, ["onlineStatus", "presence", "isOnline"]), contact?.online)),
+    isOnline: isOnlineState(onlineStatusRaw, onlineStatus, copy),
+    onlineStatus,
     phoneMasked: textValue(firstKnownValue(profile?.phoneMasked, profile?.mobileMasked, profile?.mobile, profile?.phone, conversation?.peerPhoneMasked)),
     profileVisibility: textValue(profileValue(profile, ["profileVisibility"])),
     recent7dTrading,
@@ -247,7 +378,7 @@ export function buildCustomerModel({
     registeredAt: shortDate(registeredAtRaw),
     registrationStatus,
     remark: textValue(profileExtra?.note),
-    remoteLoginAlert: textValue(valueAt(external, ["device", "security", "设备"], ["异地登录提醒", "remoteLoginAlert"])),
+    remoteLoginAlert: textValue(valueAt(external, ["device", "security", "\u8bbe\u5907"], ["\u5f02\u5730\u767b\u5f55\u63d0\u9192", "remoteLoginAlert"])),
     risk,
     sections: {
       trading: categorizedExternal.trading,
@@ -261,7 +392,7 @@ export function buildCustomerModel({
     sessionCount: textValue(profile?.tabCounts?.sessions ?? profile?.tabCounts?.conversations),
     source,
     staffLanguage: textValue(profileValue(profile, ["staffLanguage", "viewLanguage"])),
-    statusChips: buildStatusChips({ activationStatus, registrationStatus, verificationStatus }),
+    statusChips: buildStatusChips({ activationStatus, copy, registrationStatus, verificationStatus }),
     tags: tagsClean,
     temporaryOrders: profile?.temporaryOrders ?? [],
     tickets: profile?.tickets ?? [],
@@ -271,7 +402,7 @@ export function buildCustomerModel({
     touchCount: textValue(profile?.tabCounts?.touches ?? profile?.tabCounts?.campaigns),
     tradeProduct: textValue(tradingSummary.product ?? tradingSummary.symbol),
     translateMode: textValue(profileValue(profile, ["translateMode", "translationMode"])),
-    twoFactor: textValue(valueAt(external, ["device", "security", "安全"], ["2FA", "twoFactor"])),
+    twoFactor: textValue(valueAt(external, ["device", "security", "\u5b89\u5168"], ["2FA", "twoFactor"])),
     unreadCount: textValue(conversation ? conversation.unreadCount ?? 0 : undefined),
     verificationStatus,
     vipLevel: normalizeVipLevel(profile, level),
@@ -291,50 +422,47 @@ export function tabCount(tab: string, model: CustomerModel) {
 }
 
 const assetColors = ["#2563eb", "#38a8db", "#4cc9a6", "#f59e42", "#9b7af5", "#f06292"];
-const defaultAssetRows = [
-  { color: "#2563eb", name: "黄金" },
-  { color: "#4f9df7", name: "外汇" },
-  { color: "#2fc79a", name: "指数" },
-  { color: "#ff8a14", name: "商品" },
-];
+const defaultAssetRowColors = ["#2563eb", "#4f9df7", "#2fc79a", "#ff8a14"];
 
 function buildStatusChips({
   activationStatus,
+  copy,
   registrationStatus,
   verificationStatus,
 }: {
   activationStatus: string;
+  copy: CustomerModelCopy;
   registrationStatus: string;
   verificationStatus: string;
 }): CustomerStatusChip[] {
   return [
     {
-      empty: registrationStatus === "未注册",
+      empty: registrationStatus === copy.statuses.unregistered,
       label: registrationStatus,
-      tone: registrationStatus === "未注册" ? "muted" : "registered",
+      tone: registrationStatus === copy.statuses.unregistered ? "muted" : "registered",
     },
     {
-      empty: activationStatus === "未激活",
+      empty: activationStatus === copy.statuses.inactive,
       label: activationStatus,
-      tone: activationStatus === "未激活" ? "muted" : "active",
+      tone: activationStatus === copy.statuses.inactive ? "muted" : "active",
     },
     {
-      empty: verificationStatus === "未认证",
+      empty: verificationStatus === copy.statuses.unverified,
       label: verificationStatus,
-      tone: verificationStatus === "未认证" ? "muted" : "verified",
+      tone: verificationStatus === copy.statuses.unverified ? "muted" : "verified",
     },
   ];
 }
 
-function buildAssetRows(assetMix: CustomerAssetMixItem[]): CustomerAssetRow[] {
-  return defaultAssetRows.map((fallback, index) => {
+function buildAssetRows(assetMix: CustomerAssetMixItem[], copy: CustomerModelCopy): CustomerAssetRow[] {
+  return defaultAssetRowColors.map((color, index) => {
     const item = assetMix[index];
     if (!item) {
       return {
         amount: "--",
-        color: fallback.color,
+        color,
         empty: true,
-        name: fallback.name,
+        name: copy.assetRows[index] ?? defaultCustomerModelCopy.assetRows[index] ?? "--",
         percentLabel: "--",
       };
     }
@@ -355,8 +483,8 @@ function buildAssetMix(
   const raw = firstKnownAssetSource(
     profileValue(profile, ["assetMix", "assetStructure", "assetAllocation", "assets"]),
     profile?.tradingSummary && (profile.tradingSummary as Record<string, unknown>).assetMix,
-    valueAt(sections, ["asset", "assets", "资产", "持仓"], ["items", "assetMix", "assets"]),
-    sectionsBy(sections, ["asset", "assets", "资产", "持仓"])[0]?.items,
+    valueAt(sections, ["asset", "assets", "\u8d44\u4ea7", "\u6301\u4ed3"], ["items", "assetMix", "assets"]),
+    sectionsBy(sections, ["asset", "assets", "\u8d44\u4ea7", "\u6301\u4ed3"])[0]?.items,
   );
   const records =
     Array.isArray(raw)
@@ -387,14 +515,15 @@ function buildAssetMix(
 function buildRecent7dTrading(
   profile: CustomerProfileCard | undefined,
   sections: ExternalSection[],
+  copy: CustomerModelCopy,
 ): CustomerRecent7dTrading {
   const tradingSummary = profile?.tradingSummary ?? {};
   const rawDays = firstKnownAssetSource(
     profileValue(profile, ["recent7dTrading", "recent7dTrades", "last7DaysTrading", "trading7d"]),
     tradingSummary.recent7dTrading,
     tradingSummary.trading7d,
-    valueAt(sections, ["trade", "trading", "交易"], ["recent7dTrading", "trading7d", "days", "items"]),
-    sectionsBy(sections, ["recent7d", "近7天", "七天"])[0]?.items,
+    valueAt(sections, ["trade", "trading", "\u4ea4\u6613"], ["recent7dTrading", "trading7d", "days", "items"]),
+    sectionsBy(sections, ["recent7d", "\u8fd17\u5929", "\u4e03\u5929"])[0]?.items,
   );
   const dayRecords = Array.isArray(rawDays)
     ? rawDays
@@ -424,7 +553,7 @@ function buildRecent7dTrading(
     bars: buildRecent7dBars(days),
     days,
     deposit: textValue(firstKnownValue(summaryRecord.deposit, summaryRecord.totalDeposit7d, summaryRecord.deposit7d, profileValue(profile, ["recent7dDeposit"]))),
-    latest: latestTradeLabel(profile, sections),
+    latest: latestTradeLabel(profile, sections, copy),
     volume: textValue(firstKnownValue(summaryRecord.volume, summaryRecord.tradeVolume, summaryRecord.tradingVolume7d, profileValue(profile, ["recent7dTradeVolume"]))),
     withdrawal: textValue(firstKnownValue(summaryRecord.withdrawal, summaryRecord.withdraw, summaryRecord.totalWithdrawal7d, profileValue(profile, ["recent7dWithdrawal"]))),
   };
@@ -459,13 +588,13 @@ function recent7dLabels() {
   });
 }
 
-function latestTradeLabel(profile: CustomerProfileCard | undefined, sections: ExternalSection[]) {
+function latestTradeLabel(profile: CustomerProfileCard | undefined, sections: ExternalSection[], copy: CustomerModelCopy) {
   const tradingSummary = profile?.tradingSummary ?? {};
   const raw = firstNonEmptyValue(
     profileValue(profile, ["latestTrade", "lastTrade"]),
     tradingSummary.latestTrade,
     tradingSummary.lastTrade,
-    valueAt(sections, ["trade", "trading", "交易"], ["latestTrade", "lastTrade"]),
+    valueAt(sections, ["trade", "trading", "\u4ea4\u6613"], ["latestTrade", "lastTrade"]),
   );
   if (typeof raw === "string") return textValue(raw);
   if (!raw || typeof raw !== "object") return "--";
@@ -475,10 +604,10 @@ function latestTradeLabel(profile: CustomerProfileCard | undefined, sections: Ex
   const pnl = textValue(firstKnownValue(record.pnl, record.profit, record.profitLoss, record.result));
   const parts = [
     isKnown(symbol) ? symbol : undefined,
-    isKnown(lot) ? `${lot} 手` : undefined,
+    isKnown(lot) ? `${lot} ${copy.lotUnit}` : undefined,
     isKnown(pnl) ? pnl : undefined,
   ].filter(Boolean);
-  return parts.length > 0 ? `最近一次交易 ${parts.join(" · ")}` : "--";
+  return parts.length > 0 ? `${copy.latestTradePrefix} ${parts.join(" · ")}` : "--";
 }
 
 function firstKnownAssetSource(...values: unknown[]) {
@@ -506,53 +635,65 @@ function numericValue(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeOnlineStatus(value: unknown) {
-  if (typeof value === "boolean") return value ? "在线" : "离线";
+function normalizeOnlineStatus(value: unknown, copy: CustomerModelCopy) {
+  if (typeof value === "boolean") return value ? copy.statuses.online : copy.statuses.offline;
   const text = textValue(value);
-  return isKnown(text) ? text : "离线";
+  const normalized = text.trim().toLowerCase();
+  if (["online", "active", "yes", "true", "1", "\u5728\u7ebf"].includes(normalized)) return copy.statuses.online;
+  if (["offline", "inactive", "no", "false", "0", "\u79bb\u7ebf"].includes(normalized)) return copy.statuses.offline;
+  return isKnown(text) ? text : copy.statuses.offline;
 }
 
-function normalizeRegistrationStatus(value: unknown, registeredAt: unknown) {
-  if (typeof value === "boolean") return value ? "已注册" : "未注册";
+function isOnlineState(value: unknown, normalizedStatus: string, copy: CustomerModelCopy) {
+  if (typeof value === "boolean") return value;
+  const text = textValue(value).trim().toLowerCase();
+  return normalizedStatus === copy.statuses.online || ["online", "active", "yes", "true", "1", "\u5728\u7ebf"].includes(text);
+}
+
+function normalizeRegistrationStatus(value: unknown, registeredAt: unknown, copy: CustomerModelCopy) {
+  if (typeof value === "boolean") return value ? copy.statuses.registered : copy.statuses.unregistered;
   const text = textValue(value);
-  if (["是", "已注册", "registered", "success", "成功"].includes(text)) return "已注册";
-  if (["否", "未注册", "unregistered", "未开户"].includes(text)) return "未注册";
-  if (isKnown(text) && isKnown(textValue(registeredAt))) return "已注册";
+  const normalized = text.trim().toLowerCase();
+  if (["\u662f", "\u5df2\u6ce8\u518c", "\u6210\u529f"].includes(text) || ["yes", "registered", "success", "true", "1"].includes(normalized)) return copy.statuses.registered;
+  if (["\u5426", "\u672a\u6ce8\u518c", "\u672a\u5f00\u6237"].includes(text) || ["no", "unregistered", "false", "0"].includes(normalized)) return copy.statuses.unregistered;
+  if (isKnown(text) && isKnown(textValue(registeredAt))) return copy.statuses.registered;
   if (isKnown(text)) return text;
-  return isKnown(textValue(registeredAt)) ? "已注册" : "未注册";
+  return isKnown(textValue(registeredAt)) ? copy.statuses.registered : copy.statuses.unregistered;
 }
 
-function normalizeActivationStatus(value: unknown) {
-  if (typeof value === "boolean") return value ? "已激活" : "未激活";
+function normalizeActivationStatus(value: unknown, copy: CustomerModelCopy) {
+  if (typeof value === "boolean") return value ? copy.statuses.active : copy.statuses.inactive;
   const text = textValue(value);
-  if (!isKnown(text)) return "未激活";
-  if (["活跃", "已启用", "已通过", "成功"].includes(text)) return "已激活";
-  if (["否", "未启用", "未激活", "禁用", "已禁用"].includes(text)) return "未激活";
+  const normalized = text.trim().toLowerCase();
+  if (!isKnown(text)) return copy.statuses.inactive;
+  if (["\u6d3b\u8dc3", "\u5df2\u542f\u7528", "\u5df2\u901a\u8fc7", "\u6210\u529f"].includes(text) || ["active", "enabled", "accepted", "success", "yes", "true", "1"].includes(normalized)) return copy.statuses.active;
+  if (["\u5426", "\u672a\u542f\u7528", "\u672a\u6fc0\u6d3b", "\u7981\u7528", "\u5df2\u7981\u7528"].includes(text) || ["inactive", "disabled", "failed", "no", "false", "0"].includes(normalized)) return copy.statuses.inactive;
   return text;
 }
 
-function normalizeVerificationStatus(value: unknown) {
-  if (typeof value === "boolean") return value ? "已认证" : "未认证";
+function normalizeVerificationStatus(value: unknown, copy: CustomerModelCopy) {
+  if (typeof value === "boolean") return value ? copy.statuses.verified : copy.statuses.unverified;
   const text = textValue(value);
-  if (!isKnown(text)) return "未认证";
-  if (["已通过", "已审核", "成功"].includes(text)) return "已认证";
-  if (["否", "失败", "已拒绝", "未认证"].includes(text)) return "未认证";
+  const normalized = text.trim().toLowerCase();
+  if (!isKnown(text)) return copy.statuses.unverified;
+  if (["\u5df2\u901a\u8fc7", "\u5df2\u5ba1\u6838", "\u6210\u529f"].includes(text) || ["accepted", "reviewed", "success", "verified", "yes", "true", "1"].includes(normalized)) return copy.statuses.verified;
+  if (["\u5426", "\u5931\u8d25", "\u5df2\u62d2\u7edd", "\u672a\u8ba4\u8bc1"].includes(text) || ["failed", "rejected", "unverified", "no", "false", "0"].includes(normalized)) return copy.statuses.unverified;
   return text;
 }
 
 function normalizeVipLevel(profile: CustomerProfileCard | undefined, level: string) {
-  if (profile?.isVip) return isKnown(level) && level !== "普通客户" ? level : "VIP";
+  if (profile?.isVip) return isKnown(level) && level !== "\u666e\u901a\u5ba2\u6237" ? level : "VIP";
   return isVipLabel(level) ? level : "--";
 }
 
 function riskLabel(value: string) {
-  if (["高", "高风险"].includes(value)) return "高风险";
+  if (["\u9ad8", "\u9ad8\u98ce\u9669"].includes(value)) return "\u9ad8\u98ce\u9669";
   return value;
 }
 
 function riskTone(value: string) {
   const normalized = value.toLowerCase();
-  if (["高", "高风险", "high", "red", "warning", "异常"].some((key) => normalized.includes(key))) {
+  if (["\u9ad8", "\u9ad8\u98ce\u9669", "high", "red", "warning", "\u5f02\u5e38"].some((key) => normalized.includes(key))) {
     return "risk";
   }
   return "muted";
@@ -578,17 +719,17 @@ function categorizeSections(sections: ExternalSection[]) {
   };
   for (const section of sections) {
     const haystack = `${section.type ?? ""} ${section.sectionType ?? ""} ${section.title ?? ""}`.toLowerCase();
-    if (["trade", "trading", "transaction", "交易", "订单"].some((key) => haystack.includes(key))) {
+    if (["trade", "trading", "transaction", "\u4ea4\u6613", "\u8ba2\u5355"].some((key) => haystack.includes(key))) {
       groups.trading.push(section);
-    } else if (["fund", "cash", "capital", "资金", "流水"].some((key) => haystack.includes(key))) {
+    } else if (["fund", "cash", "capital", "\u8d44\u91d1", "\u6d41\u6c34"].some((key) => haystack.includes(key))) {
       groups.funds.push(section);
-    } else if (["session", "conversation", "会话"].some((key) => haystack.includes(key))) {
+    } else if (["session", "conversation", "\u4f1a\u8bdd"].some((key) => haystack.includes(key))) {
       groups.sessions.push(section);
-    } else if (["touch", "marketing", "campaign", "触达", "营销"].some((key) => haystack.includes(key))) {
+    } else if (["touch", "marketing", "campaign", "\u89e6\u8fbe", "\u8425\u9500"].some((key) => haystack.includes(key))) {
       groups.touch.push(section);
-    } else if (["kyc", "aml", "compliance", "合规"].some((key) => haystack.includes(key))) {
+    } else if (["kyc", "aml", "compliance", "\u5408\u89c4"].some((key) => haystack.includes(key))) {
       groups.compliance.push(section);
-    } else if (["device", "login", "设备", "安全"].some((key) => haystack.includes(key))) {
+    } else if (["device", "login", "\u8bbe\u5907", "\u5b89\u5168"].some((key) => haystack.includes(key))) {
       groups.device.push(section);
     } else {
       groups.other.push(section);
@@ -609,30 +750,33 @@ function sectionsBy(sections: ExternalSection[], keys: string[]) {
   });
 }
 
-export function sectionToItems(section: ExternalSection) {
+export function sectionToItems(section: ExternalSection, copy: CustomerModelCopy = defaultCustomerModelCopy) {
   const items = Array.isArray(section.items) ? section.items : [];
   if (items.length > 0) {
     return items.map((item, index) => ({
-      title: textValue(item.title ?? item.name ?? item.orderNo ?? item.id ?? section.title ?? `记录 ${index + 1}`),
-      meta: [item.status, item.type, item.updatedAt, item.createdAt].map(textValue).filter(isKnown),
-      fields: normalizeRecord(item),
+      title: textValue(
+        item.title ?? item.name ?? item.orderNo ?? item.id ?? section.title ?? copy.recordTitle.replace("{index}", String(index + 1)),
+        copy,
+      ),
+      meta: [item.status, item.type, item.updatedAt, item.createdAt].map((value) => textValue(value, copy)).filter(isKnown),
+      fields: normalizeRecord(item, copy),
     }));
   }
   const fields =
     Array.isArray(section.fields)
-      ? section.fields.flatMap(normalizeRecord)
-      : normalizeRecord(section.fields ?? section);
+      ? section.fields.flatMap((field) => normalizeRecord(field, copy))
+      : normalizeRecord(section.fields ?? section, copy);
   return fields.length > 0
-    ? [{ title: textValue(section.title ?? section.type ?? "详情"), meta: [], fields }]
+    ? [{ title: textValue(section.title ?? section.type ?? copy.sectionDetailTitle, copy), meta: [], fields }]
     : [];
 }
 
-export function normalizeRecord(value: unknown): Array<[string, string]> {
+export function normalizeRecord(value: unknown, copy: CustomerModelCopy = defaultCustomerModelCopy): Array<[string, string]> {
   if (!value || typeof value !== "object") return [];
-  if (Array.isArray(value)) return value.flatMap((item) => normalizeRecord(item));
+  if (Array.isArray(value)) return value.flatMap((item) => normalizeRecord(item, copy));
   return Object.entries(value as Record<string, unknown>)
     .filter(([key]) => !["items", "fields", "type", "sectionType", "title"].includes(key))
-    .map(([key, val]) => [fieldLabel(key), textValue(val)] as [string, string])
+    .map(([key, val]) => [fieldLabel(key, copy), textValue(val, copy)] as [string, string])
     .filter(([, val]) => isKnown(val));
 }
 
@@ -705,69 +849,24 @@ function shortTime(value: unknown) {
   return text;
 }
 
-export function textValue(value: unknown): string {
+export function textValue(value: unknown, copy: CustomerModelCopy = defaultCustomerModelCopy): string {
   if (value === undefined || value === null || value === "") return "--";
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : "--";
-  if (typeof value === "boolean") return value ? "是" : "否";
-  if (Array.isArray(value)) return value.map(textValue).filter(isKnown).join(" / ") || "--";
+  if (typeof value === "boolean") return value ? copy.booleans.yes : copy.booleans.no;
+  if (Array.isArray(value)) return value.map((item) => textValue(item, copy)).filter(isKnown).join(" / ") || "--";
   if (typeof value === "object") return "--";
-  return enumLabel(String(value));
+  return enumLabel(String(value), copy);
 }
 
 export function isKnown(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "" && value !== "--";
 }
 
-function enumLabel(value: string) {
+function enumLabel(value: string, copy: CustomerModelCopy) {
   const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
-  const map: Record<string, string> = {
-    accepted: "已通过",
-    active: "活跃",
-    app: "自有 App",
-    blocked: "已拉黑",
-    busy: "忙碌",
-    closed: "已关闭",
-    disabled: "已禁用",
-    enabled: "已启用",
-    everyone: "所有人",
-    failed: "失败",
-    friends: "仅好友",
-    high: "高",
-    low: "低",
-    medium: "中",
-    mobile_app: "移动 App",
-    native: "自有 App",
-    no: "否",
-    nobody: "不允许",
-    offline: "离线",
-    online: "在线",
-    own_app: "自有 App",
-    pending: "待处理",
-    rejected: "已拒绝",
-    reviewed: "已审核",
-    success: "成功",
-    unknown: "未知",
-    unverified: "未认证",
-    verified: "已认证",
-    web: "网页",
-    website: "网页",
-    yes: "是",
-  };
-  return map[normalized] ?? value;
+  return copy.enumLabels[normalized] ?? value;
 }
 
-function fieldLabel(key: string) {
-  const map: Record<string, string> = {
-    accountBalance: "账户余额",
-    amount: "金额",
-    createdAt: "创建时间",
-    netDeposit: "净入金",
-    product: "产品",
-    status: "状态",
-    symbol: "品种",
-    totalDeposit: "累计入金",
-    type: "类型",
-    updatedAt: "更新时间",
-  };
-  return map[key] ?? key;
+function fieldLabel(key: string, copy: CustomerModelCopy) {
+  return copy.fieldLabels[key] ?? key;
 }

@@ -3,6 +3,7 @@ import type { MouseEvent } from "react";
 
 import { PcAvatar } from "../../components/PcAvatar";
 import type { ConversationListItem } from "../../data/api-client";
+import { useI18n } from "../../i18n/useI18n";
 import { formatBadgeCount, formatChatTime } from "../../lib/format";
 import { renderWechatEmojiText } from "../../lib/wechatEmoji";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
@@ -22,7 +23,9 @@ export function ConversationAvatar({
   title?: string | null;
   unread?: number;
 }) {
-  const displayTitle = title || "未命名会话";
+  const { t } = useI18n();
+  const displayTitle = title || t("messages.conversationRow.unnamed");
+
   return (
     <span className="e-avatar-badge-host">
       {isGroup && groupAvatar?.kind === "grid" ? (
@@ -74,7 +77,9 @@ export function ConversationRow({
   onContextMenu: (event: MouseEvent<HTMLElement>) => void;
   unread: number;
 }) {
+  const { t } = useI18n();
   const draftText = draft?.trim();
+
   return (
     <button
       className={`e-conversation-row ${active ? "active" : ""}`}
@@ -91,14 +96,18 @@ export function ConversationRow({
         unread={unread}
       />
       <span className="e-conversation-copy">
-        <strong>{conversation.title || "未命名会话"}</strong>
+        <strong>{conversation.title || t("messages.conversationRow.unnamed")}</strong>
         {draftText ? (
           <small className="e-conversation-draft">
-            <span className="e-draft-prefix">[草稿]</span>
+            <span className="e-draft-prefix">{t("messages.conversationRow.draftPrefix")}</span>
             <span className="e-draft-preview">{renderWechatEmojiText(draftText)}</span>
           </small>
         ) : (
-          <small>{renderWechatEmojiText(conversation.lastMessage?.preview || "暂无最近消息")}</small>
+          <small>
+            {renderWechatEmojiText(
+              conversation.lastMessage?.preview || t("messages.conversationRow.noRecentMessage"),
+            )}
+          </small>
         )}
       </span>
       <span className="e-conversation-side">

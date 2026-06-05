@@ -17,6 +17,7 @@ import {
 } from "../../data/im-read-model";
 import { normalizeMessageType } from "../../data/im-message-normalize";
 import { getImConversationType } from "./messageConversationTypeModel";
+import { groupMemberDisplayName, groupMemberIdentityKeys } from "./groupManagementModel";
 import { usablePersonName } from "./groupAvatarModel";
 
 export type AvatarProfilePopoverState = {
@@ -38,12 +39,7 @@ export type UnreadJumpState = {
 export function buildGroupMemberMap(members: GroupMemberDto[]) {
   const map = new Map<string, GroupMemberDto>();
   members.forEach((member) => {
-    [
-      member.userId,
-      member.platformUserId,
-      member.lppId,
-      member.displayName,
-    ].forEach((key) => {
+    groupMemberIdentityKeys(member).forEach((key) => {
       if (key) map.set(key.trim().toLowerCase(), member);
     });
   });
@@ -58,15 +54,15 @@ export function resolveSenderDisplayName(
   const member = resolveGroupMember(message, groupMembers);
   const senderName = usablePersonName(message.senderDisplayName);
   if (conversation.conversationType === "direct") {
-    return senderName || conversation.title || "对方";
+    return senderName || conversation.title || "联系人";
   }
-  const memberName = usablePersonName(member?.displayName);
+  const memberName = groupMemberDisplayName(member);
   if (memberName) return memberName;
   if (senderName) return senderName;
   const bodyName = usablePersonName(
     stringField(message.body ?? {}, "senderName", "senderDisplayName", "displayName"),
   );
-  return bodyName || "成员";
+  return bodyName || "群成员";
 }
 
 export function eventMessageText(message: MessageItemDto) {
@@ -140,7 +136,7 @@ export function buildAvatarProfilePopover({
         ])
       : undefined,
     !isGroup ? profileExtra?.displayName : undefined,
-    member?.displayName ||
+    groupMemberDisplayName(member) ||
       message.senderDisplayName ||
       (isGroup ? "群成员" : conversation.peerDisplayName || conversation.title || "联系人"),
   ) || (isGroup ? "群成员" : "联系人");
@@ -450,14 +446,14 @@ function messageReadStatusText(
   const status = String(message.status ?? "").trim().toLowerCase();
   if (status === "sending" || status === "uploading") {
     const type = normalizeMessageType(message);
-    return type === "image" || type === "video" || type === "file" ? "上传中" : "发送中";
+    return type === "image" || type === "video" || type === "file" ? "Uploading" : "Sending";
   }
   if (status === "failed") {
-    return "发送失败";
+    return "Send failed";
   }
   if (conversation.conversationType === "group") {
     if (typeof message.readCount === "number" && message.readCount > 0) {
-      return `${message.readCount}人已读`;
+      return `${message.readCount} read`;
     }
     return "已发送";
   }
@@ -506,7 +502,7 @@ function compactProfileRows(
     .filter((row, index) => options.keepEmpty || row.value !== "--" || index < 3);
 }
 
-const hiddenProfileRowLabels = new Set(["账号", "手机", "邮箱"]);
+const hiddenProfileRowLabels = new Set(["Account", "Mobile", "Email"]);
 
 function profileValue(
   profile: CustomerProfileCard | undefined,

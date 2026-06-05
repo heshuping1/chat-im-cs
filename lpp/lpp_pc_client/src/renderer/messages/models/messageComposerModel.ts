@@ -1,6 +1,6 @@
 import type { GroupMemberDto, MediaResourceDto } from "../../data/api-client";
 import type { VideoPosterResult } from "../../lib/videoPoster";
-import { usablePersonName } from "./groupAvatarModel";
+import { groupMemberDisplayName, groupMemberIdentityKeys } from "./groupManagementModel";
 
 export type ReplyTarget = {
   messageId: string;
@@ -24,20 +24,23 @@ export function buildMentionOptions(members: GroupMemberDto[]) {
   return members
     .map((member) => ({
       id: member.userId || member.platformUserId || member.lppId || member.displayName,
-      label: usablePersonName(member.displayName) || member.userId || "成员",
+      label: groupMemberDisplayName(member) || member.userId || "Member",
     }))
     .filter((item) => item.id && item.label);
 }
 
 export function extractMentions(content: string, members: GroupMemberDto[]) {
-  const names = new Set(
-    Array.from(content.matchAll(/@([^\s@]+)/g)).map((match) => match[1]),
-  );
+  const rawNames = Array.from(content.matchAll(/@([^\s@]+)/g)).map((match) => match[1]);
+  const names = new Set(rawNames);
+  const normalizedNames = new Set(rawNames.map((name) => name.trim().toLowerCase()));
   return members
-    .filter((member) => member.displayName && names.has(member.displayName))
+    .filter((member) =>
+      groupMemberIdentityKeys(member).some((key) => normalizedNames.has(key)) ||
+      names.has(groupMemberDisplayName(member)),
+    )
     .map((member) => ({
       userId: member.userId || member.platformUserId || member.lppId,
-      displayName: member.displayName,
+      displayName: groupMemberDisplayName(member) || member.displayName,
     }));
 }
 

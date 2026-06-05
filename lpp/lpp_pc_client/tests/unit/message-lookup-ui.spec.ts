@@ -86,7 +86,7 @@ describe("message lookup UI", () => {
 
   it("uses one WeChat-style lookup entry instead of separate search and history buttons", () => {
     expect(header).toContain("onToggleLookup");
-    expect(header).toContain("查找聊天内容");
+    expect(header).toContain('t("messages.chatHeader.searchMessages")');
     expect(header).not.toContain("onToggleHistory");
     expect(header).not.toContain("onToggleSearch");
     expect(header).not.toContain("Clock3");
@@ -111,8 +111,8 @@ describe("message lookup UI", () => {
   it("renders one unified lookup panel with search, type filters and a close action", () => {
     expect(listPanel).toContain("const lookupOpen = messageSearchOpen || historyOpen");
     expect(listPanel).toContain("chat-lookup-panel");
-    expect(listPanel).toContain("关闭查找");
-    expect(listPanel).toContain("没有匹配的聊天记录");
+    expect(listPanel).toContain('t("messages.listPanel.closeSearch")');
+    expect(listPanel).toContain("emptyText");
     expect(listPanel).not.toContain("chat-inline-panel");
   });
 
@@ -160,8 +160,8 @@ describe("message lookup UI", () => {
     expect(header).toContain("customerApplicationName");
     expect(header).toContain("customerSource");
     expect(header).toContain("chat-header-meta-chips");
-    expect(header).toContain("渠道应用");
-    expect(header).toContain("来源渠道");
+    expect(header).toContain('t("messages.chatHeader.channelApp"');
+    expect(header).toContain('t("messages.chatHeader.sourceChannel"');
     expect(header).not.toContain("conversationMetaText");
     expect(stage).toContain("directCustomerHeaderMeta");
     expect(stage).toContain("readCustomerHeaderApplicationName(profileData)");
@@ -213,9 +213,9 @@ describe("message lookup UI", () => {
 
   it("adds a first-class add-friend action to the message plus menu", () => {
     expect(startDialogs).toContain('action: "addFriend"');
-    expect(startDialogs).toContain("添加好友");
+    expect(startDialogs).toContain('t("messages.start.addFriend")');
     expect(startDialogs).toContain("UserPlus");
-    expect(conversationListPanel).toContain('title="创建与添加"');
+    expect(conversationListPanel).toContain('title={t("messages.conversationList.createAndAdd")}');
     expect(conversationListPanel).toContain("friendRequestCount");
     expect(conversationSidebar).toContain('if (action === "addFriend")');
     expect(conversationSidebar).toContain("onAddFriend");
@@ -239,9 +239,9 @@ describe("message lookup UI", () => {
     expect(sidebar).toContain("useFriendRequestReminderController");
     expect(sidebar).toContain('item.key === "contacts"');
     expect(sidebar).toContain("pendingIncomingRequestCount");
-    expect(sidebar).toContain("条好友申请");
+    expect(sidebar).toContain('t("sidebar.badge.friendRequestsSuffix"');
     expect(reminderCenter).toContain('item.targetModule === "contacts"');
     expect(reminderCenter).toContain('setContactFilter("requests")');
-    expect(reminderCenter).toContain("处理申请");
+    expect(reminderCenter).toContain('t("reminder.action.handleRequest")');
   });
 });

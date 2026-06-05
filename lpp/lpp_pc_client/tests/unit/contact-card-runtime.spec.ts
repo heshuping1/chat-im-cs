@@ -19,7 +19,7 @@ describe("contact card runtime wiring", () => {
     expect(stage).toContain("sendContactCardPending={sendContactCardPending}");
     expect(center).toContain("contactCardSendPending");
     expect(center).toContain("setContactCardSendPending(true)");
-    expect(center).toContain("contactCardActionErrorText(error, \"发送名片失败\")");
+    expect(center).toContain('contactCardActionErrorText(error, "messages.center.sendContactCardFailed", t)');
   });
 
   it("tracks the contact card profile relation actions in a committed controller", () => {
@@ -43,13 +43,13 @@ describe("contact card runtime wiring", () => {
   it("renders relation-specific actions for friend, stranger and incoming request cards", () => {
     const profileDialog = source("src/renderer/messages/components/ConversationInfoViews.tsx");
 
-    expect(profileDialog).toContain("发消息");
-    expect(profileDialog).toContain("删除好友");
-    expect(profileDialog).toContain("加入黑名单");
-    expect(profileDialog).toContain("添加到通讯录");
-    expect(profileDialog).toContain("好友申请已发送");
-    expect(profileDialog).toContain("拒绝");
-    expect(profileDialog).toContain("通过");
-    expect(profileDialog).toContain("这是你自己");
+    expect(profileDialog).toContain('t("messages.conversationViews.sendMessage")');
+    expect(profileDialog).toContain('t("messages.conversationViews.deleteFriend")');
+    expect(profileDialog).toContain('t("messages.conversationViews.block")');
+    expect(profileDialog).toContain('t("messages.conversationViews.addToContacts")');
+    expect(profileDialog).toContain('t("messages.conversationViews.requestSent")');
+    expect(profileDialog).toContain('t("messages.conversationViews.reject")');
+    expect(profileDialog).toContain('t("messages.conversationViews.accept")');
+    expect(profileDialog).toContain('t("messages.conversationViews.self")');
   });
 });

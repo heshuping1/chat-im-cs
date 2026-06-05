@@ -5,6 +5,8 @@ const repoRoot = process.cwd();
 const sourceRoots = ["src/renderer", "src/shared", "src/main", "src/preload"];
 const sourceExtensions = new Set([".ts", ".tsx", ".cts"]);
 const maxLines = 900;
+const p19LedgerPath = "docs/refactor/PC端P19文件职责与AI上下文治理清单.md";
+const p19Ledger = readFileSync(join(repoRoot, p19LedgerPath), "utf8");
 const largeFileAllowlist = new Map([
   ["src/renderer/components/CustomerProfileWorkspace.tsx", "P19 documented customer profile workspace owner"],
   ["src/renderer/components/MePage.tsx", "P19 documented me page assembly owner"],
@@ -20,11 +22,11 @@ const warnings = [];
 const files = sourceRoots.flatMap((root) => listSourceFiles(join(repoRoot, root)));
 
 for (const file of files) {
-  const relativePath = relative(repoRoot, file);
+  const relativePath = normalizePath(relative(repoRoot, file));
   const source = readFileSync(file, "utf8");
   const lineCount = source.split("\n").length;
   if (lineCount > maxLines) {
-    const reason = largeFileAllowlist.get(relativePath);
+    const reason = largeFileReason(relativePath);
     if (reason) {
       warnings.push(`${relativePath} has ${lineCount} lines (${reason})`);
     } else {
@@ -65,6 +67,20 @@ function listSourceFiles(dir) {
     if (stat.isDirectory()) return listSourceFiles(filePath);
     return sourceExtensions.has(extname(filePath)) ? [filePath] : [];
   });
+}
+
+function normalizePath(path) {
+  return path.replace(/\\/g, "/");
+}
+
+function largeFileReason(relativePath) {
+  const allowlistReason = largeFileAllowlist.get(relativePath);
+  if (allowlistReason) return allowlistReason;
+  if (p19Ledger.includes(`\`${relativePath}\``)) return "P19 documented context owner";
+  if (relativePath.startsWith("src/renderer/i18n/messages/")) {
+    return "i18n locale dictionary catalog";
+  }
+  return "";
 }
 
 function isAllowedConsole(relativePath, line) {

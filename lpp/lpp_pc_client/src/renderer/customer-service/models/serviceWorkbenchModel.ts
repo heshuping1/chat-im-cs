@@ -7,9 +7,7 @@ import {
   createCustomerServiceLiveCounters,
 } from "../../data/customer-service/customer-service-live-counters";
 import { isTerminalCustomerServiceThreadStatus } from "../../data/customer-service/cs-thread-state";
-import {
-  customerServiceHistoryStatusLabel,
-} from "../../data/customer-service-display";
+import { customerServiceHistoryStatusKey } from "../../data/customer-service-display";
 import type { CustomerServiceStatus } from "../../data/types";
 
 export type ServiceThreadListMode = "current" | "history";
@@ -24,14 +22,23 @@ export interface ServiceThreadListCounts {
 
 export interface ServiceThreadListEmptyState {
   actionLabel?: string;
-  description: string;
-  title: string;
+  actionLabelKey?: string;
+  description?: string;
+  descriptionKey: string;
+  title?: string;
+  titleKey: string;
 }
 
 export interface ServiceCommandMetric {
-  label: string;
+  label?: string;
+  labelKey: string;
   tone?: "danger" | "muted" | "normal" | "success" | "warning";
   value: string;
+}
+
+export interface ServiceTextDescriptor {
+  key: string;
+  params?: Record<string, string | number>;
 }
 
 export interface ServiceCommandMetrics {
@@ -46,7 +53,8 @@ export interface ServiceCommandMetrics {
   queuedCount: number;
   queueEnabled?: boolean | null;
   serviceStatus: CustomerServiceStatus | string;
-  serviceStatusLabel: string;
+  serviceStatusLabel?: string;
+  serviceStatusLabelKey: string;
   slaRiskCount: number;
   totalCount: number;
 }
@@ -82,10 +90,24 @@ export function createServiceHistoryTabBadge(threads: CustomerServiceThread[]) {
   };
 }
 
-export function createServiceHistoryThreadStatusText(thread: CustomerServiceThread) {
-  const label = customerServiceHistoryStatusLabel(thread.status);
+export function createServiceHistoryThreadStatusDescriptor(thread: CustomerServiceThread): ServiceTextDescriptor {
   const unreadCount = Math.max(0, Number(thread.unreadCount ?? 0));
-  return unreadCount > 0 ? `已结束 · 未读 ${unreadCount}` : label;
+  return unreadCount > 0
+    ? { key: "customerService.threadList.historyStatusUnread", params: { count: unreadCount } }
+    : { key: customerServiceHistoryStatusKey(thread.status) };
+}
+
+export function createServiceHistoryThreadStatusText(thread: CustomerServiceThread) {
+  const descriptor = createServiceHistoryThreadStatusDescriptor(thread);
+  if (descriptor.key === "customerService.threadList.historyStatusUnread") {
+    return `已结束 · 未读 ${descriptor.params?.count ?? 0}`;
+  }
+  if (descriptor.key === "customerService.threadList.historyStatus.closedTimeout") return "超时关闭";
+  if (descriptor.key === "customerService.threadList.historyStatus.closedByVisitor") return "访客关闭";
+  if (descriptor.key === "customerService.threadList.historyStatus.closedByStaff") return "客服关闭";
+  if (descriptor.key === "customerService.threadList.historyStatus.closedSystem") return "系统关闭";
+  if (descriptor.key === "customerService.threadList.historyStatus.archived") return "已归档";
+  return "已结束";
 }
 
 export function isRiskyCustomerServiceThread(thread: CustomerServiceThread) {
@@ -116,7 +138,7 @@ export function isRiskyCustomerServiceThread(thread: CustomerServiceThread) {
     .filter(Boolean)
     .map((value) => String(value).toLowerCase());
 
-  return ["high", "urgent", "risk", "投诉", "超时", "overdue", "timeout", "breach"].some(
+  return ["high", "urgent", "risk", "\u6295\u8bc9", "\u8d85\u65f6", "overdue", "timeout", "breach"].some(
     (token) => textValues.some((value) => value.includes(token.toLowerCase())),
   );
 }
@@ -132,63 +154,77 @@ export function createServiceThreadListEmptyState(input: {
 
   if (hasQuery) {
     return {
+      actionLabelKey: "customerService.threadList.empty.clearSearch",
       actionLabel: "清空搜索",
-      description:
+      descriptionKey:
         input.mode === "history"
-          ? "历史会话里没有匹配的客户、渠道或消息内容，可清空搜索后继续查看。"
-          : "当前会话池没有匹配项，可清空搜索或切换历史会话继续排查。",
+          ? "customerService.threadList.empty.searchHistoryDescription"
+          : "customerService.threadList.empty.searchCurrentDescription",
+      titleKey: "customerService.threadList.empty.searchTitle",
       title: "未找到匹配会话",
     };
   }
 
   if (input.mode === "history") {
     return {
-      description:
+      descriptionKey:
         input.historyCount > 0
-          ? "当前历史筛选没有可展示会话，可回到当前会话池继续处理在线访客。"
-          : "已结束会话会进入历史列表；当前可先关注排队、进行中和 SLA 风险。",
-      title: input.historyCount > 0 ? "当前历史筛选为空" : "暂无历史会话",
+          ? "customerService.threadList.empty.historyFilteredDescription"
+          : "customerService.threadList.empty.noHistoryDescription",
+      description: input.historyCount > 0 ? "当前筛选没有历史会话。" : "暂无历史会话。",
+      titleKey: input.historyCount > 0
+        ? "customerService.threadList.empty.historyFilteredTitle"
+        : "customerService.threadList.empty.noHistoryTitle",
+      title: input.historyCount > 0 ? "当前筛选为空" : "暂无历史会话",
     };
   }
 
   if (input.currentCounts.all === 0) {
     return {
-      description:
-        "排队访客出现后会自动进入会话池；也可以切换历史查看已结束会话。",
+      descriptionKey: "customerService.threadList.empty.noCurrentDescription",
+      description: "当前没有待处理或接待中的会话。",
+      titleKey: "customerService.threadList.empty.noCurrentTitle",
       title: "暂无当前会话",
     };
   }
 
   if (input.filter === "queued") {
     return {
+      actionLabelKey: "customerService.threadList.empty.viewAll",
       actionLabel: "查看全部",
-      description:
-        "当前没有等待接入的访客。可切换全部或进行中，继续处理已接待会话。",
+      descriptionKey: "customerService.threadList.empty.queuedDescription",
+      description: "当前没有排队会话。",
+      titleKey: "customerService.threadList.empty.filteredTitle",
       title: "当前筛选为空",
     };
   }
 
   if (input.filter === "serving") {
     return {
+      actionLabelKey: "customerService.threadList.empty.viewQueued",
       actionLabel: "查看排队",
-      description:
-        "当前没有接待中会话。可切换排队接入访客，或查看历史记录。",
+      descriptionKey: "customerService.threadList.empty.servingDescription",
+      description: "当前没有接待中会话。",
+      titleKey: "customerService.threadList.empty.filteredTitle",
       title: "当前筛选为空",
     };
   }
 
   if (input.filter === "sla") {
     return {
+      actionLabelKey: "customerService.threadList.empty.viewAll",
       actionLabel: "查看全部",
-      description:
-        "暂未发现 SLA 风险信号。可回到全部会话，按未读和最后消息时间继续处理。",
+      descriptionKey: "customerService.threadList.empty.slaDescription",
+      description: "当前没有 SLA 风险会话。",
+      titleKey: "customerService.threadList.empty.noSlaTitle",
       title: "暂无 SLA 风险",
     };
   }
 
   return {
-    description:
-      "当前筛选下没有可处理会话。可切换历史或等待排队访客进入会话池。",
+    descriptionKey: "customerService.threadList.empty.filteredDescription",
+    description: "当前筛选没有可显示会话。",
+    titleKey: "customerService.threadList.empty.filteredTitle",
     title: "当前筛选为空",
   };
 }
@@ -237,22 +273,31 @@ export function createServiceCommandMetrics(input: {
     queueEnabled: input.receptionStatus?.queueAcceptEnabled,
     serviceStatus,
     serviceStatusLabel: serviceStatusLabel(serviceStatus),
+    serviceStatusLabelKey: serviceStatusLabelKey(serviceStatus),
     slaRiskCount,
     totalCount,
     metrics: [
-      { label: "容量", value: capacityText, tone: "success" },
-      { label: "排队", value: threadMetricValue(queuedCount), tone: queuedCount > 0 ? "warning" : "normal" },
-      { label: "进行中", value: threadMetricValue(activeCount), tone: "normal" },
-      { label: "未读", value: threadMetricValue(activeUnreadCount), tone: activeUnreadCount > 0 ? "warning" : "normal" },
-      { label: "SLA", value: threadMetricValue(slaRiskCount), tone: slaRiskCount > 0 ? "danger" : "normal" },
+      { label: "容量", labelKey: "customerService.online.metrics.capacity", value: capacityText, tone: "success" },
+      { label: "排队", labelKey: "customerService.online.metrics.queued", value: threadMetricValue(queuedCount), tone: queuedCount > 0 ? "warning" : "normal" },
+      { label: "进行中", labelKey: "customerService.online.metrics.active", value: threadMetricValue(activeCount), tone: "normal" },
+      { label: "未读", labelKey: "customerService.online.metrics.unread", value: threadMetricValue(activeUnreadCount), tone: activeUnreadCount > 0 ? "warning" : "normal" },
+      { label: "SLA", labelKey: "customerService.online.metrics.sla", value: threadMetricValue(slaRiskCount), tone: slaRiskCount > 0 ? "danger" : "normal" },
     ],
   };
+}
+
+function serviceStatusLabelKey(status?: string | null) {
+  if (status === "online") return "customerService.online.status.online";
+  if (status === "busy") return "customerService.online.status.busy";
+  if (status === "break") return "customerService.online.status.break";
+  if (status === "offline") return "customerService.online.status.offline";
+  return "customerService.online.status.unsynced";
 }
 
 function serviceStatusLabel(status?: string | null) {
   if (status === "online") return "在线";
   if (status === "busy") return "忙碌";
-  if (status === "break") return "小休";
+  if (status === "break") return "短暂离开";
   if (status === "offline") return "离线";
   return "未同步";
 }

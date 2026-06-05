@@ -1,6 +1,7 @@
 import { UserPlus } from "lucide-react";
 
 import type { FriendInviteQrDto } from "../data/api-client";
+import { useI18n } from "../i18n/useI18n";
 import { formatError } from "../lib/format";
 import { PanelState } from "./PanelState";
 
@@ -17,6 +18,7 @@ export function ContactsInviteQrCard({
   qrs: FriendInviteQrDto[];
   onCreate: () => void;
 }) {
+  const { t } = useI18n();
   const activeQr = qrs.find((item) => item.qrPayload) ?? qrs[0];
   const qrPayload = activeQr?.qrPayload;
   const copyPayload = () => {
@@ -28,31 +30,31 @@ export function ContactsInviteQrCard({
     <section className="contacts-section-card contacts-invite-card">
       <h3>
         <UserPlus size={16} />
-        添加联系人
+        {t("contacts.inviteQr.title")}
       </h3>
-      {loading && <PanelState text="正在读取好友二维码..." />}
+      {loading && <PanelState text={t("contacts.inviteQr.loading")} />}
       {Boolean(error) && (
-        <PanelState tone="error" text={`二维码加载失败：${formatError(error)}`} />
+        <PanelState tone="error" text={t("contacts.inviteQr.loadFailed", { error: formatError(error) })} />
       )}
       {!loading && !error && qrPayload && (
         <div className="contacts-mini-rows">
           <div>
-            <span>好友二维码内容</span>
+            <span>{t("contacts.inviteQr.content")}</span>
             <strong>{qrPayload}</strong>
           </div>
           <button type="button" onClick={copyPayload}>
-            复制二维码内容
+            {t("contacts.inviteQr.copy")}
           </button>
         </div>
       )}
       {!loading && !error && !qrPayload && (
         <p className="contacts-request-message">
-          暂无可用好友二维码，可生成后发给对方添加。
+          {t("contacts.inviteQr.empty")}
         </p>
       )}
       <div className="contacts-actions compact">
         <button disabled={creating} onClick={onCreate} type="button">
-          {creating ? "生成中..." : qrPayload ? "刷新二维码" : "生成二维码"}
+          {creating ? t("contacts.inviteQr.creating") : qrPayload ? t("contacts.inviteQr.refresh") : t("contacts.inviteQr.create")}
         </button>
       </div>
     </section>

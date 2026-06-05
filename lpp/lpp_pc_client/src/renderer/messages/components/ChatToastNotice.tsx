@@ -11,5 +11,5 @@ export function ChatToastNotice({ text }: { text: string }) {
 }
 
 export function isNoticeErrorText(text: string) {
-  return /failed|error|cannot|unsupported|try again|失败|错误|无法|不支持|重试/i.test(text);
+  return /failed|error|cannot|unsupported|try again|\u5931\u8d25|\u9519\u8bef|\u65e0\u6cd5|\u4e0d\u652f\u6301|\u91cd\u8bd5/i.test(text);
 }

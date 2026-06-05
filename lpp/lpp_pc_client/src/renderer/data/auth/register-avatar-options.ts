@@ -5,6 +5,7 @@ export type RegisterAvatarOption = {
   category: RegisterAvatarCategory;
   id: string;
   label: string;
+  labelKey: string;
 };
 
 type AvatarPreset = {
@@ -16,7 +17,6 @@ type AvatarPreset = {
   hairColor: string;
   id: string;
   jacket: string;
-  label: string;
   skin: string;
   tint: string;
 };
@@ -31,7 +31,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#4a251c",
     id: "ai-beauty-warm",
     jacket: "#ef7c45",
-    label: "AI暖光美女头像",
     skin: "#f3c6aa",
     tint: "#fed7aa",
   },
@@ -44,7 +43,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#5b2a43",
     id: "ai-beauty-rose",
     jacket: "#db2777",
-    label: "AI玫瑰美女头像",
     skin: "#f0bea0",
     tint: "#fbcfe8",
   },
@@ -56,7 +54,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#312e81",
     id: "ai-beauty-clear",
     jacket: "#4f46e5",
-    label: "AI清透美女头像",
     skin: "#efc4a5",
     tint: "#c7d2fe",
   },
@@ -69,7 +66,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#203040",
     id: "ai-beauty-smart",
     jacket: "#0891b2",
-    label: "AI知性美女头像",
     skin: "#edc2a4",
     tint: "#a5f3fc",
   },
@@ -82,7 +78,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#7f1d1d",
     id: "ai-beauty-sweet",
     jacket: "#e11d48",
-    label: "AI甜美美女头像",
     skin: "#f1b999",
     tint: "#fecdd3",
   },
@@ -95,7 +90,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#2f255d",
     id: "ai-beauty-purple",
     jacket: "#7c3aed",
-    label: "AI梦紫美女头像",
     skin: "#f2c6ad",
     tint: "#ddd6fe",
   },
@@ -108,7 +102,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#164e63",
     id: "cartoon-mint",
     jacket: "#14b8a6",
-    label: "卡通薄荷头像",
     skin: "#f3c7a6",
     tint: "#a7f3d0",
   },
@@ -120,7 +113,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#1e3a8a",
     id: "cartoon-blue",
     jacket: "#2563eb",
-    label: "卡通蓝莓头像",
     skin: "#f1b995",
     tint: "#bfdbfe",
   },
@@ -133,7 +125,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#6b3f2a",
     id: "cartoon-orange",
     jacket: "#f97316",
-    label: "卡通元气头像",
     skin: "#e8b08d",
     tint: "#fed7aa",
   },
@@ -146,7 +137,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#831843",
     id: "cartoon-pink",
     jacket: "#ec4899",
-    label: "卡通粉桃头像",
     skin: "#f0bea0",
     tint: "#fbcfe8",
   },
@@ -159,7 +149,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#713f12",
     id: "cartoon-lemon",
     jacket: "#ca8a04",
-    label: "卡通柠檬头像",
     skin: "#f0c29f",
     tint: "#fde68a",
   },
@@ -171,7 +160,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#111827",
     id: "cartoon-gray",
     jacket: "#64748b",
-    label: "卡通灰调头像",
     skin: "#dca47f",
     tint: "#cbd5e1",
   },
@@ -184,7 +172,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#224035",
     id: "bubble-service",
     jacket: "#00a572",
-    label: "绿泡泡客服头像",
     skin: "#f0bea0",
     tint: "#99f6e4",
   },
@@ -197,7 +184,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#14532d",
     id: "bubble-headset",
     jacket: "#059669",
-    label: "绿泡泡耳麦头像",
     skin: "#f3c6aa",
     tint: "#a7f3d0",
   },
@@ -210,7 +196,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#134e4a",
     id: "bubble-chat",
     jacket: "#0d9488",
-    label: "绿泡泡会话头像",
     skin: "#edc2a4",
     tint: "#a5f3fc",
   },
@@ -223,7 +208,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#166534",
     id: "bubble-cute",
     jacket: "#16a34a",
-    label: "绿泡泡亲和头像",
     skin: "#e8b08d",
     tint: "#bbf7d0",
   },
@@ -236,7 +220,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#365314",
     id: "bubble-online",
     jacket: "#65a30d",
-    label: "绿泡泡在线头像",
     skin: "#efc4a5",
     tint: "#d9f99d",
   },
@@ -249,7 +232,6 @@ const avatarPresets: AvatarPreset[] = [
     hairColor: "#0f172a",
     id: "bubble-brand",
     jacket: "#10b981",
-    label: "绿泡泡品牌头像",
     skin: "#f1b999",
     tint: "#d1fae5",
   },
@@ -259,8 +241,19 @@ export const registerAvatarOptions: RegisterAvatarOption[] = avatarPresets.map((
   avatarUrl: createAvatarDataUrl(preset),
   category: preset.category,
   id: preset.id,
-  label: preset.label,
+  label: avatarLabel(preset),
+  labelKey: `auth.avatarOptions.${preset.id}`,
 }));
+
+function avatarLabel(preset: AvatarPreset) {
+  const categoryLabel =
+    preset.category === "ai_beauty"
+      ? "AI"
+      : preset.category === "cartoon"
+        ? "卡通"
+        : "绿泡泡";
+  return `${categoryLabel} ${preset.id}`;
+}
 
 function createAvatarDataUrl(preset: AvatarPreset) {
   const cuteEyes = preset.expression === "cute";

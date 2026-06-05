@@ -38,6 +38,7 @@ import {
   normalizeCreateGroupChatPayload,
   type CreateGroupChatInput,
 } from "../group-create-contract";
+import { normalizeMessageBatchActionResult } from "../message/message-batch-action-result";
 
 export type MediaUploadOptions = UploadRequestOptions;
 
@@ -203,6 +204,36 @@ export class MessagesApiClient extends ContactsApiClient {
     );
   }
 
+  setConversationPinned(conversationId: string, isPinned: boolean) {
+    return this.request<{ conversationId?: string; isPinned?: boolean; updatedAt?: string }>(
+      endpointPlan.conversationPin.replace("{conversationId}", conversationId),
+      {
+        method: "PUT",
+        body: JSON.stringify({ isPinned }),
+      },
+    );
+  }
+
+  setConversationMuted(conversationId: string, isMuted: boolean) {
+    return this.request<{ conversationId?: string; isMuted?: boolean; updatedAt?: string }>(
+      endpointPlan.conversationMute.replace("{conversationId}", conversationId),
+      {
+        method: "PUT",
+        body: JSON.stringify({ isMuted }),
+      },
+    );
+  }
+
+  setConversationVisibility(conversationId: string, hidden: boolean) {
+    return this.request<{ conversationId?: string; hidden?: boolean; updatedAt?: string }>(
+      endpointPlan.conversationVisibility.replace("{conversationId}", conversationId),
+      {
+        method: "PUT",
+        body: JSON.stringify({ hidden }),
+      },
+    );
+  }
+
   addFavoriteMessage(params: { messageId: string; conversationId: string }) {
     return this.request<{ favoriteId?: string; messageId?: string }>(
       endpointPlan.favorites,
@@ -257,6 +288,29 @@ export class MessagesApiClient extends ContactsApiClient {
         }),
       },
     );
+  }
+
+  batchForwardMessages(params: {
+    messageIds: string[];
+    targetConversationId: string;
+  }) {
+    return this.request<unknown>(
+      endpointPlan.messageBatchForward,
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      },
+    ).then((result) => normalizeMessageBatchActionResult(result, params.messageIds));
+  }
+
+  batchDeleteMessages(messageIds: string[]) {
+    return this.request<unknown>(
+      endpointPlan.messageBatchDelete,
+      {
+        method: "POST",
+        body: JSON.stringify({ messageIds }),
+      },
+    ).then((result) => normalizeMessageBatchActionResult(result, messageIds));
   }
 
   markConversationRead(

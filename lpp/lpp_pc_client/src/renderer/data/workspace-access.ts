@@ -148,13 +148,13 @@ function legacyAccess(): PcWorkspaceAccess {
 }
 
 function employeeRoleKind(roleLabel: string, membershipRole?: number): PcRoleKind {
-  if (membershipRole === 4 || includesAny(roleLabel, ["所有者", "owner"])) {
+  if (membershipRole === 4 || includesAny(roleLabel, ["\u6240\u6709\u8005", "owner"])) {
     return "owner";
   }
-  if (membershipRole === 3 || includesAny(roleLabel, ["管理员", "admin"])) {
+  if (membershipRole === 3 || includesAny(roleLabel, ["\u7ba1\u7406\u5458", "admin"])) {
     return "admin";
   }
-  if (membershipRole === 2 || includesAny(roleLabel, ["客服", "customer_service"])) {
+  if (membershipRole === 2 || includesAny(roleLabel, ["\u5ba2\u670d", "customer_service"])) {
     return "customer_service";
   }
   return "basic_employee";

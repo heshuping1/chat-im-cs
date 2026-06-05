@@ -29,6 +29,7 @@ import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import type { CustomerServiceStatus } from "../data/types";
+import { useI18n } from "../i18n/useI18n";
 import {
   type ServiceAssistantPane,
   type ServiceLayoutMode,
@@ -189,10 +190,13 @@ export function calculateServiceResizeWidth({
   return clampServicePaneWidth(pane, nextWidth - overflow);
 }
 
-function serviceAssistantPaneLabel(pane: Exclude<ServiceAssistantPane, null>) {
-  if (pane === "quickReply") return "快捷话术";
-  if (pane === "aiDraft") return "AI 起草";
-  return "知识库";
+function serviceAssistantPaneLabel(
+  pane: Exclude<ServiceAssistantPane, null>,
+  t: (key: string) => string,
+) {
+  if (pane === "quickReply") return t("composer.quickReply");
+  if (pane === "aiDraft") return t("composer.aiDraft");
+  return t("knowledge.title");
 }
 
 export function calculateServiceResponsiveLayout(
@@ -227,6 +231,7 @@ export function calculateServiceResponsiveLayout(
 }
 
 export function OnlineServicePage() {
+  const { t } = useI18n();
   const session = useAuthSession();
   const queryClient = useQueryClient();
   const shellRef = useRef<HTMLElement | null>(null);
@@ -413,7 +418,7 @@ export function OnlineServicePage() {
       if (!client) throw new Error("Customer service API is not ready");
       const serviceStatus = receptionStatus?.serviceStatus ?? confirmedServiceStatus;
       const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
-      if (!patch) throw new Error("接待状态未同步，请稍后重试");
+      if (!patch) throw new Error(t("customerService.online.receptionNotSynced"));
       return client.updateReceptionStatus(patch);
     },
     onMutate: (mode) => {
@@ -540,7 +545,9 @@ export function OnlineServicePage() {
     : null;
   const hiddenAssistantHint =
     serviceAssistantPane && !effectiveServiceAssistantPane
-      ? `${serviceAssistantPaneLabel(serviceAssistantPane)}需要更宽的工作区，请拉宽窗口或先收起队列后查看。`
+      ? t("customerService.online.assistantNeedsWidth", {
+          pane: serviceAssistantPaneLabel(serviceAssistantPane, t),
+        })
       : null;
   const effectiveServiceCustomerPaneCollapsed =
     serviceCustomerPaneCollapsed ||
@@ -628,7 +635,7 @@ export function OnlineServicePage() {
       <div
         className="resizer service-assistant-resizer"
         role="separator"
-        aria-label="调整客服辅助工具宽度"
+        aria-label={t("customerService.online.resizeAssistant")}
         onPointerDown={(event) =>
           startHorizontalPaneResize(event, {
             initialWidth: serviceAssistantPaneWidth,
@@ -653,7 +660,7 @@ export function OnlineServicePage() {
       <div
         className="resizer service-profile-resizer"
         role="separator"
-        aria-label="调整客户资料宽度"
+        aria-label={t("customerService.online.resizeCustomer")}
         onPointerDown={(event) =>
           startHorizontalPaneResize(event, {
             initialWidth: serviceProfilePaneWidth,
@@ -720,7 +727,7 @@ export function OnlineServicePage() {
                 setServiceThreadFilter(filter);
                 setQueueRadarHint(null);
               } else {
-                setQueueRadarHint("未读待处理已展开，请优先查看带红点的会话；专用未读筛选等待后端能力接入。");
+                setQueueRadarHint(t("customerService.online.unreadHint"));
               }
             }}
             queuedCount={queuedCount}
@@ -735,7 +742,7 @@ export function OnlineServicePage() {
           <div
             className="resizer service-list-resizer"
             role="separator"
-            aria-label="调整在线客服列表宽度"
+            aria-label={t("customerService.online.resizeList")}
             onPointerDown={(event) =>
               startHorizontalPaneResize(event, {
                 initialWidth: serviceListPaneWidth,
@@ -790,31 +797,34 @@ function ServiceCommandBar({
   onSetStatus: (status: CustomerServiceStatus) => void;
   pending: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <header className="h-flagship-topbar service-command-bar">
       <div className="h-topbar-summary service-command-summary">
         <span className={`service-command-status ${metrics.serviceStatus}`}>
-          {metrics.serviceStatusLabel}
+          {t(metrics.serviceStatusLabelKey)}
         </span>
         <span className="service-command-copy">
-          <strong>在线客服指挥台</strong>
+          <strong>{t("customerService.online.commandTitle")}</strong>
           <span>
-            会话 {metrics.hasThreadData ? metrics.totalCount : "--"} ·{" "}
-            {typeof metrics.queueEnabled === "boolean"
-              ? metrics.queueEnabled
-                ? "自动接入"
-                : "手动接入"
-              : "接入模式未同步"}{" "}
-            · 容量{" "}
-            {metrics.capacityText}
+            {t("customerService.online.commandSummary", {
+              capacity: metrics.capacityText,
+              mode:
+                typeof metrics.queueEnabled === "boolean"
+                  ? metrics.queueEnabled
+                    ? t("customerService.online.autoAccess")
+                    : t("customerService.online.manualAccess")
+                  : t("customerService.online.accessModeUnsynced"),
+              total: metrics.hasThreadData ? metrics.totalCount : "--",
+            })}
           </span>
         </span>
       </div>
 
       <div className="h-metric-strip service-command-metrics">
         {metrics.metrics.map((item) => (
-          <div className={`h-metric-item tone-${item.tone ?? "normal"}`} key={item.label}>
-            <span>{item.label}</span>
+          <div className={`h-metric-item tone-${item.tone ?? "normal"}`} key={item.labelKey}>
+            <span>{t(item.labelKey)}</span>
             <div className="h-metric-value">
               <strong>{item.value}</strong>
             </div>
@@ -856,12 +866,14 @@ function ServiceQueueRail({
   slaRiskCount: number;
   unreadCount: number;
 }) {
+  const { t } = useI18n();
   return renderServiceQueueRail({
     activeCount,
     onExpand,
     onFilter,
     queuedCount,
     slaRiskCount,
+    t,
     unreadCount,
   });
 
@@ -873,6 +885,7 @@ function renderServiceQueueRail({
   onFilter,
   queuedCount,
   slaRiskCount,
+  t,
   unreadCount,
 }: {
   activeCount: number;
@@ -880,52 +893,53 @@ function renderServiceQueueRail({
   onFilter: (filter: "queued" | "serving" | "sla" | null) => void;
   queuedCount: number;
   slaRiskCount: number;
+  t: (key: string, params?: Record<string, string | number>) => string;
   unreadCount: number;
 }) {
   return (
-    <aside className="service-queue-rail" aria-label="在线客服队列雷达">
-      <button type="button" aria-label="展开接待队列" onClick={onExpand}>
+    <aside className="service-queue-rail" aria-label={t("customerService.online.queueRailAria")}>
+      <button type="button" aria-label={t("customerService.online.expandQueue")} onClick={onExpand}>
         <UsersRound size={18} />
       </button>
       <button
         className="service-queue-rail-metric"
         type="button"
-        title={`展开排队会话，当前 ${queuedCount} 个`}
+        title={t("customerService.online.expandQueuedTitle", { count: queuedCount })}
         onClick={() => onFilter("queued")}
       >
         <span>
           <b>Q</b>
-          <small>排队</small>
+          <small>{t("customerService.threadList.filterQueued")}</small>
           <em>{queuedCount}</em>
         </span>
       </button>
       <button
         className="service-queue-rail-metric"
         type="button"
-        title={`展开进行中会话，当前 ${activeCount} 个`}
+        title={t("customerService.online.expandActiveTitle", { count: activeCount })}
         onClick={() => onFilter("serving")}
       >
         <span>
           <b>A</b>
-          <small>进行中</small>
+          <small>{t("customerService.threadList.filterServing")}</small>
           <em>{activeCount}</em>
         </span>
       </button>
       <button
         className="service-queue-rail-metric"
         type="button"
-        title={`展开未读会话，当前 ${unreadCount} 条`}
+        title={t("customerService.online.expandUnreadTitle", { count: unreadCount })}
         onClick={() => onFilter(null)}
       >
         <span>
-          <b>未读</b>
+          <b>{t("customerService.online.unread")}</b>
           <em>{unreadCount}</em>
         </span>
       </button>
       <button
         className="service-queue-rail-metric danger"
         type="button"
-        title={`展开查看 SLA 风险会话，当前 ${slaRiskCount} 个`}
+        title={t("customerService.online.expandSlaTitle", { count: slaRiskCount })}
         onClick={() => onFilter("sla")}
       >
         <span>
@@ -958,6 +972,7 @@ function ServiceAssistantShell({
   onClose: () => void;
   pane: Exclude<ServiceAssistantPane, null>;
 }) {
+  const { t } = useI18n();
   const isAiDraft = pane === "aiDraft";
   const isQuickReply = pane === "quickReply";
   const session = useAuthSession();
@@ -965,7 +980,7 @@ function ServiceAssistantShell({
   return (
     <aside
       className="service-assistant-pane"
-      aria-label={isAiDraft ? "AI 起草" : isQuickReply ? "快捷话术" : "知识库"}
+      aria-label={serviceAssistantPaneLabel(pane, t)}
       onDragOver={onDragOverContextPane}
       onDrop={(event) => onDropContextPane(event, "assistant")}
     >
@@ -974,13 +989,13 @@ function ServiceAssistantShell({
           className="context-pane-drag"
           type="button"
           draggable
-          title="拖拽排序"
-          aria-label="拖拽排序"
+          title={t("customerService.online.dragSort")}
+          aria-label={t("customerService.online.dragSort")}
           onDragStart={(event) => onDragStartContextPane(event, "assistant")}
         >
           <GripVertical size={15} />
         </button>
-        <strong>{serviceAssistantPaneLabel(pane)}</strong>
+        <strong>{serviceAssistantPaneLabel(pane, t)}</strong>
       </header>
       {notice && <div className="service-assistant-notice">{notice}</div>}
       <div className="context-pane-body">
@@ -988,7 +1003,7 @@ function ServiceAssistantShell({
           <AiReplySuggestionPanel
             disabledReason={aiReplyTarget.disabledReason}
             session={session}
-            subtitle="客服会话"
+            subtitle={t("customerService.workspace.serviceConversation")}
             threadId={aiReplyTarget.threadId}
             threadTitle={aiReplyTarget.threadTitle}
             threadType={aiReplyTarget.threadType}

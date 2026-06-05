@@ -15,6 +15,7 @@ import { workspaceScopeFromSession, workspaceScopeDiagnostic } from "../data/wor
 import { requireApiClient } from "../data/runtime";
 import { useAuthSession } from "../data/auth/auth-store";
 import { failedMessageRetryAction } from "../data/message/message-retry-model";
+import { useI18n } from "../i18n/useI18n";
 import {
   useClearPendingImRead,
   useImPeerReadReceipts,
@@ -76,6 +77,7 @@ import { useMessageConversationSelection } from "../messages/hooks/useMessageCon
 import { useMessageListScrollRegistry } from "../messages/hooks/useMessageListScrollRegistry";
 import { useMessageContactPickerData } from "../messages/hooks/useMessageContactPickerData";
 import { useMessageContactProfileController } from "../messages/hooks/useMessageContactProfileController";
+import { useMessageConversationActions } from "../messages/hooks/useMessageConversationActions";
 import { useAutoTranslateConversationPreference } from "../translation/hooks/useAutoTranslateConversationPreference";
 import { useAutoTranslateMessages } from "../translation/hooks/useAutoTranslateMessages";
 import { autoTranslateTargetLanguage } from "../translation/models/autoTranslateModel";
@@ -95,10 +97,11 @@ import {
 import { buildUserAvatarRegistry } from "../messages/models/userAvatarRegistry";
 import type { ReplyTarget } from "../messages/models/messageComposerModel";
 import {
-  contactCardActionErrorText,
   normalizeContactCard,
   type AnchoredContactCardProfile,
 } from "../messages/models/contactCardModel";
+import { resolveGroupSpeakPermissionGate } from "../messages/models/groupSpeakPermissionModel";
+import { contactCardActionErrorText } from "../messages/presentation/contactCardActionNotice";
 import { clampComposerHeight } from "../messages/models/messageComposerLayoutModel";
 import {
   buildGroupMemberMap,
@@ -107,14 +110,21 @@ import {
   type UnreadJumpState,
 } from "../messages/models/messageDisplayModel";
 import type { HistoryFilterKey } from "../messages/models/messageListModel";
-import { useMessageCenterCommandModel } from "../messages/hooks/useMessageCenterCommandModel";
+import {
+  useMessageCenterCommandModel,
+  type MessageCenterCommandModel,
+} from "../messages/hooks/useMessageCenterCommandModel";
 import {
   calculateMessageResizeWidth,
   useMessageResponsiveLayout,
 } from "../messages/hooks/useMessageResponsiveLayout";
 import { useSerialTaskQueue } from "../messages/hooks/useSerialTaskQueue";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
-import { requestMessageDangerConfirmation } from "../messages/runtime/messageConfirm";
+import {
+  messageDangerConfirmationDescriptor,
+  requestMessageDangerConfirmation,
+  type MessageDangerConfirmAction,
+} from "../messages/runtime/messageConfirm";
 import { useContactAddFriendController } from "../contacts/hooks/useContactAddFriendController";
 import { ContactAddFriendDialog } from "./ContactAddFriendDialog";
 import { CustomerServiceKnowledgePanel } from "../customer-service/components/CustomerServiceKnowledgeDrawer";
@@ -138,9 +148,12 @@ type MessageContextPaneOrder = "assistant" | "profile";
 const messageProfilePinStorageKey = "lpp_pc_message_profile_pinned";
 const messageContextOrderStorageKey = "lpp_pc_message_context_order";
 
-function messageAssistantPaneLabel(pane: Exclude<MessageAssistantPane, null>) {
-  if (pane === "quickReply") return "快捷话术";
-  return "知识库";
+function messageAssistantPaneLabel(
+  pane: Exclude<MessageAssistantPane, null>,
+  t: (key: string) => string,
+) {
+  if (pane === "quickReply") return t("messages.center.quickReply");
+  return t("messages.center.knowledgeBase");
 }
 
 function readMessageContextOrder(): MessageContextPaneOrder[] {
@@ -165,6 +178,7 @@ function readMessageContextOrder(): MessageContextPaneOrder[] {
 
 export function MessageCenter() {
   const session = useAuthSession();
+  const { t } = useI18n();
   const activeModule = useActiveModule();
   const activeConversationId = useActiveImConversationId();
   const setActiveConversation = useSetActiveImConversation();
@@ -379,6 +393,31 @@ export function MessageCenter() {
     setFileFilter: setGroupFileFilter,
     setNotice,
   });
+  const groupSpeakPermissionGate = useMemo(
+    () =>
+      resolveGroupSpeakPermissionGate({
+        conversationType: activeConversationType,
+        detailLoaded: Boolean(groupManagement.detail),
+        groupRole: groupManagement.role,
+        membershipRole: session?.membershipRole,
+        muteMode: groupManagement.detail?.muteMode,
+      }),
+    [
+      activeConversationType,
+      groupManagement.detail,
+      groupManagement.detail?.muteMode,
+      groupManagement.role,
+      session?.membershipRole,
+    ],
+  );
+  const composerDisabledNotice =
+    groupSpeakPermissionGate.reason === "all_muted"
+      ? t("messages.center.groupAllMutedReadOnly")
+      : undefined;
+  const notifyComposerBlocked = useCallback(() => {
+    if (!composerDisabledNotice) return;
+    setNotice(composerDisabledNotice);
+  }, [composerDisabledNotice]);
   const { groupAvatarSnapshotFor } = useGroupAvatarSnapshots({
     activeConversation,
     activeConversationType,
@@ -424,6 +463,7 @@ export function MessageCenter() {
   });
   const {
     deleteMutation,
+    batchDeleteMutation,
     favoriteMutation,
     forwardMutation,
     recallMutation,
@@ -439,6 +479,15 @@ export function MessageCenter() {
     setMultiSelectMode,
     setNotice,
     setSelectedMessageIds,
+  });
+  const { runConversationAction } = useMessageConversationActions({
+    activeConversationId,
+    queryClient,
+    session,
+    setActiveConversation,
+    setLocalHiddenConversationIds,
+    setLocalMutedConversationIds,
+    setNotice,
   });
 
   const { historyCounts, messages, visibleMessages } = useMessageListData({
@@ -683,6 +732,62 @@ export function MessageCenter() {
       setLocalOutgoingMessagesByConversation,
       setReplyTarget,
     });
+  const guardedSendText = useCallback<MessageCenterCommandModel["sendText"]>(
+    (content) => {
+      if (groupSpeakPermissionGate.disabled) {
+        notifyComposerBlocked();
+        return;
+      }
+      sendTextOptimistically(content);
+    },
+    [groupSpeakPermissionGate.disabled, notifyComposerBlocked, sendTextOptimistically],
+  );
+  const guardedSendMedia = useCallback<MessageCenterCommandModel["sendMedia"]>(
+    async (file, kind) => {
+      if (groupSpeakPermissionGate.disabled) {
+        notifyComposerBlocked();
+        return;
+      }
+      await sendMediaOptimistically(file, kind);
+    },
+    [groupSpeakPermissionGate.disabled, notifyComposerBlocked, sendMediaOptimistically],
+  );
+  const guardedSendContactCard = useCallback<MessageCenterCommandModel["sendContactCard"]>(
+    (card) => {
+      if (groupSpeakPermissionGate.disabled) {
+        notifyComposerBlocked();
+        return;
+      }
+      return sendContactCardOptimistically(card);
+    },
+    [
+      groupSpeakPermissionGate.disabled,
+      notifyComposerBlocked,
+      sendContactCardOptimistically,
+    ],
+  );
+  const guardedOpenContactCardPicker = useCallback<
+    MessageCenterCommandModel["openContactCardPicker"]
+  >(() => {
+    if (groupSpeakPermissionGate.disabled) {
+      notifyComposerBlocked();
+      return;
+    }
+    setComposerDialog("card");
+  }, [groupSpeakPermissionGate.disabled, notifyComposerBlocked]);
+  const guardedUploadAction = useCallback<MessageCenterCommandModel["uploadAction"]>(
+    (localTaskId, action) => {
+      if (
+        groupSpeakPermissionGate.disabled &&
+        (action === "retry" || action === "resume")
+      ) {
+        notifyComposerBlocked();
+        return;
+      }
+      handleUploadAction(localTaskId, action);
+    },
+    [groupSpeakPermissionGate.disabled, handleUploadAction, notifyComposerBlocked],
+  );
   useDirectReadReceiptSync({
     activeConversation,
     activeConversationType,
@@ -752,42 +857,72 @@ export function MessageCenter() {
   );
 
   const openAiDraftDrawer = useCallback(() => {
+    if (groupSpeakPermissionGate.disabled) {
+      notifyComposerBlocked();
+      return;
+    }
     setAssistantPane(null);
-    setNotice("IM 聊天不开放 AI 起草，请在在线客服工作台使用。");
-  }, []);
+    setNotice(t("messages.center.aiDraftUnavailable"));
+  }, [groupSpeakPermissionGate.disabled, notifyComposerBlocked, t]);
 
   const openKnowledgePanel = useCallback(() => {
+    if (groupSpeakPermissionGate.disabled) {
+      notifyComposerBlocked();
+      return;
+    }
     if (assistantPane !== "knowledge") replaceMessageProfileIfUnpinned();
     setAssistantPane((current) => (current === "knowledge" ? null : "knowledge"));
-  }, [assistantPane, replaceMessageProfileIfUnpinned]);
+  }, [
+    assistantPane,
+    groupSpeakPermissionGate.disabled,
+    notifyComposerBlocked,
+    replaceMessageProfileIfUnpinned,
+  ]);
 
   const openQuickReplyPanel = useCallback(() => {
+    if (groupSpeakPermissionGate.disabled) {
+      notifyComposerBlocked();
+      return;
+    }
     if (assistantPane !== "quickReply") replaceMessageProfileIfUnpinned();
     setAssistantPane((current) => (current === "quickReply" ? null : "quickReply"));
-  }, [assistantPane, replaceMessageProfileIfUnpinned]);
+  }, [
+    assistantPane,
+    groupSpeakPermissionGate.disabled,
+    notifyComposerBlocked,
+    replaceMessageProfileIfUnpinned,
+  ]);
 
   const insertKnowledgeReply = useCallback((payload: KnowledgeInsertPayload) => {
+    if (groupSpeakPermissionGate.disabled) {
+      notifyComposerBlocked();
+      return;
+    }
     const text = payload.text.trim();
     if (!text) {
-      setNotice("这条知识内容暂无可插入文本。");
+      setNotice(t("messages.center.knowledgeEmpty"));
       return;
     }
     composerRef.current?.insertText(text);
     setAssistantPane(null);
-    setNotice("已插入输入框，确认后可发送。");
+    setNotice(t("messages.center.insertedToComposer"));
     requestAnimationFrame(() => composerRef.current?.focus());
-  }, []);
+  }, [groupSpeakPermissionGate.disabled, notifyComposerBlocked, t]);
 
   const insertQuickReply = useCallback((payload: QuickReplyInsertPayload) => {
+    if (groupSpeakPermissionGate.disabled) {
+      notifyComposerBlocked();
+      return;
+    }
     const text = payload.text.trim();
     if (!text) {
-      setNotice("这条话术暂无可插入文本。");
+      setNotice(t("messages.center.quickReplyEmpty"));
       return;
     }
     composerRef.current?.insertText(text);
-    setNotice("话术已插入输入框，确认后可发送。");
+    setNotice(t("messages.center.quickReplyInserted"));
     requestAnimationFrame(() => composerRef.current?.focus());
-  }, []);
+  }, [groupSpeakPermissionGate.disabled, notifyComposerBlocked, t]);
 
   const {
     handleAvatarClick,
@@ -799,24 +934,19 @@ export function MessageCenter() {
     scrollToMessage,
   } = useMessageInteractionHandlers({
     activeConversation,
-    activeConversationId,
-    deleteMessage: deleteMutation.mutateAsync,
+    deleteMessages: batchDeleteMutation.mutateAsync,
     groupMemberMap,
     messageListScrollRegistry,
     profile: contactProfileController.profileQuery.data,
     profileExtra: contactProfileController.profileExtraQuery.data,
+    runConversationAction,
     selectedMessageIds,
     session,
-    setActiveConversation,
     setAvatarProfilePopover,
     setContactCardProfile,
     setConversationMenu,
-    setLocalHiddenConversationIds,
-    setLocalMutedConversationIds,
     setMessageMenu,
-    setMultiSelectMode,
     setNotice,
-    setSelectedMessageIds,
   });
 
   const handleMenuAction = useMessageMenuActionController({
@@ -839,12 +969,12 @@ export function MessageCenter() {
   const messageCenterCommands = useMessageCenterCommandModel({
     deleteSelectedMessages: handleBatchDeleteSelected,
     menuAction: handleMenuAction,
-    openContactCardPicker: () => setComposerDialog("card"),
-    sendContactCard: sendContactCardOptimistically,
-    sendMedia: sendMediaOptimistically,
-    sendText: sendTextOptimistically,
+    openContactCardPicker: guardedOpenContactCardPicker,
+    sendContactCard: guardedSendContactCard,
+    sendMedia: guardedSendMedia,
+    sendText: guardedSendText,
     unreadJump: handleUnreadJump,
-    uploadAction: handleUploadAction,
+    uploadAction: guardedUploadAction,
   });
 
   const handleConfirmResendMessage = useCallback(() => {
@@ -853,7 +983,11 @@ export function MessageCenter() {
     const action = failedMessageRetryAction(message);
     setResendConfirmMessage(null);
     if (!action) {
-      setNotice("该消息暂时无法重发");
+      setNotice(t("messages.center.resendUnavailable"));
+      return;
+    }
+    if (groupSpeakPermissionGate.disabled) {
+      notifyComposerBlocked();
       return;
     }
     if (action.type === "upload") {
@@ -863,9 +997,16 @@ export function MessageCenter() {
     try {
       retryTextMessage(message);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "该消息暂时无法重发");
+      setNotice(error instanceof Error ? error.message : t("messages.center.resendUnavailable"));
     }
-  }, [messageCenterCommands, resendConfirmMessage, retryTextMessage]);
+  }, [
+    groupSpeakPermissionGate.disabled,
+    messageCenterCommands,
+    notifyComposerBlocked,
+    resendConfirmMessage,
+    retryTextMessage,
+    t,
+  ]);
 
   const assistantPaneVisible =
     Boolean(assistantPane) &&
@@ -970,6 +1111,8 @@ export function MessageCenter() {
         canOpenAiAssistant={false}
         canOpenKnowledgeBase={isModuleVisibleForAccess("knowledgeBase", workspaceAccess)}
         composerDialog={composerDialog}
+        composerDisabled={groupSpeakPermissionGate.disabled}
+        composerDisabledReason={composerDisabledNotice}
         composerHeight={composerHeight}
         contactPickerItems={contactPickerItems}
         conversationMenu={conversationMenu}
@@ -1029,7 +1172,7 @@ export function MessageCenter() {
         }}
         onContactCardBlock={() => {
           if (!contactCardProfile?.userId) return;
-          if (!requestMessageDangerConfirmation({ action: "block-user" })) {
+          if (!confirmMessageDanger("block-user", t)) {
             return;
           }
           contactProfileController.blockUser(contactCardProfile.userId);
@@ -1038,7 +1181,7 @@ export function MessageCenter() {
         onContactCardDeleteFriend={() => {
           const relation = contactProfileController.contactCardRelation;
           if (relation?.status !== "friend") return;
-          if (!requestMessageDangerConfirmation({ action: "delete-friend" })) return;
+          if (!confirmMessageDanger("delete-friend", t)) return;
           contactProfileController.deleteFriend(relation.friendUserId);
         }}
         onContactCardReject={() => {
@@ -1061,6 +1204,10 @@ export function MessageCenter() {
         onUpdateCustomerRemark={contactProfileController.updateCustomerRemark}
         onUpdateCustomerTags={contactProfileController.updateCustomerTags}
         onSendContactCard={async (contact) => {
+          if (groupSpeakPermissionGate.disabled) {
+            notifyComposerBlocked();
+            return;
+          }
           setContactCardSendPending(true);
           try {
             await messageCenterCommands.sendContactCard(
@@ -1072,7 +1219,7 @@ export function MessageCenter() {
             );
             setComposerDialog(null);
           } catch (error) {
-            setNotice(contactCardActionErrorText(error, "发送名片失败"));
+            setNotice(contactCardActionErrorText(error, "messages.center.sendContactCardFailed", t));
           } finally {
             setContactCardSendPending(false);
           }
@@ -1138,7 +1285,7 @@ export function MessageCenter() {
       {assistantPane && activeConversation && (
         <aside
           className="message-assistant-pane"
-          aria-label="消息辅助工作区"
+          aria-label={t("messages.center.assistantWorkspaceAria")}
           onDragOver={handleMessageContextDragOver}
           onDrop={(event) => handleMessageContextDrop(event, "assistant")}
         >
@@ -1147,13 +1294,13 @@ export function MessageCenter() {
               className="context-pane-drag"
               type="button"
               draggable
-              title="拖拽排序"
-              aria-label="拖拽排序"
+              title={t("messages.center.dragSort")}
+              aria-label={t("messages.center.dragSort")}
               onDragStart={(event) => handleMessageContextDragStart(event, "assistant")}
             >
               <GripVertical size={15} />
             </button>
-            <strong>{messageAssistantPaneLabel(assistantPane)}</strong>
+            <strong>{messageAssistantPaneLabel(assistantPane, t)}</strong>
           </header>
           <div className="context-pane-body">
             {assistantPane === "quickReply" ? (
@@ -1217,4 +1364,19 @@ export function MessageCenter() {
       )}
     </>
   );
+}
+
+type MessageCenterTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+function confirmMessageDanger(
+  action: MessageDangerConfirmAction,
+  t: MessageCenterTranslate,
+  count?: number,
+) {
+  const descriptor = messageDangerConfirmationDescriptor(action, count);
+  return requestMessageDangerConfirmation({
+    action,
+    count,
+    message: t(descriptor.key, descriptor.params),
+  });
 }

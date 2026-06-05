@@ -42,6 +42,8 @@ import { useSetAuthSession } from "../data/auth/auth-store";
 import { writeRendererAppLog } from "../data/logging/app-log";
 import { defaultApiBaseUrl, createTraceId } from "../data/runtime";
 import { primarySiteBaseUrl, primarySiteLine, siteLineManager } from "../data/network/site-line-manager";
+import { localeLabels, supportedLocales } from "../i18n/locales";
+import { useI18n } from "../i18n/useI18n";
 
 type PendingLogin = {
   baseUrl: string;
@@ -56,6 +58,7 @@ type InvitationFlowContext = {
 
 export function LoginPage() {
   const setAuthSession = useSetAuthSession();
+  const { locale, setLocale, t } = useI18n();
   const apiBaseUrlTouched = useRef(false);
   const [mode, setMode] = useState<AuthMode>("login");
   const [apiBaseUrl, setApiBaseUrl] = useState(
@@ -170,11 +173,11 @@ export function LoginPage() {
 
   const submitForm = async () => {
     if (captcha && !captchaAnswer.trim()) {
-      setError("请输入安全验证答案");
+      setError(t("auth.captchaAnswerMissing"));
       return;
     }
     if (mode === "register" && registerValidation) {
-      setError(registerValidation);
+      setError(t(registerValidation));
       return;
     }
     const captchaInput = captcha
@@ -250,7 +253,11 @@ export function LoginPage() {
         captchaAnswer: captchaInput.captchaAnswer,
         verificationCode: null,
       });
-      setNotice(invitation ? "注册成功，正在接受企业邀请" : "注册成功，正在进入账号");
+      setNotice(
+        invitation
+          ? t("auth.registeredAcceptingInvitation")
+          : t("auth.registeredEnteringAccount"),
+      );
       const login = await new ApiClient({
         baseUrl,
         traceId: createTraceId("pc-register-login"),
@@ -276,7 +283,7 @@ export function LoginPage() {
     setCaptcha(null);
     setCaptchaAnswer("");
     if (invitation?.code && login.accessToken && !login.platformToken) {
-      setError("当前登录结果无法接受邀请码，请重新登录后重试");
+      setError(t("auth.invitationCannotBeAccepted"));
       return;
     }
     if (login.accessToken) {
@@ -286,8 +293,8 @@ export function LoginPage() {
     if (!login.platformToken) {
       setError(
         sourceMode === "register"
-          ? "注册成功，但当前账号还没有可进入空间，请联系管理员加入企业后再登录"
-          : "登录成功，但没有可进入空间，请确认账号已加入企业",
+          ? t("auth.registeredNoSpace")
+          : t("auth.loggedInNoSpace"),
       );
       return;
     }
@@ -302,7 +309,11 @@ export function LoginPage() {
     }
     if ((login.tenants?.length ?? 0) > 1) {
       setPendingLogin({ baseUrl, login, mode: sourceMode });
-      setNotice(sourceMode === "register" ? "注册成功，请选择进入空间" : "请选择进入空间");
+      setNotice(
+        sourceMode === "register"
+          ? t("auth.registeredChooseSpace")
+          : t("auth.chooseSpaceNotice"),
+      );
       return;
     }
     await enterPersonalSpace(baseUrl, login, sourceMode);
@@ -318,7 +329,7 @@ export function LoginPage() {
       }).getPlatformInvitationPreview(code);
       setInvitationPreview(createInvitationPreviewView(preview));
       if (preview.tenantName) {
-        setNotice(`将加入：${preview.tenantName}`);
+        setNotice(t("auth.willJoinTenant", { name: preview.tenantName }));
       }
       return { code, preview };
     } catch (previewError) {
@@ -326,7 +337,7 @@ export function LoginPage() {
         throw previewError;
       }
       setInvitationPreview(createInvitationPreviewErrorView(previewError));
-      setNotice("登录后将尝试接受邀请码");
+      setNotice(t("auth.acceptInvitationAfterLogin"));
       return { code, preview: null };
     }
   };
@@ -338,13 +349,13 @@ export function LoginPage() {
   ) => {
     if (!login.platformToken) throw new Error("missing platform token");
     try {
-      setNotice("正在接受企业邀请");
+      setNotice(t("auth.acceptingInvitation"));
       const tenant = await new ApiClient({
         baseUrl,
         platformToken: login.platformToken,
         traceId: createTraceId("pc-invitation-accept"),
       }).acceptPlatformInvitation(invitation.code);
-      setNotice("已加入企业，正在进入工作台");
+      setNotice(t("auth.joinedEnteringWorkbench"));
       await applySelectedTenantSession(baseUrl, login, tenant, null);
     } catch (err) {
       if (
@@ -352,7 +363,7 @@ export function LoginPage() {
         err.code === "TENANT_ALREADY_MEMBER" &&
         invitation.preview?.tenantId
       ) {
-        setNotice("你已在该企业中，角色不会因邀请码变更");
+        setNotice(t("auth.alreadyMemberRoleUnchanged"));
         await selectTenantSpace({
           baseUrl,
           login,
@@ -375,7 +386,7 @@ export function LoginPage() {
         tenantId: selectedTenantId,
       });
     } catch (err) {
-      setError(mapAuthErrorMessage(err, pendingLogin.mode));
+      setError(t(mapAuthErrorMessage(err, pendingLogin.mode)));
     } finally {
       setSpaceSubmittingId(null);
     }
@@ -421,8 +432,8 @@ export function LoginPage() {
     } catch {
       setError(
         sourceMode === "register"
-          ? "注册成功，但当前账号还没有可进入空间，请联系管理员加入企业后再登录"
-          : "登录成功，但没有可进入空间，请确认账号已加入企业",
+          ? t("auth.registeredNoSpace")
+          : t("auth.loggedInNoSpace"),
       );
     }
   };
@@ -434,10 +445,10 @@ export function LoginPage() {
   ) => {
     if (isCaptchaRequired(err) && allowAutoCaptcha) {
       await handleCaptchaChallenge();
-      setError("需要完成安全验证");
+      setError(t("auth.captchaRequired"));
       return;
     }
-    setError(mapAuthErrorMessage(err, actionMode));
+    setError(t(mapAuthErrorMessage(err, actionMode)));
   };
 
   const handleCaptchaChallenge = async () => {
@@ -449,7 +460,7 @@ export function LoginPage() {
       setCaptcha(challenge);
       setCaptchaAnswer("");
     } catch {
-      setError("获取安全验证失败，请重试");
+      setError(t("auth.captchaLoadFailed"));
     }
   };
 
@@ -459,7 +470,7 @@ export function LoginPage() {
       fetchTenantInfo(baseUrl, login.accessToken ?? ""),
     ]);
     const isPersonal = login.spaceContext?.spaceType === 1;
-    const loginSite = rememberLoginSite(baseUrl);
+    const loginSite = rememberLoginSite(baseUrl, t("auth.currentLoginLine"));
     const selectedTenant = login.tenants?.find((item) => item.tenantId === login.tenantId);
     logAuthRoleEvent("auth.direct-session.apply", {
       tenantId: isPersonal ? null : login.tenantId ?? tenantInfo?.tenantId ?? null,
@@ -478,7 +489,7 @@ export function LoginPage() {
       refreshToken: login.refreshToken,
       tenantId: isPersonal ? undefined : login.tenantId ?? tenantInfo?.tenantId,
       tenantCode: isPersonal ? undefined : tenantInfo?.tenantCode,
-      tenantName: isPersonal ? "个人空间" : tenantInfo?.tenantName,
+      tenantName: isPersonal ? t("auth.personalSpace") : tenantInfo?.tenantName,
       tenantLogoUrl: isPersonal ? undefined : tenantInfo?.logoUrl,
       userId: profile?.userId ?? login.userId,
       platformUserId: profile?.platformUserId ?? login.platformUserId,
@@ -488,7 +499,7 @@ export function LoginPage() {
       userType: profile?.userType ?? login.userType ?? undefined,
       spaceType: login.spaceContext?.spaceType,
       membershipRole: undefined,
-      roleLabel: isPersonal ? "个人空间" : "租户账号",
+      roleLabel: isPersonal ? t("auth.personalSpace") : t("auth.tenantAccount"),
       tenants: login.tenants,
     });
   };
@@ -504,7 +515,7 @@ export function LoginPage() {
       fetchSessionProfile(baseUrl, tenant.accessToken),
       isPersonal ? Promise.resolve(null) : fetchTenantInfo(baseUrl, tenant.accessToken),
     ]);
-    const loginSite = rememberLoginSite(baseUrl);
+    const loginSite = rememberLoginSite(baseUrl, t("auth.currentLoginLine"));
     const resolvedRole = isPersonal ? undefined : tenant.membershipRole ?? selectedTenant?.membershipRole;
     logAuthRoleEvent("auth.session.apply-selected-tenant", {
       tenantId: isPersonal ? null : tenant.tenantId ?? currentTenant?.tenantId ?? selectedTenant?.tenantId ?? null,
@@ -524,8 +535,8 @@ export function LoginPage() {
       tenantId: isPersonal ? undefined : tenant.tenantId ?? currentTenant?.tenantId ?? selectedTenant?.tenantId,
       tenantCode: isPersonal ? undefined : currentTenant?.tenantCode ?? selectedTenant?.tenantCode,
       tenantName: isPersonal
-        ? "个人空间"
-        : currentTenant?.tenantName ?? selectedTenant?.tenantName ?? "企业空间",
+        ? t("auth.personalSpace")
+        : currentTenant?.tenantName ?? selectedTenant?.tenantName ?? t("auth.enterpriseSpace"),
       tenantLogoUrl: isPersonal ? undefined : currentTenant?.logoUrl ?? selectedTenant?.logoUrl,
       userId: profile?.userId ?? tenant.userId,
       platformUserId: profile?.platformUserId ?? tenant.platformUserId,
@@ -536,7 +547,7 @@ export function LoginPage() {
       spaceType: tenant.spaceContext?.spaceType ?? (isPersonal ? 1 : 2),
       membershipRole: resolvedRole,
       roleLabel: isPersonal
-        ? "个人空间"
+        ? t("auth.personalSpace")
         : getAuthTenantRoleLabel(resolvedRole),
       tenants: login.tenants,
     });
@@ -564,8 +575,22 @@ export function LoginPage() {
       <section className="login-panel auth-panel">
         <div className="auth-panel-heading">
           <h1>lppchat</h1>
-          <p>进入消息、在线客服和客户工作台。</p>
+          <p>{t("auth.subtitle")}</p>
         </div>
+
+        <label className="auth-language-select">
+          <span>{t("auth.language")}</span>
+          <select
+            value={locale}
+            onChange={(event) => setLocale(event.target.value as typeof locale)}
+          >
+            {supportedLocales.map((option) => (
+              <option value={option} key={option}>
+                {localeLabels[option]}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <AuthModeSwitch mode={mode} onChange={switchMode} />
 
@@ -644,13 +669,13 @@ export function LoginPage() {
   );
 }
 
-function rememberLoginSite(baseUrl: string) {
+function rememberLoginSite(baseUrl: string, currentLoginLine: string) {
   if (baseUrl.replace(/\/$/, "") === primarySiteBaseUrl) {
     return siteLineManager.selectSite(primarySiteLine);
   }
   return siteLineManager.selectSite({
     id: baseUrl,
-    name: "当前登录线路",
+    name: currentLoginLine,
     apiBaseUrl: baseUrl,
   });
 }

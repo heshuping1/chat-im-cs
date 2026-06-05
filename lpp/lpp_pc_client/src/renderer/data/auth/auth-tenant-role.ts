@@ -57,6 +57,7 @@ export function authSessionTenantRoleNeedsRefresh(session: AuthSession) {
   return (
     session.membershipRole === undefined ||
     !session.roleLabel ||
+    session.roleLabel === "auth.roles.member" ||
     session.roleLabel === "成员" ||
     (localTenant?.membershipRole !== undefined &&
       session.membershipRole !== localTenant.membershipRole) ||

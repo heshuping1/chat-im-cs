@@ -86,8 +86,8 @@ export function customerServiceNotificationPreview(
 
 function avatarLabel(title: string) {
   const compact = title.trim();
-  if (!compact) return "客";
-  return Array.from(compact)[0] ?? "客";
+  if (!compact) return "C";
+  return Array.from(compact)[0] ?? "C";
 }
 
 function isIncomingMessage(message?: MessageItemDto) {

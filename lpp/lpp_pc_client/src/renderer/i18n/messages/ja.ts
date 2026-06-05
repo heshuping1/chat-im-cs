@@ -698,6 +698,7 @@ export const ja: MessageDictionary = {
       conversationListNoMatch: 'No matching conversations',
       directConversationFallback: 'Direct IM conversation',
       dragSort: 'Drag to reorder',
+      groupAllMutedReadOnly: 'All members are muted. Only the owner, admins, and customer service can send.',
       insertedToComposer: 'Inserted into the input box. Confirm to send.',
       knowledgeBase: 'Knowledge base',
       knowledgeEmpty: 'This knowledge item has no insertable text.',
@@ -810,6 +811,16 @@ export const ja: MessageDictionary = {
       updateAnnouncement: 'Group announcement updated.',
       updateGroupTitle: 'Group name updated.',
       updateSettings: 'Group settings updated.',
+    },
+    conversationActions: {
+      deleted: 'Conversation deleted.',
+      failed: 'Conversation action failed: {error}',
+      hidden: 'Conversation hidden.',
+      muted: 'Do not disturb enabled.',
+      pinned: 'Conversation pinned.',
+      restored: 'Conversation restored.',
+      unmuted: 'Do not disturb disabled.',
+      unpinned: 'Conversation unpinned.',
     },
     conversationInfo: conversationInfoFallback,
     chatHeader: {
@@ -1201,7 +1212,7 @@ export const ja: MessageDictionary = {
   apiError: {
     aborted: '操作はキャンセルされました',
     messageConversationFrozen: 'この会話は凍結されており、現在メッセージを送信できません',
-    messageGroupMuted: 'このグループチャットは全員ミュート中で、現在メッセージを送信できません',
+    messageGroupMuted: 'This group is muted for all members. The current account has no permission to send.',
     messageMemberForbidden: 'この会話に参加していないため、メッセージを送信できません',
     messageMemberMuted: 'ミュートされているため、現在発言できません',
     messageUserMuted: '現在のアカウントはミュートされており、メッセージを送信できません',

@@ -93,7 +93,7 @@ export function createChatMessageViewModel(
   });
   const senderName = input.mine
     ? "我"
-    : input.senderFallback || message.senderDisplayName || "对方";
+    : input.senderFallback || message.senderDisplayName || "联系人";
 
   return {
     id: message.messageId,
@@ -148,7 +148,7 @@ export function replyViewModelFromMessage(
   const preview = stringField(record, "preview", "text", "content", "message");
   if (!preview) return undefined;
   return {
-    sender: stringField(record, "sender", "senderDisplayName", "name") || "引用消息",
+    sender: stringField(record, "sender", "senderDisplayName", "name") || "Referenced message",
     preview,
   };
 }

@@ -25,6 +25,7 @@ import {
 } from "../../data/api/knowledge-normalizers";
 import { pcQueryKeys } from "../../data/query-keys";
 import { createApiClient } from "../../data/runtime";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError, formatShortDate } from "../../lib/format";
 
 type KnowledgeSelection =
@@ -67,6 +68,7 @@ export function CustomerServiceKnowledgePanel({
   onNotice: (text: string) => void;
   variant?: "drawer" | "panel";
 }) {
+  const { t } = useI18n();
   const client = useMemo(
     () => (session ? createApiClient(session) : null),
     [session],
@@ -120,16 +122,16 @@ export function CustomerServiceKnowledgePanel({
         ? { type: "document" as const, item: documents[0] }
         : null);
   const insertPayload = currentSelection
-    ? buildKnowledgeInsertPayload(currentSelection, selectedBase)
+    ? buildKnowledgeInsertPayload(currentSelection, selectedBase, t)
     : null;
 
   const copySelection = async () => {
     if (!insertPayload?.text) return;
     try {
       await navigator.clipboard.writeText(insertPayload.text);
-      onNotice("知识内容已复制。");
+      onNotice(t("knowledge.copiedNotice"));
     } catch (error) {
-      onNotice(`复制失败：${formatError(error)}`);
+      onNotice(t("common.copyFailed", { error: formatError(error) }));
     }
   };
 
@@ -140,17 +142,17 @@ export function CustomerServiceKnowledgePanel({
           ? "cs-knowledge-drawer cs-knowledge-panel"
           : "cs-knowledge-drawer"
       }
-      aria-label="会话知识库"
+      aria-label={t("knowledge.conversationAria")}
     >
       <header className="cs-knowledge-drawer-head">
         <span>
           <ClipboardList size={18} />
         </span>
         <div>
-          <strong>知识库</strong>
-          <p>检索标准答案，插入草稿后人工确认发送</p>
+          <strong>{t("knowledge.title")}</strong>
+          <p>{t("knowledge.drawerSubtitle")}</p>
         </div>
-        <button type="button" aria-label="关闭知识库" title="关闭" onClick={onClose}>
+        <button type="button" aria-label={t("knowledge.close")} title={t("common.close")} onClick={onClose}>
           <X size={17} />
         </button>
       </header>
@@ -167,23 +169,23 @@ export function CustomerServiceKnowledgePanel({
         <input
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="搜索客户问题、规则、流程"
+          placeholder={t("knowledge.searchPlaceholder")}
         />
         <button type="submit" disabled={!keyword.trim()}>
-          检索
+          {t("knowledge.search")}
         </button>
       </form>
 
-      <section className="cs-knowledge-base-strip" aria-label="知识库筛选">
+      <section className="cs-knowledge-base-strip" aria-label={t("knowledge.filterAria")}>
         {basesQuery.isLoading ? (
-          <KnowledgeDrawerState text="正在读取知识库..." />
+          <KnowledgeDrawerState text={t("knowledge.loadingBases")} />
         ) : basesQuery.error ? (
           <KnowledgeDrawerState
             error
-            text={`知识库加载失败：${formatError(basesQuery.error)}`}
+            text={t("knowledge.baseLoadFailed", { error: formatError(basesQuery.error) })}
           />
         ) : bases.length === 0 ? (
-          <KnowledgeDrawerState text="暂无可用知识库" />
+          <KnowledgeDrawerState text={t("knowledge.noBases")} />
         ) : (
           bases.map((base) => {
             const active = effectiveBaseId === base.knowledgeBaseId;
@@ -192,14 +194,14 @@ export function CustomerServiceKnowledgePanel({
                 key={base.knowledgeBaseId}
                 className={active ? "active" : ""}
                 type="button"
-                title={baseTitle(base)}
+                title={baseTitle(base, t)}
                 onClick={() => {
                   setSelectedBaseId(base.knowledgeBaseId);
                   setSelection(null);
                 }}
               >
                 <LibraryBig size={14} />
-                <span>{baseTitle(base)}</span>
+                <span>{baseTitle(base, t)}</span>
               </button>
             );
           })
@@ -208,9 +210,11 @@ export function CustomerServiceKnowledgePanel({
 
       <section className="cs-knowledge-result-zone">
         <div className="cs-knowledge-section-head">
-          <strong>{trimmedKeyword ? "检索结果" : "知识文档"}</strong>
+          <strong>{trimmedKeyword ? t("knowledge.searchResults") : t("knowledge.documents")}</strong>
           <span>
-            {trimmedKeyword ? `${searchResults.length} 条` : `${documents.length} 篇`}
+            {trimmedKeyword
+              ? t("knowledge.resultCount", { count: searchResults.length })
+              : t("knowledge.documentCount", { count: documents.length })}
           </span>
         </div>
         {trimmedKeyword ? (
@@ -219,6 +223,7 @@ export function CustomerServiceKnowledgePanel({
             loading={searchQuery.isLoading}
             results={searchResults}
             selection={currentSelection}
+            t={t}
             onSelect={(item) => setSelection({ type: "search", item })}
           />
         ) : (
@@ -227,6 +232,7 @@ export function CustomerServiceKnowledgePanel({
             error={documentsQuery.error}
             loading={documentsQuery.isLoading}
             selection={currentSelection}
+            t={t}
             onSelect={(item) => setSelection({ type: "document", item })}
           />
         )}
@@ -237,9 +243,9 @@ export function CustomerServiceKnowledgePanel({
           <>
             <div className="cs-knowledge-preview-title">
               <strong>{insertPayload.title}</strong>
-              <span>{insertPayload.sourceLabel || "知识来源"}</span>
+              <span>{insertPayload.sourceLabel || t("knowledge.source")}</span>
             </div>
-            <p>{insertPayload.text || "暂无内容预览"}</p>
+            <p>{insertPayload.text || t("knowledge.noPreview")}</p>
             <div className="cs-knowledge-actions">
               <button
                 type="button"
@@ -247,7 +253,7 @@ export function CustomerServiceKnowledgePanel({
                 onClick={() => onInsert(insertPayload)}
               >
                 <CornerDownLeft size={15} />
-                插入回复
+                {t("aiDraft.insertReply")}
               </button>
               <button
                 className="secondary"
@@ -256,15 +262,15 @@ export function CustomerServiceKnowledgePanel({
                 onClick={() => void copySelection()}
               >
                 <Copy size={15} />
-                复制
+                {t("common.copy")}
               </button>
               <button className="ghost" type="button" onClick={onClose}>
-                回到会话
+                {t("knowledge.backToConversation")}
               </button>
             </div>
           </>
         ) : (
-          <KnowledgeDrawerState text="选择文档或检索结果后预览内容" />
+          <KnowledgeDrawerState text={t("knowledge.previewAfterSelect")} />
         )}
       </section>
     </aside>
@@ -276,17 +282,19 @@ function SearchResultList({
   loading,
   results,
   selection,
+  t,
   onSelect,
 }: {
   error: unknown;
   loading: boolean;
   results: KnowledgeSearchResultDto[];
   selection: KnowledgeSelection;
+  t: (key: string, params?: Record<string, string | number>) => string;
   onSelect: (item: KnowledgeSearchResultDto) => void;
 }) {
-  if (loading) return <KnowledgeDrawerState text="正在检索知识库..." />;
-  if (error) return <KnowledgeDrawerState error text={`检索失败：${formatError(error)}`} />;
-  if (results.length === 0) return <KnowledgeDrawerState text="暂无匹配结果" />;
+  if (loading) return <KnowledgeDrawerState text={t("knowledge.searching")} />;
+  if (error) return <KnowledgeDrawerState error text={t("knowledge.searchFailed", { error: formatError(error) })} />;
+  if (results.length === 0) return <KnowledgeDrawerState text={t("knowledge.noSearchResults")} />;
   return (
     <div className="cs-knowledge-result-list">
       {results.map((item, index) => {
@@ -303,10 +311,10 @@ function SearchResultList({
           >
             <FileSearch size={15} />
             <span>
-              <strong>{searchTitle(item)}</strong>
+              <strong>{searchTitle(item, t)}</strong>
               <p>{searchSnippet(item) || "--"}</p>
               <em>
-                {item.knowledgeBaseName || "知识库"}
+                {item.knowledgeBaseName || t("knowledge.title")}
                 {headingPathText(item.headingPath) && ` · ${headingPathText(item.headingPath)}`}
                 {item.score != null && ` · ${Math.round(item.score * 100)}%`}
               </em>
@@ -323,17 +331,19 @@ function DocumentList({
   error,
   loading,
   selection,
+  t,
   onSelect,
 }: {
   documents: KnowledgeDocumentDto[];
   error: unknown;
   loading: boolean;
   selection: KnowledgeSelection;
+  t: (key: string, params?: Record<string, string | number>) => string;
   onSelect: (item: KnowledgeDocumentDto) => void;
 }) {
-  if (loading) return <KnowledgeDrawerState text="正在读取文档..." />;
-  if (error) return <KnowledgeDrawerState error text={`文档加载失败：${formatError(error)}`} />;
-  if (documents.length === 0) return <KnowledgeDrawerState text="当前知识库暂无启用文档" />;
+  if (loading) return <KnowledgeDrawerState text={t("knowledge.loadingDocuments")} />;
+  if (error) return <KnowledgeDrawerState error text={t("knowledge.documentLoadFailed", { error: formatError(error) })} />;
+  if (documents.length === 0) return <KnowledgeDrawerState text={t("knowledge.noDocuments")} />;
   return (
     <div className="cs-knowledge-result-list">
       {documents.map((item) => {
@@ -349,9 +359,9 @@ function DocumentList({
           >
             <FileText size={15} />
             <span>
-              <strong>{documentTitle(item)}</strong>
-              <p>{documentSummary(item) || "暂无摘要"}</p>
-              <em>{shortDate(item.updatedAt) || "未提供更新时间"}</em>
+              <strong>{documentTitle(item, t)}</strong>
+              <p>{documentSummary(item) || t("knowledge.noSummary")}</p>
+              <em>{shortDate(item.updatedAt) || t("knowledge.noUpdatedAt")}</em>
             </span>
           </button>
         );
@@ -373,11 +383,12 @@ function KnowledgeDrawerState({
 function buildKnowledgeInsertPayload(
   selection: Exclude<KnowledgeSelection, null>,
   selectedBase?: KnowledgeBaseDto,
+  t?: (key: string, params?: Record<string, string | number>) => string,
 ): KnowledgeInsertPayload {
   if (selection.type === "search") {
     const item = selection.item;
     return {
-      title: searchTitle(item),
+      title: searchTitle(item, t),
       text: searchSnippet(item),
       sourceLabel: [item.knowledgeBaseName, headingPathText(item.headingPath)]
         .filter(Boolean)
@@ -391,22 +402,22 @@ function buildKnowledgeInsertPayload(
   }
   const document = selection.item;
   return {
-    title: documentTitle(document),
+    title: documentTitle(document, t),
     text: documentSummary(document),
-    sourceLabel: selectedBase ? baseTitle(selectedBase) : "知识文档",
+      sourceLabel: selectedBase ? baseTitle(selectedBase, t) : t?.("knowledge.document") ?? "Knowledge document",
     knowledgeBaseId: document.knowledgeBaseId || selectedBase?.knowledgeBaseId,
-    knowledgeBaseName: selectedBase ? baseTitle(selectedBase) : undefined,
+    knowledgeBaseName: selectedBase ? baseTitle(selectedBase, t) : undefined,
     documentId: document.documentId,
-    documentTitle: documentTitle(document),
+    documentTitle: documentTitle(document, t),
   };
 }
 
-function baseTitle(base: KnowledgeBaseDto) {
-  return base.name || base.title || "知识库";
+function baseTitle(base: KnowledgeBaseDto, t?: (key: string) => string) {
+  return base.name || base.title || t?.("knowledge.untitledBase") || "Knowledge base";
 }
 
-function documentTitle(document: KnowledgeDocumentDto) {
-  return document.title || document.name || "知识文档";
+function documentTitle(document: KnowledgeDocumentDto, t?: (key: string) => string) {
+  return document.title || document.name || t?.("knowledge.untitledDocument") || "Knowledge document";
 }
 
 function documentIdOf(document: KnowledgeDocumentDto) {
@@ -417,8 +428,8 @@ function documentSummary(document: KnowledgeDocumentDto) {
   return document.summary || document.contentPreview || "";
 }
 
-function searchTitle(item: KnowledgeSearchResultDto) {
-  return item.documentTitle || item.title || "知识结果";
+function searchTitle(item: KnowledgeSearchResultDto, t?: (key: string) => string) {
+  return item.documentTitle || item.title || t?.("knowledge.untitledResult") || "Knowledge result";
 }
 
 function searchSnippet(item: KnowledgeSearchResultDto) {

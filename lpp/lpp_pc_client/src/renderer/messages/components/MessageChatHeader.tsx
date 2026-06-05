@@ -4,8 +4,11 @@ import { ChannelBadge, channelLabel } from "../../components/ChannelBadge";
 import type { ConversationListItem } from "../../data/api-client";
 import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
+import { useI18n } from "../../i18n/useI18n";
 import type { AutoTranslateConversationMode } from "../../translation/models/autoTranslatePreferences";
 import { ConversationAvatar } from "./ConversationListParts";
+
+type Translate = ReturnType<typeof useI18n>["t"];
 
 export function MessageChatHeader({
   conversation,
@@ -40,17 +43,22 @@ export function MessageChatHeader({
   onOpenConversationDrawer: () => void;
   onToggleLookup: () => void;
 }) {
+  const { t } = useI18n();
   const lookupOpen = messageSearchOpen || historyOpen;
   const hasApplication = Boolean(customerApplicationName?.trim());
   const hasSource = Boolean(customerSource?.trim());
+  const autoTranslateLabel = t("messages.chatHeader.autoTranslate", {
+    state: autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective, t),
+  });
+
   return (
     <header className="e-chat-header">
       <div className={`e-chat-title ${conversationIsGroup ? "group-title" : ""}`}>
         <button
           className="e-chat-back-button"
           type="button"
-          aria-label="显示会话列表"
-          title="显示会话列表"
+          aria-label={t("messages.chatHeader.showConversationList")}
+          title={t("messages.chatHeader.showConversationList")}
           onClick={onOpenConversationDrawer}
         >
           <ChevronLeft size={20} />
@@ -75,8 +83,12 @@ export function MessageChatHeader({
               {hasApplication && (
                 <span
                   className="customer-meta-chip customer-meta-chip-app"
-                  title={`渠道应用：${customerApplicationName}`}
-                  aria-label={`渠道应用：${customerApplicationName}`}
+                  title={t("messages.chatHeader.channelApp", {
+                    name: customerApplicationName ?? "",
+                  })}
+                  aria-label={t("messages.chatHeader.channelApp", {
+                    name: customerApplicationName ?? "",
+                  })}
                 >
                   <AppWindow size={11} strokeWidth={2.4} aria-hidden="true" />
                   <span>{customerApplicationName}</span>
@@ -85,8 +97,12 @@ export function MessageChatHeader({
               {hasSource && (
                 <span
                   className="customer-meta-chip customer-meta-chip-source"
-                  title={`来源渠道：${channelLabel(customerSource)}`}
-                  aria-label={`来源渠道：${channelLabel(customerSource)}`}
+                  title={t("messages.chatHeader.sourceChannel", {
+                    name: channelLabel(customerSource),
+                  })}
+                  aria-label={t("messages.chatHeader.sourceChannel", {
+                    name: channelLabel(customerSource),
+                  })}
                 >
                   <ChannelBadge source={customerSource} compact />
                 </span>
@@ -99,8 +115,8 @@ export function MessageChatHeader({
         <button
           className={`e-icon-button ${autoTranslateEffective ? "active" : ""}`}
           type="button"
-          aria-label={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
-          title={`自动翻译：${autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective)}`}
+          aria-label={autoTranslateLabel}
+          title={autoTranslateLabel}
           aria-pressed={autoTranslateEffective}
           onClick={onCycleAutoTranslateMode}
         >
@@ -109,8 +125,8 @@ export function MessageChatHeader({
         <button
           className={`e-icon-button ${lookupOpen ? "active" : ""}`}
           type="button"
-          aria-label="查找聊天内容"
-          title="查找聊天内容"
+          aria-label={t("messages.chatHeader.searchMessages")}
+          title={t("messages.chatHeader.searchMessages")}
           aria-pressed={lookupOpen}
           onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return;
@@ -133,8 +149,11 @@ export function MessageChatHeader({
 function autoTranslateModeLabel(
   mode: AutoTranslateConversationMode,
   effective: boolean,
+  t: Translate,
 ) {
-  if (mode === "enabled") return "本会话开启";
-  if (mode === "disabled") return "本会话关闭";
-  return effective ? "跟随全局，已开启" : "跟随全局，已关闭";
+  if (mode === "enabled") return t("messages.chatHeader.autoTranslateEnabled");
+  if (mode === "disabled") return t("messages.chatHeader.autoTranslateDisabled");
+  return effective
+    ? t("messages.chatHeader.autoTranslateGlobalEnabled")
+    : t("messages.chatHeader.autoTranslateGlobalDisabled");
 }

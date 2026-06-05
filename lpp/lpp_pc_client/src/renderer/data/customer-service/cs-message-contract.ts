@@ -101,7 +101,7 @@ export function normalizeCustomerServiceMessageDto(
     const preview =
       stringField(record, "preview", "text", "message") ||
       messagePreviewFromBody(body, type) ||
-      "[消息]";
+      "[Message]";
     const dto: MessageItemDto = {
       messageId: id || `${options.threadId}:unknown`,
       conversationId,

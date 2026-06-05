@@ -51,8 +51,8 @@ describe("account space session identity", () => {
   });
 
   it("keeps enterprise join under switchable spaces instead of a two-column panel", () => {
-    expect(accountSpaceSource.indexOf("可切换空间")).toBeLessThan(
-      accountSpaceSource.indexOf("企业码预览并加入"),
+    expect(accountSpaceSource.indexOf("accountUtility.space.switchableSpaces")).toBeLessThan(
+      accountSpaceSource.indexOf("accountUtility.space.previewAndJoin"),
     );
     expect(accountSpaceSource).not.toContain("enterprise-switch-grid");
     expect(productPagesCss).not.toContain(".enterprise-switch-grid");
@@ -61,18 +61,19 @@ describe("account space session identity", () => {
   it("renders searched enterprise states before allowing join actions", () => {
     expect(accountSpaceSource).toContain("joinApprovalMode");
     expect(accountSpaceSource).toContain("alreadyMember");
-    expect(accountSpaceSource).toContain("申请后需管理员审批");
-    expect(accountSpaceSource).toContain("确认后可直接加入");
-    expect(accountSpaceSource).toContain("加入企业");
-    expect(accountSpaceSource).toContain("进入");
-    expect(accountSpaceSource).toContain("当前使用中");
-    expect(accountSpaceSource).toContain("先输入企业码预览企业");
-    expect(accountSpaceSource).toContain("未找到该企业码");
-    expect(accountSpaceSource).toContain("企业码预览失败");
-    expect(accountSpaceSource).toContain("申请已提交，等待管理员审核");
-    expect(accountSpaceSource).toContain("申请已在审核中");
+    expect(accountSpaceSource).toContain("accountUtility.space.manualApproval");
+    expect(accountSpaceSource).toContain("accountUtility.space.autoApproval");
+    expect(accountSpaceSource).toContain("accountUtility.space.joinEnterprise");
+    expect(accountSpaceSource).toContain("accountUtility.space.enter");
+    expect(accountSpaceSource).toContain("accountUtility.space.currentlyUsing");
+    expect(accountSpaceSource).toContain("accountUtility.space.previewEmptyTitle");
+    expect(accountSpaceSource).toContain("accountUtility.space.notFoundTitle");
+    expect(accountSpaceSource).toContain("accountUtility.space.previewFailedWithError");
+    expect(accountSpaceSource).toContain("accountUtility.space.joinPending");
+    expect(accountSpaceSource).toContain("accountUtility.space.joinAlreadyPending");
+    expect(accountSpaceSource).toContain("accountUtility.space.joinAlreadyPendingDetail");
     expect(accountSpaceSource).toContain("tenantJoinErrorNotice");
-    expect(accountSpaceSource).not.toContain("加入企业失败：");
+    expect(accountSpaceSource).not.toContain("accountUtility.space.joinFailedWithError");
     expect(productPagesCss).toContain(".utility-notice.warning");
     expect(productPagesCss).toContain(".utility-notice-copy");
   });
@@ -81,7 +82,7 @@ describe("account space session identity", () => {
     expect(accountSpaceSource).toContain("getMyTenantJoinRequests");
     expect(accountSpaceSource).toContain("tenantJoinRequestsPollIntervalMs");
     expect(accountSpaceSource).toContain("pcQueryKeys.tenantJoinRequests");
-    expect(accountSpaceSource).toContain("系统会每 5 分钟自动检查一次");
+    expect(accountSpaceSource).toContain("accountUtility.space.pendingRequests");
     expect(accountSpaceSource).toContain("queryKey: pcQueryKeys.tenantJoinRequests");
     expect(accountSpaceSource).toContain("await joinRequestsQuery.refetch()");
   });

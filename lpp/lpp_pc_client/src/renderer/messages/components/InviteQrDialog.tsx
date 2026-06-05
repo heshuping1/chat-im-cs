@@ -1,8 +1,10 @@
 import { QrCode, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+
 import { PanelState } from "../../components/PanelState";
 import type { FriendInviteQrDto } from "../../data/api-client";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 
 export function InviteQrDialog({
@@ -20,6 +22,7 @@ export function InviteQrDialog({
   onCreate: () => void;
   qrs: FriendInviteQrDto[];
 }) {
+  const { t } = useI18n();
   const activeQr = qrs.find((item) => item.qrPayload) ?? qrs[0];
   const qrPayload = activeQr?.qrPayload ?? "";
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
@@ -67,47 +70,49 @@ export function InviteQrDialog({
         className="pc-forward-dialog message-qr-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="我的二维码"
+        aria-label={t("messages.inviteQr.title")}
         onClick={(event) => event.stopPropagation()}
       >
         <header>
           <div>
-            <h3>我的二维码</h3>
-            <p>让对方扫码或复制内容添加好友</p>
+            <h3>{t("messages.inviteQr.title")}</h3>
+            <p>{t("messages.inviteQr.subtitle")}</p>
           </div>
-          <button type="button" aria-label="关闭" onClick={onClose}>
+          <button type="button" aria-label={t("common.close")} onClick={onClose}>
             <X size={16} />
           </button>
         </header>
-        {loading && <PanelState text="正在读取二维码..." />}
+        {loading && <PanelState text={t("messages.inviteQr.loading")} />}
         {Boolean(error) && (
-          <PanelState text={`二维码加载失败：${formatError(error)}`} />
+          <PanelState text={t("messages.inviteQr.loadFailed", { error: formatError(error) })} />
         )}
         {!loading && !error && qrPayload && (
           <div className="message-qr-card">
-            <div className="message-qr-image" aria-label="好友二维码">
+            <div className="message-qr-image" aria-label={t("messages.inviteQr.qrAria")}>
               {qrImageUrl ? (
-                <img alt="我的好友二维码" src={qrImageUrl} />
+                <img alt={t("messages.inviteQr.qrAlt")} src={qrImageUrl} />
               ) : qrRenderError ? (
                 <QrCode size={54} />
               ) : (
-                <span>生成中</span>
+                <span>{t("messages.inviteQr.generating")}</span>
               )}
             </div>
-            {qrRenderError && <small>二维码生成失败：{qrRenderError}</small>}
+            {qrRenderError && (
+              <small>{t("messages.inviteQr.renderFailed", { error: qrRenderError })}</small>
+            )}
             <strong>{qrPayload}</strong>
             <button type="button" onClick={() => void copyQrPayload()}>
-              {copied ? "已复制" : "复制内容"}
+              {copied ? t("common.copied") : t("messages.inviteQr.copyPayload")}
             </button>
           </div>
         )}
         {!loading && !error && !qrPayload && (
-          <PanelState text="暂无可用二维码，点击生成后即可使用。" />
+          <PanelState text={t("messages.inviteQr.empty")} />
         )}
         <footer className="message-start-footer">
-          <button type="button" onClick={onClose}>关闭</button>
+          <button type="button" onClick={onClose}>{t("common.close")}</button>
           <button className="primary" type="button" disabled={creating} onClick={onCreate}>
-            {creating ? "生成中..." : "生成二维码"}
+            {creating ? t("messages.inviteQr.creating") : t("messages.inviteQr.create")}
           </button>
         </footer>
       </section>

@@ -22,9 +22,9 @@ describe("space radar model", () => {
   );
 
   it("labels the popover as space switching and reminders instead of tasks", () => {
-    expect(spaceRadarPopoverSource).toContain('aria-label="空间"');
-    expect(spaceRadarPopoverSource).toContain("<strong>空间</strong>");
-    expect(spaceRadarPopoverSource).toContain("查看各空间消息提醒，切换后查看详情");
+    expect(spaceRadarPopoverSource).toContain('aria-label={t("spaceRadar.title")}');
+    expect(spaceRadarPopoverSource).toContain('t("spaceRadar.title")');
+    expect(spaceRadarPopoverSource).toContain('t("spaceRadar.subtitle")');
     expect(spaceRadarPopoverSource).not.toContain("空间任务雷达");
     expect(spaceRadarPopoverSource).not.toContain("任务");
   });

@@ -12,6 +12,7 @@ import { LoginPage } from './components/LoginPage';
 import { ReminderCenter } from './components/ReminderCenter';
 import { Sidebar } from './components/Sidebar';
 import { ApiError } from './data/api-client';
+import { quitApp } from './data/app-instance/app-instance';
 import {
   getAuthSessionSnapshot,
   getClearAuthSessionAction,
@@ -494,7 +495,7 @@ function ForcedUpdateOverlay({ state }: { state: ClientUpdateState }) {
           <button type="button" disabled={!canInstall || Boolean(busyAction)} onClick={runInstall}>
             {busyAction === 'install' ? t('app.forceUpdateInstalling') : t('app.forceUpdateInstall')}
           </button>
-          <button type="button" className="ghost" onClick={() => void window.desktopApi?.quitApp?.()}>
+          <button type="button" className="ghost" onClick={() => void quitApp()}>
             {t('app.forceUpdateExit')}
           </button>
         </div>

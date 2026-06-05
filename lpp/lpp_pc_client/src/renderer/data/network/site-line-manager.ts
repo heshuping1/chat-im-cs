@@ -1,5 +1,5 @@
 export const primarySiteId = "main-1";
-export const primarySiteName = "主站1";
+export const primarySiteName = "Primary 1";
 export const primarySiteBaseUrl = "https://chat.hearteasechat.com";
 export const primaryAdminBaseUrl = "https://admin.hearteasechat.com";
 

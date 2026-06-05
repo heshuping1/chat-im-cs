@@ -123,7 +123,7 @@ describe("message start UI closure", () => {
 
   it("exposes a disabled group action state instead of an unconditional group menu item", () => {
     expect(startDialogs).toContain("groupCreateAccess");
-    expect(startDialogs).toContain("当前角色暂无建群权限");
+    expect(startDialogs).toContain("messages.start.noGroupPermission");
     expect(startDialogs).toContain("aria-disabled");
     expect(conversationListPanel).toContain("groupCreateAccess");
   });

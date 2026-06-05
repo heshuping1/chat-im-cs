@@ -12,8 +12,12 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { PcAvatar } from "../../components/PcAvatar";
+import type { TranslationParams } from "../../i18n/dictionary";
+import { useI18n } from "../../i18n/useI18n";
 import { formatBadgeCount } from "../../lib/format";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
+
+type Translate = (key: string, params?: TranslationParams) => string;
 
 export type ContactPickerItem = {
   avatarUrl?: string | null;
@@ -34,6 +38,7 @@ export function MessagePlusMenu({
   groupCreateAccess: GroupCreateAccess;
   onAction: (action: MessagePlusAction) => void;
 }) {
+  const { t } = useI18n();
   const items: Array<{
     action: MessagePlusAction;
     badge?: number;
@@ -42,29 +47,29 @@ export function MessagePlusMenu({
     disabled?: boolean;
     title?: string;
   }> = [
-    { action: "direct", icon: <MessageSquare size={16} />, label: "发起聊天" },
+    { action: "direct", icon: <MessageSquare size={16} />, label: t("messages.start.direct") },
     {
       action: "group",
       disabled: !groupCreateAccess.canCreateGroup,
       icon: <UsersRound size={16} />,
-      label: "发起群聊",
-      title: groupCreateAccess.reason ?? "当前角色暂无建群权限",
+      label: t("messages.start.group"),
+      title: groupCreateAccess.reason ?? t("messages.start.noGroupPermission"),
     },
-    { action: "addFriend", icon: <UserPlus size={16} />, label: "添加好友" },
+    { action: "addFriend", icon: <UserPlus size={16} />, label: t("messages.start.addFriend") },
     {
       action: "requests",
       badge: friendRequestCount,
       icon: <CheckSquare size={16} />,
-      label: "好友申请",
+      label: t("messages.start.requests"),
     },
-    { action: "qr", icon: <QrCode size={16} />, label: "我的二维码" },
+    { action: "qr", icon: <QrCode size={16} />, label: t("messages.start.myQr") },
   ];
 
   return (
     <div
       className="message-plus-menu"
       role="menu"
-      aria-label="消息快捷操作"
+      aria-label={t("messages.start.quickActionsAria")}
       onClick={(event) => event.stopPropagation()}
     >
       {items.map((item) => (
@@ -97,16 +102,18 @@ export function DirectChatDialog({
   onSubmit: (userId: string) => void;
   pending: boolean;
 }) {
+  const { t } = useI18n();
   const [keyword, setKeyword] = useState("");
   const targets = filterContactPickerItems(contacts, keyword);
   return (
     <ContactPickerDialog
       contacts={targets}
-      emptyText="没有可发起聊天的联系人"
+      emptyText={t("messages.start.emptyDirect")}
       keyword={keyword}
       mode="single"
       pending={pending}
-      title="发起聊天"
+      title={t("messages.start.direct")}
+      t={t}
       onClose={onClose}
       onKeywordChange={setKeyword}
       onSingleSubmit={onSubmit}
@@ -125,23 +132,25 @@ export function GroupChatDialog({
   onSubmit: (payload: { title: string; memberUserIds: string[] }) => void;
   pending: boolean;
 }) {
+  const { t } = useI18n();
   const [keyword, setKeyword] = useState("");
   const [name, setName] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const targets = filterContactPickerItems(contacts, keyword);
   const selectedContacts = contacts.filter((item) => selectedIds.has(item.id));
-  const groupName = name.trim() || defaultGroupName(selectedContacts);
+  const groupName = name.trim() || defaultGroupName(selectedContacts, t);
   return (
     <ContactPickerDialog
       contacts={targets}
-      emptyText="没有可选择的群成员"
+      emptyText={t("messages.start.emptyGroupMembers")}
       groupName={name}
       keyword={keyword}
       mode="multi"
       pending={pending}
       selectedIds={selectedIds}
       selectedSummary={selectedContacts.map((item) => item.name).join(", ")}
-      title="发起群聊"
+      title={t("messages.start.group")}
+      t={t}
       onClose={onClose}
       onGroupNameChange={setName}
       onKeywordChange={setKeyword}
@@ -174,6 +183,7 @@ export function ContactCardDialog({
   onSubmit: (contact: ContactPickerItem) => Promise<void> | void;
   pending: boolean;
 }) {
+  const { t } = useI18n();
   const [keyword, setKeyword] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const targets = filterContactPickerItems(contacts, keyword);
@@ -184,15 +194,15 @@ export function ContactCardDialog({
         className="pc-forward-dialog message-start-dialog message-card-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="选择名片"
+        aria-label={t("messages.start.card.title")}
         onClick={(event) => event.stopPropagation()}
       >
         <header>
           <div>
-            <h3>选择名片</h3>
-            <p>选择一个联系人，确认后发送个人名片</p>
+            <h3>{t("messages.start.card.title")}</h3>
+            <p>{t("messages.start.card.subtitle")}</p>
           </div>
-          <button type="button" aria-label="关闭" onClick={onClose}>
+          <button type="button" aria-label={t("common.close")} onClick={onClose}>
             <X size={16} />
           </button>
         </header>
@@ -201,7 +211,7 @@ export function ContactCardDialog({
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索联系人"
+            placeholder={t("messages.start.searchPlaceholder")}
             autoFocus
           />
         </label>
@@ -225,14 +235,18 @@ export function ContactCardDialog({
               </button>
             );
           })}
-          {targets.length === 0 && <div className="panel-state muted">没有可发送的联系人名片</div>}
+          {targets.length === 0 && <div className="panel-state muted">{t("messages.start.card.empty")}</div>}
         </div>
         <footer className="message-start-footer message-card-confirm">
           <div className="message-card-confirm-preview">
             <UserRound size={16} />
-            <span>{selected ? `发送 ${selected.name} 的名片` : "选择一张名片"}</span>
+            <span>
+              {selected
+                ? t("messages.start.card.selected", { name: selected.name })
+                : t("messages.start.card.selectOne")}
+            </span>
           </div>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="button" onClick={onClose}>{t("common.cancel")}</button>
           <button
             className="primary"
             type="button"
@@ -240,7 +254,7 @@ export function ContactCardDialog({
             onClick={() => selected && void onSubmit(selected)}
           >
             <Send size={15} />
-            {pending ? "发送中..." : "发送"}
+            {pending ? t("messages.start.sending") : t("messages.start.send")}
           </button>
         </footer>
       </section>
@@ -263,6 +277,7 @@ function ContactPickerDialog({
   pending,
   selectedIds,
   selectedSummary,
+  t,
   title,
 }: {
   contacts: ContactPickerItem[];
@@ -279,6 +294,7 @@ function ContactPickerDialog({
   pending: boolean;
   selectedIds?: Set<string>;
   selectedSummary?: string;
+  t: Translate;
   title: string;
 }) {
   const selectedCount = selectedIds?.size ?? 0;
@@ -294,9 +310,9 @@ function ContactPickerDialog({
         <header>
           <div>
             <h3>{title}</h3>
-            <p>{mode === "multi" ? "选择成员，确认后创建群聊" : "选择一个联系人，立即打开会话"}</p>
+            <p>{mode === "multi" ? t("messages.start.groupSubtitle") : t("messages.start.directSubtitle")}</p>
           </div>
-          <button type="button" aria-label="关闭" onClick={onClose}>
+          <button type="button" aria-label={t("common.close")} onClick={onClose}>
             <X size={16} />
           </button>
         </header>
@@ -305,7 +321,7 @@ function ContactPickerDialog({
           <input
             value={keyword}
             onChange={(event) => onKeywordChange(event.target.value)}
-            placeholder="搜索联系人"
+            placeholder={t("messages.start.searchPlaceholder")}
             autoFocus
           />
         </label>
@@ -314,9 +330,9 @@ function ContactPickerDialog({
             <input
               value={groupName}
               onChange={(event) => onGroupNameChange?.(event.target.value)}
-              placeholder="群聊名称，不填则自动生成"
+              placeholder={t("messages.start.groupNamePlaceholder")}
             />
-            <small>{selectedSummary || "至少选择 2 个成员"}</small>
+            <small>{selectedSummary || t("messages.start.minMembers")}</small>
           </div>
         )}
         <div className="pc-forward-targets message-contact-targets">
@@ -345,14 +361,16 @@ function ContactPickerDialog({
         </div>
         {mode === "multi" && (
           <footer className="message-start-footer">
-            <button type="button" onClick={onClose}>取消</button>
+            <button type="button" onClick={onClose}>{t("common.cancel")}</button>
             <button
               className="primary"
               type="button"
               disabled={pending || selectedCount < 2}
               onClick={() => onMultiSubmit?.()}
             >
-              {pending ? "创建中..." : `创建(${selectedCount})`}
+              {pending
+                ? t("messages.start.creating")
+                : t("messages.start.createCount", { count: selectedCount })}
             </button>
           </footer>
         )}
@@ -369,6 +387,7 @@ function filterContactPickerItems(items: ContactPickerItem[], keyword: string) {
   );
 }
 
-function defaultGroupName(items: ContactPickerItem[]) {
-  return items.slice(0, 3).map((item) => item.name).join("、") || "新群聊";
+function defaultGroupName(items: ContactPickerItem[], t: Translate) {
+  return items.slice(0, 3).map((item) => item.name).join(t("messages.start.nameSeparator"))
+    || t("messages.start.defaultGroupName");
 }

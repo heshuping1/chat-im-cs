@@ -47,7 +47,7 @@ export function normalizeContactCard(value: unknown): NormalizedContactCard {
       "nickname",
       "nickName",
       "nick_name",
-    ) || "联系人名片";
+    ) || "";
   const mobile = stringField(record, "mobile", "phone", "phoneNumber", "phone_number");
   const email = stringField(record, "email", "mail");
   const lppId = stringField(record, "lppId", "lpp_id", "userNo", "user_no");
@@ -159,26 +159,41 @@ export function resolveUserRelation({
   return relation;
 }
 
-export function contactCardActionErrorText(error: unknown, fallback = "操作失败") {
+export type ContactCardActionErrorKind =
+  | "alreadyFriend"
+  | "requestPending"
+  | "blockRestricted"
+  | "privacyRestricted"
+  | "forbidden"
+  | "unknown";
+
+export interface ContactCardActionErrorDescriptor {
+  kind: ContactCardActionErrorKind;
+  message?: string;
+}
+
+export function contactCardActionErrorDescriptor(
+  error: unknown,
+): ContactCardActionErrorDescriptor {
   const record = error && typeof error === "object" ? error as Record<string, unknown> : {};
   const code = stringValue(record.code)?.toUpperCase() ?? "";
   const message = error instanceof Error ? error.message : stringValue(error);
-  if (code.includes("ALREADY_EXISTS") || message?.includes("已经是好友")) {
-    return "已经是好友";
+  if (code.includes("ALREADY_EXISTS") || message?.includes("\u5df2\u7ecf\u662f\u597d\u53cb")) {
+    return { kind: "alreadyFriend", message };
   }
-  if (code.includes("REQUEST_PENDING") || message?.includes("待处理")) {
-    return "好友申请已发送";
+  if (code.includes("REQUEST_PENDING") || message?.includes("\u5f85\u5904\u7406")) {
+    return { kind: "requestPending", message };
   }
-  if (code.includes("BLOCK") || message?.includes("黑名单") || message?.includes("拉黑")) {
-    return "当前无法添加，对方或你已开启黑名单限制";
+  if (code.includes("BLOCK") || message?.includes("\u9ed1\u540d\u5355") || message?.includes("\u62c9\u9ed1")) {
+    return { kind: "blockRestricted", message };
   }
-  if (code.includes("PRIVACY") || message?.includes("隐私")) {
-    return "对方设置了朋友权限，暂时无法添加";
+  if (code.includes("PRIVACY") || message?.includes("\u9690\u79c1")) {
+    return { kind: "privacyRestricted", message };
   }
   if (message?.includes("403") || code.includes("FORBIDDEN")) {
-    return "当前账号暂时没有权限执行该操作";
+    return { kind: "forbidden", message };
   }
-  return message ? `${fallback}：${message}` : fallback;
+  return { kind: "unknown", message };
 }
 
 function sessionUserId(session?: AuthSession | null) {

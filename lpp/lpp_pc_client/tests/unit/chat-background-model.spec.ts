@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   chatBackgroundPresets,
   chatBackgroundStyleVariables,
+  isSafeImageDataUrl,
   normalizeChatBackgroundPreset,
+  normalizeChatBackgroundSetting,
 } from "../../src/renderer/settings/models/chatBackgroundModel";
 
 describe("chat background model", () => {
@@ -18,16 +20,36 @@ describe("chat background model", () => {
       "light-purple",
     ]);
     expect(chatBackgroundPresets.find((preset) => preset.id === "default")).toMatchObject({
-      label: "微信浅灰",
+      label: "WeChat light gray",
       color: "#ece9e4",
     });
   });
 
   it("normalizes persisted values to the safe local preset allowlist", () => {
     expect(normalizeChatBackgroundPreset("light-blue")).toBe("light-blue");
+    expect(normalizeChatBackgroundPreset({ type: "preset", presetId: "beige" })).toBe("beige");
     expect(normalizeChatBackgroundPreset("url(https://example.test/bg.png)")).toBe("default");
     expect(normalizeChatBackgroundPreset("../private/file")).toBe("default");
     expect(normalizeChatBackgroundPreset(null)).toBe("default");
+  });
+
+  it("accepts only local image data URLs for custom chat backgrounds", () => {
+    const image = {
+      type: "image",
+      name: "local.png",
+      dataUrl: "data:image/png;base64,aGVsbG8=",
+    };
+
+    expect(normalizeChatBackgroundSetting(image)).toEqual(image);
+    expect(isSafeImageDataUrl(image.dataUrl)).toBe(true);
+    expect(isSafeImageDataUrl("https://example.test/bg.png")).toBe(false);
+    expect(
+      normalizeChatBackgroundSetting({
+        type: "image",
+        name: "remote.png",
+        dataUrl: "url(https://example.test/bg.png)",
+      }),
+    ).toBe("default");
   });
 
   it("generates only controlled message stage CSS variables", () => {
@@ -46,6 +68,19 @@ describe("chat background model", () => {
       "--chat-stage-background-size": "64px 64px, 64px 64px, auto",
       "--chat-stage-background-wash": "rgba(255, 255, 255, 0.34)",
       "--chat-background-preview": "linear-gradient(135deg, #f5f2ec 0%, #e9e5dc 100%)",
+    });
+    expect(
+      chatBackgroundStyleVariables({
+        type: "image",
+        name: "local.png",
+        dataUrl: "data:image/png;base64,aGVsbG8=",
+      }),
+    ).toEqual({
+      "--chat-stage-background": "#ece9e4",
+      "--chat-stage-background-image": 'url("data:image/png;base64,aGVsbG8=")',
+      "--chat-stage-background-size": "cover",
+      "--chat-stage-background-wash": "rgba(255, 255, 255, 0.18)",
+      "--chat-background-preview": 'url("data:image/png;base64,aGVsbG8=")',
     });
   });
 });

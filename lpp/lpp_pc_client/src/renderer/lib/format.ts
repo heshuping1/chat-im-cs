@@ -9,7 +9,7 @@ import {
   type UserTimezoneFormattingOptions,
 } from "../data/time/user-timezone";
 
-export function formatError(error: unknown, fallback = "未知错误") {
+export function formatError(error: unknown, fallback = "Unknown error") {
   const apiMessage = formatApiErrorForUser(error, fallback);
   if (apiMessage !== fallback || isLikelyApiError(error)) return apiMessage;
   if (error instanceof Error && error.message) return error.message;

@@ -27,12 +27,12 @@ export function staffServiceHistoryItemToThread(
     lastMessagePreview:
       item.lastMessagePreview ??
       (item.closedAt
-        ? `关闭时间 ${formatApiShortDateTime(item.closedAt)}`
+        ? `Closed at ${formatApiShortDateTime(item.closedAt)}`
         : item.lastMessageAt
-          ? `最近活跃 ${formatApiShortDateTime(item.lastMessageAt)}`
+          ? `Last active ${formatApiShortDateTime(item.lastMessageAt)}`
           : item.participation === "transferred"
-            ? "转接参与的历史会话"
-            : "历史会话"),
+            ? "Transferred history conversation"
+            : "History conversation"),
     lastMessageAt: item.lastMessageAt ?? item.closedAt ?? item.acceptedAt ?? item.startedAt,
     unreadCount: item.unreadCount ?? 0,
   };
@@ -58,7 +58,7 @@ function historyThreadTitle(item: StaffServiceHistoryItem) {
     readStringField(item, "nickname") ||
     readStringField(item, "name");
   const value = raw?.trim();
-  if (!value || value.startsWith("历史会话")) return "访客";
+  if (!value || value.startsWith("History conversation")) return "访客";
   return value;
 }
 

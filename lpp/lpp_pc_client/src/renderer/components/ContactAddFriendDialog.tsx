@@ -11,11 +11,15 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { FriendInviteQrDto, SearchUserDto } from "../data/api-client";
+import type { TranslationParams } from "../i18n/dictionary";
+import { useI18n } from "../i18n/useI18n";
 import { formatError } from "../lib/format";
 import type { ContactCardRelation } from "../messages/models/contactCardModel";
 import { ContactsInviteQrCard } from "./ContactsInviteQrCard";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
+
+type Translate = (key: string, params?: TranslationParams) => string;
 
 interface ContactAddFriendDialogProps {
   actionPending: boolean;
@@ -62,8 +66,9 @@ export function ContactAddFriendDialog({
   searchUsers,
   sendFriendRequest,
 }: ContactAddFriendDialogProps) {
+  const { t } = useI18n();
   const [keyword, setKeyword] = useState(initialTarget?.lppId ?? "");
-  const [requestMessage, setRequestMessage] = useState("你好，我想添加你为好友");
+  const [requestMessage, setRequestMessage] = useState(t("contacts.addFriend.defaultMessage"));
   const [selectedUserId, setSelectedUserId] = useState(initialTarget?.userId ?? "");
   const [submittedKeyword, setSubmittedKeyword] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +108,7 @@ export function ContactAddFriendDialog({
   return (
     <div className="pc-modal-backdrop contacts-add-backdrop" role="presentation" onClick={onClose}>
       <section
-        aria-label="添加联系人"
+        aria-label={t("contacts.addFriend.aria")}
         aria-modal="true"
         className="contacts-add-dialog"
         role="dialog"
@@ -111,10 +116,10 @@ export function ContactAddFriendDialog({
       >
         <header className="contacts-add-head">
           <div>
-            <strong>添加联系人</strong>
-            <span>精准搜索绿泡泡号、手机号或邮箱</span>
+            <strong>{t("contacts.addFriend.title")}</strong>
+            <span>{t("contacts.addFriend.subtitle")}</span>
           </div>
-          <button type="button" aria-label="关闭添加联系人" onClick={onClose}>
+          <button type="button" aria-label={t("contacts.addFriend.close")} onClick={onClose}>
             <X size={16} />
           </button>
         </header>
@@ -133,37 +138,40 @@ export function ContactAddFriendDialog({
                 ref={inputRef}
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
-                placeholder="输入绿泡泡号、手机号或邮箱"
+                placeholder={t("contacts.addFriend.searchPlaceholder")}
               />
               <button type="submit" disabled={searchLoading}>
-                {searchLoading ? "搜索中" : "搜索"}
+                {searchLoading ? t("contacts.addFriend.searching") : t("contacts.addFriend.search")}
               </button>
             </form>
 
             <div className="contacts-add-shortcuts">
               <button type="button" onClick={() => inputRef.current?.focus()}>
                 <Search size={15} />
-                搜索添加
+                {t("contacts.addFriend.searchAdd")}
               </button>
               <button type="button" onClick={onCreateInviteQr} disabled={createInviteQrPending}>
                 <QrCode size={15} />
-                我的好友二维码
+                {t("contacts.addFriend.myQr")}
               </button>
               <button type="button" onClick={onShowRequests}>
                 <Inbox size={15} />
-                收到的申请
+                {t("contacts.addFriend.receivedRequests")}
               </button>
             </div>
 
             {Boolean(searchError) && (
-              <PanelState tone="error" text={`搜索失败：${formatError(searchError)}`} />
+              <PanelState
+                tone="error"
+                text={t("contacts.addFriend.searchFailed", { error: formatError(searchError) })}
+              />
             )}
-            {searchLoading && <PanelState text="正在搜索联系人..." />}
+            {searchLoading && <PanelState text={t("contacts.addFriend.searchLoading")} />}
             {!searchLoading && submittedKeyword && !searchError && results.length === 0 && (
-              <PanelState text="没有找到用户，或对方不允许被搜索。" />
+              <PanelState text={t("contacts.addFriend.noResults")} />
             )}
 
-            <div className="contacts-add-results" aria-label="搜索结果">
+            <div className="contacts-add-results" aria-label={t("contacts.addFriend.resultsAria")}>
               {results.map((user) => (
                 <SearchUserRow
                   actionPending={actionPending}
@@ -177,6 +185,7 @@ export function ContactAddFriendDialog({
                   onReject={onReject}
                   onSelectRequest={() => setSelectedUserId(user.userId)}
                   onStartChat={() => onStartChat(user.userId)}
+                  t={t}
                 />
               ))}
             </div>
@@ -184,8 +193,8 @@ export function ContactAddFriendDialog({
             {selectedUser && selectedRelation?.status === "none" && (
               <section className="contacts-add-confirm">
                 <div>
-                  <strong>发送好友申请</strong>
-                  <span>{selectedUser.displayName || selectedUser.lppId || "联系人"}</span>
+                  <strong>{t("contacts.addFriend.sendRequestTitle")}</strong>
+                  <span>{selectedUser.displayName || selectedUser.lppId || t("contacts.addFriend.contactFallback")}</span>
                 </div>
                 <textarea
                   maxLength={120}
@@ -199,7 +208,9 @@ export function ContactAddFriendDialog({
                   onClick={() => sendFriendRequest(selectedUser.userId, requestMessage)}
                 >
                   <Send size={15} />
-                  {pendingFriendRequestUserId === selectedUser.userId ? "发送中" : "发送申请"}
+                  {pendingFriendRequestUserId === selectedUser.userId
+                    ? t("contacts.addFriend.sending")
+                    : t("contacts.addFriend.sendRequest")}
                 </button>
               </section>
             )}
@@ -231,6 +242,7 @@ function SearchUserRow({
   requestPending,
   selected,
   user,
+  t,
 }: {
   actionPending: boolean;
   pendingFriendRequestUserId?: string;
@@ -242,33 +254,36 @@ function SearchUserRow({
   onReject: (requestId: string) => void;
   onSelectRequest: () => void;
   onStartChat: () => void;
+  t: Translate;
 }) {
   return (
     <article className={`contacts-add-result ${selected ? "selected" : ""}`}>
       <PcAvatar
         avatarUrl={user.avatarUrl}
         className="contacts-avatar friend"
-        name={user.displayName || "联系人"}
+        name={user.displayName || t("contacts.addFriend.contactFallback")}
       />
       <div className="contacts-add-result-copy">
         <span className="contacts-name-line">
-          <strong>{user.displayName || "联系人"}</strong>
-          <em>{matchTypeLabel(user.matchType)}</em>
+          <strong>{user.displayName || t("contacts.addFriend.contactFallback")}</strong>
+          <em>{matchTypeLabel(user.matchType, t)}</em>
         </span>
         <small>{[user.lppId, user.signature].filter(Boolean).join(" · ") || user.userId}</small>
       </div>
       <div className="contacts-add-result-actions">
-        {relation.status === "self" && <button type="button" disabled>这是你自己</button>}
+        {relation.status === "self" && (
+          <button type="button" disabled>{t("contacts.addFriend.relation.self")}</button>
+        )}
         {relation.status === "friend" && (
           <button className="primary" type="button" disabled={actionPending} onClick={onStartChat}>
             <MessageSquare size={14} />
-            发消息
+            {t("contacts.addFriend.relation.message")}
           </button>
         )}
         {relation.status === "outgoingPending" && (
           <button type="button" disabled>
             <Check size={14} />
-            好友申请已发送
+            {t("contacts.addFriend.relation.sent")}
           </button>
         )}
         {relation.status === "incomingPending" && (
@@ -278,7 +293,7 @@ function SearchUserRow({
               disabled={requestPending}
               onClick={() => onReject(relation.requestId)}
             >
-              拒绝
+              {t("contacts.addFriend.relation.reject")}
             </button>
             <button
               className="primary"
@@ -286,7 +301,7 @@ function SearchUserRow({
               disabled={requestPending}
               onClick={() => onAccept(relation.requestId)}
             >
-              通过
+              {t("contacts.addFriend.relation.accept")}
             </button>
           </>
         )}
@@ -298,7 +313,7 @@ function SearchUserRow({
             onClick={onSelectRequest}
           >
             <UserPlus size={14} />
-            添加到通讯录
+            {t("contacts.addFriend.relation.add")}
           </button>
         )}
       </div>
@@ -306,10 +321,10 @@ function SearchUserRow({
   );
 }
 
-function matchTypeLabel(matchType?: string | null) {
+function matchTypeLabel(matchType: string | null | undefined, t: Translate) {
   const value = `${matchType ?? ""}`.trim().toLowerCase();
-  if (value === "lpp_id" || value === "lppid") return "绿泡泡号";
-  if (value === "mobile") return "手机号";
-  if (value === "email") return "邮箱";
-  return "精准匹配";
+  if (value === "lpp_id" || value === "lppid") return t("contacts.addFriend.matchType.lppId");
+  if (value === "mobile") return t("contacts.addFriend.matchType.mobile");
+  if (value === "email") return t("contacts.addFriend.matchType.email");
+  return t("contacts.addFriend.matchType.exact");
 }

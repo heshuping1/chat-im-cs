@@ -89,9 +89,9 @@ const numericMediaRecordFields = {
 
 export function normalizeMessageItem(message: MessageItemDto): MessageItemDto {
   const messageType = normalizeMessageType(message);
-  const body = normalizeMessageBody(message.body, messageType);
+  const body = normalizeMessageBody(message.body, messageType, message);
   const preview = renderWechatEmojiText(
-    message.preview || messagePreviewFromBody(body, messageType) || "[消息]",
+    message.preview || messagePreviewFromBody(body, messageType) || "[Message]",
   );
   return {
     ...message,
@@ -116,12 +116,15 @@ export function normalizeMessageType(message: MessageItemDto | string | undefine
 export function normalizeMessageBody(
   body?: Record<string, unknown>,
   messageType?: string,
+  message?: MessageItemDto,
 ) {
   const normalizedType = normalizeType(messageType);
   const next = { ...(body ?? {}) };
   if (normalizedType && !next.messageType && !next.type) {
     next.messageType = normalizedType;
   }
+  normalizeReplyIntoBody(next, message);
+  normalizeMentionsIntoBody(next, message);
   return next;
 }
 
@@ -159,6 +162,7 @@ export function messagePreviewFromBody(
   if (textPart?.text) return renderWechatEmojiText(textPart.text);
   const partType = parts[0]?.type || inferMessageType(normalizedBody) || normalizeType(messageType);
   if (!partType) return "";
+  if (partType === "text") return "";
   const label = messageTypeLabels[normalizeType(partType)];
   return label ? `[${label}]` : `暂不支持的消息类型：${partType}`;
 }
@@ -419,6 +423,71 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>;
 }
 
+function normalizeReplyIntoBody(body: Record<string, unknown>, message?: MessageItemDto) {
+  const source =
+    asRecord(body.reply) ||
+    asRecord(body.replyTo) ||
+    asRecord(body.quotedMessage) ||
+    asRecord(body.quote) ||
+    asRecord(body.replyMessage) ||
+    asRecord(messageRecord(message)?.reply) ||
+    asRecord(messageRecord(message)?.replyTo) ||
+    asRecord(messageRecord(message)?.quotedMessage) ||
+    asRecord(messageRecord(message)?.quote);
+  if (!source) return;
+  const messageId =
+    stringField(source, "messageId", "replyToMessageId", "quotedMessageId", "id") ||
+    stringField(body, "replyToMessageId") ||
+    stringField(messageRecord(message) ?? {}, "replyToMessageId");
+  const sender =
+    stringField(source, "sender", "senderDisplayName", "fromDisplayName", "displayName", "name") ||
+    stringField(source, "senderName", "nickname");
+  const preview =
+    stringField(source, "preview", "text", "content", "message", "summary") ||
+    messagePreviewFromBody(asRecord(source.body), stringField(source, "messageType", "type"));
+  if (!preview && !messageId) return;
+  body.reply = {
+    ...source,
+    ...(messageId ? { messageId } : {}),
+    ...(sender ? { sender } : {}),
+    ...(preview ? { preview } : {}),
+  };
+  if (messageId && !body.replyToMessageId) body.replyToMessageId = messageId;
+}
+
+function normalizeMentionsIntoBody(body: Record<string, unknown>, message?: MessageItemDto) {
+  const source =
+    mentionArray(body.mentions) ||
+    mentionArray(body.atUsers) ||
+    mentionArray(body.mentionedUsers) ||
+    mentionArray(messageRecord(message)?.mentions) ||
+    mentionArray(messageRecord(message)?.atUsers) ||
+    mentionArray(messageRecord(message)?.mentionedUsers);
+  if (!source) return;
+  body.mentions = source;
+}
+
+function mentionArray(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  const mentions: Array<{ userId?: string; displayName?: string }> = [];
+  value.forEach((item) => {
+    const record = asRecord(item);
+    if (!record) return;
+    const userId = stringField(record, "userId", "platformUserId", "memberId", "id");
+    const displayName = stringField(record, "displayName", "groupNickname", "nickname", "name");
+    if (!userId && !displayName) return;
+    mentions.push({
+      ...(userId ? { userId } : {}),
+      ...(displayName ? { displayName } : {}),
+    });
+  });
+  return mentions.length > 0 ? mentions : undefined;
+}
+
+function messageRecord(message?: MessageItemDto) {
+  return message as unknown as Record<string, unknown> | undefined;
+}
+
 function firstFieldValue(
   record: Record<string, unknown>,
   fields: readonly string[],
@@ -458,5 +527,5 @@ function durationMsToSeconds(value: unknown) {
 }
 
 function messageTypeLabel(type: string) {
-  return messageTypeLabels[normalizeType(type)] ?? "消息";
+  return messageTypeLabels[normalizeType(type)] ?? "Message";
 }

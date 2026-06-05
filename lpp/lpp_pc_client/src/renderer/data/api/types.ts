@@ -605,6 +605,8 @@ export interface GroupMemberDto {
   platformUserId?: string;
   lppId?: string;
   displayName: string;
+  groupNickname?: string | null;
+  nickname?: string | null;
   avatarUrl?: string | null;
   role?: string | null;
   memberRole?: string | null;

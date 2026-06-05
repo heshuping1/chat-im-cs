@@ -24,7 +24,7 @@ describe("api error model", () => {
     ).toBe("你不在该会话中，无法发送消息");
     expect(
       formatApiErrorForUser(new ApiError("muted", "MSG_GROUP_MUTED", "r2", 403)),
-    ).toBe("群聊已开启全员禁言，暂时无法发送");
+    ).toBe("群已开启全员禁言，当前账号无发言权限");
     expect(
       formatApiErrorForUser(new ApiError("muted", "MSG_MEMBER_MUTED", "r3", 403)),
     ).toBe("你已被禁言，暂时无法发言");

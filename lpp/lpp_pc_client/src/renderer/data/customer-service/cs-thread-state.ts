@@ -72,26 +72,26 @@ export function createCustomerServiceThreadState(
   const normalizedStatus = normalizeCustomerServiceThreadStateStatus(rawStatus);
 
   if (isRatedStatus(normalizedStatus)) {
-    return state("rated", "已评价", rawStatus, normalizedStatus, true, "readonly");
+    return state("rated", "Rated", rawStatus, normalizedStatus, true, "readonly");
   }
 
   if (isTerminalStatus(normalizedStatus)) {
-    return state("closed", "历史会话", rawStatus, normalizedStatus, true, "readonly");
+    return state("closed", "History conversation", rawStatus, normalizedStatus, true, "readonly");
   }
 
   if (isQueuedStatus(normalizedStatus)) {
-    return state("queued", "等待人工接入", rawStatus, normalizedStatus, false, "claim");
+    return state("queued", "Waiting for agent", rawStatus, normalizedStatus, false, "claim");
   }
 
   if (isAiStatus(normalizedStatus)) {
-    return state("ai", "AI 转人工", rawStatus, normalizedStatus, false, "takeover");
+    return state("ai", "AI transfer", rawStatus, normalizedStatus, false, "takeover");
   }
 
   if (isReadonlyStatus(normalizedStatus)) {
-    return state("readonly", "只读查看", rawStatus, normalizedStatus, true, "readonly");
+    return state("readonly", "Read-only", rawStatus, normalizedStatus, true, "readonly");
   }
 
-  return state("serving", "人工接待中", rawStatus, normalizedStatus, false, "open");
+  return state("serving", "Agent serving", rawStatus, normalizedStatus, false, "open");
 }
 
 export function transitionCustomerServiceThreadState(

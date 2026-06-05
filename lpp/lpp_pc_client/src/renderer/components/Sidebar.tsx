@@ -87,10 +87,10 @@ import { requireApiClient } from "../data/runtime";
 import { imPresenceStatuses } from "../data/static-config";
 import type { CustomerServiceStatus, ModuleKey } from "../data/types";
 import {
-  getQueueAutoDisabledReason,
+  getQueueAutoDisabledReasonKey,
   getReceptionControlSummary,
-  getReceptionQueueModeDescription,
-  getReceptionQueueModeLabel,
+  getReceptionQueueModeDescriptionKey,
+  getReceptionQueueModeLabelKey,
   getReceptionStatusOption,
   normalizeReceptionStatus,
   receptionControlStatusOptions,
@@ -99,6 +99,7 @@ import {
 } from "../customer-service/models/serviceReceptionControlModel";
 import { isRiskyCustomerServiceThread } from "../customer-service/models/serviceWorkbenchModel";
 import { derivePcWorkspaceAccess } from "../data/workspace-access";
+import { useI18n } from "../i18n/useI18n";
 import { formatBadgeCount, formatError } from "../lib/format";
 import { useFriendRequestReminderController } from "../contacts/hooks/useFriendRequestReminderController";
 import { SpaceRadarPopover } from "../spaces/components/SpaceRadarPopover";
@@ -113,36 +114,29 @@ import {
 } from "./SidebarAccountPanels";
 
 const primaryNavItems = [
-  { key: "messages", label: "消息", icon: MessageCircleMore },
-  { key: "onlineService", label: "在线客服", icon: Headset },
-  { key: "contacts", label: "通讯录", icon: UsersRound },
-  { key: "workbench", label: "工作台", icon: LayoutDashboard },
-  { key: "ticketCenter", label: "工单中心", icon: ClipboardCheck },
-  { key: "dataCenter", label: "数据中心", icon: ChartSpline },
-  { key: "knowledgeBase", label: "知识库", icon: BookOpenText },
+  { key: "messages", label: "Messages", icon: MessageCircleMore },
+  { key: "onlineService", label: "Customer Service", icon: Headset },
+  { key: "contacts", label: "Contacts", icon: UsersRound },
+  { key: "workbench", label: "Workbench", icon: LayoutDashboard },
+  { key: "ticketCenter", label: "Tickets", icon: ClipboardCheck },
+  { key: "dataCenter", label: "Data Center", icon: ChartSpline },
+  { key: "knowledgeBase", label: "Knowledge Base", icon: BookOpenText },
 ] satisfies Array<{ key: ModuleKey; label: string; icon: typeof MessageCircleMore }>;
 
-const settingsNavItem = { key: "settings", label: "设置", icon: Settings } satisfies {
+const settingsNavItem = { key: "settings", label: "Settings", icon: Settings } satisfies {
   key: ModuleKey;
   label: string;
   icon: typeof Settings;
 };
 
 const accountNavItems = [
-  { key: "enterpriseSwitch", label: "空间切换", icon: Building2 },
-  { key: "favorites", label: "收藏", icon: Star },
+  { key: "enterpriseSwitch", label: "Spaces", icon: Building2 },
+  { key: "favorites", label: "Favorites", icon: Star },
 ] satisfies Array<{
   key: ModuleKey;
   label: string;
   icon: typeof Building2;
 }>;
-
-const sidebarReceptionStatusLabels: Record<CustomerServiceStatus, string> = {
-  online: "客服在线",
-  busy: "客服忙碌",
-  break: "短暂离开",
-  offline: "客服离线",
-};
 
 function accountAvatarDisplayUrl(value?: string | null, version?: number) {
   const trimmed = value?.trim();
@@ -158,8 +152,36 @@ type SidebarServiceCounter = {
   tone: "active" | "warning" | "muted" | "danger";
 };
 
+function navLabelKey(moduleKey: ModuleKey) {
+  switch (moduleKey) {
+    case "contacts":
+      return "nav.contacts";
+    case "dataCenter":
+      return "nav.dataCenter";
+    case "enterpriseSwitch":
+      return "nav.enterpriseSwitch";
+    case "favorites":
+      return "nav.favorites";
+    case "knowledgeBase":
+      return "nav.knowledgeBase";
+    case "messages":
+      return "nav.messages";
+    case "onlineService":
+      return "nav.onlineService";
+    case "settings":
+      return "nav.settings";
+    case "ticketCenter":
+      return "nav.ticketCenter";
+    case "workbench":
+      return "nav.workbench";
+    default:
+      return "nav.messages";
+  }
+}
+
 export function Sidebar() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
   const [accountPanel, setAccountPanel] = useState<AccountPanel>(null);
@@ -250,8 +272,8 @@ export function Sidebar() {
     mutationFn: async () => {
       await openAppProfile();
     },
-    onSuccess: () => setAccountNotice("已打开新的 PC 客户端"),
-    onError: (error) => setAccountNotice(`打开新客户端失败：${formatError(error)}`),
+    onSuccess: () => setAccountNotice(t("sidebar.account.openedNewClient")),
+    onError: (error) => setAccountNotice(t("sidebar.account.openClientFailed", { error: formatError(error) })),
   });
   const invalidateReceptionAndThreads = async () => {
     await queryClient.invalidateQueries({
@@ -312,7 +334,7 @@ export function Sidebar() {
     mutationFn: async (mode: ReceptionQueueMode) => {
       const serviceStatus = receptionStatusQuery.data?.serviceStatus ?? confirmedServiceStatus;
       const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
-      if (!patch) throw new Error("接待状态未同步，暂不能切换接入模式。");
+      if (!patch) throw new Error(t("sidebar.service.receptionNotSynced"));
       return requireApiClient(authSession).updateReceptionStatus(patch);
     },
     onMutate: (mode) => {
@@ -356,12 +378,12 @@ export function Sidebar() {
       requireApiClient(authSession).createFriendInviteQr({
         ttlHours: 720,
         maxUses: 0,
-        message: "扫码加我",
+        message: t("sidebar.account.inviteQrMessage"),
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pc-account-invite-qrs"] });
     },
-    onError: (error) => setAccountNotice(`生成二维码失败：${formatError(error)}`),
+    onError: (error) => setAccountNotice(t("sidebar.account.createQrFailed", { error: formatError(error) })),
   });
   const unifiedReadStateForIdentity = mergeUnifiedReadStateForIdentity(
     locallyReadConversationReads,
@@ -397,12 +419,11 @@ export function Sidebar() {
     taskbarServiceUnreadCount,
   } = serviceBadgeView;
   const imStatusLabel =
-    imPresenceStatuses.find((item) => item.value === imPresenceStatus)?.label ??
-    "在线";
+    t(imPresenceStatuses.find((item) => item.value === imPresenceStatus)?.labelKey ?? "sidebar.presence.online");
   const gatewayStatusNotice = gatewayRealtimeStatusNotice(gatewayRealtime.status);
   const profile = profileQuery.data;
   const tenantInfo = tenantInfoQuery.data;
-  const displayName = profile?.displayName || authSession?.displayName || "PC 用户";
+  const displayName = profile?.displayName || authSession?.displayName || t("sidebar.account.pcUser");
   const avatarUrl = accountAvatarDisplayUrl(
     profile?.avatarUrl ?? authSession?.avatarUrl,
     profile?.avatarUrl ? profileQuery.dataUpdatedAt : undefined,
@@ -414,20 +435,20 @@ export function Sidebar() {
     authSession?.tenantName ||
     authSession?.tenantId ||
     "--";
-  const roleLabel = authSession?.roleLabel ?? "成员";
-  const signature = profile?.signature || profile?.bio || "暂无签名";
+  const roleLabel = authSession?.roleLabel ?? t("sidebar.account.member");
+  const signature = profile?.signature || profile?.bio || t("sidebar.account.noSignature");
   const isPersonalSpace =
-    authSession?.spaceType === 1 || authSession?.roleLabel === "个人空间";
+    authSession?.spaceType === 1 || authSession?.roleLabel === t("sidebar.space.personal");
   const spaceCode =
     tenantInfo?.tenantCode || authSession?.tenantCode || authSession?.tenantId || "--";
   const spaceName = isPersonalSpace
-    ? "个人空间"
-    : tenantInfo?.tenantName || authSession?.tenantName || "企业空间";
+    ? t("sidebar.space.personal")
+    : tenantInfo?.tenantName || authSession?.tenantName || t("sidebar.space.enterprise");
   const spaceMeta = isPersonalSpace
-    ? (profile?.lppId ?? authSession?.lppId ?? "个人账号")
+    ? (profile?.lppId ?? authSession?.lppId ?? t("sidebar.space.personalAccount"))
     : spaceCode !== "--"
-      ? `企业码 ${spaceCode}`
-      : "企业空间";
+      ? t("sidebar.space.enterpriseCode", { code: spaceCode })
+      : t("sidebar.space.enterprise");
   const tenantLogoUrl = tenantInfo?.logoUrl ?? authSession?.tenantLogoUrl ?? null;
   const spaceRadar = useSpaceRadarController({
     currentTenant: tenantInfo,
@@ -443,9 +464,9 @@ export function Sidebar() {
   const appInstance = appInstanceQuery.data;
   const appInstanceLabel = appInstance
     ? formatAppInstanceLabel(appInstance)
-    : "正在识别客户端";
+    : t("sidebar.account.identifyingClient");
   const appInstanceShortId = appInstance?.clientInstanceId.slice(0, 8) ?? "--";
-  const productVersionLabel = `专业版 · v${appVersion}`;
+  const productVersionLabel = t("sidebar.productVersion", { version: appVersion });
   const receptionStatus = receptionStatusQuery.data;
   const effectiveReceptionStatus = confirmedServiceStatus;
   const receptionSummary = getReceptionControlSummary({
@@ -454,32 +475,32 @@ export function Sidebar() {
     queueAcceptEnabled: confirmedQueueAcceptEnabled ?? receptionStatus?.queueAcceptEnabled,
     serviceStatus: effectiveReceptionStatus ?? undefined,
   });
-  const queueAutoDisabledReason = getQueueAutoDisabledReason(effectiveReceptionStatus);
+  const queueAutoDisabledReasonKey = getQueueAutoDisabledReasonKey(effectiveReceptionStatus);
   const serviceStatusOption = effectiveReceptionStatus
     ? getReceptionStatusOption(effectiveReceptionStatus)
     : null;
   const serviceStatusTone = serviceStatusOption?.tone ?? "offline";
   const serviceStatusLabel = effectiveReceptionStatus
-    ? sidebarReceptionStatusLabels[effectiveReceptionStatus]
-    : "状态未同步";
+    ? t(`sidebar.service.status.${effectiveReceptionStatus}`)
+    : t("sidebar.service.statusUnsynced");
   const activeReceptionCount = receptionStatus?.activeSessionCount ?? null;
   const serviceStatusCounters: SidebarServiceCounter[] = [
     {
-      label: "接",
-      name: "接待中",
+      label: t("sidebar.service.counterReceptionShort"),
+      name: t("sidebar.service.counterReception"),
       value: activeReceptionCount ?? "--",
       tone: "active",
     },
     {
-      label: "排",
-      name: "排队",
+      label: t("sidebar.service.counterQueueShort"),
+      name: t("sidebar.service.counterQueue"),
       value: hasServiceThreadData ? queuedServiceCount : "--",
       tone: queuedServiceCount > 0 ? "warning" : "muted",
     },
     activeServiceUnreadCount > 0
       ? {
-          label: "未",
-          name: "未读",
+          label: t("sidebar.service.counterUnreadShort"),
+          name: t("sidebar.service.counterUnread"),
           value: activeServiceUnreadCount,
           tone: "danger",
         }
@@ -488,9 +509,11 @@ export function Sidebar() {
   const serviceStatusCompactDetail = serviceStatusCounters
     .map((item) => `${item.name} ${item.value}`)
     .join(" · ");
-  const serviceStatusFullDetail = `接待 ${receptionSummary.sessionText} · 排队 ${
-    hasServiceThreadData ? queuedServiceCount : "--"
-  } · 未读 ${hasServiceThreadData ? activeServiceUnreadCount : "--"}`;
+  const serviceStatusFullDetail = t("sidebar.service.fullDetail", {
+    reception: receptionSummary.sessionText,
+    queue: hasServiceThreadData ? queuedServiceCount : "--",
+    unread: hasServiceThreadData ? activeServiceUnreadCount : "--",
+  });
   const collapsed = sidebarCollapsed;
   const activeThreadId = useActiveThreadId();
   const activeThreadOpenSource = useActiveThreadOpenSource();
@@ -709,7 +732,7 @@ export function Sidebar() {
       fallbackBody: string,
     ) => {
       const id = thread.threadId || thread.conversationId;
-      const title = thread.title || "新的在线客服会话";
+      const title = thread.title || t("sidebar.notification.newServiceThread");
       const source =
         thread.source ||
         thread.channel ||
@@ -718,8 +741,8 @@ export function Sidebar() {
         thread.platform ||
         thread.provider;
       const body = source
-        ? `来自 ${source} 的访客正在排队，等待接入`
-        : "有访客正在排队，等待接入";
+        ? t("sidebar.notification.queueFromSource", { source: String(source) })
+        : t("sidebar.notification.queueBody");
       pushRealtimeReminder({
         id: `cs-queue-${id}`,
         title,
@@ -754,6 +777,10 @@ export function Sidebar() {
         authSession,
         pcSettings,
         pushRealtimeReminder,
+        text: {
+          messageBody: t("sidebar.notification.serviceMessageBody"),
+          messageTitle: t("sidebar.notification.serviceMessageTitle"),
+        },
         thread,
       }),
     );
@@ -761,12 +788,19 @@ export function Sidebar() {
       notifyCustomerServiceSlaRiskThread({
         pcSettings,
         pushRealtimeReminder,
+        text: {
+          body: t("sidebar.notification.slaBody"),
+          bodyNamedTemplate: t("sidebar.notification.slaBodyNamed", {
+            title: "{title}",
+          }),
+          title: t("sidebar.notification.slaTitle"),
+        },
         thread,
       }),
     );
     if (queuedCountIncreased && shouldPushQueueReminder) {
-      const title = "新的在线客服会话";
-      const body = "有新的访客正在排队，等待接入";
+      const title = t("sidebar.notification.newServiceThread");
+      const body = t("sidebar.notification.queueCountBody");
       pushRealtimeReminder({
         id: `cs-queue-count-${queueReminderSessionKey}-${queuedServiceCount}-${Date.now()}`,
         title,
@@ -801,6 +835,7 @@ export function Sidebar() {
     queuedServiceCount,
     queuedTempSessions,
     queueReminderSessionKey,
+    t,
     workspaceAccess.canReadServiceWorkbench,
   ]);
 
@@ -830,7 +865,7 @@ export function Sidebar() {
           </span>
         </button>
         {brandInfoOpen && (
-          <div className="sidebar-brand-popover" role="dialog" aria-label="关于 LPP">
+          <div className="sidebar-brand-popover" role="dialog" aria-label={t("sidebar.brand.about")}>
             <div className="sidebar-brand-popover-title">
               <span className="sidebar-brand-logo small" aria-hidden="true">
                 <img alt="" src={appIconSrc} />
@@ -849,14 +884,15 @@ export function Sidebar() {
               }}
             >
               <Info size={15} />
-              帮助 / 关于 / 检查更新
+              {t("sidebar.brand.helpAboutUpdate")}
             </button>
           </div>
         )}
       </div>
-      <nav className="nav-list" aria-label="主导航">
+      <nav className="nav-list" aria-label={t("sidebar.navAria")}>
         {visiblePrimaryNavItems.map((item) => {
           const Icon = item.icon;
+          const itemLabel = t(navLabelKey(item.key));
           const badgeCount =
             item.key === "messages"
               ? unreadCount
@@ -868,15 +904,15 @@ export function Sidebar() {
           const badgeLabel =
             badgeCount > 0
               ? item.key === "contacts"
-                ? `，${badgeCount} 条好友申请`
-                : `，${badgeCount} 条提醒`
+                ? t("sidebar.badge.friendRequestsSuffix", { count: badgeCount })
+                : t("sidebar.badge.remindersSuffix", { count: badgeCount })
               : "";
           return (
             <button
               className={`nav-item ${activeModule === item.key ? "active" : ""}`}
-              key={item.label}
-              aria-label={`${item.label}${badgeLabel}`}
-              data-sidebar-tooltip={item.label}
+              key={item.key}
+              aria-label={`${itemLabel}${badgeLabel}`}
+              data-sidebar-tooltip={itemLabel}
               onClick={() => {
                 if (item.key === "onlineService") {
                   setActiveThread("");
@@ -896,18 +932,19 @@ export function Sidebar() {
                   </span>
                 )}
               </span>
-              <span>{item.label}</span>
+              <span>{itemLabel}</span>
             </button>
           );
         })}
         {visibleAccountNavItems.map((item) => {
           const Icon = item.icon;
+          const itemLabel = t(navLabelKey(item.key));
           return (
             <button
               className={`nav-item account-nav-item ${activeModule === item.key ? "active" : ""}`}
-              key={item.label}
-              aria-label={item.label}
-              data-sidebar-tooltip={item.label}
+              key={item.key}
+              aria-label={itemLabel}
+              data-sidebar-tooltip={itemLabel}
               onClick={() => {
                 setActiveModule(item.key);
                 setBrandInfoOpen(false);
@@ -921,14 +958,17 @@ export function Sidebar() {
               <span className="nav-icon">
                 <Icon size={19} />
               </span>
-              <span>{item.label}</span>
+              <span>{itemLabel}</span>
             </button>
           );
         })}
+        {(() => {
+          const itemLabel = t(navLabelKey(settingsNavItem.key));
+          return (
         <button
           className={`nav-item ${activeModule === settingsNavItem.key ? "active" : ""}`}
-          aria-label={settingsNavItem.label}
-          data-sidebar-tooltip={settingsNavItem.label}
+          aria-label={itemLabel}
+          data-sidebar-tooltip={itemLabel}
           onClick={() => {
             setActiveModule(settingsNavItem.key);
             setBrandInfoOpen(false);
@@ -940,8 +980,10 @@ export function Sidebar() {
           <span className="nav-icon">
             <Settings size={19} />
           </span>
-          <span>{settingsNavItem.label}</span>
+          <span>{itemLabel}</span>
         </button>
+          );
+        })()}
       </nav>
       <div className="sidebar-footer">
         {gatewayStatusNotice && (
@@ -953,17 +995,21 @@ export function Sidebar() {
             <span>{gatewayStatusNotice.label}</span>
           </div>
         )}
-        <div className="sidebar-status-center" aria-label="状态中心">
+        <div className="sidebar-status-center" aria-label={t("sidebar.statusCenter")}>
           <div className="account-entry sidebar-footer-account-entry">
             <button
               className="account-button"
               type="button"
               aria-expanded={accountOpen}
-              aria-label={`${displayName}，${accountMeta}，状态：${imStatusLabel}`}
+              aria-label={t("sidebar.account.entryAria", {
+                account: accountMeta,
+                name: displayName,
+                status: imStatusLabel,
+              })}
               data-sidebar-popover-trigger="account"
               data-sidebar-tooltip={`${displayName} · ${accountMeta}`}
               data-testid="account-entry-button"
-              title="打开账号资料"
+              title={t("sidebar.account.openProfile")}
               onClick={() => {
                 setAccountOpen((opened) => !opened);
                 setBrandInfoOpen(false);
@@ -982,7 +1028,7 @@ export function Sidebar() {
                 <span className={`status-dot account-status-dot ${imPresenceStatus}`} />
               </PcAvatar>
               <span className="account-identity">
-                <strong>{shortName.length > 0 ? displayName : "PC 用户"}</strong>
+                <strong>{shortName.length > 0 ? displayName : t("sidebar.account.pcUser")}</strong>
                 <em>
                   <span
                     className={`sidebar-status-dot ${imPresenceStatus}`}
@@ -994,7 +1040,7 @@ export function Sidebar() {
               <ChevronRight className="account-chevron" size={15} aria-hidden="true" />
             </button>
             {accountOpen && (
-              <div className="account-popover" role="dialog" aria-label="我的账号">
+              <div className="account-popover" role="dialog" aria-label={t("sidebar.account.myAccount")}>
                 <div className="account-profile-card">
                   <PcAvatar
                     avatarUrl={avatarUrl}
@@ -1017,23 +1063,23 @@ export function Sidebar() {
                 </div>
 
                 <section className="account-popover-section">
-                  <span className="account-section-label">账号与客户端</span>
+                  <span className="account-section-label">{t("sidebar.account.accountAndClient")}</span>
                   <div className="account-client-card">
                     <span>
                       <MonitorCog size={15} />
                       <strong>{appInstanceLabel}</strong>
                     </span>
-                    <em>实例 {appInstanceShortId}</em>
+                    <em>{t("sidebar.account.instance", { id: appInstanceShortId })}</em>
                   </div>
                   <div className="account-action-list">
                     <AccountAction
                       icon={<Plus size={15} />}
-                      label={openAppProfileMutation.isPending ? "正在打开" : "打开新客户端"}
+                      label={openAppProfileMutation.isPending ? t("sidebar.account.opening") : t("sidebar.account.openNewClient")}
                       onClick={() => openAppProfileMutation.mutate()}
                     />
                     <AccountAction
                       icon={<ShieldCheck size={15} />}
-                      label="管理登录设备"
+                      label={t("sidebar.account.manageDevices")}
                       onClick={() => {
                         setActiveModule("settings");
                         setAccountOpen(false);
@@ -1044,35 +1090,38 @@ export function Sidebar() {
                 </section>
 
                 <section className="account-popover-section">
-                  <span className="account-section-label">IM 状态</span>
+                  <span className="account-section-label">{t("sidebar.account.imStatus")}</span>
                   <div className="presence-options">
-                    {imPresenceStatuses.map((item) => (
-                      <button
-                        className={`presence-option ${
-                          imPresenceStatus === item.value ? "selected" : ""
-                        }`}
-                        type="button"
-                        key={item.value}
-                        aria-label={`设置 IM 状态为${item.label}`}
-                        onClick={() => {
-                          setImPresenceStatus(item.value as TrayStatus);
-                          setAccountNotice(null);
-                        }}
-                      >
-                        <span className={`status-dot ${item.value}`} />
-                        <span>{item.label}</span>
-                        {imPresenceStatus === item.value && <Check size={14} />}
-                      </button>
-                    ))}
+                    {imPresenceStatuses.map((item) => {
+                      const label = t(item.labelKey);
+                      return (
+                        <button
+                          className={`presence-option ${
+                            imPresenceStatus === item.value ? "selected" : ""
+                          }`}
+                          type="button"
+                          key={item.value}
+                          aria-label={t("sidebar.account.setImStatus", { status: label })}
+                          onClick={() => {
+                            setImPresenceStatus(item.value as TrayStatus);
+                            setAccountNotice(null);
+                          }}
+                        >
+                          <span className={`status-dot ${item.value}`} />
+                          <span>{label}</span>
+                          {imPresenceStatus === item.value && <Check size={14} />}
+                        </button>
+                      );
+                    })}
                   </div>
                 </section>
 
                 <section className="account-popover-section">
-                  <span className="account-section-label">我的入口</span>
+                  <span className="account-section-label">{t("sidebar.account.myEntrances")}</span>
                   <div className="account-action-list">
                     <AccountAction
                       icon={<QrCode size={15} />}
-                      label="我的二维码"
+                      label={t("account.qrcode.title")}
                       onClick={() => setAccountPanel("qrcode")}
                     />
                   </div>
@@ -1088,7 +1137,7 @@ export function Sidebar() {
                     creatingInviteQr={createInviteQrMutation.isPending}
                     onCopy={(text) => {
                       void copyToClipboard(text);
-                      setAccountNotice("已复制");
+                      setAccountNotice(t("common.copied"));
                     }}
                     onClose={() => setAccountPanel(null)}
                   />
@@ -1097,7 +1146,7 @@ export function Sidebar() {
                 <div className="account-actions">
                   <button type="button" onClick={() => clearAuthSession()}>
                     <LogOut size={14} />
-                    退出登录
+                    {t("sidebar.account.logout")}
                   </button>
                 </div>
 
@@ -1115,9 +1164,9 @@ export function Sidebar() {
                 className={`sidebar-status-row sidebar-service-status-row ${serviceStatusTone}`}
                 type="button"
                 aria-expanded={serviceStatusOpen}
-                aria-label={`在线客服：${serviceStatusLabel}`}
+                aria-label={t("sidebar.service.entryAria", { status: serviceStatusLabel })}
                 data-sidebar-popover-trigger="service"
-                data-sidebar-tooltip={`在线客服 · ${serviceStatusLabel}`}
+                data-sidebar-tooltip={t("sidebar.service.tooltip", { status: serviceStatusLabel })}
                 onClick={() => {
                   setServiceStatusOpen((opened) => !opened);
                   setBrandInfoOpen(false);
@@ -1150,19 +1199,19 @@ export function Sidebar() {
                 <div
                   className="sidebar-status-popover sidebar-service-status-popover"
                   role="dialog"
-                  aria-label="在线客服状态"
+                  aria-label={t("sidebar.service.statusAria")}
                 >
                   <strong>{serviceStatusLabel}</strong>
                   <span>{serviceStatusFullDetail}</span>
                   {receptionStatusQuery.error && (
                     <span className="sidebar-status-error">
-                      接待状态同步失败：{formatError(receptionStatusQuery.error)}
+                      {t("sidebar.service.syncFailed", { error: formatError(receptionStatusQuery.error) })}
                     </span>
                   )}
                   <div
                     className="sidebar-service-status-options"
                     role="radiogroup"
-                    aria-label="客服接待状态"
+                    aria-label={t("sidebar.service.receptionStatusAria")}
                   >
                     {receptionControlStatusOptions.map((item) => (
                       <button
@@ -1182,23 +1231,23 @@ export function Sidebar() {
                           className={`sidebar-status-dot service-${item.tone}`}
                           aria-hidden="true"
                         />
-                        <span>{sidebarReceptionStatusLabels[item.value]}</span>
+                        <span>{t(item.labelKey)}</span>
                         {effectiveReceptionStatus === item.value && <Check size={14} />}
                       </button>
                     ))}
                   </div>
-                  <span className="account-section-label">接入模式</span>
+                  <span className="account-section-label">{t("customerService.reception.mode")}</span>
                   <div
                     className="sidebar-service-status-options"
                     role="radiogroup"
-                    aria-label="客服接入模式"
+                    aria-label={t("sidebar.service.accessModeAria")}
                   >
                     {(["manual", "auto"] as ReceptionQueueMode[]).map((mode) => {
                       const selected = receptionSummary.queueMode === mode;
                       const modeDescription =
-                        mode === "auto" && queueAutoDisabledReason
-                          ? "点击后切换为客服在线，并启用自动分配。"
-                          : getReceptionQueueModeDescription(mode);
+                        mode === "auto" && queueAutoDisabledReasonKey
+                          ? t("sidebar.service.autoEnableHint")
+                          : t(getReceptionQueueModeDescriptionKey(mode));
                       return (
                         <button
                           className={`sidebar-status-option sidebar-queue-mode-option ${
@@ -1215,7 +1264,7 @@ export function Sidebar() {
                           onClick={() => queueAcceptMutation.mutate(mode)}
                         >
                           <span>
-                            <strong>{getReceptionQueueModeLabel(mode)}</strong>
+                            <strong>{t(getReceptionQueueModeLabelKey(mode))}</strong>
                             <small>{modeDescription}</small>
                           </span>
                           {selected && <Check size={14} />}
@@ -1224,9 +1273,9 @@ export function Sidebar() {
                     })}
                   </div>
                   <div className="sidebar-service-metrics">
-                    <b>接待 {receptionSummary.sessionText}</b>
-                    <b>排队 {hasServiceThreadData ? queuedServiceCount : "--"}</b>
-                    <b>未读 {hasServiceThreadData ? activeServiceUnreadCount : "--"}</b>
+                    <b>{t("sidebar.service.metricReception", { value: receptionSummary.sessionText })}</b>
+                    <b>{t("sidebar.service.metricQueue", { value: hasServiceThreadData ? queuedServiceCount : "--" })}</b>
+                    <b>{t("sidebar.service.metricUnread", { value: hasServiceThreadData ? activeServiceUnreadCount : "--" })}</b>
                   </div>
                   <button
                     className="sidebar-status-action"
@@ -1238,7 +1287,7 @@ export function Sidebar() {
                     }}
                   >
                     <Headset size={15} />
-                    进入在线客服
+                    {t("sidebar.service.enter")}
                   </button>
                 </div>
               )}
@@ -1252,11 +1301,11 @@ export function Sidebar() {
               }`}
               type="button"
               aria-expanded={spaceStatusOpen}
-              aria-label={`当前空间：${spaceName}，${spaceMeta}`}
+              aria-label={t("sidebar.space.entryAria", { meta: spaceMeta, name: spaceName })}
               data-sidebar-popover-trigger="space"
-              data-sidebar-tooltip={`空间 · ${spaceName} · ${spaceMeta}${
+              data-sidebar-tooltip={`${t("sidebar.space.tooltip", { meta: spaceMeta, name: spaceName })}${
                 currentSpaceBadgeCount > 0
-                  ? ` · ${formatBadgeCount(currentSpaceBadgeCount)} 条未处理`
+                  ? t("sidebar.space.pendingSuffix", { count: formatBadgeCount(currentSpaceBadgeCount) })
                   : ""
               }`}
               onClick={() => {
@@ -1313,9 +1362,9 @@ export function Sidebar() {
           <button
             className="sidebar-collapse-button"
             type="button"
-            aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
-            data-sidebar-tooltip={collapsed ? "展开侧边栏" : "收起侧边栏"}
-            title={collapsed ? "展开" : "收起"}
+            aria-label={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+            data-sidebar-tooltip={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+            title={collapsed ? t("common.expand") : t("common.collapse")}
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           >
             <Menu size={19} />
@@ -1326,6 +1375,17 @@ export function Sidebar() {
   );
 }
 
+type SidebarServiceMessageReminderText = {
+  messageBody: string;
+  messageTitle: string;
+};
+
+type SidebarSlaReminderText = {
+  body: string;
+  bodyNamedTemplate: string;
+  title: string;
+};
+
 function notifyActiveCustomerServiceThreadMessage({
   activeModule,
   activeThreadId,
@@ -1333,6 +1393,7 @@ function notifyActiveCustomerServiceThreadMessage({
   authSession,
   pcSettings,
   pushRealtimeReminder,
+  text,
   thread,
 }: {
   activeModule: ModuleKey;
@@ -1341,12 +1402,13 @@ function notifyActiveCustomerServiceThreadMessage({
   authSession: AuthSession | null;
   pcSettings: PcSettings;
   pushRealtimeReminder: (reminder: PcRealtimeReminderInput) => void;
+  text: SidebarServiceMessageReminderText;
   thread: CustomerServiceThread;
 }) {
   if (!shouldPushCustomerServiceThreadMessageReminder(pcSettings)) return;
   const targetId = thread.threadId || thread.conversationId;
   if (!targetId) return;
-  const message = customerServiceThreadReminderMessage(thread);
+  const message = customerServiceThreadReminderMessage(thread, text.messageBody);
   const reminderDecision = consumeCustomerServiceMessageReminder({
     identity: authSession,
     message,
@@ -1374,8 +1436,8 @@ function notifyActiveCustomerServiceThreadMessage({
   });
   if (!reminderDecision.shouldNotify) return;
 
-  const title = thread.title || "在线客服新消息";
-  const body = thread.lastMessagePreview || "在线客服会话有新消息";
+  const title = thread.title || text.messageTitle;
+  const body = thread.lastMessagePreview || text.messageBody;
   const windowFocused = isRendererWindowFocused();
   if (
     shouldPushCustomerServiceThreadMessageInAppReminder(pcSettings, {
@@ -1437,18 +1499,20 @@ function notifyActiveCustomerServiceThreadMessage({
 function notifyCustomerServiceSlaRiskThread({
   pcSettings,
   pushRealtimeReminder,
+  text,
   thread,
 }: {
   pcSettings: PcSettings;
   pushRealtimeReminder: (reminder: PcRealtimeReminderInput) => void;
+  text: SidebarSlaReminderText;
   thread: CustomerServiceThread;
 }) {
   const targetId = thread.threadId || thread.conversationId;
   if (!targetId || !pcSettings.slaTimeoutNotifications) return;
-  const title = "SLA 超时提醒";
+  const title = text.title;
   const body = thread.title
-    ? `${thread.title} 接近超时或已经超时`
-    : "在线客服会话接近超时或已经超时";
+    ? text.bodyNamedTemplate.replace("{title}", thread.title)
+    : text.body;
 
   pushRealtimeReminder({
     id: `cs-sla-${targetId}`,
@@ -1475,7 +1539,10 @@ function notifyCustomerServiceSlaRiskThread({
   );
 }
 
-function customerServiceThreadReminderMessage(thread: CustomerServiceThread): MessageItemDto {
+function customerServiceThreadReminderMessage(
+  thread: CustomerServiceThread,
+  fallbackPreview: string,
+): MessageItemDto {
   const record = thread as unknown as Record<string, unknown>;
   const messageId =
     stringValue(record.lastMessageId) ||
@@ -1491,7 +1558,7 @@ function customerServiceThreadReminderMessage(thread: CustomerServiceThread): Me
     conversationId: thread.conversationId || thread.threadId,
     messageId,
     messageType: "text",
-    preview: thread.lastMessagePreview || "在线客服会话有新消息",
+    preview: thread.lastMessagePreview || fallbackPreview,
     sentAt: thread.lastMessageAt ?? thread.updatedAt ?? new Date().toISOString(),
   };
 }

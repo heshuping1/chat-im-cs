@@ -25,6 +25,7 @@ import {
 } from "../../data/api/quick-reply-normalizers";
 import { pcQueryKeys } from "../../data/query-keys";
 import { createApiClient } from "../../data/runtime";
+import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 
 const recentQuickReplyStorageKey = "lpp.pc.customer-service.quick-reply.recent";
@@ -54,6 +55,21 @@ export interface QuickReplyPickerViewModel {
   selectedReply?: CustomerServiceQuickReplyDto;
   totalCount: number;
   visibleReplies: CustomerServiceQuickReplyDto[];
+}
+
+interface QuickReplyPickerLabels {
+  all: string;
+  current: string;
+  currentEmpty: string;
+  categoryEmpty: string;
+  empty: string;
+  list: string;
+  loadFailed: string;
+  loading: string;
+  noAvailable: string;
+  noMatch: string;
+  recent: string;
+  recentEmpty: string;
 }
 
 export function CustomerServiceQuickReplyDrawer({
@@ -96,6 +112,7 @@ export function CustomerServiceQuickReplyPanel({
   threadType?: CustomerServiceThreadType | string | null;
   variant?: "drawer" | "panel";
 }) {
+  const { t } = useI18n();
   const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
   const [keyword, setKeyword] = useState("");
@@ -118,6 +135,7 @@ export function CustomerServiceQuickReplyPanel({
         errorText: repliesQuery.error ? formatError(repliesQuery.error) : undefined,
         filter,
         keyword: deferredKeyword,
+        labels: quickReplyPickerLabels(t),
         loading: repliesQuery.isLoading,
         recentIds,
         replies: repliesQuery.data ?? [],
@@ -133,6 +151,7 @@ export function CustomerServiceQuickReplyPanel({
       repliesQuery.isLoading,
       scope,
       selectedId,
+      t,
     ],
   );
   const { emptyState, filterItems, filterLabel, selectedReply, totalCount, visibleReplies } =
@@ -147,13 +166,13 @@ export function CustomerServiceQuickReplyPanel({
   const insertReply = (reply: CustomerServiceQuickReplyDto) => {
     const payload = buildQuickReplyInsertPayload(reply);
     if (!payload.text.trim()) {
-      onNotice("这条话术暂无可插入文本。");
+      onNotice(t("quickReply.noInsertableText"));
       return;
     }
     const nextRecentIds = rememberQuickReply(reply.quickReplyId);
     setRecentIds(nextRecentIds);
     onInsert(payload);
-    onNotice("话术已插入输入框，发送前请确认。");
+    onNotice(t("quickReply.insertedNotice"));
   };
 
   const copyReply = async (reply: CustomerServiceQuickReplyDto) => {
@@ -161,26 +180,26 @@ export function CustomerServiceQuickReplyPanel({
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
-      onNotice("话术已复制。");
+      onNotice(t("quickReply.copiedNotice"));
     } catch (error) {
-      onNotice(`复制失败：${formatError(error)}`);
+      onNotice(t("common.copyFailed", { error: formatError(error) }));
     }
   };
 
   return (
     <aside
       className={`cs-quick-reply-picker cs-quick-reply-picker-${variant}`}
-      aria-label="会话话术"
+      aria-label={t("quickReply.conversationAria")}
     >
       <header className="cs-quick-reply-head">
         <span className="cs-quick-reply-head-icon" aria-hidden="true">
           <MessageSquareQuote size={18} />
         </span>
         <div>
-          <strong>快捷话术</strong>
-          <p>选择企业标准回复，插入后仍可编辑再发送</p>
+          <strong>{t("composer.quickReply")}</strong>
+          <p>{t("quickReply.drawerSubtitle")}</p>
         </div>
-        <button type="button" aria-label="关闭快捷话术" title="关闭" onClick={onClose}>
+        <button type="button" aria-label={t("quickReply.close")} title={t("common.close")} onClick={onClose}>
           <X size={17} />
         </button>
       </header>
@@ -194,17 +213,17 @@ export function CustomerServiceQuickReplyPanel({
               setKeyword(event.target.value);
               setSelectedId("");
             }}
-            placeholder="搜索标题、内容、分类或标签"
+            placeholder={t("quickReply.searchPlaceholder")}
           />
           <button type="button" disabled={!keyword} onClick={() => setKeyword("")}>
-            清空
+            {t("quickReply.clear")}
           </button>
         </form>
 
       </div>
 
       <div className="cs-quick-reply-workbench">
-        <nav className="cs-quick-reply-filter-rail" aria-label="话术分类">
+        <nav className="cs-quick-reply-filter-rail" aria-label={t("quickReply.categoryAria")}>
           {filterItems.map((item) => (
             <FilterButton
               key={item.key}
@@ -220,7 +239,7 @@ export function CustomerServiceQuickReplyPanel({
         <section className="cs-quick-reply-list-zone">
           <div className="cs-quick-reply-section-head">
             <strong>{filterLabel}</strong>
-            <span>{visibleReplies.length} / {totalCount} 条</span>
+            <span>{t("quickReply.count", { visible: visibleReplies.length, total: totalCount })}</span>
           </div>
           {emptyState ? (
             <QuickReplyState text={emptyState.text} error={emptyState.tone === "error"} />
@@ -246,11 +265,11 @@ export function CustomerServiceQuickReplyPanel({
               <strong>{selectedReply.title}</strong>
               <span>{quickReplyCategory(selectedReply)}</span>
             </div>
-            <p>{selectedReply.content || "暂无内容预览"}</p>
+            <p>{selectedReply.content || t("knowledge.noPreview")}</p>
             <div className="cs-quick-reply-actions">
               <button type="button" onClick={() => insertReply(selectedReply)}>
                 <CornerDownLeft size={15} />
-                插入回复
+                {t("aiDraft.insertReply")}
               </button>
               <button
                 className="secondary"
@@ -259,15 +278,15 @@ export function CustomerServiceQuickReplyPanel({
                 onClick={() => void copyReply(selectedReply)}
               >
                 <Copy size={15} />
-                复制
+                {t("common.copy")}
               </button>
               <button className="ghost" type="button" onClick={onClose}>
-                回到会话
+                {t("knowledge.backToConversation")}
               </button>
             </div>
           </>
         ) : (
-          <QuickReplyState text="选择一条话术后预览内容。" />
+          <QuickReplyState text={t("quickReply.previewEmpty")} />
         )}
       </section>
     </aside>
@@ -278,6 +297,7 @@ export function createQuickReplyPickerViewModel({
   errorText,
   filter,
   keyword,
+  labels = defaultQuickReplyPickerLabels,
   loading = false,
   recentIds,
   replies,
@@ -287,6 +307,7 @@ export function createQuickReplyPickerViewModel({
   errorText?: string;
   filter: QuickReplyFilter;
   keyword: string;
+  labels?: QuickReplyPickerLabels;
   loading?: boolean;
   recentIds: string[];
   replies: CustomerServiceQuickReplyDto[];
@@ -311,11 +332,12 @@ export function createQuickReplyPickerViewModel({
   const filterItems = createQuickReplyFilterItems({
     categories,
     categoryCounts,
+    labels,
     recentIds,
     scope,
     scopedReplies,
   });
-  const filterLabel = filterItems.find((item) => item.key === filter)?.label ?? "话术列表";
+  const filterLabel = filterItems.find((item) => item.key === filter)?.label ?? labels.list;
 
   return {
     categories,
@@ -324,6 +346,7 @@ export function createQuickReplyPickerViewModel({
       errorText,
       filter,
       keyword: normalizedKeyword,
+      labels,
       loading,
       scopedCount: scopedReplies.length,
       visibleCount: visibleReplies.length,
@@ -447,12 +470,14 @@ function countQuickReplyCategories(replies: CustomerServiceQuickReplyDto[]) {
 function createQuickReplyFilterItems({
   categories,
   categoryCounts,
+  labels,
   recentIds,
   scope,
   scopedReplies,
 }: {
   categories: string[];
   categoryCounts: Record<string, number>;
+  labels: QuickReplyPickerLabels;
   recentIds: string[];
   scope?: QuickReplyFilterScope | null;
   scopedReplies: CustomerServiceQuickReplyDto[];
@@ -464,9 +489,9 @@ function createQuickReplyFilterItems({
   const recentCount = recentIds.filter((id) => availableIds.has(id)).length;
 
   return [
-    { count: scopedReplies.length, key: "all", label: "全部" },
-    { count: currentCount, disabled: !scope, key: "current", label: "当前场景" },
-    { count: recentCount, disabled: recentCount === 0, key: "recent", label: "最近使用" },
+    { count: scopedReplies.length, key: "all", label: labels.all },
+    { count: currentCount, disabled: !scope, key: "current", label: labels.current },
+    { count: recentCount, disabled: recentCount === 0, key: "recent", label: labels.recent },
     ...categories.map((category) => ({
       count: categoryCounts[category] ?? 0,
       key: categoryFilter(category),
@@ -479,6 +504,7 @@ function createQuickReplyEmptyState({
   errorText,
   filter,
   keyword,
+  labels,
   loading,
   scopedCount,
   visibleCount,
@@ -486,22 +512,57 @@ function createQuickReplyEmptyState({
   errorText?: string;
   filter: QuickReplyFilter;
   keyword: string;
+  labels: QuickReplyPickerLabels;
   loading: boolean;
   scopedCount: number;
   visibleCount: number;
 }): QuickReplyPickerEmptyState | undefined {
-  if (loading) return { text: "正在读取快捷话术..." };
-  if (errorText) return { text: `话术加载失败：${errorText}`, tone: "error" };
-  if (scopedCount === 0) return { text: "当前会话暂无可用话术。" };
+  if (loading) return { text: labels.loading };
+  if (errorText) return { text: labels.loadFailed.replace("{error}", errorText), tone: "error" };
+  if (scopedCount === 0) return { text: labels.noAvailable };
   if (visibleCount > 0) return undefined;
-  if (keyword) return { text: `没有匹配“${keyword}”的话术。` };
-  if (filter === "recent") return { text: "最近使用的话术暂不可用。" };
-  if (filter === "current") return { text: "当前场景暂无可用话术。" };
+  if (keyword) return { text: labels.noMatch.replace("{keyword}", keyword) };
+  if (filter === "recent") return { text: labels.recentEmpty };
+  if (filter === "current") return { text: labels.currentEmpty };
   if (filter.startsWith(categoryFilterPrefix)) {
-    return { text: `“${filter.slice(categoryFilterPrefix.length)}”分类暂无可用话术。` };
+    return { text: labels.categoryEmpty.replace("{category}", filter.slice(categoryFilterPrefix.length)) };
   }
-  return { text: "暂无匹配话术。" };
+  return { text: labels.empty };
 }
+
+function quickReplyPickerLabels(
+  t: (key: string, params?: Record<string, string | number>) => string,
+): QuickReplyPickerLabels {
+  return {
+    all: t("quickReply.filter.all"),
+    current: t("quickReply.filter.current"),
+    currentEmpty: t("quickReply.empty.current"),
+    categoryEmpty: t("quickReply.empty.category", { category: "{category}" }),
+    empty: t("quickReply.empty.default"),
+    list: t("quickReply.list"),
+    loadFailed: t("quickReply.loadFailed", { error: "{error}" }),
+    loading: t("quickReply.loading"),
+    noAvailable: t("quickReply.empty.noAvailable"),
+    noMatch: t("quickReply.empty.noMatch", { keyword: "{keyword}" }),
+    recent: t("quickReply.filter.recent"),
+    recentEmpty: t("quickReply.empty.recent"),
+  };
+}
+
+const defaultQuickReplyPickerLabels: QuickReplyPickerLabels = {
+  all: "全部",
+  current: "当前场景",
+  currentEmpty: "当前场景暂无可用话术。",
+  categoryEmpty: "“{category}”分类暂无可用话术。",
+  empty: "暂无匹配话术。",
+  list: "话术列表",
+  loadFailed: "话术加载失败：{error}",
+  loading: "正在读取快捷话术...",
+  noAvailable: "当前会话暂无可用话术。",
+  noMatch: "没有匹配“{keyword}”的话术。",
+  recent: "最近使用",
+  recentEmpty: "最近使用的话术暂不可用。",
+};
 
 function categoryFilter(category: string): QuickReplyFilter {
   return `${categoryFilterPrefix}${category}`;
