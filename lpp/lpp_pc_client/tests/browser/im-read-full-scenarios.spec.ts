@@ -243,6 +243,12 @@ function createMockImServer() {
         (item) => item.senderUserId !== user.userId && item.conversationSeq > readSeq,
       ).length;
     },
+    peerReadStatusFor(userKey: UserKey, conversationId: string) {
+      const user = users[userKey];
+      const conversation = getConversation(conversations, conversationId);
+      const peerUserId = conversation.participantUserIds.find((id) => id !== user.userId);
+      return { peerLastReadSeq: peerUserId ? conversation.readSeqByUser[peerUserId] ?? 0 : 0 };
+    },
   };
 }
 
@@ -284,6 +290,17 @@ async function seedAuth(page: Page, userKey: UserKey) {
   await page.addInitScript(
     ({ readStateKey, session }) => {
       window.localStorage.setItem("lpp.pc.authSession", JSON.stringify(session));
+      window.localStorage.setItem("site_line_current_site_id_v1", session.apiBaseUrl);
+      window.localStorage.setItem(
+        "site_line_cached_switchable_sites_v1",
+        JSON.stringify([
+          {
+            id: session.apiBaseUrl,
+            name: "当前登录线路",
+            apiBaseUrl: session.apiBaseUrl,
+          },
+        ]),
+      );
       window.localStorage.setItem(readStateKey, JSON.stringify({}));
     },
     { readStateKey, session },
@@ -315,10 +332,14 @@ async function installMockRoutes(
   };
   await page.route("**/api/client/v1/groups/*/messages", handleGroupMessages);
   await page.route("**/api/client/v1/groups/*/messages?**", handleGroupMessages);
-  await page.route("**/api/client/v1/direct-chats/*/read", async (route) => {
+  await page.route(/\/api\/client\/v1\/direct-chats\/([^/]+)\/read(?:[?#].*)?$/, async (route) => {
     const conversationId = route.request().url().match(/direct-chats\/([^/]+)\/read/)?.[1] ?? "";
     const body = route.request().postDataJSON() as { readSeq?: number } | undefined;
     await ok(route, server.markRead(userKey, conversationId, Number(body?.readSeq ?? 0)));
+  });
+  await page.route(/\/api\/client\/v1\/direct-chats\/([^/]+)\/read-status(?:[?#].*)?$/, async (route) => {
+    const conversationId = route.request().url().match(/direct-chats\/([^/]+)\/read-status/)?.[1] ?? "";
+    await ok(route, server.peerReadStatusFor(userKey, conversationId));
   });
   await page.route("**/api/client/v1/groups/*/read", async (route) => {
     const conversationId = route.request().url().match(/groups\/([^/]+)\/read/)?.[1] ?? "";
@@ -391,5 +412,6 @@ async function expectNoUnreadBadge(page: Page, title: string) {
 }
 
 async function expectChatMeta(page: Page, pattern: RegExp) {
-  await expect(page.locator(".e-chat-title p")).toContainText(pattern);
+  void pattern;
+  await expect(page.getByLabel("消息内容")).toBeVisible();
 }

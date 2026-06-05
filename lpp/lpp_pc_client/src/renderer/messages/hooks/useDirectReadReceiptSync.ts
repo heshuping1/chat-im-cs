@@ -47,6 +47,7 @@ export function useDirectReadReceiptSync({
     const currentReadState = getImReadSnapshot().imReadStateByConversation[key];
     const previousPeerReadSeq = currentReadState?.peerReadSeq ?? 0;
     if (previousPeerReadSeq >= peerReadSeq) {
+      markImPeerReadReceipt(activeConversation.conversationId, peerReadSeq);
       logImReadDiagnostic({
         event: "im-read.read-status-merge",
         phase: "merge",
