@@ -25,6 +25,7 @@
 **/.local/
 lpp/reports/pc/
 lpp/reports/mobile/api-probes/
+lpp/lpp_pc_client/tmp/
 
 # Release/signing secrets
 **/android/key.properties
