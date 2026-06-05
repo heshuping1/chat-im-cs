@@ -77,13 +77,17 @@ const appIconPath = app.isPackaged
   : join(__dirname, '../../assets/app-icon-green-bubble.ico');
 const devDockIconPath = join(__dirname, '../../assets/app-icon-green-bubble.png');
 const appDisplayName = 'lppchat';
+const isSandboxedElectronAutomation = Boolean(process.env.LPP_PC_USER_DATA_ROOT);
 app.setName(appDisplayName);
+if (isSandboxedElectronAutomation) {
+  app.disableHardwareAcceleration();
+}
 if (process.platform === 'win32') {
   app.setAppUserModelId(appUserModelIdForProfile(null));
 }
 const appInstanceProfile = configureAppInstanceProfile(app);
-app.setAppLogsPath(join(app.getPath('userData'), 'logs'));
-const logsDir = app.getPath('logs');
+const logsDir = join(app.getPath('userData'), 'logs');
+app.setAppLogsPath(logsDir);
 const diagnosticsDir = join(app.getPath('userData'), 'diagnostics');
 configureDefaultMainAppLogging({ logsDir, isDev });
 setElectronRuntimeDiagnosticLogger(mainAppLogBackend);

@@ -1,6 +1,7 @@
+import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
-const chromeChannel = process.env.PLAYWRIGHT_CHROME_CHANNEL;
+const chromeChannel = process.env.PLAYWRIGHT_CHROME_CHANNEL || detectWindowsChromeChannel();
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -32,3 +33,26 @@ export default defineConfig({
     },
   ],
 });
+
+function detectWindowsChromeChannel() {
+  if (process.platform !== 'win32') return undefined;
+
+  const browserCandidates = [
+    {
+      channel: 'chrome',
+      executables: [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      ],
+    },
+    {
+      channel: 'msedge',
+      executables: [
+        'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+        'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      ],
+    },
+  ] as const;
+
+  return browserCandidates.find((candidate) => candidate.executables.some((path) => existsSync(path)))?.channel;
+}

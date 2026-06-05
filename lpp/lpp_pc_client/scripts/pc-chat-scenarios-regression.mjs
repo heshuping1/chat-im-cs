@@ -14,6 +14,10 @@ const reportDir = join(
 const electronPath = join(root, 'node_modules', 'electron', 'dist', 'electron.exe');
 const viteUrl = 'http://127.0.0.1:5173';
 const apiBaseUrl = 'https://chat.hearteasechat.com';
+const electronSandboxRoot = join(root, 'tmp', 'electron-sandbox');
+const electronSandboxAppData = join(electronSandboxRoot, 'appdata');
+const electronSandboxLocalAppData = join(electronSandboxRoot, 'localappdata');
+const electronSandboxUserDataRoot = join(electronSandboxRoot, 'userdata');
 const password = '123123123';
 const accounts = {
   staff: { label: 'staff', identifier: 'lpp_gs9fn2c7', password },
@@ -60,6 +64,11 @@ async function launchClient(profileId) {
       ...process.env,
       VITE_DEV_SERVER_URL: viteUrl,
       LPP_PC_INSTANCE_PROFILE: profileId,
+      APPDATA: electronSandboxAppData,
+      LOCALAPPDATA: electronSandboxLocalAppData,
+      LPP_PC_USER_DATA_ROOT: electronSandboxUserDataRoot,
+      TEMP: join(electronSandboxRoot, 'temp'),
+      TMP: join(electronSandboxRoot, 'temp'),
     },
   });
   apps.push(app);

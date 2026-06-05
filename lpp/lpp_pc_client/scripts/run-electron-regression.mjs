@@ -14,6 +14,10 @@ const defaultApiBaseUrl = 'https://chat.hearteasechat.com';
 const viteUrl = 'http://127.0.0.1:5173';
 const reportRoot = join(lppRoot, 'reports', 'pc', 'electron-regression');
 const localRoot = join(lppRoot, '.local', 'pc-regression');
+const electronSandboxRoot = join(pcRoot, 'tmp', 'electron-sandbox');
+const electronSandboxAppData = join(electronSandboxRoot, 'appdata');
+const electronSandboxLocalAppData = join(electronSandboxRoot, 'localappdata');
+const electronSandboxUserDataRoot = join(electronSandboxRoot, 'userdata');
 const poolPath = join(localRoot, 'account-pool.json');
 const quickLoginSeedPath = join(
   lppRoot,
@@ -662,11 +666,7 @@ async function launchProfileClients(env, accounts) {
     const app = await electron.launch({
       cwd: pcRoot,
       args: ['.', `--profile=${account.profileId}`],
-      env: {
-        ...process.env,
-        VITE_DEV_SERVER_URL: viteUrl,
-        LPP_PC_INSTANCE_PROFILE: account.profileId,
-      },
+      env: electronTestEnv(account.profileId),
     });
     apps.push(app);
     const page = await app.firstWindow();
@@ -702,11 +702,7 @@ async function assertDuplicateProfileBlocked(profileId) {
   const electronPath = electronExecutablePath();
   const child = spawn(electronPath, ['.', `--profile=${profileId}`], {
     cwd: pcRoot,
-    env: {
-      ...process.env,
-      VITE_DEV_SERVER_URL: viteUrl,
-      LPP_PC_INSTANCE_PROFILE: profileId,
-    },
+    env: electronTestEnv(profileId),
     stdio: 'ignore',
   });
   const exit = await waitForExit(child, 7_000);
@@ -1026,6 +1022,19 @@ function runNpmCommand(args, timeoutMs = 120_000) {
       else reject(new Error(`npm ${args.join(' ')} exited with code ${code}`));
     });
   });
+}
+
+function electronTestEnv(profileId) {
+  return {
+    ...process.env,
+    VITE_DEV_SERVER_URL: viteUrl,
+    LPP_PC_INSTANCE_PROFILE: profileId,
+    APPDATA: electronSandboxAppData,
+    LOCALAPPDATA: electronSandboxLocalAppData,
+    LPP_PC_USER_DATA_ROOT: electronSandboxUserDataRoot,
+    TEMP: join(electronSandboxRoot, 'temp'),
+    TMP: join(electronSandboxRoot, 'temp'),
+  };
 }
 
 function spawnNpm(args, options) {

@@ -1,5 +1,5 @@
 import type { App, BrowserWindow } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import electronUpdater from 'electron-updater';
 import { dirname, join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import type {
@@ -12,6 +12,8 @@ import type {
   DesktopApiMethod,
 } from '../shared/desktop-api.js';
 import { desktopUpdateStateChangedChannel } from '../shared/desktop-api.js';
+
+const { autoUpdater } = electronUpdater;
 
 type RegisterDesktopIpc = <Args extends unknown[]>(
   method: DesktopApiMethod,

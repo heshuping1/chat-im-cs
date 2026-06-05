@@ -6,6 +6,10 @@ export const root = process.cwd();
 export const electronPath = join(root, 'node_modules', 'electron', 'dist', 'electron.exe');
 export const viteUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
 export const apiBaseUrl = process.env.LPP_PC_API_BASE_URL || 'https://chat.hearteasechat.com';
+const electronSandboxRoot = join(root, 'tmp', 'electron-sandbox');
+const electronSandboxAppData = join(electronSandboxRoot, 'appdata');
+const electronSandboxLocalAppData = join(electronSandboxRoot, 'localappdata');
+const electronSandboxUserDataRoot = join(electronSandboxRoot, 'userdata');
 export const defaultPassword = process.env.LPP_PC_TEST_PASSWORD || '123123123';
 export const defaultAccounts = {
   owner: { label: 'owner', identifier: process.env.LPP_PC_TEST_OWNER || 'lpp_aej69f2o', password: defaultPassword },
@@ -107,11 +111,7 @@ export function createElectronTestRunner({ suiteName, catalog = null }) {
       executablePath: electronPath,
       args: ['.', `--profile=${profileId}`],
       cwd: root,
-      env: {
-        ...process.env,
-        VITE_DEV_SERVER_URL: viteUrl,
-        LPP_PC_INSTANCE_PROFILE: profileId,
-      },
+      env: electronTestEnv(profileId),
     });
     apps.push(app);
     const page = await appPage(app);
@@ -160,6 +160,19 @@ export async function loginClient(runner, client, account) {
       hasPlatformToken: Boolean(session.platformToken),
     };
   }, { hardGate: true, category: 'test-data-or-auth' });
+}
+
+export function electronTestEnv(profileId) {
+  return {
+    ...process.env,
+    VITE_DEV_SERVER_URL: viteUrl,
+    LPP_PC_INSTANCE_PROFILE: profileId,
+    APPDATA: electronSandboxAppData,
+    LOCALAPPDATA: electronSandboxLocalAppData,
+    LPP_PC_USER_DATA_ROOT: electronSandboxUserDataRoot,
+    TEMP: join(electronSandboxRoot, 'temp'),
+    TMP: join(electronSandboxRoot, 'temp'),
+  };
 }
 
 export async function fillAuthLoginForm(page, account, options = {}) {

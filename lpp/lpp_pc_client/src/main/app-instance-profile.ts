@@ -15,13 +15,18 @@ export interface ProfileSource {
 
 const profileArgNames = new Set(['--profile', '--lpp-profile', '--pc-profile']);
 const profileEnvNames = ['LPP_PC_PROFILE', 'LPP_PC_INSTANCE_PROFILE'];
+const userDataRootEnvName = 'LPP_PC_USER_DATA_ROOT';
 export const appUserModelIdPrefix = 'com.lppchat.desktop';
 
 export function configureAppInstanceProfile(
   app: Pick<typeof ElectronApp, 'getPath' | 'setPath' | 'setAppUserModelId'>,
   source: ProfileSource = { argv: process.argv, env: process.env },
 ): AppInstanceProfile {
-  const defaultUserDataPath = app.getPath('userData');
+  const overriddenUserDataRoot = normalizeUserDataRoot(source.env[userDataRootEnvName]);
+  const defaultUserDataPath = overriddenUserDataRoot || app.getPath('userData');
+  if (overriddenUserDataRoot) {
+    app.setPath('userData', overriddenUserDataRoot);
+  }
   const profileId = resolveAppInstanceProfileId(source);
   if (!profileId) {
     return {
@@ -113,4 +118,9 @@ function normalizeProfileId(value: string | undefined) {
     .replace(/^[._-]+|[._-]+$/g, '')
     .slice(0, 48);
   return normalized || null;
+}
+
+function normalizeUserDataRoot(value: string | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
