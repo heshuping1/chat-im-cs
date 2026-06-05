@@ -5,7 +5,8 @@ import {
   QueryClientProvider,
 } from '@tanstack/react-query';
 import type { CSSProperties } from 'react';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
+import type { ClientUpdateState } from '../shared/desktop-api';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { LoginPage } from './components/LoginPage';
 import { ReminderCenter } from './components/ReminderCenter';
@@ -27,6 +28,14 @@ import { createApiClient } from './data/runtime';
 import type { PcSettings } from './data/settings/pc-settings';
 import { usePcSettings } from './data/settings/settings-store';
 import type { ModuleKey } from './data/types';
+import { useI18n } from './i18n/useI18n';
+import { updatePackageSummary, updateProgressText } from './settings/models/clientUpdateModel';
+import {
+  downloadClientUpdate,
+  getClientUpdateState,
+  installClientUpdate,
+  subscribeClientUpdateState,
+} from './settings/runtime/clientUpdateRuntime';
 import {
   derivePcWorkspaceAccess,
   normalizeActiveModuleForAccess,
@@ -168,6 +177,7 @@ export default function App() {
   const messageLayoutMode = useMessageLayoutMode();
   const serviceLayoutMode = useServiceLayoutMode();
   const workspaceAccess = derivePcWorkspaceAccess(authSession);
+  const forcedUpdateState = useForcedUpdateState();
   const safeKnownModule = normalizeActiveModule(activeModule);
   const safeActiveModule = normalizeActiveModuleForAccess(
     safeKnownModule,
@@ -312,12 +322,13 @@ export default function App() {
             </Suspense>
             <Sidebar />
             <ReminderCenter />
-            <Suspense fallback={<PageFallback />}>
+            <Suspense fallback={<LocalizedPageFallback />}>
               <ActiveModulePage
                 activeModule={safeActiveModule}
                 workspaceAccess={workspaceAccess}
               />
             </Suspense>
+            {forcedUpdateState && <ForcedUpdateOverlay state={forcedUpdateState} />}
           </div>
         )}
       </AppErrorBoundary>
@@ -408,15 +419,88 @@ function useAppearanceSettings(settings: PcSettings) {
 
 function fontSizeDatasetValue(fontSize: PcSettings['fontSize']) {
   switch (fontSize) {
-    case '小':
+    case '\u5c0f':
       return 'small';
-    case '大':
+    case '\u5927':
       return 'large';
-    case '超大':
+    case '\u8d85\u5927':
       return 'extra-large';
     default:
       return 'standard';
   }
+}
+
+function useForcedUpdateState() {
+  const [state, setState] = useState<ClientUpdateState | null>(null);
+  useEffect(() => {
+    void getClientUpdateState().then((nextState) => {
+      setState(nextState.available?.force ? nextState : null);
+    });
+    return subscribeClientUpdateState((nextState) => {
+      setState(nextState.available?.force ? nextState : null);
+    });
+  }, []);
+  return state;
+}
+
+function ForcedUpdateOverlay({ state }: { state: ClientUpdateState }) {
+  const { t } = useI18n();
+  const [busyAction, setBusyAction] = useState<'download' | 'install' | null>(null);
+  const [error, setError] = useState('');
+  const canInstall = state.phase === 'downloaded';
+  const canDownload = state.phase === 'available' || state.phase === 'error';
+  const progress = state.phase === 'downloading' ? updateProgressText(state.progress) : '';
+
+  const runDownload = async () => {
+    setBusyAction('download');
+    setError('');
+    try {
+      await downloadClientUpdate();
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : String(downloadError));
+    } finally {
+      setBusyAction(null);
+    }
+  };
+  const runInstall = async () => {
+    setBusyAction('install');
+    setError('');
+    try {
+      await installClientUpdate();
+    } catch (installError) {
+      setError(installError instanceof Error ? installError.message : String(installError));
+      setBusyAction(null);
+    }
+  };
+
+  return (
+    <div className="force-update-backdrop" role="alertdialog" aria-modal="true">
+      <section className="force-update-dialog">
+        <span className="eyebrow">{t('app.forceUpdateEyebrow')}</span>
+        <h2>{t('app.forceUpdateTitle')}</h2>
+        <p>{t('app.forceUpdateMessage')}</p>
+        {state.available && (
+          <strong className="force-update-version">{updatePackageSummary(state.available)}</strong>
+        )}
+        {state.available?.releaseNotes && <em>{state.available.releaseNotes}</em>}
+        {progress && <small>{progress}</small>}
+        {(error || state.error) && <small className="force-update-error">{error || state.error}</small>}
+        <div className="force-update-actions">
+          <button type="button" disabled={!canDownload || Boolean(busyAction)} onClick={runDownload}>
+            {state.phase === 'downloading' || busyAction === 'download'
+              ? t('app.forceUpdateDownloading')
+              : t('app.forceUpdateDownload')}
+          </button>
+          <button type="button" disabled={!canInstall || Boolean(busyAction)} onClick={runInstall}>
+            {busyAction === 'install' ? t('app.forceUpdateInstalling') : t('app.forceUpdateInstall')}
+          </button>
+          <button type="button" className="ghost" onClick={() => void window.desktopApi?.quitApp?.()}>
+            {t('app.forceUpdateExit')}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function useTransientScrollbars() {
@@ -447,10 +531,11 @@ function useTransientScrollbars() {
   }, []);
 }
 
-function PageFallback() {
+function LocalizedPageFallback() {
+  const { t } = useI18n();
   return (
     <main className="page-fallback" aria-live="polite">
-      正在加载...
+      {t('app.loading')}
     </main>
   );
 }

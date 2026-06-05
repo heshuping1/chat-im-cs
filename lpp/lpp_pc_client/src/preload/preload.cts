@@ -1,6 +1,8 @@
 import type {
   DesktopApi,
   DesktopApiMethod,
+  ClientUpdatePreferences,
+  ClientUpdateState,
   AppLogPayload,
   ApiTrafficDiagnosticPayload,
   CsRoutingDiagnosticPayload,
@@ -13,6 +15,7 @@ import type {
 } from '../shared/desktop-api.js';
 
 const { contextBridge, ipcRenderer, webUtils } = require('electron') as typeof import('electron');
+const desktopUpdateStateChangedChannel = 'desktop:update-state-changed';
 
 type DesktopApiValidationModule = typeof import('../shared/desktop-api-validation.js');
 
@@ -42,6 +45,15 @@ const desktopApi: DesktopApi = {
     ipcRenderer.on('desktop:notification-clicked', handler);
     return () => {
       ipcRenderer.removeListener('desktop:notification-clicked', handler);
+    };
+  },
+  onUpdateStateChanged: (callback: (payload: ClientUpdateState) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: ClientUpdateState) => {
+      callback(payload);
+    };
+    ipcRenderer.on(desktopUpdateStateChangedChannel, handler);
+    return () => {
+      ipcRenderer.removeListener(desktopUpdateStateChangedChannel, handler);
     };
   },
   openFile: (path: string) => validatedInvoke('openFile', 'desktop:open-file', path),
@@ -108,6 +120,15 @@ const desktopApi: DesktopApi = {
     validatedInvoke('getMinimizeToTray', 'desktop:get-minimize-to-tray'),
   setMinimizeToTray: (enabled: boolean) =>
     validatedInvoke('setMinimizeToTray', 'desktop:set-minimize-to-tray', enabled),
+  getUpdatePreferences: () =>
+    validatedInvoke('getUpdatePreferences', 'desktop:get-update-preferences'),
+  setUpdatePreferences: (payload: ClientUpdatePreferences) =>
+    validatedInvoke('setUpdatePreferences', 'desktop:set-update-preferences', payload),
+  getUpdateState: () => validatedInvoke('getUpdateState', 'desktop:get-update-state'),
+  checkForUpdates: () => validatedInvoke('checkForUpdates', 'desktop:check-for-updates'),
+  downloadUpdate: () => validatedInvoke('downloadUpdate', 'desktop:download-update'),
+  installUpdate: () => validatedInvoke('installUpdate', 'desktop:install-update'),
+  quitApp: () => validatedInvoke('quitApp', 'desktop:quit-app'),
   captureScreenshot: () => validatedInvoke('captureScreenshot', 'desktop:capture-screenshot'),
   getAppVersion: () => validatedInvoke('getAppVersion', 'desktop:get-app-version'),
   exportDiagnostics: (payload: DiagnosticsPayload) =>

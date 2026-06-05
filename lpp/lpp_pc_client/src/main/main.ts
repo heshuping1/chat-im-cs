@@ -67,6 +67,7 @@ import {
   formatProfileWindowTitle,
 } from './app-instance-profile.js';
 import { readOrCreateAppInstanceIdentity } from './app-instance-identity.js';
+import { registerUpdateManager } from './update-manager.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -285,7 +286,20 @@ registerDesktopFileHandlers({
   register: handleDesktopIpc,
 });
 
+const updateManager = registerUpdateManager({
+  app,
+  appInstanceIdentity: appInstanceIdentityPromise,
+  getMainWindow: () => mainWindow,
+  readAuthSession: readSecureAuthSession,
+  register: handleDesktopIpc,
+});
+
 handleDesktopIpc('openExternal', async (_event, url: string) => openExternalUrl(url));
+
+handleDesktopIpc('quitApp', async () => {
+  isQuitting = true;
+  app.quit();
+});
 
 handleDesktopIpc('readAuthSession', async () => readSecureAuthSession());
 
@@ -444,6 +458,7 @@ app.whenReady().then(() => {
     app.dock?.setIcon(devDockIconPath);
   }
   createWindow();
+  void updateManager.scheduleInitialAutoCheck();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

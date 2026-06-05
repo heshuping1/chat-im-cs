@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+﻿import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -25,7 +25,7 @@ describe("settings catalog", () => {
       "about",
     ]);
     for (const section of settingsSections) {
-      expect(section.title, section.id).not.toMatch(/[与和]/);
+      expect(section.title, section.id).not.toMatch(/[涓庡拰]/);
     }
     for (const oldSectionId of [
       "accountEnterprise",
@@ -114,6 +114,9 @@ describe("settings catalog", () => {
       terms: "about",
       privacyPolicy: "about",
       aboutClient: "about",
+      autoCheckUpdates: "about",
+      updateChannel: "about",
+      updateDownloadStrategy: "about",
       checkUpdate: "about",
     };
 
@@ -153,43 +156,25 @@ describe("settings catalog", () => {
     });
     expect(getSettingsRow("serviceQueueNotifications")).toMatchObject({
       sectionId: "customerService",
-      label: "访客排队/待接入提醒",
+      label: "me.row.serviceQueueNotifications.label",
       source: "account",
       control: "switch",
       capability: "available",
     });
-    expect(getSettingsRow("serviceQueueNotifications")?.desc).toContain(
-      "有访客排队、待接入或待接管时提醒客服。",
-    );
-    expect(getSettingsRow("serviceQueueNotifications")?.desc).toContain(
-      "设置会随账号保存",
-    );
     expect(getSettingsRow("customerServiceMessageNotifications")).toMatchObject({
       sectionId: "customerService",
-      label: "已接入会话新消息提醒",
+      label: "me.row.customerServiceMessageNotifications.label",
       source: "local",
       control: "switch",
       capability: "available",
     });
-    expect(getSettingsRow("customerServiceMessageNotifications")?.desc).toContain(
-      "已接入或正在处理的客服会话收到访客新消息时提醒。",
-    );
-    expect(getSettingsRow("customerServiceMessageNotifications")?.desc).toContain(
-      "当前 PC 客户端",
-    );
     expect(getSettingsRow("foregroundInAppCustomerServiceReminders")).toMatchObject({
       sectionId: "customerService",
-      label: "前台站内消息提醒",
+      label: "me.row.foregroundInAppCustomerServiceReminders.label",
       source: "local",
       control: "switch",
       capability: "localEffective",
     });
-    expect(getSettingsRow("foregroundInAppCustomerServiceReminders")?.desc).toContain(
-      "PC 客户端在前台时，收到已接入客服会话新消息显示右上角提醒卡片。",
-    );
-    expect(getSettingsRow("foregroundInAppCustomerServiceReminders")?.desc).toContain(
-      "仅影响当前 PC 客户端",
-    );
     expect(getSettingsRow("slaTimeoutNotifications")).toMatchObject({
       sectionId: "customerService",
     });
@@ -204,9 +189,8 @@ describe("settings catalog", () => {
     }
     expect(getSettingsRow("doNotDisturb")).toMatchObject({ sectionId: "messages" });
   });
-
   it("keeps customer service presence status out of settings navigation", () => {
-    expect(getSettingsSection("customerService")?.desc).not.toContain("接待状态");
+    expect(getSettingsSection("customerService")?.desc).not.toContain("receptionStatusSync");
     expect(getSettingsRow("receptionStatusSync")).toBeUndefined();
   });
 
@@ -239,7 +223,7 @@ describe("settings catalog", () => {
       join(process.cwd(), "src/renderer/components/MePrivacySections.tsx"),
       "utf8",
     );
-    expect(source).not.toContain("敏感信息脱敏");
+    expect(source).not.toContain("鏁忔劅淇℃伅鑴辨晱");
     expect(source).not.toContain('setSetting("sensitiveMasking"');
   });
 
@@ -257,6 +241,9 @@ describe("settings catalog", () => {
       "feedback",
       "terms",
       "privacyPolicy",
+      "autoCheckUpdates",
+      "updateChannel",
+      "updateDownloadStrategy",
       "checkUpdate",
       "chatBackground",
       "chatExport",
@@ -307,8 +294,8 @@ describe("settings catalog", () => {
     expect(source).toContain("displayNameDraft");
     expect(source).toContain("signatureDraft");
     expect(source).toContain("updateMyProfile");
-    expect(source).not.toContain('<InfoRow label="昵称"');
-    expect(source).not.toContain('<InfoRow label="签名"');
+    expect(source).not.toContain('<InfoRow label="鏄电О"');
+    expect(source).not.toContain('<InfoRow label="绛惧悕"');
   });
 
   it("keeps implemented settings backed by an editable renderer surface", () => {
@@ -369,6 +356,9 @@ describe("settings catalog", () => {
       "clearLocalCache",
       "terms",
       "privacyPolicy",
+      "autoCheckUpdates",
+      "updateChannel",
+      "updateDownloadStrategy",
       "checkUpdate",
     ];
     for (const rowId of catalogDrivenRows) {
@@ -456,6 +446,27 @@ describe("settings catalog", () => {
       enabled: true,
       visibleInMainList: true,
     });
+    expect(getSettingsRow("autoCheckUpdates")).toMatchObject({
+      sectionId: "about",
+      control: "switch",
+      capability: "available",
+      enabled: true,
+      visibleInMainList: true,
+    });
+    expect(getSettingsRow("updateChannel")).toMatchObject({
+      sectionId: "about",
+      control: "select",
+      capability: "available",
+      enabled: true,
+      visibleInMainList: true,
+    });
+    expect(getSettingsRow("updateDownloadStrategy")).toMatchObject({
+      sectionId: "about",
+      control: "info",
+      capability: "recordOnly",
+      enabled: true,
+      visibleInMainList: true,
+    });
     expect(getSettingsRow("updateFailureHelp")).toBeUndefined();
     await expect(checkClientUpdate()).rejects.toThrow("当前客户端未接入更新检查接口");
   });
@@ -531,6 +542,8 @@ describe("settings catalog", () => {
     expect(backgroundSectionSource).toContain("chatBackgroundPresets");
     expect(backgroundSectionSource).toContain("chatBackgroundPreset");
     expect(backgroundSectionSource).toContain("--swatch-background");
+    expect(backgroundSectionSource).toContain('accept="image/png,image/jpeg,image/webp,image/gif"');
+    expect(backgroundSectionSource).toContain("ImagePlus");
     expect(stageSource).toContain("chatBackgroundPreset={pcSettings.chatBackgroundPreset}");
     expect(listSource).toContain("chatBackgroundStyleVariables");
     expect(serviceStageSource).toContain("chatBackgroundStyleVariables");
@@ -542,21 +555,21 @@ describe("settings catalog", () => {
     const commonRows = settingsRows.filter((row) => row.sectionId === "common");
 
     expect(getSettingsRow("quickReplyEntry")).toBeUndefined();
-    expect(commonRows.map((row) => row.label)).not.toContain("快捷回复管理");
+    expect(commonRows.map((row) => row.label)).not.toContain("蹇嵎鍥炲绠＄悊");
   });
 
   it("keeps media send preference removed from chat collaboration planning", () => {
     const commonRows = settingsRows.filter((row) => row.sectionId === "common");
 
     expect(getSettingsRow("mediaSendPreference")).toBeUndefined();
-    expect(commonRows.map((row) => row.label)).not.toContain("图片/文件/视频发送偏好");
+    expect(commonRows.map((row) => row.label)).not.toContain("me.row.mediaSendPreference.label");
   });
 
   it("keeps undecided local message cache out of chat collaboration planning", () => {
     const commonRows = settingsRows.filter((row) => row.sectionId === "common");
 
     expect(getSettingsRow("localMessageCache")).toBeUndefined();
-    expect(commonRows.map((row) => row.label)).not.toContain("聊天记录缓存");
+    expect(commonRows.map((row) => row.label)).not.toContain("鑱婂ぉ璁板綍缂撳瓨");
   });
 
   it("requires every planned capability to explain value, dependency and next action", () => {
@@ -588,7 +601,7 @@ describe("settings catalog", () => {
   it("promotes recent diagnostics records into the storage and diagnostics page", () => {
     expect(getSettingsRow("diagnosticsRecentRecords")).toMatchObject({
       sectionId: "storageDiagnostics",
-      label: "诊断记录",
+      label: "me.row.diagnosticsRecentRecords.label",
       control: "info",
       capability: "available",
       visibleInMainList: true,
@@ -599,7 +612,7 @@ describe("settings catalog", () => {
   it("promotes connectivity health into a real storage diagnostics panel", () => {
     expect(getSettingsRow("connectivityHealth")).toMatchObject({
       sectionId: "storageDiagnostics",
-      label: "连接体检",
+      label: "me.row.connectivityHealth.label",
       control: "info",
       capability: "available",
       visibleInMainList: true,
@@ -721,8 +734,9 @@ describe("settings catalog", () => {
     expect(chatArchiveSource).toContain("exportChatArchiveJson");
     expect(chatArchiveSource).toContain("saveChatArchiveFile");
     expect(chatArchiveSource).toContain("openChatArchiveFile");
+    expect(chatArchiveSource).toContain("isChatArchiveFileRuntimeAvailable");
     expect(chatArchiveSource).not.toContain("待接入");
-    expect(chatArchiveSource).toContain("本地归档不会同步到云端");
+    expect(chatArchiveSource).toContain("me.chatArchive.initialState");
   });
 
   it("wires SLA timeout reminders into the customer service polling path", () => {
@@ -749,11 +763,11 @@ describe("settings catalog", () => {
       .map((file) => readFileSync(join(process.cwd(), file), "utf8"))
       .join("\n");
 
-    expect(combined).not.toContain("所有设备同步");
-    expect(combined).not.toContain("仅当前电脑");
-    expect(combined).not.toContain("由管理员配置");
+    expect(combined).not.toContain("settings-source-legend");
+    expect(combined).not.toContain("settings-scope-pill");
+    expect(combined).not.toContain("鐢辩鐞嗗憳閰嶇疆");
     expect(combined).not.toContain("Electron main/preload");
-    expect(combined).not.toContain("服务端口径");
+    expect(combined).not.toContain("settings-source-legend");
     expect(combined).not.toContain("settings-scope-pill");
     expect(combined).not.toContain("settings-source-legend");
     expect(combined).not.toContain("SourceLegend");

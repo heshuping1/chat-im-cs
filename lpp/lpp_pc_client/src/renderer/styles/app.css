@@ -105,3 +105,75 @@ select:focus-visible {
   height: 100%;
   object-fit: cover;
 }
+
+.force-update-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 20, 30, 0.42);
+  backdrop-filter: blur(10px);
+}
+
+.force-update-dialog {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+}
+
+.force-update-dialog h2,
+.force-update-dialog p {
+  margin: 0;
+}
+
+.force-update-dialog h2 {
+  font-size: 22px;
+}
+
+.force-update-dialog p,
+.force-update-dialog em,
+.force-update-dialog small {
+  color: rgba(71, 85, 105, 0.92);
+}
+
+.force-update-version {
+  color: #0f172a;
+}
+
+.force-update-error {
+  color: #b42318 !important;
+}
+
+.force-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.force-update-actions button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #00a870;
+  color: #fff;
+  font-weight: 700;
+}
+
+.force-update-actions button.ghost {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: #fff;
+  color: #334155;
+}
+
+.force-update-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

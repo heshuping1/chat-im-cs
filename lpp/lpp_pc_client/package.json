@@ -46,7 +46,11 @@
     "start:profile:a": "electron . --profile=agent-a",
     "start:profile:b": "electron . --profile=agent-b",
     "dist:win": "npm run build && electron-builder --win nsis",
-    "dist:mac": "npm run build && electron-builder --mac dmg"
+    "dist:mac": "npm run build && electron-builder --mac dmg",
+    "build:win:full": "npm run dist:win",
+    "build:win:update-metadata": "node scripts/build-win-update-metadata.mjs",
+    "build:win:delta": "node scripts/build-win-update-metadata.mjs --delta",
+    "publish:win:update": "node scripts/publish-win-update.mjs"
   },
   "dependencies": {
     "@lexical/history": "^0.44.0",
@@ -57,6 +61,7 @@
     "@microsoft/signalr": "^8.0.17",
     "@tanstack/react-query": "^5.85.5",
     "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.3",
     "lexical": "^0.44.0",
     "lucide-react": "^0.468.0",
     "qrcode": "^1.5.4",
@@ -108,7 +113,7 @@
     "win": {
       "icon": "assets/app-icon-green-bubble.ico",
       "target": "nsis",
-      "artifactName": "lppchat-${version}.${ext}",
+      "artifactName": "lppchat-${version}-win-x64.${ext}",
       "signAndEditExecutable": false
     },
     "nsis": {

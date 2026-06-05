@@ -3,6 +3,9 @@ import type {
   CacheMediaPosterPayload,
   ChatArchiveFileKind,
   ChatArchiveFilePayload,
+  ClientUpdateChannel,
+  ClientUpdatePreferences,
+  UpdateDownloadMode,
   AppLogLevel,
   AppLogModule,
   AppLogPayload,
@@ -34,6 +37,8 @@ const maxDiagnosticsObjectEntries = 80;
 const maxDiagnosticsDepth = 8;
 const maxDataUrlLength = 25 * 1024 * 1024;
 const trayStatuses = new Set<TrayStatus>(['online', 'busy', 'away', 'invisible']);
+const clientUpdateChannels = new Set<ClientUpdateChannel>(['stable', 'beta']);
+const updateDownloadModes = new Set<UpdateDownloadMode>(['differential-first']);
 const mediaKinds = new Set<CacheMediaFilePayload['kind']>(['image', 'video', 'file']);
 const notificationChannels = new Set<DesktopNotificationChannel>(['im', 'serviceQueue', 'sla']);
 const appLogModules = new Set<AppLogModule>(['main', 'auth', 'api']);
@@ -65,11 +70,19 @@ export function validateDesktopApiCall(
     case 'getAppInstanceProfile':
     case 'getLaunchAtStartup':
     case 'getMinimizeToTray':
+    case 'getUpdatePreferences':
+    case 'getUpdateState':
+    case 'checkForUpdates':
+    case 'downloadUpdate':
+    case 'installUpdate':
+    case 'quitApp':
       return [];
     case 'setLaunchAtStartup':
       return [safeBoolean(args[0], 'launchAtStartup.enabled')];
     case 'setMinimizeToTray':
       return [safeBoolean(args[0], 'minimizeToTray.enabled')];
+    case 'setUpdatePreferences':
+      return [validateClientUpdatePreferences(args[0])];
     case 'openAppProfile':
       return args[0] === undefined || args[0] === null
         ? []
@@ -406,6 +419,25 @@ export function validateChatArchiveFilePayload(value: unknown): ChatArchiveFileP
     content: safeString(record.content, 'chatArchive.content', maxChatArchiveContentLength),
     defaultName,
     kind,
+  };
+}
+
+export function validateClientUpdatePreferences(value: unknown): ClientUpdatePreferences {
+  const record = objectValue(value, 'clientUpdate.preferences');
+  const channel = safeString(record.channel, 'clientUpdate.channel', 32) as ClientUpdateChannel;
+  const downloadMode = safeString(
+    record.downloadMode,
+    'clientUpdate.downloadMode',
+    64,
+  ) as UpdateDownloadMode;
+  if (!clientUpdateChannels.has(channel)) throw new Error(`Invalid clientUpdate.channel: ${channel}`);
+  if (!updateDownloadModes.has(downloadMode)) {
+    throw new Error(`Invalid clientUpdate.downloadMode: ${downloadMode}`);
+  }
+  return {
+    autoCheck: safeBoolean(record.autoCheck, 'clientUpdate.autoCheck'),
+    channel,
+    downloadMode,
   };
 }
 

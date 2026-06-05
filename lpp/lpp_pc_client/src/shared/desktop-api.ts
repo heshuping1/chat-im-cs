@@ -199,6 +199,58 @@ export interface ChatArchiveFileResult {
   content: string;
 }
 
+export type ClientUpdateChannel = 'stable' | 'beta';
+export type UpdateDownloadMode = 'differential-first';
+export type ClientUpdateKind = 'delta' | 'full';
+export type ClientUpdatePhase =
+  | 'idle'
+  | 'checking'
+  | 'latest'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'installing'
+  | 'error';
+
+export interface ClientUpdatePreferences {
+  autoCheck: boolean;
+  channel: ClientUpdateChannel;
+  downloadMode: UpdateDownloadMode;
+}
+
+export interface ClientUpdatePackageInfo {
+  updateKind: ClientUpdateKind;
+  version: string;
+  force: boolean;
+  releaseNotes?: string;
+  packageUrl?: string;
+  latestYmlUrl?: string;
+  sha512?: string;
+  sizeBytes?: number;
+  fallbackFullPackageUrl?: string;
+  fallbackSha512?: string;
+  publishedAt?: string;
+}
+
+export interface ClientUpdateProgress {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+}
+
+export interface ClientUpdateState {
+  phase: ClientUpdatePhase;
+  currentVersion: string;
+  preferences: ClientUpdatePreferences;
+  available?: ClientUpdatePackageInfo;
+  progress?: ClientUpdateProgress;
+  error?: string;
+  checkedAt?: string;
+}
+
+export const desktopUpdateStateChangedChannel = 'desktop:update-state-changed';
+
 export interface DesktopApi {
   notify(payload: NotifyPayload): Promise<void>;
   onNotificationClicked(callback: (payload: NotificationClickedPayload) => void): () => void;
@@ -235,6 +287,14 @@ export interface DesktopApi {
   setLaunchAtStartup(enabled: boolean): Promise<boolean>;
   getMinimizeToTray(): Promise<boolean>;
   setMinimizeToTray(enabled: boolean): Promise<boolean>;
+  getUpdatePreferences(): Promise<ClientUpdatePreferences>;
+  setUpdatePreferences(payload: ClientUpdatePreferences): Promise<ClientUpdatePreferences>;
+  getUpdateState(): Promise<ClientUpdateState>;
+  checkForUpdates(): Promise<ClientUpdateState>;
+  downloadUpdate(): Promise<ClientUpdateState>;
+  installUpdate(): Promise<void>;
+  onUpdateStateChanged(callback: (payload: ClientUpdateState) => void): () => void;
+  quitApp(): Promise<void>;
   captureScreenshot(): Promise<ScreenshotCaptureResult>;
   getAppVersion(): Promise<string>;
   exportDiagnostics(payload: DiagnosticsPayload): Promise<string | null>;
@@ -246,7 +306,10 @@ export interface DesktopApi {
   setTrayStatus(status: TrayStatus): Promise<void>;
 }
 
-export type DesktopApiMethod = Exclude<keyof DesktopApi, 'onNotificationClicked'>;
+export type DesktopApiMethod = Exclude<
+  keyof DesktopApi,
+  'onNotificationClicked' | 'onUpdateStateChanged'
+>;
 
 export const desktopIpcChannelByMethod = {
   cacheLocalMediaFile: 'desktop:cache-local-media-file',
@@ -262,8 +325,15 @@ export const desktopIpcChannelByMethod = {
   getAppVersion: 'desktop:get-app-version',
   getLaunchAtStartup: 'desktop:get-launch-at-startup',
   getMinimizeToTray: 'desktop:get-minimize-to-tray',
+  getUpdatePreferences: 'desktop:get-update-preferences',
+  setUpdatePreferences: 'desktop:set-update-preferences',
+  getUpdateState: 'desktop:get-update-state',
+  checkForUpdates: 'desktop:check-for-updates',
+  downloadUpdate: 'desktop:download-update',
+  installUpdate: 'desktop:install-update',
   getCachedMediaStatus: 'desktop:get-cached-media-status',
   notify: 'desktop:notify',
+  quitApp: 'desktop:quit-app',
   getAppInstanceProfile: 'desktop:get-app-instance-profile',
   openDownloadedFile: 'desktop:open-downloaded-file',
   openChatArchiveFile: 'desktop:open-chat-archive-file',

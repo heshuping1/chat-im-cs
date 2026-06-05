@@ -12,6 +12,7 @@ import {
   validateDesktopApiCall,
   validateDesktopIpcCall,
   validateDesktopAuthSessionPayload,
+  validateClientUpdatePreferences,
   validateDiagnosticsPayload,
   validateMessageReminderDiagnosticPayload,
   validateNotifyPayload,
@@ -33,6 +34,13 @@ describe("desktop api validation", () => {
     expect(methods).toContain("setLaunchAtStartup");
     expect(methods).toContain("getMinimizeToTray");
     expect(methods).toContain("setMinimizeToTray");
+    expect(methods).toContain("getUpdatePreferences");
+    expect(methods).toContain("setUpdatePreferences");
+    expect(methods).toContain("getUpdateState");
+    expect(methods).toContain("checkForUpdates");
+    expect(methods).toContain("downloadUpdate");
+    expect(methods).toContain("installUpdate");
+    expect(methods).toContain("quitApp");
     expect(methods).toContain("recordCsRoutingDiagnostic");
     expect(methods).toContain("writeAppLog");
     expect(methods).toContain("recordMessageReminderDiagnostic");
@@ -57,6 +65,10 @@ describe("desktop api validation", () => {
     expect(desktopIpcChannelByMethod.setMinimizeToTray).toBe(
       "desktop:set-minimize-to-tray",
     );
+    expect(desktopIpcChannelByMethod.checkForUpdates).toBe("desktop:check-for-updates");
+    expect(desktopIpcChannelByMethod.downloadUpdate).toBe("desktop:download-update");
+    expect(desktopIpcChannelByMethod.installUpdate).toBe("desktop:install-update");
+    expect(desktopIpcChannelByMethod.quitApp).toBe("desktop:quit-app");
     expect(desktopIpcChannelByMethod.recordCsRoutingDiagnostic).toBe(
       "desktop:record-cs-routing-diagnostic",
     );
@@ -97,6 +109,12 @@ describe("desktop api validation", () => {
     expect(validateDesktopApiCall("setLaunchAtStartup", [true])).toEqual([true]);
     expect(validateDesktopApiCall("setLaunchAtStartup", [false])).toEqual([false]);
     expect(validateDesktopApiCall("getMinimizeToTray", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("getUpdatePreferences", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("getUpdateState", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("checkForUpdates", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("downloadUpdate", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("installUpdate", ["ignored"])).toEqual([]);
+    expect(validateDesktopApiCall("quitApp", ["ignored"])).toEqual([]);
     expect(validateDesktopApiCall("setMinimizeToTray", [true])).toEqual([true]);
     expect(validateDesktopApiCall("setMinimizeToTray", [false])).toEqual([false]);
     expect(validateDesktopApiCall("setTaskbarBadge", [{ count: 84, urgent: true }])).toEqual([
@@ -455,6 +473,44 @@ describe("desktop api validation", () => {
         },
       ]),
     ).toThrow("authSession.tenantToken");
+  });
+
+  it("validates client update preferences", () => {
+    expect(
+      validateClientUpdatePreferences({
+        autoCheck: true,
+        channel: "stable",
+        downloadMode: "differential-first",
+      }),
+    ).toEqual({
+      autoCheck: true,
+      channel: "stable",
+      downloadMode: "differential-first",
+    });
+    expect(
+      validateDesktopApiCall("setUpdatePreferences", [
+        { autoCheck: false, channel: "beta", downloadMode: "differential-first" },
+      ]),
+    ).toEqual([{ autoCheck: false, channel: "beta", downloadMode: "differential-first" }]);
+    expect(() =>
+      validateDesktopApiCall("setUpdatePreferences", [
+        { autoCheck: "yes", channel: "stable", downloadMode: "differential-first" },
+      ]),
+    ).toThrow("clientUpdate.autoCheck");
+    expect(() =>
+      validateClientUpdatePreferences({
+        autoCheck: true,
+        channel: "nightly",
+        downloadMode: "differential-first",
+      }),
+    ).toThrow("clientUpdate.channel");
+    expect(() =>
+      validateClientUpdatePreferences({
+        autoCheck: true,
+        channel: "stable",
+        downloadMode: "full-only",
+      }),
+    ).toThrow("clientUpdate.downloadMode");
   });
 
   it("validates app log payloads and redacts sensitive context", () => {
