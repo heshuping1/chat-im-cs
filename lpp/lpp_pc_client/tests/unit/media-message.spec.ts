@@ -677,11 +677,14 @@ describe("message media upload presentation", () => {
     expect(mediaParts).toContain("const imageSrc = localImage ? src : displaySrc;");
     expect(mediaParts).toContain("imageSourceUrls");
     expect(mediaParts).toContain("hasNextImageSource");
-    expect(mediaParts).toContain("useNextImageSource");
+    expect(mediaParts).toContain("advanceToNextImageSource");
     expect(mediaParts).toContain("forgetPrefetchedImageFileUrl");
     expect(mediaParts).toContain("hasUsableLocalFile ? undefined : src");
-    expect(mediaParts).toContain("if (failed && hasNextImageSource) useNextImageSource();");
+    expect(mediaParts).toContain("if (failed && hasNextImageSource) advanceToNextImageSource();");
     expect(mediaParts).toContain("sourceAvailable={Boolean(visibleImageSrc)}");
+    expect(mediaParts).toContain("const imageReady =");
+    expect(mediaParts).toContain("hasUsableLocalFile");
+    expect(mediaParts).toContain("imageLoaded={imageReady}");
     expect(mediaParts).toContain("copyCurrentMessageImage");
     expect(mediaParts).toContain("saveCurrentMessageImageAs");
     expect(mediaParts).toContain("revealCurrentMessageImageInFolder");

@@ -104,7 +104,7 @@ export function ImagePart({
   const [imageActionNotice, setImageActionNotice] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { canCacheMediaFile } = getCurrentMediaActionCapabilities();
-  const useNextImageSource = useCallback(() => {
+  const advanceToNextImageSource = useCallback(() => {
     setActiveImageSourceIndex((current) =>
       current < imageSourceUrls.length - 1 ? current + 1 : current,
     );
@@ -148,7 +148,7 @@ export function ImagePart({
         if (!disposed && result) setLocalFileSrc(result.fileUrl);
       })
       .catch(() => {
-        if (!disposed && hasNextImageSource) useNextImageSource();
+        if (!disposed && hasNextImageSource) advanceToNextImageSource();
       });
     return () => {
       disposed = true;
@@ -164,7 +164,7 @@ export function ImagePart({
     cacheKey,
     hasNextImageSource,
     src,
-    useNextImageSource,
+    advanceToNextImageSource,
   ]);
 
   useEffect(() => {
@@ -173,9 +173,14 @@ export function ImagePart({
   }, [brokenImageSrc, cached, imageSrc, localFileSrc, localImage]);
 
   const visibleImageSrc = imageVisibleSource(localFileSrc, imageSrc, brokenImageSrc);
+  const imageReady =
+    imageLoaded ||
+    localImage ||
+    hasUsableLocalFile ||
+    Boolean(imageSrc && cached && !sameMediaUrl(imageSrc, brokenImageSrc));
   useEffect(() => {
-    if (failed && hasNextImageSource) useNextImageSource();
-  }, [failed, hasNextImageSource, useNextImageSource]);
+    if (failed && hasNextImageSource) advanceToNextImageSource();
+  }, [advanceToNextImageSource, failed, hasNextImageSource]);
 
   const imageActionPayload = imageActionSrc
     ? {
@@ -198,7 +203,7 @@ export function ImagePart({
       forgetPrefetchedImageFileUrl(cacheKey, localFileSrc);
     }
     loadCachedMedia();
-    if (hasNextImageSource) useNextImageSource();
+    if (hasNextImageSource) advanceToNextImageSource();
   };
   const runImageAction = useCallback(
     async (action: () => Promise<unknown>, successText: string) => {
@@ -224,7 +229,7 @@ export function ImagePart({
         actionBusy={imageActionBusy}
         actionNotice={imageActionNotice}
         fileName={fileName}
-        imageLoaded={imageLoaded}
+        imageLoaded={imageReady}
         onClosePreview={() => setPreviewOpen(false)}
         onCopyImage={
           imageActionPayload
@@ -243,7 +248,7 @@ export function ImagePart({
           );
         }}
         onOpenPreview={() => {
-          if (imageLoaded && visibleImageSrc) setPreviewOpen(true);
+          if (imageReady && visibleImageSrc) setPreviewOpen(true);
         }}
         onRetryImage={() => {
           setBrokenImageSrc(null);
