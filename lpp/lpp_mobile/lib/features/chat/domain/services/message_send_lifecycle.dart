@@ -1,6 +1,7 @@
 import 'package:lpp_mobile/core/diagnostics/app_diagnostics.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_send_failure.dart';
 
 abstract final class MessageSendLifecycle {
   static const _category = 'chat.send.lifecycle';
@@ -101,6 +102,9 @@ abstract final class MessageSendLifecycle {
   }
 
   static Map<String, Object?> _errorContext(Object error) {
+    if (error is MessageSendFailure) {
+      return error.toDiagnosticContext();
+    }
     if (error is ServerError) {
       return {
         'errorType': 'server',

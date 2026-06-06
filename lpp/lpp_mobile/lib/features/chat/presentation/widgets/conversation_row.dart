@@ -4,6 +4,7 @@ import 'package:lpp_mobile/core/providers/font_size_provider.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/identity_badge.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
@@ -55,7 +56,7 @@ class ConversationRow extends ConsumerWidget {
     if (!isPersonal && !isGroup) {
       final peerUserType = conversation.peerUserType;
       if (peerUserType != null) {
-        peerIdentity = identityBadgeFor(userType: peerUserType);
+        peerIdentity = _conversationPeerIdentity(userType: peerUserType);
       } else if (effectivePeerUserId?.isNotEmpty == true) {
         final membersAsync = ref.watch(tenantMembersProvider);
         if (membersAsync.hasValue) {
@@ -63,7 +64,7 @@ class ConversationRow extends ConsumerWidget {
           final peer =
               members.where((m) => m.userId == effectivePeerUserId).firstOrNull;
           if (peer != null) {
-            peerIdentity = identityBadgeFor(
+            peerIdentity = _conversationPeerIdentity(
               userType: peer.userType,
               customerTag: peer.customerTag,
             );
@@ -235,7 +236,11 @@ class ConversationRow extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _lastMessagePreview(conversation, context),
+                          _lastMessagePreview(
+                            conversation,
+                            context,
+                            currentUserId: currentUserId,
+                          ),
                           style: TextStyle(
                             fontSize: 12.5,
                             color: _rowSubtitleColor(context),
@@ -282,32 +287,45 @@ class ConversationRow extends ConsumerWidget {
     return senderUserId;
   }
 
-  String _lastMessagePreview(Conversation conversation, BuildContext context) {
+  String _lastMessagePreview(
+    Conversation conversation,
+    BuildContext context, {
+    required String? currentUserId,
+  }) {
     final l10n = AppLocalizations.of(context);
     final msg = conversation.lastMessage;
     if (msg == null) return '';
-    if (msg.text != null && msg.text!.isNotEmpty) return msg.text!;
+    final label = mentionReminderLabel(
+      mentionReminderKindForConversation(
+        conversation,
+        currentUserId: currentUserId,
+      ),
+    );
+    final prefix = label == null ? '' : '$label ';
+    if (msg.text != null && msg.text!.isNotEmpty) return '$prefix${msg.text!}';
+    late final String preview;
     switch (msg.messageType) {
       case 'image':
-        return l10n.chatImageMessage;
+        preview = l10n.chatImageMessage;
       case 'video':
-        return l10n.chatVideoMessage;
+        preview = l10n.chatVideoMessage;
       case 'audio':
       case 'voice':
-        return l10n.chatVoiceMessage;
+        preview = l10n.chatVoiceMessage;
       case 'file':
-        return l10n.chatFileMessage;
+        preview = l10n.chatFileMessage;
       case 'contact_card':
-        return '[名片]';
+        preview = '[名片]';
       case 'call_log':
-        return '[通话记录]';
+        preview = '[通话记录]';
       case 'location':
-        return '[位置]';
+        preview = '[位置]';
       case 'event':
-        return '[系统消息]';
+        preview = '[系统消息]';
       default:
-        return '[消息]';
+        preview = '[消息]';
     }
+    return '$prefix$preview';
   }
 
   String _formatTime(DateTime dt, double tzOffset) {
@@ -423,4 +441,18 @@ class _ConversationTag extends StatelessWidget {
       ),
     );
   }
+}
+
+({String label, String shortLabel, IdentityBadgeTone tone})?
+    _conversationPeerIdentity({
+  int? userType,
+  String? customerTag,
+  int? membershipRole,
+}) {
+  final identity = identityBadgeFor(
+    userType: userType,
+    customerTag: customerTag,
+    membershipRole: membershipRole,
+  );
+  return identity?.tone == IdentityBadgeTone.customer ? null : identity;
 }

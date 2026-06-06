@@ -246,6 +246,9 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       'last_message_preview': c.lastMessage?.text,
       'last_message_type': c.lastMessage?.messageType,
       'last_message_sender_id': c.lastMessage?.senderUserId,
+      'last_message_mentions': c.lastMessage?.mentions != null
+          ? jsonEncode(c.lastMessage!.mentions!.map((e) => e.toJson()).toList())
+          : null,
       'last_message_is_self': c.lastMessage?.isSelf == true ? 1 : 0,
       'last_message_direction': c.lastMessage?.direction,
       'last_activity_at': c.lastActivityAt?.millisecondsSinceEpoch,
@@ -279,6 +282,17 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     final lastMsgId = row['last_message_id'] as String?;
     if (lastMsgId != null) {
       final sentAtRaw = row['last_activity_at'] as int?;
+      List<Mention>? mentions;
+      try {
+        final raw = row['last_message_mentions'] as String?;
+        if (raw != null) {
+          mentions = (jsonDecode(raw) as List<dynamic>)
+              .map((e) => Mention.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+      } catch (_) {
+        mentions = null;
+      }
       lastMessage = LastMessage(
         messageId: lastMsgId,
         text: row['last_message_preview'] as String?,
@@ -289,6 +303,7 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
             : DateTime.now(),
         isSelf: (row['last_message_is_self'] as int? ?? 0) == 1,
         direction: row['last_message_direction'] as String?,
+        mentions: mentions,
       );
     }
 
@@ -494,6 +509,7 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
         sentAt: message.sentAt,
         isSelf: isSelfMessage,
         direction: isSelfMessage ? 'out' : null,
+        mentions: message.mentions,
       ),
       lastActivityAt: message.sentAt,
       lastMessageSeq: lastMessageSeq,
@@ -708,5 +724,6 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       'INTEGER NOT NULL DEFAULT 0',
     );
     await _ensureColumn(db, 'conversations', 'last_message_direction', 'TEXT');
+    await _ensureColumn(db, 'conversations', 'last_message_mentions', 'TEXT');
   }
 }

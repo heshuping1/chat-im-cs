@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/notice/domain/entities/notice.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
 
-final noticeListProvider = StateNotifierProvider.autoDispose<NoticeListNotifier, AsyncValue<List<Notice>>>(
+final noticeListProvider = StateNotifierProvider.autoDispose<NoticeListNotifier,
+    AsyncValue<List<Notice>>>(
   (ref) => NoticeListNotifier(ref),
 );
 
@@ -52,13 +53,14 @@ class NoticeListNotifier extends StateNotifier<AsyncValue<List<Notice>>> {
   Future<void> refresh() => _load();
 
   void markRead(String noticeId) {
-    state = state.whenData((list) =>
-        list.map((n) => n.noticeId == noticeId ? n.copyWith(isRead: true) : n).toList());
+    state = state.whenData((list) => list
+        .map((n) => n.noticeId == noticeId ? n.copyWith(isRead: true) : n)
+        .toList());
   }
 
   void markAllRead() {
-    state = state.whenData(
-        (list) => list.map((n) => n.copyWith(isRead: true)).toList());
+    state = state
+        .whenData((list) => list.map((n) => n.copyWith(isRead: true)).toList());
   }
 }
 
@@ -94,22 +96,23 @@ class NoticeListPage extends ConsumerWidget {
         centerTitle: true,
         actions: [
           noticesAsync.whenOrNull(
-            data: (notices) {
-              final unread = notices.where((n) => !n.isRead).length;
-              if (unread == 0) return const SizedBox.shrink();
-              return TextButton(
-                onPressed: () =>
-                    ref.read(noticeListProvider.notifier).markAllRead(),
-                child: const Text(
-                  '全部已读',
-                  style: TextStyle(
-                    color: Color(0xFF00B27A),
-                    fontSize: 14,
-                  ),
-                ),
-              );
-            },
-          ) ?? const SizedBox.shrink(),
+                data: (notices) {
+                  final unread = notices.where((n) => !n.isRead).length;
+                  if (unread == 0) return const SizedBox.shrink();
+                  return TextButton(
+                    onPressed: () =>
+                        ref.read(noticeListProvider.notifier).markAllRead(),
+                    child: const Text(
+                      '全部已读',
+                      style: TextStyle(
+                        color: Color(0xFF00B27A),
+                        fontSize: 14,
+                      ),
+                    ),
+                  );
+                },
+              ) ??
+              const SizedBox.shrink(),
         ],
       ),
       body: noticesAsync.when(
@@ -132,12 +135,12 @@ class NoticeListPage extends ConsumerWidget {
         data: (notices) {
           if (notices.isEmpty) {
             return Center(
-              child: Text(l10n.noticeEmpty, style: const TextStyle(color: Color(0xFF86909C))),
+              child: Text(l10n.noticeEmpty,
+                  style: const TextStyle(color: Color(0xFF86909C))),
             );
           }
           return RefreshIndicator(
-            onRefresh: () =>
-                ref.read(noticeListProvider.notifier).refresh(),
+            onRefresh: () => ref.read(noticeListProvider.notifier).refresh(),
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: notices.length,
@@ -150,8 +153,7 @@ class NoticeListPage extends ConsumerWidget {
                     ref
                         .read(noticeListProvider.notifier)
                         .markRead(notice.noticeId);
-                    context.push('/notices/${notice.noticeId}',
-                        extra: notice);
+                    context.push('/notices/${notice.noticeId}', extra: notice);
                   },
                 );
               },
@@ -167,14 +169,15 @@ class NoticeListPage extends ConsumerWidget {
 // Notice Card
 // ---------------------------------------------------------------------------
 
-class _NoticeCard extends StatelessWidget {
+class _NoticeCard extends ConsumerWidget {
   final Notice notice;
   final VoidCallback onTap;
 
   const _NoticeCard({required this.notice, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tzOffset = ref.watch(timezoneOffsetProvider);
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -199,8 +202,8 @@ class _NoticeCard extends StatelessWidget {
             // Cover image
             if (notice.coverImage != null)
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(12)),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Stack(
@@ -301,7 +304,7 @@ class _NoticeCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        DateFormat('yyyy-MM-dd').format(notice.publishedAt),
+                        formatDateWithTimezone(notice.publishedAt, tzOffset),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFFAEAEB2),

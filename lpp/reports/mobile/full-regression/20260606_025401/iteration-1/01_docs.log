@@ -1,0 +1,135 @@
++ /Users/treesoft/Downloads/lpp-flutte/lpp/scripts/docs/check-docs.sh
+== LPP docs files ==
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/.DS_Store
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/00-ECC工作流.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/01-需求规格说明书.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/02-功能矩阵和实现情况.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/03-技术方案.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/04-测试验收方案.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/05-接口与服务端依赖.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/06-发布风险与检查清单.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/07-UI与交互设计说明.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/08-代码现状与证据索引.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/09-安全权限与数据治理.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/10-性能稳定性基线.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/11-项目现状与缺口清单.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/12-版本交付报告.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/13-自动化执行脚本说明.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/14-功能接口映射表.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/15-新电脑安装与运行指南.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/16-客服工作台App-PC功能拆分.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/17-PC端准备与复用方案.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/README.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/.DS_Store
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/README.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/admin-api-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/admin-api.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/client-api-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/client-api.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/field-enum-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/followme.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/friend-invite-qr.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/account-devices-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/admin-cs-center-dashboard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/admin-cs-center-threads-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-add-members-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-change-password-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-chat-files-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-conversations-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-create-conversation-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-history-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-alice-refresh-tenant-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-alice-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-alice-tenant-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-bob-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-charlie-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-member-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-member-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-open-guard-user-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-owner-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-login-owner-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-presence-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-read-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-recall-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-refresh-alice-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-alice-refresh-tenant-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-alice-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-alice-tenant-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-bob-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-charlie-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-member-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-member-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-open-guard-user-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-owner-bot-guard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-register-owner-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-image-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-reply-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-text-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-send-video-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-sync-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-upload-image-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-upload-video-cover-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/client-upload-video-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/department-tree-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/gateway-msg-new-event.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/gateway-presence-changed-event.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/gateway-space-notice-event.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-configure-webhook-request.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-configure-webhook-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-create-app-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-deliveries-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-rotate-credentials-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-send-message-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-subscriptions-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/open-upload-image-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-admin-detail-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-admin-force-close-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-create-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-staff-mine-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-staff-send-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-visitor-send-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-widget-state-final.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/temp-session-widget-state-initial.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/webhook-message-created-request.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/webhook-message-read-request.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/workbench-dashboard-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/workbench-thread-detail-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/payloads/workbench-threads-response.json
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/screen-share.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/tenant-join-invite-permissions-2026-05-31.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/voice-video-call-reference.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/voice-video-call.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/api-contracts/web-video-thumbnail-2026-05-28.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/templates/功能矩阵模板.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/templates/技术方案模板.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/templates/需求条目模板.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/原型参考/客服支撑系统.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/国际化任务清单.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/国际化方案.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/服务端支持.md
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC在线客服工作台-A高密度指挥台.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC在线客服工作台-A高密度指挥台.png
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC在线客服工作台-B微信客服增强稿.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC在线客服工作台-B微信客服增强稿.png
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC在线客服工作台-C运营监控强稿.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC在线客服工作台-C运营监控强稿.png
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC头像弹层高保真视觉方案.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC头像弹层高保真视觉方案.png
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC通讯录E体系高保真方案.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC通讯录E体系高保真方案.png
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC通讯录高保真视觉方案.html
+/Users/treesoft/Downloads/lpp-flutte/lpp/docs/设计方案/PC通讯录高保真视觉方案.png
+
+== Markdown local link check ==
+lpp/docs/api-contracts/web-video-thumbnail-2026-05-28.md: missing src/Modules/Messages/ZTChat.Modules.Messages.Infrastructure/DirectMessageServiceImpl.cs
+lpp/docs/api-contracts/web-video-thumbnail-2026-05-28.md: missing src/Modules/Messages/ZTChat.Modules.Messages.Infrastructure/MessageModuleExtensions.cs
+lpp/docs/api-contracts/admin-api.md: missing ./open-platform.md
+lpp/docs/api-contracts/field-enum-reference.md: missing open-platform.md
+lpp/docs/api-contracts/README.md: missing ./open-platform.md
+lpp/docs/api-contracts/README.md: missing ./open-platform-reference.md
+lpp/docs/api-contracts/README.md: missing ./open-platform.md
+lpp/docs/api-contracts/README.md: missing ./open-platform-reference.md
+lpp/docs/api-contracts/client-api.md: missing ./open-platform.md
+lpp/docs/api-contracts/client-api.md: missing ./open-platform.md
+missing_count=10
+FAIL docs check (0s, exit 1)

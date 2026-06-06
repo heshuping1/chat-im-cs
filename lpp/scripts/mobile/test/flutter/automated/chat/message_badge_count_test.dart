@@ -4,7 +4,7 @@ import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dar
 
 void main() {
   group('message badge count', () {
-    test('sums only conversations that show numeric unread bubbles', () {
+    test('sums unmuted direct and group conversations with numeric badges', () {
       final conversations = const [
         Conversation(
           conversationId: 'direct',
@@ -13,10 +13,17 @@ void main() {
           unreadCount: 27,
         ),
         Conversation(
-          conversationId: 'group-red-dot',
+          conversationId: 'group',
           type: ConversationType.group,
           title: '群聊',
           unreadCount: 17,
+        ),
+        Conversation(
+          conversationId: 'muted-group',
+          type: ConversationType.group,
+          title: '免打扰群聊',
+          unreadCount: 9,
+          isMuted: true,
         ),
         Conversation(
           conversationId: 'muted-direct',
@@ -33,8 +40,8 @@ void main() {
         ),
       ];
 
-      expect(calculateMessageBadgeCount(conversations), 27);
-      expect(calculateNumericUnreadConversationCount(conversations), 1);
+      expect(calculateMessageBadgeCount(conversations), 44);
+      expect(calculateNumericUnreadConversationCount(conversations), 2);
     });
 
     test('does not count negative unread values', () {

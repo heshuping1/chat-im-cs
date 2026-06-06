@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/notice/domain/entities/notice.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -13,8 +13,7 @@ import 'package:lpp_mobile/features/notice/domain/entities/notice.dart';
 final noticeDetailProvider =
     FutureProvider.family<Notice, String>((ref, noticeId) async {
   final dio = ref.watch(dioProvider);
-  final resp =
-      await dio.get('/api/client/v1/announcements/$noticeId');
+  final resp = await dio.get('/api/client/v1/announcements/$noticeId');
   return Notice.fromJson(resp.data['data'] as Map<String, dynamic>);
 });
 
@@ -35,7 +34,7 @@ class NoticeDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (preloadedNotice != null) {
-      return _buildScaffold(context, preloadedNotice!);
+      return _buildScaffold(context, ref, preloadedNotice!);
     }
 
     final noticeAsync = ref.watch(noticeDetailProvider(noticeId));
@@ -71,11 +70,12 @@ class NoticeDetailPage extends ConsumerWidget {
           ),
         ),
       ),
-      data: (notice) => _buildScaffold(context, notice),
+      data: (notice) => _buildScaffold(context, ref, notice),
     );
   }
 
-  Widget _buildScaffold(BuildContext context, Notice notice) {
+  Widget _buildScaffold(BuildContext context, WidgetRef ref, Notice notice) {
+    final tzOffset = ref.watch(timezoneOffsetProvider);
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
@@ -104,8 +104,7 @@ class NoticeDetailPage extends ConsumerWidget {
             if (notice.isImportant)
               Container(
                 margin: const EdgeInsets.only(bottom: 10),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF3B30).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
@@ -137,7 +136,10 @@ class NoticeDetailPage extends ConsumerWidget {
                     size: 14, color: Color(0xFFAEAEB2)),
                 const SizedBox(width: 4),
                 Text(
-                  DateFormat('yyyy年MM月dd日 HH:mm').format(notice.publishedAt),
+                  formatChineseFullMinuteWithTimezone(
+                    notice.publishedAt,
+                    tzOffset,
+                  ),
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFFAEAEB2),
@@ -146,8 +148,8 @@ class NoticeDetailPage extends ConsumerWidget {
                 if (notice.isPinned) ...[
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
                       color: const Color(0xFF00B27A).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),

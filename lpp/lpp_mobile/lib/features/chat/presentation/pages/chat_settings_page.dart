@@ -114,7 +114,11 @@ class _ChatSettingsPageState extends ConsumerState<ChatSettingsPage> {
                     icon: Icons.search,
                     label: '查找聊天内容',
                     showArrow: true,
-                    onTap: () => context.push('/search'),
+                    onTap: () => context.push('/search', extra: {
+                      'conversationId': widget.chatId,
+                      'isGroup': false,
+                      'conversationTitle': _peerName,
+                    }),
                   ),
                 ]),
                 const SizedBox(height: 8),

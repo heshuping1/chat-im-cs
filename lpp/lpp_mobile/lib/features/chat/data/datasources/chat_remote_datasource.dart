@@ -1,17 +1,37 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:lpp_mobile/core/network/api_response.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/features/chat/data/models/conversation_model.dart';
 import 'package:lpp_mobile/features/chat/data/models/message_model.dart';
-import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/conversation_page.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 
-/// 分页会话列表结果
-class ConversationsPage {
-  final List<Conversation> items;
-  final String? nextCursor;
-
-  const ConversationsPage({required this.items, this.nextCursor});
+MessageType _messageTypeFromString(String raw) {
+  switch (raw) {
+    case 'markdown':
+      return MessageType.markdown;
+    case 'image':
+      return MessageType.image;
+    case 'video':
+      return MessageType.video;
+    case 'voice':
+      return MessageType.voice;
+    case 'file':
+      return MessageType.file;
+    case 'event':
+      return MessageType.event;
+    case 'contact_card':
+      return MessageType.contactCard;
+    case 'call_log':
+      return MessageType.callLog;
+    case 'location':
+      return MessageType.location;
+    default:
+      return MessageType.text;
+  }
 }
 
 class ScheduledMessageDto {
@@ -19,7 +39,7 @@ class ScheduledMessageDto {
   final String conversationId;
   final bool isGroup;
   final String messageType;
-  final Map<String, dynamic> body;
+  final Map<String, dynamic> rawBody;
   final DateTime scheduledAt;
   final int status;
   final String? failureReason;
@@ -29,23 +49,38 @@ class ScheduledMessageDto {
     required this.conversationId,
     required this.isGroup,
     required this.messageType,
-    required this.body,
+    required this.rawBody,
     required this.scheduledAt,
     this.status = 0,
     this.failureReason,
   });
 
   factory ScheduledMessageDto.fromJson(Map<String, dynamic> json) {
+    final messageType = json['messageType'] as String? ?? 'text';
+    final rawBody = Map<String, dynamic>.from(json['body'] as Map? ?? const {});
     return ScheduledMessageDto(
       scheduledMessageId: json['scheduledMessageId'] as String? ?? '',
       conversationId: json['conversationId'] as String? ?? '',
       isGroup: json['isGroup'] as bool? ?? false,
-      messageType: json['messageType'] as String? ?? 'text',
-      body: Map<String, dynamic>.from(json['body'] as Map? ?? const {}),
+      messageType: messageType,
+      rawBody: rawBody,
       scheduledAt: DateTime.tryParse(json['scheduledAt'] as String? ?? '') ??
           DateTime.now(),
       status: json['status'] as int? ?? 0,
       failureReason: json['failureReason'] as String?,
+    );
+  }
+
+  ScheduledMessage toDomain() {
+    return ScheduledMessage(
+      scheduledMessageId: scheduledMessageId,
+      conversationId: conversationId,
+      isGroup: isGroup,
+      type: _messageTypeFromString(messageType),
+      body: MessageBody.fromJson(rawBody),
+      scheduledAt: scheduledAt,
+      status: status,
+      failureReason: failureReason,
     );
   }
 }
@@ -89,6 +124,7 @@ abstract class ChatRemoteDataSource {
     required MessageType type,
     required MessageBody body,
     String? replyToMessageId,
+    List<Mention>? mentions,
   });
 
   /// POST /api/client/v1/scheduled-messages
@@ -108,7 +144,10 @@ abstract class ChatRemoteDataSource {
   Future<void> cancelScheduledMessage(String scheduledMessageId);
 
   /// POST /api/client/v1/media/upload
-  Future<MediaResource> uploadMedia(String filePath);
+  Future<MediaResource> uploadMedia(
+    String filePath, {
+    MediaUploadProgressCallback? onProgress,
+  });
 
   /// POST /api/client/v1/messages/{messageId}/recall
   Future<void> recallMessage(String messageId);
@@ -308,6 +347,7 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     required MessageType type,
     required MessageBody body,
     String? replyToMessageId,
+    List<Mention>? mentions,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -317,7 +357,8 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
           'messageType': _messageTypeToString(type),
           'body': _messageBodyToRequestJson(body),
           if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
-          'mentions': <Map<String, dynamic>>[],
+          'mentions': mentions?.map((mention) => mention.toJson()).toList() ??
+              <Map<String, dynamic>>[],
         },
       );
       final apiResponse = ApiResponse.fromJson(
@@ -329,6 +370,7 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
           body: body,
           conversationId: groupId,
           replyToMessageId: replyToMessageId,
+          mentions: mentions,
         ),
       );
       return apiResponse.getDataOrThrow();
@@ -409,14 +451,27 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   }
 
   @override
-  Future<MediaResource> uploadMedia(String filePath) async {
+  Future<MediaResource> uploadMedia(
+    String filePath, {
+    MediaUploadProgressCallback? onProgress,
+  }) async {
     try {
+      final fallbackTotal = await _safeFileLength(filePath);
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(filePath),
       });
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/client/v1/media/upload',
         data: formData,
+        onSendProgress: onProgress == null
+            ? null
+            : (sent, total) {
+                final resolvedTotal = total > 0 ? total : fallbackTotal;
+                onProgress(MediaUploadProgressEvent(
+                  loaded: sent,
+                  total: resolvedTotal,
+                ));
+              },
       );
       final apiResponse = ApiResponse.fromJson(
         response.data!,
@@ -425,6 +480,14 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
       return apiResponse.getDataOrThrow();
     } on DioException catch (e) {
       throw ErrorHandler.fromDioException(e);
+    }
+  }
+
+  Future<int?> _safeFileLength(String filePath) async {
+    try {
+      return await File(filePath).length();
+    } catch (_) {
+      return null;
     }
   }
 

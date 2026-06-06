@@ -1,3 +1,5 @@
+import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+
 enum ConversationType { direct, group, tempSession }
 
 class Conversation {
@@ -95,6 +97,7 @@ class LastMessage {
   final DateTime sentAt;
   final bool isSelf;
   final String? direction;
+  final List<Mention>? mentions;
 
   const LastMessage({
     required this.messageId,
@@ -104,5 +107,28 @@ class LastMessage {
     required this.sentAt,
     this.isSelf = false,
     this.direction,
+    this.mentions,
   });
+
+  LastMessage copyWith({
+    String? messageId,
+    String? text,
+    String? messageType,
+    String? senderUserId,
+    DateTime? sentAt,
+    bool? isSelf,
+    String? direction,
+    List<Mention>? mentions,
+  }) {
+    return LastMessage(
+      messageId: messageId ?? this.messageId,
+      text: text ?? this.text,
+      messageType: messageType ?? this.messageType,
+      senderUserId: senderUserId ?? this.senderUserId,
+      sentAt: sentAt ?? this.sentAt,
+      isSelf: isSelf ?? this.isSelf,
+      direction: direction ?? this.direction,
+      mentions: mentions ?? this.mentions,
+    );
+  }
 }

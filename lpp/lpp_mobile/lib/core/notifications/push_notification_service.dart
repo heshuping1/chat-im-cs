@@ -91,6 +91,8 @@ class PushNotificationService {
     String? title,
     String? body,
     String? peerUserId,
+    String? mentionKind,
+    String? senderDisplayName,
   }) async {
     if (!PlatformCapabilities.isDesktop) return;
     await _showDataNotification({
@@ -102,6 +104,10 @@ class PushNotificationService {
       if (title != null && title.isNotEmpty) 'title': title,
       if (body != null && body.isNotEmpty) 'body': body,
       if (peerUserId != null && peerUserId.isNotEmpty) 'peerUserId': peerUserId,
+      if (mentionKind != null && mentionKind.isNotEmpty)
+        'mentionKind': mentionKind,
+      if (senderDisplayName != null && senderDisplayName.isNotEmpty)
+        'senderDisplayName': senderDisplayName,
     });
   }
 
@@ -133,8 +139,9 @@ class PushNotificationService {
     final isCall = scenario == 'call';
     final title = _stringValue(data, const ['title', 'notificationTitle']) ??
         (isCall ? '来电' : '新消息');
-    final body = _stringValue(data, const ['body', 'alert', 'preview']) ??
+    final rawBody = _stringValue(data, const ['body', 'alert', 'preview']) ??
         _fallbackBody(data, isCall: isCall);
+    final body = isCall ? rawBody : _mentionAwareBody(data, rawBody);
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -339,6 +346,32 @@ class PushNotificationService {
       'location' => '[位置]',
       _ => '你收到一条新消息',
     };
+  }
+
+  static String _mentionAwareBody(Map<String, dynamic> data, String body) {
+    final kind = (_stringValue(data, const [
+              'mentionType',
+              'mentionReminder',
+              'mentionKind',
+            ]) ??
+            '')
+        .trim()
+        .toLowerCase();
+    final sender = _stringValue(data, const [
+          'senderDisplayName',
+          'senderName',
+          'fromDisplayName',
+        ]) ??
+        '';
+    if (kind == 'me' ||
+        kind == 'user' ||
+        _boolValue(data, const ['isMentioned'])) {
+      return sender.isEmpty ? '@了你：$body' : '$sender @了你：$body';
+    }
+    if (kind == 'all' || _boolValue(data, const ['isMentionAll'])) {
+      return sender.isEmpty ? '@所有人：$body' : '$sender @所有人：$body';
+    }
+    return body;
   }
 
   static String _scenario(Map<String, dynamic> data) {

@@ -32,7 +32,6 @@ Run from `lpp/lpp_mobile`:
 ../scripts/mobile/test/run_automated_tests.sh
 ../scripts/mobile/test/run_android_tests.sh
 ../scripts/mobile/test/run_ios_tests.sh
-../scripts/mobile/test/run_pc_tests.sh
 ../scripts/mobile/test/run_platform_tests.sh --android
 ```
 
@@ -67,5 +66,6 @@ Reports are written to `reports/mobile/full-regression/<timestamp>/` by default,
 with one log per step and a `summary.md` overview.
 
 Platform scripts share the same baseline checks: `flutter analyze` with
-non-fatal warnings/infos and `flutter test ../scripts/mobile/test/flutter`. Each platform script then runs
-its own build or smoke test.
+non-fatal warnings/infos and `flutter test ../scripts/mobile/test/flutter`.
+Each platform script then runs its own mobile build or smoke test. PC regression
+now lives in the independent `lpp_pc_client` project.

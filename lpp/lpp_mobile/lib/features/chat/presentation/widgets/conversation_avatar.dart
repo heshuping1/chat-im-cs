@@ -80,7 +80,7 @@ class ConversationAvatar extends ConsumerWidget {
     if (isPersonal) return null;
     final peerUserType = conversation.peerUserType;
     if (peerUserType != null) {
-      return identityBadgeFor(userType: peerUserType);
+      return _conversationAvatarIdentity(userType: peerUserType);
     }
     if (conversation.peerUserId?.isNotEmpty == true) {
       final membersAsync = ref.watch(tenantMembersProvider);
@@ -90,7 +90,7 @@ class ConversationAvatar extends ConsumerWidget {
             .where((member) => member.userId == conversation.peerUserId)
             .firstOrNull;
         if (peer != null) {
-          return identityBadgeFor(
+          return _conversationAvatarIdentity(
             userType: peer.userType,
             customerTag: peer.customerTag,
           );
@@ -102,4 +102,18 @@ class ConversationAvatar extends ConsumerWidget {
     }
     return null;
   }
+}
+
+({String label, String shortLabel, IdentityBadgeTone tone})?
+    _conversationAvatarIdentity({
+  int? userType,
+  String? customerTag,
+  int? membershipRole,
+}) {
+  final identity = identityBadgeFor(
+    userType: userType,
+    customerTag: customerTag,
+    membershipRole: membershipRole,
+  );
+  return identity?.tone == IdentityBadgeTone.customer ? null : identity;
 }

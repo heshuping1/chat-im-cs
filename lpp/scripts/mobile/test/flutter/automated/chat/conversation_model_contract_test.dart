@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lpp_mobile/features/chat/data/models/conversation_model.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 
 void main() {
   group('ConversationModel API contract', () {
@@ -188,6 +189,9 @@ void main() {
           messageType: 'text',
           senderUserId: 'me',
           sentAt: DateTime.utc(2026, 5, 15, 12),
+          mentions: const [
+            Mention.user(userId: 'u-2', offset: 0, length: 3),
+          ],
         ),
         isPinned: true,
         isMuted: true,
@@ -201,7 +205,33 @@ void main() {
         'messageType': 'text',
         'senderUserId': 'me',
         'sentAt': '2026-05-15T12:00:00.000Z',
+        'mentions': [
+          {'type': 'user', 'userId': 'u-2', 'offset': 0, 'length': 3},
+        ],
       });
+    });
+
+    test('parses last message mentions from conversation list payload', () {
+      final conversation = ConversationModel.fromJson({
+        'conversationId': 'group-1',
+        'conversationType': 'group',
+        'title': '群聊',
+        'unreadCount': 2,
+        'lastMessage': {
+          'messageId': 'msg-1',
+          'messageType': 'text',
+          'preview': '@所有人 开会',
+          'senderUserId': 'u-2',
+          'sentAt': '2026-06-06T12:00:00Z',
+          'mentions': [
+            {'type': 'all', 'offset': 0, 'length': 4},
+          ],
+        },
+      });
+
+      expect(conversation.lastMessage?.mentions, const [
+        Mention.all(offset: 0, length: 4),
+      ]);
     });
   });
 }

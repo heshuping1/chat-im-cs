@@ -43,5 +43,6 @@ Widget localImageWidget(
     fit: fit,
     width: width,
     height: height,
+    gaplessPlayback: true,
   );
 }

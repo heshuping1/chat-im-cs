@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Colors
@@ -51,8 +51,10 @@ class GroupAnnouncement {
       title: json['title'] as String?,
       content: json['content'] as String? ?? '',
       isPinned: json['isPinned'] as bool? ?? false,
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -62,7 +64,8 @@ class GroupAnnouncement {
 // ---------------------------------------------------------------------------
 
 final groupAnnouncementsProvider =
-    FutureProvider.family<List<GroupAnnouncement>, String>((ref, groupId) async {
+    FutureProvider.family<List<GroupAnnouncement>, String>(
+        (ref, groupId) async {
   final dio = ref.watch(dioProvider);
   final resp = await dio.get('/api/client/v1/groups/$groupId/announcements');
   final list = resp.data['data'] as List<dynamic>? ?? [];
@@ -120,9 +123,9 @@ class GroupAnnouncementPage extends ConsumerWidget {
             const Center(child: CircularProgressIndicator(color: _primary)),
         error: (_, __) => Center(
           child: TextButton(
-            onPressed: () => ref.invalidate(groupAnnouncementsProvider(groupId)),
-            child: const Text('加载失败，点击重试',
-                style: TextStyle(color: _primary)),
+            onPressed: () =>
+                ref.invalidate(groupAnnouncementsProvider(groupId)),
+            child: const Text('加载失败，点击重试', style: TextStyle(color: _primary)),
           ),
         ),
         data: (announcements) {
@@ -174,20 +177,17 @@ class GroupAnnouncementPage extends ConsumerWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('删除公告'),
         content: const Text('确定删除这条公告吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消',
-                style: TextStyle(color: _secondary)),
+            child: const Text('取消', style: TextStyle(color: _secondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('删除',
-                style: TextStyle(color: _red)),
+            child: const Text('删除', style: TextStyle(color: _red)),
           ),
         ],
       ),
@@ -211,7 +211,7 @@ class GroupAnnouncementPage extends ConsumerWidget {
 // AnnouncementCard
 // ---------------------------------------------------------------------------
 
-class _AnnouncementCard extends StatelessWidget {
+class _AnnouncementCard extends ConsumerWidget {
   final GroupAnnouncement announcement;
   final bool isAdminOrAbove;
   final VoidCallback onEdit;
@@ -225,8 +225,8 @@ class _AnnouncementCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final fmt = DateFormat('yyyy-MM-dd HH:mm');
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tzOffset = ref.watch(timezoneOffsetProvider);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -242,8 +242,8 @@ class _AnnouncementCard extends StatelessWidget {
             children: [
               if (announcement.isPinned) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: _primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
@@ -262,17 +262,15 @@ class _AnnouncementCard extends StatelessWidget {
                       ? announcement.title!
                       : '公告',
                   style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: _text),
+                      fontSize: 15, fontWeight: FontWeight.w600, color: _text),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (isAdminOrAbove)
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_horiz,
-                      color: _secondary, size: 20),
+                  icon:
+                      const Icon(Icons.more_horiz, color: _secondary, size: 20),
                   onSelected: (v) {
                     if (v == 'edit') onEdit();
                     if (v == 'delete') onDelete();
@@ -281,8 +279,7 @@ class _AnnouncementCard extends StatelessWidget {
                     const PopupMenuItem(value: 'edit', child: Text('编辑')),
                     const PopupMenuItem(
                         value: 'delete',
-                        child: Text('删除',
-                            style: TextStyle(color: _red))),
+                        child: Text('删除', style: TextStyle(color: _red))),
                   ],
                 ),
             ],
@@ -297,12 +294,12 @@ class _AnnouncementCard extends StatelessWidget {
             children: [
               if (announcement.publisherDisplayName != null)
                 Text(announcement.publisherDisplayName!,
-                    style: const TextStyle(
-                        fontSize: 12, color: _secondary)),
+                    style: const TextStyle(fontSize: 12, color: _secondary)),
               const Spacer(),
-              Text(fmt.format(announcement.createdAt),
-                  style: const TextStyle(
-                      fontSize: 12, color: _secondary)),
+              Text(
+                  formatFullMinuteWithTimezone(
+                      announcement.createdAt, tzOffset),
+                  style: const TextStyle(fontSize: 12, color: _secondary)),
             ],
           ),
         ],
@@ -341,10 +338,8 @@ class _AnnouncementEditSheetState
   @override
   void initState() {
     super.initState();
-    _titleCtrl =
-        TextEditingController(text: widget.existing?.title ?? '');
-    _contentCtrl =
-        TextEditingController(text: widget.existing?.content ?? '');
+    _titleCtrl = TextEditingController(text: widget.existing?.title ?? '');
+    _contentCtrl = TextEditingController(text: widget.existing?.content ?? '');
     _isPinned = widget.existing?.isPinned ?? false;
   }
 
@@ -361,9 +356,7 @@ class _AnnouncementEditSheetState
     try {
       final dio = ref.read(dioProvider);
       final data = {
-        'title': _titleCtrl.text.trim().isEmpty
-            ? null
-            : _titleCtrl.text.trim(),
+        'title': _titleCtrl.text.trim().isEmpty ? null : _titleCtrl.text.trim(),
         'content': _contentCtrl.text.trim(),
         'isPinned': _isPinned,
       };
@@ -392,22 +385,21 @@ class _AnnouncementEditSheetState
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // 顶部栏
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('取消',
-                        style: TextStyle(color: _secondary)),
+                    child:
+                        const Text('取消', style: TextStyle(color: _secondary)),
                   ),
                   const Expanded(
                     child: Text(
@@ -429,8 +421,7 @@ class _AnnouncementEditSheetState
                                 strokeWidth: 2, color: _primary))
                         : const Text('发布',
                             style: TextStyle(
-                                color: _primary,
-                                fontWeight: FontWeight.w600)),
+                                color: _primary, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -438,8 +429,7 @@ class _AnnouncementEditSheetState
             const Divider(height: 1, color: _divider),
             // 标题
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
                 controller: _titleCtrl,
                 style: const TextStyle(fontSize: 15, color: _text),
@@ -453,8 +443,7 @@ class _AnnouncementEditSheetState
             const Divider(height: 1, indent: 16, color: _divider),
             // 内容
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
                 controller: _contentCtrl,
                 maxLines: 5,

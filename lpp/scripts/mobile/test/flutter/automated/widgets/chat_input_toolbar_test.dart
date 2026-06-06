@@ -32,7 +32,7 @@ void main() {
             return true;
           },
           onSendVoice: (_, __) {},
-          onSendImages: (_) {},
+          onSendMedia: (_) {},
           onVoiceCall: () => voiceCalls++,
           onVideoCall: () => videoCalls++,
           onLocation: () => locationCalls++,
@@ -81,7 +81,7 @@ void main() {
             return true;
           },
           onSendVoice: (_, __) {},
-          onSendImages: (_) {},
+          onSendMedia: (_) {},
         ),
       ),
     );
@@ -97,6 +97,55 @@ void main() {
 
     expect(sentText, 'hello');
     expect(tester.testTextInput.isVisible, isTrue);
+  });
+
+  testWidgets('favorites tool is hidden without a favorite handler', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'chat-1',
+          isGroup: false,
+          onSendText: (_) async => true,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.add_circle_outline_rounded));
+    await tester.pumpAndSettle();
+    await _showSecondToolPage(tester);
+
+    expect(find.text('收藏'), findsNothing);
+  });
+
+  testWidgets('favorites tool opens the configured favorite entry', (
+    tester,
+  ) async {
+    var favoriteTaps = 0;
+
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'chat-1',
+          isGroup: false,
+          onSendText: (_) async => true,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+          onFavorite: () => favoriteTaps++,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.add_circle_outline_rounded));
+    await tester.pumpAndSettle();
+    await _showSecondToolPage(tester);
+    await tester.tap(find.text('收藏'));
+    await tester.pumpAndSettle();
+
+    expect(favoriteTaps, 1);
   });
 
   testWidgets('scheduled message picker schedules typed content', (
@@ -117,7 +166,7 @@ void main() {
             return true;
           },
           onSendVoice: (_, __) {},
-          onSendImages: (_) {},
+          onSendMedia: (_) {},
         ),
       ),
     );
@@ -147,6 +196,76 @@ void main() {
     expect(scheduledAt, isNotNull);
     expect(scheduledAt!.isAfter(DateTime.now()), isTrue);
   });
+
+  testWidgets('group mention picker opens again after deleting and retyping @', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'group-1',
+          isGroup: true,
+          mentionCandidates: const [
+            ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+          ],
+          onSendText: (_) async => true,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+        ),
+      ),
+    );
+
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '@');
+    await tester.pumpAndSettle();
+    expect(find.text('选择提醒的人'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), '@');
+    await tester.pumpAndSettle();
+
+    expect(find.text('选择提醒的人'), findsOneWidget);
+    expect(find.text('张三'), findsOneWidget);
+  });
+
+  testWidgets('group mention picker accepts full-width @ from Chinese keyboard', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'group-1',
+          isGroup: true,
+          mentionCandidates: const [
+            ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+          ],
+          onSendText: (_) async => true,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+        ),
+      ),
+    );
+
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '＠');
+    await tester.pumpAndSettle();
+
+    expect(find.text('选择提醒的人'), findsOneWidget);
+    await tester.tap(find.text('张三'));
+    await tester.pumpAndSettle();
+    expect(find.text('@张三 '), findsOneWidget);
+  });
+}
+
+Future<void> _showSecondToolPage(WidgetTester tester) async {
+  final pageView = find.byType(PageView);
+  if (pageView.evaluate().isEmpty) return;
+  await tester.drag(pageView, const Offset(-420, 0));
+  await tester.pumpAndSettle();
 }
 
 Widget _wrap(Widget child) {

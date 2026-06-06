@@ -22,12 +22,14 @@ import 'package:lpp_mobile/features/chat/data/models/message_model.dart';
 import 'package:lpp_mobile/features/chat/data/repositories/chat_repository_impl.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/group_detail_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/presence_provider.dart';
 import 'package:lpp_mobile/features/contacts/application/friend_acceptance_conversation_service.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
+import 'package:lpp_mobile/features/contacts/presentation/providers/friend_acceptance_conversation_provider.dart';
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
 import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider.dart';
 
@@ -181,16 +183,13 @@ void _handleEvent(
         final isSelf =
             _isSelfGatewayMessage(event.data, message, currentUserId);
         if (!isSelf) {
-          unawaited(PushNotificationService.showGatewayMessageNotification(
+          unawaited(_showGatewayMessageNotificationIfAllowed(
+            spaceId: spaceId,
             conversationId: conversationId,
-            isGroup: fallbackType == ConversationType.group,
-            messageId: message.messageId,
-            messageType: GatewayEventHandler.messageTypeToApiString(
-              message.type,
-            ),
-            title: _gatewayNotificationTitle(event.data),
-            body: message.body.text,
-            peerUserId: message.senderUserId,
+            fallbackType: fallbackType,
+            message: message,
+            data: event.data,
+            currentUserId: currentUserId,
           ));
         }
         // 写入 SQLite 本地事实源，并从同一条消息派生会话摘要（fire-and-forget）。
@@ -402,7 +401,7 @@ void _handleFriendRequestChanged(
     final peerUserId = event.peerUserId?.trim();
     if (peerUserId != null && peerUserId.isNotEmpty) {
       unawaited(
-        ensureFriendAcceptanceConversation(
+        ensureFriendAcceptanceConversationFromProvider(
           ref,
           FriendAcceptanceConversationDraft(
             requestId: event.requestId,
@@ -570,8 +569,8 @@ Future<void> _syncMessages(Dio dio, String spaceId, Ref ref) async {
         // sync 当前文档不保证返回会话类型；如果服务端补了类型则优先使用，
         // 否则从本地缓存继承，最后再按 direct 兼容旧响应。
         final currentUserId = ref.read(currentSpaceProvider)?.userId;
-        final isSelf =
-            message.isSelf || _sameIdentity(message.senderUserId, currentUserId);
+        final isSelf = message.isSelf ||
+            _sameIdentity(message.senderUserId, currentUserId);
         final existingConvs =
             ref.read(conversationsProvider(spaceId)).valueOrNull;
         final existingConv = existingConvs
@@ -762,7 +761,8 @@ ConversationType? _conversationTypeFromGatewayData(Map<String, dynamic> data) {
     _gatewayString(data['type']),
     _gatewayString(_gatewayMap(data['conversation'])?['conversationType']),
   ];
-  if (rawValues.any((value) => _normalizeGatewayType(value) == 'temp_session')) {
+  if (rawValues
+      .any((value) => _normalizeGatewayType(value) == 'temp_session')) {
     return ConversationType.tempSession;
   }
   final raw = rawValues.firstWhere(
@@ -801,6 +801,57 @@ String? _gatewayNotificationTitle(Map<String, dynamic> data) {
     if (value != null && value.isNotEmpty) return value;
   }
   return null;
+}
+
+Future<void> _showGatewayMessageNotificationIfAllowed({
+  required String spaceId,
+  required String conversationId,
+  required ConversationType fallbackType,
+  required Message message,
+  required Map<String, dynamic> data,
+  required String? currentUserId,
+}) async {
+  if (await _isGatewayConversationMuted(spaceId, conversationId)) return;
+  final mentionKind = mentionReminderKindForMessage(
+    mentions: message.mentions,
+    currentUserId: currentUserId,
+    isGroup: fallbackType == ConversationType.group,
+    isSelf: false,
+  );
+  await PushNotificationService.showGatewayMessageNotification(
+    conversationId: conversationId,
+    isGroup: fallbackType == ConversationType.group,
+    messageId: message.messageId,
+    messageType: GatewayEventHandler.messageTypeToApiString(message.type),
+    title: _gatewayNotificationTitle(data),
+    body: message.body.text,
+    peerUserId: message.senderUserId,
+    mentionKind: switch (mentionKind) {
+      MentionReminderKind.me => 'me',
+      MentionReminderKind.all => 'all',
+      MentionReminderKind.none => null,
+    },
+    senderDisplayName: _gatewayString(data['senderDisplayName']) ??
+        _gatewayString(data['senderName']),
+  );
+}
+
+Future<bool> _isGatewayConversationMuted(
+  String spaceId,
+  String conversationId,
+) async {
+  try {
+    final conversations =
+        await ChatLocalDataSourceImpl().getConversations(spaceId);
+    return conversations
+            .where(
+                (conversation) => conversation.conversationId == conversationId)
+            .firstOrNull
+            ?.isMuted ==
+        true;
+  } catch (_) {
+    return false;
+  }
 }
 
 bool _isSelfGatewayMessage(

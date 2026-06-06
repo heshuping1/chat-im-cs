@@ -310,7 +310,13 @@ class AppRouter {
         path: AppRoutes.groupSettings,
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          return GroupSettingsPage(groupId: id);
+          final extra = state.extra as Map<String, dynamic>?;
+          return GroupSettingsPage(
+            groupId: id,
+            fallbackTitle: extra?['title'] as String?,
+            fallbackAvatarUrl: extra?['avatarUrl'] as String?,
+            fallbackMemberCount: extra?['memberCount'] as int?,
+          );
         },
         routes: [
           GoRoute(
@@ -439,7 +445,17 @@ class AppRouter {
       // 搜索页
       GoRoute(
         path: AppRoutes.search,
-        builder: (context, state) => const SearchPage(),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map) {
+            return SearchPage(
+              conversationId: extra['conversationId'] as String?,
+              isGroup: extra['isGroup'] as bool? ?? false,
+              conversationTitle: extra['conversationTitle'] as String?,
+            );
+          }
+          return const SearchPage();
+        },
       ),
 
       // 设置页

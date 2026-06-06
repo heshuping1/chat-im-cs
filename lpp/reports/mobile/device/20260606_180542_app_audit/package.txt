@@ -1,0 +1,254 @@
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        5140735 com.lpp.mobile/.MainActivity filter bb767ca
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      androidx.profileinstaller.action.SAVE_PROFILE:
+        ef2ed3b com.lpp.mobile/androidx.profileinstaller.ProfileInstallReceiver filter 4cc3696
+          Action: "androidx.profileinstaller.action.SAVE_PROFILE"
+      androidx.profileinstaller.action.INSTALL_PROFILE:
+        ef2ed3b com.lpp.mobile/androidx.profileinstaller.ProfileInstallReceiver filter 8592c58
+          Action: "androidx.profileinstaller.action.INSTALL_PROFILE"
+      androidx.profileinstaller.action.SKIP_FILE:
+        ef2ed3b com.lpp.mobile/androidx.profileinstaller.ProfileInstallReceiver filter d8ae1b1
+          Action: "androidx.profileinstaller.action.SKIP_FILE"
+      androidx.profileinstaller.action.BENCHMARK_OPERATION:
+        ef2ed3b com.lpp.mobile/androidx.profileinstaller.ProfileInstallReceiver filter 1992217
+          Action: "androidx.profileinstaller.action.BENCHMARK_OPERATION"
+
+Service Resolver Table:
+  Non-Data Actions:
+      com.google.android.gms.metadata.MODULE_DEPENDENCIES:
+        b60b604 com.lpp.mobile/com.google.android.gms.metadata.ModuleDependencies filter abae7ed
+          Action: "com.google.android.gms.metadata.MODULE_DEPENDENCIES"
+
+Domain verification status:
+
+Permissions:
+  Permission [com.lpp.mobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION] (6c64490):
+    sourcePackage=com.lpp.mobile
+    uid=10334 gids=[] type=0 prot=signature
+    perm=PermissionInfo{cc4e84f com.lpp.mobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION}
+
+Registered ContentProviders:
+  com.lpp.mobile/com.google.mlkit.common.internal.MlKitInitProvider:
+    Provider{ab92bdc com.lpp.mobile/com.google.mlkit.common.internal.MlKitInitProvider}
+  com.lpp.mobile/androidx.startup.InitializationProvider:
+    Provider{45ce4e5 com.lpp.mobile/androidx.startup.InitializationProvider}
+  com.lpp.mobile/com.crazecoder.openfile.FileProvider:
+    Provider{7696bba com.lpp.mobile/com.crazecoder.openfile.FileProvider}
+  com.lpp.mobile/io.flutter.plugins.imagepicker.ImagePickerFileProvider:
+    Provider{291ba6b com.lpp.mobile/io.flutter.plugins.imagepicker.ImagePickerFileProvider}
+
+ContentProvider Authorities:
+  [com.lpp.mobile.androidx-startup]:
+    Provider{45ce4e5 com.lpp.mobile/androidx.startup.InitializationProvider}
+      applicationInfo=ApplicationInfo{2af4189 com.lpp.mobile}
+  [com.lpp.mobile.flutter.image_provider]:
+    Provider{291ba6b com.lpp.mobile/io.flutter.plugins.imagepicker.ImagePickerFileProvider}
+      applicationInfo=ApplicationInfo{38cd58e com.lpp.mobile}
+  [com.lpp.mobile.mlkitinitprovider]:
+    Provider{ab92bdc com.lpp.mobile/com.google.mlkit.common.internal.MlKitInitProvider}
+      applicationInfo=ApplicationInfo{5dc61af com.lpp.mobile}
+  [com.lpp.mobile.fileProvider.com.crazecoder.openfile]:
+    Provider{7696bba com.lpp.mobile/com.crazecoder.openfile.FileProvider}
+      applicationInfo=ApplicationInfo{f319bc com.lpp.mobile}
+
+Key Set Manager:
+  [com.lpp.mobile]
+      Signing KeySets: 133
+
+Packages:
+  Package [com.lpp.mobile] (d1d1a74):
+    userId=10334
+    pkg=Package{d2bcb9d com.lpp.mobile}
+    codePath=/data/app/~~1iS_R_BFOyb_JbeX69lbJA==/com.lpp.mobile-D0s8POq0EEXXfZDr0fxZ3g==
+    resourcePath=/data/app/~~1iS_R_BFOyb_JbeX69lbJA==/com.lpp.mobile-D0s8POq0EEXXfZDr0fxZ3g==
+    legacyNativeLibraryDir=/data/app/~~1iS_R_BFOyb_JbeX69lbJA==/com.lpp.mobile-D0s8POq0EEXXfZDr0fxZ3g==/lib
+    extractNativeLibs=false
+    primaryCpuAbi=arm64-v8a
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=1 minSdk=24 targetSdk=36
+    minExtensionVersions=[]
+    versionName=1.0.0
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=2
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PARTIALLY_DIRECT_BOOT_AWARE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    queriesIntents=[Intent { act=android.intent.action.PROCESS_TEXT dat=content://*/... typ=text/plain }, Intent { act=android.intent.action.VIEW dat=geo:/... }, Intent { act=android.intent.action.VIEW dat=https:/... }, Intent { act=android.intent.action.GET_CONTENT dat=content://*/... typ=*/* }]
+    dataDir=/data/user/0/com.lpp.mobile
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    usesOptionalLibraries:
+      androidx.window.extensions
+      androidx.window.sidecar
+    usesLibraryFiles:
+      /system_ext/framework/androidx.window.extensions.jar
+      /system_ext/framework/androidx.window.sidecar.jar
+    timeStamp=2026-06-06 18:03:35
+    lastUpdateTime=2026-06-06 18:03:35
+    installerPackageName=pc
+    packageSource=0
+    signatures=PackageSignatures{7e22909 version:2, signatures:[551390ab], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    declared permissions:
+      com.lpp.mobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: prot=signature, INSTALLED
+    requested permissions:
+      android.permission.INTERNET
+      android.permission.ACCESS_NETWORK_STATE
+      android.permission.ACCESS_COARSE_LOCATION
+      android.permission.ACCESS_FINE_LOCATION
+      android.permission.CAMERA
+      android.permission.RECORD_AUDIO
+      android.permission.MODIFY_AUDIO_SETTINGS
+      android.permission.READ_MEDIA_IMAGES
+      android.permission.READ_MEDIA_VIDEO
+      android.permission.READ_MEDIA_AUDIO
+      android.permission.POST_NOTIFICATIONS
+      android.permission.VIBRATE
+      android.permission.USE_FULL_SCREEN_INTENT
+      android.permission.WAKE_LOCK
+      com.lpp.mobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+    install permissions:
+      com.lpp.mobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+      android.permission.MODIFY_AUDIO_SETTINGS: granted=true
+      android.permission.INTERNET: granted=true
+      android.permission.USE_FULL_SCREEN_INTENT: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+      android.permission.VIBRATE: granted=true
+      android.permission.WAKE_LOCK: granted=true
+    User 0: ceDataInode=147538 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 ofs=0 pdm=false instant=false virtual=false
+      installReason=0
+      firstInstallTime=2026-06-06 03:20:51
+      uninstallReason=0
+      overlay paths:
+        /product/overlay/NavigationBarMode3Button/NavigationBarMode3ButtonOverlay.apk
+        /data/resource-cache/com.android.systemui-neutral-b4Y4.frro
+        /data/resource-cache/com.android.systemui-accent-OLAm.frro
+      legacy overlay paths:
+        /product/overlay/NavigationBarMode3Button/NavigationBarMode3ButtonOverlay.apk
+      lastDisabledCaller: pc
+      gids=[3003]
+      runtime permissions:
+        android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.ACCESS_FINE_LOCATION: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.ACCESS_COARSE_LOCATION: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.READ_MEDIA_IMAGES: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.CAMERA: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.READ_MEDIA_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.READ_MEDIA_VIDEO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+
+Queries:
+  system apps queryable: false
+  queries via forceQueryable:
+  queries via package name:
+  queries via component:
+    com.heytap.market:
+      com.lpp.mobile
+    com.heytap.speechassist:
+      com.lpp.mobile
+    com.oplus.ocar:
+      com.lpp.mobile
+    com.sohu.inputmethod.sogouoem:
+      com.lpp.mobile
+    com.nearme.instant.platform:
+      com.lpp.mobile
+    com.heytap.browser:
+      com.lpp.mobile
+    com.heytap.tas:
+      com.lpp.mobile
+    com.coloros.directui:
+      com.lpp.mobile
+    com.heytap.htms:
+      com.lpp.mobile
+    com.heytap.pictorial:
+      com.lpp.mobile
+    com.android.settings.intelligence:
+      com.lpp.mobile
+    com.android.systemui:
+      com.lpp.mobile
+    com.heytap.music:
+      com.lpp.mobile
+    com.finshell.wallet:
+      com.lpp.mobile
+    com.heytap.themestore:
+      com.lpp.mobile
+    com.oppo.community:
+      com.lpp.mobile
+    com.oppo.store:
+      com.lpp.mobile
+    com.heytap.health:
+      com.lpp.mobile
+    com.coloros.note:
+      com.lpp.mobile
+    com.heytap.reader:
+      com.lpp.mobile
+    com.ximalaya.ting.android:
+      com.lpp.mobile
+    ctrip.android.view:
+      com.lpp.mobile
+    com.youku.phone:
+      com.lpp.mobile
+    com.sina.weibo:
+      com.lpp.mobile
+    com.taobao.taobao:
+      com.lpp.mobile
+    com.redteamobile.roaming:
+      com.lpp.mobile
+    com.tencent.mm:
+      com.lpp.mobile
+    com.lpp.mobile:
+      com.coloros.video
+      com.heytap.speechassist
+      com.heytap.browser
+      com.android.contacts
+      com.coloros.filemanager
+      com.heytap.yoli
+      com.coloros.note
+      com.ss.android.article.news
+      com.smile.gifmaker
+      com.tencent.mtt
+      com.baidu.searchbox
+      com.baidu.BaiduMap
+      com.youku.phone
+      com.sina.weibo
+      com.taobao.taobao
+      com.android.chrome
+  queryable via interaction:
+    User 0:
+      [com.android.networkstack.tethering.inprocess,com.oplus.battery,com.oplus.appplatform,com.oplus.healthservice,com.android.location.fused,com.android.localtransport,com.android.keychain,com.oplus.notificationmanager,com.oplus.bttestmode,com.oplus.athena,com.android.settings,com.oplus.wirelesssettings,com.oplus.sauhelper,com.oplus.engineermode,com.oplus.vdc,com.oplus.onetrace,com.android.networkstack.inprocess,com.android.server.telecom,com.oplus.sau,com.wapi.wapicertmanage,com.oplus.securitypermission,com.android.inputdevices,oplus,com.heytap.mcs,com.qualcomm.qti.xrvd.service,com.oplus.qualityprotect,com.oplus.wifibackuprestore,com.android.providers.settings,com.oplus.lfeh,com.oplus.customize.coreapp,com.oplus.powermonitor,com.oplus.subsys,com.oplus.engineernetwork,com.oplus.trafficmonitor,com.oplus.safecenter,com.android.dynsystem,com.android.wallpaperbackup,com.oplus.atlas,com.oplus.audio.effectcenter,com.tencent.soter.soterserver,com.oplus.engineercamera,com.oplus.exsystemservice,com.oplus.postmanservice,com.oplus.obrain,com.oplus.olc,com.oplus.logkit,android,com.oplus.crashbox,com.oplus.nas]:
+        com.lpp.mobile
+      [com.google.android.gsf,com.google.android.gms]:
+        com.lpp.mobile
+  queryable via uses-library:
+
+Dexopt state:
+  [com.lpp.mobile]
+    path: /data/app/~~1iS_R_BFOyb_JbeX69lbJA==/com.lpp.mobile-D0s8POq0EEXXfZDr0fxZ3g==/base.apk
+      arm64: [status=run-from-apk] [reason=unknown]
+  BgDexopt state:
+    enabled:true
+    mDexOptThread:null
+    mDexOptCancellingThread:null
+    mFinishedPostBootUpdate:true
+    mLastExecutionStatus:0
+    mLastExecutionStartTimeMs:2156356198
+    mLastExecutionDurationIncludingSleepMs:97788
+    mLastExecutionStartUptimeMs:940746067
+    mLastExecutionDurationMs:97789
+    now:2187076072
+    mLastCancelledPackages:
+    mFailedPackageNamesPrimary:com.tencent.soter.soterserver,com.coloros.phonemanager
+    mFailedPackageNamesSecondary:
+
+Compiler stats:
+  [com.lpp.mobile]
+     base.apk - 2831

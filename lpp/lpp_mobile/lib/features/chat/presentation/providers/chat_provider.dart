@@ -4,6 +4,7 @@ import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.
 import 'package:lpp_mobile/features/chat/data/datasources/pending_message_queue.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/gateway_event_handler.dart';
+import 'package:lpp_mobile/features/chat/data/mappers/message_send_failure_mapper.dart';
 import 'package:lpp_mobile/features/chat/data/repositories/chat_repository_impl.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/group_entities.dart';
@@ -365,12 +366,14 @@ final sendMessageUseCaseProvider =
   return SendMessageUseCase(
     repository: repo,
     currentUserId: currentUserId,
+    failureMapper: mapAppErrorToMessageSendFailure,
     onPendingEnqueue: ({
       required clientMsgId,
       required conversationId,
       required isGroup,
       required type,
       required body,
+      mentions,
     }) {
       return PendingMessageQueue().enqueue(PendingMessage(
         clientMsgId: clientMsgId,
@@ -378,6 +381,7 @@ final sendMessageUseCaseProvider =
         isGroup: isGroup,
         messageType: GatewayEventHandler.messageTypeToApiString(type),
         body: body.toJson(),
+        mentions: mentions,
         createdAt: DateTime.now(),
       ));
     },

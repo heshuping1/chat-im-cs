@@ -1,0 +1,9 @@
+iteration	step	status	seconds	log
+1	docs check	FAIL(1)	0	iteration-1/01_docs.log
+1	flutter pub get	PASS	2	iteration-1/02_pub_get.log
+1	flutter analyze	PASS	4	iteration-1/03_analyze.log
+1	flutter test	FAIL(1)	48	iteration-1/04_flutter_test.log
+1	flutter build apk debug	PASS	36	iteration-1/05_build_debug_apk.log
+1	adb install debug apk	FAIL(1)	8	iteration-1/07_adb_install.log
+1	adb launch smoke	PASS	1	iteration-1/08_adb_launch.log
+1	adb process check	PASS	0	iteration-1/09_adb_pid_check.log

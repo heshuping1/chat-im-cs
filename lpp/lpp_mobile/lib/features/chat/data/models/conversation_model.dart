@@ -1,4 +1,5 @@
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 
 /// API 响应 → Domain 实体的映射模型
 class ConversationModel {
@@ -46,6 +47,7 @@ class ConversationModel {
             isSelf: _boolValue(lastMsgJson['isSelf']) ||
                 _boolValue(lastMsgJson['isMine']),
             direction: _firstString(lastMsgJson, const ['direction']),
+            mentions: _parseMentions(lastMsgJson['mentions']),
           )
         : null;
 
@@ -204,8 +206,24 @@ class ConversationModel {
           if (c.lastMessage!.isSelf) 'isSelf': true,
           if (c.lastMessage!.direction != null)
             'direction': c.lastMessage!.direction,
+          if (c.lastMessage!.mentions != null)
+            'mentions':
+                c.lastMessage!.mentions!.map((e) => e.toJson()).toList(),
         },
     };
+  }
+
+  static List<Mention>? _parseMentions(Object? raw) {
+    if (raw is! List) return null;
+    final mentions = <Mention>[];
+    for (final item in raw) {
+      if (item is Map<String, dynamic>) {
+        mentions.add(Mention.fromJson(item));
+      } else if (item is Map) {
+        mentions.add(Mention.fromJson(Map<String, dynamic>.from(item)));
+      }
+    }
+    return mentions.isEmpty ? null : mentions;
   }
 
   static bool _boolValue(Object? value) {

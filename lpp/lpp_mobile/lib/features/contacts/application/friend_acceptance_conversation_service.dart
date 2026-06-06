@@ -1,9 +1,5 @@
-import 'package:lpp_mobile/core/di/injector.dart';
-import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
-import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
-import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/contacts/domain/entities/contact.dart';
 
 class FriendAcceptanceConversationDraft {
@@ -41,95 +37,153 @@ class FriendAcceptanceConversationDraft {
   }
 }
 
-/// 好友通过后按微信体验补齐会话入口：
-/// 1. 创建/复用单聊；
-/// 2. 写入本地系统消息：申请说明 + 验证通过；
-/// 3. 更新会话摘要，让消息列表立即出现该会话。
+class FriendAcceptanceConversationResult {
+  final String conversationId;
+
+  const FriendAcceptanceConversationResult({
+    required this.conversationId,
+  });
+}
+
+abstract class FriendAcceptanceConversationGateway {
+  Future<String?> createDirectConversation(String peerUserId);
+}
+
+abstract class FriendAcceptanceConversationStore {
+  Future<void> upsertMessages(
+    String spaceId,
+    String conversationId,
+    List<Message> messages,
+  );
+
+  Future<List<Conversation>> getConversations(String spaceId);
+
+  Future<void> upsertConversation(String spaceId, Conversation conversation);
+}
+
+typedef FriendAcceptanceClock = DateTime Function();
+
+/// 好友通过后按微信体验补齐会话入口。
 ///
 /// 服务端当前好友申请结果事件不返回消息对象，所以这里是本地体验补齐；
 /// 后续如果服务端返回正式 event message，SQLite upsert 会按 messageId 去重。
-Future<void> ensureFriendAcceptanceConversation(
-  dynamic ref,
-  FriendAcceptanceConversationDraft draft,
-) async {
-  final space = ref.read(currentSpaceProvider);
-  if (space == null || draft.peerUserId.isEmpty) return;
+class FriendAcceptanceConversationService {
+  final FriendAcceptanceConversationGateway gateway;
+  final FriendAcceptanceConversationStore store;
+  final FriendAcceptanceClock now;
 
-  final dio = ref.read(dioProvider);
-  final response = await dio.post<Map<String, dynamic>>(
-    '/api/client/v1/direct-chats',
-    data: {'peerUserId': draft.peerUserId},
-  );
-  final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-  final chatId = (data['chatId'] ?? data['conversationId']) as String?;
-  if (chatId == null || chatId.isEmpty) return;
+  const FriendAcceptanceConversationService({
+    required this.gateway,
+    required this.store,
+    FriendAcceptanceClock? now,
+  }) : now = now ?? _utcNow;
 
-  final now = DateTime.now().toUtc();
-  final requestText = draft.requestMessage?.trim();
-  final messages = <Message>[
-    if (requestText != null && requestText.isNotEmpty)
-      _eventMessage(
-        messageId: 'friend_request_${draft.requestId}_request',
-        conversationId: chatId,
-        conversationSeq: -2,
-        senderUserId: draft.peerUserId,
-        sentAt: now.subtract(const Duration(milliseconds: 1)),
-        text: '好友申请：$requestText',
-        eventType: 'friend_request',
+  Future<FriendAcceptanceConversationResult?> ensureConversation({
+    required String spaceId,
+    required String currentUserId,
+    required FriendAcceptanceConversationDraft draft,
+  }) async {
+    if (draft.peerUserId.isEmpty) return null;
+
+    final chatId = await gateway.createDirectConversation(draft.peerUserId);
+    if (chatId == null || chatId.isEmpty) return null;
+
+    final acceptedAt = now().toUtc();
+    final messages = _buildLocalEventMessages(
+      chatId: chatId,
+      currentUserId: currentUserId,
+      acceptedAt: acceptedAt,
+      draft: draft,
+    );
+    await store.upsertMessages(spaceId, chatId, messages);
+
+    final existing = await _findConversation(spaceId, chatId);
+    await store.upsertConversation(
+      spaceId,
+      _conversationWithLatestAcceptanceEvent(
+        existing: existing,
+        chatId: chatId,
+        draft: draft,
+        last: messages.last,
       ),
-    _eventMessage(
-      messageId: 'friend_request_${draft.requestId}_accepted',
-      conversationId: chatId,
-      conversationSeq: -1,
-      senderUserId: space.userId,
-      sentAt: now,
-      text: draft.acceptedText,
-      eventType: 'friend_request_accepted',
-    ),
-  ];
+    );
 
-  final local = ChatLocalDataSourceImpl();
-  await local.upsertMessages(space.spaceId, chatId, messages);
-
-  Conversation? existing;
-  for (final conversation in await local.getConversations(space.spaceId)) {
-    if (conversation.conversationId == chatId) {
-      existing = conversation;
-      break;
-    }
+    return FriendAcceptanceConversationResult(conversationId: chatId);
   }
-  final last = messages.last;
-  final existingSeq = existing?.lastMessageSeq ?? 0;
-  final updated = (existing ??
-          Conversation(
-            conversationId: chatId,
-            type: ConversationType.direct,
-            title: draft.peerDisplayName,
-            avatarUrl: draft.peerAvatarUrl,
-            peerUserId: draft.peerUserId,
-          ))
-      .copyWith(
-    type: ConversationType.direct,
-    title: existing?.title.isNotEmpty == true
-        ? existing!.title
-        : draft.peerDisplayName,
-    avatarUrl: existing?.avatarUrl ?? draft.peerAvatarUrl,
-    peerUserId: existing?.peerUserId ?? draft.peerUserId,
-    lastMessage: LastMessage(
-      messageId: last.messageId,
-      text: last.body.text,
-      messageType: 'event',
-      senderUserId: last.senderUserId,
-      sentAt: last.sentAt,
-    ),
-    lastActivityAt: last.sentAt,
-    lastMessageSeq: existingSeq <= 0 ? last.conversationSeq : existingSeq,
-    unreadCount: existing?.unreadCount ?? 0,
-  );
-  await local.upsertConversation(space.spaceId, updated);
 
-  ref.invalidate(conversationsProvider(space.spaceId));
-  ref.invalidate(chatProvider((space.spaceId, chatId, false)));
+  List<Message> _buildLocalEventMessages({
+    required String chatId,
+    required String currentUserId,
+    required DateTime acceptedAt,
+    required FriendAcceptanceConversationDraft draft,
+  }) {
+    final requestText = draft.requestMessage?.trim();
+    return <Message>[
+      if (requestText != null && requestText.isNotEmpty)
+        _eventMessage(
+          messageId: 'friend_request_${draft.requestId}_request',
+          conversationId: chatId,
+          conversationSeq: -2,
+          senderUserId: draft.peerUserId,
+          sentAt: acceptedAt.subtract(const Duration(milliseconds: 1)),
+          text: '好友申请：$requestText',
+          eventType: 'friend_request',
+        ),
+      _eventMessage(
+        messageId: 'friend_request_${draft.requestId}_accepted',
+        conversationId: chatId,
+        conversationSeq: -1,
+        senderUserId: currentUserId,
+        sentAt: acceptedAt,
+        text: draft.acceptedText,
+        eventType: 'friend_request_accepted',
+      ),
+    ];
+  }
+
+  Future<Conversation?> _findConversation(String spaceId, String chatId) async {
+    for (final conversation in await store.getConversations(spaceId)) {
+      if (conversation.conversationId == chatId) {
+        return conversation;
+      }
+    }
+    return null;
+  }
+
+  Conversation _conversationWithLatestAcceptanceEvent({
+    required Conversation? existing,
+    required String chatId,
+    required FriendAcceptanceConversationDraft draft,
+    required Message last,
+  }) {
+    final existingSeq = existing?.lastMessageSeq ?? 0;
+    return (existing ??
+            Conversation(
+              conversationId: chatId,
+              type: ConversationType.direct,
+              title: draft.peerDisplayName,
+              avatarUrl: draft.peerAvatarUrl,
+              peerUserId: draft.peerUserId,
+            ))
+        .copyWith(
+      type: ConversationType.direct,
+      title: existing?.title.isNotEmpty == true
+          ? existing!.title
+          : draft.peerDisplayName,
+      avatarUrl: existing?.avatarUrl ?? draft.peerAvatarUrl,
+      peerUserId: existing?.peerUserId ?? draft.peerUserId,
+      lastMessage: LastMessage(
+        messageId: last.messageId,
+        text: last.body.text,
+        messageType: 'event',
+        senderUserId: last.senderUserId,
+        sentAt: last.sentAt,
+      ),
+      lastActivityAt: last.sentAt,
+      lastMessageSeq: existingSeq <= 0 ? last.conversationSeq : existingSeq,
+      unreadCount: existing?.unreadCount ?? 0,
+    );
+  }
 }
 
 Message _eventMessage({
@@ -158,3 +212,5 @@ Message _eventMessage({
     sentAt: sentAt,
   );
 }
+
+DateTime _utcNow() => DateTime.now().toUtc();

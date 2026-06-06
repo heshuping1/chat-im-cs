@@ -19,6 +19,8 @@ import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/audio_player_service.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/image_viewer_page.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/message_media_preview_model.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/message_upload_progress_model.dart';
 import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 import 'package:open_filex/open_filex.dart';
@@ -183,6 +185,9 @@ class MessageBubble extends ConsumerWidget {
                         status: message.status,
                         isReadByPeer: message.isReadByPeer,
                         showReadReceipt: groupId == null,
+                        showSendingProgress: !_suppressesExternalSendProgress(
+                          message,
+                        ),
                         onFailedTap: onFailedTap,
                       ),
                       const SizedBox(width: 4),
@@ -292,11 +297,13 @@ class _StatusIndicator extends StatelessWidget {
   final MessageStatus status;
   final bool isReadByPeer;
   final bool showReadReceipt;
+  final bool showSendingProgress;
   final VoidCallback? onFailedTap;
-  _StatusIndicator({
+  const _StatusIndicator({
     required this.status,
     this.isReadByPeer = false,
     required this.showReadReceipt,
+    this.showSendingProgress = true,
     this.onFailedTap,
   });
 
@@ -304,6 +311,7 @@ class _StatusIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     switch (status) {
       case MessageStatus.sending:
+        if (!showSendingProgress) return const SizedBox.shrink();
         return SizedBox(
           width: 14,
           height: 14,
@@ -338,6 +346,19 @@ class _StatusIndicator extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+
+bool _suppressesExternalSendProgress(Message message) {
+  final uploadState = message.localUploadState;
+  if (uploadState != null && uploadState.isActive) return true;
+  final url = switch (message.type) {
+    MessageType.image => message.body.image?.url,
+    MessageType.video => message.body.video?.url,
+    _ => null,
+  };
+  if (url == null || url.isEmpty) return false;
+  return url.startsWith('/') ||
+      (!url.startsWith('http://') && !url.startsWith('https://'));
+}
 // Recalled Bubble
 // ---------------------------------------------------------------------------
 
@@ -475,8 +496,6 @@ class _TextBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = message.body.text ?? '';
-
     // 微信风格：正文气泡 + 下方引用块（分离显示）
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,11 +528,7 @@ class _TextBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 正文
-              Text(text,
-                  style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      height: 1.4)),
+              _MentionAwareText(message: message),
               // 翻译
               if (message.isTranslating)
                 Container(
@@ -642,38 +657,50 @@ class _ImageBubble extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rawUrl = message.body.image?.url;
-    // 本地文件：以 / 开头但不是 /media/ 这类服务端相对路径，或者是绝对本地路径
-    final isLocalFile = rawUrl != null &&
-        !rawUrl.startsWith('http') &&
-        !rawUrl.startsWith('/media') &&
-        !rawUrl.startsWith('/api');
-    final url = rawUrl;
+    final media = message.body.image;
+    final actionUrl = media?.url;
+    final url = imageBubbleVisualSource(media);
+    final uploadPresentation =
+        imageMessageUploadPresentation(message.localUploadState);
+    final isLocalFile = isLocalVisualMediaUrl(url) &&
+        url != null &&
+        !url.startsWith('/media') &&
+        !url.startsWith('/api');
 
     return GestureDetector(
-      onTap: url != null && !isLocalFile
+      onTap: actionUrl != null && !isLocalVisualMediaUrl(actionUrl)
           ? () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => ImageViewerPage(imageUrls: [url]),
+                  builder: (_) => ImageViewerPage(imageUrls: [actionUrl]),
                 ),
               )
           : null,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: url != null
-            ? isLocalFile
-                // 发送中：本地文件路径，由平台适配层选择可用的渲染方式
-                ? localImageWidget(url,
-                    width: 200, height: 200, fit: BoxFit.cover)
-                : AppNetworkImage(
-                    url: url,
-                    width: 200,
-                    height: 200,
-                    fit: BoxFit.cover,
-                    placeholderBuilder: _placeholder,
-                    errorBuilder: _placeholder,
-                  )
-            : _placeholder(context),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            url != null
+                ? isLocalFile
+                    // 发送中：本地文件路径，由平台适配层选择可用的渲染方式
+                    ? localImageWidget(localPathFromUriOrPath(url),
+                        width: 200, height: 200, fit: BoxFit.cover)
+                    : AppNetworkImage(
+                        url: url,
+                        width: 200,
+                        height: 200,
+                        fit: BoxFit.cover,
+                        placeholderBuilder: _placeholder,
+                        errorBuilder: _placeholder,
+                      )
+                : _placeholder(context),
+            if (uploadPresentation.active)
+              _MediaUploadOverlay(
+                key: const ValueKey('message-image-upload-progress'),
+                uploadPresentation: uploadPresentation,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -997,38 +1024,60 @@ class _VideoBubble extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final thumbnailUrl = message.body.video?.thumbnailUrl;
+    final posterUrl = videoBubblePosterSource(message.body.video);
     final duration = message.body.video?.durationSeconds;
+    final uploadPresentation =
+        videoMessageUploadPresentation(message.localUploadState);
+    final isLocalPoster = isLocalVisualMediaUrl(posterUrl) &&
+        posterUrl != null &&
+        !posterUrl.startsWith('/media') &&
+        !posterUrl.startsWith('/api');
 
     return GestureDetector(
-      onTap: () => _openMediaResource(
-        context,
-        ref,
-        message.body.video,
-        fallbackName: 'video.mp4',
-      ),
+      onTap: uploadPresentation.active
+          ? null
+          : () => _openMediaResource(
+                context,
+                ref,
+                message.body.video,
+                fallbackName: 'video.mp4',
+              ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            thumbnailUrl != null
-                ? AppNetworkImage(
-                    url: thumbnailUrl,
-                    width: 220,
-                    height: 160,
-                    fit: BoxFit.cover,
-                    placeholderBuilder: _placeholder,
-                    errorBuilder: _placeholder)
+            posterUrl != null
+                ? isLocalPoster
+                    ? localImageWidget(
+                        localPathFromUriOrPath(posterUrl),
+                        width: 220,
+                        height: 160,
+                        fit: BoxFit.cover,
+                      )
+                    : AppNetworkImage(
+                        url: posterUrl,
+                        width: 220,
+                        height: 160,
+                        fit: BoxFit.cover,
+                        placeholderBuilder: _placeholder,
+                        errorBuilder: _placeholder)
                 : _placeholder(context),
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
-              child: Icon(Icons.play_arrow,
-                  color: Theme.of(context).colorScheme.surface, size: 28),
-            ),
+            if (uploadPresentation.active)
+              _MediaUploadOverlay(
+                key: const ValueKey('message-video-upload-progress'),
+                uploadPresentation: uploadPresentation,
+              )
+            else
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    shape: BoxShape.circle),
+                child: Icon(Icons.play_arrow,
+                    color: Theme.of(context).colorScheme.surface, size: 28),
+              ),
             if (duration != null)
               Positioned(
                 bottom: 8,
@@ -1061,6 +1110,59 @@ class _VideoBubble extends ConsumerWidget {
       '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 }
 
+class _MediaUploadOverlay extends StatelessWidget {
+  final MessageUploadPresentation uploadPresentation;
+
+  const _MediaUploadOverlay({
+    super.key,
+    required this.uploadPresentation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = uploadPresentation.progress.clamp(0, 100).toInt();
+    final color =
+        uploadPresentation.failed ? Colors.redAccent : const Color(0xFFFFFFFF);
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        shape: BoxShape.circle,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 54,
+            height: 54,
+            child: CustomPaint(
+              painter: _UploadRingPainter(
+                progress: progress,
+                color: color,
+                trackColor: Colors.white.withValues(alpha: 0.22),
+                strokeWidth: 3,
+              ),
+            ),
+          ),
+          if (uploadPresentation.failed)
+            const Icon(Icons.error_outline, size: 24, color: Colors.redAccent)
+          else
+            Text(
+              '$progress%',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                height: 1,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // File Bubble
 // ---------------------------------------------------------------------------
@@ -1078,16 +1180,20 @@ class _FileBubble extends ConsumerWidget {
     final name =
         file?.fileName ?? AppLocalizations.of(context).chatFileDefaultName;
     final size = file?.sizeBytes;
+    final uploadPresentation =
+        fileMessageUploadPresentation(message.localUploadState);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _openMediaResource(
-          context,
-          ref,
-          file,
-          fallbackName: name,
-        ),
+        onTap: uploadPresentation.active
+            ? null
+            : () => _openMediaResource(
+                  context,
+                  ref,
+                  file,
+                  fallbackName: name,
+                ),
         borderRadius: br,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 240),
@@ -1097,17 +1203,10 @@ class _FileBubble extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4A90E2).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.insert_drive_file,
-                      color: Color(0xFF4A90E2), size: 24),
+                _FileIconWithUploadProgress(
+                  uploadPresentation: uploadPresentation,
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Flexible(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1120,14 +1219,14 @@ class _FileBubble extends ConsumerWidget {
                               color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w500)),
                       if (size != null) ...[
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(_fmtSize(size),
                             style: TextStyle(
                                 fontSize: 11,
                                 color: Theme.of(context)
                                     .colorScheme
                                     .onSurface
-                                    .withOpacity(0.5))),
+                                    .withValues(alpha: 0.5))),
                       ],
                     ],
                   ),
@@ -1144,6 +1243,100 @@ class _FileBubble extends ConsumerWidget {
     if (b < 1024) return '$b B';
     if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
     return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+class _FileIconWithUploadProgress extends StatelessWidget {
+  final MessageUploadPresentation uploadPresentation;
+
+  const _FileIconWithUploadProgress({
+    required this.uploadPresentation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const blue = Color(0xFF4A90E2);
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: blue.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(
+            uploadPresentation.failed
+                ? Icons.error_outline
+                : Icons.insert_drive_file,
+            color: uploadPresentation.failed ? Colors.redAccent : blue,
+            size: 24,
+          ),
+          if (uploadPresentation.active)
+            SizedBox(
+              key: const ValueKey('message-file-upload-progress'),
+              width: 34,
+              height: 34,
+              child: CustomPaint(
+                painter: _UploadRingPainter(
+                  progress: uploadPresentation.progress,
+                  color: uploadPresentation.failed ? Colors.redAccent : blue,
+                  trackColor: blue.withValues(alpha: 0.18),
+                  strokeWidth: 2.4,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UploadRingPainter extends CustomPainter {
+  final int progress;
+  final Color color;
+  final Color trackColor;
+  final double strokeWidth;
+
+  const _UploadRingPainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final inset = strokeWidth / 2;
+    final arcRect = rect.deflate(inset);
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    final meterPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(arcRect, -math.pi / 2, math.pi * 2, false, trackPaint);
+    canvas.drawArc(
+      arcRect,
+      -math.pi / 2,
+      math.pi * 2 * (progress.clamp(0, 100).toDouble() / 100),
+      false,
+      meterPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _UploadRingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }
 
@@ -1276,6 +1469,59 @@ class _EventBubble extends StatelessWidget {
                 color:
                     Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
       ),
+    );
+  }
+}
+
+class _MentionAwareText extends StatelessWidget {
+  final Message message;
+
+  const _MentionAwareText({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = message.body.text ?? '';
+    final baseStyle = TextStyle(
+      fontSize: 15,
+      color: Theme.of(context).colorScheme.onSurface,
+      height: 1.4,
+    );
+    final mentions = message.mentions
+            ?.where(
+              (mention) =>
+                  mention.offset >= 0 &&
+                  mention.length > 0 &&
+                  mention.offset + mention.length <= text.length,
+            )
+            .toList(growable: false) ??
+        const <Mention>[];
+    if (mentions.isEmpty) return Text(text, style: baseStyle);
+
+    final sorted = [...mentions]..sort((a, b) => a.offset.compareTo(b.offset));
+    final spans = <TextSpan>[];
+    var cursor = 0;
+    for (final mention in sorted) {
+      if (mention.offset < cursor) continue;
+      if (mention.offset > cursor) {
+        spans.add(TextSpan(text: text.substring(cursor, mention.offset)));
+      }
+      spans.add(
+        TextSpan(
+          text: text.substring(mention.offset, mention.offset + mention.length),
+          style: baseStyle.copyWith(
+            color: const Color(0xFF2F6FED),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+      cursor = mention.offset + mention.length;
+    }
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor)));
+    }
+
+    return RichText(
+      text: TextSpan(style: baseStyle, children: spans),
     );
   }
 }

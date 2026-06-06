@@ -17,6 +17,7 @@ import {
 } from "../../../media/runtime/imagePrecache";
 import {
   imageVisibleSource,
+  isInstantLocalImageSource,
   sameMediaUrl,
   useCachedImageMediaUrl,
 } from "../../../media/runtime/useCachedImageMediaUrl";
@@ -70,9 +71,7 @@ export function ImagePart({
     item?.remoteSourceUrl ||
     (src && !isTransientImageUrl(src) ? src : undefined);
   const fileName = item?.fileName;
-  const localImage = Boolean(
-    typeof src === "string" && (src.startsWith("blob:") || src.startsWith("data:")),
-  );
+  const localImage = isInstantLocalImageSource(src);
   const cacheKey = item?.imageCacheKey ?? imageMediaCacheKey(media, src);
   const { cached, displaySrc, failed, loadCachedMedia } = useCachedImageMediaUrl(
     src,

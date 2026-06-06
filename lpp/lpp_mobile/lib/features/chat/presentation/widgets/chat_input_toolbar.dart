@@ -10,6 +10,10 @@ import 'package:lpp_mobile/app/theme/theme.dart';
 import 'package:lpp_mobile/core/utils/debouncer.dart';
 import 'package:lpp_mobile/core/widgets/app_toast.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/services/mention_composer.dart';
+import 'package:lpp_mobile/features/chat/presentation/pages/chat_camera_capture_page.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/emoji_picker_panel.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/voice_recorder.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
@@ -18,6 +22,28 @@ import 'package:lpp_mobile/features/settings/presentation/providers/chat_input_s
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
 enum _InputMode { text, voice, emoji, tools }
+
+class ChatMentionCandidate {
+  final String userId;
+  final String displayName;
+  final String? avatarUrl;
+
+  const ChatMentionCandidate({
+    required this.userId,
+    required this.displayName,
+    this.avatarUrl,
+  });
+}
+
+class ChatTextSendRequest {
+  final String text;
+  final List<Mention>? mentions;
+
+  const ChatTextSendRequest({
+    required this.text,
+    this.mentions,
+  });
+}
 
 class ChatInputToolbar extends ConsumerStatefulWidget {
   final String conversationId;
@@ -34,10 +60,11 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
   final String? muteReason;
 
   final FutureOr<bool> Function(String text) onSendText;
+  final FutureOr<bool> Function(ChatTextSendRequest request)? onSendTextRequest;
   final FutureOr<bool> Function(String text, DateTime scheduledAt)?
       onScheduleText;
   final Function(String filePath, int duration) onSendVoice;
-  final Function(List<String> imagePaths) onSendImages;
+  final FutureOr<void> Function(List<ChatPickedMedia> media) onSendMedia;
   final Function(
           String filePath, String fileName, String mimeType, int sizeBytes)?
       onSendFile;
@@ -50,6 +77,8 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
   final String? aiReplyContextText;
   final String? externalInsertText;
   final int externalInsertToken;
+  final List<ChatMentionCandidate> mentionCandidates;
+  final bool canMentionAll;
 
   const ChatInputToolbar({
     super.key,
@@ -60,9 +89,10 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
     this.canSpeak = true,
     this.muteReason,
     required this.onSendText,
+    this.onSendTextRequest,
     this.onScheduleText,
     required this.onSendVoice,
-    required this.onSendImages,
+    required this.onSendMedia,
     this.onSendFile,
     this.onVoiceCall,
     this.onVideoCall,
@@ -73,6 +103,8 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
     this.aiReplyContextText,
     this.externalInsertText,
     this.externalInsertToken = 0,
+    this.mentionCandidates = const [],
+    this.canMentionAll = false,
   });
 
   @override
@@ -84,9 +116,11 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
   final _imagePicker = ImagePicker();
+  MentionComposerDraft _mentionDraft = const MentionComposerDraft.empty();
   Timer? _draftTimer;
   bool _sendingText = false;
   DateTime? _scheduledSendAt;
+  int? _lastMentionPromptTextLength;
 
   bool get _isMutedForUser => widget.isMuted && !widget.canSpeak;
 
@@ -96,6 +130,10 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     // 恢复草稿
     if (widget.initialDraft != null && widget.initialDraft!.isNotEmpty) {
       _textController.text = widget.initialDraft!;
+      _mentionDraft = MentionComposerDraft(
+        text: widget.initialDraft!,
+        tokens: const [],
+      );
       _textController.selection = TextSelection.fromPosition(
         TextPosition(offset: widget.initialDraft!.length),
       );
@@ -158,15 +196,22 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     if (_sendingText) return;
     final text = _textController.text.trim();
     if (text.isEmpty) return;
+    final request = ChatTextSendRequest(
+      text: text,
+      mentions: widget.isGroup ? _mentionDraft.mentions : null,
+    );
     final scheduledAt = _scheduledSendAt;
     setState(() => _sendingText = true);
     _textController.clear();
+    _mentionDraft = const MentionComposerDraft.empty();
     _draftTimer?.cancel();
     try {
       final sent = scheduledAt == null
-          ? await Future.sync(() => widget.onSendText(text))
-              .then((value) => value)
-              .catchError((_) => false)
+          ? await Future.sync(
+              () =>
+                  widget.onSendTextRequest?.call(request) ??
+                  widget.onSendText(text),
+            ).then((value) => value).catchError((_) => false)
           : await Future.sync(
               () => widget.onScheduleText?.call(text, scheduledAt) ?? false,
             ).then((value) => value).catchError((_) => false);
@@ -225,20 +270,20 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
         !pressed.contains(LogicalKeyboardKey.metaRight);
   }
 
-  Future<void> _pickImages() async {
+  Future<void> _pickMediaFromGallery() async {
     if (_isMutedForUser) return;
     try {
-      final files = await _imagePicker.pickMultiImage(imageQuality: 85);
+      final files = await _imagePicker.pickMultipleMedia(imageQuality: 85);
       if (files.isNotEmpty) {
-        widget.onSendImages(files.map((f) => f.path).toList());
+        await _sendPickedFiles(files);
       }
     } catch (e) {
-      // pickMultiImage 不可用时降级为单张选图
+      // 部分系统相册能力不可用时降级为单张选图，至少保留旧体验。
       try {
         final file = await _imagePicker.pickImage(
             source: ImageSource.gallery, imageQuality: 85);
         if (file != null) {
-          widget.onSendImages([file.path]);
+          await _sendPickedFiles([file]);
         }
       } catch (_) {
         // 静默失败
@@ -246,13 +291,60 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     }
   }
 
-  Future<void> _takePhoto() async {
+  Future<void> _openCameraPicker() async {
     if (_isMutedForUser) return;
-    final file = await _imagePicker.pickImage(
-        source: ImageSource.camera, imageQuality: 85);
-    if (file != null) {
-      widget.onSendImages([file.path]);
+    final result = await Navigator.of(context).push<ChatCameraCaptureResult>(
+      MaterialPageRoute(builder: (_) => const ChatCameraCapturePage()),
+    );
+    if (result == null || !mounted) return;
+    await _sendCapturedMedia(result);
+  }
+
+  Future<void> _sendCapturedMedia(ChatCameraCaptureResult result) async {
+    int? sizeBytes;
+    try {
+      sizeBytes = await XFile(result.path).length();
+    } catch (_) {
+      sizeBytes = null;
     }
+    final media = result.kind == ChatCameraCaptureKind.video
+        ? ChatPickedMedia.video(
+            path: result.path,
+            fileName: result.name,
+            mimeType: result.mimeType,
+            sizeBytes: sizeBytes,
+          )
+        : ChatPickedMedia.image(
+            path: result.path,
+            fileName: result.name,
+            mimeType: result.mimeType,
+            sizeBytes: sizeBytes,
+          );
+    await Future.sync(() => widget.onSendMedia([media]));
+  }
+
+  Future<void> _sendPickedFiles(List<XFile> files) async {
+    final media = <ChatPickedMedia>[];
+    for (final file in files) {
+      media.add(await _pickedMediaFromXFile(file));
+    }
+    if (media.isEmpty) return;
+    await Future.sync(() => widget.onSendMedia(media));
+  }
+
+  Future<ChatPickedMedia> _pickedMediaFromXFile(XFile file) async {
+    int? sizeBytes;
+    try {
+      sizeBytes = await file.length();
+    } catch (_) {
+      sizeBytes = null;
+    }
+    return ChatPickedMedia.fromPickedFile(
+      path: file.path,
+      name: file.name,
+      mimeType: file.mimeType,
+      sizeBytes: sizeBytes,
+    );
   }
 
   Future<void> _pickFile() async {
@@ -311,12 +403,89 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     final start = sel.start < 0 ? text.length : sel.start;
     final end = sel.end < 0 ? text.length : sel.end;
     final newText = text.replaceRange(start, end, insertedText);
+    _mentionDraft = MentionComposerDraft(
+      text: newText,
+      tokens: _mentionDraft.tokens,
+    );
     _textController.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(offset: start + insertedText.length),
     );
     _scheduleDraftSave(newText);
     setState(() {}); // 触发重建，更新发送按钮状态
+  }
+
+  void _handleTextChanged(String text) {
+    _mentionDraft = MentionComposerDraft(
+      text: text,
+      tokens: _mentionDraft.tokens,
+    );
+    _scheduleDraftSave(text);
+    if (!widget.isGroup || _isMutedForUser) {
+      _lastMentionPromptTextLength = null;
+      return;
+    }
+    if (!_endsWithMentionTrigger(text)) {
+      _lastMentionPromptTextLength = null;
+      return;
+    }
+    if (_lastMentionPromptTextLength == text.length) return;
+    _lastMentionPromptTextLength = text.length;
+    unawaited(_openMentionPicker(replaceTypedAt: true));
+  }
+
+  bool _endsWithMentionTrigger(String text) {
+    return text.endsWith('@') || text.endsWith('＠');
+  }
+
+  bool _isMentionTriggerChar(String text) {
+    return text == '@' || text == '＠';
+  }
+
+  Future<void> _openMentionPicker({bool replaceTypedAt = false}) async {
+    if (_isMutedForUser || !widget.isGroup) return;
+    final selected = await showModalBottomSheet<_MentionPickResult>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => _MentionPickerSheet(
+        candidates: widget.mentionCandidates,
+        canMentionAll: widget.canMentionAll,
+      ),
+    );
+    if (selected == null || !mounted) return;
+    final selection = _textController.selection;
+    var start =
+        selection.start < 0 ? _textController.text.length : selection.start;
+    var end = selection.end < 0 ? _textController.text.length : selection.end;
+    if (replaceTypedAt && start > 0 && end == start) {
+      final text = _textController.text;
+      if (_isMentionTriggerChar(text.substring(start - 1, start))) {
+        start -= 1;
+      }
+    }
+    final draft = selected.isAll
+        ? _mentionDraft.insertAll(selectionStart: start, selectionEnd: end)
+        : _mentionDraft.insertUser(
+            userId: selected.userId!,
+            displayName: selected.displayName!,
+            selectionStart: start,
+            selectionEnd: end,
+          );
+    final insertedLength =
+        selected.isAll ? '@所有人 '.length : '@${selected.displayName} '.length;
+    _mentionDraft = draft;
+    _textController.value = TextEditingValue(
+      text: draft.text,
+      selection: TextSelection.collapsed(offset: start + insertedLength),
+    );
+    _scheduleDraftSave(draft.text);
+    _setMode(_InputMode.text);
+    _focusNode.requestFocus();
   }
 
   Future<void> _openQuickReplies() async {
@@ -506,7 +675,7 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
           textInputAction: TextInputAction.send,
           onEditingComplete: () {},
           onSubmitted: (_) => _sendText(),
-          onChanged: _scheduleDraftSave,
+          onChanged: _handleTextChanged,
           onTap: () {
             if (_mode != _InputMode.text) {
               setState(() => _mode = _InputMode.text);
@@ -563,18 +732,19 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
       return _ToolsPanel(
         isGroup: widget.isGroup,
         bottomPadding: bottomPadding,
-        onPickImages: _pickImages,
-        onTakePhoto: _takePhoto,
+        onPickImages: _pickMediaFromGallery,
+        onTakePhoto: _openCameraPicker,
         onPickFile: _pickFile,
         onVoiceCall: widget.onVoiceCall ?? () {},
         onVideoCall: widget.onVideoCall ?? () {},
         onLocation: widget.onLocation ?? () {},
-        onFavorite: widget.onFavorite ?? () {},
+        onFavorite: widget.onFavorite,
         onSendContactCard: widget.onSendContactCard,
         onScheduleMessage: _openSchedulePicker,
         onQuickReply: widget.quickReplyScope == null ? null : _openQuickReplies,
         onAiReply:
             widget.quickReplyScope == null ? null : _openAiReplySuggestions,
+        onMention: widget.isGroup ? _openMentionPicker : null,
       );
     }
 
@@ -892,6 +1062,232 @@ String _weekdayText(DateTime date) {
   return weekdays[date.weekday - 1];
 }
 
+class _MentionPickResult {
+  final bool isAll;
+  final String? userId;
+  final String? displayName;
+
+  const _MentionPickResult.all()
+      : isAll = true,
+        userId = null,
+        displayName = null;
+
+  const _MentionPickResult.user({
+    required this.userId,
+    required this.displayName,
+  }) : isAll = false;
+}
+
+class _MentionPickerSheet extends StatelessWidget {
+  final List<ChatMentionCandidate> candidates;
+  final bool canMentionAll;
+
+  const _MentionPickerSheet({
+    required this.candidates,
+    required this.canMentionAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final visibleCandidates = candidates
+        .where((candidate) => candidate.displayName.trim().isNotEmpty)
+        .toList(growable: false);
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.62,
+        child: Column(
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 8, bottom: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.onSurface.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(
+                children: [
+                  const SizedBox(width: 48),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        '选择提醒的人',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            if (canMentionAll)
+              _MentionTile(
+                icon: Icons.campaign_outlined,
+                title: '@所有人',
+                subtitle: '提醒群内全部成员',
+                onTap: () =>
+                    Navigator.of(context).pop(const _MentionPickResult.all()),
+              ),
+            Expanded(
+              child: visibleCandidates.isEmpty
+                  ? Center(
+                      child: Text(
+                        '暂无可提醒成员',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colorScheme.onSurface.withValues(alpha: 0.56),
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: EdgeInsets.only(bottom: 12 + bottomPadding),
+                      itemCount: visibleCandidates.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 0.5,
+                        indent: 64,
+                        color: Theme.of(context).dividerColor,
+                      ),
+                      itemBuilder: (context, index) {
+                        final candidate = visibleCandidates[index];
+                        return _MentionTile(
+                          avatarUrl: candidate.avatarUrl,
+                          title: candidate.displayName,
+                          onTap: () => Navigator.of(context).pop(
+                            _MentionPickResult.user(
+                              userId: candidate.userId,
+                              displayName: candidate.displayName,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MentionTile extends StatelessWidget {
+  final IconData? icon;
+  final String? avatarUrl;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  const _MentionTile({
+    this.icon,
+    this.avatarUrl,
+    required this.title,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: subtitle == null ? 56 : 64,
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            _MentionAvatar(icon: icon, avatarUrl: avatarUrl, title: title),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface.withValues(alpha: 0.56),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: colorScheme.onSurface.withValues(alpha: 0.28),
+            ),
+            const SizedBox(width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MentionAvatar extends StatelessWidget {
+  final IconData? icon;
+  final String? avatarUrl;
+  final String title;
+
+  const _MentionAvatar({
+    this.icon,
+    this.avatarUrl,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final url = avatarUrl;
+    if (url != null && url.isNotEmpty) {
+      return CircleAvatar(radius: 20, backgroundImage: NetworkImage(url));
+    }
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+      child: icon != null
+          ? Icon(icon, size: 21, color: colorScheme.primary)
+          : Text(
+              title.characters.take(1).string,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.primary,
+              ),
+            ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 更多工具面板
 // ---------------------------------------------------------------------------
@@ -905,11 +1301,12 @@ class _ToolsPanel extends StatelessWidget {
   final VoidCallback onVoiceCall;
   final VoidCallback onVideoCall;
   final VoidCallback onLocation;
-  final VoidCallback onFavorite;
+  final VoidCallback? onFavorite;
   final VoidCallback? onSendContactCard;
   final VoidCallback onScheduleMessage;
   final VoidCallback? onQuickReply;
   final VoidCallback? onAiReply;
+  final VoidCallback? onMention;
 
   const _ToolsPanel({
     required this.isGroup,
@@ -925,6 +1322,7 @@ class _ToolsPanel extends StatelessWidget {
     required this.onScheduleMessage,
     this.onQuickReply,
     this.onAiReply,
+    this.onMention,
   });
 
   @override
@@ -958,6 +1356,12 @@ class _ToolsPanel extends StatelessWidget {
           onTap: () {
             onSendContactCard?.call();
           }),
+      if (onMention != null)
+        _ToolItem(
+          icon: Icons.alternate_email_rounded,
+          label: '@成员',
+          onTap: onMention!,
+        ),
       if (onQuickReply != null)
         _ToolItem(
           icon: Icons.quickreply_outlined,
@@ -980,10 +1384,11 @@ class _ToolsPanel extends StatelessWidget {
             label: l10n.chatToolVideoCall,
             onTap: onVideoCall),
       ],
-      _ToolItem(
-          icon: Icons.star_border_rounded,
-          label: l10n.chatToolFavorites,
-          onTap: onFavorite),
+      if (onFavorite != null)
+        _ToolItem(
+            icon: Icons.star_border_rounded,
+            label: l10n.chatToolFavorites,
+            onTap: onFavorite!),
     ];
 
     final pages = <List<_ToolItem>>[];

@@ -15,6 +15,7 @@ class PendingMessage {
   final bool isGroup;
   final String messageType;
   final Map<String, dynamic> body;
+  final List<Mention>? mentions;
   final int retryCount;
   final DateTime createdAt;
 
@@ -24,6 +25,7 @@ class PendingMessage {
     required this.isGroup,
     required this.messageType,
     required this.body,
+    this.mentions,
     this.retryCount = 0,
     required this.createdAt,
   });
@@ -34,6 +36,7 @@ class PendingMessage {
     bool? isGroup,
     String? messageType,
     Map<String, dynamic>? body,
+    List<Mention>? mentions,
     int? retryCount,
     DateTime? createdAt,
   }) {
@@ -43,6 +46,7 @@ class PendingMessage {
       isGroup: isGroup ?? this.isGroup,
       messageType: messageType ?? this.messageType,
       body: body ?? this.body,
+      mentions: mentions ?? this.mentions,
       retryCount: retryCount ?? this.retryCount,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -54,6 +58,7 @@ class PendingMessage {
         'isGroup': isGroup,
         'messageType': messageType,
         'body': body,
+        'mentions': mentions?.map((mention) => mention.toJson()).toList(),
         'retryCount': retryCount,
         'createdAt': createdAt.toIso8601String(),
       };
@@ -64,6 +69,9 @@ class PendingMessage {
         isGroup: json['isGroup'] as bool? ?? false,
         messageType: json['messageType'] as String? ?? 'text',
         body: Map<String, dynamic>.from(json['body'] as Map? ?? {}),
+        mentions: (json['mentions'] as List<dynamic>?)
+            ?.map((e) => Mention.fromJson(e as Map<String, dynamic>))
+            .toList(),
         retryCount: json['retryCount'] as int? ?? 0,
         createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
             DateTime.now(),
@@ -137,6 +145,7 @@ class PendingMessageQueue {
           clientMsgId: message.clientMsgId,
           type: type,
           body: body,
+          mentions: message.isGroup ? message.mentions : null,
         );
 
         // 发送成功，从队列移除

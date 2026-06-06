@@ -192,14 +192,17 @@ void main() {
     expect(find.text('在线客服'), findsWidgets);
     expect(find.text('排队'), findsOneWidget);
     expect(find.text('接待人员'), findsOneWidget);
-    expect(find.text('客服人员'), findsOneWidget);
-    expect(find.text('账号状态 --'), findsOneWidget);
-    expect(find.text('接待状态 在线'), findsOneWidget);
-    expect(find.text('服务中 2/5'), findsOneWidget);
-    expect(find.text('最近心跳 --'), findsOneWidget);
+    expect(find.text('客服状态'), findsOneWidget);
     expect(find.text('客户会话 A'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, '在线客服'));
+    await tester.tap(find.widgetWithText(InkWell, '客服状态'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('客服小王'), findsOneWidget);
+    expect(find.text('服务中 2/5 · 手动接入'), findsOneWidget);
+    expect(find.text('在线'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(InkWell, '在线客服'));
     await tester.pumpAndSettle();
 
     expect(find.text('访客咨询 A'), findsOneWidget);

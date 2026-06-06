@@ -1,3 +1,7 @@
+import 'package:lpp_mobile/features/chat/domain/services/message_local_upload_state.dart';
+
+export 'package:lpp_mobile/features/chat/domain/services/message_local_upload_state.dart';
+
 enum MessageType {
   text,
   markdown,
@@ -84,6 +88,7 @@ class Message {
   final bool isReadByPeer; // 单聊：对方已读（由 msg.read 事件驱动）
   final String? failureReason; // 发送失败原因（本地状态，用于重试/诊断）
   final bool isSelf; // 服务端/Gateway 明确标记为当前账号发送
+  final MessageLocalUploadState? localUploadState; // 本地上传展示状态，不进入发送 body
 
   const Message({
     required this.messageId,
@@ -105,6 +110,7 @@ class Message {
     this.isReadByPeer = false,
     this.failureReason,
     this.isSelf = false,
+    this.localUploadState,
   });
 
   Message copyWith({
@@ -127,6 +133,8 @@ class Message {
     bool? isReadByPeer,
     String? failureReason,
     bool? isSelf,
+    MessageLocalUploadState? localUploadState,
+    bool clearLocalUploadState = false,
   }) {
     return Message(
       messageId: messageId ?? this.messageId,
@@ -148,6 +156,9 @@ class Message {
       isReadByPeer: isReadByPeer ?? this.isReadByPeer,
       failureReason: failureReason ?? this.failureReason,
       isSelf: isSelf ?? this.isSelf,
+      localUploadState: clearLocalUploadState
+          ? null
+          : localUploadState ?? this.localUploadState,
     );
   }
 }
@@ -434,6 +445,8 @@ class MediaResource {
   final int? height;
   final int? durationSeconds;
   final String? thumbnailUrl;
+  final String? localPreviewUrl;
+  final String? localPosterUrl;
 
   const MediaResource({
     required this.url,
@@ -444,6 +457,8 @@ class MediaResource {
     this.height,
     this.durationSeconds,
     this.thumbnailUrl,
+    this.localPreviewUrl,
+    this.localPosterUrl,
   });
 
   factory MediaResource.fromJson(Map<String, dynamic> json) {
@@ -456,6 +471,32 @@ class MediaResource {
       height: json['height'] as int?,
       durationSeconds: json['durationSeconds'] as int?,
       thumbnailUrl: json['thumbnailUrl'] as String?,
+    );
+  }
+
+  MediaResource copyWith({
+    String? url,
+    String? fileName,
+    String? mimeType,
+    int? sizeBytes,
+    int? width,
+    int? height,
+    int? durationSeconds,
+    String? thumbnailUrl,
+    String? localPreviewUrl,
+    String? localPosterUrl,
+  }) {
+    return MediaResource(
+      url: url ?? this.url,
+      fileName: fileName ?? this.fileName,
+      mimeType: mimeType ?? this.mimeType,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      localPreviewUrl: localPreviewUrl ?? this.localPreviewUrl,
+      localPosterUrl: localPosterUrl ?? this.localPosterUrl,
     );
   }
 
@@ -473,8 +514,11 @@ class MediaResource {
   }
 }
 
+enum MentionTargetType { user, all }
+
 class Mention {
-  final String userId;
+  final MentionTargetType type;
+  final String? userId;
   final int offset;
   final int length;
 
@@ -482,11 +526,33 @@ class Mention {
     required this.userId,
     required this.offset,
     required this.length,
-  });
+  }) : type = MentionTargetType.user;
+
+  const Mention.user({
+    required String userId,
+    required this.offset,
+    required this.length,
+  })  : type = MentionTargetType.user,
+        userId = userId;
+
+  const Mention.all({
+    required this.offset,
+    required this.length,
+  })  : type = MentionTargetType.all,
+        userId = null;
+
+  bool get isAll => type == MentionTargetType.all;
 
   factory Mention.fromJson(Map<String, dynamic> json) {
+    final rawType = json['type'] as String?;
+    if (rawType == 'all') {
+      return Mention.all(
+        offset: json['offset'] as int,
+        length: json['length'] as int,
+      );
+    }
     return Mention(
-      userId: json['userId'] as String,
+      userId: json['userId'] as String?,
       offset: json['offset'] as int,
       length: json['length'] as int,
     );
@@ -494,11 +560,25 @@ class Mention {
 
   Map<String, dynamic> toJson() {
     return {
-      'userId': userId,
+      'type': type == MentionTargetType.all ? 'all' : 'user',
+      if (userId != null && userId!.isNotEmpty) 'userId': userId,
       'offset': offset,
       'length': length,
     };
   }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is Mention &&
+            other.type == type &&
+            other.userId == userId &&
+            other.offset == offset &&
+            other.length == length;
+  }
+
+  @override
+  int get hashCode => Object.hash(type, userId, offset, length);
 }
 
 // ---------------------------------------------------------------------------

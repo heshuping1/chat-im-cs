@@ -1,7 +1,9 @@
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/conversation_page.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/filter_conversations.dart';
 
@@ -82,21 +84,27 @@ class ChatRepositoryImpl implements ChatRepository {
     return remoteItems.map((remote) {
       final local = cachedById[remote.conversationId];
       final localLast = local?.lastMessage;
+      final remoteWithLocalMention = _preserveLocalLastMessageMentions(
+        remote,
+        local,
+      );
       if (local == null ||
           localLast == null ||
-          remote.unreadCount <= 0 ||
+          remoteWithLocalMention.unreadCount <= 0 ||
           !_isSelfLastMessage(localLast) ||
-          !_isSameLastMessage(local, remote)) {
-        return remote;
+          !_isSameLastMessage(local, remoteWithLocalMention)) {
+        return remoteWithLocalMention;
       }
 
-      final lastSeq = remote.lastMessageSeq > local.lastMessageSeq
-          ? remote.lastMessageSeq
+      final lastSeq = remoteWithLocalMention.lastMessageSeq > local.lastMessageSeq
+          ? remoteWithLocalMention.lastMessageSeq
           : local.lastMessageSeq;
       final readSeq =
-          remote.lastReadSeq > lastSeq ? remote.lastReadSeq : lastSeq;
+          remoteWithLocalMention.lastReadSeq > lastSeq
+              ? remoteWithLocalMention.lastReadSeq
+              : lastSeq;
 
-      return remote.copyWith(
+      return remoteWithLocalMention.copyWith(
         lastMessage: localLast,
         lastMessageSeq: lastSeq,
         lastReadSeq: readSeq,
@@ -110,6 +118,25 @@ class ChatRepositoryImpl implements ChatRepository {
         (message.direction ?? '').trim().toLowerCase().replaceAll('-', '_');
     return message.isSelf ||
         const {'out', 'outgoing', 'sent', 'self'}.contains(direction);
+  }
+
+  Conversation _preserveLocalLastMessageMentions(
+    Conversation remote,
+    Conversation? local,
+  ) {
+    final remoteLast = remote.lastMessage;
+    final localLast = local?.lastMessage;
+    if (local == null ||
+        remoteLast == null ||
+        localLast == null ||
+        remoteLast.mentions != null ||
+        localLast.mentions == null ||
+        !_isSameLastMessage(local, remote)) {
+      return remote;
+    }
+    return remote.copyWith(
+      lastMessage: remoteLast.copyWith(mentions: localLast.mentions),
+    );
   }
 
   bool _isSameLastMessage(Conversation local, Conversation remote) {
@@ -279,6 +306,7 @@ class ChatRepositoryImpl implements ChatRepository {
     required MessageType type,
     required MessageBody body,
     String? replyToMessageId,
+    List<Mention>? mentions,
   }) async {
     if (isGroup) {
       return _remote.sendGroupMessage(
@@ -287,6 +315,7 @@ class ChatRepositoryImpl implements ChatRepository {
         type: type,
         body: body,
         replyToMessageId: replyToMessageId,
+        mentions: mentions,
       );
     } else {
       return _remote.sendDirectChatMessage(
@@ -300,36 +329,43 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<ScheduledMessageDto> createScheduledMessage({
+  Future<ScheduledMessage> createScheduledMessage({
     required String conversationId,
     required bool isGroup,
     required MessageType type,
     required MessageBody body,
     required DateTime scheduledAt,
     String? replyToMessageId,
-  }) =>
-      _remote.createScheduledMessage(
-        conversationId: conversationId,
-        isGroup: isGroup,
-        type: type,
-        body: body,
-        scheduledAt: scheduledAt,
-        replyToMessageId: replyToMessageId,
-      );
+  }) async {
+    final dto = await _remote.createScheduledMessage(
+      conversationId: conversationId,
+      isGroup: isGroup,
+      type: type,
+      body: body,
+      scheduledAt: scheduledAt,
+      replyToMessageId: replyToMessageId,
+    );
+    return dto.toDomain();
+  }
 
   @override
-  Future<List<ScheduledMessageDto>> getScheduledMessages(
+  Future<List<ScheduledMessage>> getScheduledMessages(
     String conversationId,
-  ) =>
-      _remote.getScheduledMessages(conversationId);
+  ) async {
+    final items = await _remote.getScheduledMessages(conversationId);
+    return items.map((item) => item.toDomain()).toList(growable: false);
+  }
 
   @override
   Future<void> cancelScheduledMessage(String scheduledMessageId) =>
       _remote.cancelScheduledMessage(scheduledMessageId);
 
   @override
-  Future<MediaResource> uploadMedia(String filePath) async {
-    return _remote.uploadMedia(filePath);
+  Future<MediaResource> uploadMedia(
+    String filePath, {
+    MediaUploadProgressCallback? onProgress,
+  }) async {
+    return _remote.uploadMedia(filePath, onProgress: onProgress);
   }
 
   @override

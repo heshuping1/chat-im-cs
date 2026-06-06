@@ -317,6 +317,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         0;
     if (storedUserRole > 0) return storedUserRole;
 
+    final storedTenantRole = int.tryParse(await _storage.read(
+              SecureStorageService.tenantMembershipRoleKey(spaceId),
+            ) ??
+            '') ??
+        0;
+    if (storedTenantRole > 0) return storedTenantRole;
+
     return 0;
   }
 

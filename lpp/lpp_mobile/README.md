@@ -2,7 +2,9 @@
 
 LPP Flutter 移动端 App 工程。当前本地开发和验证优先 Android 真机。
 
-项目总入口见 [../README.md](../README.md)，交付文档见 [../docs/README.md](../docs/README.md)。
+项目总入口见 [../README.md](../README.md)，跨端交付总账见 [../docs/README.md](../docs/README.md)。
+
+App 专属文档入口见 [docs/README.md](docs/README.md)。后续移动端需求、设计、实现、测试和风险判断优先阅读该目录；新需求准入、DDD 分层和测试验收规则分别见 [docs/constraints](docs/constraints)。
 
 ## 工程结构
 
@@ -12,7 +14,7 @@ LPP Flutter 移动端 App 工程。当前本地开发和验证优先 Android 真
 - `lib/shared`：共享组件和工具。
 - `lib/l10n`：多语言文案。
 - `assets`：图片、音频等静态资源。
-- `android`、`ios`、`windows`、`macos`、`web`：平台壳工程。
+- `android`、`ios`：移动端平台壳工程。
 - `../scripts/mobile`：移动端本地开发、测试数据、自动化辅助脚本。
 
 ## Android 运行

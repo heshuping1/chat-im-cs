@@ -1,0 +1,5 @@
++ adb_cmd install -r build/app/outputs/flutter-apk/app-debug.apk
+Performing Streamed Install
+adb: failed to install build/app/outputs/flutter-apk/app-debug.apk: Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.lpp.mobile signatures do not match newer version; ignoring!]
+
+FAIL adb install debug apk (8s, exit 1)

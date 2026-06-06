@@ -13,8 +13,10 @@ import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/network/http_client.dart' as app_http;
 import 'package:lpp_mobile/core/platform/local_file.dart';
+import 'package:lpp_mobile/core/platform/local_video_poster.dart';
 import 'package:lpp_mobile/core/platform/media_saver.dart';
 import 'package:lpp_mobile/core/permissions/app_permissions.dart';
+import 'package:lpp_mobile/core/providers/locale_provider.dart';
 import 'package:lpp_mobile/core/space/space_context.dart';
 import 'package:lpp_mobile/core/widgets/app_toast.dart';
 import 'package:lpp_mobile/core/widgets/identity_badge.dart';
@@ -23,6 +25,7 @@ import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
@@ -31,6 +34,7 @@ import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.
     show groupMembersProvider;
 import 'package:lpp_mobile/features/chat/presentation/pages/favorites_page.dart'
     show favoritesProvider, favoritesSummaryProvider;
+import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/marketing_toolbar.dart';
@@ -41,6 +45,7 @@ import 'package:lpp_mobile/features/customer_service/data/models/customer_servic
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
 import 'package:lpp_mobile/features/profile/presentation/pages/my_page.dart';
 import 'package:lpp_mobile/features/settings/presentation/providers/chat_background_provider.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 import 'package:path/path.dart' as p;
@@ -1215,12 +1220,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     // 调用翻译 API：POST /translate/message
     final dio = ref.read(dioProvider);
+    final targetLanguage =
+        translationTargetLanguageForLocale(ref.read(localeProvider));
     try {
       final resp = await dio.post<Map<String, dynamic>>(
         '/api/client/v1/translate/message',
         data: {
           'messageId': msg.messageId,
-          'targetLanguage': 'zh-CN',
+          'targetLanguage': targetLanguage,
           'model': 'fast',
         },
       );
@@ -1361,6 +1368,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required MessageType type,
     required MessageBody body,
     String? replyToMessageId,
+    List<Mention>? mentions,
     required void Function(Message message) onOptimisticInsert,
     required void Function(String clientMsgId, Message updated) onMessageUpdate,
   }) async {
@@ -1402,6 +1410,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       type: type,
       body: body,
       replyToMessageId: replyToMessageId,
+      mentions: mentions,
       onOptimisticInsert: onOptimisticInsert,
       onMessageUpdate: onMessageUpdate,
     );
@@ -1410,6 +1419,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Future<bool> _sendTextMessage({
     required String text,
     String? replyToMessageId,
+    List<Mention>? mentions,
     bool manageSendingState = true,
     bool clearReplyOnSuccess = false,
   }) async {
@@ -1428,6 +1438,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         type: MessageType.text,
         body: MessageBody(text: text),
         replyToMessageId: replyToMessageId,
+        mentions: _effectiveIsGroup ? mentions : null,
         onOptimisticInsert: (msg) {
           notifier.optimisticInsert(msg);
           _scrollToBottom();
@@ -1605,7 +1616,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     onOptimisticInsert(optimistic);
 
     try {
-      final resolvedBody = await _resolveCustomerServiceMediaBody(type, body);
+      final hasLocalMedia = _customerServiceLocalMediaPath(type, body) != null;
+      final resolvedBody = await _resolveCustomerServiceMediaBody(
+        type,
+        body,
+        clientMsgId: clientMsgId,
+        optimistic: optimistic,
+        onMessageUpdate: onMessageUpdate,
+        emitProgress: true,
+      );
+      if (hasLocalMedia) {
+        onMessageUpdate(
+          clientMsgId,
+          optimistic.copyWith(
+            body: resolvedBody,
+            localUploadState: const MessageLocalUploadState(
+              status: MessageLocalUploadStatus.sending,
+              phase: MessageLocalUploadPhase.sending,
+              progress: 95,
+            ),
+          ),
+        );
+      }
       final sent = await ref
           .read(customerServiceRepositoryProvider)
           .sendThreadMessage(
@@ -1622,6 +1654,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         body: resolvedBody,
         senderUserId: currentUserId,
         status: MessageStatus.sent,
+        clearLocalUploadState: true,
       );
       onMessageUpdate(clientMsgId, confirmed);
       await ChatLocalDataSourceImpl().upsertMessage(
@@ -1639,6 +1672,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         optimistic.copyWith(
           status: MessageStatus.failed,
           failureReason: _sendFailureReason(e),
+          localUploadState: _isMediaType(type)
+              ? MessageLocalUploadState(
+                  status: MessageLocalUploadStatus.failed,
+                  phase: MessageLocalUploadPhase.failed,
+                  error: _sendFailureReason(e),
+                )
+              : null,
         ),
       );
       rethrow;
@@ -1672,21 +1712,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   Future<MessageBody> _resolveCustomerServiceMediaBody(
     MessageType type,
-    MessageBody body,
-  ) async {
-    final localPath = switch (type) {
-      MessageType.image =>
-        _isLocalMediaUrl(body.image?.url) ? body.image?.url : null,
-      MessageType.video =>
-        _isLocalMediaUrl(body.video?.url) ? body.video?.url : null,
-      MessageType.voice =>
-        _isLocalMediaUrl(body.voice?.url) ? body.voice?.url : null,
-      MessageType.file =>
-        _isLocalMediaUrl(body.file?.url) ? body.file?.url : null,
-      _ => null,
-    };
+    MessageBody body, {
+    required String clientMsgId,
+    required Message optimistic,
+    required void Function(String clientMsgId, Message updated) onMessageUpdate,
+    bool emitProgress = true,
+  }) async {
+    final localPath = _customerServiceLocalMediaPath(type, body);
     if (localPath == null) return body;
 
+    if (emitProgress) {
+      onMessageUpdate(
+        clientMsgId,
+        optimistic.copyWith(
+          localUploadState: const MessageLocalUploadState(
+            status: MessageLocalUploadStatus.uploading,
+            phase: MessageLocalUploadPhase.preparing,
+            progress: 0,
+          ),
+        ),
+      );
+    }
+    final fallbackTotalBytes = _mediaSizeBytes(type, body);
     final dio = ref.read(dioProvider);
     final formData = dio_package.FormData.fromMap({
       'file': dio_package.MultipartFile.fromBytes(
@@ -1704,6 +1751,27 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final uploadResp = await dio.post<Map<String, dynamic>>(
       '/api/client/v1/media/upload',
       data: formData,
+      onSendProgress: (sent, total) {
+        final progress = mediaUploadProgressPercent(
+          MediaUploadProgressEvent(
+            loaded: sent,
+            total: total > 0 ? total : fallbackTotalBytes,
+          ),
+          fallbackTotalBytes: fallbackTotalBytes,
+        );
+        if (emitProgress) {
+          onMessageUpdate(
+            clientMsgId,
+            optimistic.copyWith(
+              localUploadState: MessageLocalUploadState(
+                status: MessageLocalUploadStatus.uploading,
+                phase: MessageLocalUploadPhase.uploadingMedia,
+                progress: progress,
+              ),
+            ),
+          );
+        }
+      },
     );
     final data = uploadResp.data?['data'] as Map<String, dynamic>?;
     if (data == null) return body;
@@ -1712,7 +1780,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return switch (type) {
       MessageType.image => MessageBody(
           text: body.text,
-          image: resource,
+          image: _preserveLocalMediaPreview(
+            uploaded: resource,
+            local: body.image,
+          ),
           video: body.video,
           voice: body.voice,
           file: body.file,
@@ -1720,7 +1791,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       MessageType.video => MessageBody(
           text: body.text,
           image: body.image,
-          video: resource,
+          video: _preserveLocalMediaPreview(
+            uploaded: resource,
+            local: body.video,
+          ),
           voice: body.voice,
           file: body.file,
         ),
@@ -1742,6 +1816,49 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     };
   }
 
+  String? _customerServiceLocalMediaPath(MessageType type, MessageBody body) {
+    return switch (type) {
+      MessageType.image =>
+        _isLocalMediaUrl(body.image?.url) ? body.image?.url : null,
+      MessageType.video =>
+        _isLocalMediaUrl(body.video?.url) ? body.video?.url : null,
+      MessageType.voice =>
+        _isLocalMediaUrl(body.voice?.url) ? body.voice?.url : null,
+      MessageType.file =>
+        _isLocalMediaUrl(body.file?.url) ? body.file?.url : null,
+      _ => null,
+    };
+  }
+
+  bool _isMediaType(MessageType type) {
+    return type == MessageType.image ||
+        type == MessageType.video ||
+        type == MessageType.voice ||
+        type == MessageType.file;
+  }
+
+  int? _mediaSizeBytes(MessageType type, MessageBody body) {
+    return switch (type) {
+      MessageType.image => body.image?.sizeBytes,
+      MessageType.video => body.video?.sizeBytes,
+      MessageType.voice => body.voice?.sizeBytes,
+      MessageType.file => body.file?.sizeBytes,
+      _ => null,
+    };
+  }
+
+  MediaResource _preserveLocalMediaPreview({
+    required MediaResource uploaded,
+    required MediaResource? local,
+  }) {
+    if (local == null) return uploaded;
+    final localUrl = _isLocalMediaUrl(local.url) ? local.url : null;
+    return uploaded.copyWith(
+      localPreviewUrl: local.localPreviewUrl ?? localUrl,
+      localPosterUrl: local.localPosterUrl,
+    );
+  }
+
   bool _isLocalMediaUrl(String? url) {
     if (url == null || url.isEmpty) return false;
     return url.startsWith('/') ||
@@ -1753,73 +1870,39 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       String filePath, String fileName, String mimeType, int sizeBytes) async {
     if (_isSending) return;
     setState(() => _isSending = true);
-    final notifier = ref.read(
-        chatProvider((_spaceId, widget.conversationId, _effectiveIsGroup))
-            .notifier);
-
-    // 插入占位消息
-    final clientMsgId = 'file_${DateTime.now().millisecondsSinceEpoch}';
-    final placeholderMsg = Message(
-      messageId: clientMsgId,
-      clientMsgId: clientMsgId,
-      conversationId: widget.conversationId,
-      conversationSeq: 0,
-      senderUserId: ref.read(currentSpaceProvider)?.userId ?? '',
-      type: MessageType.file,
-      body: MessageBody(
-        file: MediaResource(
-          url: filePath,
-          fileName: fileName,
-          mimeType: mimeType,
-          sizeBytes: sizeBytes,
-        ),
-      ),
-      sentAt: DateTime.now(),
-      status: MessageStatus.sending,
-    );
-    notifier.optimisticInsert(placeholderMsg);
-    _scrollToBottom();
 
     try {
-      final dio = ref.read(dioProvider);
-      // Upload file
-      final formData = dio_package.FormData.fromMap({
-        'file': dio_package.MultipartFile.fromBytes(
-          await readLocalFileBytes(filePath),
-          filename: fileName,
-        ),
-        'mediaKind': 'file',
-      });
-      final uploadResp = await dio.post<Map<String, dynamic>>(
-        '/api/client/v1/media/upload',
-        data: formData,
-      );
-      final uploadData = uploadResp.data?['data'] as Map<String, dynamic>?;
-      if (uploadData == null) throw Exception('Upload failed');
-
-      final url = uploadData['url'] as String;
-      final respFileName = uploadData['fileName'] as String? ?? fileName;
-      final respMimeType = uploadData['mimeType'] as String? ?? mimeType;
-      final respSizeBytes = uploadData['sizeBytes'] as int? ?? sizeBytes;
-
+      final sendConversationId = await _ensureDirectConversationForSend();
+      if (!mounted) return;
+      final notifier = ref.read(
+          chatProvider((_spaceId, sendConversationId, _effectiveIsGroup))
+              .notifier);
       await _sendChatMessage(
         type: MessageType.file,
         body: MessageBody(
           file: MediaResource(
-            url: url,
-            fileName: respFileName,
-            mimeType: respMimeType,
-            sizeBytes: respSizeBytes,
+            url: filePath,
+            fileName: fileName,
+            mimeType: mimeType,
+            sizeBytes: sizeBytes,
           ),
         ),
-        onOptimisticInsert: (_) {},
-        onMessageUpdate: (id, updated) {
+        onOptimisticInsert: (message) {
+          notifier.optimisticInsert(message);
+          _scrollToBottom();
+        },
+        onMessageUpdate: (clientMsgId, updated) {
           notifier.updateMessage(clientMsgId, updated);
+          if (updated.status.isServerUsable) {
+            _updateConversationLocally(
+              updated,
+              fileName,
+              messageType: 'file',
+            );
+          }
         },
       );
     } catch (e) {
-      // 移除占位消息，显示错误
-      notifier.markRecalled(clientMsgId);
       if (mounted) {
         if (e is ServerError) {
           _handleSendError(e);
@@ -1829,6 +1912,75 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             AppLocalizations.of(context).chatFileUploadFailed,
           );
         }
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _handleSendMedia(List<ChatPickedMedia> mediaItems) async {
+    if (_isSending || mediaItems.isEmpty) return;
+    final l10n = AppLocalizations.of(context);
+    final imagePreview = l10n.chatImageMessage;
+    final videoPreview = l10n.chatVideoMessage;
+    final uploadFailedText = l10n.chatImageUploadUnsupported;
+    setState(() => _isSending = true);
+
+    try {
+      final sendConversationId = await _ensureDirectConversationForSend();
+      if (!mounted) return;
+      final notifier = ref.read(
+        chatProvider((_spaceId, sendConversationId, _effectiveIsGroup))
+            .notifier,
+      );
+      for (final item in mediaItems) {
+        final sizeBytes = item.sizeBytes ?? await localFileLength(item.path);
+        final localPosterUrl =
+            item.isVideo ? await generateLocalVideoPoster(item.path) : null;
+        final resource = MediaResource(
+          url: item.path,
+          fileName: item.fileName,
+          mimeType: item.mimeType,
+          sizeBytes: sizeBytes,
+          localPreviewUrl: item.isImage ? item.path : null,
+          localPosterUrl: localPosterUrl,
+        );
+        final type = item.isVideo ? MessageType.video : MessageType.image;
+        final body = item.isVideo
+            ? MessageBody(video: resource)
+            : MessageBody(image: resource);
+        await _sendChatMessage(
+          type: type,
+          body: body,
+          replyToMessageId: _replyingTo?.id,
+          onOptimisticInsert: (msg) {
+            notifier.optimisticInsert(msg);
+            _scrollToBottom();
+          },
+          onMessageUpdate: (clientMsgId, updated) {
+            notifier.updateMessage(clientMsgId, updated);
+            if (updated.status.isServerUsable) {
+              _updateConversationLocally(
+                updated,
+                item.isVideo ? videoPreview : imagePreview,
+                messageType: item.isVideo ? 'video' : 'image',
+              );
+            }
+          },
+        );
+      }
+      if (mounted) setState(() => _replyingTo = null);
+    } catch (e) {
+      if (!mounted) return;
+      if (e is ServerError) {
+        _handleSendError(e);
+      } else {
+        AppToast.show(
+          context,
+          uploadFailedText,
+          type: AppToastType.error,
+          duration: const Duration(seconds: 3),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -2185,9 +2337,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final groupDetail = effectiveIsGroup
         ? ref.watch(groupDetailProvider(activeConversationId))
         : null;
-    if (effectiveIsGroup) {
-      ref.watch(groupMembersProvider(activeConversationId));
-    }
+    final groupMembersAsync = effectiveIsGroup
+        ? ref.watch(groupMembersProvider(activeConversationId))
+        : null;
     final currentUserId = ref.watch(currentSpaceProvider)?.userId ?? '';
     final space = ref.watch(currentSpaceProvider);
     final groupDetailValue = groupDetail?.valueOrNull;
@@ -2198,7 +2350,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             isAllMuted: groupDetailValue.muteMode == 'all_muted',
             allowMemberInvite: true,
             allowMemberModifyTitle: true,
-            allowMemberAtAll: true,
+            allowMemberAtAll: groupDetailValue.allowMemberAtAll,
             allowMemberViewMemberList: true,
             allowMemberAddFriend: groupDetailValue.allowMemberAddFriend,
             space: space,
@@ -2206,6 +2358,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final groupMutedForMe = groupPermissions?.canSpeak == false;
     final allowAddFriendFromGroup =
         groupPermissions?.canAddFriendFromGroup ?? true;
+    final mentionCandidates = groupMembersAsync?.valueOrNull
+            ?.where((member) => member.userId != currentUserId)
+            .map(
+              (member) => ChatMentionCandidate(
+                userId: member.userId,
+                displayName: member.displayName,
+                avatarUrl: member.avatarUrl,
+              ),
+            )
+            .toList(growable: false) ??
+        const <ChatMentionCandidate>[];
     final isEmployee = space?.type == SpaceType.employee;
     final quickReplyScope =
         !effectiveIsGroup && AppPermissions.canUseCustomerWorkbench(space)
@@ -2285,6 +2448,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         subtitle: effectiveIsGroup && currentMemberCount != null
             ? '($currentMemberCount)'
             : null,
+        memberCount: currentMemberCount,
         isQuickTranslating: _isQuickTranslating,
         readOnly: _isReadOnlyConversation,
         onCustomerProfile:
@@ -2347,6 +2511,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     scrollController: _scrollController,
                     isGroup: _effectiveIsGroup,
                     conversationId: activeConversationId,
+                    lastReadSeq: currentConversation?.lastReadSeq ?? 0,
                     allowAddFriendFromGroup: allowAddFriendFromGroup,
                     multiSelectMode: _multiSelectMode,
                     selectedMessages: _selectedMessages,
@@ -2386,6 +2551,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       scrollController: _scrollController,
                       isGroup: _effectiveIsGroup,
                       conversationId: activeConversationId,
+                      lastReadSeq: currentConversation?.lastReadSeq ?? 0,
                       allowAddFriendFromGroup: allowAddFriendFromGroup,
                       multiSelectMode: _multiSelectMode,
                       selectedMessages: _selectedMessages,
@@ -2455,6 +2621,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         clearReplyOnSuccess: true,
                       );
                     },
+                    onSendTextRequest: (request) async {
+                      return _sendTextMessage(
+                        text: request.text,
+                        mentions: request.mentions,
+                        replyToMessageId: _replyingTo?.id,
+                        clearReplyOnSuccess: true,
+                      );
+                    },
                     onScheduleText: _scheduleTextMessage,
                     onSendVoice: (filePath, duration) async {
                       if (_isSending) return;
@@ -2505,64 +2679,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         if (mounted) setState(() => _isSending = false);
                       }
                     },
-                    onSendImages: (imagePaths) async {
-                      if (_isSending) return;
-                      setState(() => _isSending = true);
-                      final notifier = ref.read(chatProvider((
-                        _spaceId,
-                        widget.conversationId,
-                        _effectiveIsGroup
-                      )).notifier);
-                      try {
-                        for (final path in imagePaths) {
-                          final bytes = await localFileLength(path);
-                          await _sendChatMessage(
-                            type: MessageType.image,
-                            body: MessageBody(
-                              image: MediaResource(
-                                url: path,
-                                mimeType: 'image/jpeg',
-                                sizeBytes: bytes,
-                              ),
-                            ),
-                            onOptimisticInsert: (msg) {
-                              notifier.optimisticInsert(msg);
-                              _scrollToBottom();
-                            },
-                            onMessageUpdate: (clientMsgId, updated) {
-                              notifier.updateMessage(clientMsgId, updated);
-                            },
-                          );
-                        }
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        if (e is ServerError) {
-                          _handleSendError(e);
-                        } else {
-                          AppToast.show(
-                            context,
-                            AppLocalizations.of(context)
-                                .chatImageUploadUnsupported,
-                            type: AppToastType.error,
-                            duration: const Duration(seconds: 3),
-                          );
-                        }
-                      } finally {
-                        if (mounted) setState(() => _isSending = false);
-                      }
-                    },
+                    onSendMedia: _handleSendMedia,
                     onVoiceCall: () => _startCall(isVideo: false),
                     onVideoCall: () => _startCall(isVideo: true),
                     onSendFile: (filePath, fileName, mimeType, sizeBytes) =>
                         _handleSendFile(
                             filePath, fileName, mimeType, sizeBytes),
                     onLocation: () => unawaited(_handleSendLocation()),
-                    onFavorite: () {
-                      AppToast.info(
-                        context,
-                        AppLocalizations.of(context).chatFavoriteLongPressHint,
-                      );
-                    },
+                    mentionCandidates: mentionCandidates,
+                    canMentionAll: groupPermissions?.canAtAll ?? false,
+                    onFavorite: () => context.push('/favorites'),
                     onSendContactCard: () => _handleSendContactCard(),
                     quickReplyScope: quickReplyScope,
                     aiReplyContextText: aiReplyContextText,
@@ -2976,6 +3102,7 @@ class _ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final bool isGroup;
   final String conversationId;
   final String? subtitle;
+  final int? memberCount;
   final bool isQuickTranslating;
   final bool readOnly;
   final String? customerServiceSubtitle;
@@ -2988,6 +3115,7 @@ class _ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
     required this.isGroup,
     required this.conversationId,
     this.subtitle,
+    this.memberCount,
     required this.isQuickTranslating,
     this.readOnly = false,
     this.customerServiceSubtitle,
@@ -3218,7 +3346,11 @@ class _ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.more_horiz, color: Color(0xFF1D2129)),
             onPressed: () {
               if (isGroup) {
-                context.push('/group-settings/$conversationId');
+                context.push('/group-settings/$conversationId', extra: {
+                  'title': title,
+                  'avatarUrl': avatarUrl,
+                  'memberCount': memberCount,
+                });
               } else {
                 context.push('/chat-settings/$conversationId');
               }
@@ -3286,7 +3418,7 @@ class _CustomerProfileSheet extends ConsumerWidget {
   }
 }
 
-class _CustomerProfileContent extends StatelessWidget {
+class _CustomerProfileContent extends ConsumerWidget {
   final CustomerProfileCard card;
   final String? warning;
 
@@ -3296,7 +3428,8 @@ class _CustomerProfileContent extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tzOffset = ref.watch(timezoneOffsetProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
       child: Column(
@@ -3362,7 +3495,7 @@ class _CustomerProfileContent extends StatelessWidget {
                 ),
                 _ProfileLine(
                   label: '注册日期',
-                  value: _dateText(card.account?.registeredAt),
+                  value: _dateText(card.account?.registeredAt, tzOffset),
                 ),
                 _ProfileLine(label: 'IB', value: card.account?.ibCode ?? '--'),
               ],
@@ -3388,14 +3521,20 @@ class _CustomerProfileContent extends StatelessWidget {
                 ),
                 _ProfileLine(
                   label: '最近交易时间',
-                  value: _dateTimeText(card.trading?.lastTradeAt),
+                  value: _dateTimeText(card.trading?.lastTradeAt, tzOffset),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _TemporaryOrdersSection(orders: card.temporaryOrders),
+            _TemporaryOrdersSection(
+              orders: card.temporaryOrders,
+              timezoneOffset: tzOffset,
+            ),
             const SizedBox(height: 12),
-            _TicketSection(tickets: card.tickets),
+            _TicketSection(
+              tickets: card.tickets,
+              timezoneOffset: tzOffset,
+            ),
           ] else ...[
             const SizedBox(height: 12),
             _ProfileSection(
@@ -3472,16 +3611,14 @@ class _CustomerProfileContent extends StatelessWidget {
     return '$fixed%';
   }
 
-  String _dateText(DateTime? value) {
+  String _dateText(DateTime? value, double tzOffset) {
     if (value == null) return '--';
-    return value.toIso8601String().substring(0, 10);
+    return formatDateWithTimezone(value, tzOffset);
   }
 
-  String _dateTimeText(DateTime? value) {
+  String _dateTimeText(DateTime? value, double tzOffset) {
     if (value == null) return '--';
-    final local = value.toLocal();
-    final text = local.toIso8601String();
-    return '${text.substring(0, 10)} ${text.substring(11, 16)}';
+    return formatFullMinuteWithTimezone(value, tzOffset);
   }
 }
 
@@ -3635,8 +3772,12 @@ class _TagsLine extends StatelessWidget {
 
 class _TicketSection extends StatelessWidget {
   final List<CustomerTicketSummary> tickets;
+  final double timezoneOffset;
 
-  const _TicketSection({required this.tickets});
+  const _TicketSection({
+    required this.tickets,
+    required this.timezoneOffset,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -3676,7 +3817,7 @@ class _TicketSection extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${_ticketStatus(ticket.status)} · ${ticket.assigneeDisplayName ?? '未分配'} · ${_ticketTime(ticket.updatedAt)}',
+                        '${_ticketStatus(ticket.status)} · ${ticket.assigneeDisplayName ?? '未分配'} · ${_ticketTime(ticket.updatedAt, timezoneOffset)}',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF86909C),
@@ -3699,17 +3840,20 @@ class _TicketSection extends StatelessWidget {
     };
   }
 
-  String _ticketTime(DateTime? value) {
+  String _ticketTime(DateTime? value, double tzOffset) {
     if (value == null) return '--';
-    final local = value.toLocal().toIso8601String();
-    return '${local.substring(0, 10)} ${local.substring(11, 16)}';
+    return formatFullMinuteWithTimezone(value, tzOffset);
   }
 }
 
 class _TemporaryOrdersSection extends StatelessWidget {
   final List<CustomerTemporaryOrderSummary> orders;
+  final double timezoneOffset;
 
-  const _TemporaryOrdersSection({required this.orders});
+  const _TemporaryOrdersSection({
+    required this.orders,
+    required this.timezoneOffset,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -3837,9 +3981,7 @@ class _TemporaryOrdersSection extends StatelessWidget {
 
   String _dateTimeText(DateTime? value) {
     if (value == null) return '--';
-    final local = value.toLocal();
-    final text = local.toIso8601String();
-    return '${text.substring(0, 10)} ${text.substring(11, 16)}';
+    return formatFullMinuteWithTimezone(value, timezoneOffset);
   }
 }
 
@@ -4428,7 +4570,7 @@ class _ChatBackground extends StatelessWidget {
 // Message List
 // ---------------------------------------------------------------------------
 
-class _MessageList extends StatelessWidget {
+class _MessageList extends ConsumerWidget {
   final List<Message> messages;
   final bool showEmptyState;
   final String currentUserId;
@@ -4439,6 +4581,7 @@ class _MessageList extends StatelessWidget {
   final ScrollController scrollController;
   final bool isGroup;
   final String conversationId;
+  final int lastReadSeq;
   final bool allowAddFriendFromGroup;
   final bool multiSelectMode;
   final Set<String> selectedMessages;
@@ -4460,6 +4603,7 @@ class _MessageList extends StatelessWidget {
     required this.scrollController,
     required this.isGroup,
     required this.conversationId,
+    this.lastReadSeq = 0,
     required this.allowAddFriendFromGroup,
     required this.multiSelectMode,
     required this.selectedMessages,
@@ -4475,8 +4619,9 @@ class _MessageList extends StatelessWidget {
   bool get _isPersonalSelf => conversationId == 'self-personal';
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final tzOffset = ref.watch(timezoneOffsetProvider);
     if (messages.isEmpty) {
       if (!showEmptyState) {
         return const SizedBox.expand();
@@ -4528,7 +4673,8 @@ class _MessageList extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
+    final mentionReminder = _latestUnreadMentionReminder();
+    final listView = ListView.builder(
       controller: scrollController,
       reverse: true,
       padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 24),
@@ -4621,7 +4767,7 @@ class _MessageList extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      _formatMessageTime(message.sentAt),
+                      _formatMessageTime(message.sentAt, tzOffset),
                       style: const TextStyle(
                           fontSize: 11, color: Color(0xFF888888)),
                     ),
@@ -4720,6 +4866,50 @@ class _MessageList extends StatelessWidget {
         ); // Column
       },
     );
+    if (mentionReminder == null) return listView;
+    return Stack(
+      children: [
+        listView,
+        Positioned(
+          top: 8,
+          left: 12,
+          right: 12,
+          child: _MentionReminderJumpBar(
+            kind: mentionReminder.kind,
+            onTap: () => _scrollToMessage(mentionReminder.messageId),
+          ),
+        ),
+      ],
+    );
+  }
+
+  UnreadMentionReminder? _latestUnreadMentionReminder() {
+    return latestUnreadMentionReminderForMessages(
+      messages: messages,
+      currentUserId: currentUserId,
+      isGroup: isGroup,
+      lastReadSeq: lastReadSeq,
+    );
+  }
+
+  void _scrollToMessage(String messageId) {
+    final realIndex = messages.indexWhere((m) => m.messageId == messageId);
+    if (!scrollController.hasClients) return;
+    if (realIndex < 0) {
+      scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+      return;
+    }
+    final renderIndex = messages.length - 1 - realIndex;
+    final estimatedOffset = renderIndex * 80.0;
+    scrollController.animateTo(
+      estimatedOffset.clamp(0.0, scrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeInOut,
+    );
   }
 
   String _displayNameForSender(BuildContext context, Message message) {
@@ -4741,30 +4931,82 @@ class _MessageList extends StatelessWidget {
   }
 }
 
+class _MentionReminderJumpBar extends StatelessWidget {
+  final MentionReminderKind kind;
+  final VoidCallback onTap;
+
+  const _MentionReminderJumpBar({
+    required this.kind,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = kind == MentionReminderKind.me ? '有 @你的消息' : '有 @所有人的消息';
+    final colorScheme = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: const Color(0xFF2F6FED).withValues(alpha: 0.22),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.alternate_email_rounded,
+                  size: 15,
+                  color: Color(0xFF2F6FED),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF2F6FED),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '查看',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurface.withValues(alpha: 0.66),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 时间格式化辅助函数
 // ---------------------------------------------------------------------------
 
-String _formatMessageTime(DateTime dt) {
-  final now = DateTime.now();
-  final local = dt.toLocal();
-  final diff = now.difference(local);
-
-  String timeStr =
-      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-
-  if (diff.inDays == 0) {
-    return timeStr;
-  } else if (diff.inDays == 1) {
-    return '昨天 $timeStr';
-  } else if (diff.inDays < 7) {
-    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    return '${days[local.weekday - 1]} $timeStr';
-  } else if (local.year == now.year) {
-    return '${local.month}月${local.day}日 $timeStr';
-  } else {
-    return '${local.year}年${local.month}月${local.day}日 $timeStr';
-  }
+String _formatMessageTime(DateTime dt, double tzOffset) {
+  return formatChatSeparatorTime(dt, tzOffset);
 }
 
 // ---------------------------------------------------------------------------

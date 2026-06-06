@@ -45,3 +45,18 @@ const kSupportedLocales = [
   (Locale('ko'), '한국어'),
   (Locale('vi'), 'Tiếng Việt'),
 ];
+
+String translationTargetLanguageForLocale(Locale locale) {
+  final languageCode = locale.languageCode.toLowerCase();
+  final countryCode = locale.countryCode?.toUpperCase();
+  if (languageCode == 'zh') {
+    return switch (countryCode) {
+      'TW' || 'HK' || 'MO' => 'zh-TW',
+      _ => 'zh-CN',
+    };
+  }
+  if (const {'en', 'ja', 'ko', 'vi'}.contains(languageCode)) {
+    return languageCode;
+  }
+  return 'zh-CN';
+}

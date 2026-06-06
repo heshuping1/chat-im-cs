@@ -3,10 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
-import 'package:lpp_mobile/features/contacts/application/friend_acceptance_conversation_service.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
+import 'package:lpp_mobile/features/contacts/application/friend_acceptance_conversation_service.dart';
 import 'package:lpp_mobile/features/contacts/domain/entities/contact.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
+import 'package:lpp_mobile/features/contacts/presentation/providers/friend_acceptance_conversation_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
 // ---------------------------------------------------------------------------

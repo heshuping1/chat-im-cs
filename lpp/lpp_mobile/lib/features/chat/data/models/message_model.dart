@@ -50,6 +50,7 @@ class MessageModel {
     required String conversationId,
     String? replyToMessageId,
     String? senderUserId,
+    List<Mention>? mentions,
   }) {
     return Message(
       messageId: json['messageId'] as String,
@@ -64,6 +65,7 @@ class MessageModel {
       sentAt: DateTime.tryParse(json['serverTime'] as String? ?? '') ??
           DateTime.now(),
       replyToMessageId: replyToMessageId,
+      mentions: mentions,
       status: MessageStatus.sent,
       isSelf: true,
     );

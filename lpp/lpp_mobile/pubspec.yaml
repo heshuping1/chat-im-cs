@@ -1,5 +1,5 @@
 name: lpp_mobile
-description: LPP Flutter 三端应用（iOS/Android/Windows）
+description: LPP Flutter mobile app for Android and iOS
 publish_to: none
 version: 1.0.0+1
 
@@ -66,6 +66,8 @@ dependencies:
   package_info_plus: ^9.0.1
   open_filex: ^4.7.0
   mobile_scanner: ^7.2.0
+  video_thumbnail: ^0.5.6
+  camera: ^0.12.0+1
 
 dependency_overrides:
   record_linux: ^1.3.0

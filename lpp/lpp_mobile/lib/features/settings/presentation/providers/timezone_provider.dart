@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/storage/secure_storage.dart';
 
+export 'package:lpp_mobile/core/time/user_timezone_formatter.dart';
+
 const _kTimezoneKey = 'user_timezone_offset';
 
 // 常用时区列表
@@ -62,45 +64,5 @@ class TimezoneNotifier extends StateNotifier<double> {
   Future<void> setOffset(double offset) async {
     state = offset;
     await _storage.write(_kTimezoneKey, offset.toString());
-  }
-}
-
-/// 将 DateTime 转换为用户时区
-DateTime toUserTimezone(DateTime time, double offsetHours) {
-  final minutes = (offsetHours * 60).round();
-  return time.toUtc().add(Duration(minutes: minutes));
-}
-
-/// 格式化为 HH:mm（应用用户时区）
-String formatTimeWithTimezone(DateTime time, double offsetHours) {
-  final local = toUserTimezone(time, offsetHours);
-  final h = local.hour.toString().padLeft(2, '0');
-  final m = local.minute.toString().padLeft(2, '0');
-  return '$h:$m';
-}
-
-/// 微信风格时间格式化（应用用户时区）
-/// - 今天：HH:mm
-/// - 昨天：昨天
-/// - 本周：周X
-/// - 更早：MM/dd
-String formatChatTime(DateTime time, double offsetHours) {
-  final local = toUserTimezone(time, offsetHours);
-  final now = toUserTimezone(DateTime.now(), offsetHours);
-
-  final todayStart = DateTime(now.year, now.month, now.day);
-  final yesterdayStart = todayStart.subtract(const Duration(days: 1));
-  final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
-
-  if (!local.isBefore(todayStart)) {
-    // 今天
-    return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
-  } else if (!local.isBefore(yesterdayStart)) {
-    return '昨天';
-  } else if (!local.isBefore(weekStart)) {
-    const weekdays = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    return weekdays[local.weekday];
-  } else {
-    return '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
   }
 }

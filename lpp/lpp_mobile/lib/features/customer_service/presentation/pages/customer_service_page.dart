@@ -17,6 +17,7 @@ import 'package:lpp_mobile/features/chat/presentation/providers/conversations_pr
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Colors
@@ -1885,7 +1886,7 @@ class _AdminWorkbenchFeatureContent extends ConsumerWidget {
   }
 }
 
-class _AdminAuditLogList extends StatelessWidget {
+class _AdminAuditLogList extends ConsumerWidget {
   final List<AdminAuditLog> items;
   final String emptyMessage;
 
@@ -1895,7 +1896,7 @@ class _AdminAuditLogList extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (items.isEmpty) {
       return _WorkbenchEmptyState(
         icon: Icons.fact_check_outlined,
@@ -1903,6 +1904,7 @@ class _AdminAuditLogList extends StatelessWidget {
       );
     }
     final colorScheme = Theme.of(context).colorScheme;
+    final tzOffset = ref.watch(timezoneOffsetProvider);
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
@@ -1950,7 +1952,7 @@ class _AdminAuditLogList extends StatelessWidget {
                     item.actorDisplayName,
                     if (target.isNotEmpty) target,
                     if (item.createdAt != null)
-                      _formatShortTime(item.createdAt!),
+                      _formatShortTime(item.createdAt!, tzOffset),
                   ].join(' · '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -2398,9 +2400,8 @@ class _ThreadManagementTypeBar extends StatelessWidget {
   }
 }
 
-String _formatShortTime(DateTime time) {
-  String two(int value) => value.toString().padLeft(2, '0');
-  return '${two(time.month)}-${two(time.day)} ${two(time.hour)}:${two(time.minute)}';
+String _formatShortTime(DateTime time, double tzOffset) {
+  return formatMonthDayMinuteWithTimezone(time, tzOffset);
 }
 
 class _AdminDashboardContent extends StatefulWidget {

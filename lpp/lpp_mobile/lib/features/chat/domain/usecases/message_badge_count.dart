@@ -2,7 +2,7 @@ import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 
 bool shouldShowNumericUnreadBadge(Conversation conversation) {
   if (conversation.unreadCount <= 0 || conversation.isMuted) return false;
-  return conversation.type == ConversationType.direct;
+  return true;
 }
 
 int calculateMessageBadgeCount(List<Conversation> conversations) {

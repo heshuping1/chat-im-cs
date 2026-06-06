@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { isBrowserNativeUrl } from "../../data/im-message-normalize";
 import { getCachedMedia, refreshCachedMedia } from "../../lib/mediaCache";
 
+export function isInstantLocalImageSource(src: string | undefined) {
+  return Boolean(src && isBrowserNativeUrl(src));
+}
+
 export function useCachedImageMediaUrl(
   src: string | undefined,
   authToken: string | undefined,

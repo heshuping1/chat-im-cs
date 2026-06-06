@@ -1,5 +1,6 @@
-import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/conversation_page.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 
 abstract class ChatRepository {
   Future<ConversationsPage> getConversations({String? cursor, int limit = 50});
@@ -22,9 +23,10 @@ abstract class ChatRepository {
     required MessageType type,
     required MessageBody body,
     String? replyToMessageId,
+    List<Mention>? mentions,
   });
 
-  Future<ScheduledMessageDto> createScheduledMessage({
+  Future<ScheduledMessage> createScheduledMessage({
     required String conversationId,
     required bool isGroup,
     required MessageType type,
@@ -33,14 +35,17 @@ abstract class ChatRepository {
     String? replyToMessageId,
   });
 
-  Future<List<ScheduledMessageDto>> getScheduledMessages(
+  Future<List<ScheduledMessage>> getScheduledMessages(
     String conversationId,
   );
 
   Future<void> cancelScheduledMessage(String scheduledMessageId);
 
   /// 上传媒体文件
-  Future<MediaResource> uploadMedia(String filePath);
+  Future<MediaResource> uploadMedia(
+    String filePath, {
+    MediaUploadProgressCallback? onProgress,
+  });
 
   /// 撤回消息
   Future<void> recallMessage(String messageId);

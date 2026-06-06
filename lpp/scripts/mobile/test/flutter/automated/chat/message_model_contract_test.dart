@@ -44,6 +44,44 @@ void main() {
       expect(body.toJson(), {'text': '你好 😁'});
     });
 
+    test('serializes user and all-member mentions for group messages', () {
+      const userMention = Mention.user(userId: 'user-2', offset: 0, length: 3);
+      const allMention = Mention.all(offset: 5, length: 4);
+
+      expect(userMention.toJson(), {
+        'type': 'user',
+        'userId': 'user-2',
+        'offset': 0,
+        'length': 3,
+      });
+      expect(allMention.toJson(), {'type': 'all', 'offset': 5, 'length': 4});
+      expect(Mention.fromJson(allMention.toJson()).isAll, isTrue);
+    });
+
+    test('omits local media preview fields from outgoing API json', () {
+      const body = MessageBody(
+        image: MediaResource(
+          url: 'https://cdn.example.com/image.jpg',
+          thumbnailUrl: 'https://cdn.example.com/image-thumb.jpg',
+          localPreviewUrl: '/tmp/local-image.jpg',
+          localPosterUrl: '/tmp/local-poster.jpg',
+        ),
+      );
+
+      expect(body.toJson(), {
+        'image': {
+          'url': 'https://cdn.example.com/image.jpg',
+          'fileName': null,
+          'mimeType': null,
+          'sizeBytes': null,
+          'width': null,
+          'height': null,
+          'durationSeconds': null,
+          'thumbnailUrl': 'https://cdn.example.com/image-thumb.jpg',
+        },
+      });
+    });
+
     test('serializes rich message bodies with client API field names', () {
       const body = MessageBody(
         contactCard: ContactCardDto(

@@ -2,40 +2,53 @@
 
 本目录是 LPP Flutter 移动端 App。当前项目文档入口为：
 
-- `lpp/docs/00-ECC工作流.md`
-- `lpp/docs/01-需求规格说明书.md`
-- `lpp/docs/02-功能矩阵和实现情况.md`
-- `lpp/docs/03-技术方案.md`
-- `lpp/docs/04-测试验收方案.md`
-- `lpp/docs/05-接口与服务端依赖.md`
-- `lpp/docs/06-发布风险与检查清单.md`
+- `lpp/lpp_mobile/docs/README.md`
+- `lpp/lpp_mobile/docs/01-APP端需求规格说明.md`
+- `lpp/lpp_mobile/docs/03-APP端功能矩阵.md`
+- `lpp/lpp_mobile/docs/04-APP端技术方案总览.md`
+- `lpp/lpp_mobile/docs/05-服务端支持.md`
+- `lpp/lpp_mobile/docs/06-APP端发布文档.md`
+- `lpp/lpp_mobile/docs/requirements/README.md`
+- `lpp/lpp_mobile/docs/constraints/01-通用开发约束.md`
+- `lpp/lpp_mobile/docs/constraints/02-DDD分层约束.md`
+- `lpp/lpp_mobile/docs/constraints/03-需求与设计准入规则.md`
+- `lpp/lpp_mobile/docs/constraints/04-AI协作规则.md`
+
+跨端总账仍在 `lpp/docs/**`，但 App 任务优先阅读 `lpp/lpp_mobile/docs/**`；只有涉及跨端口径、接口合同或总账同步时再回到 `lpp/docs/**`。
 
 ## 必读
 
 任何非简单工程改动前，必须先阅读：
 
-1. `lpp/docs/00-ECC工作流.md`
-2. `lpp/docs/01-需求规格说明书.md`
-3. `lpp/docs/02-功能矩阵和实现情况.md`
-4. `lpp/docs/03-技术方案.md`
-5. `../../.codex/skills/karpathy-guidelines.md`
+1. `lpp/lpp_mobile/docs/README.md`
+2. `lpp/lpp_mobile/docs/constraints/01-通用开发约束.md`
+3. `lpp/lpp_mobile/docs/constraints/02-DDD分层约束.md`
+4. `lpp/lpp_mobile/docs/constraints/03-需求与设计准入规则.md`
+5. `lpp/lpp_mobile/docs/constraints/04-AI协作规则.md`
+6. `../../.codex/skills/karpathy-guidelines.md`
 
 涉及接口、权限、客服工作台、通话、发布或测试验收时，还必须阅读：
 
-- `lpp/docs/04-测试验收方案.md`
-- `lpp/docs/05-接口与服务端依赖.md`
-- `lpp/docs/06-发布风险与检查清单.md`
+- `lpp/lpp_mobile/docs/05-服务端支持.md`
+- `lpp/lpp_mobile/docs/constraints/05-测试与验收规则.md`
+- `lpp/lpp_mobile/docs/release/01-发布检查清单.md`
+
+涉及 IM、Gateway、未读、已读、发送、在线客服线程、客服接入或消息底座时，还必须阅读：
+
+- `lpp/lpp_mobile/docs/technical/02-消息与会话详细方案.md`
+- `lpp/lpp_mobile/docs/03-APP端功能矩阵.md`
 
 ## 文档优先流程
 
-所有非简单工程改动必须按 `lpp/docs/00-ECC工作流.md` 执行。需求规格说明书、功能矩阵和技术方案是 ECC 流程中的核心产物，不是替代 ECC 的独立流程。
+所有非简单工程改动必须按 `lpp/lpp_mobile/docs/README.md` 的 AI 读取规则执行。需求规格、功能矩阵和技术方案是核心产物，不是替代工程流程的独立流程。
 
-1. 确认或更新需求规格说明书。
-2. 确认或更新功能矩阵和实现情况。
-3. 确认或更新技术方案。
-4. 按既有架构修改代码。
-5. 执行测试验收并记录结论。
-6. 判断发布风险和遗留问题。
+1. 确认或更新 `requirements/01-产品需求规格.md`。
+2. 确认或更新 `requirements/01-APP端需求池.md` 和 `requirements/03-APP端需求状态流转规则.md`。
+3. 确认或更新 `03-APP端功能矩阵.md`。
+4. 确认或更新 `technical/` 下对应方案。
+5. 按既有架构修改代码。
+6. 执行测试验收并记录结论。
+7. 判断发布风险和遗留问题。
 
 如果用户只是讨论方案、纠正理解或评估可行性，不得直接改代码。
 

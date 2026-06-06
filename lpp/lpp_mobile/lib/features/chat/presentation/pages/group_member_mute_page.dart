@@ -5,6 +5,7 @@ import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/permissions/app_permissions.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.dart';
+import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 
 const _bg = Color(0xFFF2F2F7);
 const _card = Colors.white;
@@ -13,6 +14,22 @@ const _secondary = Color(0xFF8E8E93);
 const _primary = Color(0xFF00B27A);
 const _divider = Color(0xFFE5E5EA);
 const _red = Color(0xFFFF3B30);
+
+List<GroupMember> filterGroupMuteCandidates(
+  List<GroupMember> members,
+  String query,
+) {
+  final normalizedQuery = query.trim().toLowerCase();
+  final candidates = members
+      .where((m) => m.role == GroupRole.member && m.userId.isNotEmpty)
+      .toList();
+  if (normalizedQuery.isEmpty) return candidates;
+  return candidates.where((member) {
+    return member.displayName.toLowerCase().contains(normalizedQuery) ||
+        member.userId.toLowerCase().contains(normalizedQuery) ||
+        (member.muteReason?.toLowerCase().contains(normalizedQuery) ?? false);
+  }).toList();
+}
 
 class GroupMemberMutePage extends ConsumerStatefulWidget {
   final String groupId;
@@ -26,6 +43,14 @@ class GroupMemberMutePage extends ConsumerStatefulWidget {
 
 class _GroupMemberMutePageState extends ConsumerState<GroupMemberMutePage> {
   final Set<String> _savingUsers = {};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _setMute(
     GroupMember member,
@@ -75,9 +100,12 @@ class _GroupMemberMutePageState extends ConsumerState<GroupMemberMutePage> {
   }
 
   Future<void> _openMuteDialog(GroupMember member) async {
-    final result = await showDialog<_MuteMemberSettings>(
+    final result = await showModalBottomSheet<_MuteMemberSettings>(
       context: context,
-      builder: (context) => _MuteMemberDialog(memberName: member.displayName),
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _MuteMemberSheet(memberName: member.displayName),
     );
     if (result == null) return;
     await _setMute(
@@ -136,11 +164,10 @@ class _GroupMemberMutePageState extends ConsumerState<GroupMemberMutePage> {
             error: (_, __) => const Center(
                 child: Text('加载失败', style: TextStyle(color: _secondary))),
             data: (members) {
-              final candidates = members
-                  .where(
-                      (m) => m.role == GroupRole.member && m.userId.isNotEmpty)
-                  .toList();
-              if (candidates.isEmpty) {
+              final allCandidates = filterGroupMuteCandidates(members, '');
+              final candidates =
+                  filterGroupMuteCandidates(members, _searchQuery);
+              if (allCandidates.isEmpty) {
                 return const Center(
                   child:
                       Text('暂无可禁言的普通成员', style: TextStyle(color: _secondary)),
@@ -151,6 +178,20 @@ class _GroupMemberMutePageState extends ConsumerState<GroupMemberMutePage> {
                 children: [
                   const _HintCard(),
                   const SizedBox(height: 12),
+                  _MemberMuteSearchBox(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() {
+                      _searchQuery = value;
+                    }),
+                    onClear: () => setState(() {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    }),
+                  ),
+                  if (candidates.isEmpty)
+                    _EmptySearchState(query: _searchQuery)
+                  else
+                    const SizedBox(height: 12),
                   ...List.generate(candidates.length, (index) {
                     final member = candidates[index];
                     final saving = _savingUsers.contains(member.userId);
@@ -177,6 +218,81 @@ class _GroupMemberMutePageState extends ConsumerState<GroupMemberMutePage> {
   }
 }
 
+class _MemberMuteSearchBox extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _MemberMuteSearchBox({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: '搜索成员',
+          hintStyle: const TextStyle(color: _secondary),
+          prefixIcon:
+              const Icon(Icons.search, size: 20, color: Color(0xFFB8B8BD)),
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: '清空搜索',
+                  icon: const Icon(Icons.close,
+                      size: 18, color: Color(0xFFB8B8BD)),
+                  onPressed: onClear,
+                ),
+          border: InputBorder.none,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptySearchState extends StatelessWidget {
+  final String query;
+
+  const _EmptySearchState({required this.query});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.search_off, size: 32, color: Color(0xFFC7C7CC)),
+          const SizedBox(height: 8),
+          Text(
+            query.trim().isEmpty ? '暂无匹配成员' : '未找到“${query.trim()}”',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 14, color: _secondary),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HintCard extends StatelessWidget {
   const _HintCard();
 
@@ -197,7 +313,7 @@ class _HintCard extends StatelessWidget {
   }
 }
 
-class _MemberMuteTile extends StatelessWidget {
+class _MemberMuteTile extends ConsumerWidget {
   final GroupMember member;
   final bool saving;
   final VoidCallback onMute;
@@ -211,8 +327,9 @@ class _MemberMuteTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isMuted = member.isMuted;
+    final tzOffset = ref.watch(timezoneOffsetProvider);
     return Container(
       color: _card,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -236,34 +353,27 @@ class _MemberMuteTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 5),
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _MuteStatusChip(isMuted: isMuted),
-                    if (isMuted == true && member.muteUntil != null) ...[
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          '至 ${_formatMuteUntil(member.muteUntil!)}',
-                          style:
-                              const TextStyle(fontSize: 12, color: _secondary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    if (isMuted == true && member.muteUntil != null)
+                      Text(
+                        '至 ${_formatMuteUntil(member.muteUntil!, tzOffset)}',
+                        style: const TextStyle(fontSize: 12, color: _secondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
                     if (isMuted == true &&
-                        member.muteReason?.isNotEmpty == true) ...[
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          '原因：${member.muteReason!}',
-                          style:
-                              const TextStyle(fontSize: 12, color: _secondary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        member.muteReason?.isNotEmpty == true)
+                      Text(
+                        '原因：${member.muteReason!}',
+                        style: const TextStyle(fontSize: 12, color: _secondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
                   ],
                 ),
               ],
@@ -277,14 +387,20 @@ class _MemberMuteTile extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2, color: _primary),
             )
           else if (isMuted == true)
-            TextButton(
-              onPressed: onUnmute,
-              child: const Text('解除禁言'),
+            SizedBox(
+              width: 76,
+              child: TextButton(
+                onPressed: onUnmute,
+                child: const Text('解除'),
+              ),
             )
           else if (isMuted == false)
-            TextButton(
-              onPressed: onMute,
-              child: const Text('禁言', style: TextStyle(color: _red)),
+            SizedBox(
+              width: 64,
+              child: TextButton(
+                onPressed: onMute,
+                child: const Text('禁言', style: TextStyle(color: _red)),
+              ),
             )
           else
             PopupMenuButton<bool>(
@@ -304,10 +420,9 @@ class _MemberMuteTile extends StatelessWidget {
     );
   }
 
-  static String _formatMuteUntil(String iso) {
+  static String _formatMuteUntil(String iso, double tzOffset) {
     try {
-      final dt = DateTime.parse(iso).toLocal();
-      return '${dt.month}/${dt.day} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return formatMonthDayMinuteWithTimezone(DateTime.parse(iso), tzOffset);
     } catch (_) {
       return iso;
     }
@@ -324,16 +439,16 @@ class _MuteMemberSettings {
   });
 }
 
-class _MuteMemberDialog extends StatefulWidget {
+class _MuteMemberSheet extends StatefulWidget {
   final String memberName;
 
-  const _MuteMemberDialog({required this.memberName});
+  const _MuteMemberSheet({required this.memberName});
 
   @override
-  State<_MuteMemberDialog> createState() => _MuteMemberDialogState();
+  State<_MuteMemberSheet> createState() => _MuteMemberSheetState();
 }
 
-class _MuteMemberDialogState extends State<_MuteMemberDialog> {
+class _MuteMemberSheetState extends State<_MuteMemberSheet> {
   final _minutesController = TextEditingController(text: '0');
   final _reasonController = TextEditingController();
   String? _minutesError;
@@ -364,55 +479,125 @@ class _MuteMemberDialogState extends State<_MuteMemberDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('设置禁言'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.memberName.isEmpty ? '将禁言该成员' : '将禁言「${widget.memberName}」',
-            style: const TextStyle(fontSize: 14, color: _secondary),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _minutesController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: '禁言时长（分钟）',
-              hintText: '0 表示永久',
-              errorText: _minutesError,
-              border: const OutlineInputBorder(),
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD8D8DC),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  '设置禁言',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: _text,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.memberName.isEmpty
+                      ? '将禁言该成员'
+                      : '将禁言「${widget.memberName}」',
+                  style: const TextStyle(fontSize: 14, color: _secondary),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _minutesController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: '禁言时长（分钟）',
+                    helperText: '填 0 表示永久禁言',
+                    errorText: _minutesError,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onChanged: (_) {
+                    if (_minutesError != null) {
+                      setState(() => _minutesError = null);
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _reasonController,
+                  minLines: 3,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.newline,
+                  decoration: InputDecoration(
+                    labelText: '禁言原因',
+                    hintText: '选填，便于后续追溯',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _secondary,
+                          minimumSize: const Size.fromHeight(46),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _red,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(46),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('确定禁言'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            onChanged: (_) {
-              if (_minutesError != null) setState(() => _minutesError = null);
-            },
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _reasonController,
-            minLines: 2,
-            maxLines: 3,
-            textInputAction: TextInputAction.newline,
-            decoration: const InputDecoration(
-              labelText: '禁言原因',
-              hintText: '选填',
-              border: OutlineInputBorder(),
-            ),
-          ),
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消', style: TextStyle(color: _secondary)),
-        ),
-        TextButton(
-          onPressed: _submit,
-          child: const Text('确定禁言', style: TextStyle(color: _red)),
-        ),
-      ],
     );
   }
 }

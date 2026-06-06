@@ -40,6 +40,7 @@ class GroupDetailEntity {
   final int lastMessageSeq;
   final int lastReadSeq;
   final bool allowMemberAddFriend;
+  final bool allowMemberAtAll;
 
   const GroupDetailEntity({
     required this.groupId,
@@ -55,6 +56,7 @@ class GroupDetailEntity {
     required this.lastMessageSeq,
     required this.lastReadSeq,
     required this.allowMemberAddFriend,
+    required this.allowMemberAtAll,
   });
 
   factory GroupDetailEntity.fromJson(Map<String, dynamic> json) {
@@ -73,6 +75,7 @@ class GroupDetailEntity {
       lastMessageSeq: json['lastMessageSeq'] as int? ?? 0,
       lastReadSeq: json['lastReadSeq'] as int? ?? 0,
       allowMemberAddFriend: settings['allowMemberAddFriend'] as bool? ?? true,
+      allowMemberAtAll: settings['allowMemberAtAll'] as bool? ?? false,
     );
   }
 
