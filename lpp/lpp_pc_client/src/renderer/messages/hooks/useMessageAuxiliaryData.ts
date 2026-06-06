@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 
 import type { ConversationListItem, GroupMemberDto, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
-import { prefetchImageMessages } from "../../media/runtime/imagePrecache";
+import {
+  accountIdFromSession,
+  materializeImageMessages,
+} from "../../media/runtime/imageMaterialization";
 import { getImConversationType } from "./useMessageCenterViewModel";
 
 export function useMessageAuxiliaryData({
@@ -48,16 +51,13 @@ export function useMessageAuxiliaryData({
     if (!session || !activeConversation?.conversationId || messages.length === 0) {
       return;
     }
-    prefetchImageMessages({
-      accountId:
-        session.userId ||
-        session.platformUserId ||
-        session.lppId ||
-        session.tenantId,
+    materializeImageMessages({
+      accountId: accountIdFromSession(session),
       assetBaseUrl: session.apiBaseUrl,
       authToken: session.tenantToken,
       conversationId: activeConversation.conversationId,
       messages,
+      reason: "conversation-snapshot",
     });
   }, [
     activeConversation?.conversationId,

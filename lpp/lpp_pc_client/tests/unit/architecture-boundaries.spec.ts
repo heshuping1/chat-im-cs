@@ -669,6 +669,7 @@ describe("architecture boundaries", () => {
       "src/renderer/components/MePage.tsx",
       "src/renderer/components/Sidebar.tsx",
       "src/renderer/media/runtime/desktopMediaActions.ts",
+      "src/renderer/media/runtime/imageMaterialization.ts",
       "src/renderer/media/runtime/imagePrecache.ts",
       "src/renderer/media/runtime/localMediaCache.ts",
       "src/renderer/media/runtime/videoPosterRuntime.ts",

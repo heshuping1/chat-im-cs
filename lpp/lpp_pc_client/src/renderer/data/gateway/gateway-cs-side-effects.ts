@@ -18,6 +18,10 @@ import { getPcSettingsSnapshot } from "../settings/settings-store";
 import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
 import { workspaceScopeKeyFromSession } from "../workspace-scope";
 import {
+  accountIdFromSession,
+  materializeReceivedImageMessage,
+} from "../../media/runtime/imageMaterialization";
+import {
   isExplicitCustomerServiceThreadOpenSource,
   resolveCustomerServiceThreadReadVisibility,
 } from "../customer-service/customer-service-read-visibility";
@@ -96,6 +100,14 @@ export function mergeCustomerServiceGatewayMessage(
     selfMessage: self,
     threadId,
     threadType,
+  });
+  void materializeReceivedImageMessage({
+    accountId: accountIdFromSession(session),
+    assetBaseUrl: session?.apiBaseUrl,
+    authToken: session?.tenantToken,
+    conversationId: threadId,
+    message,
+    reason: "cs-gateway-received",
   });
 
   if (!self) {

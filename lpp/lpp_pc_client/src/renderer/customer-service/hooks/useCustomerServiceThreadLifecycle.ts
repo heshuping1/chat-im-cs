@@ -22,7 +22,10 @@ import {
 import type { CustomerServiceThreadDetailView } from "../../data/customer-service/cs-workspace-view-model";
 import type { CustomerServiceThreadOpenSource } from "../../data/workspace-ui/workspace-ui-store";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
-import { prefetchImageMessages } from "../../media/runtime/imagePrecache";
+import {
+  accountIdFromSession,
+  materializeImageMessages,
+} from "../../media/runtime/imageMaterialization";
 
 export function useCustomerServiceThreadLifecycle({
   activeModule,
@@ -74,16 +77,13 @@ export function useCustomerServiceThreadLifecycle({
 
   useEffect(() => {
     if (!session || !selectedThread || messages.length === 0) return;
-    prefetchImageMessages({
-      accountId:
-        session.userId ||
-        session.platformUserId ||
-        session.lppId ||
-        session.tenantId,
+    materializeImageMessages({
+      accountId: accountIdFromSession(session),
       assetBaseUrl: session.apiBaseUrl,
       authToken: session.tenantToken,
       conversationId: selectedThread.threadId || selectedThread.conversationId,
       messages,
+      reason: "conversation-snapshot",
     });
   }, [messages, selectedThread, session]);
 

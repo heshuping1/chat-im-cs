@@ -7,6 +7,7 @@ import {
 import { workspaceScopeKeyFromSession } from "../../src/renderer/data/workspace-scope";
 
 const mocks = vi.hoisted(() => ({
+  materializeReceivedImageMessage: vi.fn(),
   notifyDesktopOrBrowser: vi.fn(),
   pushRealtimeReminder: vi.fn(),
   pcSettings: {
@@ -49,6 +50,16 @@ vi.mock("../../src/renderer/data/reminder/reminder-service", () => ({
     settings: { customerServiceMessageNotifications?: boolean },
   ) => settings.customerServiceMessageNotifications === true,
   shouldShowDesktopNotificationForTarget: () => true,
+}));
+
+vi.mock("../../src/renderer/media/runtime/imageMaterialization", () => ({
+  accountIdFromSession: (session: {
+    lppId?: string;
+    platformUserId?: string;
+    tenantId?: string;
+    userId?: string;
+  } | null) => session?.userId || session?.platformUserId || session?.lppId || session?.tenantId,
+  materializeReceivedImageMessage: mocks.materializeReceivedImageMessage,
 }));
 
 vi.mock("../../src/renderer/data/workspace-ui/workspace-ui-store", () => ({
@@ -141,6 +152,45 @@ describe("gateway customer service side effects", () => {
         channel: "serviceQueue",
       }),
     );
+  });
+
+  it("starts background image materialization when a customer service image message is received", async () => {
+    const { mergeCustomerServiceGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+    const queryClient = {
+      setQueriesData: vi.fn(),
+    };
+
+    mergeCustomerServiceGatewayMessage(
+      queryClient as never,
+      {
+        body: {
+          image: {
+            fileName: "visitor.png",
+            signedUrl: "/media/visitor-image?sig=cs",
+          },
+        },
+        conversationId: "im-conversation-cs-1",
+        messageId: "visitor-image-1",
+        messageType: "image",
+        senderRole: "visitor",
+      },
+      "temp-session-1",
+    );
+
+    expect(mocks.materializeReceivedImageMessage).toHaveBeenCalledWith({
+      accountId: "staff-1",
+      assetBaseUrl: "https://api.example.test",
+      authToken: "tenant-token",
+      conversationId: "temp-session-1",
+      message: expect.objectContaining({
+        conversationId: "im-conversation-cs-1",
+        messageId: "visitor-image-1",
+        messageType: "image",
+      }),
+      reason: "cs-gateway-received",
+    });
   });
 
   it("does not let queue reminder settings block active thread visitor messages", async () => {

@@ -6,6 +6,7 @@ import { canAutoReadImConversation } from "../../src/renderer/messages/hooks/use
 const mocks = vi.hoisted(() => ({
   markConversationRead: vi.fn(),
   markImConversationReadLocally: vi.fn(),
+  materializeReceivedImageMessage: vi.fn(),
   notifyDesktopOrBrowser: vi.fn(),
   pcSettings: {
     desktopNotifications: true,
@@ -78,6 +79,16 @@ vi.mock("../../src/renderer/data/reminder/reminder-service", async () => {
     notifyDesktopOrBrowser: mocks.notifyDesktopOrBrowser,
   };
 });
+
+vi.mock("../../src/renderer/media/runtime/imageMaterialization", () => ({
+  accountIdFromSession: (session: {
+    lppId?: string;
+    platformUserId?: string;
+    tenantId?: string;
+    userId?: string;
+  } | null) => session?.userId || session?.platformUserId || session?.lppId || session?.tenantId,
+  materializeReceivedImageMessage: mocks.materializeReceivedImageMessage,
+}));
 
 describe("gateway IM side effects", () => {
   const scopedConversationsKey = [
@@ -323,6 +334,41 @@ describe("gateway IM side effects", () => {
         }),
       }),
     );
+  });
+
+  it("starts background image materialization when an IM image message is received", async () => {
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+
+    mergeImGatewayMessage(
+      new QueryClient(),
+      imTextPayload({
+        body: {
+          image: {
+            fileName: "received.png",
+            signedUrl: "/media/received-image?sig=gateway",
+          },
+        },
+        messageId: "image-received-1",
+        messageType: "image",
+      }),
+      "direct-1",
+      "direct",
+    );
+
+    expect(mocks.materializeReceivedImageMessage).toHaveBeenCalledWith({
+      accountId: "staff-1",
+      assetBaseUrl: "https://api.example.test",
+      authToken: "tenant-token",
+      conversationId: "direct-1",
+      message: expect.objectContaining({
+        conversationId: "direct-1",
+        messageId: "image-received-1",
+        messageType: "image",
+      }),
+      reason: "im-gateway-received",
+    });
   });
 
   it("does not notify for the active visible IM conversation while focused", async () => {

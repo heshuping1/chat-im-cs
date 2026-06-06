@@ -40,6 +40,10 @@ import { getPcSettingsSnapshot } from "../settings/settings-store";
 import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 import { workspaceScopeFromSession } from "../workspace-scope";
+import {
+  accountIdFromSession,
+  materializeReceivedImageMessage,
+} from "../../media/runtime/imageMaterialization";
 
 export function mergeImGatewayMessage(
   queryClient: QueryClient,
@@ -172,6 +176,14 @@ export function mergeImGatewayMessage(
     payload,
     currentTenantId: workspaceScope.tenantId,
     scopeKey: workspaceScope.key,
+  });
+  void materializeReceivedImageMessage({
+    accountId: accountIdFromSession(identity),
+    assetBaseUrl: identity?.apiBaseUrl,
+    authToken: identity?.tenantToken,
+    conversationId: message.conversationId,
+    message,
+    reason: "im-gateway-received",
   });
   recordMessageReminderDiagnostic({
     event: "im.cache.write",
