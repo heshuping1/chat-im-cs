@@ -1,4 +1,3 @@
-import type { QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
@@ -9,14 +8,12 @@ import {
   resolveImConversationReadView,
 } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
-import { pcQueryKeys } from "../../data/query-keys";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
 import { useI18n } from "../../i18n/useI18n";
 import {
   findFirstUnreadLoadedMessage,
   type UnreadJumpState,
 } from "../models/messageDisplayModel";
-import { getImConversationType } from "./useMessageCenterViewModel";
 
 export type ActiveImConversationSource = "user" | "auto" | "none";
 
@@ -26,7 +23,6 @@ export function useMessageUnreadJumpController({
   messageListScrollRegistry,
   messageSearchOpen,
   messages,
-  queryClient,
   session,
   setActiveConversation,
   setConversationDrawerOpen,
@@ -44,7 +40,6 @@ export function useMessageUnreadJumpController({
   };
   messageSearchOpen: boolean;
   messages: MessageItemDto[];
-  queryClient: QueryClient;
   session: AuthSession | null;
   setActiveConversation: (conversationId: string) => void;
   setConversationDrawerOpen: Dispatch<SetStateAction<boolean>>;
@@ -103,7 +98,7 @@ export function useMessageUnreadJumpController({
       }
       setActiveConversation(activeConversation.conversationId);
     }
-  }, [activeConversation, activeConversationId, setActiveConversation]);
+  }, [activeConversation, activeConversationId, setActiveConversation, unreadIdentity]);
 
   const openConversationFromUserClick = useCallback(
     (conversation: ConversationListItem) => {
@@ -139,17 +134,6 @@ export function useMessageUnreadJumpController({
       setConversationDrawerOpen(false);
       setActiveConversation(conversation.conversationId);
 
-      const conversationType = getImConversationType(conversation);
-      if (!session || !conversationType) return;
-      void queryClient.invalidateQueries({
-        queryKey: pcQueryKeys.imMessages(
-          session.apiBaseUrl,
-          session.tenantToken,
-          conversationType,
-          conversation.conversationId,
-        ),
-      });
-
       const unread = imConversationEffectiveUnreadCount(conversation, unreadIdentity);
       if (unread <= 0) {
         setUnreadJump(null);
@@ -163,8 +147,7 @@ export function useMessageUnreadJumpController({
       });
     },
     [
-      queryClient,
-      session,
+      activeConversationId,
       setActiveConversation,
       setConversationDrawerOpen,
       setUnreadJump,

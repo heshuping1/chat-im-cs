@@ -182,6 +182,9 @@ describe("workspace ui store selectors", () => {
         activeImConversationId: "conversation-2",
         activeModule: "messages",
       });
+      const selectedConversationState = useWorkspaceStore.getState();
+      useWorkspaceStore.getState().setActiveImConversation("conversation-2");
+      expect(useWorkspaceStore.getState()).toBe(selectedConversationState);
 
       useWorkspaceStore.getState().setActiveImConversationVisibility("paneVisible");
       expect(useWorkspaceStore.getState().activeImConversationVisibility).toBe("paneVisible");

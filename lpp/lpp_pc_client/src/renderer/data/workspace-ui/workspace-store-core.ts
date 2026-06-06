@@ -340,7 +340,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
     }),
   setActiveImConversation: (id) =>
-    set({ activeImConversationId: id, activeModule: 'messages' }),
+    set((state) =>
+      state.activeImConversationId === id && state.activeModule === 'messages'
+        ? state
+        : { activeImConversationId: id, activeModule: 'messages' },
+    ),
   setActiveImConversationVisibility: (activeImConversationVisibility) =>
     set((state) =>
       state.activeImConversationVisibility === activeImConversationVisibility

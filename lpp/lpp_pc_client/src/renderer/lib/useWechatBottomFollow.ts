@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   createConversationViewportRegistry,
+  decideConversationViewportAfterAppend,
   restoreConversationViewport,
+  shouldKeepBottomPinnedAfterLayout,
 } from "../messages/models/messageConversationViewportModel";
 
 const bottomThreshold = 80;
-const conversationBottomLockMs = 2400;
 const userScrollIntentMs = 450;
 
 export function useWechatBottomFollow<TMessage>({
@@ -22,12 +23,12 @@ export function useWechatBottomFollow<TMessage>({
   const stageRef = useRef<HTMLElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const isAtBottomRef = useRef(true);
-  const bottomLockUntilRef = useRef(0);
   const userScrollIntentUntilRef = useRef(0);
   const previousConversationKeyRef = useRef<string | undefined>(undefined);
   const previousMessageKeysRef = useRef<Set<string>>(new Set());
   const viewportRegistryRef = useRef(createConversationViewportRegistry());
   const pendingNewMessageCountRef = useRef(0);
+  const scheduledScrollFrameRef = useRef<number | null>(null);
   const [pendingNewMessageCount, setPendingNewMessageCount] = useState(0);
 
   const updatePendingNewMessageCount = useCallback(
@@ -41,16 +42,16 @@ export function useWechatBottomFollow<TMessage>({
     [],
   );
 
-  const isBottomLocked = useCallback(
-    () => Date.now() < bottomLockUntilRef.current,
-    [],
-  );
-
   const rawIsNearBottom = useCallback((threshold = bottomThreshold) => {
     const stage = stageRef.current;
     if (!stage) return true;
     return stage.scrollHeight - stage.scrollTop - stage.clientHeight <= threshold;
   }, []);
+
+  const hasRecentUserScrollIntent = useCallback(
+    () => Date.now() <= userScrollIntentUntilRef.current,
+    [],
+  );
 
   const rememberConversationViewport = useCallback(
     (key: string | undefined) => {
@@ -66,50 +67,44 @@ export function useWechatBottomFollow<TMessage>({
   );
 
   const isNearBottom = useCallback(
-    (threshold = bottomThreshold) => isBottomLocked() || rawIsNearBottom(threshold),
-    [isBottomLocked, rawIsNearBottom],
+    (threshold = bottomThreshold) => rawIsNearBottom(threshold),
+    [rawIsNearBottom],
   );
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
-    const scroll = () => {
+  const alignBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
       const stage = stageRef.current;
       if (!stage) return;
       stage.scrollTo({ top: stage.scrollHeight, behavior });
-      bottomRef.current?.scrollIntoView({ block: "end", behavior });
       isAtBottomRef.current = true;
       updatePendingNewMessageCount(0);
-    };
-    requestAnimationFrame(scroll);
-    window.setTimeout(scroll, 80);
-    window.setTimeout(scroll, 260);
-  }, []);
+    },
+    [updatePendingNewMessageCount],
+  );
 
-  const beginBottomLock = useCallback(() => {
-    bottomLockUntilRef.current = Date.now() + conversationBottomLockMs;
-  }, []);
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      alignBottom(behavior);
+      if (scheduledScrollFrameRef.current !== null) {
+        cancelAnimationFrame(scheduledScrollFrameRef.current);
+      }
+      scheduledScrollFrameRef.current = requestAnimationFrame(() => {
+        scheduledScrollFrameRef.current = null;
+        alignBottom(behavior);
+      });
+    },
+    [alignBottom],
+  );
 
   const handleScroll = useCallback(() => {
     const atBottom = rawIsNearBottom();
-    if (
-      !atBottom &&
-      isBottomLocked() &&
-      Date.now() <= userScrollIntentUntilRef.current
-    ) {
-      bottomLockUntilRef.current = 0;
-    }
-    if (!atBottom && isBottomLocked()) {
-      scrollToBottom("auto");
-      return;
-    }
     isAtBottomRef.current = atBottom;
     if (atBottom) updatePendingNewMessageCount(0);
     rememberConversationViewport(conversationKey);
   }, [
     conversationKey,
-    isBottomLocked,
     rawIsNearBottom,
     rememberConversationViewport,
-    scrollToBottom,
     updatePendingNewMessageCount,
   ]);
 
@@ -117,7 +112,7 @@ export function useWechatBottomFollow<TMessage>({
     scrollToBottom("smooth");
   }, [scrollToBottom]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const currentKeys = new Set(messages.map(messageKey));
     const previousConversationKey = previousConversationKeyRef.current;
     const previousKeys = previousMessageKeysRef.current;
@@ -127,14 +122,13 @@ export function useWechatBottomFollow<TMessage>({
     previousMessageKeysRef.current = currentKeys;
 
     if (!conversationKey) {
-      bottomLockUntilRef.current = 0;
       updatePendingNewMessageCount(0);
       return;
     }
+
     if (conversationChanged) {
       const restore = restoreConversationViewport(viewportRegistryRef.current, conversationKey);
       if (restore.kind === "restore") {
-        bottomLockUntilRef.current = 0;
         isAtBottomRef.current = restore.state.atBottom;
         updatePendingNewMessageCount(restore.state.pendingNewMessageCount);
         const restoreScroll = () => {
@@ -146,32 +140,30 @@ export function useWechatBottomFollow<TMessage>({
             stage.scrollTo({ top: restore.state.scrollTop, behavior: "auto" });
           }
         };
+        restoreScroll();
         requestAnimationFrame(restoreScroll);
-        window.setTimeout(restoreScroll, 80);
-        window.setTimeout(restoreScroll, 260);
         return;
       }
-      beginBottomLock();
       isAtBottomRef.current = true;
       updatePendingNewMessageCount(0);
       scrollToBottom("auto");
       return;
     }
+
     const addedMessages = messages.filter((message) => !previousKeys.has(messageKey(message)));
     if (addedMessages.length === 0) return;
-    if (isAtBottomRef.current) {
-      scrollToBottom("auto");
-      return;
-    }
-    const incomingCount = addedMessages.filter((message) => !isMineMessage(message)).length;
-    if (incomingCount > 0) {
-      updatePendingNewMessageCount((count) => count + incomingCount);
-    }
-    if (addedMessages.some(isMineMessage)) {
-      scrollToBottom("smooth");
+
+    const decision = decideConversationViewportAfterAppend({
+      addedIncomingCount: addedMessages.filter((message) => !isMineMessage(message)).length,
+      addedMineCount: addedMessages.filter(isMineMessage).length,
+      wasAtBottom: isAtBottomRef.current,
+    });
+    if (decision.kind === "follow-bottom") {
+      scrollToBottom(decision.behavior);
+    } else if (decision.pendingNewMessageDelta > 0) {
+      updatePendingNewMessageCount((count) => count + decision.pendingNewMessageDelta);
     }
   }, [
-    beginBottomLock,
     conversationKey,
     isMineMessage,
     messageKey,
@@ -209,12 +201,25 @@ export function useWechatBottomFollow<TMessage>({
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage || typeof ResizeObserver === "undefined") return undefined;
+    let resizeFrame: number | null = null;
     const followBottomIfNeeded = () => {
-      if (isBottomLocked() || isAtBottomRef.current) {
+      if (
+        shouldKeepBottomPinnedAfterLayout({
+          atBottom: isAtBottomRef.current,
+          recentUserScroll: hasRecentUserScrollIntent(),
+        })
+      ) {
         scrollToBottom("auto");
       }
     };
-    const resizeObserver = new ResizeObserver(followBottomIfNeeded);
+    const scheduleFollowBottom = () => {
+      if (resizeFrame !== null) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        followBottomIfNeeded();
+      });
+    };
+    const resizeObserver = new ResizeObserver(scheduleFollowBottom);
     const observeCurrentLayout = () => {
       resizeObserver.observe(stage);
       Array.from(stage.children).forEach((child) => resizeObserver.observe(child));
@@ -222,14 +227,24 @@ export function useWechatBottomFollow<TMessage>({
     observeCurrentLayout();
     const mutationObserver = new MutationObserver(() => {
       observeCurrentLayout();
-      followBottomIfNeeded();
+      scheduleFollowBottom();
     });
     mutationObserver.observe(stage, { childList: true, subtree: false });
     return () => {
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       mutationObserver.disconnect();
       resizeObserver.disconnect();
     };
-  }, [conversationKey, isBottomLocked, messages.length, scrollToBottom]);
+  }, [conversationKey, hasRecentUserScrollIntent, messages.length, scrollToBottom]);
+
+  useEffect(
+    () => () => {
+      if (scheduledScrollFrameRef.current !== null) {
+        cancelAnimationFrame(scheduledScrollFrameRef.current);
+      }
+    },
+    [],
+  );
 
   return {
     bottomRef,

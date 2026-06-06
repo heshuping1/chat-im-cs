@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 
 import {
   createConversationViewportRegistry,
+  decideConversationViewportAfterAppend,
   restoreConversationViewport,
+  shouldKeepBottomPinnedAfterLayout,
 } from "../../src/renderer/messages/models/messageConversationViewportModel";
 
 describe("message conversation viewport model", () => {
@@ -44,5 +46,72 @@ describe("message conversation viewport model", () => {
     expect(hookSource).toContain('restore.kind === "restore"');
     expect(hookSource).toContain("rememberConversationViewport(previousConversationKey)");
     expect(hookSource).toContain("stage.scrollTo({ top: restore.state.scrollTop");
+  });
+
+  it("only follows appended messages when the user is already at bottom or sends a message", () => {
+    expect(
+      decideConversationViewportAfterAppend({
+        addedIncomingCount: 3,
+        addedMineCount: 0,
+        wasAtBottom: true,
+      }),
+    ).toEqual({ kind: "follow-bottom", behavior: "auto" });
+
+    expect(
+      decideConversationViewportAfterAppend({
+        addedIncomingCount: 2,
+        addedMineCount: 0,
+        wasAtBottom: false,
+      }),
+    ).toEqual({ kind: "keep-position", pendingNewMessageDelta: 2 });
+
+    expect(
+      decideConversationViewportAfterAppend({
+        addedIncomingCount: 0,
+        addedMineCount: 1,
+        wasAtBottom: false,
+      }),
+    ).toEqual({ kind: "follow-bottom", behavior: "smooth" });
+  });
+
+  it("does not let layout shifts or resource loads fight recent user scrolling", () => {
+    expect(
+      shouldKeepBottomPinnedAfterLayout({
+        atBottom: true,
+        recentUserScroll: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldKeepBottomPinnedAfterLayout({
+        atBottom: true,
+        recentUserScroll: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldKeepBottomPinnedAfterLayout({
+        atBottom: false,
+        recentUserScroll: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps chat click and media load from forcing a full message-stage re-scroll", () => {
+    const hookSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/lib/useWechatBottomFollow.ts"),
+      "utf8",
+    );
+    const stageSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
+      "utf8",
+    );
+    const unreadControllerSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/hooks/useMessageUnreadJumpController.ts"),
+      "utf8",
+    );
+
+    expect(hookSource).not.toContain("conversationBottomLock");
+    expect(hookSource).not.toContain("scrollIntoView");
+    expect(stageSource).not.toContain("onLoadCapture");
+    expect(unreadControllerSource).not.toContain("invalidateQueries");
   });
 });

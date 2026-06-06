@@ -515,9 +515,6 @@ export function MessageCenterConversationStage({
                 onFailedMessageClick={onFailedMessageClick}
                 onHistoryFilterChange={setHistoryFilter}
                 onJumpToLatest={jumpToLatest}
-                onLoadCapture={() => {
-                  if (isMessageStageNearBottom()) scrollMessagesToBottom("auto");
-                }}
                 onMessageElementRef={onMessageElementRef}
                 onMessageSearchKeywordChange={setMessageSearchKeyword}
                 onMessageStageScroll={handleMessageStageScroll}

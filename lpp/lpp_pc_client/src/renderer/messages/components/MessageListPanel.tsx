@@ -79,7 +79,6 @@ export interface MessageListPanelProps {
   onFailedMessageClick?: (message: MessageItemDto) => void;
   onHistoryFilterChange: (filter: HistoryFilterKey) => void;
   onJumpToLatest: () => void;
-  onLoadCapture: () => void;
   onMessageElementRef: (messageId: string, element: HTMLDivElement | null) => void;
   onMessageSearchKeywordChange: (keyword: string) => void;
   onMessageStageScroll: () => void;
@@ -142,7 +141,6 @@ export function MessageListPanel({
   onFailedMessageClick,
   onHistoryFilterChange,
   onJumpToLatest,
-  onLoadCapture,
   onMessageElementRef,
   onMessageSearchKeywordChange,
   onMessageStageScroll,
@@ -241,7 +239,6 @@ export function MessageListPanel({
     <section
       className="e-message-stage"
       aria-label={t("messages.listPanel.stageAria")}
-      onLoadCapture={onLoadCapture}
       onScroll={onMessageStageScroll}
       ref={messageStageRef}
       style={chatBackgroundStyleVariables(chatBackgroundPreset) as CSSProperties}

@@ -596,7 +596,6 @@ export function MessageCenter() {
     messageListScrollRegistry,
     messageSearchOpen,
     messages,
-    queryClient,
     session,
     setActiveConversation,
     setConversationDrawerOpen,
