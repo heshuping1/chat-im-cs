@@ -1281,35 +1281,98 @@
   position: fixed;
   z-index: 130;
   box-sizing: border-box;
-  display: grid;
-  width: min(280px, calc(100vw - 24px));
-  max-height: min(236px, calc(100vh - 24px));
-  overflow: auto;
-  padding: 6px;
-  border: 1px solid rgba(211, 222, 234, 0.95);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 16px 42px rgba(20, 35, 55, 0.14);
+  display: flex;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(340px, calc(100vh - 24px));
+  flex-direction: column;
+  gap: 0;
+  overflow: visible;
+  padding: 10px;
+  border: 1px solid rgba(206, 214, 224, 0.9);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(20, 24, 33, 0.18);
 }
 
-.composer-mention-panel button {
+.composer-mention-panel::after {
+  position: absolute;
+  bottom: -9px;
+  left: calc(50% - 9px);
+  width: 18px;
+  height: 18px;
+  border-right: 1px solid rgba(206, 214, 224, 0.9);
+  border-bottom: 1px solid rgba(206, 214, 224, 0.9);
+  background: #fff;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.composer-mention-item {
   min-width: 0;
-  min-height: 32px;
-  padding: 0 10px;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 6px;
   overflow: hidden;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
-  color: #24354a;
-  font-weight: 780;
+  color: #111827;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.1;
   text-align: left;
+}
+
+.composer-mention-item.is-all {
+  background: #e5e5e5;
+}
+
+.composer-mention-item:hover {
+  background: #f0f2f5;
+}
+
+.composer-mention-avatar {
+  display: grid;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  overflow: hidden;
+  place-items: center;
+  border-radius: 3px;
+  background: #d8e6f5;
+  color: #2563eb;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.composer-mention-all-icon {
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+}
+
+.composer-mention-name {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.composer-mention-panel button:hover {
-  background: rgba(236, 246, 242, 0.95);
-  color: #07966d;
+.composer-mention-section,
+.composer-mention-empty {
+  display: block;
+  padding: 12px 6px 8px;
+  color: #9ca3af;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.composer-mention-empty {
+  padding: 18px 6px 24px;
+  font-weight: 500;
 }
 
 .message-info-collapse {

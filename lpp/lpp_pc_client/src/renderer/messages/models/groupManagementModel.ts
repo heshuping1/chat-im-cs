@@ -134,7 +134,8 @@ export function canAddGroupMemberFriend({ role, settings }: GroupInfoVisibilityI
   return settings?.allowMemberAddFriend !== false;
 }
 
-export function canMentionAllGroupMembers({ settings }: GroupInfoVisibilityInput) {
+export function canMentionAllGroupMembers({ role, settings }: GroupInfoVisibilityInput) {
+  if (canViewGroupManagement(role)) return true;
   return settings?.allowMemberAtAll === true;
 }
 

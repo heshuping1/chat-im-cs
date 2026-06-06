@@ -157,8 +157,8 @@ describe("message group management", () => {
     expect(canAddGroupMemberFriend({ role: "member", settings: { allowMemberAddFriend: true } })).toBe(true);
     expect(canAddGroupMemberFriend({ role: "member", settings: { allowMemberAddFriend: false } })).toBe(false);
     expect(canAddGroupMemberFriend({ role: "member", settings: {} })).toBe(true);
-    expect(canMentionAllGroupMembers({ role: "owner", settings: { allowMemberAtAll: false } })).toBe(false);
-    expect(canMentionAllGroupMembers({ role: "admin", settings: { allowMemberAtAll: false } })).toBe(false);
+    expect(canMentionAllGroupMembers({ role: "owner", settings: { allowMemberAtAll: false } })).toBe(true);
+    expect(canMentionAllGroupMembers({ role: "admin", settings: { allowMemberAtAll: false } })).toBe(true);
     expect(canMentionAllGroupMembers({ role: "owner", settings: { allowMemberAtAll: true } })).toBe(true);
     expect(canMentionAllGroupMembers({ role: "member", settings: { allowMemberAtAll: true } })).toBe(true);
     expect(canMentionAllGroupMembers({ role: "member", settings: { allowMemberAtAll: false } })).toBe(false);

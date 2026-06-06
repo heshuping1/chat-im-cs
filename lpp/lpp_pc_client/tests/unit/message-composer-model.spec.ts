@@ -126,4 +126,16 @@ describe("messageComposerModel", () => {
     expect(lexicalInputSource).toContain("insertMentionAtSelection(label)");
     expect(lexicalInputSource).toContain("/(?:^|\\s)@([^\\s@]*)$/");
   });
+
+  it("opens the mention picker from the composer toolbar", () => {
+    expect(messageComposerSource).toContain("const openMentionPicker = () =>");
+    expect(messageComposerSource).toContain("<AtSign size={16} />");
+    expect(messageComposerSource).toContain("const mentionPanelOpen = Boolean(mentionMatch) && mentionOptions.length > 0");
+  });
+
+  it("renders @all before group members in the mention picker", () => {
+    expect(messageComposerSource).toContain('className="composer-mention-item is-all"');
+    expect(messageComposerSource).toContain('className="composer-mention-section">群成员</span>');
+    expect(messageComposerSource).toContain("mentionMemberCandidates.map");
+  });
 });

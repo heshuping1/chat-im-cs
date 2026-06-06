@@ -1,4 +1,5 @@
 import {
+  AtSign,
   FileImage,
   Folder,
   MessageSquareQuote,
@@ -182,6 +183,9 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
         .filter((item) => item.label.toLowerCase().includes(mentionMatch[1].toLowerCase()))
         .slice(0, 6)
     : [];
+  const mentionAllOption = mentionCandidates.find((item) => item.kind === "all");
+  const mentionMemberCandidates = mentionCandidates.filter((item) => item.kind !== "all");
+  const mentionPanelOpen = Boolean(mentionMatch) && mentionOptions.length > 0;
   const updateDraft = useCallback((value: string) => {
     if (draftValue === undefined) {
       setInternalDraft(value);
@@ -226,7 +230,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
     );
     const panelHeight =
       mentionPanelRef.current?.getBoundingClientRect().height ??
-      Math.min(236, 12 + mentionCandidates.length * 34);
+      Math.min(340, 74 + Math.max(1, mentionCandidates.length) * 52);
     const maxLeft = Math.max(margin, window.innerWidth - panelWidth - margin);
     const left = Math.min(maxLeft, Math.max(margin, composerRect.left + 22));
     const topAbove = composerRect.top - panelHeight - gap;
@@ -362,7 +366,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   }, [moreOpen, updateMorePanelPosition]);
 
   useEffect(() => {
-    if (mentionCandidates.length === 0) {
+    if (!mentionPanelOpen) {
       setMentionPanelPosition(null);
       return undefined;
     }
@@ -375,7 +379,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       window.removeEventListener("resize", updateMentionPanelPosition);
       window.removeEventListener("scroll", updateMentionPanelPosition, true);
     };
-  }, [mentionCandidates.length, updateMentionPanelPosition]);
+  }, [mentionPanelOpen, mentionCandidates.length, updateMentionPanelPosition]);
 
   const sendDraft = async () => {
     if (compactComposer) {
@@ -540,6 +544,41 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
+  const openMentionPicker = () => {
+    if (disabled || mentionOptions.length === 0) return;
+    setEmojiOpen(false);
+    setMoreOpen(false);
+    setDraftTranslation(null);
+    if (compactComposer) {
+      lexicalInputRef.current?.insertText("@");
+      requestAnimationFrame(() => {
+        lexicalInputRef.current?.focus();
+        updateMentionPanelPosition();
+      });
+      return;
+    }
+    const textarea = textareaRef.current;
+    const current = draft;
+    const cursor = textarea?.selectionStart ?? current.length;
+    const before = current.slice(0, cursor);
+    if (/(?:^|\s)@([^\s@]*)$/.test(before)) {
+      updateMentionPanelPosition();
+      requestAnimationFrame(() => textarea?.focus());
+      return;
+    }
+    const prefix = cursor > 0 && !/\s$/.test(before) ? " " : "";
+    const next = `${before}${prefix}@${current.slice(cursor)}`;
+    const nextCursor = cursor + prefix.length + 1;
+    updateDraft(next);
+    requestAnimationFrame(() => {
+      const input = textareaRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(nextCursor, nextCursor);
+      updateMentionPanelPosition();
+    });
+  };
+
   useEffect(() => {
     if (!enableScreenshot || screenshotShortcut === "None") return undefined;
     const handleShortcut = (event: KeyboardEvent) => {
@@ -649,6 +688,20 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
         </button>
         <span className="composer-tool-separator" aria-hidden="true" />
         {leadingTools}
+        {mentionOptions.length > 0 && (
+          <button
+            type="button"
+            disabled={disabled}
+            className={mentionPanelOpen ? "active" : ""}
+            onClick={openMentionPicker}
+            aria-expanded={mentionPanelOpen}
+            aria-label={t("composer.mentionAria")}
+            title={t("composer.mentionAria")}
+          >
+            <AtSign size={16} />
+            <span className={dense ? "tool-label" : ""}>@</span>
+          </button>
+        )}
         {showDefaultQuickReplyTool && (
           <button
             type="button"
@@ -737,7 +790,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
           document.body,
         )
       )}
-      {mentionCandidates.length > 0 && (
+      {mentionPanelOpen && (
         typeof document !== "undefined" &&
         createPortal(
           <div
@@ -751,16 +804,39 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
               visibility: mentionPanelPosition ? "visible" : "hidden",
             } satisfies CSSProperties}
           >
-            {mentionCandidates.map((item) => (
+            {mentionAllOption && (
               <button
                 type="button"
-                key={item.id}
+                className="composer-mention-item is-all"
+                key={mentionAllOption.id}
                 role="option"
-                onClick={() => insertMention(item.label)}
+                onClick={() => insertMention(mentionAllOption.label)}
               >
-                @{item.label}
+                <span className="composer-mention-avatar composer-mention-all-icon">
+                  <UserRound size={24} />
+                </span>
+                <span className="composer-mention-name">{mentionAllOption.label}</span>
               </button>
-            ))}
+            )}
+            <span className="composer-mention-section">群成员</span>
+            {mentionMemberCandidates.length > 0 ? (
+              mentionMemberCandidates.map((item) => (
+                <button
+                  type="button"
+                  className="composer-mention-item"
+                  key={item.id}
+                  role="option"
+                  onClick={() => insertMention(item.label)}
+                >
+                  <span className="composer-mention-avatar">
+                    {item.label.slice(0, 1)}
+                  </span>
+                  <span className="composer-mention-name">{item.label}</span>
+                </button>
+              ))
+            ) : (
+              <span className="composer-mention-empty">暂无可提醒成员</span>
+            )}
           </div>,
           document.body,
         )
