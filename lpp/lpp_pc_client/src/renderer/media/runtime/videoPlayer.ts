@@ -88,8 +88,12 @@ export async function openDesktopVideoPlayer({
   return true;
 }
 
-export function inlineVideoPreviewSrc(url?: string) {
-  if (!url || /^file:/i.test(url)) return undefined;
+export function inlineVideoPreviewSrc(
+  url?: string,
+  options: { allowDesktopFile?: boolean } = {},
+) {
+  if (!url) return undefined;
+  if (/^file:/i.test(url)) return options.allowDesktopFile ? url : undefined;
   return url;
 }
 

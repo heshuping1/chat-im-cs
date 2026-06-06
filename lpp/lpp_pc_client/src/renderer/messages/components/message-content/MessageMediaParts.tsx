@@ -440,8 +440,14 @@ export function VideoPart({
   const [localVideoSrc, setLocalVideoSrc] = useState<string | null>(
     () => getMaterializedMediaFileUrl(videoCacheKey) ?? null,
   );
+  const [localVideoDisplaySrc, setLocalVideoDisplaySrc] = useState<string | null>(
+    () => getMaterializedMediaDisplayUrl(videoCacheKey) ?? null,
+  );
   const openSrc = localVideoSrc || item?.localOpenUrl || src;
-  const previewSrc = inlineVideoPreviewSrc(src);
+  const previewSource = localVideoDisplaySrc || src;
+  const previewSrc = inlineVideoPreviewSrc(previewSource, {
+    allowDesktopFile: Boolean(window.desktopApi),
+  });
   const poster = item?.posterUrl;
   const { displaySrc, failed, loadAuthenticatedMedia } = useAuthenticatedMediaUrl(
     previewSrc,
@@ -469,9 +475,60 @@ export function VideoPart({
     : undefined;
   useEffect(() => {
     const materialized = getMaterializedMediaFileUrl(videoCacheKey);
+    const display = getMaterializedMediaDisplayUrl(videoCacheKey);
     setLocalVideoSrc(materialized ?? null);
-    return subscribeMaterializedMediaFile(videoCacheKey, setLocalVideoSrc);
+    setLocalVideoDisplaySrc(display ?? null);
+    const unsubscribeFile = subscribeMaterializedMediaFile(videoCacheKey, setLocalVideoSrc);
+    const unsubscribeDisplay = subscribeMaterializedMediaDisplayUrl(
+      videoCacheKey,
+      setLocalVideoDisplaySrc,
+    );
+    return () => {
+      unsubscribeFile();
+      unsubscribeDisplay();
+    };
   }, [videoCacheKey]);
+  useEffect(() => {
+    let disposed = false;
+    const display = getMaterializedMediaDisplayUrl(videoCacheKey);
+    if (display) {
+      setLocalVideoDisplaySrc(display);
+      return undefined;
+    }
+    if (!localVideoSrc || !videoCacheKey) {
+      setLocalVideoDisplaySrc(null);
+      return undefined;
+    }
+    void ensureMaterializedMediaDisplayUrl({
+      accountId: mediaCacheContext?.accountId,
+      authToken,
+      cacheIdentity: mediaStableCacheIdentity(media, remoteSrc || src),
+      cacheKey: videoCacheKey,
+      conversationId: mediaCacheContext?.conversationId,
+      fileName: item?.fileName || "video.mp4",
+      fileUrl: localVideoSrc,
+      kind: "video",
+    })
+      .then((displayUrl) => {
+        if (!disposed && displayUrl) setLocalVideoDisplaySrc(displayUrl);
+      })
+      .catch(() => {
+        if (!disposed) setLocalVideoDisplaySrc(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [
+    authToken,
+    item?.fileName,
+    localVideoSrc,
+    media,
+    mediaCacheContext?.accountId,
+    mediaCacheContext?.conversationId,
+    remoteSrc,
+    src,
+    videoCacheKey,
+  ]);
   useEffect(() => {
     setFrameReady(isVideoSourceReady(displaySrc));
   }, [displaySrc]);

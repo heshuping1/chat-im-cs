@@ -589,7 +589,10 @@ describe("message media upload presentation", () => {
   it("splits local file video open sources from inline preview sources", () => {
     expect(messageMediaParts).toContain("inlineVideoPreviewSrc");
     expect(messageMediaParts).toContain("const openSrc = localVideoSrc || item?.localOpenUrl || src;");
-    expect(messageMediaParts).toContain("const previewSrc = inlineVideoPreviewSrc(src);");
+    expect(messageMediaParts).toContain("localVideoDisplaySrc");
+    expect(messageMediaParts).toContain("const previewSource = localVideoDisplaySrc || src;");
+    expect(messageMediaParts).toContain("allowDesktopFile: Boolean(window.desktopApi)");
+    expect(messageMediaParts).toContain('kind: "video"');
     expect(messageMediaParts).toMatch(/useAuthenticatedMediaUrl\(\s*previewSrc,/);
     expect(messageMediaParts).toContain("displaySrc: openSrc");
     expect(messageMediaParts).toContain("openable={Boolean(openSrc)}");

@@ -190,8 +190,11 @@ describe("openDesktopVideoPlayer", () => {
     );
   });
 
-  it("does not use local file cache urls as inline video preview sources", () => {
-    expect(inlineVideoPreviewSrc("file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4")).toBeUndefined();
+  it("uses local file cache urls as inline video preview sources only inside desktop", () => {
+    const fileUrl =
+      "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4";
+    expect(inlineVideoPreviewSrc(fileUrl)).toBeUndefined();
+    expect(inlineVideoPreviewSrc(fileUrl, { allowDesktopFile: true })).toBe(fileUrl);
     expect(inlineVideoPreviewSrc("blob:http://127.0.0.1:5173/video")).toBe(
       "blob:http://127.0.0.1:5173/video",
     );
