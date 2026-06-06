@@ -516,6 +516,8 @@ class MediaResource {
 
 enum MentionTargetType { user, all }
 
+const mentionAllUserId = '00000000-0000-0000-0000-000000000000';
+
 class Mention {
   final MentionTargetType type;
   final String? userId;
@@ -545,7 +547,8 @@ class Mention {
 
   factory Mention.fromJson(Map<String, dynamic> json) {
     final rawType = json['type'] as String?;
-    if (rawType == 'all') {
+    final rawUserId = json['userId'] as String?;
+    if (rawType == 'all' || rawUserId == mentionAllUserId) {
       return Mention.all(
         offset: json['offset'] as int,
         length: json['length'] as int,
@@ -561,7 +564,8 @@ class Mention {
   Map<String, dynamic> toJson() {
     return {
       'type': type == MentionTargetType.all ? 'all' : 'user',
-      if (userId != null && userId!.isNotEmpty) 'userId': userId,
+      if (isAll) 'userId': mentionAllUserId,
+      if (!isAll && userId != null && userId!.isNotEmpty) 'userId': userId,
       'offset': offset,
       'length': length,
     };

@@ -22,6 +22,7 @@ export type ImMediaItem = {
   localPreviewUrl?: string;
   posterUrl?: string;
   imageCacheKey?: string;
+  imageSourceUrls?: string[];
 };
 export type ChatMediaItem = ImMediaItem & { kind: ChatMediaKind };
 
@@ -74,10 +75,12 @@ export function normalizeMediaPart({
     part.type === "image"
       ? imageActionSourceUrl(media, assetBaseUrl)
       : mediaSourceUrl(part.type, media, assetBaseUrl);
+  const imageSourceUrls =
+    part.type === "image" ? imageDisplaySourceUrls(media, assetBaseUrl) : undefined;
   const sourceUrl =
     part.type === "image"
-      ? localPreviewUrl || imageVisualSourceUrl(media, assetBaseUrl) || localOpenUrl
-      : localPreviewUrl || remoteSourceUrl;
+      ? imageSourceUrls?.[0]
+      : localPreviewUrl || (part.type === "video" ? localOpenUrl : undefined) || remoteSourceUrl;
   const fileName = normalizedMediaFileName(part.type, media, fallback);
   return {
     kind: part.type,
@@ -91,6 +94,7 @@ export function normalizeMediaPart({
       ? videoPosterUrl(media, assetBaseUrl, Boolean(localPreviewUrl))
       : undefined,
     imageCacheKey: part.type === "image" ? imageMediaCacheKey(media, sourceUrl) : undefined,
+    imageSourceUrls,
   };
 }
 
@@ -162,12 +166,12 @@ export function resolveMessageMediaUrl(
           media,
           baseUrl,
           "localOpenUrl",
-          "url",
-          "downloadUrl",
           "signedUrl",
+          "downloadUrl",
           "fileUrl",
           "uri",
           "path",
+          "url",
           "thumbnailUrl",
           "thumbUrl",
           "previewUrl",
@@ -176,9 +180,9 @@ export function resolveMessageMediaUrl(
           media,
           baseUrl,
           "localOpenUrl",
-          "url",
-          "downloadUrl",
           "signedUrl",
+          "downloadUrl",
+          "url",
           "fileUrl",
           "uri",
           "path",
@@ -199,9 +203,9 @@ function resolveVideoPlaybackUrl(
   return resolveMediaUrl(
     media,
     assetBaseUrl || globalThis.location?.origin,
-    "url",
-    "downloadUrl",
     "signedUrl",
+    "downloadUrl",
+    "url",
     "fileUrl",
     "uri",
     "path",
@@ -273,12 +277,12 @@ function mediaSourceUrl(
     return resolveMediaUrl(
       media,
       assetBaseUrl,
+      "signedUrl",
+      "downloadUrl",
       "thumbnailUrl",
       "thumbUrl",
       "previewUrl",
       "url",
-      "downloadUrl",
-      "signedUrl",
       "fileUrl",
       "uri",
       "path",
@@ -287,9 +291,9 @@ function mediaSourceUrl(
   return resolveMediaUrl(
     media,
     assetBaseUrl,
-    "url",
-    "downloadUrl",
     "signedUrl",
+    "downloadUrl",
+    "url",
     "fileUrl",
     "uri",
     "path",
@@ -303,16 +307,44 @@ function imageVisualSourceUrl(
   return resolveMediaUrl(
     media,
     assetBaseUrl,
+    "signedUrl",
+    "downloadUrl",
     "thumbnailUrl",
     "thumbUrl",
     "previewUrl",
     "url",
-    "downloadUrl",
-    "signedUrl",
     "fileUrl",
     "uri",
     "path",
   );
+}
+
+function imageDisplaySourceUrls(
+  media: MediaResourceDto | undefined,
+  assetBaseUrl: string | undefined,
+) {
+  return uniqueMediaUrls([
+    mediaStringField(media, "localPreviewUrl"),
+    mediaStringField(media, "localOpenUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "signedUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "downloadUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "thumbnailUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "thumbUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "previewUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "url"),
+    resolveMediaUrl(media, assetBaseUrl, "fileUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "uri"),
+    resolveMediaUrl(media, assetBaseUrl, "path"),
+  ]);
+}
+
+function uniqueMediaUrls(urls: Array<string | undefined>) {
+  const seen = new Set<string>();
+  return urls.filter((url): url is string => {
+    if (!url || seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
 }
 
 function imageActionSourceUrl(
@@ -322,9 +354,9 @@ function imageActionSourceUrl(
   return resolveMediaUrl(
     media,
     assetBaseUrl,
-    "url",
-    "downloadUrl",
     "signedUrl",
+    "downloadUrl",
+    "url",
     "fileUrl",
     "uri",
     "path",

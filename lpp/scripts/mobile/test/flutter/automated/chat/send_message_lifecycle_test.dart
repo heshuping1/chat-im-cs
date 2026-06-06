@@ -105,6 +105,34 @@ void main() {
   });
 
   test(
+    'all-member mention permission denial uses friendly failure reason',
+    () async {
+      repository.sendError = const MessageSendFailure.serverRejected(
+        code: 'MSG_AT_ALL_NOT_ALLOWED',
+        message: '@all not allowed',
+        statusCode: 403,
+        requestId: 'req-at-all',
+      );
+
+      Message? rejected;
+      await expectLater(
+        useCase.execute(
+          conversationId: 'group-1',
+          isGroup: true,
+          type: MessageType.text,
+          body: const MessageBody(text: '@所有人 集合'),
+          mentions: const [Mention.all(offset: 0, length: 4)],
+          onMessageUpdate: (_, message) => rejected = message,
+        ),
+        throwsA(isA<MessageSendFailure>()),
+      );
+
+      expect(rejected?.status, MessageStatus.rejected);
+      expect(rejected?.failureReason, '当前群不允许普通成员 @所有人');
+    },
+  );
+
+  test(
     'network failures retry and enqueue pending message for recovery',
     () async {
       final queued = <Map<String, Object?>>[];

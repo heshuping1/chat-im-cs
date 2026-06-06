@@ -39,6 +39,7 @@ export function ImageMessageFrame({
   sourceAvailable: boolean;
 }) {
   const { t } = useI18n();
+  const canRenderImage = sourceAvailable && Boolean(src);
   useEffect(() => {
     if (!previewOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -50,7 +51,7 @@ export function ImageMessageFrame({
 
   return (
     <>
-      {sourceAvailable ? (
+      {canRenderImage ? (
         <button
           className={`message-image-frame ${imageLoaded ? "loaded" : ""}`}
           type="button"

@@ -725,6 +725,8 @@ export interface GroupChatCreatedDto {
 
 export interface MediaResourceDto {
   url?: string;
+  signedUrl?: string;
+  downloadUrl?: string;
   fileName?: string;
   mimeType?: string;
   sizeBytes?: number;

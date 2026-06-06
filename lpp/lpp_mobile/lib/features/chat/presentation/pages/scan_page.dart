@@ -11,6 +11,7 @@ import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/platform/platform_capabilities.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/group_invite_qr_api.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
@@ -440,11 +441,71 @@ class _ScanPageState extends ConsumerState<ScanPage>
   }
 
   Future<void> _handleGroupInvite(_GroupInviteQrPayload invite) async {
+    final token = invite.token;
+    if (token != null && token.isNotEmpty) {
+      await _handleGroupInviteByToken(token);
+      return;
+    }
+
+    await _handleLegacyGroupInvite(invite);
+  }
+
+  Future<void> _handleGroupInviteByToken(String token) async {
+    if (_pendingGroupJoinRequestId == token) return;
+    try {
+      final api = GroupInviteQrApi(ref.read(dioProvider));
+      final preview = await api.preview(token);
+      if (!mounted) return;
+
+      if (preview.expired) {
+        _showSnack('二维码已失效，请向群成员索取新码');
+        return;
+      }
+
+      final action = await _showGroupPreview(
+        invite: _GroupInviteQrPayload.fromPreview(preview),
+        alreadyInGroup: preview.alreadyMember,
+      );
+      if (action == _GroupInviteAction.openChat && mounted) {
+        _openGroupChat(
+          conversationId: preview.conversationId,
+          title: preview.groupTitle,
+          avatarUrl: preview.groupAvatarUrl,
+          memberCount: preview.memberCount,
+        );
+        return;
+      }
+      if (action != _GroupInviteAction.apply || !mounted) return;
+
+      setState(() => _pendingGroupJoinRequestId = token);
+      final result = await api.accept(token, message: '希望加入群聊');
+      _refreshGroupJoinState(result.conversationId);
+      if (!mounted) return;
+      _showSnack(result.isPending ? '入群申请已提交，等待审批' : '已加入群聊');
+      context.pop();
+    } on AppError catch (err) {
+      if (mounted) _showSnack(_groupInviteErrorMessage(err));
+    } catch (_) {
+      if (mounted) _showSnack('处理群二维码失败');
+    } finally {
+      if (mounted && _pendingGroupJoinRequestId == token) {
+        setState(() => _pendingGroupJoinRequestId = null);
+      }
+    }
+  }
+
+  Future<void> _handleLegacyGroupInvite(_GroupInviteQrPayload invite) async {
+    final groupId = invite.groupId;
+    if (groupId == null || groupId.isEmpty) {
+      _showSnack('群二维码无效');
+      return;
+    }
+
     try {
       final dio = ref.read(dioProvider);
       final space = ref.read(currentSpaceProvider);
       final resp = await dio.get<Map<String, dynamic>>(
-        '/api/client/v1/groups/${invite.groupId}',
+        '/api/client/v1/groups/$groupId',
       );
       final data = Map<String, dynamic>.from(
         resp.data?['data'] as Map? ?? const {},
@@ -463,14 +524,11 @@ class _ScanPageState extends ConsumerState<ScanPage>
         alreadyInGroup: alreadyInGroup,
       );
       if (action == _GroupInviteAction.openChat && mounted) {
-        context.go(
-          '/chat/${detail.groupId}',
-          extra: {
-            'isGroup': true,
-            'title': detail.title,
-            'avatarUrl': detail.avatarUrl,
-            'memberCount': detail.memberCount,
-          },
+        _openGroupChat(
+          conversationId: detail.groupId,
+          title: detail.title,
+          avatarUrl: detail.avatarUrl,
+          memberCount: detail.memberCount,
         );
         return;
       }
@@ -491,6 +549,11 @@ class _ScanPageState extends ConsumerState<ScanPage>
     _GroupInviteQrPayload invite,
   ) async {
     if (!mounted) return;
+    final groupId = invite.groupId;
+    if (groupId == null || groupId.isEmpty) {
+      _showSnack('群二维码无效');
+      return;
+    }
     if (invite.allowQrCodeJoin == false) {
       _showSnack('群主或管理员已关闭二维码进群');
       return;
@@ -512,15 +575,20 @@ class _ScanPageState extends ConsumerState<ScanPage>
     _GroupInviteQrPayload invite, {
     required bool requiresApproval,
   }) async {
-    if (_pendingGroupJoinRequestId == invite.groupId) return;
-    setState(() => _pendingGroupJoinRequestId = invite.groupId);
+    final groupId = invite.groupId;
+    if (groupId == null || groupId.isEmpty) {
+      _showSnack('群二维码无效');
+      return;
+    }
+    if (_pendingGroupJoinRequestId == groupId) return;
+    setState(() => _pendingGroupJoinRequestId = groupId);
     try {
       final dio = ref.read(dioProvider);
       await dio.post<Map<String, dynamic>>(
-        '/api/client/v1/groups/${invite.groupId}/join-requests',
+        '/api/client/v1/groups/$groupId/join-requests',
         data: {'message': '希望加入群聊'},
       );
-      _refreshGroupJoinState(invite.groupId);
+      _refreshGroupJoinState(groupId);
       if (!mounted) return;
       _showSnack(requiresApproval ? '入群申请已提交，等待审批' : '已加入群聊');
       context.pop();
@@ -534,7 +602,7 @@ class _ScanPageState extends ConsumerState<ScanPage>
         return;
       }
       if (_isAlreadyGroupMemberError(err)) {
-        _refreshGroupJoinState(invite.groupId);
+        _refreshGroupJoinState(groupId);
         if (mounted) {
           _showSnack('你已在该群聊中');
           context.pop();
@@ -545,10 +613,27 @@ class _ScanPageState extends ConsumerState<ScanPage>
     } catch (_) {
       if (mounted) _showSnack('入群申请提交失败');
     } finally {
-      if (mounted && _pendingGroupJoinRequestId == invite.groupId) {
+      if (mounted && _pendingGroupJoinRequestId == groupId) {
         setState(() => _pendingGroupJoinRequestId = null);
       }
     }
+  }
+
+  void _openGroupChat({
+    required String conversationId,
+    required String title,
+    required String? avatarUrl,
+    required int? memberCount,
+  }) {
+    context.go(
+      '/chat/$conversationId',
+      extra: {
+        'isGroup': true,
+        'title': title,
+        'avatarUrl': avatarUrl,
+        'memberCount': memberCount,
+      },
+    );
   }
 
   void _refreshGroupJoinState(String groupId) {
@@ -637,6 +722,20 @@ class _ScanPageState extends ConsumerState<ScanPage>
 
   String _groupInviteErrorMessage(AppError err) {
     if (err is! ServerError) return '入群申请提交失败';
+    switch (err.code) {
+      case 'GROUP_QR_REVOKED':
+        return '二维码已被撤销，请向群成员索取新码';
+      case 'GROUP_QR_EXPIRED':
+        return '二维码已过期，请向群成员索取新码';
+      case 'GROUP_QR_EXHAUSTED':
+        return '二维码使用次数已达上限，请向群成员索取新码';
+      case 'GROUP_QR_NOT_FOUND':
+        return '二维码无效';
+      case 'GROUP_QR_SCANNER_INVALID':
+        return '当前账号无法加入该群聊';
+      case 'GROUP_PERMISSION_DENIED':
+        return '你没有权限通过该二维码加入群聊';
+    }
     final message = err.message.trim();
     final lower = message.toLowerCase();
     if (lower.contains('pending')) return '入群申请已提交，等待审批';
@@ -829,6 +928,10 @@ class _ScanPageState extends ConsumerState<ScanPage>
           uri.pathSegments.contains('group-invite') ||
           uri.path.contains('group-invite');
       if (looksLikeGroupInvite) {
+        final token = _firstQueryValue(uri, const ['token', 'inviteToken']);
+        if (token != null) {
+          return _GroupInviteQrPayload(token: token);
+        }
         final groupId = _firstQueryValue(
           uri,
           const ['groupId', 'conversationId', 'id'],
@@ -856,6 +959,10 @@ class _ScanPageState extends ConsumerState<ScanPage>
       if (decoded is! Map<String, dynamic>) return null;
       final type = decoded['type']?.toString();
       if (type != 'group-invite' && type != 'group_invite') return null;
+      final token = decoded['token']?.toString().trim();
+      if (token != null && token.isNotEmpty) {
+        return _GroupInviteQrPayload(token: token);
+      }
       final groupId = decoded['groupId']?.toString().trim();
       if (groupId == null || groupId.isEmpty) return null;
       return _GroupInviteQrPayload(
@@ -1254,7 +1361,8 @@ class _ActionButton extends StatelessWidget {
 enum _GroupInviteAction { openChat, apply }
 
 class _GroupInviteQrPayload {
-  final String groupId;
+  final String? token;
+  final String? groupId;
   final String? title;
   final String? avatarUrl;
   final int? memberCount;
@@ -1262,13 +1370,25 @@ class _GroupInviteQrPayload {
   final bool? requireApproval;
 
   const _GroupInviteQrPayload({
-    required this.groupId,
+    this.token,
+    this.groupId,
     this.title,
     this.avatarUrl,
     this.memberCount,
     this.allowQrCodeJoin,
     this.requireApproval,
   });
+
+  factory _GroupInviteQrPayload.fromPreview(GroupInviteQrPreview preview) {
+    return _GroupInviteQrPayload(
+      groupId: preview.conversationId,
+      title: preview.groupTitle,
+      avatarUrl: preview.groupAvatarUrl,
+      memberCount: preview.memberCount,
+      allowQrCodeJoin: true,
+      requireApproval: preview.requireApproval,
+    );
+  }
 
   _GroupInviteQrPayload mergeDetail(GroupDetail detail) {
     return _GroupInviteQrPayload(

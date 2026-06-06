@@ -12,6 +12,7 @@ import { ImageMessageFrame } from "../../../media/components/ImageMessageFrame";
 import { VideoMessagePreview } from "../../../media/components/VideoMessagePreview";
 import type { ImMediaItem } from "../../../media/domain/mediaMessage";
 import {
+  forgetPrefetchedImageFileUrl,
   getPrefetchedImageFileUrl,
   subscribeImagePrecache,
 } from "../../../media/runtime/imagePrecache";
@@ -65,7 +66,17 @@ export function ImagePart({
 }) {
   const { t } = useI18n();
   const media = item?.media;
-  const src = item?.sourceUrl;
+  const initialSrc = item?.sourceUrl;
+  const imageSourceUrls =
+    item?.imageSourceUrls?.length
+      ? item.imageSourceUrls
+      : initialSrc
+        ? [initialSrc]
+        : [];
+  const imageSourceKey = imageSourceUrls.join("\n");
+  const [activeImageSourceIndex, setActiveImageSourceIndex] = useState(0);
+  const src = imageSourceUrls[activeImageSourceIndex] ?? imageSourceUrls[0];
+  const hasNextImageSource = activeImageSourceIndex < imageSourceUrls.length - 1;
   const imageActionSrc =
     item?.localOpenUrl ||
     item?.remoteSourceUrl ||
@@ -73,21 +84,33 @@ export function ImagePart({
   const fileName = item?.fileName;
   const localImage = isInstantLocalImageSource(src);
   const cacheKey = item?.imageCacheKey ?? imageMediaCacheKey(media, src);
-  const { cached, displaySrc, failed, loadCachedMedia } = useCachedImageMediaUrl(
-    src,
-    authToken,
-    cacheKey,
-  );
-  const imageSrc = localImage ? src : displaySrc || src;
   const [localFileSrc, setLocalFileSrc] = useState<string | null>(
     () => getPrefetchedImageFileUrl(cacheKey) ?? null,
   );
   const [brokenImageSrc, setBrokenImageSrc] = useState<string | null>(null);
+  const hasUsableLocalFile = Boolean(
+    localFileSrc && !sameMediaUrl(localFileSrc, brokenImageSrc),
+  );
+  const { cached, displaySrc, failed, loadCachedMedia } = useCachedImageMediaUrl(
+    hasUsableLocalFile ? undefined : src,
+    authToken,
+    cacheKey,
+  );
+  const imageSrc = localImage ? src : displaySrc || src;
   const [imageLoaded, setImageLoaded] = useState(localImage);
   const [imageActionBusy, setImageActionBusy] = useState(false);
   const [imageActionNotice, setImageActionNotice] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { canCacheMediaFile } = getCurrentMediaActionCapabilities();
+  const useNextImageSource = useCallback(() => {
+    setActiveImageSourceIndex((current) =>
+      current < imageSourceUrls.length - 1 ? current + 1 : current,
+    );
+  }, [imageSourceUrls.length]);
+
+  useEffect(() => {
+    setActiveImageSourceIndex(0);
+  }, [imageSourceKey]);
 
   useEffect(() => {
     const prefetched = getPrefetchedImageFileUrl(cacheKey);
@@ -121,7 +144,9 @@ export function ImagePart({
       .then((result) => {
         if (!disposed && result) setLocalFileSrc(result.fileUrl);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!disposed && hasNextImageSource) useNextImageSource();
+      });
     return () => {
       disposed = true;
     };
@@ -133,7 +158,9 @@ export function ImagePart({
     mediaCacheContext?.accountId,
     mediaCacheContext?.conversationId,
     cacheKey,
+    hasNextImageSource,
     src,
+    useNextImageSource,
   ]);
 
   useEffect(() => {
@@ -142,6 +169,10 @@ export function ImagePart({
   }, [brokenImageSrc, cached, imageSrc, localFileSrc, localImage]);
 
   const visibleImageSrc = imageVisibleSource(localFileSrc, imageSrc, brokenImageSrc);
+  useEffect(() => {
+    if (failed && hasNextImageSource) useNextImageSource();
+  }, [failed, hasNextImageSource, useNextImageSource]);
+
   const imageActionPayload = imageActionSrc
     ? {
         url: imageActionSrc,
@@ -159,8 +190,10 @@ export function ImagePart({
     setImageLoaded(false);
     if (failedSrc && localFileSrc && sameMediaUrl(failedSrc, localFileSrc)) {
       setLocalFileSrc(null);
+      forgetPrefetchedImageFileUrl(cacheKey, localFileSrc);
     }
     loadCachedMedia();
+    if (hasNextImageSource) useNextImageSource();
   };
   const runImageAction = useCallback(
     async (action: () => Promise<unknown>, successText: string) => {
@@ -209,6 +242,7 @@ export function ImagePart({
         }}
         onRetryImage={() => {
           setBrokenImageSrc(null);
+          setActiveImageSourceIndex(0);
           setImageLoaded(localImage);
           loadCachedMedia();
         }}
@@ -231,7 +265,7 @@ export function ImagePart({
             : undefined
         }
         previewOpen={previewOpen}
-        sourceAvailable={Boolean(visibleImageSrc || (src && !failed))}
+        sourceAvailable={Boolean(visibleImageSrc)}
         src={visibleImageSrc}
       />
     </div>
@@ -255,9 +289,9 @@ export function VoicePart({
   const src = resolveMediaUrl(
     media,
     assetBaseUrl,
-    "url",
-    "downloadUrl",
     "signedUrl",
+    "downloadUrl",
+    "url",
     "fileUrl",
     "uri",
     "path",

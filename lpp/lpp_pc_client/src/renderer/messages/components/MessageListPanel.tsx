@@ -5,7 +5,6 @@ import {
   FileImage,
   FileText,
   MessageSquarePlus,
-  PanelRight,
   Play,
   Search,
   Star,
@@ -36,6 +35,7 @@ import {
   openMessageMediaFile,
   openMessageVideoPlayer,
 } from "../runtime/messageMediaActions";
+import { useCachedImageMediaUrl } from "../../media/runtime/useCachedImageMediaUrl";
 
 export interface MessageListPanelProps {
   accountId?: string;
@@ -104,7 +104,6 @@ const historyFilterTabs: Array<{
   { key: "image", labelKey: "messages.listPanel.filter.image", icon: FileImage },
   { key: "file", labelKey: "messages.listPanel.filter.file", icon: FileText },
   { key: "voice", labelKey: "messages.listPanel.filter.voice", icon: MessageSquarePlus },
-  { key: "video", labelKey: "messages.listPanel.filter.video", icon: PanelRight },
   { key: "link", labelKey: "messages.listPanel.filter.link", icon: Search },
   { key: "favorite", labelKey: "messages.listPanel.filter.favorite", icon: Star },
 ];
@@ -328,13 +327,7 @@ export function MessageListPanel({
                             title={item.fileName}
                             onClick={() => openLookupMediaPreview(item)}
                           >
-                            {item.previewUrl ? (
-                              <img src={item.previewUrl} alt={item.fileName} loading="lazy" />
-                            ) : (
-                              <span className="chat-history-media-placeholder">
-                                {item.kind === "video" ? <Play size={22} /> : <FileImage size={22} />}
-                              </span>
-                            )}
+                            <LookupMediaThumbnail authToken={authToken} item={item} />
                             {item.kind === "video" && (
                               <em className="chat-history-media-video">
                                 <Play size={12} />
@@ -506,6 +499,8 @@ type LookupMediaPreviewItem = {
   message: MessageItemDto;
   openUrl?: string;
   previewUrl?: string;
+  previewUrls?: string[];
+  previewCacheKey?: string;
 };
 
 function groupLookupMediaPreviewItems({
@@ -553,9 +548,87 @@ function lookupMediaPreviewItemsFromMessage({
       openUrl: item.localOpenUrl || item.remoteSourceUrl || item.sourceUrl,
       previewUrl:
         item.kind === "video"
-          ? item.posterUrl || item.localPreviewUrl || item.sourceUrl || item.remoteSourceUrl
-          : item.sourceUrl || item.localPreviewUrl || item.remoteSourceUrl,
+          ? item.posterUrl
+          : item.localPreviewUrl || item.localOpenUrl || item.sourceUrl || item.remoteSourceUrl,
+      previewUrls:
+        item.kind === "image"
+          ? item.imageSourceUrls
+          : item.posterUrl
+            ? [item.posterUrl]
+            : [],
+      previewCacheKey:
+        item.kind === "image"
+          ? item.imageCacheKey
+          : item.posterUrl
+            ? `lookup-poster:${message.messageId}:${index}:${item.posterUrl}`
+            : undefined,
     }));
+}
+
+function LookupMediaThumbnail({
+  authToken,
+  item,
+}: {
+  authToken?: string;
+  item: LookupMediaPreviewItem;
+}) {
+  const previewUrls =
+    item.previewUrls?.length
+      ? item.previewUrls
+      : item.previewUrl
+        ? [item.previewUrl]
+        : [];
+  const previewUrlsKey = previewUrls.join("\n");
+  const [activePreviewIndex, setActivePreviewIndex] = useState(0);
+  const previewUrl = previewUrls[activePreviewIndex] ?? previewUrls[0];
+  const hasNextPreview = activePreviewIndex < previewUrls.length - 1;
+  const { displaySrc, failed, loadCachedMedia } = useCachedImageMediaUrl(
+    previewUrl,
+    authToken,
+    item.previewCacheKey,
+  );
+  const src = displaySrc || (!authToken ? previewUrl : "");
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setActivePreviewIndex(0);
+  }, [previewUrlsKey]);
+
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+
+  useEffect(() => {
+    if (!failed || !hasNextPreview) return;
+    setActivePreviewIndex((current) =>
+      current < previewUrls.length - 1 ? current + 1 : current,
+    );
+  }, [failed, hasNextPreview, previewUrls.length]);
+
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt={item.fileName}
+        loading="lazy"
+        onError={() => {
+          setBroken(true);
+          if (!failed) loadCachedMedia();
+          if (hasNextPreview) {
+            setActivePreviewIndex((current) =>
+              current < previewUrls.length - 1 ? current + 1 : current,
+            );
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <span className="chat-history-media-placeholder">
+      {item.kind === "video" ? <Play size={22} /> : <FileImage size={22} />}
+    </span>
+  );
 }
 
 function lookupMediaDateLabel(sentAt: string | undefined, todayLabel: string) {

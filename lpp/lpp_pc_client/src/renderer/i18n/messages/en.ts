@@ -1123,7 +1123,11 @@ export const en: MessageDictionary = {
     contextRail: {
       aiDraft: 'AI draft',
       collapseProfile: 'Collapse user info',
+      collapseGroupInfo: 'Collapse group chat info',
+      collapseUserInfo: 'Collapse user info',
       expandProfile: 'Expand user info',
+      expandGroupInfo: 'Expand group chat info',
+      expandUserInfo: 'Expand user info',
       knowledge: 'Knowledge base',
       quickReply: 'Quick replies',
       railAria: 'Message side toolbar',

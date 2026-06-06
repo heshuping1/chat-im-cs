@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.dart';
+import 'package:lpp_mobile/features/chat/presentation/providers/group_invite_qr_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/group_conversation_avatar.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -50,16 +51,23 @@ class GroupQrCodePage extends ConsumerWidget {
   }
 }
 
-class _GroupQrContent extends StatelessWidget {
+class _GroupQrContent extends ConsumerWidget {
   final String groupId;
   final GroupDetail detail;
 
   const _GroupQrContent({required this.groupId, required this.detail});
 
   @override
-  Widget build(BuildContext context) {
-    final payload = _buildGroupQrPayload(detail);
-    final disabled = !detail.allowQrCodeJoin;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canGenerate =
+        detail.myRole != GroupRole.member || detail.allowQrCodeJoin;
+    final qrAsync =
+        canGenerate ? ref.watch(groupInviteQrProvider(groupId)) : null;
+    final qr = qrAsync?.valueOrNull;
+    final payload = qr?.qrPayload ?? '';
+    final loading = qrAsync?.isLoading ?? false;
+    final hasError = qrAsync?.hasError ?? false;
+    final disabled = !canGenerate || hasError || (!loading && payload.isEmpty);
 
     return Column(
       children: [
@@ -134,20 +142,30 @@ class _GroupQrContent extends StatelessWidget {
                             ),
                             child: Opacity(
                               opacity: disabled ? 0.24 : 1,
-                              child: QrImageView(
-                                data: payload,
-                                version: QrVersions.auto,
-                                size: 236,
-                                backgroundColor: Colors.white,
-                                eyeStyle: const QrEyeStyle(
-                                  eyeShape: QrEyeShape.square,
-                                  color: _text,
-                                ),
-                                dataModuleStyle: const QrDataModuleStyle(
-                                  dataModuleShape: QrDataModuleShape.square,
-                                  color: _text,
-                                ),
-                              ),
+                              child: loading
+                                  ? const SizedBox(
+                                      width: 236,
+                                      height: 236,
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    )
+                                  : QrImageView(
+                                      data: payload.isNotEmpty ? payload : '-',
+                                      version: QrVersions.auto,
+                                      size: 236,
+                                      backgroundColor: Colors.white,
+                                      eyeStyle: const QrEyeStyle(
+                                        eyeShape: QrEyeShape.square,
+                                        color: _text,
+                                      ),
+                                      dataModuleStyle:
+                                          const QrDataModuleStyle(
+                                        dataModuleShape:
+                                            QrDataModuleShape.square,
+                                        color: _text,
+                                      ),
+                                    ),
                             ),
                           ),
                           if (disabled)
@@ -161,7 +179,7 @@ class _GroupQrContent extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(18),
                               ),
                               child: const Text(
-                                '二维码进群已关闭',
+                                '二维码不可用',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 13,
@@ -173,11 +191,13 @@ class _GroupQrContent extends StatelessWidget {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        disabled
-                            ? '群主或管理员已关闭二维码进群'
-                            : detail.requireApproval
-                                ? '扫一扫上面的二维码，提交入群申请'
-                                : '扫一扫上面的二维码，加入群聊',
+                        _hintText(
+                          canGenerate: canGenerate,
+                          loading: loading,
+                          hasError: hasError,
+                          detail: detail,
+                          expiresAt: qr?.expiresAt,
+                        ),
                         style: const TextStyle(
                           fontSize: 13,
                           color: _secondary,
@@ -200,9 +220,11 @@ class _GroupQrContent extends StatelessWidget {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => context.push('/scan'),
+                  onPressed: canGenerate
+                      ? () => ref.invalidate(groupInviteQrProvider(groupId))
+                      : null,
                   child: const Text(
-                    '扫一扫',
+                    '刷新',
                     style: TextStyle(fontSize: 15, color: _primary),
                   ),
                 ),
@@ -210,7 +232,9 @@ class _GroupQrContent extends StatelessWidget {
               Container(width: 1, height: 16, color: const Color(0xFFE5E5EA)),
               Expanded(
                 child: TextButton(
-                  onPressed: () => _copyPayload(context, payload),
+                  onPressed: payload.isEmpty
+                      ? null
+                      : () => _copyPayload(context, payload),
                   child: const Text(
                     '复制内容',
                     style: TextStyle(fontSize: 15, color: _primary),
@@ -224,20 +248,28 @@ class _GroupQrContent extends StatelessWidget {
     );
   }
 
-  static String _buildGroupQrPayload(GroupDetail detail) {
-    return Uri(
-      scheme: 'ztchat',
-      host: 'group-invite',
-      queryParameters: {
-        'groupId': detail.groupId,
-        'title': detail.title,
-        if (detail.avatarUrl?.isNotEmpty == true)
-          'avatarUrl': detail.avatarUrl!,
-        'memberCount': detail.memberCount.toString(),
-        'allowQrCodeJoin': detail.allowQrCodeJoin.toString(),
-        'requireApproval': detail.requireApproval.toString(),
-      },
-    ).toString();
+  static String _hintText({
+    required bool canGenerate,
+    required bool loading,
+    required bool hasError,
+    required GroupDetail detail,
+    required DateTime? expiresAt,
+  }) {
+    if (!canGenerate) return '群主或管理员已关闭普通成员生成二维码';
+    if (loading) return '正在生成群二维码';
+    if (hasError) return '群二维码生成失败，请刷新重试';
+    final suffix =
+        expiresAt == null ? '' : '，${_formatExpiresAt(expiresAt)}前有效';
+    return detail.requireApproval
+        ? '扫一扫上面的二维码，提交入群申请$suffix'
+        : '扫一扫上面的二维码，加入群聊$suffix';
+  }
+
+  static String _formatExpiresAt(DateTime value) {
+    final local = value.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
   }
 
   static Future<void> _copyPayload(BuildContext context, String payload) async {

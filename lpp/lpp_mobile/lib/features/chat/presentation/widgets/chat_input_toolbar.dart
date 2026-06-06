@@ -444,18 +444,16 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
 
   Future<void> _openMentionPicker({bool replaceTypedAt = false}) async {
     if (_isMutedForUser || !widget.isGroup) return;
-    final selected = await showModalBottomSheet<_MentionPickResult>(
+    final selected = await showDialog<_MentionPickResult>(
       context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (_) => _MentionPickerSheet(
-        candidates: widget.mentionCandidates,
-        canMentionAll: widget.canMentionAll,
-      ),
+      barrierDismissible: true,
+      barrierColor: Colors.transparent,
+      builder: (_) {
+        return _MentionPickerPopup(
+          candidates: widget.mentionCandidates,
+          canMentionAll: widget.canMentionAll,
+        );
+      },
     );
     if (selected == null || !mounted) return;
     final selection = _textController.selection;
@@ -1078,11 +1076,11 @@ class _MentionPickResult {
   }) : isAll = false;
 }
 
-class _MentionPickerSheet extends StatelessWidget {
+class _MentionPickerPopup extends StatelessWidget {
   final List<ChatMentionCandidate> candidates;
   final bool canMentionAll;
 
-  const _MentionPickerSheet({
+  const _MentionPickerPopup({
     required this.candidates,
     required this.canMentionAll,
   });
@@ -1090,94 +1088,130 @@ class _MentionPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final media = MediaQuery.of(context);
     final visibleCandidates = candidates
         .where((candidate) => candidate.displayName.trim().isNotEmpty)
         .toList(growable: false);
+    final popupWidth =
+        (media.size.width - 48).clamp(280.0, 340.0).toDouble();
+    final bottomInset = media.viewInsets.bottom + media.padding.bottom + 72;
+    final availableHeight =
+        media.size.height - bottomInset - media.padding.top - 24;
+    final maxHeight = availableHeight.clamp(220.0, 390.0).toDouble();
+
     return SafeArea(
-      top: false,
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.62,
-        child: Column(
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(top: 8, bottom: 10),
-              decoration: BoxDecoration(
-                color: colorScheme.onSurface.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Row(
-                children: [
-                  const SizedBox(width: 48),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        '选择提醒的人',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
+      child: Stack(
+        children: [
+          Positioned(
+            bottom: bottomInset,
+            left: (media.size.width - popupWidth) / 2,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: popupWidth,
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: colorScheme.outline.withValues(alpha: 0.16),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
                     ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-            if (canMentionAll)
-              _MentionTile(
-                icon: Icons.campaign_outlined,
-                title: '@所有人',
-                subtitle: '提醒群内全部成员',
-                onTap: () =>
-                    Navigator.of(context).pop(const _MentionPickResult.all()),
-              ),
-            Expanded(
-              child: visibleCandidates.isEmpty
-                  ? Center(
-                      child: Text(
-                        '暂无可提醒成员',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colorScheme.onSurface.withValues(alpha: 0.56),
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.only(bottom: 12 + bottomPadding),
-                      itemCount: visibleCandidates.length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 0.5,
-                        indent: 64,
-                        color: Theme.of(context).dividerColor,
-                      ),
-                      itemBuilder: (context, index) {
-                        final candidate = visibleCandidates[index];
-                        return _MentionTile(
-                          avatarUrl: candidate.avatarUrl,
-                          title: candidate.displayName,
-                          onTap: () => Navigator.of(context).pop(
-                            _MentionPickResult.user(
-                              userId: candidate.userId,
-                              displayName: candidate.displayName,
+                  ],
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (canMentionAll)
+                            _MentionTile(
+                              icon: Icons.person_outline_rounded,
+                              title: '所有人',
+                              highlighted: true,
+                              onTap: () => Navigator.of(context).pop(
+                                const _MentionPickResult.all(),
+                              ),
+                            ),
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: canMentionAll ? 12 : 2,
+                              left: 6,
+                              bottom: 8,
+                            ),
+                            child: Text(
+                              '群成员',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.42),
+                              ),
                             ),
                           ),
-                        );
-                      },
+                          if (visibleCandidates.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(6, 18, 6, 28),
+                              child: Text(
+                                '暂无可提醒成员',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: colorScheme.onSurface
+                                      .withValues(alpha: 0.56),
+                                ),
+                              ),
+                            )
+                          else
+                            Flexible(
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                padding: EdgeInsets.zero,
+                                itemCount: visibleCandidates.length,
+                                itemBuilder: (context, index) {
+                                  final candidate = visibleCandidates[index];
+                                  return _MentionTile(
+                                    avatarUrl: candidate.avatarUrl,
+                                    title: candidate.displayName,
+                                    onTap: () => Navigator.of(context).pop(
+                                      _MentionPickResult.user(
+                                        userId: candidate.userId,
+                                        displayName: candidate.displayName,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
+                    Positioned(
+                      left: popupWidth / 2 - 12,
+                      bottom: -12,
+                      child: CustomPaint(
+                        size: const Size(24, 12),
+                        painter: _MentionPopupArrowPainter(
+                          color: colorScheme.surface,
+                          borderColor:
+                              colorScheme.outline.withValues(alpha: 0.16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1187,14 +1221,14 @@ class _MentionTile extends StatelessWidget {
   final IconData? icon;
   final String? avatarUrl;
   final String title;
-  final String? subtitle;
+  final bool highlighted;
   final VoidCallback onTap;
 
   const _MentionTile({
     this.icon,
     this.avatarUrl,
     required this.title,
-    this.subtitle,
+    this.highlighted = false,
     required this.onTap,
   });
 
@@ -1203,49 +1237,38 @@ class _MentionTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      child: SizedBox(
-        height: subtitle == null ? 56 : 64,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        height: highlighted ? 58 : 64,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: highlighted
+              ? colorScheme.onSurface.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
         child: Row(
           children: [
-            const SizedBox(width: 16),
-            _MentionAvatar(icon: icon, avatarUrl: avatarUrl, title: title),
+            _MentionAvatar(
+              icon: icon,
+              avatarUrl: avatarUrl,
+              title: title,
+              highlighted: highlighted,
+            ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (subtitle != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        subtitle!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurface.withValues(alpha: 0.56),
-                        ),
-                      ),
-                    ),
-                ],
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 24,
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                  height: 1.1,
+                ),
               ),
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colorScheme.onSurface.withValues(alpha: 0.28),
-            ),
-            const SizedBox(width: 12),
           ],
         ),
       ),
@@ -1257,11 +1280,13 @@ class _MentionAvatar extends StatelessWidget {
   final IconData? icon;
   final String? avatarUrl;
   final String title;
+  final bool highlighted;
 
   const _MentionAvatar({
     this.icon,
     this.avatarUrl,
     required this.title,
+    this.highlighted = false,
   });
 
   @override
@@ -1269,22 +1294,94 @@ class _MentionAvatar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final url = avatarUrl;
     if (url != null && url.isNotEmpty) {
-      return CircleAvatar(radius: 20, backgroundImage: NetworkImage(url));
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: Image.network(
+          url,
+          width: 48,
+          height: 48,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _MentionAvatarFallback(title: title),
+        ),
+      );
     }
-    return CircleAvatar(
-      radius: 20,
-      backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
-      child: icon != null
-          ? Icon(icon, size: 21, color: colorScheme.primary)
-          : Text(
-              title.characters.take(1).string,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: colorScheme.primary,
-              ),
-            ),
+    if (highlighted || icon != null) {
+      return Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: colorScheme.primary,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon ?? Icons.person_outline_rounded,
+          size: 30,
+          color: colorScheme.onPrimary,
+        ),
+      );
+    }
+    return _MentionAvatarFallback(title: title);
+  }
+}
+
+class _MentionAvatarFallback extends StatelessWidget {
+  final String title;
+
+  const _MentionAvatarFallback({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Center(
+        child: Text(
+          title.characters.take(1).string,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: colorScheme.primary,
+          ),
+        ),
+      ),
     );
+  }
+}
+
+class _MentionPopupArrowPainter extends CustomPainter {
+  final Color color;
+  final Color borderColor;
+
+  const _MentionPopupArrowPainter({
+    required this.color,
+    required this.borderColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MentionPopupArrowPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.borderColor != borderColor;
   }
 }
 

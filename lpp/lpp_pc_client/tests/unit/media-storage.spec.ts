@@ -10,10 +10,14 @@ import {
 } from "../../src/main/runtime-diagnostics";
 
 const getPath = vi.fn();
+const createFromBuffer = vi.fn(() => ({ isEmpty: () => false }));
 
 vi.mock("electron", () => ({
   app: {
     getPath,
+  },
+  nativeImage: {
+    createFromBuffer,
   },
 }));
 
@@ -24,6 +28,8 @@ describe("media storage", () => {
   beforeEach(async () => {
     userDataDir = await mkdtemp(join(tmpdir(), "lpp-media-storage-"));
     getPath.mockReturnValue(userDataDir);
+    createFromBuffer.mockReset();
+    createFromBuffer.mockReturnValue({ isEmpty: () => false });
     resetElectronRuntimeDiagnosticsForTest();
   });
 
@@ -57,6 +63,39 @@ describe("media storage", () => {
       conversationId: "c1",
       fileName: "clip.mp4",
       kind: "video",
+      url,
+    });
+
+    expect(result.filePath).toBe(filePath);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(await readFile(filePath)).toEqual(Buffer.from(freshBytes));
+  });
+
+  it("redownloads stale image cache files instead of reusing invalid local images", async () => {
+    const { ensureLocalMediaFile } = await import("../../src/main/media-storage");
+    const url = "https://cdn.example.test/media/photo.png";
+    const filePath = cachedMediaPath({
+      accountId: "u1",
+      conversationId: "c1",
+      directory: "Images",
+      fileName: "photo.png",
+      url,
+      userDataDir,
+    });
+    await mkdir(join(filePath, ".."), { recursive: true });
+    await writeFile(filePath, JSON.stringify({ code: "AUTH_REQUIRED", message: "login" }));
+
+    const freshBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    globalThis.fetch = vi.fn(async () => new Response(freshBytes, {
+      headers: { "content-type": "image/png" },
+      status: 200,
+    })) as typeof fetch;
+
+    const result = await ensureLocalMediaFile({
+      accountId: "u1",
+      conversationId: "c1",
+      fileName: "photo.png",
+      kind: "image",
       url,
     });
 

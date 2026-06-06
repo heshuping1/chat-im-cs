@@ -28,6 +28,7 @@ const messageTypeLabels: Record<string, string> = {
 };
 const nestedBodyFields = ["parts", "bodies", "items", "contents", "messageBodies"] as const;
 const textFields = ["text", "content", "message", "caption"] as const;
+const mediaTextFields = ["text", "message", "caption"] as const;
 const markdownFields = ["markdown", "markdownText"] as const;
 const eventTextFields = ["eventText", "notice", "text", "content", "message"] as const;
 const contactFields = [
@@ -59,33 +60,78 @@ const mediaTypeFallbacks = {
 const mediaRecordFields = {
   url: [
     "url",
+    "sourceUrl",
+    "source_url",
+    "contentUrl",
+    "content_url",
     "resourceUrl",
+    "resource_url",
     "mediaUrl",
+    "media_url",
     "objectUrl",
+    "object_url",
     "originalUrl",
-    "downloadUrl",
-    "signedUrl",
+    "original_url",
+    "content",
     "fileUrl",
+    "file_url",
     "filePath",
+    "file_path",
     "uri",
     "path",
   ],
+  signedUrl: ["signedUrl", "signed_url"],
+  downloadUrl: ["downloadUrl", "download_url"],
   thumbnailUrl: [
     "thumbnailUrl",
+    "thumbnail_url",
     "thumbUrl",
+    "thumb_url",
     "previewUrl",
+    "preview_url",
     "previewPath",
+    "preview_path",
+    "posterUrl",
+    "poster_url",
     "coverUrl",
+    "cover_url",
     "cover",
     "thumbnail",
   ],
-  fileName: ["fileName", "filename", "name", "originalName", "originalFileName"],
-  mimeType: ["mimeType", "contentType", "mediaType"],
+  fileName: [
+    "fileName",
+    "file_name",
+    "filename",
+    "name",
+    "originalName",
+    "original_name",
+    "originalFileName",
+    "original_file_name",
+  ],
+  mimeType: ["mimeType", "mime_type", "contentType", "content_type", "mediaType", "media_type"],
 } as const;
 const numericMediaRecordFields = {
   sizeBytes: ["sizeBytes", "size", "fileSize"],
   durationSeconds: ["durationSeconds", "duration"],
 } as const;
+const mediaRecordIdFields = [
+  "mediaId",
+  "media_id",
+  "resourceId",
+  "resource_id",
+  "fileId",
+  "file_id",
+] as const;
+const mediaRecordThumbnailIdFields = [
+  "thumbnailMediaId",
+  "thumbnail_media_id",
+  "thumbMediaId",
+  "thumb_media_id",
+  "posterMediaId",
+  "poster_media_id",
+  "coverMediaId",
+  "cover_media_id",
+] as const;
 
 export function normalizeMessageItem(message: MessageItemDto): MessageItemDto {
   const messageType = normalizeMessageType(message);
@@ -209,17 +255,28 @@ export function mediaFileName(media?: MediaResourceDto) {
 }
 
 export function imageMediaCacheKey(media: MediaResourceDto | undefined, src: string | undefined) {
-  if (!src || isBrowserNativeUrl(src)) return undefined;
   const record = media as Record<string, unknown> | undefined;
   const stableKey =
     stringValue(record?.mediaId) ||
+    stringValue(record?.media_id) ||
     stringValue(record?.resourceId) ||
+    stringValue(record?.resource_id) ||
     stringValue(record?.fileId) ||
+    stringValue(record?.file_id) ||
     stringValue(record?.objectKey) ||
+    stringValue(record?.object_key) ||
     stringValue(record?.storageKey) ||
+    stringValue(record?.storage_key) ||
+    stringValue(record?.url) ||
+    stringValue(record?.contentUrl) ||
+    stringValue(record?.content_url) ||
+    stringValue(record?.thumbnailUrl) ||
+    stringValue(record?.thumbnail_url) ||
     stringValue(record?.filePath) ||
     stringValue(record?.path);
-  return stableKey ? `image:${stableKey}` : `image:${src}`;
+  if (stableKey) return `image:${stableKey}`;
+  if (!src || isBrowserNativeUrl(src)) return undefined;
+  return `image:${src}`;
 }
 
 export function resolveMediaUrl(
@@ -287,14 +344,15 @@ export function normalizeType(value?: string) {
 
 function appendBodyParts(parts: NormalizedMessagePart[], body: Record<string, unknown>) {
   const type = normalizeType(stringValue(body.type) || stringValue(body.messageType));
-  const valueBody = asRecord(body.body) ?? body;
+  const valueBody = messageValueBody(body, type);
   const eventText = eventMessageText(valueBody, type);
   if (eventText) {
     parts.push({ type: "event", text: eventText });
     return;
   }
 
-  const text = firstStringField(valueBody, textFields);
+  const bodyTextFields = mediaTypeFallbacksFor(type) ? mediaTextFields : textFields;
+  const text = firstStringField(valueBody, bodyTextFields);
   const markdown = firstStringField(valueBody, markdownFields) || (type === "markdown" ? text : undefined);
   if (markdown) {
     parts.push({ type: "markdown", text: renderWechatEmojiText(markdown) });
@@ -402,8 +460,12 @@ function normalizeMediaRecord(record?: Record<string, unknown>) {
   if (!record) return undefined;
   return {
     ...record,
-    url: firstStringField(record, mediaRecordFields.url),
-    thumbnailUrl: firstStringField(record, mediaRecordFields.thumbnailUrl),
+    url: firstStringField(record, mediaRecordFields.url) ?? mediaAccessUrl(record, mediaRecordIdFields),
+    signedUrl: firstStringField(record, mediaRecordFields.signedUrl),
+    downloadUrl: firstStringField(record, mediaRecordFields.downloadUrl),
+    thumbnailUrl:
+      firstStringField(record, mediaRecordFields.thumbnailUrl) ??
+      mediaAccessUrl(record, mediaRecordThumbnailIdFields),
     fileName: firstStringField(record, mediaRecordFields.fileName),
     mimeType: firstStringField(record, mediaRecordFields.mimeType),
     sizeBytes: firstNumberField(record, numericMediaRecordFields.sizeBytes),
@@ -418,9 +480,38 @@ function toBodyArray(value: unknown): Record<string, unknown>[] {
   return value.map((item) => asRecord(item)).filter(Boolean) as Record<string, unknown>[];
 }
 
+function messageValueBody(body: Record<string, unknown>, type: string) {
+  const nestedBody = asRecord(body.body) ?? jsonRecord(body.body);
+  if (nestedBody) return nestedBody;
+  const content = asRecord(body.content) ?? jsonRecord(body.content);
+  if (content && mediaTypeFallbacksFor(type)) return content;
+  return body;
+}
+
+function mediaAccessUrl(record: Record<string, unknown>, fields: readonly string[]) {
+  const id = firstStringField(record, fields);
+  return id ? `/media/${encodeURIComponent(id)}` : undefined;
+}
+
+function mediaTypeFallbacksFor(type: string) {
+  return Object.values(mediaTypeFallbacks).some((fallbacks) =>
+    fallbacks.includes(type as never),
+  );
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== "object") return undefined;
   return value as Record<string, unknown>;
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> | undefined {
+  const text = stringValue(value);
+  if (!text || !/^\s*\{/.test(text)) return undefined;
+  try {
+    return asRecord(JSON.parse(text));
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeReplyIntoBody(body: Record<string, unknown>, message?: MessageItemDto) {

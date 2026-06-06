@@ -141,7 +141,6 @@ const historyFilterKeys: HistoryFilterKey[] = [
   "image",
   "file",
   "voice",
-  "video",
   "link",
   "favorite",
 ];

@@ -120,6 +120,7 @@ const _knownPresentationBoundaryDebt = {
   'lib/features/chat/presentation/providers/conversations_provider.dart',
   'lib/features/chat/presentation/providers/gateway_provider.dart',
   'lib/features/chat/presentation/providers/group_detail_provider.dart',
+  'lib/features/chat/presentation/providers/group_invite_qr_provider.dart',
   'lib/features/chat/presentation/providers/group_join_requests_provider.dart',
   'lib/features/chat/presentation/providers/presence_provider.dart',
   'lib/features/chat/presentation/widgets/chat_input_toolbar.dart',

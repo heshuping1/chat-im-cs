@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MessageItemDto } from "../../src/renderer/data/api/types";
-import { selectImagePrecacheCandidates } from "../../src/renderer/media/runtime/imagePrecache";
+import {
+  forgetPrefetchedImageFileUrl,
+  getPrefetchedImageFileUrl,
+  selectImagePrecacheCandidates,
+} from "../../src/renderer/media/runtime/imagePrecache";
 
 function message(
   messageType: string,
@@ -28,7 +32,7 @@ describe("selectImagePrecacheCandidates", () => {
 
     expect(candidates).toEqual([
       {
-        cacheKey: "image:https://assets.example/a.png",
+        cacheKey: "image:/a.png",
         fileName: "a.png",
         url: "https://assets.example/a.png",
       },
@@ -38,6 +42,60 @@ describe("selectImagePrecacheCandidates", () => {
         url: "https://assets.example/d.png",
       },
     ]);
+  });
+
+  it("prefers signed image urls for protected media precache", () => {
+    const candidates = selectImagePrecacheCandidates(
+      [
+        message(
+          "image",
+          {
+            image: {
+              fileName: "signed.png",
+              signedUrl: "/media/signed-photo?sig=ok",
+              thumbnailUrl: "/media/signed-photo-thumb",
+              url: "/media/signed-photo",
+            },
+          },
+          "signed",
+        ),
+      ],
+      "https://assets.example",
+    );
+
+    expect(candidates).toEqual([
+      {
+        cacheKey: "image:/media/signed-photo",
+        fileName: "signed.png",
+        url: "https://assets.example/media/signed-photo?sig=ok",
+      },
+    ]);
+  });
+
+  it("restores prefetched local image file urls from persistent storage", () => {
+    const store = new Map<string, string>();
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => store.get(key) ?? null,
+          setItem: (key: string, value: string) => {
+            store.set(key, value);
+          },
+        },
+      },
+    });
+    window.localStorage.setItem(
+      "lpp-pc-prefetched-image-files",
+      JSON.stringify([["image:/media/persisted", "file:///app-cache/persisted.png"]]),
+    );
+
+    expect(getPrefetchedImageFileUrl("image:/media/persisted")).toBe(
+      "file:///app-cache/persisted.png",
+    );
+
+    forgetPrefetchedImageFileUrl("image:/media/persisted", "file:///app-cache/persisted.png");
+    expect(getPrefetchedImageFileUrl("image:/media/persisted")).toBeUndefined();
   });
 
   it("keeps only the latest image candidates to control bandwidth", () => {

@@ -102,10 +102,16 @@ describe("message lookup UI", () => {
 
   it("uses one WeChat-style lookup entry instead of separate search and history buttons", () => {
     expect(header).toContain("onToggleLookup");
+    expect(header).toContain("lookupPointerHandledRef");
+    expect(header).toContain("onPointerDown");
+    expect(header).toContain("onClick={() => {");
     expect(header).toContain('t("messages.chatHeader.searchMessages")');
     expect(header).not.toContain("onToggleHistory");
     expect(header).not.toContain("onToggleSearch");
     expect(header).not.toContain("Clock3");
+    expect(messageCenterCss).toContain(".e-chat-panel.group-chat-mode .e-chat-actions");
+    expect(messageCenterCss).toContain("z-index: 12");
+    expect(messageCenterCss).toContain("pointer-events: auto");
   });
 
   it("closes standalone profile before opening lookup from the chat header", () => {
@@ -140,15 +146,22 @@ describe("message lookup UI", () => {
     expect(listPanel).toContain("chat-history-media-results");
     expect(listPanel).toContain("chat-history-media-grid");
     expect(listPanel).toContain("chat-history-media-tile");
-    expect(listPanel).toContain("item.posterUrl || item.localPreviewUrl || item.sourceUrl || item.remoteSourceUrl");
+    expect(listPanel).toContain("LookupMediaThumbnail");
+    expect(listPanel).toContain("useCachedImageMediaUrl");
+    expect(listPanel).toContain("previewUrls");
+    expect(listPanel).toContain("hasNextPreview");
+    expect(listPanel).toContain('item.kind === "video"');
+    expect(listPanel).toContain("? item.posterUrl");
     expect(listPanel).toContain("openLookupMediaPreview(item)");
     expect(listPanel).toContain("setLookupImagePreview({ fileName: item.fileName, src: openUrl })");
     expect(listPanel).toContain("openMessageVideoPlayer(item.message, openUrl, authToken, cacheContext)");
     expect(listPanel).toContain("openMessageMediaFile(item.message, openUrl, authToken, cacheContext)");
     expect(listPanel).toContain("chat-lookup-image-preview");
     expect(listPanel).toContain("openUrl: item.localOpenUrl || item.remoteSourceUrl || item.sourceUrl");
+    expect(listPanel).not.toContain('key: "video"');
     expect(messageListModel).toContain('filter === "image"');
     expect(messageListModel).toContain("Boolean(body.image || body.video)");
+    expect(messageListModel).not.toContain('"video",\n  "link"');
     expect(zhCnMessages).toContain("image: '图片与视频'");
     expect(messageCenterCss).toContain(".chat-history-media-grid");
     expect(messageCenterCss).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
@@ -247,7 +260,17 @@ describe("message lookup UI", () => {
     expect(stage).toContain('if (pane === "knowledge")');
     expect(messageContextRail).toContain("message-context-rail");
     expect(messageContextRail).toContain("message-context-rail-avatar");
-    expect(messageContextRail).not.toContain("UserRound");
+    expect(messageContextRail).toContain("isGroup");
+    expect(messageContextRail).toContain("UsersRound");
+    expect(messageContextRail).toContain("UserRound");
+    expect(messageContextRail).toContain("collapseGroupInfo");
+    expect(messageContextRail).toContain("expandGroupInfo");
+    expect(messageContextRail).toContain("collapseUserInfo");
+    expect(messageContextRail).toContain("expandUserInfo");
+    expect(messageContextRail).not.toContain('src="/customer-info-entry.svg"');
+    expect(stage).not.toContain("<MessageContextRail\n        activeAssistantPane={activeAssistantPane}\n        conversation={activeConversation}\n        groupAvatar={");
+    expect(zhCnMessages).toContain("collapseGroupInfo: '收起群聊信息'");
+    expect(zhCnMessages).toContain("expandGroupInfo: '展开群聊信息'");
     expect(messageContextRail).toContain("MessageSquareText");
     expect(messageContextRail).toContain("{showAiTools &&");
     expect(messageContextRail).toContain("LibraryBig");

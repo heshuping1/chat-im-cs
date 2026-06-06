@@ -76,12 +76,13 @@ describe("message list model", () => {
     expect(filterVisibleMessages([pendingVideo, readyVideo], "").map((item) => item.messageId))
       .toEqual(["video-ready"]);
     expect(filterVisibleMessages([pendingVideo, readyVideo], "clip")).toEqual([]);
-    expect(filterMessagesByHistory([pendingVideo, readyVideo], "video").map((item) => item.messageId))
+    expect(filterMessagesByHistory([pendingVideo, readyVideo], "image").map((item) => item.messageId))
       .toEqual(["video-ready"]);
     expect(getHistoryFilterCounts([pendingVideo, readyVideo])).toMatchObject({
       all: 1,
-      video: 1,
+      image: 1,
     });
+    expect(getHistoryFilterCounts([pendingVideo, readyVideo])).not.toHaveProperty("video");
   });
 
   it("creates compact action previews for media and long text", () => {

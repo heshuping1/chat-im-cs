@@ -2454,10 +2454,18 @@ body:has(.sidebar.collapsed)
 }
 
 .e-chat-panel.group-chat-mode .e-chat-header {
+  position: relative;
+  z-index: 2;
   min-height: 64px !important;
   padding: 0 18px 0 20px !important;
   border-bottom-color: rgba(214, 219, 225, 0.92) !important;
   background: #fbfcfd !important;
+}
+
+.e-chat-panel.group-chat-mode .e-chat-actions {
+  position: relative;
+  z-index: 12;
+  pointer-events: auto;
 }
 
 .e-chat-panel.group-chat-mode .e-chat-title.group-title h2 {
@@ -2467,10 +2475,13 @@ body:has(.sidebar.collapsed)
 }
 
 .e-chat-panel.group-chat-mode .e-chat-actions .e-icon-button {
+  position: relative;
+  z-index: 13;
   border-color: transparent !important;
   background: transparent !important;
   color: #1f2933 !important;
   box-shadow: none !important;
+  pointer-events: auto;
 }
 
 .e-chat-panel.group-chat-mode .e-chat-actions .e-icon-button:hover,

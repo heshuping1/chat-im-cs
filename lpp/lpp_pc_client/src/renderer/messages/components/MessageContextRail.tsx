@@ -1,15 +1,15 @@
-import { LibraryBig, MessageSquareText } from "lucide-react";
+import { LibraryBig, MessageSquareText, UserRound, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { ConversationListItem } from "../../data/api-client";
 import { useI18n } from "../../i18n/useI18n";
-import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 
 export type MessageContextPane = "aiDraft" | "knowledge" | "quickReply" | null;
 
 export function MessageContextRail({
   activeAssistantPane,
   conversation,
+  isGroup,
   profileOpen,
   showAiTools,
   onToggleAssistantPane,
@@ -17,7 +17,6 @@ export function MessageContextRail({
 }: {
   activeAssistantPane: MessageContextPane;
   conversation?: ConversationListItem;
-  groupAvatar?: GroupConversationAvatar;
   isGroup: boolean;
   profileOpen: boolean;
   showAiTools: boolean;
@@ -25,9 +24,10 @@ export function MessageContextRail({
   onToggleProfile: () => void;
 }) {
   const { t } = useI18n();
+  const ProfileIcon = isGroup ? UsersRound : UserRound;
   const profileTooltip = profileOpen
-    ? t("messages.contextRail.collapseProfile")
-    : t("messages.contextRail.expandProfile");
+    ? t(isGroup ? "messages.contextRail.collapseGroupInfo" : "messages.contextRail.collapseUserInfo")
+    : t(isGroup ? "messages.contextRail.expandGroupInfo" : "messages.contextRail.expandUserInfo");
 
   return (
     <aside className="message-context-rail" aria-label={t("messages.contextRail.railAria")}>
@@ -40,12 +40,7 @@ export function MessageContextRail({
         aria-pressed={profileOpen}
         onClick={onToggleProfile}
       >
-        <img
-          className="message-context-rail-avatar-image"
-          src="/customer-info-entry.svg"
-          alt=""
-          aria-hidden="true"
-        />
+        <ProfileIcon className="message-context-rail-avatar-image" size={22} aria-hidden="true" />
         {conversation && <span className="message-context-status-dot" />}
       </button>
 

@@ -1,4 +1,5 @@
 import { AppWindow, ChevronLeft, Languages, Search } from "lucide-react";
+import { useRef } from "react";
 
 import { ChannelBadge, channelLabel } from "../../components/ChannelBadge";
 import type { ConversationListItem } from "../../data/api-client";
@@ -44,6 +45,7 @@ export function MessageChatHeader({
   onToggleLookup: () => void;
 }) {
   const { t } = useI18n();
+  const lookupPointerHandledRef = useRef(false);
   const lookupOpen = messageSearchOpen || historyOpen;
   const hasApplication = Boolean(customerApplicationName?.trim());
   const hasSource = Boolean(customerSource?.trim());
@@ -135,7 +137,15 @@ export function MessageChatHeader({
           }}
           onPointerDown={(event) => {
             if (event.button !== 0) return;
+            lookupPointerHandledRef.current = true;
             event.preventDefault();
+            onToggleLookup();
+          }}
+          onClick={() => {
+            if (lookupPointerHandledRef.current) {
+              lookupPointerHandledRef.current = false;
+              return;
+            }
             onToggleLookup();
           }}
         >

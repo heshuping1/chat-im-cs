@@ -715,15 +715,6 @@ export function MessageCenterConversationStage({
       <MessageContextRail
         activeAssistantPane={activeAssistantPane}
         conversation={activeConversation}
-        groupAvatar={
-          activeConversation
-            ? resolveGroupConversationAvatar(
-                activeConversation,
-                groupMembers,
-                groupAvatarSnapshotFor(activeConversation),
-              )
-            : undefined
-        }
         isGroup={activeConversationIsGroup}
         profileOpen={dockProfile || profileStandaloneOpen}
         showAiTools={canOpenAiAssistant}

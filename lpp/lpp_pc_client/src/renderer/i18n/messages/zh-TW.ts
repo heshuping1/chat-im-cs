@@ -1278,7 +1278,11 @@ export const zhTW: MessageDictionary = {
     contextRail: {
       aiDraft: 'AI 起草',
       collapseProfile: '收起使用者資訊',
+      collapseGroupInfo: '收起群聊資訊',
+      collapseUserInfo: '收起使用者資訊',
       expandProfile: '展開使用者資訊',
+      expandGroupInfo: '展開群聊資訊',
+      expandUserInfo: '展開使用者資訊',
       knowledge: '知識庫',
       quickReply: '快捷話術',
       railAria: '訊息右側工具列',

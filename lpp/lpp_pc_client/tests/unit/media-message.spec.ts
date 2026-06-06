@@ -28,7 +28,31 @@ describe("normalizeMediaPart", () => {
       kind: "image",
       fileName: "photo.jpg",
       sourceUrl: "https://assets.example/thumbs/photo.jpg",
-      imageCacheKey: "image:https://assets.example/thumbs/photo.jpg",
+      imageCacheKey: "image:/files/photo.jpg",
+    });
+  });
+
+  it("prefers signed image urls over protected raw media urls for display", () => {
+    const part: NormalizedMessagePart = {
+      type: "image",
+      media: {
+        fileName: "photo.jpg",
+        signedUrl: "/media/photo?sig=ok",
+        thumbnailUrl: "/media/photo-thumb",
+        url: "/media/photo",
+      },
+    };
+
+    expect(normalizeMediaPart({ assetBaseUrl: "https://assets.example", part })).toMatchObject({
+      kind: "image",
+      fileName: "photo.jpg",
+      remoteSourceUrl: "https://assets.example/media/photo?sig=ok",
+      sourceUrl: "https://assets.example/media/photo?sig=ok",
+      imageSourceUrls: [
+        "https://assets.example/media/photo?sig=ok",
+        "https://assets.example/media/photo-thumb",
+        "https://assets.example/media/photo",
+      ],
     });
   });
 
@@ -101,6 +125,32 @@ describe("normalizeMediaPart", () => {
     });
   });
 
+  it("keeps locally cached image files ahead of remote fallback urls", () => {
+    const part: NormalizedMessagePart = {
+      type: "image",
+      media: {
+        fileName: "photo.jpg",
+        localOpenUrl: "file:///app-cache/photo.jpg",
+        signedUrl: "/media/photo?sig=ok",
+        thumbnailUrl: "/thumbs/photo.jpg",
+        url: "/media/photo",
+      } as MediaResourceDto & { localOpenUrl: string },
+    };
+
+    expect(normalizeMediaPart({ assetBaseUrl: "https://assets.example", part })).toMatchObject({
+      kind: "image",
+      sourceUrl: "file:///app-cache/photo.jpg",
+      remoteSourceUrl: "https://assets.example/media/photo?sig=ok",
+      localOpenUrl: "file:///app-cache/photo.jpg",
+      imageSourceUrls: [
+        "file:///app-cache/photo.jpg",
+        "https://assets.example/media/photo?sig=ok",
+        "https://assets.example/thumbs/photo.jpg",
+        "https://assets.example/media/photo",
+      ],
+    });
+  });
+
   it("falls back to the message preview only for file cards", () => {
     const part: NormalizedMessagePart = {
       type: "file",
@@ -143,6 +193,31 @@ describe("message media action model", () => {
         sourceUrl: "https://assets.example/thumb.jpg",
       }),
     ]);
+  });
+
+  it("resolves mediaId-only image messages through the protected media endpoint", () => {
+    const message = {
+      messageId: "m-group-image-media-id",
+      messageType: "image",
+      body: {
+        image: {
+          mediaId: "group-photo-1",
+          fileName: "photo.jpg",
+        },
+      },
+    } as never;
+
+    expect(chatMediaItemsFromMessage({ assetBaseUrl: "https://assets.example", message })).toEqual([
+      expect.objectContaining({
+        kind: "image",
+        fileName: "photo.jpg",
+        remoteSourceUrl: "https://assets.example/media/group-photo-1",
+        sourceUrl: "https://assets.example/media/group-photo-1",
+      }),
+    ]);
+    expect(resolveMessageMediaUrl(message, "https://assets.example")).toBe(
+      "https://assets.example/media/group-photo-1",
+    );
   });
 
   it("builds one desktop action payload from a message", () => {
@@ -589,12 +664,21 @@ describe("message media upload presentation", () => {
     );
 
     expect(imageFrame).toContain("message-image-viewer-toolbar");
+    expect(imageFrame).toContain("const canRenderImage = sourceAvailable && Boolean(src);");
+    expect(imageFrame).toContain("{canRenderImage ? (");
     expect(imageFrame).toContain('t("media.image.copy")');
     expect(imageFrame).toContain('t("media.image.saveAs")');
     expect(imageFrame).toContain('t("media.image.reveal")');
     expect(imageFrame).toContain("message-image-retry");
     expect(mediaParts).toContain("imageActionSrc");
     expect(mediaParts).toContain("const imageSrc = localImage ? src : displaySrc || src;");
+    expect(mediaParts).toContain("imageSourceUrls");
+    expect(mediaParts).toContain("hasNextImageSource");
+    expect(mediaParts).toContain("useNextImageSource");
+    expect(mediaParts).toContain("forgetPrefetchedImageFileUrl");
+    expect(mediaParts).toContain("hasUsableLocalFile ? undefined : src");
+    expect(mediaParts).toContain("if (failed && hasNextImageSource) useNextImageSource();");
+    expect(mediaParts).toContain("sourceAvailable={Boolean(visibleImageSrc)}");
     expect(mediaParts).toContain("copyCurrentMessageImage");
     expect(mediaParts).toContain("saveCurrentMessageImageAs");
     expect(mediaParts).toContain("revealCurrentMessageImageInFolder");

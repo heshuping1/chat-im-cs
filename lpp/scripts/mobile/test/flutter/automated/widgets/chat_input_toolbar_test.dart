@@ -218,9 +218,9 @@ void main() {
     await tester.showKeyboard(find.byType(TextField));
     await tester.enterText(find.byType(TextField), '@');
     await tester.pumpAndSettle();
-    expect(find.text('选择提醒的人'), findsOneWidget);
+    expect(find.text('群成员'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.tapAt(const Offset(8, 8));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '');
     await tester.pump();
@@ -228,7 +228,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '@');
     await tester.pumpAndSettle();
 
-    expect(find.text('选择提醒的人'), findsOneWidget);
+    expect(find.text('群成员'), findsOneWidget);
     expect(find.text('张三'), findsOneWidget);
   });
 
@@ -254,10 +254,42 @@ void main() {
     await tester.enterText(find.byType(TextField), '＠');
     await tester.pumpAndSettle();
 
-    expect(find.text('选择提醒的人'), findsOneWidget);
+    expect(find.text('群成员'), findsOneWidget);
     await tester.tap(find.text('张三'));
     await tester.pumpAndSettle();
     expect(find.text('@张三 '), findsOneWidget);
+  });
+
+  testWidgets('group mention picker shows all-member shortcut first', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'group-1',
+          isGroup: true,
+          canMentionAll: true,
+          mentionCandidates: const [
+            ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+          ],
+          onSendText: (_) async => true,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+        ),
+      ),
+    );
+
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '@');
+    await tester.pumpAndSettle();
+
+    expect(find.text('所有人'), findsOneWidget);
+    expect(find.text('群成员'), findsOneWidget);
+
+    await tester.tap(find.text('所有人'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('@所有人 '), findsOneWidget);
   });
 }
 

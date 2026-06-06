@@ -1276,7 +1276,11 @@
     contextRail: {
       aiDraft: 'AI 起草',
       collapseProfile: '收起用户信息',
+      collapseGroupInfo: '收起群聊信息',
+      collapseUserInfo: '收起用户信息',
       expandProfile: '展开用户信息',
+      expandGroupInfo: '展开群聊信息',
+      expandUserInfo: '展开用户信息',
       knowledge: '知识库',
       quickReply: '快捷话术',
       railAria: '消息右侧工具栏',

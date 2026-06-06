@@ -1567,6 +1567,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       'MSG_GROUP_MUTED' => l10n.chatMutedFullNotice,
       'MSG_MEMBER_MUTED' => '你已被禁言，暂时无法发言',
       'MSG_USER_MUTED' => '当前账号已被禁言，暂时无法发言',
+      'MSG_AT_ALL_NOT_ALLOWED' => '当前群不允许普通成员 @所有人',
       'DIRECT_MESSAGE_BLOCKED_BY_MODERATION' => '内容不符合规范，已禁止发送',
       'GROUP_MESSAGE_BLOCKED_BY_MODERATION' => '内容不符合规范，已禁止发送',
       'TEMP_SESSION_SENSITIVE_BLOCKED' => '内容不符合规范，已禁止发送',
@@ -2166,6 +2167,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   String _sendFailureReason(Object error) {
     if (error is ServerError) {
+      if (error.code == 'MSG_AT_ALL_NOT_ALLOWED') {
+        return '当前群不允许普通成员 @所有人';
+      }
       return error.code.isNotEmpty ? error.code : error.message;
     }
     if (error is AuthError) return error.code;

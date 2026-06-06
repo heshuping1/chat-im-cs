@@ -11,6 +11,8 @@ import { refreshCachedMedia } from "../../lib/mediaCache";
 
 const imagePrecacheLimit = 24;
 const imagePrecacheRetryMs = 2 * 60 * 1000;
+const imagePrecacheStorageKey = "lpp-pc-prefetched-image-files";
+const imagePrecacheStorageLimit = 800;
 
 type ImagePrecacheOptions = {
   accountId?: string;
@@ -32,7 +34,23 @@ const failedImagePrecaches = new Map<string, number>();
 const imagePrecacheSubscribers = new Map<string, Set<(fileUrl: string) => void>>();
 
 export function getPrefetchedImageFileUrl(cacheKey: string | undefined) {
-  return cacheKey ? prefetchedImageFileUrls.get(cacheKey) : undefined;
+  if (!cacheKey) return undefined;
+  const cached = prefetchedImageFileUrls.get(cacheKey);
+  if (cached) return cached;
+  const persisted = readPersistedImageFileUrls().get(cacheKey);
+  if (!persisted) return undefined;
+  prefetchedImageFileUrls.set(cacheKey, persisted);
+  return persisted;
+}
+
+export function forgetPrefetchedImageFileUrl(cacheKey: string | undefined, fileUrl?: string | null) {
+  if (!cacheKey) return;
+  const current = prefetchedImageFileUrls.get(cacheKey) ?? readPersistedImageFileUrls().get(cacheKey);
+  if (fileUrl && current && current !== fileUrl) return;
+  prefetchedImageFileUrls.delete(cacheKey);
+  const persisted = readPersistedImageFileUrls();
+  persisted.delete(cacheKey);
+  writePersistedImageFileUrls(persisted);
 }
 
 export function subscribeImagePrecache(
@@ -61,7 +79,7 @@ export function prefetchImageMessages({
   candidates.forEach((candidate) => {
     const failedAt = failedImagePrecaches.get(candidate.cacheKey);
     if (failedAt && Date.now() - failedAt < imagePrecacheRetryMs) return;
-    if (prefetchedImageFileUrls.has(candidate.cacheKey)) return;
+    if (getPrefetchedImageFileUrl(candidate.cacheKey)) return;
     if (pendingImagePrecaches.has(candidate.cacheKey)) return;
 
     const task = prefetchImageCandidate({
@@ -102,12 +120,12 @@ function imagePrecacheCandidate(
   const url = resolveMediaUrl(
     media,
     assetBaseUrl,
+    "signedUrl",
+    "downloadUrl",
     "thumbnailUrl",
     "thumbUrl",
     "previewUrl",
     "url",
-    "downloadUrl",
-    "signedUrl",
     "fileUrl",
     "uri",
     "path",
@@ -157,5 +175,37 @@ function registerPrefetchedImageFileUrl(cacheKey: string, fileUrl: string) {
   if (!fileUrl) return;
   failedImagePrecaches.delete(cacheKey);
   prefetchedImageFileUrls.set(cacheKey, fileUrl);
+  const persisted = readPersistedImageFileUrls();
+  persisted.set(cacheKey, fileUrl);
+  writePersistedImageFileUrls(persisted);
   imagePrecacheSubscribers.get(cacheKey)?.forEach((callback) => callback(fileUrl));
+}
+
+function readPersistedImageFileUrls() {
+  const entries = new Map<string, string>();
+  try {
+    const raw = window.localStorage?.getItem(imagePrecacheStorageKey);
+    if (!raw) return entries;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return entries;
+    parsed.forEach((item) => {
+      if (!Array.isArray(item) || item.length < 2) return;
+      const [key, fileUrl] = item;
+      if (typeof key === "string" && typeof fileUrl === "string" && key && fileUrl) {
+        entries.set(key, fileUrl);
+      }
+    });
+  } catch {
+    return entries;
+  }
+  return entries;
+}
+
+function writePersistedImageFileUrls(entries: Map<string, string>) {
+  try {
+    const limited = Array.from(entries.entries()).slice(-imagePrecacheStorageLimit);
+    window.localStorage?.setItem(imagePrecacheStorageKey, JSON.stringify(limited));
+  } catch {
+    // Local storage is only an optimization; image loading still falls back to cache/download.
+  }
 }

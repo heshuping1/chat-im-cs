@@ -19,6 +19,7 @@ const _secondary = Color(0xFF8E8E93);
 const _primary = Color(0xFF00B27A);
 const _divider = Color(0xFFE5E5EA);
 const _red = Color(0xFFFF3B30);
+const double _groupManageSideInset = 8;
 
 // ---------------------------------------------------------------------------
 // GroupManagePage
@@ -584,7 +585,7 @@ class _CardSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(horizontal: _groupManageSideInset),
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(12),
@@ -618,7 +619,8 @@ class _SwitchTile extends StatelessWidget {
     return InkWell(
       onTap: disabled ? onTapWhenDisabled : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+            horizontal: _groupManageSideInset, vertical: 4),
         child: Row(
           children: [
             Expanded(
@@ -665,7 +667,8 @@ class _NavTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(
+            horizontal: _groupManageSideInset, vertical: 16),
         child: Row(
           children: [
             ConstrainedBox(
@@ -703,5 +706,5 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const Divider(height: 1, indent: 16, color: _divider);
+      const Divider(height: 1, indent: _groupManageSideInset, color: _divider);
 }

@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app, nativeImage } from 'electron';
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, open, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path';
@@ -120,7 +120,7 @@ export async function getLocalMediaStatus(
   payload: CacheMediaFilePayload,
 ): Promise<CachedMediaStatus> {
   const { filePath, cacheKey } = mediaCacheTarget(payload);
-  if (await fileExists(filePath)) return 'cached';
+  if (await isReusableCachedMediaFile(filePath, payload.kind)) return 'cached';
   if (pendingMediaCacheKeys.has(cacheKey)) return 'caching';
   if (failedMediaCacheKeys.has(cacheKey)) return 'failed';
   return 'not_cached';
@@ -240,6 +240,7 @@ async function isReusableCachedMediaFile(
   try {
     const stats = await stat(path);
     if (!stats.isFile() || stats.size <= 0) return false;
+    if (kind === 'image') return isReusableCachedImageFile(path);
     if (kind !== 'video') return true;
     const bytes = await readFilePrefix(path, 2048);
     const errorMessage = mediaErrorMessage(bytes, '');
@@ -253,6 +254,19 @@ async function isReusableCachedMediaFile(
   } catch {
     return false;
   }
+}
+
+async function isReusableCachedImageFile(path: string) {
+  const bytes = await readFile(path);
+  const errorMessage = mediaErrorMessage(bytes, '');
+  const image = errorMessage ? null : nativeImage.createFromBuffer(bytes);
+  if (!errorMessage && image && !image.isEmpty()) return true;
+  recordElectronRuntimeDiagnostic({
+    event: 'media.cache_failed',
+    error: new Error(`Cached image is not reusable: ${errorMessage || 'invalid_image'}`),
+    reason: `kind=image urlType=file fileName=${safeDiagnosticText(basename(path))}`,
+  });
+  return false;
 }
 
 function dataUrlBytes(url: string) {

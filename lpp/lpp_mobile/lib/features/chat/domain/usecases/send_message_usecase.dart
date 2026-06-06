@@ -388,6 +388,9 @@ class SendMessageUseCase {
       if (_isModerationBlocked(code)) {
         return '内容不符合规范，已禁止发送';
       }
+      if (code == 'MSG_AT_ALL_NOT_ALLOWED') {
+        return '当前群不允许普通成员 @所有人';
+      }
       return code;
     }
     return failure.message;

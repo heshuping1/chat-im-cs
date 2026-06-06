@@ -39,6 +39,103 @@ describe("im-message-normalize", () => {
     });
   });
 
+  it("normalizes group media payloads that wrap image fields under content", () => {
+    expect(
+      normalizeMessageParts(
+        message(
+          {
+            content: {
+              content_url: "/group/files/photo.jpg",
+              thumb_url: "/group/thumbs/photo.jpg",
+              original_file_name: "photo.jpg",
+              mime_type: "image/jpeg",
+            },
+          },
+          "image",
+        ),
+      )[0],
+    ).toMatchObject({
+      type: "image",
+      media: {
+        fileName: "photo.jpg",
+        mimeType: "image/jpeg",
+        thumbnailUrl: "/group/thumbs/photo.jpg",
+        url: "/group/files/photo.jpg",
+      },
+    });
+
+    expect(normalizeMessageParts(message({ content: "/media/group-photo-1" }, "image"))[0]).toMatchObject({
+      type: "image",
+      media: { url: "/media/group-photo-1" },
+    });
+
+    expect(
+      normalizeMessageParts(
+        message(
+          {
+            content: JSON.stringify({
+              mediaId: "group-photo-2",
+              originalFileName: "photo-2.jpg",
+              mimeType: "image/jpeg",
+            }),
+          },
+          "image",
+        ),
+      )[0],
+    ).toMatchObject({
+      type: "image",
+      media: {
+        fileName: "photo-2.jpg",
+        mimeType: "image/jpeg",
+        url: "/media/group-photo-2",
+      },
+    });
+
+    expect(
+      normalizeMessageParts(
+        message(
+          {
+            image: {
+              mediaId: "group-photo-3",
+              thumbnail_media_id: "group-photo-thumb-3",
+              file_name: "photo-3.jpg",
+            },
+          },
+          "image",
+        ),
+      )[0],
+    ).toMatchObject({
+      type: "image",
+      media: {
+        fileName: "photo-3.jpg",
+        thumbnailUrl: "/media/group-photo-thumb-3",
+        url: "/media/group-photo-3",
+      },
+    });
+
+    expect(
+      normalizeMessageParts(
+        message(
+          {
+            image: {
+              url: "/media/raw-photo",
+              signedUrl: "/media/raw-photo?sig=ok",
+              fileName: "signed.png",
+            },
+          },
+          "image",
+        ),
+      )[0],
+    ).toMatchObject({
+      type: "image",
+      media: {
+        fileName: "signed.png",
+        signedUrl: "/media/raw-photo?sig=ok",
+        url: "/media/raw-photo",
+      },
+    });
+  });
+
   it("normalizes structured location, contact, call and event messages", () => {
     expect(normalizeMessageParts(message({ location: { name: "Tokyo" } }, "location"))).toEqual([
       { type: "location", value: { name: "Tokyo" } },

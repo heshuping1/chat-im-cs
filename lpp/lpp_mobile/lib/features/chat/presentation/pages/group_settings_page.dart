@@ -23,6 +23,8 @@ import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_pro
 /// superAdmin = 群主(owner)，admin = 管理员，member = 普通成员
 enum GroupRole { superAdmin, admin, member }
 
+const double _groupSettingsSideInset = 8;
+
 class GroupMember {
   final String userId;
   final String displayName;
@@ -1037,7 +1039,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             children: [
               _Row(
                   label: '设置当前聊天背景',
-                  onTap: () => context.push('/chat-background')),
+                  onTap: () => context.push(
+                      '/chat-background?conversationId=${widget.groupId}')),
               const _Div(),
               _Row(
                   label: '清空聊天记录',
@@ -1058,7 +1061,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         // 只有超级管理员才能解散群，管理员和普通成员只能退出
         if (!detailUnavailable)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding:
+                const EdgeInsets.symmetric(horizontal: _groupSettingsSideInset),
             child: ElevatedButton(
               onPressed: () => _leaveOrDismiss(isSuperAdmin),
               style: ElevatedButton.styleFrom(
@@ -1120,7 +1124,8 @@ class _DetailFallbackBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      margin: const EdgeInsets.fromLTRB(
+          _groupSettingsSideInset, 0, _groupSettingsSideInset, 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF7E6),
@@ -1209,7 +1214,7 @@ class _MembersGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Theme.of(context).colorScheme.surface,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(_groupSettingsSideInset),
       child: isLoading
           ? const SizedBox(
               height: 80, child: Center(child: CircularProgressIndicator()))
@@ -1513,7 +1518,8 @@ class _Row extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+            horizontal: _groupSettingsSideInset, vertical: 14),
         child: Row(
           children: [
             if (icon != null) ...[
@@ -1568,7 +1574,8 @@ class _SwitchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+          horizontal: _groupSettingsSideInset, vertical: 12),
       child: Row(
         children: [
           Expanded(
@@ -1597,7 +1604,10 @@ class _Div extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Divider(height: 1, indent: 16, color: Theme.of(context).dividerColor);
+      Divider(
+          height: 1,
+          indent: _groupSettingsSideInset,
+          color: Theme.of(context).dividerColor);
 }
 
 // ---------------------------------------------------------------------------
