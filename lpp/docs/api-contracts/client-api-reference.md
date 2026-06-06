@@ -186,7 +186,7 @@ Base URL：`/api/client/v1`
 | `/tenant/info` | GET | 无 | `TenantDetailDto` | `status=0(pending_approval)`、`1(active)`、`2(suspended)`、`9(deleted)` |
 | `/tenant/info` | PUT | `UpdateTenantInfoRequest` | `updated=true` | 仅更新传入字段；支持维护 `tenantDescription` |
 | `/tenant/leave` | POST | 无 | `left=true` `tenantId` | 最后一个所有者不能直接退出 |
-| `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户 |
+| `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户。**2026-06-04 起**每个成员附带 `lppId`（绿泡泡号），供通讯录展示 |
 | `/tenant/members/{userId}` | DELETE | 路径参数：`userId` | `userId` | 当前实现返回被移除用户 ID |
 | `/tenant/members/{userId}/role` | PUT | `membershipRole` | `userId` | 仅所有者可修改角色 |
 | `/tenant/invitations` | POST | `maxUses` `expireHours` `targetIdentifier?` `targetMembershipRole?` | `InvitationDto` | **客服/管理员/所有者**可调用(2026-05-31 起放宽,原为仅管理员/所有者);`inviteType=0(public)`、`1(targeted)`；`status=0(revoked)`、`1(active)`、`3(exhausted)`；权限不足返回 `403 TENANT_PERMISSION_DENIED`。**2026-06-03 起** `targetMembershipRole?`(1=技术/2=客服/3=管理员,省略=普通成员)→接受后直接落地为员工角色;只能签发<自己的角色,否则 `403 INVITATION_ROLE_TOO_HIGH`;请求 `4(Owner)` 返回 `400 INVITATION_ROLE_INVALID` |
@@ -264,6 +264,7 @@ Base URL：`/api/client/v1`
 | `/groups/{groupId}/transfer-owner` | POST | `newOwnerUserId` | `groupId` `newOwnerUserId` | 专门用于群主转让 |
 | `/groups/{groupId}/members/{targetUserId}/role` | PUT | `role` | `groupId` `targetUserId` | `role=admin/member` |
 | `/groups/{groupId}/members/{targetUserId}/mute` | PUT | `muteMode` `muteUntil?` | `groupId` `targetUserId` | `muteMode=0/1` |
+| `/groups/{groupId}/members/{targetUserId}/alias` | PUT | `alias?` | `groupId` `targetUserId` `alias` | **群内昵称(群备注名)**。`targetUserId` 传自己=改自己的;群主/管理员可代改成员的(管理员不能改另一个管理员/群主的,仅群主能)。`alias` 为空/空白=清除(回退到全局 `displayName`);上限 64 字符,超长 400 `GROUP_ALIAS_TOO_LONG`。**2026-06-06 起** |
 | `/groups/{groupId}/settings` | GET | 无 | `GroupSettingsDto` | 返回 `allowMemberInvite` `allowMemberModifyTitle` `allowMemberAtAll` `allowMemberViewMemberList` `allowQrCodeJoin` `requireApproval` `allowMemberAddFriend` |
 | `/groups/{groupId}/settings` | PUT | `allowMemberInvite?` `allowMemberModifyTitle?` `allowMemberAtAll?` `allowMemberViewMemberList?` `allowQrCodeJoin?` `requireApproval?` `allowMemberAddFriend?` | `groupId` | 只更新传入字段 |
 | `/groups/{groupId}/mute-mode` | PUT | `muteMode` | `groupId` | `muteMode=0/1` |
@@ -688,6 +689,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `membershipRole` | short | 角色：`0=member`、`1=technical`、`2=customer_service`、`3=admin`、`4=owner` |
 | `joinMethod` | short | 加入方式：`0=self`、`1=invite`、`2=approval` |
 | `joinedAt` | DateTimeOffset? | 入租时间 |
+| `lppId` | string? | **2026-06-04 新增**。成员对应平台账号的全局唯一 `lpp_id`（绿泡泡号）；未设置时为 `null`。用于在通讯录展示成员的绿泡泡号 |
 
 ### 4.3 `InvitationDto`
 
@@ -864,7 +866,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `PeerReadStatusDto` | `peerLastReadSeq` `peerLastReadAt?` |
 | `GroupCreatedDto` | `groupId` `title` `memberCount` |
 | `GroupDetailV2Dto` | `groupId` `title` `avatarUrl?` `ownerUserId?` `memberCount` `muteMode` `settings` `isPinned` `isMuted` `myRole` `unreadCount` `lastMessageSeq` `lastReadSeq` `createdAt` |
-| `GroupMemberDto` | `userId` `displayName` `avatarUrl?` `role` `joinedAt` |
+| `GroupMemberDto` | `userId` `displayName` `avatarUrl?` `role` `joinedAt` `groupAlias?` | `groupAlias`=群内昵称(群备注名),**2026-06-06 起**;为 `null` 表示未设置,展示时回退到 `displayName` |
 | `GroupAnnouncementDto` | `announcementId` `conversationId` `publisherUserId` `publisherDisplayName?` `title?` `content` `isPinned` `createdAt` `updatedAt` |
 | `GroupJoinRequestDto` | `requestId` `conversationId` `userId` `userDisplayName?` `userAvatarUrl?` `message?` `status` `createdAt` |
 | `GroupSettingsDto` | `allowMemberInvite` `allowMemberModifyTitle` `allowMemberAtAll` `allowMemberViewMemberList` `allowQrCodeJoin` `requireApproval` `allowMemberAddFriend` |
@@ -1062,6 +1064,7 @@ Hub 路径：`/ws/client`（标准客户端）、`/ws/widget`（访客 Widget）
 | `presence.changed` | 好友/同租户成员 | `userId` `isOnline` `customStatus?` | 在线状态变更；只包含这 3 个字段 |
 | `msg.read` | 会话其他成员 | `tenantId` `conversationId` `userId` `readSeq` | 已读回执推送 |
 | `msg.recalled` | 会话所有成员 | `tenantId` `messageId` `conversationId` `conversationSeq` `operatorUserId` | 消息撤回推送 |
+| `group.settings.updated` | 群在群成员 | `conversationId` `operatorUserId` `title` `avatarUrl?` `muteMode` `settings` `updatedAt` | 群设置/全员禁言/群名群头像变更推送（2026-06-06 新增）；完整快照，收到后可直接覆盖或重拉群详情；纯 `/ws/client` 多端同步信号，不进 push/webhook（详见 client-api.md §10.10.3） |
 | `auth.force_logout` | 目标连接 | `platformUserId?` `deviceId?` `reason` `revokedAt` `deactivateRequestedAt?` `cooldownEndsAt?` | 强制登出；`reason=device_revoked/account_deactivated/device_claimed_by_other_user` |
 | `temp_session.assigned` | 租户客服 + 访客 Widget | `tenantId` `sessionId` `staffUserId` | 临时会话分配客服 |
 | `temp_session.closed` | 租户客服 + 访客 Widget | `tenantId` `sessionId` `status` `reasonCode?` `reasonText?` `closedAt?` | 临时会话关闭 |

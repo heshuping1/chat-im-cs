@@ -1332,6 +1332,7 @@ Base URL：`/api/client/v1`，需要租户级 Token。
 
 - 绿泡泡模式下，客户（`userType=1`）不能查看企业成员列表
 - 该接口返回的是租户成员关系，不包含官方服务号等系统投影用户
+- **2026-06-04 起**，`/tenant/members` 返回的每个成员（`TenantMemberDto`，见 reference §4.2）附带 `lppId`（绿泡泡号，对应平台账号的全局唯一 `lpp_id`；未设置时为 `null`），供通讯录展示
 
 ### 4.3 邀请管理
 
@@ -2061,6 +2062,7 @@ Base URL：`/api/client/v1/groups`
 | `/{groupId}/transfer-owner` | POST | 转让群主 |
 | `/{groupId}/members/{targetUserId}/role` | PUT | 设置管理员角色 |
 | `/{groupId}/members/{targetUserId}/mute` | PUT | 设置成员禁言 |
+| `/{groupId}/members/{targetUserId}/alias` | PUT | 设置群内昵称(群备注名)。**2026-06-06 起** |
 
 `GET /{groupId}/members` 响应 `data` 为 `GroupMemberDto[]`，每项字段：
 
@@ -2071,6 +2073,16 @@ Base URL：`/api/client/v1/groups`
 | `avatarUrl` | string? | 头像 |
 | `role` | string | 角色：`owner`、`admin`、`member` |
 | `joinedAt` | DateTimeOffset | 加入时间 |
+| `groupAlias` | string? | **群内昵称(群备注名)**,**2026-06-06 起**。`null`=未设置;展示时**回退到 `displayName`**(即客户端渲染规则为 `groupAlias ?? displayName`)。不影响该用户在其他群/全局的显示名 |
+
+`GET /{groupId}/members` 有**两道独立、叠加生效**的可见性控制，常被混淆，务必区分：
+
+1. **能不能调用此端点（由 `allowMemberViewMemberList` 控制）**：群设置里 `allowMemberViewMemberList=false` 时，普通成员调用直接返回 `403 GROUP_MEMBER_LIST_RESTRICTED`，只有群主 / 群管理员能拉；`=true` 时普通成员才可拉列表。
+2. **拉到列表里能出现谁（B2B 客户隐私隔离，与上面那个开关无关）**：当**请求者本人是客户**（`userType=1`）且**不是群主 / 群管理员**时，返回结果只包含**企业员工（`userType=2`）+ 自己**，**同群的其他客户一律隐藏**——防止客户 A 知道客户 B 也在跟这家企业沟通。这是刻意设计，优先级高于第 1 条开关。
+
+因此：**把 `allowMemberViewMemberList` 打开 ≠ 客户能看到同群其他客户。** 开关放行的只是"查看成员列表这个动作"；"外部客户之间互相不可见"是恒定生效的隔离规则。群主 / 群管理员（含员工管理员）不受第 2 条裁剪，可见完整名册。
+
+> **群内昵称(群备注名)——2026-06-06 起已支持。** `GET /{groupId}/members` 每项新增 `groupAlias`(可空):它是**只在本群展示**的覆盖名,**不影响**该用户的全局 `displayName` 或其在其他群的展示。客户端渲染成员名时用 `groupAlias ?? displayName`。设置端点见下方 `PUT /{groupId}/members/{targetUserId}/alias`。
 
 `POST /{groupId}/transfer-owner` 转让群主请求体：
 
@@ -2105,6 +2117,26 @@ Base URL：`/api/client/v1/groups`
 |---|---|---|---|
 | `muteMode` | short | 是 | 禁言模式：`0=取消禁言`、`1=禁言` |
 | `muteUntil` | DateTimeOffset? | 否 | 禁言截止时间；为 `null` 时表示永久禁言 |
+
+`PUT /{groupId}/members/{targetUserId}/alias` 设置群内昵称(群备注名)请求体：
+
+```json
+{ "alias": "财务-小王" }
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `alias` | string? | 否 | 群内昵称;`null`/空/纯空白=**清除**(回退到 `displayName`)。上限 **64** 字符,超长返回 `400 GROUP_ALIAS_TOO_LONG` |
+
+**谁能改(服务端强制):**
+
+- **本人**:`targetUserId` 传自己的 `userId` → 改自己的群内昵称,只需是本群在群成员。
+- **群主 / 群管理员**:可代改成员的群内昵称。但**管理员不能改另一个管理员或群主的**(`403 GROUP_PERMISSION_DENIED`),只有群主能改管理员的——与"改角色 / 禁言"同款层级约束。
+- 非本群成员 / 已退群成员调用 → `404 GROUP_MEMBER_NOT_FOUND`。
+
+成功响应 `data` 为 `{ groupId, targetUserId, alias }`(`alias` 已规范化:清除时为 `null`)。设置后 `GET /{groupId}/members` 对应成员的 `groupAlias` 即更新。
+
+> 注意:群内昵称是**个人/本群偏好**,**不广播** `group.settings.updated` 实时事件(那个事件只覆盖群设置 / 全员禁言 / 群名群头像变更)。其他成员下次拉成员列表时看到新昵称即可。
 
 #### 群设置与公告
 
@@ -3248,6 +3280,64 @@ Hub 路径：`/ws/client`
 `requireApproval=true` 的群组提交、审批通过、拒绝时,会通过统一总线向**群主/管理员**(申请提交时)或**申请人**(结果通知时)同时下发 push + webhook。当前**不进入 `/ws/client` 实时通道**,仅进入移动端 push、Admin SignalR 和 webhook。
 
 事件类型与 payload 详见 [open-platform.md §12.3](./open-platform.md)。
+
+### 10.10.3 `group.settings.updated`（2026-06-06 新增）
+
+下行事件名：`group.settings.updated`
+
+群管理设置 / 全员禁言 / 群名群头像发生变更时推送。**会话级**事件——服务端按 `conversationId` 扇出给该群**全部在群成员**（`joinState=1`）的 `/ws/client` 在线连接（不含触发变更的操作者本人所在连接以外的设备也会收到，因为这是会话级广播而非"排除发送者"语义）。
+
+触发端点（任一成功后即推送一帧）：
+
+| 端点 | 覆盖字段 |
+|---|---|
+| `PUT /api/client/v1/groups/{groupId}/settings` | 7 项群设置开关（可邀请 / 可改群名 / @所有人 / 看成员列表 / 二维码进群 / 入群审批 / 可互加好友） |
+| `PUT /api/client/v1/groups/{groupId}/mute-mode` | 全员禁言 `muteMode` |
+| `PUT /api/client/v1/groups/{groupId}`（群名/头像） | `title` / `avatarUrl` |
+
+```json
+{
+  "event": "group.settings.updated",
+  "traceId": "01...",
+  "sentAt": "2026-06-06T12:00:00Z",
+  "data": {
+    "conversationId": "019daaaa-0000-7000-0000-000000000099",
+    "operatorUserId": "019daaaa-0000-7000-0000-000000000005",
+    "title": "研发群",
+    "avatarUrl": "https://.../g.png",
+    "muteMode": "normal",
+    "settings": {
+      "allowMemberInvite": true,
+      "allowMemberModifyTitle": false,
+      "allowMemberAtAll": false,
+      "allowMemberViewMemberList": true,
+      "allowQrCodeJoin": true,
+      "requireApproval": false,
+      "allowMemberAddFriend": true
+    },
+    "updatedAt": "2026-06-06T12:00:00Z"
+  }
+}
+```
+
+`data` 字段：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `conversationId` | GUID | 发生变更的群会话 ID |
+| `operatorUserId` | GUID | 执行变更的操作者用户 ID |
+| `title` | string | 变更后的群名（始终回传当前值，空名为 `""`） |
+| `avatarUrl` | string? | 变更后的群头像 URL，未设置为 `null` |
+| `muteMode` | string | 全员禁言模式：`normal` / `all_muted` |
+| `settings` | object | 变更后的完整群设置（字段同 `GET /groups/{groupId}/settings`） |
+| `updatedAt` | DateTimeOffset | 变更时间 |
+
+说明：
+
+- 这是一帧**完整快照**：客户端可以直接用 `data` 覆盖本地群详情缓存，也可以仅把它当作"缓存失效"信号、随后重新拉 `GET /groups/{groupId}` 或 `GET /groups/{groupId}/settings`。
+- **best-effort**：若某连接错过此帧（断线、刚重连等），客户端仍应在进入群设置页 / 进入群聊页 / App 回前台 / WebSocket 重连后主动拉一次群详情兜底。
+- **关键动作（发言、邀请成员、@所有人 等）务必以服务端校验为准**——本帧只用于多端 UI 一致，不替代服务端鉴权。
+- 同一类设置变更**不进入** Webhook / Admin SignalR / 移动端 push（与 `group.join_request.*` 相反）——它纯粹是 `/ws/client` 的多端同步信号。
 
 ### 10.11 `customer_service.assigned`
 

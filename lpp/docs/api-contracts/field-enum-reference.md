@@ -303,6 +303,7 @@
 | `membershipRole` | short | 租户角色：`0=member`、`1=technical`、`2=customer_service`、`3=admin`、`4=owner` |
 | `joinMethod` | short | 入租方式：`0=self`、`1=invite`、`2=approval` |
 | `joinedAt` | datetime? | 入租时间 |
+| `lppId` | string? | **2026-06-04 新增**。对应平台账号的全局唯一 `lpp_id`（绿泡泡号）；未设置时为 `null` |
 
 ### 3.14 `DepartmentDto`
 
