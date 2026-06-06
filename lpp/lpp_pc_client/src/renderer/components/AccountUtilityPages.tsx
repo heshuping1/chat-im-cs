@@ -12,15 +12,18 @@ import {
   Info,
   MessageSquareText,
   Mic,
+  Play,
   PlaySquare,
   Search,
   Tag,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import {
   ApiClient,
   type FavoriteItemDto,
   type FavoriteSummaryDto,
+  type MessageItemDto,
   type PlatformJoinResultDto,
   type PlatformTenant,
   type TenantJoinRequestDto,
@@ -39,6 +42,11 @@ import {
   tenantJoinRequestStatus,
   tenantJoinRequestsPollIntervalMs,
 } from "../spaces/models/tenantJoinReminderModel";
+import { chatMediaItemsFromMessage, type ChatMediaItem } from "../media/domain/mediaMessage";
+import {
+  openMessageMediaFile,
+  openMessageVideoPlayer,
+} from "../messages/runtime/messageMediaActions";
 import { PcAvatar } from "./PcAvatar";
 
 type UtilityNoticeTone = "info" | "success" | "warning" | "error";
@@ -486,6 +494,7 @@ export function FavoritesPage() {
   const authSession = useAuthSession();
   const [category, setCategory] = useState("all");
   const [keyword, setKeyword] = useState("");
+  const [imagePreview, setImagePreview] = useState<{ fileName: string; src: string } | null>(null);
   const summaryQuery = useQuery({
     queryKey: pcQueryKeys.accountFavoritesSummary(authSession?.apiBaseUrl, authSession?.tenantToken),
     enabled: Boolean(authSession),
@@ -508,6 +517,28 @@ export function FavoritesPage() {
   const favorites = normalizeFavorites(favoritesQuery.data);
   const summary = summaryQuery.data;
   const tags = uniqueTags(favorites);
+  const assetBaseUrl = authSession?.apiBaseUrl;
+  const authToken = authSession?.tenantToken;
+
+  const openFavoritePreview = (preview: FavoriteMediaPreview) => {
+    const openUrl = preview.openUrl || preview.previewUrl;
+    if (!openUrl) return;
+    if (preview.kind === "image") {
+      setImagePreview({ fileName: preview.fileName, src: openUrl });
+      return;
+    }
+    const cacheContext = {
+      accountId: authSession?.userId,
+      conversationId: preview.message.conversationId,
+      fileName: preview.fileName,
+    };
+    void openMessageVideoPlayer(preview.message, openUrl, authToken, cacheContext)
+      .then((opened) => {
+        if (!opened) return openMessageMediaFile(preview.message, openUrl, authToken, cacheContext);
+        return undefined;
+      })
+      .catch(() => openMessageMediaFile(preview.message, openUrl, authToken, cacheContext));
+  };
 
   return (
     <main className="module-page account-utility-page">
@@ -566,11 +597,42 @@ export function FavoritesPage() {
         )}
         {favorites.length > 0 && (
           <div className="favorite-page-list">
-            {favorites.map((item) => (
+            {favorites.map((item) => {
+              const mediaPreview = favoriteMediaPreviewFromItem({ assetBaseUrl, item });
+              return (
               <article className="favorite-page-item" key={item.favoriteId || item.messageId}>
-                <span className="favorite-type-icon">
-                  {favoriteIcon(item.messageType || item.favoriteCategory)}
-                </span>
+                {mediaPreview ? (
+                  <button
+                    className="favorite-media-preview"
+                    type="button"
+                    aria-label={t("accountUtility.favorites.previewMedia", {
+                      name: mediaPreview.fileName,
+                    })}
+                    onClick={() => openFavoritePreview(mediaPreview)}
+                  >
+                    {mediaPreview.previewUrl ? (
+                      <img src={mediaPreview.previewUrl} alt={mediaPreview.fileName} loading="lazy" />
+                    ) : (
+                      <span className="favorite-media-placeholder">
+                        {mediaPreview.kind === "video" ? (
+                          <Play size={18} />
+                        ) : (
+                          favoriteIcon(item.messageType || item.favoriteCategory)
+                        )}
+                      </span>
+                    )}
+                    {mediaPreview.kind === "video" && (
+                      <em className="favorite-media-video">
+                        <Play size={11} />
+                        {formatFavoriteMediaDuration(mediaPreview.durationSeconds)}
+                      </em>
+                    )}
+                  </button>
+                ) : (
+                  <span className="favorite-type-icon">
+                    {favoriteIcon(item.messageType || item.favoriteCategory)}
+                  </span>
+                )}
                 <div>
                   <strong>{item.preview || item.conversationTitle || "--"}</strong>
                   <span>
@@ -580,10 +642,37 @@ export function FavoritesPage() {
                   </span>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
+      {imagePreview && (
+        <div
+          className="message-image-preview favorite-image-preview"
+          role="dialog"
+          aria-modal="true"
+          aria-label={imagePreview.fileName}
+          onClick={() => setImagePreview(null)}
+        >
+          <button
+            className="message-image-preview-close"
+            type="button"
+            aria-label={t("accountUtility.favorites.closePreview")}
+            onClick={(event) => {
+              event.stopPropagation();
+              setImagePreview(null);
+            }}
+          >
+            <X size={18} />
+          </button>
+          <img
+            src={imagePreview.src}
+            alt={imagePreview.fileName}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </main>
   );
 }
@@ -645,6 +734,185 @@ function favoriteIcon(type?: string | null) {
   if (normalized.includes("voice") || normalized.includes("audio")) return <Mic size={17} />;
   if (normalized.includes("file")) return <FileText size={17} />;
   return <MessageSquareText size={17} />;
+}
+
+type FavoriteMediaPreview = {
+  durationSeconds?: number;
+  fileName: string;
+  kind: "image" | "video";
+  message: MessageItemDto;
+  openUrl?: string;
+  previewUrl?: string;
+};
+
+function favoriteMediaPreviewFromItem({
+  assetBaseUrl,
+  item,
+}: {
+  assetBaseUrl?: string;
+  item: FavoriteItemDto;
+}): FavoriteMediaPreview | undefined {
+  const message = favoriteItemToMessage(item);
+  const mediaItem = chatMediaItemsFromMessage({ assetBaseUrl, message }).find(
+    (candidate): candidate is ChatMediaItem & { kind: "image" | "video" } =>
+      candidate.kind === "image" || candidate.kind === "video",
+  );
+  if (!mediaItem) return undefined;
+  return {
+    durationSeconds:
+      typeof mediaItem.media?.durationSeconds === "number"
+        ? mediaItem.media.durationSeconds
+        : undefined,
+    fileName: mediaItem.fileName,
+    kind: mediaItem.kind,
+    message,
+    openUrl: mediaItem.localOpenUrl || mediaItem.remoteSourceUrl || mediaItem.sourceUrl,
+    previewUrl:
+      mediaItem.kind === "video"
+        ? mediaItem.posterUrl || mediaItem.localPreviewUrl || mediaItem.sourceUrl || mediaItem.remoteSourceUrl
+        : mediaItem.sourceUrl || mediaItem.localPreviewUrl || mediaItem.remoteSourceUrl,
+  };
+}
+
+function favoriteItemToMessage(item: FavoriteItemDto): MessageItemDto {
+  const record = item as unknown as Record<string, unknown>;
+  const messageType = favoriteMessageType(item, record);
+  return {
+    body: favoriteBodyFromRecord(item, record, messageType),
+    conversationId: item.conversationId,
+    messageId: item.messageId || item.favoriteId,
+    messageType,
+    preview: item.preview ?? "",
+    senderDisplayName: item.senderDisplayName ?? undefined,
+    sentAt: item.favoritedAt ?? undefined,
+  };
+}
+
+function favoriteBodyFromRecord(
+  item: FavoriteItemDto,
+  record: Record<string, unknown>,
+  messageType: string,
+) {
+  const explicitBody =
+    objectField(record, "body") ||
+    objectField(record, "messageBody") ||
+    objectField(record, "contentBody") ||
+    objectField(record, "payload");
+  if (explicitBody) return explicitBody;
+  const mediaRecord =
+    objectField(record, "media") ||
+    objectField(record, "resource") ||
+    objectField(record, "attachment") ||
+    favoriteTopLevelMediaRecord(item, record);
+  if (!mediaRecord) return { text: item.preview ?? "", messageType };
+  if (messageType === "video") return { messageType, video: mediaRecord };
+  if (messageType === "image") return { image: mediaRecord, messageType };
+  return { file: mediaRecord, messageType };
+}
+
+function favoriteMessageType(item: FavoriteItemDto, record: Record<string, unknown>) {
+  const typeText = [
+    item.messageType,
+    item.favoriteCategory,
+    stringValue(record.type),
+    stringValue(record.category),
+    stringValue(record.mimeType),
+    stringValue(record.contentType),
+    stringValue(record.mediaType),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (typeText.includes("video")) return "video";
+  if (typeText.includes("image") || typeText.includes("picture") || typeText.includes("photo")) {
+    return "image";
+  }
+  return item.messageType || item.favoriteCategory || "text";
+}
+
+function favoriteTopLevelMediaRecord(
+  item: FavoriteItemDto,
+  record: Record<string, unknown>,
+) {
+  const url = stringField(
+    record,
+    "url",
+    "resourceUrl",
+    "mediaUrl",
+    "objectUrl",
+    "originalUrl",
+    "downloadUrl",
+    "signedUrl",
+    "fileUrl",
+    "filePath",
+    "uri",
+    "path",
+    "imageUrl",
+    "image_url",
+    "videoUrl",
+    "video_url",
+  );
+  const thumbnailUrl = stringField(
+    record,
+    "thumbnailUrl",
+    "thumbUrl",
+    "previewUrl",
+    "previewPath",
+    "coverUrl",
+    "cover",
+    "thumbnail",
+  );
+  if (!url && !thumbnailUrl) return undefined;
+  return {
+    durationSeconds: numberValue(record.durationSeconds) ?? numberValue(record.duration),
+    fileName:
+      stringField(record, "fileName", "filename", "name", "originalName", "originalFileName") ||
+      item.preview ||
+      item.favoriteId,
+    mimeType: stringField(record, "mimeType", "contentType", "mediaType"),
+    sizeBytes: numberValue(record.sizeBytes) ?? numberValue(record.size) ?? numberValue(record.fileSize),
+    thumbnailUrl,
+    url,
+  };
+}
+
+function formatFavoriteMediaDuration(durationSeconds?: number) {
+  if (!durationSeconds || durationSeconds <= 0) return "";
+  const totalSeconds = Math.round(durationSeconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function objectField(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function stringField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = stringValue(record[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function stringValue(value: unknown) {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text || undefined;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return undefined;
+}
+
+function numberValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return undefined;
 }
 
 function ChevronHint() {

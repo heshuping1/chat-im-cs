@@ -13,6 +13,7 @@ import {
 } from "./MessageComposer";
 import type { ComposerMediaKind } from "../composer/domain/detectComposerMediaKind";
 import { useI18n } from "../i18n/useI18n";
+import type { MentionOption } from "../messages/models/messageComposerModel";
 
 export type { MessageComposerHandle };
 
@@ -27,7 +28,7 @@ export const ChatComposerSurface = forwardRef<
     draftValue?: string;
     dragUpload: boolean;
     enterToSend: boolean;
-    mentionOptions?: Array<{ id: string; label: string }>;
+    mentionOptions?: MentionOption[];
     placeholder?: string;
     screenshotShortcut: ScreenshotShortcut;
     shortcutHints: boolean;

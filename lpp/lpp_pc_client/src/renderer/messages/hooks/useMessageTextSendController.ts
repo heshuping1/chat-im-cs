@@ -44,6 +44,7 @@ import {
 export function useMessageTextSendController({
   activeConversation,
   activeConversationType,
+  canMentionAll,
   enqueueOutgoingTask,
   groupMembers,
   queryClient,
@@ -55,6 +56,7 @@ export function useMessageTextSendController({
 }: {
   activeConversation?: ConversationListItem;
   activeConversationType?: ImConversationType;
+  canMentionAll?: boolean;
   enqueueOutgoingTask: (task: () => Promise<void>) => Promise<void>;
   groupMembers: GroupMemberDto[];
   queryClient: QueryClient;
@@ -133,7 +135,9 @@ export function useMessageTextSendController({
               retryAction.content,
               retryAction.replyToMessageId,
               conversationType === "group"
-                ? extractMentions(retryAction.content, groupMembers)
+                ? extractMentions(retryAction.content, groupMembers, {
+                    includeAll: canMentionAll,
+                  })
                 : [],
               { clientMsgId },
             )
@@ -229,6 +233,7 @@ export function useMessageTextSendController({
     [
       activeConversation,
       activeConversationType,
+      canMentionAll,
       enqueueOutgoingTask,
       groupMembers,
       queryClient,
@@ -343,7 +348,9 @@ export function useMessageTextSendController({
             conversation.conversationId,
             content,
             reply?.messageId,
-            conversationType === "group" ? extractMentions(content, groupMembers) : [],
+            conversationType === "group"
+              ? extractMentions(content, groupMembers, { includeAll: canMentionAll })
+              : [],
             { clientMsgId },
           );
           recordMessageTraceEvent({
@@ -469,6 +476,7 @@ export function useMessageTextSendController({
     [
       activeConversation,
       activeConversationType,
+      canMentionAll,
       enqueueOutgoingTask,
       groupMembers,
       queryClient,

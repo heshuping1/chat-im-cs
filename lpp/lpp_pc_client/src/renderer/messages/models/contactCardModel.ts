@@ -14,11 +14,15 @@ export type ContactCardRelationStatus =
   | "none";
 
 export interface NormalizedContactCard extends ContactCardDto {
+  bio?: string | null;
   lppId?: string | null;
+  signature?: string | null;
+  source?: string | null;
   subtitle?: string;
 }
 
 export interface AnchoredContactCardProfile extends NormalizedContactCard {
+  allowFriendRequest?: boolean;
   x: number;
   y: number;
 }
@@ -51,6 +55,8 @@ export function normalizeContactCard(value: unknown): NormalizedContactCard {
   const mobile = stringField(record, "mobile", "phone", "phoneNumber", "phone_number");
   const email = stringField(record, "email", "mail");
   const lppId = stringField(record, "lppId", "lpp_id", "userNo", "user_no");
+  const signature = stringField(record, "signature", "bio", "statusMessage", "personalSignature");
+  const source = stringField(record, "source", "sourceChannel", "channel", "from");
   const normalized = {
     userId:
       stringField(
@@ -65,6 +71,8 @@ export function normalizeContactCard(value: unknown): NormalizedContactCard {
     displayName,
     avatarUrl: stringField(record, "avatarUrl", "avatar_url", "avatar", "photoUrl") ?? null,
     ...(lppId ? { lppId } : {}),
+    ...(signature ? { signature } : {}),
+    ...(source ? { source } : {}),
     mobile,
     email,
     subtitle: lppId || "个人名片",

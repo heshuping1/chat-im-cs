@@ -29,6 +29,7 @@ export function selectScreenshotRegion(payload: {
       ),
     );
     overlay.setAlwaysOnTop(true, 'screen-saver');
+    overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;

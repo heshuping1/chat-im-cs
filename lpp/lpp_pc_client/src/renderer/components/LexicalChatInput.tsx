@@ -63,6 +63,7 @@ export type LexicalDraftPart = ComposerDocumentPart;
 export type LexicalChatInputHandle = {
   focus: () => void;
   insertText: (text: string) => void;
+  insertMention: (label: string) => void;
   insertAttachments: (attachments: LexicalPendingAttachment[]) => void;
   getSendableParts: () => LexicalSendPart[];
   replaceWithDraftParts: (parts: LexicalDraftPart[]) => void;
@@ -134,6 +135,14 @@ export const LexicalChatInput = forwardRef<
         editor.update(() => {
           ensureRangeSelection();
           $insertNodes([$createTextNode(text)]);
+        });
+        editor.focus();
+      },
+      insertMention: (label) => {
+        const editor = editorRef.current;
+        if (!editor) return;
+        editor.update(() => {
+          insertMentionAtSelection(label);
         });
         editor.focus();
       },
@@ -298,6 +307,35 @@ function insertComposerLineBreak(editor: LexicalEditor) {
     insertLineBreakAtSelection();
   });
   editor.focus();
+}
+
+function insertMentionAtSelection(label: string) {
+  const mentionText = `@${label} `;
+  ensureRangeSelection();
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+    $insertNodes([$createTextNode(mentionText)]);
+    return;
+  }
+
+  const anchor = selection.anchor;
+  const anchorNode = anchor.getNode();
+  if (anchor.type === "text" && $isTextNode(anchorNode)) {
+    const text = anchorNode.getTextContent();
+    const before = text.slice(0, anchor.offset);
+    const after = text.slice(anchor.offset);
+    const nextBefore = before.replace(/(?:^|\s)@([^\s@]*)$/, (match) => {
+      const prefix = match.startsWith(" ") ? " " : "";
+      return `${prefix}${mentionText}`;
+    });
+    if (nextBefore !== before) {
+      anchorNode.setTextContent(`${nextBefore}${after}`);
+      anchorNode.select(nextBefore.length, nextBefore.length);
+      return;
+    }
+  }
+
+  $insertNodes([$createTextNode(mentionText)]);
 }
 
 function ComposerCommandPlugin({

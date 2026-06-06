@@ -6,6 +6,7 @@ import {
   FileText,
   MessageSquarePlus,
   PanelRight,
+  Play,
   Search,
   Star,
   TextCursorInput,
@@ -30,6 +31,11 @@ import {
   messageRenderWindowExpandStep,
 } from "../models/messageListWindowing";
 import { logMessageCenterDiagnostic } from "../diagnostics/message-center-diagnostics";
+import { chatMediaItemsFromMessage, type ChatMediaItem } from "../../media/domain/mediaMessage";
+import {
+  openMessageMediaFile,
+  openMessageVideoPlayer,
+} from "../runtime/messageMediaActions";
 
 export interface MessageListPanelProps {
   accountId?: string;
@@ -54,6 +60,7 @@ export interface MessageListPanelProps {
   multiSelectMode: boolean;
   pendingNewMessageCount: number;
   selectedMessageIds: Set<string>;
+  showGroupMemberNicknames?: boolean;
   emptyText: string;
   unreadJump?: {
     conversationId: string;
@@ -126,6 +133,7 @@ export function MessageListPanel({
   multiSelectMode,
   pendingNewMessageCount,
   selectedMessageIds,
+  showGroupMemberNicknames = true,
   unreadJump,
   onAvatarClick,
   onClearMessageSearch,
@@ -151,9 +159,26 @@ export function MessageListPanel({
 }: MessageListPanelProps) {
   const { t } = useI18n();
   const [expandedOlderCount, setExpandedOlderCount] = useState(0);
+  const [lookupImagePreview, setLookupImagePreview] = useState<{
+    fileName: string;
+    src: string;
+  } | null>(null);
   const lastWindowDiagnosticKeyRef = useRef("");
   const lookupOpen = messageSearchOpen || historyOpen;
   const windowingEnabled = !lookupOpen && !unreadJump;
+  const showMediaLookupPreview = historyFilter === "image" || historyFilter === "video";
+  const lookupMediaGroups = useMemo(
+    () =>
+      showMediaLookupPreview
+        ? groupLookupMediaPreviewItems({
+            assetBaseUrl,
+            filter: historyFilter,
+            messages,
+            todayLabel: t("messages.listPanel.today"),
+          })
+        : [],
+    [assetBaseUrl, historyFilter, messages, showMediaLookupPreview, t],
+  );
   const messageRenderWindow = useMemo(
     () =>
       createMessageRenderWindow({
@@ -167,6 +192,26 @@ export function MessageListPanel({
   useEffect(() => {
     setExpandedOlderCount(0);
   }, [conversation.conversationId, historyOpen, messageSearchOpen, messages.length]);
+
+  const openLookupMediaPreview = (item: LookupMediaPreviewItem) => {
+    const openUrl = item.openUrl || item.previewUrl;
+    if (!openUrl) return;
+    if (item.kind === "image") {
+      setLookupImagePreview({ fileName: item.fileName, src: openUrl });
+      return;
+    }
+    const cacheContext = {
+      accountId,
+      conversationId: conversation.conversationId,
+      fileName: item.fileName,
+    };
+    void openMessageVideoPlayer(item.message, openUrl, authToken, cacheContext)
+      .then((opened) => {
+        if (!opened) return openMessageMediaFile(item.message, openUrl, authToken, cacheContext);
+        return undefined;
+      })
+      .catch(() => openMessageMediaFile(item.message, openUrl, authToken, cacheContext));
+  };
 
   useEffect(() => {
     if (!messageRenderWindow.windowed) return;
@@ -269,16 +314,51 @@ export function MessageListPanel({
           </div>
           {(historyFilter !== "all" || messageSearchKeyword.trim()) && (
             <div className="chat-history-results" aria-label={t("messages.listPanel.resultsAria")}>
-              {messages.slice(0, 8).map((message) => (
-                <button
-                  type="button"
-                  key={message.messageId}
-                  onClick={() => onScrollToMessage(message.messageId)}
-                >
-                  <span>{formatChatTime(message.sentAt)}</span>
-                  <strong>{messageActionPreview(message)}</strong>
-                </button>
-              ))}
+              {showMediaLookupPreview ? (
+                <div className="chat-history-media-results">
+                  {lookupMediaGroups.map((group) => (
+                    <section className="chat-history-media-group" key={group.label}>
+                      <h3>{group.label}</h3>
+                      <div className="chat-history-media-grid">
+                        {group.items.map((item) => (
+                          <button
+                            className="chat-history-media-tile"
+                            type="button"
+                            key={`${item.message.messageId}-${item.index}`}
+                            title={item.fileName}
+                            onClick={() => openLookupMediaPreview(item)}
+                          >
+                            {item.previewUrl ? (
+                              <img src={item.previewUrl} alt={item.fileName} loading="lazy" />
+                            ) : (
+                              <span className="chat-history-media-placeholder">
+                                {item.kind === "video" ? <Play size={22} /> : <FileImage size={22} />}
+                              </span>
+                            )}
+                            {item.kind === "video" && (
+                              <em className="chat-history-media-video">
+                                <Play size={12} />
+                                {formatLookupMediaDuration(item.durationSeconds)}
+                              </em>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                messages.slice(0, 8).map((message) => (
+                  <button
+                    type="button"
+                    key={message.messageId}
+                    onClick={() => onScrollToMessage(message.messageId)}
+                  >
+                    <span>{formatChatTime(message.sentAt)}</span>
+                    <strong>{messageActionPreview(message)}</strong>
+                  </button>
+                ))
+              )}
               {messages.length === 0 && <PanelState text={t("messages.listPanel.noMatches")} />}
             </div>
           )}
@@ -295,6 +375,32 @@ export function MessageListPanel({
         <button className="pc-chat-latest-jump" type="button" onClick={onJumpToLatest}>
           {t("messages.listPanel.newMessages", { count: pendingNewMessageCount })}
         </button>
+      )}
+      {lookupImagePreview && (
+        <div
+          className="message-image-preview chat-lookup-image-preview"
+          role="dialog"
+          aria-modal="true"
+          aria-label={lookupImagePreview.fileName}
+          onClick={() => setLookupImagePreview(null)}
+        >
+          <button
+            className="message-image-preview-close"
+            type="button"
+            aria-label={t("messages.listPanel.closeSearch")}
+            onClick={(event) => {
+              event.stopPropagation();
+              setLookupImagePreview(null);
+            }}
+          >
+            <X size={18} />
+          </button>
+          <img
+            src={lookupImagePreview.src}
+            alt={lookupImagePreview.fileName}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
       )}
       <div className="e-day-divider">{t("messages.listPanel.today")}</div>
       {loading && <PanelState text={t("messages.listPanel.loading")} />}
@@ -371,6 +477,9 @@ export function MessageListPanel({
                   onUploadAction={onUploadAction}
                   senderFallback={senderFallback}
                   senderAvatarUrl={senderAvatarUrl}
+                  showSenderName={
+                    conversation.conversationType !== "group" || showGroupMemberNicknames
+                  }
                   timeText={formatChatMessageTime(message.sentAt)}
                   translationText={messageAnnotations[message.messageId]}
                   viewModel={messageViewModel}
@@ -387,4 +496,87 @@ export function MessageListPanel({
       )}
     </section>
   );
+}
+
+type LookupMediaPreviewItem = {
+  durationSeconds?: number;
+  fileName: string;
+  index: number;
+  kind: "image" | "video";
+  message: MessageItemDto;
+  openUrl?: string;
+  previewUrl?: string;
+};
+
+function groupLookupMediaPreviewItems({
+  assetBaseUrl,
+  filter,
+  messages,
+  todayLabel,
+}: {
+  assetBaseUrl?: string;
+  filter: HistoryFilterKey;
+  messages: MessageItemDto[];
+  todayLabel: string;
+}) {
+  const groups = new Map<string, LookupMediaPreviewItem[]>();
+  messages.forEach((message) => {
+    lookupMediaPreviewItemsFromMessage({ assetBaseUrl, filter, message }).forEach((item) => {
+      const label = lookupMediaDateLabel(message.sentAt, todayLabel);
+      const items = groups.get(label) ?? [];
+      items.push(item);
+      groups.set(label, items);
+    });
+  });
+  return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
+}
+
+function lookupMediaPreviewItemsFromMessage({
+  assetBaseUrl,
+  filter,
+  message,
+}: {
+  assetBaseUrl?: string;
+  filter: HistoryFilterKey;
+  message: MessageItemDto;
+}): LookupMediaPreviewItem[] {
+  return chatMediaItemsFromMessage({ assetBaseUrl, message })
+    .filter((item): item is ChatMediaItem & { kind: "image" | "video" } =>
+      filter === "video" ? item.kind === "video" : item.kind === "image" || item.kind === "video",
+    )
+    .map((item, index) => ({
+      durationSeconds: typeof item.media?.durationSeconds === "number" ? item.media.durationSeconds : undefined,
+      fileName: item.fileName,
+      index,
+      kind: item.kind,
+      message,
+      openUrl: item.localOpenUrl || item.remoteSourceUrl || item.sourceUrl,
+      previewUrl:
+        item.kind === "video"
+          ? item.posterUrl || item.localPreviewUrl || item.sourceUrl || item.remoteSourceUrl
+          : item.sourceUrl || item.localPreviewUrl || item.remoteSourceUrl,
+    }));
+}
+
+function lookupMediaDateLabel(sentAt: string | undefined, todayLabel: string) {
+  if (!sentAt) return todayLabel;
+  const date = new Date(sentAt);
+  if (Number.isNaN(date.getTime())) return formatChatTime(sentAt);
+  const now = new Date();
+  if (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  ) {
+    return todayLabel;
+  }
+  return date.toLocaleDateString();
+}
+
+function formatLookupMediaDuration(durationSeconds?: number) {
+  if (!durationSeconds || durationSeconds <= 0) return "";
+  const totalSeconds = Math.round(durationSeconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }

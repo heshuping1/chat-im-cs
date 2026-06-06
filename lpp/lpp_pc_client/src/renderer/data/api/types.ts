@@ -607,10 +607,14 @@ export interface GroupMemberDto {
   displayName: string;
   groupNickname?: string | null;
   nickname?: string | null;
+  signature?: string | null;
+  bio?: string | null;
   avatarUrl?: string | null;
   role?: string | null;
   memberRole?: string | null;
   isMuted?: boolean;
+  muteUntil?: string | null;
+  muteReason?: string | null;
   joinedAt?: string | null;
 }
 
@@ -619,6 +623,8 @@ export interface GroupDetailDto {
   conversationId?: string;
   title: string;
   avatarUrl?: string | null;
+  groupNickname?: string | null;
+  groupRemark?: string | null;
   ownerUserId?: string | null;
   ownerDisplayName?: string | null;
   memberCount?: number | null;
@@ -630,6 +636,10 @@ export interface GroupDetailDto {
   unreadCount?: number;
   lastMessageSeq?: number;
   lastReadSeq?: number;
+  myGroupNickname?: string | null;
+  nicknameInGroup?: string | null;
+  remark?: string | null;
+  remarkName?: string | null;
   createdAt?: string | null;
 }
 

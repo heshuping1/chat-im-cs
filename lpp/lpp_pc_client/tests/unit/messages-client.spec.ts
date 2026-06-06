@@ -27,6 +27,28 @@ class TestMessagesApiClient extends MessagesApiClient {
   }
 }
 
+class CapturingMessagesApiClient extends MessagesApiClient {
+  requests: Array<{ init: RequestInit; path: string }> = [];
+
+  constructor() {
+    super({
+      baseUrl: "https://api.example.test",
+      tenantToken: "tenant-token",
+      traceId: "test-trace",
+    });
+  }
+
+  override async request<T>(path: string, init: RequestInit = {}) {
+    this.requests.push({ path, init });
+    return {
+      conversationId: "group-1",
+      conversationSeq: 1,
+      messageId: "m1",
+      serverTime: "2026-06-06T00:00:00.000Z",
+    } as T;
+  }
+}
+
 describe("MessagesApiClient", () => {
   beforeEach(() => {
     resetCustomerServiceConversationIndexForTest();
@@ -209,5 +231,26 @@ describe("MessagesApiClient", () => {
       getCustomerServiceConversationIndex("im-conversation-cs-self", testScopeKey)
         ?.overlayUnreadCount,
     ).toBeUndefined();
+  });
+
+  it("sends @all as the standard group mention DTO", async () => {
+    const client = new CapturingMessagesApiClient();
+
+    await client.sendConversationTextMessage("group", "group-1", "@所有人 hi", null, [
+      { type: "all", offset: 0, length: 4 },
+      { type: "user", userId: "u1", offset: 5, length: 6 },
+    ], { clientMsgId: "client-1" });
+
+    expect(client.requests).toHaveLength(1);
+    expect(client.requests[0]?.path).toBe("/api/client/v1/groups/group-1/messages");
+    const body = JSON.parse(`${client.requests[0]?.init.body}`) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("atAll");
+    expect(body).not.toHaveProperty("mentionAll");
+    expect(body).toMatchObject({
+      mentions: [
+        { type: "all", offset: 0, length: 4 },
+        { type: "user", userId: "u1", offset: 5, length: 6 },
+      ],
+    });
   });
 });

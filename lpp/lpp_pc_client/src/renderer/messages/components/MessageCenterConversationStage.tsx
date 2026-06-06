@@ -6,6 +6,7 @@ import type {
   Ref,
   SetStateAction,
 } from "react";
+import { useState } from "react";
 
 import { PanelState } from "../../components/PanelState";
 import { isKnown } from "../../components/CustomerProfileModel";
@@ -24,6 +25,10 @@ import type { ContactItem } from "../../data/types";
 import type { MessageLayoutMode } from "../../data/workspace-ui/workspace-ui-store";
 import { requireApiClient } from "../../data/runtime";
 import { extractActionResultText, type ReplyTarget } from "../models/messageComposerModel";
+import {
+  canMentionAllGroupMembers,
+  normalizeGroupRole,
+} from "../models/groupManagementModel";
 import {
   eventMessageText,
   isMineMessage,
@@ -53,6 +58,7 @@ import type { ContactPickerItem } from "./MessageStartDialogs";
 
 type MessageOverlayProps = ComponentProps<typeof MessageOverlayLayer>;
 type StandaloneProfileProps = ComponentProps<typeof StandaloneConversationInfoView>;
+const groupMemberNicknamePrefsKey = "lpp.pc.groupMemberNicknamePrefs";
 
 export function MessageCenterConversationStage({
   activeConversation,
@@ -140,8 +146,12 @@ export function MessageCenterConversationStage({
   onCreateDirectChat,
   onCreateGroupChat,
   onCreateInviteQr,
+  onOpenCreateGroup,
+  onOpenChatBackgroundSettings,
+  onSubmitConversationComplaint,
   onUpdateCustomerRemark,
   onUpdateCustomerTags,
+  onOpenGroupMemberProfile,
   onSendContactCard,
   onForwardToConversation,
   onFailedMessageClick,
@@ -280,8 +290,12 @@ export function MessageCenterConversationStage({
   onCreateDirectChat: (userId: string) => void;
   onCreateGroupChat: (payload: CreateGroupChatPayload) => void;
   onCreateInviteQr: () => void;
+  onOpenCreateGroup: () => void;
+  onOpenChatBackgroundSettings: () => void;
+  onSubmitConversationComplaint: ComponentProps<typeof StandaloneConversationInfoView>["onSubmitComplaint"];
   onUpdateCustomerRemark?: (remarkName: string) => Promise<void> | void;
   onUpdateCustomerTags?: (tags: string[]) => Promise<void> | void;
+  onOpenGroupMemberProfile?: ComponentProps<typeof MessageProfileDock>["onOpenGroupMemberProfile"];
   onSendContactCard: ComponentProps<typeof MessageDialogsLayer>["onSendContactCard"];
   onForwardToConversation: (targetConversationId: string) => void;
   onFailedMessageClick: (message: MessageItemDto) => void;
@@ -339,6 +353,28 @@ export function MessageCenterConversationStage({
   userAvatarRegistry: UserAvatarRegistry;
   visibleMessages: MessageItemDto[];
 }) {
+  const [groupMemberNicknamePrefs, setGroupMemberNicknamePrefs] = useState<Record<string, boolean>>(
+    () => readGroupMemberNicknamePrefs(),
+  );
+  const activeConversationId = activeConversation?.conversationId;
+  const showGroupMemberNicknames =
+    activeConversationId && activeConversationIsGroup
+      ? groupMemberNicknamePrefs[activeConversationId] !== false
+      : true;
+  const canMentionAll =
+    activeConversationType === "group" &&
+    canMentionAllGroupMembers({
+      role: groupManagement?.role ?? normalizeGroupRole(activeConversation?.myRole),
+      settings: groupManagement?.settings ?? groupManagement?.detail?.settings,
+    });
+  const setShowGroupMemberNicknames = (show: boolean) => {
+    if (!activeConversationId) return;
+    setGroupMemberNicknamePrefs((current) => {
+      const next = { ...current, [activeConversationId]: show };
+      writeGroupMemberNicknamePrefs(next);
+      return next;
+    });
+  };
   const directCustomerHeaderMeta =
     activeConversation && activeConversationType === "direct" && !activeConversationIsGroup
       ? {
@@ -363,6 +399,12 @@ export function MessageCenterConversationStage({
     setHistoryOpen(false);
     setMessageSearchOpen(false);
     setProfileStandaloneOpen(true);
+  };
+  const openMessageLookupFromInfo = () => {
+    setProfileStandaloneOpen(false);
+    setHistoryOpen(true);
+    setMessageSearchOpen(true);
+    setHistoryFilter("all");
   };
 
   return (
@@ -416,9 +458,17 @@ export function MessageCenterConversationStage({
                 profileExtra={profileExtra}
                 profileExtraLoading={profileExtraLoading}
                 profileLoading={profileLoading}
+                showGroupMemberNicknames={showGroupMemberNicknames}
                 userIdentity={unreadIdentity}
+                onShowGroupMemberNicknamesChange={setShowGroupMemberNicknames}
                 onUpdateRemark={onUpdateCustomerRemark}
                 onUpdateTags={onUpdateCustomerTags}
+                onOpenGroupMemberProfile={onOpenGroupMemberProfile}
+                onOpenMessageLookup={openMessageLookupFromInfo}
+                onOpenChatBackgroundSettings={onOpenChatBackgroundSettings}
+                onOpenCreateGroup={onOpenCreateGroup}
+                onConversationAction={handleConversationMenuAction}
+                onSubmitComplaint={onSubmitConversationComplaint}
                 onBack={() => setProfileStandaloneOpen(false)}
               />
             ) : (
@@ -451,6 +501,7 @@ export function MessageCenterConversationStage({
                 multiSelectMode={multiSelectMode}
                 pendingNewMessageCount={pendingNewMessageCount}
                 selectedMessageIds={selectedMessageIds}
+                showGroupMemberNicknames={showGroupMemberNicknames}
                 unreadJump={unreadJump}
                 isMineMessage={(message) => isMineMessage(message, session)}
                 onAvatarClick={handleAvatarClick}
@@ -534,6 +585,7 @@ export function MessageCenterConversationStage({
                 activeConversation={activeConversation}
                 activeConversationDraft={activeConversationDraft}
                 activeConversationType={activeConversationType}
+                canMentionAll={canMentionAll}
                 composerDisabled={composerDisabled}
                 composerHeight={composerHeight}
                 composerPlaceholder={composerDisabledReason}
@@ -643,10 +695,18 @@ export function MessageCenterConversationStage({
           loadingGroupMembers={loadingGroupMembers}
           pinned={messageProfilePinned}
           profilePaneWidth={profilePaneWidth}
+          showGroupMemberNicknames={showGroupMemberNicknames}
           userIdentity={unreadIdentity}
           onDragOverContextPane={onMessageContextDragOver}
           onDragStartContextPane={onMessageContextDragStart}
           onDropContextPane={onMessageContextDrop}
+          onOpenGroupMemberProfile={onOpenGroupMemberProfile}
+          onOpenMessageLookup={openMessageLookupFromInfo}
+          onOpenChatBackgroundSettings={onOpenChatBackgroundSettings}
+          onOpenCreateGroup={onOpenCreateGroup}
+          onConversationAction={handleConversationMenuAction}
+          onSubmitComplaint={onSubmitConversationComplaint}
+          onShowGroupMemberNicknamesChange={setShowGroupMemberNicknames}
           onTogglePin={onToggleMessageProfilePin}
           onResize={setProfilePaneWidth}
         />
@@ -750,4 +810,28 @@ function headerTextValue(value: unknown) {
   if (typeof value !== "string") return undefined;
   const text = value.trim();
   return isKnown(text) ? text : undefined;
+}
+
+function readGroupMemberNicknamePrefs() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(groupMemberNicknamePrefsKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeGroupMemberNicknamePrefs(prefs: Record<string, boolean>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(groupMemberNicknamePrefsKey, JSON.stringify(prefs));
+  } catch {
+    // localStorage can be unavailable in hardened environments; keep the in-memory toggle usable.
+  }
 }

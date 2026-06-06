@@ -22,6 +22,7 @@ export function MessageComposerDock({
   activeConversation,
   activeConversationDraft,
   activeConversationType,
+  canMentionAll,
   composerDisabled,
   composerHeight,
   composerPlaceholder,
@@ -58,6 +59,7 @@ export function MessageComposerDock({
   activeConversation: ConversationListItem;
   activeConversationDraft?: string;
   activeConversationType?: "direct" | "group";
+  canMentionAll?: boolean;
   composerDisabled?: boolean;
   composerHeight: number;
   composerPlaceholder?: string;
@@ -124,7 +126,9 @@ export function MessageComposerDock({
         placeholder={composerPlaceholder}
         draftEditorState={draftEditorState}
         mentionOptions={
-          activeConversationType === "group" ? buildMentionOptions(groupMembers) : []
+          activeConversationType === "group"
+            ? buildMentionOptions(groupMembers, { includeAll: canMentionAll })
+            : []
         }
         screenshotShortcut={screenshotShortcut}
         shortcutHints={shortcutHints}

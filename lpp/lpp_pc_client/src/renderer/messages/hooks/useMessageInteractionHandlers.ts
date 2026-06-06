@@ -10,10 +10,10 @@ import type {
 import type { AuthSession } from "../../data/auth/auth-session";
 import { useI18n } from "../../i18n/useI18n";
 import {
-  buildAvatarProfilePopover,
   buildGroupMemberMap,
   type AvatarProfilePopoverState,
 } from "../models/messageDisplayModel";
+import { groupMemberDisplayName } from "../models/groupManagementModel";
 import {
   normalizeContactCard,
   type AnchoredContactCardProfile,
@@ -39,11 +39,11 @@ type ConversationMenuState = {
 
 const PROFILE_POPOVER_GAP = 12;
 const PROFILE_POPOVER_VIEWPORT_PADDING = 16;
-const AVATAR_PROFILE_POPOVER_SIZE = { width: 320, height: 244 };
 const CONTACT_CARD_PROFILE_POPOVER_SIZE = { width: 340, height: 372 };
 
 export function useMessageInteractionHandlers({
   activeConversation,
+  canAddGroupMemberFriend = true,
   deleteMessages,
   groupMemberMap,
   messageListScrollRegistry,
@@ -59,6 +59,7 @@ export function useMessageInteractionHandlers({
   setNotice,
 }: {
   activeConversation?: ConversationListItem;
+  canAddGroupMemberFriend?: boolean;
   deleteMessages: (messageIds: string[]) => Promise<unknown>;
   groupMemberMap: ReturnType<typeof buildGroupMemberMap>;
   messageListScrollRegistry: {
@@ -121,36 +122,46 @@ export function useMessageInteractionHandlers({
       event.preventDefault();
       event.stopPropagation();
       if (!activeConversation) return;
-      if (activeConversation.conversationType === "group") return;
       setMessageMenu(null);
       setNotice(null);
+      setAvatarProfilePopover(null);
       const rect = event.currentTarget.getBoundingClientRect();
-      setAvatarProfilePopover(
-        buildAvatarProfilePopover({
-          conversation: activeConversation,
-          groupMembers: groupMemberMap,
-          message,
-          mine,
-          profile,
-          profileExtra,
-          session,
-          ...resolveFloatingProfilePosition(rect, {
-            panelHeight: AVATAR_PROFILE_POPOVER_SIZE.height,
-            panelWidth: AVATAR_PROFILE_POPOVER_SIZE.width,
-            preferSide: mine ? "left" : "right",
-          }),
+      const card = buildMessageAvatarContactCard({
+        conversation: activeConversation,
+        groupMemberMap,
+        message,
+        mine,
+        profile,
+        profileExtra,
+        session,
+      });
+      if (!card.userId) {
+        setNotice(t("contacts.notice.cardMissingUserId"));
+        return;
+      }
+      setContactCardProfile({
+        ...normalizeContactCard(card),
+        allowFriendRequest:
+          activeConversation.conversationType === "group" ? canAddGroupMemberFriend : true,
+        ...resolveFloatingProfilePosition(rect, {
+          panelHeight: CONTACT_CARD_PROFILE_POPOVER_SIZE.height,
+          panelWidth: CONTACT_CARD_PROFILE_POPOVER_SIZE.width,
+          preferSide: mine ? "left" : "right",
         }),
-      );
+      });
     },
     [
       activeConversation,
+      canAddGroupMemberFriend,
       groupMemberMap,
       profile,
       profileExtra,
       session,
       setAvatarProfilePopover,
+      setContactCardProfile,
       setMessageMenu,
       setNotice,
+      t,
     ],
   );
 
@@ -216,6 +227,93 @@ export function useMessageInteractionHandlers({
 }
 
 type MessageInteractionTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+function buildMessageAvatarContactCard({
+  conversation,
+  groupMemberMap,
+  message,
+  mine,
+  profile,
+  profileExtra,
+  session,
+}: {
+  conversation: ConversationListItem;
+  groupMemberMap: ReturnType<typeof buildGroupMemberMap>;
+  message: MessageItemDto;
+  mine: boolean;
+  profile?: CustomerProfileCard;
+  profileExtra?: FriendProfileExtraDto;
+  session: AuthSession | null;
+}) {
+  const member = resolveMessageSenderGroupMember(message, groupMemberMap);
+  const userId = mine
+    ? session?.userId || session?.platformUserId || ""
+    : conversation.conversationType === "direct"
+      ? conversation.peerUserId || message.senderUserId || message.fromUserId || message.senderId || ""
+      : member?.userId || message.senderUserId || message.fromUserId || message.senderId || message.senderPlatformUserId || "";
+  const displayName = mine
+    ? session?.displayName || message.senderDisplayName || "Me"
+    : conversation.conversationType === "direct"
+      ? profileExtra?.remarkName ||
+        profileExtra?.displayName ||
+        profile?.displayName ||
+        profile?.customerDisplayName ||
+        profile?.customerName ||
+        message.senderDisplayName ||
+        conversation.title
+      : groupMemberDisplayName(member) || message.senderDisplayName || "Group member";
+  return {
+    userId,
+    displayName,
+    avatarUrl: mine
+      ? session?.avatarUrl
+      : conversation.conversationType === "direct"
+        ? profileExtra?.avatarUrl || profile?.avatarUrl || message.senderAvatarUrl || message.avatarUrl
+        : member?.avatarUrl || message.senderAvatarUrl || message.avatarUrl,
+    lppId: mine
+      ? session?.lppId
+      : conversation.conversationType === "direct"
+        ? profileExtra?.lppId || profile?.lppId || profile?.lppNo || message.senderLppId || message.lppId
+        : member?.lppId || message.senderLppId || message.lppId,
+    signature: mine
+      ? undefined
+      : conversation.conversationType === "direct"
+        ? profileExtra?.signature
+        : member?.signature,
+    bio: mine
+      ? undefined
+      : conversation.conversationType === "direct"
+        ? profileExtra?.bio
+        : member?.bio,
+    source: conversation.conversationType === "group" ? conversation.title : undefined,
+  };
+}
+
+function resolveMessageSenderGroupMember(
+  message: MessageItemDto,
+  groupMemberMap: ReturnType<typeof buildGroupMemberMap>,
+) {
+  for (const key of messageSenderLookupKeys(message)) {
+    const member = groupMemberMap.get(key);
+    if (member) return member;
+  }
+  return undefined;
+}
+
+function messageSenderLookupKeys(message: MessageItemDto) {
+  return [
+    message.senderUserId,
+    message.senderId,
+    message.fromUserId,
+    message.senderPlatformUserId,
+    message.platformUserId,
+    message.senderLppId,
+    message.lppId,
+    message.senderDisplayName,
+  ]
+    .map((value) => `${value ?? ""}`.trim().toLowerCase())
+    .filter(Boolean);
+}
 
 function confirmMessageDangerText(
   action: MessageDangerConfirmAction,

@@ -45,6 +45,45 @@ describe("message list model", () => {
     ]);
   });
 
+  it("hides received videos until the playable source is ready", () => {
+    const pendingVideo = message({
+      messageId: "video-pending",
+      messageType: "video",
+      preview: "clip.mp4",
+      status: "sent",
+      body: {
+        video: {
+          fileName: "clip.mp4",
+          thumbnailUrl: "/covers/clip.jpg",
+          status: "processing",
+        },
+      },
+    });
+    const readyVideo = message({
+      messageId: "video-ready",
+      messageType: "video",
+      preview: "ready.mp4",
+      body: {
+        video: {
+          fileName: "ready.mp4",
+          thumbnailUrl: "/covers/ready.jpg",
+          url: "/video/ready.mp4",
+          status: "completed",
+        },
+      },
+    });
+
+    expect(filterVisibleMessages([pendingVideo, readyVideo], "").map((item) => item.messageId))
+      .toEqual(["video-ready"]);
+    expect(filterVisibleMessages([pendingVideo, readyVideo], "clip")).toEqual([]);
+    expect(filterMessagesByHistory([pendingVideo, readyVideo], "video").map((item) => item.messageId))
+      .toEqual(["video-ready"]);
+    expect(getHistoryFilterCounts([pendingVideo, readyVideo])).toMatchObject({
+      all: 1,
+      video: 1,
+    });
+  });
+
   it("creates compact action previews for media and long text", () => {
     expect(
       messageActionPreview(

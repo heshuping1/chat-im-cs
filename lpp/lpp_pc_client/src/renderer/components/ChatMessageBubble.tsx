@@ -25,6 +25,7 @@ export function ChatMessageBubble({
   mineAvatarUrl,
   mediaCacheContext,
   onUploadAction,
+  showSenderName = true,
   statusText,
   timeText,
   translationText,
@@ -48,6 +49,7 @@ export function ChatMessageBubble({
     conversationId?: string;
   };
   statusText?: string;
+  showSenderName?: boolean;
   timeText: string;
   translationText?: string;
   viewModel?: ChatMessageViewModel;
@@ -136,7 +138,7 @@ export function ChatMessageBubble({
     >
       {!mine && avatar}
       <div className="pc-chat-message-main">
-        {!mine && <div className="pc-chat-sender">{senderName}</div>}
+        {!mine && showSenderName && <div className="pc-chat-sender">{senderName}</div>}
         <div className="pc-chat-bubble-row">
           {sendStatusSlot}
           <div className="pc-chat-bubble">

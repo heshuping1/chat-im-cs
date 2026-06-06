@@ -87,6 +87,7 @@ export function CustomerProfileWorkspace({
   onUpdateTags,
   onDragOver,
   onDrop,
+  profileActions,
   profileActionPending = false,
   profileExtra,
   profile,
@@ -105,6 +106,7 @@ export function CustomerProfileWorkspace({
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
   onDragOver?: (event: DragEvent<HTMLElement>) => void;
   onDrop?: (event: DragEvent<HTMLElement>) => void;
+  profileActions?: ReactNode;
   profileActionPending?: boolean;
   profileExtra?: FriendProfileExtraDto;
   profile?: CustomerProfileCard;
@@ -151,6 +153,7 @@ export function CustomerProfileWorkspace({
         t={t}
       />
       <CustomerStatusChips model={model} t={t} />
+      {profileActions}
 
       {loading && <PanelState text={t("customerProfile.loading")} />}
       {showBlockingError && (

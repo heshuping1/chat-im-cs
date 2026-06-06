@@ -1,6 +1,9 @@
 import type { MediaResourceDto, MessageItemDto } from "../../data/api/types";
 import { normalizeMessageType } from "../../data/im-message-normalize";
-import { messageMediaFileName } from "../../media/domain/mediaMessage";
+import {
+  messageMediaFileName,
+  shouldDisplayMessageMedia,
+} from "../../media/domain/mediaMessage";
 
 export type HistoryFilterKey =
   | "all"
@@ -14,8 +17,9 @@ export type HistoryFilterKey =
 
 export function filterVisibleMessages(messages: MessageItemDto[], keyword: string) {
   const normalized = keyword.trim().toLowerCase();
-  if (!normalized) return messages;
-  return messages.filter((message) =>
+  const displayableMessages = messages.filter((message) => shouldDisplayMessageMedia(message));
+  if (!normalized) return displayableMessages;
+  return displayableMessages.filter((message) =>
     [
       message.preview,
       message.senderDisplayName,
@@ -33,18 +37,20 @@ export function filterMessagesByHistory(
   messages: MessageItemDto[],
   filter: HistoryFilterKey,
 ) {
-  if (filter === "all") return messages;
-  return messages.filter((message) => historyMessageMatches(message, filter));
+  const displayableMessages = messages.filter((message) => shouldDisplayMessageMedia(message));
+  if (filter === "all") return displayableMessages;
+  return displayableMessages.filter((message) => historyMessageMatches(message, filter));
 }
 
 export function getHistoryFilterCounts(messages: MessageItemDto[]) {
+  const displayableMessages = messages.filter((message) => shouldDisplayMessageMedia(message));
   return historyFilterKeys.reduce(
     (counts, key) => ({
       ...counts,
       [key]:
         key === "all"
-          ? messages.length
-          : messages.filter((message) => historyMessageMatches(message, key)).length,
+          ? displayableMessages.length
+          : displayableMessages.filter((message) => historyMessageMatches(message, key)).length,
     }),
     {} as Record<HistoryFilterKey, number>,
   );
@@ -60,7 +66,9 @@ export function historyMessageMatches(message: MessageItemDto, filter: HistoryFi
       (!type && Boolean(message.preview))
     );
   }
-  if (filter === "image") return type.includes("image") || Boolean(body.image);
+  if (filter === "image") {
+    return type.includes("image") || type.includes("video") || Boolean(body.image || body.video);
+  }
   if (filter === "file") return type.includes("file") || Boolean(body.file);
   if (filter === "voice") {
     return type.includes("voice") || type.includes("audio") || Boolean(body.voice || body.audio);

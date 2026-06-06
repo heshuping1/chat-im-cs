@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
-  canTenantRoleBypassAllMute,
   isGroupAllMuted,
   resolveGroupSpeakPermissionGate,
 } from "../../src/renderer/messages/models/groupSpeakPermissionModel";
@@ -11,6 +10,10 @@ import {
 describe("group speak permission model", () => {
   const messageCenterSource = readFileSync(
     resolve(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
+    "utf8",
+  );
+  const speakPermissionModelSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/models/groupSpeakPermissionModel.ts"),
     "utf8",
   );
   const conversationStageSource = readFileSync(
@@ -29,6 +32,10 @@ describe("group speak permission model", () => {
     resolve(process.cwd(), "src/renderer/components/ChatComposerSurface.tsx"),
     "utf8",
   );
+  const zhCnMessagesSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/i18n/messages/zh-CN.ts"),
+    "utf8",
+  );
 
   it("recognizes backend mute-all values", () => {
     expect(isGroupAllMuted("all_muted")).toBe(true);
@@ -38,33 +45,15 @@ describe("group speak permission model", () => {
     expect(isGroupAllMuted(0)).toBe(false);
   });
 
-  it("keeps customers, ordinary members, and technical support read-only in mute-all groups", () => {
-    [0, 1, undefined].forEach((membershipRole) => {
-      expect(
-        resolveGroupSpeakPermissionGate({
-          conversationType: "group",
-          detailLoaded: true,
-          groupRole: "member",
-          membershipRole,
-          muteMode: "all_muted",
-        }),
-      ).toEqual({ disabled: true, reason: "all_muted" });
-    });
-  });
-
-  it("allows customer service, admins, and owners by tenant role", () => {
-    [2, 3, 4].forEach((membershipRole) => {
-      expect(canTenantRoleBypassAllMute(membershipRole)).toBe(true);
-      expect(
-        resolveGroupSpeakPermissionGate({
-          conversationType: "group",
-          detailLoaded: true,
-          groupRole: "member",
-          membershipRole,
-          muteMode: "all_muted",
-        }).disabled,
-      ).toBe(false);
-    });
+  it("keeps non-manager group members read-only in mute-all groups", () => {
+    expect(
+      resolveGroupSpeakPermissionGate({
+        conversationType: "group",
+        detailLoaded: true,
+        groupRole: "member",
+        muteMode: "all_muted",
+      }),
+    ).toEqual({ disabled: true, reason: "all_muted" });
   });
 
   it("allows group owners and group admins under mute-all", () => {
@@ -74,7 +63,6 @@ describe("group speak permission model", () => {
           conversationType: "group",
           detailLoaded: true,
           groupRole: groupRole as "owner" | "admin",
-          membershipRole: 0,
           muteMode: 1,
         }).disabled,
       ).toBe(false);
@@ -87,7 +75,6 @@ describe("group speak permission model", () => {
         conversationType: "group",
         detailLoaded: false,
         groupRole: "member",
-        membershipRole: 0,
         muteMode: "all_muted",
       }).disabled,
     ).toBe(false);
@@ -96,7 +83,6 @@ describe("group speak permission model", () => {
         conversationType: "direct",
         detailLoaded: true,
         groupRole: "member",
-        membershipRole: 0,
         muteMode: "all_muted",
       }).disabled,
     ).toBe(false);
@@ -105,7 +91,6 @@ describe("group speak permission model", () => {
         conversationType: "group",
         detailLoaded: true,
         groupRole: "member",
-        membershipRole: 0,
         muteMode: "normal",
       }).disabled,
     ).toBe(false);
@@ -114,7 +99,10 @@ describe("group speak permission model", () => {
   it("wires the mute-all gate through composer UI and send commands", () => {
     expect(messageCenterSource).toContain("resolveGroupSpeakPermissionGate");
     expect(messageCenterSource).toContain("detailLoaded: Boolean(groupManagement.detail)");
-    expect(messageCenterSource).toContain("membershipRole: session?.membershipRole");
+    expect(speakPermissionModelSource).not.toContain("membershipRole");
+    expect(speakPermissionModelSource).not.toContain("canTenantRoleBypassAllMute");
+    expect(messageCenterSource).not.toContain("resolveTenantMembershipRole(session)");
+    expect(messageCenterSource).not.toContain("membershipRole: tenantMembershipRole");
     expect(messageCenterSource).toContain("sendText: guardedSendText");
     expect(messageCenterSource).toContain("sendMedia: guardedSendMedia");
     expect(messageCenterSource).toContain("sendContactCard: guardedSendContactCard");
@@ -123,6 +111,7 @@ describe("group speak permission model", () => {
     expect(messageCenterSource).toContain("if (groupSpeakPermissionGate.disabled)");
     expect(messageCenterSource).toContain("composerDisabled={groupSpeakPermissionGate.disabled}");
     expect(messageCenterSource).toContain("composerDisabledReason={composerDisabledNotice}");
+    expect(zhCnMessagesSource).toContain("groupAllMutedReadOnly: '已开启仅群主或特定成员可发言'");
 
     expect(conversationStageSource).toContain("composerDisabled?: boolean");
     expect(conversationStageSource).toContain("composerDisabledReason?: string");

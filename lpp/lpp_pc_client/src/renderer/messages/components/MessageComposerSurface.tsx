@@ -7,6 +7,7 @@ import {
 import type { ScreenshotShortcut } from "../../components/MessageComposer";
 import type { ComposerMediaKind } from "../../composer/domain/detectComposerMediaKind";
 import { useI18n } from "../../i18n/useI18n";
+import type { MentionOption } from "../models/messageComposerModel";
 
 export const MessageComposerSurface = forwardRef<
   MessageComposerHandle,
@@ -17,7 +18,7 @@ export const MessageComposerSurface = forwardRef<
     draftValue?: string;
     dragUpload: boolean;
     enterToSend: boolean;
-    mentionOptions: Array<{ id: string; label: string }>;
+    mentionOptions: MentionOption[];
     placeholder?: string;
     screenshotShortcut: ScreenshotShortcut;
     shortcutHints: boolean;

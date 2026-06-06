@@ -8,6 +8,7 @@ import {
   messageVideoPlayerPayload,
   normalizeMediaPart,
   resolveMessageMediaUrl,
+  shouldDisplayVideoMessage,
 } from "../../src/renderer/media/domain/mediaMessage";
 import type { NormalizedMessagePart } from "../../src/renderer/data/im-message-normalize";
 import type { MediaResourceDto } from "../../src/renderer/data/api/types";
@@ -238,6 +239,61 @@ describe("message media action model", () => {
       title: "clip.mp4",
     });
   });
+
+  it("waits for received videos to have a playable source before display", () => {
+    expect(
+      shouldDisplayVideoMessage(
+        {
+          messageId: "m-video-poster-only",
+          messageType: "video",
+          body: {
+            video: {
+              fileName: "clip.mp4",
+              thumbnailUrl: "/covers/clip.jpg",
+              status: "processing",
+            },
+          },
+        } as never,
+        "https://assets.example",
+      ),
+    ).toBe(false);
+
+    expect(
+      shouldDisplayVideoMessage(
+        {
+          messageId: "m-video-ready",
+          messageType: "video",
+          body: {
+            video: {
+              fileName: "clip.mp4",
+              thumbnailUrl: "/covers/clip.jpg",
+              url: "/video/clip.mp4",
+              status: "completed",
+            },
+          },
+        } as never,
+        "https://assets.example",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps local outgoing videos visible while upload controls own the pending state", () => {
+    expect(
+      shouldDisplayVideoMessage({
+        messageId: "m-video-local",
+        localTaskId: "task-video-1",
+        messageType: "video",
+        status: "uploading",
+        body: {
+          video: {
+            fileName: "clip.mp4",
+            localPreviewUrl: "blob:local-video",
+            localPosterUrl: "blob:local-poster",
+          },
+        },
+      } as never),
+    ).toBe(true);
+  });
 });
 
 describe("message media upload presentation", () => {
@@ -395,10 +451,10 @@ describe("message media upload presentation", () => {
     );
 
     expect(conversationInfoPanel).toContain("visibleGroupInfoTabs");
-    expect(conversationInfoPanel).toContain('t(`messages.conversationInfo.tabs.${tab}`)');
-    expect(conversationInfoPanel).toContain("group-member-list");
+    expect(conversationInfoPanel).toContain('t("messages.conversationInfo.tabs.files")');
+    expect(conversationInfoPanel).toContain("group-member-grid");
     expect(conversationInfoPanel).toContain("conversation.memberCount");
-    expect(interactionHandlers).toContain("if (activeConversation.conversationType === \"group\") return;");
+    expect(interactionHandlers).toContain('activeConversation.conversationType === "group" ? canAddGroupMemberFriend : true');
   });
 
   it("keeps video upload progress in the central ring without visible uploading text", () => {
@@ -538,6 +594,7 @@ describe("message media upload presentation", () => {
     expect(imageFrame).toContain('t("media.image.reveal")');
     expect(imageFrame).toContain("message-image-retry");
     expect(mediaParts).toContain("imageActionSrc");
+    expect(mediaParts).toContain("const imageSrc = localImage ? src : displaySrc || src;");
     expect(mediaParts).toContain("copyCurrentMessageImage");
     expect(mediaParts).toContain("saveCurrentMessageImageAs");
     expect(mediaParts).toContain("revealCurrentMessageImageInFolder");

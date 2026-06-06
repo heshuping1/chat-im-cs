@@ -33,22 +33,27 @@ export type MessageGroupManagement = {
   actions: {
     addMembers: (userIds: string[]) => void;
     approveJoinRequest: (requestId: string) => void;
-    createAnnouncement: (content: string, title?: string) => void;
+    createAnnouncement: (content: string, title?: string, isPinned?: boolean) => void;
     deleteAnnouncement: (announcementId: string) => void;
     disbandGroup: () => void;
     leaveGroup: () => void;
     rejectJoinRequest: (requestId: string) => void;
     removeMember: (userId: string) => void;
     setFileFilter: (filter: GroupFileFilter) => void;
-    setMemberMute: (userId: string, muted: boolean) => void;
+    setMemberMute: (
+      userId: string,
+      muted: boolean,
+      options?: { muteUntil?: string | null; reason?: string | null },
+    ) => void;
     setMemberRole: (userId: string, role: "admin" | "member") => void;
-    setMuted: (muted: boolean) => void;
-    setMuteMode: (enabled: boolean) => void;
-    setPinned: (pinned: boolean) => void;
+    setMuted: (muted: boolean) => Promise<void>;
+    setMuteMode: (enabled: boolean) => Promise<void>;
+    setPinned: (pinned: boolean) => Promise<void>;
     transferOwner: (userId: string) => void;
-    updateAnnouncement: (announcementId: string, content: string, title?: string) => void;
-    updateGroupTitle: (title: string) => void;
-    updateSettings: (settings: Partial<GroupSettingsDto>) => void;
+    updateAnnouncement: (announcementId: string, content: string, title?: string, isPinned?: boolean) => void;
+    updateGroupTitle: (title: string) => Promise<void>;
+    updateMyGroupNickname: (nickname: string) => Promise<void>;
+    updateSettings: (settings: Partial<GroupSettingsDto>) => Promise<void>;
   };
 };
 
@@ -144,6 +149,10 @@ export function useMessageGroupManagement({
   const mutate = (action: () => Promise<unknown>, success: string) => {
     pendingMutation.mutate(action, { onSuccess: () => setNotice(success) });
   };
+  const mutateAsync = async (action: () => Promise<unknown>, success: string) => {
+    await pendingMutation.mutateAsync(action);
+    setNotice(success);
+  };
 
   return {
     announcements: announcementsQuery.data ?? [],
@@ -166,9 +175,9 @@ export function useMessageGroupManagement({
         mutate(() => api().addGroupMembers(id(), userIds), t("messages.groupManagement.addMembers")),
       approveJoinRequest: (requestId) =>
         mutate(() => api().approveGroupJoinRequest(id(), requestId), t("messages.groupManagement.approveJoinRequest")),
-      createAnnouncement: (content, title) =>
+      createAnnouncement: (content, title, isPinned) =>
         mutate(
-          () => api().createGroupAnnouncement(id(), { content, title, isPinned: false }),
+          () => api().createGroupAnnouncement(id(), { content, title, isPinned: Boolean(isPinned) }),
           t("messages.groupManagement.createAnnouncement"),
         ),
       deleteAnnouncement: (announcementId) =>
@@ -180,9 +189,14 @@ export function useMessageGroupManagement({
       removeMember: (userId) =>
         mutate(() => api().removeGroupMember(id(), userId), t("messages.groupManagement.removeMember")),
       setFileFilter,
-      setMemberMute: (userId, muted) =>
+      setMemberMute: (userId, muted, options) =>
         mutate(
-          () => api().setGroupMemberMute(id(), userId, { muteMode: muted ? 1 : 0 }),
+          () =>
+            api().setGroupMemberMute(id(), userId, {
+              muteMode: muted ? 1 : 0,
+              muteUntil: muted ? options?.muteUntil ?? null : null,
+              reason: muted ? options?.reason ?? null : null,
+            }),
           muted ? t("messages.groupManagement.memberMuted") : t("messages.groupManagement.memberUnmuted"),
         ),
       setMemberRole: (userId, nextRole) =>
@@ -191,31 +205,36 @@ export function useMessageGroupManagement({
           nextRole === "admin" ? t("messages.groupManagement.setAdmin") : t("messages.groupManagement.unsetAdmin"),
         ),
       setMuted: (muted) =>
-        mutate(
+        mutateAsync(
           () => api().setGroupMuted(id(), muted),
           muted ? t("messages.groupManagement.muted") : t("messages.groupManagement.unmuted"),
         ),
       setMuteMode: (enabled) =>
-        mutate(
+        mutateAsync(
           () => api().setGroupMuteMode(id(), enabled ? 1 : 0),
           enabled ? t("messages.groupManagement.allMuted") : t("messages.groupManagement.allUnmuted"),
         ),
       setPinned: (pinned) =>
-        mutate(
+        mutateAsync(
           () => api().setGroupPinned(id(), pinned),
           pinned ? t("messages.groupManagement.pinned") : t("messages.groupManagement.unpinned"),
         ),
       transferOwner: (userId) =>
         run(() => api().transferGroupOwner(id(), userId), t("messages.groupManagement.transferOwner")),
-      updateAnnouncement: (announcementId, content, title) =>
+      updateAnnouncement: (announcementId, content, title, isPinned) =>
         mutate(
-          () => api().updateGroupAnnouncement(id(), announcementId, { content, title }),
+          () => api().updateGroupAnnouncement(id(), announcementId, { content, title, isPinned }),
           t("messages.groupManagement.updateAnnouncement"),
         ),
       updateGroupTitle: (title) =>
-        mutate(() => api().updateGroupDetail(id(), { title }), t("messages.groupManagement.updateGroupTitle")),
+        mutateAsync(() => api().updateGroupDetail(id(), { title }), t("messages.groupManagement.updateGroupTitle")),
+      updateMyGroupNickname: (nickname) =>
+        mutateAsync(
+          () => api().updateMyGroupNickname(id(), nickname.trim() || null),
+          t("messages.groupManagement.updateMyGroupNickname"),
+        ),
       updateSettings: (settings) =>
-        mutate(() => api().updateGroupSettings(id(), settings), t("messages.groupManagement.updateSettings")),
+        mutateAsync(() => api().updateGroupSettings(id(), settings), t("messages.groupManagement.updateSettings")),
     },
   };
 }

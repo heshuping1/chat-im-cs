@@ -79,7 +79,7 @@ export function ImagePart({
     authToken,
     cacheKey,
   );
-  const imageSrc = localImage ? src : displaySrc;
+  const imageSrc = localImage ? src : displaySrc || src;
   const [localFileSrc, setLocalFileSrc] = useState<string | null>(
     () => getPrefetchedImageFileUrl(cacheKey) ?? null,
   );

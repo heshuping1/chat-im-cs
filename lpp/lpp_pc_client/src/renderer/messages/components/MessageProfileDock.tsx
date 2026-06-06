@@ -1,7 +1,7 @@
 import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { GripVertical, Pin, PinOff } from "lucide-react";
-import type { DragEvent } from "react";
+import type { ComponentProps, DragEvent } from "react";
 import type { ContactItem } from "../../data/types";
 import { useI18n } from "../../i18n/useI18n";
 import { startHorizontalPaneResize } from "../../lib/paneResize";
@@ -25,8 +25,16 @@ export function MessageProfileDock({
   onDragOverContextPane,
   onDragStartContextPane,
   onDropContextPane,
+  onOpenGroupMemberProfile,
+  onOpenMessageLookup,
+  onOpenChatBackgroundSettings,
+  onOpenCreateGroup,
+  onConversationAction,
+  onSubmitComplaint,
+  onShowGroupMemberNicknamesChange,
   onResize,
   onTogglePin,
+  showGroupMemberNicknames = true,
 }: {
   avatarUrl?: string | null;
   contact?: ContactItem | null;
@@ -48,8 +56,16 @@ export function MessageProfileDock({
     event: DragEvent<HTMLElement>,
     pane: "assistant" | "profile",
   ) => void;
+  onOpenGroupMemberProfile?: ComponentProps<typeof ConversationInfoPanel>["onOpenGroupMemberProfile"];
+  onOpenMessageLookup?: ComponentProps<typeof ConversationInfoPanel>["onOpenMessageLookup"];
+  onOpenChatBackgroundSettings?: ComponentProps<typeof ConversationInfoPanel>["onOpenChatBackgroundSettings"];
+  onOpenCreateGroup?: ComponentProps<typeof ConversationInfoPanel>["onOpenCreateGroup"];
+  onConversationAction?: ComponentProps<typeof ConversationInfoPanel>["onConversationAction"];
+  onSubmitComplaint?: ComponentProps<typeof ConversationInfoPanel>["onSubmitComplaint"];
+  onShowGroupMemberNicknamesChange?: ComponentProps<typeof ConversationInfoPanel>["onShowGroupMemberNicknamesChange"];
   onResize: (width: number) => void;
   onTogglePin: () => void;
+  showGroupMemberNicknames?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -104,6 +120,14 @@ export function MessageProfileDock({
         loadingGroupMembers={loadingGroupMembers}
         onDragOver={onDragOverContextPane}
         onDrop={(event) => onDropContextPane(event, "profile")}
+        onOpenGroupMemberProfile={onOpenGroupMemberProfile}
+        onOpenMessageLookup={onOpenMessageLookup}
+        onOpenChatBackgroundSettings={onOpenChatBackgroundSettings}
+        onOpenCreateGroup={onOpenCreateGroup}
+        onConversationAction={onConversationAction}
+        onSubmitComplaint={onSubmitComplaint}
+        onShowGroupMemberNicknamesChange={onShowGroupMemberNicknamesChange}
+        showGroupMemberNicknames={showGroupMemberNicknames}
         userIdentity={userIdentity}
       />
     </>

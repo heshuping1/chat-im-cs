@@ -131,6 +131,24 @@ export function hasOpenableMessageMedia(
   return Boolean(resolveMessageMediaUrl(message, assetBaseUrl));
 }
 
+export function shouldDisplayMessageMedia(
+  message: MessageItemDto,
+  assetBaseUrl?: string,
+) {
+  if (messageMediaKind(message) !== "video") return true;
+  return shouldDisplayVideoMessage(message, assetBaseUrl);
+}
+
+export function shouldDisplayVideoMessage(
+  message: MessageItemDto,
+  assetBaseUrl?: string,
+) {
+  const media = firstMessageMedia(message);
+  if (isLocalVideoMessage(message, media)) return true;
+  if (hasIncompleteVideoStatus(message, media)) return false;
+  return Boolean(resolveVideoPlaybackUrl(media, assetBaseUrl));
+}
+
 export function resolveMessageMediaUrl(
   message: MessageItemDto,
   assetBaseUrl?: string,
@@ -172,6 +190,22 @@ export function resolveMessageMediaUrl(
   } catch {
     return raw;
   }
+}
+
+function resolveVideoPlaybackUrl(
+  media: MediaResourceDto | undefined,
+  assetBaseUrl?: string,
+) {
+  return resolveMediaUrl(
+    media,
+    assetBaseUrl || globalThis.location?.origin,
+    "url",
+    "downloadUrl",
+    "signedUrl",
+    "fileUrl",
+    "uri",
+    "path",
+  );
 }
 
 export function messageMediaActionPayload({
@@ -352,4 +386,82 @@ function messageMediaFallbackName(message: MessageItemDto) {
 function mediaStringField(media: MediaResourceDto | undefined, key: string) {
   const value = (media as Record<string, unknown> | undefined)?.[key];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function isLocalVideoMessage(
+  message: MessageItemDto,
+  media: MediaResourceDto | undefined,
+) {
+  if (message.localTaskId) return true;
+  return Boolean(
+    mediaStringField(media, "localPreviewUrl") ||
+      mediaStringField(media, "localOpenUrl") ||
+      localVideoUrl(mediaStringField(media, "url")),
+  );
+}
+
+function localVideoUrl(value?: string) {
+  return Boolean(value && /^(blob:|data:|file:)/i.test(value));
+}
+
+function hasIncompleteVideoStatus(
+  message: MessageItemDto,
+  media: MediaResourceDto | undefined,
+) {
+  const mediaRecord = media as Record<string, unknown> | undefined;
+  const statuses = [
+    message.status,
+    mediaRecord?.status,
+    mediaRecord?.uploadStatus,
+    mediaRecord?.upload_status,
+    mediaRecord?.processStatus,
+    mediaRecord?.process_status,
+    mediaRecord?.processingStatus,
+    mediaRecord?.processing_status,
+    mediaRecord?.transcodeStatus,
+    mediaRecord?.transcode_status,
+    mediaRecord?.state,
+    mediaRecord?.phase,
+  ];
+  return statuses.some((status) => incompleteVideoStatus(status));
+}
+
+function incompleteVideoStatus(value: unknown) {
+  const normalized = `${value ?? ""}`.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  if (!normalized) return false;
+  if (
+    [
+      "complete",
+      "completed",
+      "done",
+      "ready",
+      "available",
+      "uploaded",
+      "sent",
+      "success",
+      "succeeded",
+      "finished",
+      "ok",
+    ].includes(normalized)
+  ) {
+    return false;
+  }
+  return (
+    normalized.includes("pending") ||
+    normalized.includes("queue") ||
+    normalized.includes("upload") ||
+    normalized.includes("process") ||
+    normalized.includes("transcod") ||
+    normalized.includes("encod") ||
+    normalized.includes("prepar") ||
+    normalized.includes("sending") ||
+    normalized.includes("receiving") ||
+    normalized.includes("downloading") ||
+    normalized === "init" ||
+    normalized === "created" ||
+    normalized === "started" ||
+    normalized === "running" ||
+    normalized === "in_progress" ||
+    normalized === "not_ready"
+  );
 }

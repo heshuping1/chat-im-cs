@@ -57,6 +57,7 @@ export const endpointPlan = {
   groupMessages: "/api/client/v1/groups/{conversationId}/messages",
   groupMembers: "/api/client/v1/groups/{conversationId}/members",
   groupMember: "/api/client/v1/groups/{conversationId}/members/{userId}",
+  groupMyNickname: "/api/client/v1/groups/{conversationId}/members/me/nickname",
   groupTransferOwner: "/api/client/v1/groups/{conversationId}/transfer-owner",
   groupMemberRole: "/api/client/v1/groups/{conversationId}/members/{userId}/role",
   groupMemberMute: "/api/client/v1/groups/{conversationId}/members/{userId}/mute",

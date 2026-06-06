@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createScreenshotSelectionWindowOptions } from "../../src/main/screenshot-selection-window-options";
 import { screenshotSelectorHtml } from "../../src/main/screenshot-selection-template";
 import { videoPlayerHtml } from "../../src/main/video-player-template";
 
@@ -155,9 +156,36 @@ describe("electron html templates", () => {
 
     expect(html).toContain('id="shot"');
     expect(html).toContain('id="draw"');
+    expect(html).toContain('id="sizeBadge"');
     expect(html).toContain('data-action="ok"');
+    expect(html).toContain("rgba(0, 0, 0, .42)");
+    expect(html).toContain("ctx.clearRect(selection.x, selection.y, selection.width, selection.height)");
     expect(html).toContain("window.screenshotSelector.onSource");
     expect(html).toContain("window.screenshotSelector.sendReady");
     expect(html).toContain("window.screenshotSelector.sendResult");
+  });
+
+  it("sizes the screenshot selector window from display bounds", () => {
+    const options = createScreenshotSelectionWindowOptions(
+      {
+        displayBounds: { x: 12, y: 24, width: 1280, height: 720 },
+        displaySize: { width: 2560, height: 1440 },
+      },
+      {
+        result: "desktop:screenshot-selection:test",
+        ready: "desktop:screenshot-selection:test:ready",
+      },
+      "preload.cjs",
+    );
+
+    expect(options.x).toBe(12);
+    expect(options.y).toBe(24);
+    expect(options.width).toBe(1280);
+    expect(options.height).toBe(720);
+    expect(options.hasShadow).toBe(false);
+    expect(options.focusable).toBe(true);
+    expect(options.webPreferences?.additionalArguments).toContain(
+      "--lpp-screenshot-channel=desktop:screenshot-selection:test",
+    );
   });
 });

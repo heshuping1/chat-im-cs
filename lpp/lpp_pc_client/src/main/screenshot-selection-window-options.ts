@@ -14,8 +14,8 @@ export function createScreenshotSelectionWindowOptions(
   return {
     x: payload.displayBounds.x,
     y: payload.displayBounds.y,
-    width: payload.displaySize.width,
-    height: payload.displaySize.height,
+    width: payload.displayBounds.width,
+    height: payload.displayBounds.height,
     show: false,
     frame: false,
     transparent: true,
@@ -24,6 +24,8 @@ export function createScreenshotSelectionWindowOptions(
     movable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
+    focusable: true,
+    hasShadow: false,
     backgroundColor: '#00000000',
     webPreferences: {
       additionalArguments: [

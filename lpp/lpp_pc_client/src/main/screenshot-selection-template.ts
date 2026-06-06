@@ -1,52 +1,177 @@
 export function screenshotSelectorHtml(channel: string, readyChannel: string) {
+  void channel;
+  void readyChannel;
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <style>
-    :root { color-scheme: light; --green: #07c160; --panel: rgba(20, 27, 38, .94); }
-    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; cursor: crosshair; user-select: none; }
-    body { background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; }
-    #shot { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: fill; }
-    #draw { position: fixed; inset: 0; width: 100vw; height: 100vh; }
-    #box { position: fixed; display: none; box-sizing: border-box; border: 1px solid var(--green); outline: 1px solid rgba(255,255,255,.92); background: transparent; cursor: move; box-shadow: 0 0 0 1px rgba(7,193,96,.18); }
-    #toolbar { position: fixed; display: none; z-index: 4; align-items: center; gap: 2px; padding: 5px; border: 1px solid rgba(15,23,42,.15); border-radius: 8px; background: var(--panel); box-shadow: 0 10px 30px rgba(15,23,42,.28); }
-    #hint { position: fixed; left: 50%; bottom: 18px; z-index: 3; transform: translateX(-50%); padding: 6px 10px; border-radius: 999px; background: rgba(15,23,42,.38); color: rgba(255,255,255,.84); font-size: 12px; pointer-events: none; transition: opacity .16s ease; }
-    #textEditor { position: fixed; z-index: 5; min-width: 120px; max-width: 360px; height: 30px; padding: 0 8px; border: 1px solid var(--green); border-radius: 4px; outline: none; background: #fff; color: #111827; font: 14px/30px -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; box-shadow: 0 8px 24px rgba(15,23,42,.22); }
-    .handle { position: absolute; width: 7px; height: 7px; border: 1px solid rgba(255,255,255,.96); border-radius: 999px; background: var(--green); transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
-    .nw { left: 0; top: 0; cursor: nwse-resize; } .n { left: 50%; top: 0; cursor: ns-resize; } .ne { left: 100%; top: 0; cursor: nesw-resize; }
-    .e { left: 100%; top: 50%; cursor: ew-resize; } .se { left: 100%; top: 100%; cursor: nwse-resize; } .s { left: 50%; top: 100%; cursor: ns-resize; }
-    .sw { left: 0; top: 100%; cursor: nesw-resize; } .w { left: 0; top: 50%; cursor: ew-resize; }
-    button { display: grid; width: 32px; height: 30px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: #f8fafc; cursor: pointer; font-size: 15px; font-weight: 600; }
-    button:hover { background: rgba(255,255,255,.13); }
-    button.active { background: rgba(7,193,96,.24); color: #7dffb8; }
-    button.primary { background: var(--green); color: #fff; }
+    :root {
+      color-scheme: light;
+      --wechat-green: #07c160;
+      --panel: rgba(28, 33, 43, .95);
+      --panel-border: rgba(255, 255, 255, .12);
+    }
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      cursor: crosshair;
+      user-select: none;
+    }
+    body {
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    #shot,
+    #draw {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+    #shot {
+      z-index: 0;
+      object-fit: fill;
+    }
+    #draw {
+      z-index: 1;
+      pointer-events: none;
+    }
+    #box {
+      position: fixed;
+      z-index: 2;
+      display: none;
+      box-sizing: border-box;
+      border: 1px solid var(--wechat-green);
+      outline: 1px solid rgba(255, 255, 255, .94);
+      background: transparent;
+      cursor: move;
+      box-shadow: 0 0 0 1px rgba(7, 193, 96, .2), 0 8px 24px rgba(0, 0, 0, .18);
+    }
+    #sizeBadge {
+      position: fixed;
+      z-index: 3;
+      display: none;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: rgba(16, 24, 39, .88);
+      color: #fff;
+      font-size: 12px;
+      line-height: 16px;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
+    #toolbar {
+      position: fixed;
+      z-index: 4;
+      display: none;
+      align-items: center;
+      gap: 2px;
+      padding: 5px;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      background: var(--panel);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .28);
+    }
+    #hint {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 3;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(16, 24, 39, .56);
+      color: rgba(255, 255, 255, .9);
+      font-size: 12px;
+      line-height: 16px;
+      pointer-events: none;
+    }
+    #textEditor {
+      position: fixed;
+      z-index: 5;
+      min-width: 120px;
+      max-width: 360px;
+      height: 30px;
+      padding: 0 8px;
+      border: 1px solid var(--wechat-green);
+      border-radius: 4px;
+      outline: none;
+      background: #fff;
+      color: #111827;
+      font: 14px/30px -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .22);
+    }
+    .handle {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border: 1px solid rgba(255, 255, 255, .96);
+      border-radius: 999px;
+      background: var(--wechat-green);
+      transform: translate(-50%, -50%);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
+    }
+    .nw { left: 0; top: 0; cursor: nwse-resize; }
+    .n { left: 50%; top: 0; cursor: ns-resize; }
+    .ne { left: 100%; top: 0; cursor: nesw-resize; }
+    .e { left: 100%; top: 50%; cursor: ew-resize; }
+    .se { left: 100%; top: 100%; cursor: nwse-resize; }
+    .s { left: 50%; top: 100%; cursor: ns-resize; }
+    .sw { left: 0; top: 100%; cursor: nesw-resize; }
+    .w { left: 0; top: 50%; cursor: ew-resize; }
+    button {
+      display: grid;
+      width: 32px;
+      height: 30px;
+      place-items: center;
+      border: 0;
+      border-radius: 4px;
+      background: transparent;
+      color: #f8fafc;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    button:hover { background: rgba(255, 255, 255, .13); }
+    button.active { background: rgba(7, 193, 96, .24); color: #87ffc0; }
+    button.primary { background: var(--wechat-green); color: #fff; }
     button.primary:hover { background: #06ad56; }
-    .divider { width: 1px; height: 22px; margin: 0 3px; background: rgba(255,255,255,.18); }
+    .divider {
+      width: 1px;
+      height: 22px;
+      margin: 0 3px;
+      background: rgba(255, 255, 255, .18);
+    }
   </style>
 </head>
 <body>
-  <img id="shot" />
+  <img id="shot" alt="" />
   <canvas id="draw"></canvas>
   <div id="box">
     <i class="handle nw" data-handle="nw"></i><i class="handle n" data-handle="n"></i><i class="handle ne" data-handle="ne"></i>
     <i class="handle e" data-handle="e"></i><i class="handle se" data-handle="se"></i><i class="handle s" data-handle="s"></i>
     <i class="handle sw" data-handle="sw"></i><i class="handle w" data-handle="w"></i>
   </div>
-  <div id="toolbar" aria-label="截图编辑工具">
-    <button data-tool="select" title="移动/调整">↕</button>
-    <button data-tool="rect" title="矩形">▭</button>
-    <button data-tool="ellipse" title="圆形">○</button>
-    <button data-tool="arrow" title="箭头">↗</button>
-    <button data-tool="pen" title="画笔">✎</button>
+  <div id="sizeBadge"></div>
+  <div id="toolbar" aria-label="截图工具">
+    <button data-tool="select" title="移动 / 调整">&#8596;</button>
+    <button data-tool="rect" title="矩形">&#9633;</button>
+    <button data-tool="ellipse" title="圆形">&#9711;</button>
+    <button data-tool="arrow" title="箭头">&#8599;</button>
+    <button data-tool="pen" title="画笔">&#9998;</button>
     <button data-tool="text" title="文字">T</button>
-    <button data-tool="mosaic" title="马赛克">▦</button>
+    <button data-tool="mosaic" title="马赛克">&#9638;</button>
     <span class="divider"></span>
-    <button data-action="undo" title="撤销">↶</button>
-    <button data-action="cancel" title="取消">×</button>
-    <button data-action="ok" class="primary" title="完成">✓</button>
+    <button data-action="undo" title="撤销">&#8630;</button>
+    <button data-action="cancel" title="取消">&#215;</button>
+    <button data-action="ok" class="primary" title="完成">&#10003;</button>
   </div>
-  <div id="hint">拖拽框选区域，框选后可标注；Enter 完成，Esc 取消</div>
+  <div id="hint">拖拽框选区域，Enter 完成，Esc 取消</div>
   <script>
     const shot = document.getElementById('shot');
     const draw = document.getElementById('draw');
@@ -54,6 +179,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
     const box = document.getElementById('box');
     const toolbar = document.getElementById('toolbar');
     const hint = document.getElementById('hint');
+    const sizeBadge = document.getElementById('sizeBadge');
     const color = '#07c160';
     let action = null;
     let tool = 'select';
@@ -63,6 +189,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
     let draft = null;
     let annotations = [];
     let textEditor = null;
+
     window.screenshotSelector.onSource((dataUrl) => {
       shot.onload = () => {
         resizeCanvas();
@@ -70,8 +197,15 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       };
       shot.src = dataUrl;
     });
-    function send(value) { window.screenshotSelector.sendResult(value); }
-    function point(event) { return { x: event.clientX, y: event.clientY }; }
+
+    function send(value) {
+      window.screenshotSelector.sendResult(value);
+    }
+
+    function point(event) {
+      return { x: event.clientX, y: event.clientY };
+    }
+
     function imageMetrics() {
       const bounds = shot.getBoundingClientRect();
       const width = Math.max(1, bounds.width);
@@ -85,6 +219,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         scaleY: shot.naturalHeight / height,
       };
     }
+
     function imageCropRect(rect) {
       const metrics = imageMetrics();
       const x = Math.max(metrics.x, Math.min(metrics.x + metrics.width, rect.x));
@@ -100,11 +235,13 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         scaleY: metrics.scaleY,
       };
     }
+
     function normalized(a, b) {
       const x = Math.min(a.x, b.x);
       const y = Math.min(a.y, b.y);
       return { x, y, width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) };
     }
+
     function clampSelection(next) {
       const x = Math.max(0, Math.min(window.innerWidth - 1, next.x));
       const y = Math.max(0, Math.min(window.innerHeight - 1, next.y));
@@ -112,6 +249,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       const height = Math.max(1, Math.min(window.innerHeight - y, next.height));
       return { x, y, width, height };
     }
+
     function resizeRect(handle, origin, delta) {
       let left = origin.x;
       let top = origin.y;
@@ -123,13 +261,20 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       if (handle.indexOf('s') >= 0) bottom += delta.y;
       return normalized({ x: left, y: top }, { x: right, y: bottom });
     }
+
     function insideSelection(p) {
-      return selection && p.x >= selection.x && p.x <= selection.x + selection.width && p.y >= selection.y && p.y <= selection.y + selection.height;
+      return selection &&
+        p.x >= selection.x &&
+        p.x <= selection.x + selection.width &&
+        p.y >= selection.y &&
+        p.y <= selection.y + selection.height;
     }
+
     function setSelection(next) {
       selection = clampSelection(next);
       render();
     }
+
     function resizeCanvas() {
       const ratio = window.devicePixelRatio || 1;
       draw.width = Math.round(window.innerWidth * ratio);
@@ -137,19 +282,38 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       render();
     }
+
     function render() {
+      const hasSelection = selection && selection.width > 3 && selection.height > 3;
       ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, .42)';
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      if (hasSelection) {
+        ctx.clearRect(selection.x, selection.y, selection.width, selection.height);
+      }
+      ctx.restore();
+
       for (const item of annotations) drawAnnotation(ctx, item);
       if (draft) drawAnnotation(ctx, draft);
-      const hasSelection = selection && selection.width > 3 && selection.height > 3;
+
       box.style.display = hasSelection ? 'block' : 'none';
       toolbar.style.display = hasSelection ? 'flex' : 'none';
+      sizeBadge.style.display = hasSelection ? 'block' : 'none';
       hint.style.display = hasSelection ? 'none' : 'block';
       if (!hasSelection) return;
+
       box.style.left = selection.x + 'px';
       box.style.top = selection.y + 'px';
       box.style.width = selection.width + 'px';
       box.style.height = selection.height + 'px';
+
+      const crop = shot.naturalWidth ? imageCropRect(selection) : null;
+      sizeBadge.textContent = crop ? crop.sw + ' x ' + crop.sh : Math.round(selection.width) + ' x ' + Math.round(selection.height);
+      const badgeTop = selection.y > 24 ? selection.y - 24 : selection.y + 6;
+      sizeBadge.style.left = Math.max(8, selection.x) + 'px';
+      sizeBadge.style.top = Math.min(window.innerHeight - 24, Math.max(8, badgeTop)) + 'px';
+
       const toolbarWidth = Math.ceil(toolbar.getBoundingClientRect().width || 372);
       const topBelow = selection.y + selection.height + 9;
       const top = topBelow + 42 > window.innerHeight ? Math.max(8, selection.y - 42) : topBelow;
@@ -157,6 +321,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       toolbar.style.top = top + 'px';
       updateToolbar();
     }
+
     function updateToolbar() {
       for (const button of toolbar.querySelectorAll('button[data-tool]')) {
         button.classList.toggle('active', button.dataset.tool === tool);
@@ -164,6 +329,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       document.body.style.cursor = tool === 'select' ? 'crosshair' : 'copy';
       box.style.cursor = tool === 'select' ? 'move' : 'copy';
     }
+
     function drawAnnotation(context, item) {
       context.save();
       context.strokeStyle = item.color || color;
@@ -195,6 +361,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       }
       context.restore();
     }
+
     function drawArrow(context, x1, y1, x2, y2) {
       const angle = Math.atan2(y2 - y1, x2 - x1);
       const head = 13;
@@ -209,6 +376,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       context.closePath();
       context.fill();
     }
+
     function drawMosaicPreview(context, item) {
       if (shot.naturalWidth) {
         const crop = imageCropRect(item);
@@ -217,17 +385,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         scratch.width = Math.max(1, Math.round(item.width / tile));
         scratch.height = Math.max(1, Math.round(item.height / tile));
         const scratchContext = scratch.getContext('2d');
-        scratchContext.drawImage(
-          shot,
-          crop.sx,
-          crop.sy,
-          crop.sw,
-          crop.sh,
-          0,
-          0,
-          scratch.width,
-          scratch.height,
-        );
+        scratchContext.drawImage(shot, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, scratch.width, scratch.height);
         const previousSmoothing = context.imageSmoothingEnabled;
         context.imageSmoothingEnabled = false;
         context.drawImage(scratch, item.x, item.y, item.width, item.height);
@@ -236,19 +394,12 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         context.strokeRect(item.x, item.y, item.width, item.height);
         return;
       }
-      const step = 8;
       context.save();
       context.fillStyle = 'rgba(7, 193, 96, .18)';
       context.fillRect(item.x, item.y, item.width, item.height);
-      context.strokeStyle = 'rgba(7, 193, 96, .45)';
-      context.lineWidth = 1;
-      for (let x = item.x; x < item.x + item.width; x += step) {
-        for (let y = item.y; y < item.y + item.height; y += step) {
-          if (((x + y) / step) % 2 < 1) context.strokeRect(x, y, step, step);
-        }
-      }
       context.restore();
     }
+
     function makeDraft(startPoint, currentPoint) {
       const shape = normalized(startPoint, currentPoint);
       if (tool === 'rect' || tool === 'ellipse' || tool === 'mosaic') {
@@ -259,6 +410,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       }
       return null;
     }
+
     function startTextEdit(p) {
       commitTextEdit(false);
       const input = document.createElement('input');
@@ -281,6 +433,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       });
       input.addEventListener('blur', () => commitTextEdit(true));
     }
+
     function commitTextEdit(keep) {
       if (!textEditor) return;
       const text = textEditor.node.value.trim();
@@ -293,7 +446,9 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         render();
       }
     }
+
     window.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
       const target = event.target;
       if ((target && target.closest && target.closest('#toolbar')) || (target && target.id === 'textEditor')) return;
       commitTextEdit(true);
@@ -326,8 +481,11 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         return;
       }
       action = 'select';
+      annotations = [];
+      draft = null;
       setSelection({ x: p.x, y: p.y, width: 1, height: 1 });
     });
+
     window.addEventListener('mousemove', (event) => {
       if (!action || !start) return;
       const current = point(event);
@@ -346,6 +504,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         render();
       }
     });
+
     window.addEventListener('mouseup', () => {
       if ((action === 'annotate' || action === 'pen') && draft) {
         const enough =
@@ -358,9 +517,11 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       }
       action = null;
     });
+
     window.addEventListener('dblclick', (event) => {
       if (selection && insideSelection(point(event))) finish();
     });
+
     toolbar.addEventListener('click', (event) => {
       const target = event.target;
       const button = target && target.closest ? target.closest('button') : null;
@@ -382,6 +543,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         finish();
       }
     });
+
     window.addEventListener('keydown', (event) => {
       if (event.target && event.target.id === 'textEditor') return;
       if (event.key === 'Escape') send({ canceled: true });
@@ -391,7 +553,9 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
         render();
       }
     });
+
     window.addEventListener('resize', resizeCanvas);
+
     function finish() {
       commitTextEdit(true);
       if (!selection || selection.width < 3 || selection.height < 3 || !shot.naturalWidth) return;
@@ -400,17 +564,7 @@ export function screenshotSelectorHtml(channel: string, readyChannel: string) {
       canvas.width = crop.sw;
       canvas.height = crop.sh;
       const context = canvas.getContext('2d');
-      context.drawImage(
-        shot,
-        crop.sx,
-        crop.sy,
-        crop.sw,
-        crop.sh,
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      );
+      context.drawImage(shot, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
       context.save();
       context.scale(crop.scaleX, crop.scaleY);
       context.translate(-selection.x, -selection.y);

@@ -15,6 +15,10 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
     "utf8",
   );
+  const messageListModel = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/models/messageListModel.ts"),
+    "utf8",
+  );
   const messageCenter = readFileSync(
     resolve(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
     "utf8",
@@ -79,6 +83,18 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/styles/messages/message-center.css"),
     "utf8",
   );
+  const accountUtilityPages = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/AccountUtilityPages.tsx"),
+    "utf8",
+  );
+  const productPagesCss = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/pages/product-pages.css"),
+    "utf8",
+  );
+  const zhCnMessages = readFileSync(
+    resolve(process.cwd(), "src/renderer/i18n/messages/zh-CN.ts"),
+    "utf8",
+  );
   const contextMenuCss = readFileSync(
     resolve(process.cwd(), "src/renderer/styles/messages/context-menu.css"),
     "utf8",
@@ -114,6 +130,47 @@ describe("message lookup UI", () => {
     expect(listPanel).toContain('t("messages.listPanel.closeSearch")');
     expect(listPanel).toContain("emptyText");
     expect(listPanel).not.toContain("chat-inline-panel");
+  });
+
+  it("previews image and video chat history as a thumbnail grid", () => {
+    expect(listPanel).toContain("chatMediaItemsFromMessage");
+    expect(listPanel).toContain("showMediaLookupPreview");
+    expect(listPanel).toContain("groupLookupMediaPreviewItems");
+    expect(listPanel).toContain("lookupMediaPreviewItemsFromMessage");
+    expect(listPanel).toContain("chat-history-media-results");
+    expect(listPanel).toContain("chat-history-media-grid");
+    expect(listPanel).toContain("chat-history-media-tile");
+    expect(listPanel).toContain("item.posterUrl || item.localPreviewUrl || item.sourceUrl || item.remoteSourceUrl");
+    expect(listPanel).toContain("openLookupMediaPreview(item)");
+    expect(listPanel).toContain("setLookupImagePreview({ fileName: item.fileName, src: openUrl })");
+    expect(listPanel).toContain("openMessageVideoPlayer(item.message, openUrl, authToken, cacheContext)");
+    expect(listPanel).toContain("openMessageMediaFile(item.message, openUrl, authToken, cacheContext)");
+    expect(listPanel).toContain("chat-lookup-image-preview");
+    expect(listPanel).toContain("openUrl: item.localOpenUrl || item.remoteSourceUrl || item.sourceUrl");
+    expect(messageListModel).toContain('filter === "image"');
+    expect(messageListModel).toContain("Boolean(body.image || body.video)");
+    expect(zhCnMessages).toContain("image: '图片与视频'");
+    expect(messageCenterCss).toContain(".chat-history-media-grid");
+    expect(messageCenterCss).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
+    expect(messageCenterCss).toContain(".chat-history-media-tile img");
+    expect(messageCenterCss).toContain(".chat-history-media-video");
+  });
+
+  it("previews favorite images and videos from real media fields", () => {
+    expect(accountUtilityPages).toContain("favoriteMediaPreviewFromItem");
+    expect(accountUtilityPages).toContain("chatMediaItemsFromMessage({ assetBaseUrl, message })");
+    expect(accountUtilityPages).toContain("favorite-media-preview");
+    expect(accountUtilityPages).toContain("setImagePreview({ fileName: preview.fileName, src: openUrl })");
+    expect(accountUtilityPages).toContain("openMessageVideoPlayer(preview.message, openUrl, authToken, cacheContext)");
+    expect(accountUtilityPages).toContain("openMessageMediaFile(preview.message, openUrl, authToken, cacheContext)");
+    expect(accountUtilityPages).toContain("message-image-preview favorite-image-preview");
+    expect(accountUtilityPages).toContain('"imageUrl"');
+    expect(accountUtilityPages).toContain('"videoUrl"');
+    expect(accountUtilityPages).toContain('"thumbnailUrl"');
+    expect(productPagesCss).toContain(".favorite-media-preview");
+    expect(productPagesCss).toContain(".favorite-media-preview img");
+    expect(productPagesCss).toContain(".favorite-media-video");
+    expect(zhCnMessages).toContain("previewMedia: '预览{name}'");
   });
 
   it("renders an empty message list as a centered event notice instead of a regular panel state", () => {

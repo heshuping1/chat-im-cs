@@ -259,6 +259,10 @@ export function buildContactCardProfilePopover({
   const lppId = profile?.lppId || stringField(value, "lppId", "lpp_id", "lppNo", "lppNumber");
   const source = stringField(value, "source", "sourceChannel", "channel", "from");
   const avatarUrl = profile?.avatarUrl || stringField(value, "avatarUrl", "avatar_url", "avatar", "photoUrl");
+  const signature =
+    profile?.signature ||
+    profile?.bio ||
+    stringField(value, "signature", "bio", "statusMessage", "personalSignature");
   return {
     x,
     y,
@@ -266,6 +270,7 @@ export function buildContactCardProfilePopover({
     subtitle: lppId || "个人名片",
     avatarUrl,
     rows: compactProfileRows([
+      ["个性签名", signature],
       ["昵称", title],
       ["绿泡泡号", lppId],
       ["来源", source],

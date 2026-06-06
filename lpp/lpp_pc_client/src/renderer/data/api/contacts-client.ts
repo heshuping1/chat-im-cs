@@ -160,7 +160,16 @@ export class ContactsApiClient extends ProfileApiClient {
     );
   }
 
-  updateGroupDetail(conversationId: string, body: { title?: string; avatarUrl?: string | null }) {
+  updateGroupDetail(
+    conversationId: string,
+    body: {
+      avatarUrl?: string | null;
+      groupNickname?: string | null;
+      myGroupNickname?: string | null;
+      nicknameInGroup?: string | null;
+      title?: string;
+    },
+  ) {
     return this.request<{ groupId?: string }>(
       endpointPlan.groupDetail.replace("{conversationId}", conversationId),
       { method: "PUT", body: JSON.stringify(body) },
@@ -209,13 +218,20 @@ export class ContactsApiClient extends ProfileApiClient {
   setGroupMemberMute(
     conversationId: string,
     userId: string,
-    body: { muteMode: 0 | 1; muteUntil?: string | null },
+    body: { muteMode: 0 | 1; muteUntil?: string | null; reason?: string | null },
   ) {
     return this.request<{ groupId?: string; targetUserId?: string }>(
       endpointPlan.groupMemberMute
         .replace("{conversationId}", conversationId)
         .replace("{userId}", encodeURIComponent(userId)),
       { method: "PUT", body: JSON.stringify(body) },
+    );
+  }
+
+  updateMyGroupNickname(conversationId: string, nickname: string | null) {
+    return this.request<{ groupId?: string; nickname?: string | null }>(
+      endpointPlan.groupMyNickname.replace("{conversationId}", conversationId),
+      { method: "PUT", body: JSON.stringify({ nickname }) },
     );
   }
 

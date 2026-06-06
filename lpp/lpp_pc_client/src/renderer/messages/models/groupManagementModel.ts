@@ -16,7 +16,14 @@ export type GroupManagementPermissions = {
 
 export type GroupInfoVisibilityInput = {
   role: GroupRole;
-  settings?: Pick<GroupSettingsDto, "allowMemberViewMemberList"> | null;
+  settings?: Pick<
+    GroupSettingsDto,
+    | "allowMemberAddFriend"
+    | "allowMemberAtAll"
+    | "allowMemberInvite"
+    | "allowMemberModifyTitle"
+    | "allowMemberViewMemberList"
+  > | null;
 };
 
 export function normalizeGroupRole(role?: string | number | null): GroupRole {
@@ -108,6 +115,25 @@ export function canViewGroupManagement(role: GroupRole) {
 export function canViewGroupMemberList({ role, settings }: GroupInfoVisibilityInput) {
   if (canViewGroupManagement(role)) return true;
   return settings?.allowMemberViewMemberList !== false;
+}
+
+export function canModifyGroupTitle({ role, settings }: GroupInfoVisibilityInput) {
+  if (canViewGroupManagement(role)) return true;
+  return settings?.allowMemberModifyTitle === true;
+}
+
+export function canInviteGroupMembers({ role, settings }: GroupInfoVisibilityInput) {
+  if (canViewGroupManagement(role)) return true;
+  return settings?.allowMemberInvite === true;
+}
+
+export function canAddGroupMemberFriend({ role, settings }: GroupInfoVisibilityInput) {
+  if (canViewGroupManagement(role)) return true;
+  return settings?.allowMemberAddFriend !== false;
+}
+
+export function canMentionAllGroupMembers({ settings }: GroupInfoVisibilityInput) {
+  return settings?.allowMemberAtAll === true;
 }
 
 export function visibleGroupInfoTabs(input: GroupInfoVisibilityInput): GroupInfoTabKey[] {

@@ -60,6 +60,7 @@ import {
   captureScreenshotFile,
   isCaptureScreenshotCancelError,
 } from "../messages/runtime/screenshotCapture";
+import type { MentionOption } from "../messages/models/messageComposerModel";
 
 export type { ScreenshotShortcut };
 
@@ -87,7 +88,7 @@ type MessageComposerProps = {
   showDefaultQuickReplyTool?: boolean;
   draftValue?: string;
   draftEditorState?: string;
-  mentionOptions?: Array<{ id: string; label: string }>;
+  mentionOptions?: MentionOption[];
   onResizeStart?: (event: ReactPointerEvent<HTMLElement>) => void;
   onDraftChange?: (value: string) => void;
   onDraftPreviewChange?: (value: string) => void;
@@ -142,7 +143,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   const [lexicalAttachmentsByScope, setLexicalAttachmentsByScope] = useState<
     Record<string, LexicalPendingAttachment[]>
   >({});
-  const [richHasText, setRichHasText] = useState(false);
+  const [, setRichHasText] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<PendingAttachment | null>(
     null,
   );
@@ -524,7 +525,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
 
   const insertMention = (label: string) => {
     if (compactComposer) {
-      lexicalInputRef.current?.insertText(`@${label} `);
+      lexicalInputRef.current?.insertMention(label);
       return;
     }
     const textarea = textareaRef.current;

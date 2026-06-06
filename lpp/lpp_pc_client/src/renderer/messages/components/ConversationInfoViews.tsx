@@ -1,5 +1,5 @@
 import { ChevronLeft, X } from "lucide-react";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 
 import { PcAvatar } from "../../components/PcAvatar";
 import type {
@@ -36,6 +36,13 @@ export function StandaloneConversationInfoView({
   loadingGroupMembers,
   onUpdateRemark,
   onUpdateTags,
+  onOpenGroupMemberProfile,
+  onOpenMessageLookup,
+  onOpenChatBackgroundSettings,
+  onOpenCreateGroup,
+  onConversationAction,
+  onSubmitComplaint,
+  onShowGroupMemberNicknamesChange,
   onBack,
   profile,
   profileActionPending = false,
@@ -43,6 +50,7 @@ export function StandaloneConversationInfoView({
   profileExtra,
   profileExtraLoading = false,
   profileLoading = false,
+  showGroupMemberNicknames = true,
   userIdentity,
 }: {
   avatarUrl?: string | null;
@@ -55,6 +63,13 @@ export function StandaloneConversationInfoView({
   loadingGroupMembers: boolean;
   onUpdateRemark?: (remarkName: string) => Promise<void> | void;
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
+  onOpenGroupMemberProfile?: ComponentProps<typeof ConversationInfoPanel>["onOpenGroupMemberProfile"];
+  onOpenMessageLookup?: ComponentProps<typeof ConversationInfoPanel>["onOpenMessageLookup"];
+  onOpenChatBackgroundSettings?: ComponentProps<typeof ConversationInfoPanel>["onOpenChatBackgroundSettings"];
+  onOpenCreateGroup?: ComponentProps<typeof ConversationInfoPanel>["onOpenCreateGroup"];
+  onConversationAction?: ComponentProps<typeof ConversationInfoPanel>["onConversationAction"];
+  onSubmitComplaint?: ComponentProps<typeof ConversationInfoPanel>["onSubmitComplaint"];
+  onShowGroupMemberNicknamesChange?: ComponentProps<typeof ConversationInfoPanel>["onShowGroupMemberNicknamesChange"];
   onBack: () => void;
   profile?: CustomerProfileCard;
   profileActionPending?: boolean;
@@ -62,6 +77,7 @@ export function StandaloneConversationInfoView({
   profileExtra?: FriendProfileExtraDto;
   profileExtraLoading?: boolean;
   profileLoading?: boolean;
+  showGroupMemberNicknames?: boolean;
   userIdentity?: CurrentUserIdentity | null;
 }) {
   const { t } = useI18n();
@@ -94,12 +110,20 @@ export function StandaloneConversationInfoView({
         loadingGroupMembers={loadingGroupMembers}
         onUpdateRemark={onUpdateRemark}
         onUpdateTags={onUpdateTags}
+        onOpenGroupMemberProfile={onOpenGroupMemberProfile}
+        onOpenMessageLookup={onOpenMessageLookup}
+        onOpenChatBackgroundSettings={onOpenChatBackgroundSettings}
+        onOpenCreateGroup={onOpenCreateGroup}
+        onConversationAction={onConversationAction}
+        onSubmitComplaint={onSubmitComplaint}
+        onShowGroupMemberNicknamesChange={onShowGroupMemberNicknamesChange}
         profile={profile}
         profileActionPending={profileActionPending}
         profileError={profileError}
         profileExtra={profileExtra}
         profileExtraLoading={profileExtraLoading}
         profileLoading={profileLoading}
+        showGroupMemberNicknames={showGroupMemberNicknames}
         userIdentity={userIdentity}
       />
     </section>
@@ -201,6 +225,7 @@ export function ContactCardProfileDialog({
     y: card.y,
   });
   const title = cardProfile.title;
+  const canSendFriendRequest = card.allowFriendRequest !== false;
 
   return (
     <aside
@@ -245,7 +270,7 @@ export function ContactCardProfileDialog({
           {t("messages.conversationViews.profilePrivacyHint")}
         </p>
       )}
-      {relation.status === "none" && (
+      {relation.status === "none" && canSendFriendRequest && (
         <label className="contact-card-profile-request">
           <span>{t("messages.conversationViews.verificationMessage")}</span>
           <textarea
@@ -274,7 +299,7 @@ export function ContactCardProfileDialog({
             </button>
           </>
         )}
-        {relation.status === "none" && (
+        {relation.status === "none" && canSendFriendRequest && (
           <button
             className="primary"
             type="button"

@@ -17,6 +17,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { readdir } from 'node:fs/promises';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import type {
   AppLogPayload,
   ApiTrafficDiagnosticPayload,
@@ -78,6 +79,7 @@ const appIconPath = app.isPackaged
 const devDockIconPath = join(__dirname, '../../assets/app-icon-green-bubble.png');
 const appDisplayName = 'lppchat';
 const isSandboxedElectronAutomation = Boolean(process.env.LPP_PC_USER_DATA_ROOT);
+const screenshotRequestWindowHideDelayMs = 140;
 app.setName(appDisplayName);
 if (isSandboxedElectronAutomation) {
   app.disableHardwareAcceleration();
@@ -335,14 +337,23 @@ handleDesktopIpc('openAppProfile', async (_event, profileId?: string) => {
   openProfileInstance(nextProfileId);
 });
 
-handleDesktopIpc('captureScreenshot', async () => {
+handleDesktopIpc('captureScreenshot', async (event) => {
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const width = Math.round(display.size.width * display.scaleFactor);
   const height = Math.round(display.size.height * display.scaleFactor);
   const permissionStatus = process.platform === 'darwin'
     ? systemPreferences.getMediaAccessStatus('screen')
     : undefined;
+  const requestWindow = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+  const shouldRestoreRequestWindow =
+    Boolean(requestWindow && !requestWindow.isDestroyed() && requestWindow.isVisible());
+  const shouldRefocusRequestWindow =
+    Boolean(shouldRestoreRequestWindow && requestWindow?.isFocused());
   try {
+    if (shouldRestoreRequestWindow && requestWindow && !requestWindow.isDestroyed()) {
+      requestWindow.hide();
+      await delay(screenshotRequestWindowHideDelayMs);
+    }
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width, height },
@@ -355,6 +366,15 @@ handleDesktopIpc('captureScreenshot', async () => {
     );
   } catch (error) {
     throw normalizeScreenshotCaptureError(error, permissionStatus);
+  } finally {
+    if (shouldRestoreRequestWindow && requestWindow && !requestWindow.isDestroyed()) {
+      if (shouldRefocusRequestWindow) {
+        requestWindow.show();
+        requestWindow.focus();
+      } else {
+        requestWindow.showInactive();
+      }
+    }
   }
 });
 

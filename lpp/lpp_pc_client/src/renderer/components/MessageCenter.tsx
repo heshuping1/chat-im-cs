@@ -4,6 +4,7 @@ import type { DragEvent } from "react";
 import { GripVertical } from "lucide-react";
 import type {
   ConversationListItem,
+  GroupMemberDto,
   KnowledgeInsertPayload,
   MessageItemDto,
   QuickReplyInsertPayload,
@@ -97,10 +98,16 @@ import {
 import { buildUserAvatarRegistry } from "../messages/models/userAvatarRegistry";
 import type { ReplyTarget } from "../messages/models/messageComposerModel";
 import {
+  canAddGroupMemberFriend,
+  canMentionAllGroupMembers,
+} from "../messages/models/groupManagementModel";
+import {
   normalizeContactCard,
   type AnchoredContactCardProfile,
 } from "../messages/models/contactCardModel";
-import { resolveGroupSpeakPermissionGate } from "../messages/models/groupSpeakPermissionModel";
+import {
+  resolveGroupSpeakPermissionGate,
+} from "../messages/models/groupSpeakPermissionModel";
 import { contactCardActionErrorText } from "../messages/presentation/contactCardActionNotice";
 import { clampComposerHeight } from "../messages/models/messageComposerLayoutModel";
 import {
@@ -147,6 +154,9 @@ type MessageAssistantPane = "knowledge" | "quickReply" | null;
 type MessageContextPaneOrder = "assistant" | "profile";
 const messageProfilePinStorageKey = "lpp_pc_message_profile_pinned";
 const messageContextOrderStorageKey = "lpp_pc_message_context_order";
+const GROUP_MEMBER_CONTACT_CARD_SIZE = { width: 340, height: 372 };
+const GROUP_MEMBER_CONTACT_CARD_GAP = 12;
+const GROUP_MEMBER_CONTACT_CARD_PADDING = 16;
 
 function messageAssistantPaneLabel(
   pane: Exclude<MessageAssistantPane, null>,
@@ -399,7 +409,6 @@ export function MessageCenter() {
         conversationType: activeConversationType,
         detailLoaded: Boolean(groupManagement.detail),
         groupRole: groupManagement.role,
-        membershipRole: session?.membershipRole,
         muteMode: groupManagement.detail?.muteMode,
       }),
     [
@@ -407,13 +416,24 @@ export function MessageCenter() {
       groupManagement.detail,
       groupManagement.detail?.muteMode,
       groupManagement.role,
-      session?.membershipRole,
     ],
   );
   const composerDisabledNotice =
     groupSpeakPermissionGate.reason === "all_muted"
       ? t("messages.center.groupAllMutedReadOnly")
       : undefined;
+  const canMentionAll =
+    activeConversationType === "group" &&
+    canMentionAllGroupMembers({
+      role: groupManagement.role,
+      settings: groupManagement.settings ?? groupManagement.detail?.settings,
+    });
+  const canAddCurrentGroupMemberFriend =
+    activeConversationType !== "group" ||
+    canAddGroupMemberFriend({
+      role: groupManagement.role,
+      settings: groupManagement.settings ?? groupManagement.detail?.settings,
+    });
   const notifyComposerBlocked = useCallback(() => {
     if (!composerDisabledNotice) return;
     setNotice(composerDisabledNotice);
@@ -448,6 +468,30 @@ export function MessageCenter() {
     setContactCardProfile,
     setNotice,
   });
+  const handleGroupMemberProfileOpen = useCallback(
+    (target: HTMLElement, member: GroupMemberDto, options?: { canAddFriend?: boolean }) => {
+      if (!member.userId) return;
+      setAvatarProfilePopover(null);
+      setConversationMenu(null);
+      setMessageMenu(null);
+      setNotice(null);
+      const rect = target.getBoundingClientRect();
+      setContactCardProfile({
+        ...normalizeContactCard({
+          userId: member.userId,
+          displayName: groupMemberContactCardName(member),
+          avatarUrl: member.avatarUrl,
+          lppId: member.lppId,
+          signature: member.signature,
+          bio: member.bio,
+          source: activeConversation?.title,
+        }),
+        allowFriendRequest: options?.canAddFriend ?? canAddCurrentGroupMemberFriend,
+        ...resolveGroupMemberContactCardPosition(rect),
+      });
+    },
+    [activeConversation?.title, canAddCurrentGroupMemberFriend],
+  );
 
   const {
     createDirectChatMutation,
@@ -710,6 +754,7 @@ export function MessageCenter() {
   } = useMessageTextSendController({
     activeConversation,
     activeConversationType,
+    canMentionAll,
     enqueueOutgoingTask,
     groupMembers: groupMembersQuery.data ?? [],
     queryClient,
@@ -923,6 +968,38 @@ export function MessageCenter() {
     setNotice(t("messages.center.quickReplyInserted"));
     requestAnimationFrame(() => composerRef.current?.focus());
   }, [groupSpeakPermissionGate.disabled, notifyComposerBlocked, t]);
+  const submitConversationComplaint = useCallback(
+    async (conversation: ConversationListItem, content: string) => {
+      if (!session) {
+        setNotice(t("messages.conversationInfo.complaintLoginRequired"));
+        return;
+      }
+      try {
+        await requireApiClient(session).submitFeedback({
+          type: "complaint",
+          title: t("messages.conversationInfo.complaintTitle", {
+            title: conversation.title,
+          }),
+          content,
+          diagnosticsIncluded: true,
+          clientContext: {
+            source: "pc-conversation-info",
+            conversationId: conversation.conversationId,
+            conversationType: conversation.conversationType,
+            title: conversation.title,
+          },
+        });
+        setNotice(t("messages.conversationInfo.complaintSubmitted"));
+      } catch (error) {
+        setNotice(
+          t("messages.conversationInfo.complaintFailed", {
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
+    },
+    [session, t],
+  );
 
   const {
     handleAvatarClick,
@@ -934,6 +1011,7 @@ export function MessageCenter() {
     scrollToMessage,
   } = useMessageInteractionHandlers({
     activeConversation,
+    canAddGroupMemberFriend: canAddCurrentGroupMemberFriend,
     deleteMessages: batchDeleteMutation.mutateAsync,
     groupMemberMap,
     messageListScrollRegistry,
@@ -1201,8 +1279,12 @@ export function MessageCenter() {
         onCreateDirectChat={(userId) => createDirectChatMutation.mutate(userId)}
         onCreateGroupChat={(payload) => createGroupChatMutation.mutate(payload)}
         onCreateInviteQr={() => createInviteQrMutation.mutate()}
+        onOpenCreateGroup={() => setComposerDialog("group")}
+        onOpenChatBackgroundSettings={() => setActiveModule("settings")}
+        onSubmitConversationComplaint={submitConversationComplaint}
         onUpdateCustomerRemark={contactProfileController.updateCustomerRemark}
         onUpdateCustomerTags={contactProfileController.updateCustomerTags}
+        onOpenGroupMemberProfile={handleGroupMemberProfileOpen}
         onSendContactCard={async (contact) => {
           if (groupSpeakPermissionGate.disabled) {
             notifyComposerBlocked();
@@ -1379,4 +1461,47 @@ function confirmMessageDanger(
     count,
     message: t(descriptor.key, descriptor.params),
   });
+}
+
+function groupMemberContactCardName(member: GroupMemberDto) {
+  const groupNickname = `${member.groupNickname ?? ""}`.trim();
+  const accountNickname =
+    `${member.nickname ?? ""}`.trim() ||
+    `${member.displayName ?? ""}`.trim() ||
+    `${(member as unknown as Record<string, unknown>).name ?? ""}`.trim() ||
+    `${(member as unknown as Record<string, unknown>).userName ?? ""}`.trim();
+  if (groupNickname && accountNickname && groupNickname !== accountNickname) {
+    return `${groupNickname} / ${accountNickname}`;
+  }
+  return groupNickname || accountNickname || member.userId;
+}
+
+function resolveGroupMemberContactCardPosition(anchor: DOMRect) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const spaceRight = viewportWidth - anchor.right - GROUP_MEMBER_CONTACT_CARD_PADDING;
+  const spaceLeft = anchor.left - GROUP_MEMBER_CONTACT_CARD_PADDING;
+  const side = spaceRight >= GROUP_MEMBER_CONTACT_CARD_SIZE.width || spaceRight >= spaceLeft ? "right" : "left";
+  const rawX =
+    side === "right"
+      ? anchor.right + GROUP_MEMBER_CONTACT_CARD_GAP
+      : anchor.left - GROUP_MEMBER_CONTACT_CARD_SIZE.width - GROUP_MEMBER_CONTACT_CARD_GAP;
+  const rawY = anchor.top + anchor.height / 2 - GROUP_MEMBER_CONTACT_CARD_SIZE.height / 2;
+  return {
+    x: clampGroupMemberContactCard(
+      rawX,
+      GROUP_MEMBER_CONTACT_CARD_PADDING,
+      viewportWidth - GROUP_MEMBER_CONTACT_CARD_SIZE.width - GROUP_MEMBER_CONTACT_CARD_PADDING,
+    ),
+    y: clampGroupMemberContactCard(
+      rawY,
+      GROUP_MEMBER_CONTACT_CARD_PADDING,
+      viewportHeight - GROUP_MEMBER_CONTACT_CARD_SIZE.height - GROUP_MEMBER_CONTACT_CARD_PADDING,
+    ),
+  };
+}
+
+function clampGroupMemberContactCard(value: number, min: number, max: number) {
+  if (max < min) return min;
+  return Math.max(min, Math.min(value, max));
 }

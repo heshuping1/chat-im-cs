@@ -41,6 +41,9 @@ import {
 import { normalizeMessageBatchActionResult } from "../message/message-batch-action-result";
 
 export type MediaUploadOptions = UploadRequestOptions;
+export type MessageMentionPayload =
+  | { type: "all"; offset: number; length: number }
+  | { type: "user"; userId: string; offset: number; length: number };
 
 export class MessagesApiClient extends ContactsApiClient {
   getConversations(params: { limit?: number; cursor?: string } = {}) {
@@ -146,7 +149,7 @@ export class MessagesApiClient extends ContactsApiClient {
     conversationId: string,
     text: string,
     replyToMessageId?: string | null,
-    mentions: Array<{ userId?: string; displayName?: string }> = [],
+    mentions: MessageMentionPayload[] = [],
     options: { clientMsgId?: string } = {},
   ) {
     return this.sendConversationMessage(conversationType, conversationId, "text", {
@@ -389,7 +392,7 @@ export class MessagesApiClient extends ContactsApiClient {
     messageType: "text" | "image" | "video" | "file" | "contact_card",
     body: Record<string, unknown>,
     replyToMessageId?: string | null,
-    mentions: Array<{ userId?: string; displayName?: string }> = [],
+    mentions: MessageMentionPayload[] = [],
     options: { clientMsgId?: string } = {},
   ) {
     const base =
