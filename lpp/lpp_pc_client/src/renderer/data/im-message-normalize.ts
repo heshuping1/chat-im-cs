@@ -474,7 +474,7 @@ function mentionArray(value: unknown) {
     const record = asRecord(item);
     if (!record) return;
     const userId = stringField(record, "userId", "platformUserId", "memberId", "id");
-    const displayName = stringField(record, "displayName", "groupNickname", "nickname", "name");
+    const displayName = stringField(record, "groupAlias", "displayName", "groupNickname", "nickname", "name");
     if (!userId && !displayName) return;
     mentions.push({
       ...(userId ? { userId } : {}),

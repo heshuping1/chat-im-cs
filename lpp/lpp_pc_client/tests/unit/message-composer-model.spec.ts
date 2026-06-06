@@ -40,9 +40,9 @@ describe("messageComposerModel", () => {
 
   it("builds mention options and extracts mentioned members", () => {
     const members = [
-      { userId: "u1", displayName: "Alice", groupNickname: "A-one" },
+      { userId: "u1", displayName: "Alice", groupAlias: "A-one" },
       { platformUserId: "p2", displayName: "Bob" },
-      { userId: "u3", displayName: "Owner", groupNickname: "@mouse所有者" },
+      { userId: "u3", displayName: "Owner", groupAlias: "@mouse所有者" },
     ] as GroupMemberDto[];
 
     expect(buildMentionOptions(members)).toEqual([

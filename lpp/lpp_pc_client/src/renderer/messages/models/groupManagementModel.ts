@@ -50,9 +50,10 @@ export function groupMemberRoleRank(member: GroupMemberDto) {
 export function groupMemberDisplayName(member?: GroupMemberDto | null) {
   if (!member) return "";
   return (
+    usableGroupMemberName(member.groupAlias) ||
+    usableGroupMemberName(member.displayName) ||
     usableGroupMemberName(member.groupNickname) ||
     usableGroupMemberName(member.nickname) ||
-    usableGroupMemberName(member.displayName) ||
     usableGroupMemberName((member as unknown as Record<string, unknown>).name) ||
     usableGroupMemberName((member as unknown as Record<string, unknown>).userName) ||
     member.userId ||
@@ -65,6 +66,7 @@ export function groupMemberIdentityKeys(member: GroupMemberDto) {
     member.userId,
     member.platformUserId,
     member.lppId,
+    member.groupAlias,
     member.groupNickname,
     member.nickname,
     member.displayName,

@@ -1464,10 +1464,10 @@ function confirmMessageDanger(
 }
 
 function groupMemberContactCardName(member: GroupMemberDto) {
-  const groupNickname = `${member.groupNickname ?? ""}`.trim();
+  const groupNickname = `${member.groupAlias ?? ""}`.trim();
   const accountNickname =
-    `${member.nickname ?? ""}`.trim() ||
     `${member.displayName ?? ""}`.trim() ||
+    `${member.nickname ?? ""}`.trim() ||
     `${(member as unknown as Record<string, unknown>).name ?? ""}`.trim() ||
     `${(member as unknown as Record<string, unknown>).userName ?? ""}`.trim();
   if (groupNickname && accountNickname && groupNickname !== accountNickname) {

@@ -230,7 +230,11 @@ export function useMessageGroupManagement({
         mutateAsync(() => api().updateGroupDetail(id(), { title }), t("messages.groupManagement.updateGroupTitle")),
       updateMyGroupNickname: (nickname) =>
         mutateAsync(
-          () => api().updateMyGroupNickname(id(), nickname.trim() || null),
+          () => {
+            const targetUserId = session?.userId || session?.platformUserId || "";
+            if (!targetUserId) return Promise.reject(new Error(t("messages.groupManagement.failed")));
+            return api().updateGroupMemberAlias(id(), targetUserId, nickname.trim());
+          },
           t("messages.groupManagement.updateMyGroupNickname"),
         ),
       updateSettings: (settings) =>

@@ -3846,11 +3846,17 @@ body:has(.sidebar.collapsed)
 }
 
 .group-info-list {
-  gap: 14px;
+  gap: 0;
 }
 
 .group-info-list-section {
   border-top: 1px solid #edf1f5;
+  padding: 12px 0;
+}
+
+.group-info-list-section:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .group-management-title-section {
@@ -3866,7 +3872,6 @@ body:has(.sidebar.collapsed)
   gap: 10px;
   padding: 0 2px;
   border: 0 !important;
-  border-bottom: 1px solid #f1f4f7 !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -3880,15 +3885,9 @@ body:has(.sidebar.collapsed)
   gap: 10px;
   padding: 0 2px;
   border: 0 !important;
-  border-bottom: 1px solid #f1f4f7 !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
-}
-
-.group-info-row:last-child,
-.group-info-action-button:last-child {
-  border-bottom: 0 !important;
 }
 
 .group-info-row-label,
@@ -4029,6 +4028,7 @@ body:has(.sidebar.collapsed)
   display: grid;
   min-width: 0;
   border-top: 1px solid #edf1f5;
+  padding: 12px 0;
 }
 
 .group-info-danger-button {
@@ -4039,7 +4039,6 @@ body:has(.sidebar.collapsed)
   justify-content: center;
   padding: 0;
   border: 0;
-  border-bottom: 1px solid #f1f4f7;
   border-radius: 0;
   background: transparent;
   color: #ff4d4f;
@@ -4052,15 +4051,11 @@ body:has(.sidebar.collapsed)
   background: #fff8f8;
 }
 
-.group-info-danger-button:last-child {
-  border-bottom: 0;
-}
-
 .group-info-member-preview-section {
   display: grid;
   gap: 8px;
   min-width: 0;
-  padding: 4px 0 2px;
+  padding: 4px 0 14px;
 }
 
 .group-member-grid {

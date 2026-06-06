@@ -605,6 +605,7 @@ export interface GroupMemberDto {
   platformUserId?: string;
   lppId?: string;
   displayName: string;
+  groupAlias?: string | null;
   groupNickname?: string | null;
   nickname?: string | null;
   signature?: string | null;
@@ -636,6 +637,7 @@ export interface GroupDetailDto {
   unreadCount?: number;
   lastMessageSeq?: number;
   lastReadSeq?: number;
+  myGroupAlias?: string | null;
   myGroupNickname?: string | null;
   nicknameInGroup?: string | null;
   remark?: string | null;

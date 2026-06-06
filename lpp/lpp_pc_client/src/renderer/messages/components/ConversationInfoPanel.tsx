@@ -122,6 +122,7 @@ export function ConversationInfoPanel({
   profileExtraLoading = false,
   profileLoading = false,
   showGroupMemberNicknames = true,
+  userIdentity,
 }: {
   avatarUrl?: string | null;
   contact?: ContactItem | null;
@@ -263,6 +264,7 @@ export function ConversationInfoPanel({
           showGroupMemberNicknames={showGroupMemberNicknames}
           tab={safeActiveTab}
           t={t}
+          userIdentity={userIdentity}
         />
       </section>
       {membersInviteOpen && (
@@ -295,6 +297,7 @@ function GroupInfoTabContent({
   showGroupMemberNicknames,
   tab,
   t,
+  userIdentity,
 }: {
   conversation: ConversationListItem;
   groupManagement?: MessageGroupManagement;
@@ -312,6 +315,7 @@ function GroupInfoTabContent({
   showGroupMemberNicknames: boolean;
   tab: GroupInfoTabKey;
   t: Translate;
+  userIdentity?: CurrentUserIdentity | null;
 }) {
   if (tab === "members") {
     return (
@@ -353,6 +357,7 @@ function GroupInfoTabContent({
       role={role}
       showGroupMemberNicknames={showGroupMemberNicknames}
       t={t}
+      userIdentity={userIdentity}
     />
   );
 }
@@ -703,6 +708,7 @@ function GroupProfileInfoList({
   role,
   showGroupMemberNicknames,
   t,
+  userIdentity,
 }: {
   conversation: ConversationListItem;
   groupManagement?: MessageGroupManagement;
@@ -718,6 +724,7 @@ function GroupProfileInfoList({
   role: "owner" | "admin" | "member";
   showGroupMemberNicknames: boolean;
   t: Translate;
+  userIdentity?: CurrentUserIdentity | null;
 }) {
   const detailRecord = (groupManagement?.detail ?? {}) as Record<string, unknown>;
   const settings = groupManagement?.settings ?? groupManagement?.detail?.settings;
@@ -758,8 +765,11 @@ function GroupProfileInfoList({
     detailRecord.groupRemarkName,
   );
   const displayedGroupRemark = localGroupRemark ?? groupRemark ?? "";
+  const currentMember = findCurrentGroupMember(members, userIdentity);
   const serverMyGroupNickname =
     firstProfileValue(
+      currentMember?.groupAlias,
+      detailRecord.myGroupAlias,
       detailRecord.myGroupNickname,
       detailRecord.groupNickname,
       detailRecord.myNickname,
@@ -833,7 +843,7 @@ function GroupProfileInfoList({
           allowEmpty
           canEdit={Boolean(groupManagement?.actions.updateMyGroupNickname)}
           label={t("messages.conversationInfo.myGroupNickname")}
-          maxLength={30}
+          maxLength={64}
           onSave={async (nextNickname) => {
             if (!groupManagement?.actions.updateMyGroupNickname) return;
             await groupManagement.actions.updateMyGroupNickname(nextNickname);
@@ -943,7 +953,9 @@ function GroupProfileInfoList({
           label={t("messages.conversationInfo.actions.clearHistory")}
           onClick={() => onConversationAction?.("delete", conversation)}
         />
-        {groupManagement?.permissions.canLeave && (
+      </section>
+      {groupManagement?.permissions.canLeave && (
+        <section className="group-info-danger-section">
           <GroupInfoDangerButton
             label={t("messages.conversationInfo.actions.leaveGroup")}
             onClick={() =>
@@ -951,8 +963,8 @@ function GroupProfileInfoList({
               groupManagement?.actions.leaveGroup()
             }
           />
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }
@@ -989,9 +1001,14 @@ function GroupMembersTab({
     });
     if (!normalized) return sorted;
     return sorted.filter((member) =>
-      [groupMemberDisplayName(member), member.groupNickname, member.nickname, member.displayName, member.lppId].some((value) =>
-        `${value ?? ""}`.toLowerCase().includes(normalized),
-      ),
+      [
+        groupMemberDisplayName(member),
+        member.groupAlias,
+        member.groupNickname,
+        member.nickname,
+        member.displayName,
+        member.lppId,
+      ].some((value) => `${value ?? ""}`.toLowerCase().includes(normalized)),
     );
   }, [keyword, members]);
   return (
@@ -1504,10 +1521,22 @@ function GroupMemberRow({
 }
 
 function groupMemberPrimaryLine(member: GroupMemberDto) {
-  const groupNickname = `${member.groupNickname ?? ""}`.trim();
+  const groupNickname = `${member.groupAlias ?? ""}`.trim();
   const accountNickname = groupMemberAccountNickname(member);
   if (groupNickname && accountNickname && groupNickname !== accountNickname) return `${groupNickname} / ${accountNickname}`;
   return groupNickname || accountNickname;
+}
+
+function findCurrentGroupMember(members: GroupMemberDto[], identity?: CurrentUserIdentity | null) {
+  const identityKeys = [identity?.userId, identity?.platformUserId, identity?.lppId]
+    .map((value) => `${value ?? ""}`.trim().toLowerCase())
+    .filter(Boolean);
+  if (identityKeys.length === 0) return undefined;
+  return members.find((member) =>
+    [member.userId, member.platformUserId, member.lppId]
+      .map((value) => `${value ?? ""}`.trim().toLowerCase())
+      .some((value) => value && identityKeys.includes(value)),
+  );
 }
 
 function sortGroupMembers(members: GroupMemberDto[]) {
@@ -1523,8 +1552,8 @@ function sortGroupMembers(members: GroupMemberDto[]) {
 
 function groupMemberAccountNickname(member: GroupMemberDto) {
   return (
-    `${member.nickname ?? ""}`.trim() ||
     `${member.displayName ?? ""}`.trim() ||
+    `${member.nickname ?? ""}`.trim() ||
     `${(member as unknown as Record<string, unknown>).name ?? ""}`.trim() ||
     `${(member as unknown as Record<string, unknown>).userName ?? ""}`.trim()
   );

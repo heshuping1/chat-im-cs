@@ -29,6 +29,10 @@ describe("message group management", () => {
     resolve(process.cwd(), "src/renderer/data/api/endpoints.ts"),
     "utf8",
   );
+  const apiTypes = readFileSync(
+    resolve(process.cwd(), "src/renderer/data/api/types.ts"),
+    "utf8",
+  );
   const groupHook = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/hooks/useMessageGroupManagement.ts"),
     "utf8",
@@ -74,6 +78,12 @@ describe("message group management", () => {
     "utf8",
   );
 
+  function cssRuleBody(selector: string) {
+    const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const matches = Array.from(messageCenterCss.matchAll(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, "g")));
+    return matches[matches.length - 1]?.[1] ?? "";
+  }
+
   it("normalizes group roles and permissions", () => {
     expect(normalizeGroupRole("owner")).toBe("owner");
     expect(normalizeGroupRole("admin")).toBe("admin");
@@ -107,12 +117,18 @@ describe("message group management", () => {
     ]);
   });
 
-  it("prefers group nickname for member display", () => {
+  it("prefers group alias for member display and falls back to display name", () => {
     expect(groupMemberDisplayName({
       userId: "u1",
       displayName: "Account name",
+      groupAlias: "财务-小王",
       groupNickname: "Group nick",
-    } as GroupMemberDto)).toBe("Group nick");
+    } as GroupMemberDto)).toBe("财务-小王");
+    expect(groupMemberDisplayName({
+      userId: "u2",
+      displayName: "Account name",
+      groupAlias: " ",
+    } as GroupMemberDto)).toBe("Account name");
   });
 
   it("prevents admins from handling owners or other admins", () => {
@@ -251,19 +267,26 @@ describe("message group management", () => {
     expect(conversationInfoPanel).toContain("writeLocalGroupRemark");
     expect(conversationInfoPanel).toContain("setLocalGroupRemark(nextRemark)");
     expect(conversationInfoPanel).toContain("displayedGroupRemark");
+    expect(conversationInfoPanel).toContain("currentMember?.groupAlias");
+    expect(conversationInfoPanel).toContain("detailRecord.myGroupAlias");
     expect(conversationInfoPanel).toContain("optimisticMyGroupNickname");
     expect(conversationInfoPanel).toContain("actions.updateMyGroupNickname(nextNickname)");
     expect(conversationInfoPanel).toContain("setOptimisticMyGroupNickname(nextNickname.trim())");
     expect(conversationInfoPanel).toContain("allowEmpty");
-    expect(conversationInfoPanel).toContain("maxLength={30}");
+    expect(conversationInfoPanel).toContain("maxLength={64}");
     expect(groupHook).toContain("updateMyGroupNickname: (nickname: string) => Promise<void>");
-    expect(groupHook).toContain("api().updateMyGroupNickname(id(), nickname.trim() || null)");
+    expect(groupHook).toContain("const targetUserId = session?.userId || session?.platformUserId || \"\"");
+    expect(groupHook).toContain("api().updateGroupMemberAlias(id(), targetUserId, nickname.trim())");
+    expect(groupHook).not.toContain("nickname.trim() || null");
     expect(groupHook).not.toContain("myGroupNickname: nickname.trim() || null");
     expect(groupHook).not.toContain("nicknameInGroup: nickname.trim() || null");
     expect(groupHook).toContain("messages.groupManagement.updateMyGroupNickname");
-    expect(contactsClient).toContain("updateMyGroupNickname(conversationId: string, nickname: string | null)");
-    expect(contactsClient).toContain("endpointPlan.groupMyNickname");
-    expect(endpoints).toContain("groupMyNickname");
+    expect(contactsClient).toContain("updateGroupMemberAlias(groupId: string, targetUserId: string, alias: string)");
+    expect(contactsClient).toContain("endpointPlan.groupMemberAlias");
+    expect(contactsClient).toContain("body: JSON.stringify({ alias })");
+    expect(endpoints).toContain("groupMemberAlias");
+    expect(endpoints).toContain("/groups/{groupId}/members/{targetUserId}/alias");
+    expect(apiTypes).toContain("groupAlias?: string | null");
     expect(zhCnMessages).toContain("updateMyGroupNickname: '我在本群的昵称已更新。'");
     expect(conversationInfoPanel).not.toContain(
       '<GroupInfoValueRow label={t("messages.conversationInfo.groupRemark")}',
@@ -278,6 +301,18 @@ describe("message group management", () => {
     expect(messageCenterCss).toContain("grid-template-columns: minmax(0, 1fr) auto;");
     expect(messageCenterCss).toContain(".group-title-value");
     expect(messageCenterCss).not.toContain("grid-template-columns: minmax(86px, auto) minmax(0, 1fr) auto;");
+  });
+
+  it("uses WeChat-style separators only between group profile sections", () => {
+    expect(cssRuleBody(".group-info-list-section")).toContain("border-top: 1px solid #edf1f5;");
+    expect(cssRuleBody(".group-info-list-section:first-child")).toContain("border-top: 0;");
+    expect(cssRuleBody(".group-info-row")).not.toContain("border-bottom");
+    expect(cssRuleBody(".group-info-action-button")).not.toContain("border-bottom");
+    expect(cssRuleBody(".group-info-danger-button")).not.toContain("border-bottom");
+    expect(conversationInfoPanel).toContain('className="group-info-danger-section"');
+    expect(conversationInfoPanel).not.toContain(
+      '<section className="group-info-danger-section">\n        <GroupInfoDangerButton\n          label={t("messages.conversationInfo.actions.clearHistory")}\n          onClick={() => onConversationAction?.("delete", conversation)}\n        />\n        {groupManagement?.permissions.canLeave && (',
+    );
   });
 
   it("implements the group member nickname display toggle as a real message setting", () => {
@@ -430,7 +465,7 @@ describe("message group management", () => {
 
   it("keeps internal member ids out of the searchable member presentation", () => {
     expect(conversationInfoPanel).toContain(
-      "[groupMemberDisplayName(member), member.groupNickname, member.nickname, member.displayName, member.lppId]",
+      "member.groupAlias",
     );
     expect(conversationInfoPanel).not.toContain("member.userId].some");
     expect(conversationInfoPanel).not.toContain("member.platformUserId].some");
@@ -440,6 +475,7 @@ describe("message group management", () => {
     [
       "groupDetail",
       "groupMemberRole",
+      "groupMemberAlias",
       "groupMemberMute",
       "groupSettings",
       "groupAnnouncements",
@@ -457,6 +493,7 @@ describe("message group management", () => {
       "removeGroupMember",
       "transferGroupOwner",
       "setGroupMemberRole",
+      "updateGroupMemberAlias",
       "setGroupMemberMute",
       "getGroupSettings",
       "updateGroupSettings",

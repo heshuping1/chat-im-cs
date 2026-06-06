@@ -228,10 +228,17 @@ export class ContactsApiClient extends ProfileApiClient {
     );
   }
 
-  updateMyGroupNickname(conversationId: string, nickname: string | null) {
-    return this.request<{ groupId?: string; nickname?: string | null }>(
-      endpointPlan.groupMyNickname.replace("{conversationId}", conversationId),
-      { method: "PUT", body: JSON.stringify({ nickname }) },
+  updateGroupMemberAlias(groupId: string, targetUserId: string, alias: string) {
+    return this.request<{
+      alias?: string | null;
+      groupAlias?: string | null;
+      groupId?: string;
+      targetUserId?: string;
+    }>(
+      endpointPlan.groupMemberAlias
+        .replace("{groupId}", encodeURIComponent(groupId))
+        .replace("{targetUserId}", encodeURIComponent(targetUserId)),
+      { method: "PUT", body: JSON.stringify({ alias }) },
     );
   }
 
