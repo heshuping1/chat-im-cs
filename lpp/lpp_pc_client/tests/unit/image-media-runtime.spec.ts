@@ -4,7 +4,17 @@ import {
   imageMediaCacheKey,
   mediaStableCacheIdentity,
 } from "../../src/renderer/data/im-message-normalize";
+import {
+  clearImageObjectUrlHotCache,
+  peekImageObjectUrl,
+  rememberImageObjectUrl,
+} from "../../src/renderer/media/runtime/imageObjectUrlHotCache";
+import {
+  getPrefetchedImageFileUrl,
+  registerPrefetchedImageFileUrl,
+} from "../../src/renderer/media/runtime/imagePrecache";
 import { isInstantLocalImageSource } from "../../src/renderer/media/runtime/useCachedImageMediaUrl";
+import { imageDisplayReady } from "../../src/renderer/media/runtime/useCachedImageMediaUrl";
 
 describe("image media runtime", () => {
   it("treats native local image urls as immediately displayable", () => {
@@ -44,5 +54,42 @@ describe("image media runtime", () => {
     expect(imageMediaCacheKey({ relativePath: "tenant/a/photo.png" }, "/media/other")).toBe(
       "image:tenant/a/photo.png",
     );
+  });
+
+  it("keeps a loaded remote image object url available for the next mount", () => {
+    clearImageObjectUrlHotCache();
+    const blob = new Blob(["image"], { type: "image/png" });
+
+    const firstUrl = rememberImageObjectUrl("image:media:photo-1", blob);
+
+    expect(firstUrl).toBeTruthy();
+    expect(peekImageObjectUrl("image:media:photo-1")).toBe(firstUrl);
+  });
+
+  it("treats already displayable local image urls as ready without waiting for another load event", () => {
+    expect(
+      imageDisplayReady({
+        cached: false,
+        hasUsableLocalFile: false,
+        localImage: false,
+        src: "blob:lpp-hot-image",
+      }),
+    ).toBe(true);
+    expect(
+      imageDisplayReady({
+        cached: false,
+        hasUsableLocalFile: false,
+        localImage: false,
+        src: "https://assets.example/protected.png",
+      }),
+    ).toBe(false);
+  });
+
+  it("registers lazily cached desktop image files for the next chat entry", () => {
+    const fileUrl = "file:///Users/me/Library/Application%20Support/lppchat/LPP%20Files/a.png";
+
+    registerPrefetchedImageFileUrl("image:media:lazy-photo", fileUrl);
+
+    expect(getPrefetchedImageFileUrl("image:media:lazy-photo")).toBe(fileUrl);
   });
 });

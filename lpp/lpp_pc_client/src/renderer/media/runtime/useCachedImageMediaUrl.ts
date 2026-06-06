@@ -1,9 +1,27 @@
 import { useEffect, useState } from "react";
 import { isBrowserNativeUrl } from "../../data/im-message-normalize";
 import { getCachedMedia, refreshCachedMedia } from "../../lib/mediaCache";
+import {
+  peekImageObjectUrl,
+  rememberImageObjectUrl,
+} from "./imageObjectUrlHotCache";
 
 export function isInstantLocalImageSource(src: string | undefined) {
   return Boolean(src && isBrowserNativeUrl(src));
+}
+
+export function imageDisplayReady({
+  cached,
+  hasUsableLocalFile,
+  localImage,
+  src,
+}: {
+  cached: boolean;
+  hasUsableLocalFile: boolean;
+  localImage: boolean;
+  src: string | undefined;
+}) {
+  return localImage || hasUsableLocalFile || isInstantLocalImageSource(src) || Boolean(src && cached);
 }
 
 export function useCachedImageMediaUrl(
@@ -11,35 +29,34 @@ export function useCachedImageMediaUrl(
   authToken: string | undefined,
   cacheKey: string | undefined,
 ) {
-  const [cached, setCached] = useState(false);
-  const [checkedCache, setCheckedCache] = useState(false);
+  const initialHotSrc = peekImageObjectUrl(cacheKey);
+  const [cached, setCached] = useState(Boolean(initialHotSrc));
+  const [checkedCache, setCheckedCache] = useState(Boolean(initialHotSrc));
   const [failed, setFailed] = useState(false);
-  const [blobSrc, setBlobSrc] = useState<string | null>(null);
+  const [blobSrc, setBlobSrc] = useState<string | null>(initialHotSrc);
   const shouldFetchBlob = Boolean(src && authToken && cacheKey && !isBrowserNativeUrl(src));
 
   useEffect(() => {
     let active = true;
-    const objectUrls: string[] = [];
 
     const showBlob = (blob: Blob | null, fromCache: boolean) => {
-      if (!blob?.size) return;
-      const objectUrl = URL.createObjectURL(blob);
-      objectUrls.push(objectUrl);
+      if (!blob?.size || !cacheKey) return;
+      const objectUrl = rememberImageObjectUrl(cacheKey, blob);
       if (!active) return;
       setBlobSrc(objectUrl);
       setCached(fromCache);
       setFailed(false);
     };
 
-    setBlobSrc(null);
-    setCached(false);
-    setCheckedCache(!src || isBrowserNativeUrl(src) || !cacheKey);
+    const hotSrc = peekImageObjectUrl(cacheKey);
+    setBlobSrc(hotSrc);
+    setCached(Boolean(hotSrc));
+    setCheckedCache(Boolean(hotSrc) || !src || isBrowserNativeUrl(src) || !cacheKey);
     setFailed(false);
 
     if (!src || isBrowserNativeUrl(src) || !cacheKey) {
       return () => {
         active = false;
-        objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
       };
     }
 
@@ -94,7 +111,6 @@ export function useCachedImageMediaUrl(
 
     return () => {
       active = false;
-      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
     };
   }, [authToken, cacheKey, src, shouldFetchBlob]);
 
@@ -113,10 +129,7 @@ export function useCachedImageMediaUrl(
           setFailed(true);
           return;
         }
-        setBlobSrc((current) => {
-          if (current) URL.revokeObjectURL(current);
-          return URL.createObjectURL(blob);
-        });
+        setBlobSrc(rememberImageObjectUrl(cacheKey, blob));
         setCached(false);
         setFailed(false);
       })

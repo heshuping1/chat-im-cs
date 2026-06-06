@@ -15,9 +15,11 @@ import type { ImMediaItem } from "../../../media/domain/mediaMessage";
 import {
   forgetPrefetchedImageFileUrl,
   getPrefetchedImageFileUrl,
+  registerPrefetchedImageFileUrl,
   subscribeImagePrecache,
 } from "../../../media/runtime/imagePrecache";
 import {
+  imageDisplayReady,
   imageVisibleSource,
   isInstantLocalImageSource,
   sameMediaUrl,
@@ -145,7 +147,10 @@ export function ImagePart({
       conversationId: mediaCacheContext?.conversationId,
     })
       .then((result) => {
-        if (!disposed && result) setLocalFileSrc(result.fileUrl);
+        if (!disposed && result) {
+          if (cacheKey) registerPrefetchedImageFileUrl(cacheKey, result.fileUrl);
+          setLocalFileSrc(result.fileUrl);
+        }
       })
       .catch(() => {
         if (!disposed && hasNextImageSource) advanceToNextImageSource();
@@ -175,9 +180,12 @@ export function ImagePart({
   const visibleImageSrc = imageVisibleSource(localFileSrc, imageSrc, brokenImageSrc);
   const imageReady =
     imageLoaded ||
-    localImage ||
-    hasUsableLocalFile ||
-    Boolean(imageSrc && cached && !sameMediaUrl(imageSrc, brokenImageSrc));
+    imageDisplayReady({
+      cached,
+      hasUsableLocalFile,
+      localImage,
+      src: sameMediaUrl(visibleImageSrc, brokenImageSrc) ? undefined : visibleImageSrc,
+    });
   useEffect(() => {
     if (failed && hasNextImageSource) advanceToNextImageSource();
   }, [advanceToNextImageSource, failed, hasNextImageSource]);

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
 
 import type { MessageItemDto } from "../../data/api/types";
 import type { ConversationListItem } from "../../data/api-client";
@@ -10,8 +11,10 @@ import {
   activeDirectReadStatusRefetchIntervalMs,
   shouldEnableDirectReadStatusQuery,
 } from "../models/imReadReceiptPolicy";
+import { createMessageQueryHotCache } from "../models/messageQueryHotCacheModel";
 
 type ImConversationType = "direct" | "group";
+const messageQueryHotCache = createMessageQueryHotCache<MessageItemDto[]>();
 
 export function useActiveImConversationQueries({
   activeConversation,
@@ -22,14 +25,27 @@ export function useActiveImConversationQueries({
   activeConversationType?: ImConversationType;
   session: AuthSession | null;
 }) {
-  const messagesQuery = useQuery({
-    queryKey: pcQueryKeys.imMessages(
+  const messagesQueryKey = useMemo(
+    () =>
+      pcQueryKeys.imMessages(
+        session?.apiBaseUrl,
+        session?.tenantToken,
+        activeConversationType,
+        activeConversation?.conversationId,
+      ),
+    [
+      activeConversation?.conversationId,
+      activeConversationType,
       session?.apiBaseUrl,
       session?.tenantToken,
-      activeConversationType,
-      activeConversation?.conversationId,
-    ),
+    ],
+  );
+  const hotMessagesSnapshot = messageQueryHotCache.read(messagesQueryKey);
+  const messagesQuery = useQuery({
+    queryKey: messagesQueryKey,
     enabled: Boolean(session && activeConversation && activeConversationType),
+    initialData: () => hotMessagesSnapshot?.data,
+    initialDataUpdatedAt: () => hotMessagesSnapshot?.updatedAt,
     queryFn: async () =>
       requireApiClient(session).getConversationMessages(
         activeConversationType!,
@@ -48,6 +64,11 @@ export function useActiveImConversationQueries({
       );
     },
   });
+  useEffect(() => {
+    if (isMessageItemList(messagesQuery.data)) {
+      messageQueryHotCache.remember(messagesQueryKey, messagesQuery.data, messagesQuery.dataUpdatedAt);
+    }
+  }, [messagesQuery.data, messagesQuery.dataUpdatedAt, messagesQueryKey]);
 
   const directReadStatusQuery = useQuery({
     queryKey: pcQueryKeys.imDirectReadStatus(
@@ -86,6 +107,9 @@ export function useActiveImConversationQueries({
   return {
     directReadStatusQuery,
     groupMembersQuery,
+    messages: messagesQuery.data ?? hotMessagesSnapshot?.data ?? [],
+    messagesLoaded: messagesQuery.data !== undefined || hotMessagesSnapshot !== undefined,
+    messagesLoading: messagesQuery.isLoading && !hotMessagesSnapshot,
     messagesQuery,
   };
 }

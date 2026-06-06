@@ -176,7 +176,7 @@ async function prefetchImageCandidate({
   });
 }
 
-function registerPrefetchedImageFileUrl(cacheKey: string, fileUrl: string) {
+export function registerPrefetchedImageFileUrl(cacheKey: string, fileUrl: string) {
   if (!fileUrl) return;
   failedImagePrecaches.delete(cacheKey);
   prefetchedImageFileUrls.set(cacheKey, fileUrl);

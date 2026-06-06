@@ -370,6 +370,9 @@ export function MessageCenter() {
   const {
     directReadStatusQuery,
     groupMembersQuery,
+    messages: hotServerMessages,
+    messagesLoaded,
+    messagesLoading,
     messagesQuery,
   } = useActiveImConversationQueries({
     activeConversation,
@@ -379,7 +382,7 @@ export function MessageCenter() {
   useMessageDetailSync({
     enabled: Boolean(session && activeConversation && activeConversationType),
     isFetching: messagesQuery.isFetching,
-    messages: messagesQuery.data ?? [],
+    messages: hotServerMessages,
     refetch: messagesQuery.refetch,
     target: activeConversation
       ? {
@@ -545,7 +548,7 @@ export function MessageCenter() {
     localOutgoingMessagesByConversation,
     messageSearchKeyword,
     messageSearchOpen,
-    serverMessages: messagesQuery.data ?? [],
+    serverMessages: hotServerMessages,
     unreadIdentity,
   });
   const autoTranslateConversationKind =
@@ -616,7 +619,7 @@ export function MessageCenter() {
   useEffect(() => {
     setActiveImConversationVisibility(activeConversationVisibility);
   }, [activeConversationVisibility, setActiveImConversationVisibility]);
-  const activeConversationMessagesLoaded = messagesQuery.data !== undefined;
+  const activeConversationMessagesLoaded = messagesLoaded;
   useEffect(() => {
     recordMessageReminderDiagnostic({
       event: "im.message-center.mounted",
@@ -715,7 +718,7 @@ export function MessageCenter() {
     keyword,
     messageSearchKeyword,
     messagesError: messagesQuery.error,
-    messagesLoading: messagesQuery.isLoading,
+    messagesLoading,
     unreadIdentity,
     visibleConversations,
     visibleMessagesLength: visibleMessages.length,
