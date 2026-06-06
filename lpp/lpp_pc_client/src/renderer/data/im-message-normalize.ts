@@ -255,9 +255,10 @@ export function mediaFileName(media?: MediaResourceDto) {
 }
 
 export function imageMediaCacheKey(media: MediaResourceDto | undefined, src: string | undefined) {
-  if (!src || isBrowserNativeUrl(src)) return undefined;
   const stableKey = mediaStableCacheIdentity(media, src);
-  return stableKey ? `image:${stableKey}` : `image:${src}`;
+  if (stableKey) return `image:${stableKey}`;
+  if (!src || isBrowserNativeUrl(src)) return undefined;
+  return `image:${src}`;
 }
 
 export function mediaStableCacheIdentity(

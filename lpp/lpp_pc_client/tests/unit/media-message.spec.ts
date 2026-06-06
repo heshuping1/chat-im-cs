@@ -588,7 +588,7 @@ describe("message media upload presentation", () => {
 
   it("splits local file video open sources from inline preview sources", () => {
     expect(messageMediaParts).toContain("inlineVideoPreviewSrc");
-    expect(messageMediaParts).toContain("const openSrc = item?.localOpenUrl || src;");
+    expect(messageMediaParts).toContain("const openSrc = localVideoSrc || item?.localOpenUrl || src;");
     expect(messageMediaParts).toContain("const previewSrc = inlineVideoPreviewSrc(src);");
     expect(messageMediaParts).toMatch(/useAuthenticatedMediaUrl\(\s*previewSrc,/);
     expect(messageMediaParts).toContain("displaySrc: openSrc");
@@ -605,11 +605,11 @@ describe("message media upload presentation", () => {
     expect(messageMediaParts).toContain("hasLocalOpenUrl");
     expect(messageMediaParts).toContain("openedWithInitialFileUrl");
     expect(messageMediaParts).toContain("prepareElapsedMs");
-    expect(messageMediaParts).toContain("localOpenSrc: item?.localOpenUrl");
+    expect(messageMediaParts).toContain("localOpenSrc: localVideoSrc || item?.localOpenUrl");
   });
 
   it("uses local open urls for file cards before remote source urls", () => {
-    expect(fileMessageContent).toContain("const openUrl = item?.localOpenUrl || href;");
+    expect(fileMessageContent).toContain("const openUrl = localFileSrc || item?.localOpenUrl || href;");
     expect(fileMessageContent).toContain("url: openUrl");
     expect(fileMessageContent).toContain("if (!openUrl) return;");
   });
@@ -647,6 +647,7 @@ describe("message media upload presentation", () => {
     for (const source of [imMediaSendController, csMediaSendController]) {
       expect(source).toContain("cacheLocalSentMediaForDesktop");
       expect(source).toContain("localCachedMediaPromise");
+      expect(source).toContain("registerSentMediaMaterialization");
       expect(source).toContain('phase: "cache"');
       expect(source).toContain("localPreviewForSent");
       expect(source).toContain("localOpenUrl: localOpenForSent");
@@ -679,7 +680,12 @@ describe("message media upload presentation", () => {
     expect(mediaParts).toContain("hasNextImageSource");
     expect(mediaParts).toContain("advanceToNextImageSource");
     expect(mediaParts).toContain("forgetPrefetchedImageFileUrl");
-    expect(mediaParts).toContain("hasUsableLocalFile ? undefined : src");
+    expect(mediaParts).toContain("ensureMaterializedMediaDisplayUrl");
+    expect(mediaParts).toContain("getMaterializedMediaDisplayUrl");
+    expect(mediaParts).toContain("subscribeMaterializedMediaDisplayUrl");
+    expect(mediaParts).toContain("localDisplaySrc");
+    expect(mediaParts).toContain("hasMaterializedLocalFile || hasUsableLocalFile ? undefined : src");
+    expect(mediaParts).toContain("const visibleImageSrc = imageVisibleSource(localDisplaySrc, imageSrc, brokenImageSrc);");
     expect(mediaParts).toContain("if (failed && hasNextImageSource) advanceToNextImageSource();");
     expect(mediaParts).toContain("sourceAvailable={Boolean(visibleImageSrc)}");
     expect(mediaParts).toContain("const imageReady =");

@@ -27,6 +27,7 @@ describe("desktop api validation", () => {
     const channels = Object.values(desktopIpcChannelByMethod);
 
     expect(methods).toContain("notify");
+    expect(methods).toContain("readMediaFileAsDataUrl");
     expect(methods).toContain("cacheLocalMediaFile");
     expect(methods).toContain("openAppProfile");
     expect(methods).toContain("getAppInstanceProfile");
@@ -47,6 +48,9 @@ describe("desktop api validation", () => {
     expect(methods).toContain("saveChatArchiveFile");
     expect(methods).toContain("openChatArchiveFile");
     expect(desktopIpcChannelByMethod.cacheLocalMediaFile).toBe("desktop:cache-local-media-file");
+    expect(desktopIpcChannelByMethod.readMediaFileAsDataUrl).toBe(
+      "desktop:read-media-file-as-data-url",
+    );
     expect(desktopIpcChannelByMethod.saveChatArchiveFile).toBe(
       "desktop:save-chat-archive-file",
     );
@@ -176,6 +180,29 @@ describe("desktop api validation", () => {
       kind: "file",
       url: "https://assets.example/report.xlsx",
     });
+    expect(
+      validateDesktopApiCall("readMediaFileAsDataUrl", [
+        {
+          accountId: "u1",
+          authToken: "token",
+          cacheIdentity: "media:019e-photo-id",
+          conversationId: "c1",
+          fileName: "photo.png",
+          kind: "image",
+          url: "file:///Users/eric/Library/Application%20Support/lppchat/LPP%20Files/photo.png",
+        },
+      ]),
+    ).toEqual([
+      {
+        accountId: "u1",
+        authToken: "token",
+        cacheIdentity: "media:019e-photo-id",
+        conversationId: "c1",
+        fileName: "photo.png",
+        kind: "image",
+        url: "file:///Users/eric/Library/Application%20Support/lppchat/LPP%20Files/photo.png",
+      },
+    ]);
     expect(() =>
       validateCacheMediaFilePayload({
         fileName: "report.xlsx",

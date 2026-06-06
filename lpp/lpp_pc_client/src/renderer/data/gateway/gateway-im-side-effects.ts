@@ -42,8 +42,8 @@ import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder
 import { workspaceScopeFromSession } from "../workspace-scope";
 import {
   accountIdFromSession,
-  materializeReceivedImageMessage,
-} from "../../media/runtime/imageMaterialization";
+  materializeReceivedMediaMessage,
+} from "../../media/runtime/mediaMaterialization";
 
 export function mergeImGatewayMessage(
   queryClient: QueryClient,
@@ -177,7 +177,7 @@ export function mergeImGatewayMessage(
     currentTenantId: workspaceScope.tenantId,
     scopeKey: workspaceScope.key,
   });
-  void materializeReceivedImageMessage({
+  void materializeReceivedMediaMessage({
     accountId: accountIdFromSession(identity),
     assetBaseUrl: identity?.apiBaseUrl,
     authToken: identity?.tenantToken,

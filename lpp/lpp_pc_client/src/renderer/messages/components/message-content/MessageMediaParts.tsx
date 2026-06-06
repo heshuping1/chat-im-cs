@@ -19,6 +19,14 @@ import {
   subscribeImagePrecache,
 } from "../../../media/runtime/imagePrecache";
 import {
+  ensureMaterializedMediaDisplayUrl,
+  getMaterializedMediaDisplayUrl,
+  getMaterializedMediaFileUrl,
+  mediaMaterializationCacheKey,
+  subscribeMaterializedMediaDisplayUrl,
+  subscribeMaterializedMediaFile,
+} from "../../../media/runtime/mediaMaterialization";
+import {
   imageDisplayReady,
   imageVisibleSource,
   isInstantLocalImageSource,
@@ -91,12 +99,18 @@ export function ImagePart({
   const [localFileSrc, setLocalFileSrc] = useState<string | null>(
     () => getPrefetchedImageFileUrl(cacheKey) ?? null,
   );
+  const [localDisplaySrc, setLocalDisplaySrc] = useState<string | null>(
+    () => getMaterializedMediaDisplayUrl(cacheKey) ?? null,
+  );
   const [brokenImageSrc, setBrokenImageSrc] = useState<string | null>(null);
-  const hasUsableLocalFile = Boolean(
+  const hasMaterializedLocalFile = Boolean(
     localFileSrc && !sameMediaUrl(localFileSrc, brokenImageSrc),
   );
+  const hasUsableLocalFile = Boolean(
+    localDisplaySrc && !sameMediaUrl(localDisplaySrc, brokenImageSrc),
+  );
   const { cached, displaySrc, failed, loadCachedMedia } = useCachedImageMediaUrl(
-    hasUsableLocalFile ? undefined : src,
+    hasMaterializedLocalFile || hasUsableLocalFile ? undefined : src,
     authToken,
     cacheKey,
   );
@@ -118,13 +132,69 @@ export function ImagePart({
 
   useEffect(() => {
     const prefetched = getPrefetchedImageFileUrl(cacheKey);
+    const display = getMaterializedMediaDisplayUrl(cacheKey);
     setLocalFileSrc(prefetched ?? null);
+    setLocalDisplaySrc(display ?? null);
     if (!cacheKey) return undefined;
-    return subscribeImagePrecache(cacheKey, (fileUrl) => {
+    const unsubscribeFile = subscribeImagePrecache(cacheKey, (fileUrl) => {
       setBrokenImageSrc((current) => (current && sameMediaUrl(current, fileUrl) ? null : current));
       setLocalFileSrc(fileUrl);
     });
+    const unsubscribeDisplay = subscribeMaterializedMediaDisplayUrl(cacheKey, (displayUrl) => {
+      setBrokenImageSrc((current) =>
+        current && sameMediaUrl(current, displayUrl) ? null : current,
+      );
+      setLocalDisplaySrc(displayUrl);
+    });
+    return () => {
+      unsubscribeFile();
+      unsubscribeDisplay();
+    };
   }, [cacheKey]);
+
+  useEffect(() => {
+    let disposed = false;
+    const display = getMaterializedMediaDisplayUrl(cacheKey);
+    if (display) {
+      setLocalDisplaySrc(display);
+      return undefined;
+    }
+    if (!localFileSrc || !cacheKey) {
+      setLocalDisplaySrc(null);
+      return undefined;
+    }
+    void ensureMaterializedMediaDisplayUrl({
+      accountId: mediaCacheContext?.accountId,
+      authToken,
+      cacheIdentity,
+      cacheKey,
+      conversationId: mediaCacheContext?.conversationId,
+      fileName: fileName || "image.png",
+      fileUrl: localFileSrc,
+      kind: "image",
+    })
+      .then((displayUrl) => {
+        if (!disposed && displayUrl) setLocalDisplaySrc(displayUrl);
+      })
+      .catch(() => {
+        if (!disposed) {
+          setLocalDisplaySrc(null);
+          setLocalFileSrc(null);
+          forgetPrefetchedImageFileUrl(cacheKey, localFileSrc);
+        }
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [
+    authToken,
+    cacheIdentity,
+    cacheKey,
+    fileName,
+    localFileSrc,
+    mediaCacheContext?.accountId,
+    mediaCacheContext?.conversationId,
+  ]);
 
   useEffect(() => {
     let disposed = false;
@@ -173,11 +243,11 @@ export function ImagePart({
   ]);
 
   useEffect(() => {
-    const nextVisibleImageSrc = imageVisibleSource(localFileSrc, imageSrc, brokenImageSrc);
+    const nextVisibleImageSrc = imageVisibleSource(localDisplaySrc, imageSrc, brokenImageSrc);
     setImageLoaded(localImage || Boolean(nextVisibleImageSrc && cached));
-  }, [brokenImageSrc, cached, imageSrc, localFileSrc, localImage]);
+  }, [brokenImageSrc, cached, imageSrc, localDisplaySrc, localImage]);
 
-  const visibleImageSrc = imageVisibleSource(localFileSrc, imageSrc, brokenImageSrc);
+  const visibleImageSrc = imageVisibleSource(localDisplaySrc, imageSrc, brokenImageSrc);
   const imageReady =
     imageLoaded ||
     imageDisplayReady({
@@ -206,7 +276,15 @@ export function ImagePart({
     const failedSrc = event.currentTarget.currentSrc || event.currentTarget.src || visibleImageSrc;
     if (failedSrc) setBrokenImageSrc(failedSrc);
     setImageLoaded(false);
-    if (failedSrc && localFileSrc && sameMediaUrl(failedSrc, localFileSrc)) {
+    if (
+      failedSrc &&
+      localDisplaySrc &&
+      sameMediaUrl(failedSrc, localDisplaySrc)
+    ) {
+      setLocalDisplaySrc(null);
+      setLocalFileSrc(null);
+      if (localFileSrc) forgetPrefetchedImageFileUrl(cacheKey, localFileSrc);
+    } else if (failedSrc && localFileSrc && sameMediaUrl(failedSrc, localFileSrc)) {
       setLocalFileSrc(null);
       forgetPrefetchedImageFileUrl(cacheKey, localFileSrc);
     }
@@ -358,7 +436,11 @@ export function VideoPart({
   const media = item?.media;
   const remoteSrc = item?.remoteSourceUrl;
   const src = item?.sourceUrl;
-  const openSrc = item?.localOpenUrl || src;
+  const videoCacheKey = mediaMaterializationCacheKey("video", media, remoteSrc || src);
+  const [localVideoSrc, setLocalVideoSrc] = useState<string | null>(
+    () => getMaterializedMediaFileUrl(videoCacheKey) ?? null,
+  );
+  const openSrc = localVideoSrc || item?.localOpenUrl || src;
   const previewSrc = inlineVideoPreviewSrc(src);
   const poster = item?.posterUrl;
   const { displaySrc, failed, loadAuthenticatedMedia } = useAuthenticatedMediaUrl(
@@ -386,6 +468,11 @@ export function VideoPart({
     ? ({ "--video-bubble-aspect": String(videoAspectRatio) } as CSSProperties)
     : undefined;
   useEffect(() => {
+    const materialized = getMaterializedMediaFileUrl(videoCacheKey);
+    setLocalVideoSrc(materialized ?? null);
+    return subscribeMaterializedMediaFile(videoCacheKey, setLocalVideoSrc);
+  }, [videoCacheKey]);
+  useEffect(() => {
     setFrameReady(isVideoSourceReady(displaySrc));
   }, [displaySrc]);
   const handlePosterReady = useCallback(() => setFrameReady(true), []);
@@ -409,7 +496,7 @@ export function VideoPart({
     if (!uploadOverlay.canPlay) return;
     if (!openSrc || previewLoading) return;
     logVideoOpenDiagnostic("video.open_attempt", "ok", {
-      hasLocalOpenUrl: Boolean(item?.localOpenUrl),
+      hasLocalOpenUrl: Boolean(localVideoSrc || item?.localOpenUrl),
       openSrc,
       posterSrc,
       remoteSrc,
@@ -419,7 +506,7 @@ export function VideoPart({
       authToken,
       displaySrc: openSrc,
       durationSeconds: duration,
-      localOpenSrc: item?.localOpenUrl,
+      localOpenSrc: localVideoSrc || item?.localOpenUrl,
       media,
       mediaCacheContext,
       onDiagnostic: (diagnostic) =>

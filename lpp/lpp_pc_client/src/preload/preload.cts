@@ -82,6 +82,8 @@ const desktopApi: DesktopApi = {
   },
   getCachedMediaStatus: (payload) =>
     validatedInvoke('getCachedMediaStatus', 'desktop:get-cached-media-status', payload),
+  readMediaFileAsDataUrl: (payload) =>
+    validatedInvoke('readMediaFileAsDataUrl', 'desktop:read-media-file-as-data-url', payload),
   cacheMediaPoster: (payload) =>
     validatedInvoke('cacheMediaPoster', 'desktop:cache-media-poster', payload),
   openVideoPlayer: (payload) =>

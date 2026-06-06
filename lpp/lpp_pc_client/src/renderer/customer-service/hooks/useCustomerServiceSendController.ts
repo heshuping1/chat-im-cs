@@ -50,6 +50,7 @@ import {
   withVideoPosterMedia,
 } from "../../media/runtime/videoPosterMedia";
 import { cacheLocalSentMediaForDesktop } from "../../media/runtime/localMediaCache";
+import { registerSentMediaMaterialization } from "../../media/runtime/mediaMaterialization";
 import {
   createVideoUploadDisplayProgressTicker,
   mediaUploadProgressPercent,
@@ -522,6 +523,7 @@ export function useCustomerServiceSendController({
             (await task.localCachedMediaPromise?.catch(() => undefined)) ??
             task.localOpenUrl;
           if (localOpenForSent) task.localOpenUrl = localOpenForSent;
+          registerSentMediaMaterialization(task.kind, media, localOpenForSent);
           const localPreviewForSent = task.localPreviewUrl;
           removeCustomerServiceLocalMessage(queryClient, task.thread, task.localMessageId);
           mergeSentCustomerServiceMessage(queryClient, {

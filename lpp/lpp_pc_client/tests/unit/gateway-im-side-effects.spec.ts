@@ -6,7 +6,7 @@ import { canAutoReadImConversation } from "../../src/renderer/messages/hooks/use
 const mocks = vi.hoisted(() => ({
   markConversationRead: vi.fn(),
   markImConversationReadLocally: vi.fn(),
-  materializeReceivedImageMessage: vi.fn(),
+  materializeReceivedMediaMessage: vi.fn(),
   notifyDesktopOrBrowser: vi.fn(),
   pcSettings: {
     desktopNotifications: true,
@@ -80,14 +80,14 @@ vi.mock("../../src/renderer/data/reminder/reminder-service", async () => {
   };
 });
 
-vi.mock("../../src/renderer/media/runtime/imageMaterialization", () => ({
+vi.mock("../../src/renderer/media/runtime/mediaMaterialization", () => ({
   accountIdFromSession: (session: {
     lppId?: string;
     platformUserId?: string;
     tenantId?: string;
     userId?: string;
   } | null) => session?.userId || session?.platformUserId || session?.lppId || session?.tenantId,
-  materializeReceivedImageMessage: mocks.materializeReceivedImageMessage,
+  materializeReceivedMediaMessage: mocks.materializeReceivedMediaMessage,
 }));
 
 describe("gateway IM side effects", () => {
@@ -336,14 +336,13 @@ describe("gateway IM side effects", () => {
     );
   });
 
-  it("starts background image materialization when an IM image message is received", async () => {
+  it("starts background media materialization when an IM media message is received", async () => {
     const { mergeImGatewayMessage } = await import(
       "../../src/renderer/data/gateway/gateway-im-side-effects"
     );
 
-    mergeImGatewayMessage(
-      new QueryClient(),
-      imTextPayload({
+    [
+      {
         body: {
           image: {
             fileName: "received.png",
@@ -352,12 +351,33 @@ describe("gateway IM side effects", () => {
         },
         messageId: "image-received-1",
         messageType: "image",
-      }),
-      "direct-1",
-      "direct",
-    );
+      },
+      {
+        body: {
+          video: {
+            fileName: "received.mp4",
+            signedUrl: "/media/received-video?sig=gateway",
+          },
+        },
+        messageId: "video-received-1",
+        messageType: "video",
+      },
+      {
+        body: {
+          file: {
+            fileName: "received.zip",
+            signedUrl: "/media/received-file?sig=gateway",
+          },
+        },
+        messageId: "file-received-1",
+        messageType: "file",
+      },
+    ].forEach((payload) => {
+      mergeImGatewayMessage(new QueryClient(), imTextPayload(payload), "direct-1", "direct");
+    });
 
-    expect(mocks.materializeReceivedImageMessage).toHaveBeenCalledWith({
+    expect(mocks.materializeReceivedMediaMessage).toHaveBeenCalledTimes(3);
+    expect(mocks.materializeReceivedMediaMessage).toHaveBeenCalledWith({
       accountId: "staff-1",
       assetBaseUrl: "https://api.example.test",
       authToken: "tenant-token",

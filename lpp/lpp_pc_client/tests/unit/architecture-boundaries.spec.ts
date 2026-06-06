@@ -672,6 +672,7 @@ describe("architecture boundaries", () => {
       "src/renderer/media/runtime/imageMaterialization.ts",
       "src/renderer/media/runtime/imagePrecache.ts",
       "src/renderer/media/runtime/localMediaCache.ts",
+      "src/renderer/media/runtime/mediaMaterialization.ts",
       "src/renderer/media/runtime/videoPosterRuntime.ts",
       "src/renderer/media/runtime/videoPlayer.ts",
       "src/renderer/messages/runtime/mediaActionCapabilities.ts",

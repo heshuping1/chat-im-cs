@@ -103,7 +103,7 @@ git diff --check
 2. 消息发送在 `useMessageTextSendController` / `useMessageMediaSendController`。
 3. 菜单动作在 `useMessageMenuActionController`。
 4. 已读命令在 `useImReadCommandExecutor` 与 `im-read` owner。
-5. 媒体桌面动作在 `media/runtime` 与 `messages/runtime` owner；收到图片后的本地物化由 `src/renderer/media/runtime/imageMaterialization.ts` 负责。
+5. 媒体桌面动作在 `media/runtime` 与 `messages/runtime` owner；收到和发送后的图片/视频/文件本地物化由 `src/renderer/media/runtime/mediaMaterialization.ts` 负责。
 6. Gateway payload 仍在 `gateway-payload-utils.ts` 偏宽，进入 `P14-RESP-001`。
 
 新增机械约束：

@@ -60,6 +60,15 @@ export function registerDesktopFileHandlers({
   );
 
   register(
+    'readMediaFileAsDataUrl',
+    async (_event, payload: CacheMediaFilePayload) => {
+      const { filePath } = await ensureLocalMediaFile(payload);
+      const bytes = await readFile(filePath);
+      return `data:${mediaMimeType(filePath, payload.kind)};base64,${bytes.toString('base64')}`;
+    },
+  );
+
+  register(
     'cacheMediaPoster',
     async (_event, payload: CacheMediaPosterPayload) => cacheMediaPosterFile(payload),
   );
@@ -219,6 +228,23 @@ export function registerDesktopFileHandlers({
       kind: 'backup',
     };
   });
+}
+
+function mediaMimeType(filePath: string, kind: CacheMediaFilePayload['kind']) {
+  const lower = filePath.toLowerCase();
+  if (kind === 'image') {
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    if (lower.endsWith('.bmp')) return 'image/bmp';
+    return 'image/png';
+  }
+  if (kind === 'video') {
+    if (lower.endsWith('.webm')) return 'video/webm';
+    if (lower.endsWith('.mov')) return 'video/quicktime';
+    return 'video/mp4';
+  }
+  return 'application/octet-stream';
 }
 
 function encryptChatBackupPayload(content: string) {

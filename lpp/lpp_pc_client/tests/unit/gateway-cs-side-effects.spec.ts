@@ -7,7 +7,7 @@ import {
 import { workspaceScopeKeyFromSession } from "../../src/renderer/data/workspace-scope";
 
 const mocks = vi.hoisted(() => ({
-  materializeReceivedImageMessage: vi.fn(),
+  materializeReceivedMediaMessage: vi.fn(),
   notifyDesktopOrBrowser: vi.fn(),
   pushRealtimeReminder: vi.fn(),
   pcSettings: {
@@ -52,14 +52,14 @@ vi.mock("../../src/renderer/data/reminder/reminder-service", () => ({
   shouldShowDesktopNotificationForTarget: () => true,
 }));
 
-vi.mock("../../src/renderer/media/runtime/imageMaterialization", () => ({
+vi.mock("../../src/renderer/media/runtime/mediaMaterialization", () => ({
   accountIdFromSession: (session: {
     lppId?: string;
     platformUserId?: string;
     tenantId?: string;
     userId?: string;
   } | null) => session?.userId || session?.platformUserId || session?.lppId || session?.tenantId,
-  materializeReceivedImageMessage: mocks.materializeReceivedImageMessage,
+  materializeReceivedMediaMessage: mocks.materializeReceivedMediaMessage,
 }));
 
 vi.mock("../../src/renderer/data/workspace-ui/workspace-ui-store", () => ({
@@ -154,7 +154,7 @@ describe("gateway customer service side effects", () => {
     );
   });
 
-  it("starts background image materialization when a customer service image message is received", async () => {
+  it("starts background media materialization when a customer service media message is received", async () => {
     const { mergeCustomerServiceGatewayMessage } = await import(
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
@@ -162,8 +162,7 @@ describe("gateway customer service side effects", () => {
       setQueriesData: vi.fn(),
     };
 
-    mergeCustomerServiceGatewayMessage(
-      queryClient as never,
+    [
       {
         body: {
           image: {
@@ -176,10 +175,36 @@ describe("gateway customer service side effects", () => {
         messageType: "image",
         senderRole: "visitor",
       },
-      "temp-session-1",
-    );
+      {
+        body: {
+          video: {
+            fileName: "visitor.mp4",
+            signedUrl: "/media/visitor-video?sig=cs",
+          },
+        },
+        conversationId: "im-conversation-cs-1",
+        messageId: "visitor-video-1",
+        messageType: "video",
+        senderRole: "visitor",
+      },
+      {
+        body: {
+          file: {
+            fileName: "visitor.zip",
+            signedUrl: "/media/visitor-file?sig=cs",
+          },
+        },
+        conversationId: "im-conversation-cs-1",
+        messageId: "visitor-file-1",
+        messageType: "file",
+        senderRole: "visitor",
+      },
+    ].forEach((payload) => {
+      mergeCustomerServiceGatewayMessage(queryClient as never, payload, "temp-session-1");
+    });
 
-    expect(mocks.materializeReceivedImageMessage).toHaveBeenCalledWith({
+    expect(mocks.materializeReceivedMediaMessage).toHaveBeenCalledTimes(3);
+    expect(mocks.materializeReceivedMediaMessage).toHaveBeenCalledWith({
       accountId: "staff-1",
       assetBaseUrl: "https://api.example.test",
       authToken: "tenant-token",

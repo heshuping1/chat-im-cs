@@ -4,8 +4,8 @@ import type { ConversationListItem, GroupMemberDto, MessageItemDto } from "../..
 import type { AuthSession } from "../../data/auth/auth-session";
 import {
   accountIdFromSession,
-  materializeImageMessages,
-} from "../../media/runtime/imageMaterialization";
+  materializeMediaMessages,
+} from "../../media/runtime/mediaMaterialization";
 import { getImConversationType } from "./useMessageCenterViewModel";
 
 export function useMessageAuxiliaryData({
@@ -51,7 +51,7 @@ export function useMessageAuxiliaryData({
     if (!session || !activeConversation?.conversationId || messages.length === 0) {
       return;
     }
-    materializeImageMessages({
+    materializeMediaMessages({
       accountId: accountIdFromSession(session),
       assetBaseUrl: session.apiBaseUrl,
       authToken: session.tenantToken,

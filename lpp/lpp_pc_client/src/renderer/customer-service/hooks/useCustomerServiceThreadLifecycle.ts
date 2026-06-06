@@ -24,8 +24,8 @@ import type { CustomerServiceThreadOpenSource } from "../../data/workspace-ui/wo
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
 import {
   accountIdFromSession,
-  materializeImageMessages,
-} from "../../media/runtime/imageMaterialization";
+  materializeMediaMessages,
+} from "../../media/runtime/mediaMaterialization";
 
 export function useCustomerServiceThreadLifecycle({
   activeModule,
@@ -77,7 +77,7 @@ export function useCustomerServiceThreadLifecycle({
 
   useEffect(() => {
     if (!session || !selectedThread || messages.length === 0) return;
-    materializeImageMessages({
+    materializeMediaMessages({
       accountId: accountIdFromSession(session),
       assetBaseUrl: session.apiBaseUrl,
       authToken: session.tenantToken,

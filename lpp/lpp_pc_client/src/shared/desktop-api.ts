@@ -259,6 +259,7 @@ export interface DesktopApi {
   cacheMediaFile(payload: CacheMediaFilePayload): Promise<CachedMediaFileResult>;
   cacheLocalMediaFile(payload: CacheMediaFilePayload, file: unknown): Promise<CachedMediaFileResult>;
   getCachedMediaStatus(payload: CacheMediaFilePayload): Promise<CachedMediaStatus>;
+  readMediaFileAsDataUrl(payload: CacheMediaFilePayload): Promise<string>;
   cacheMediaPoster(payload: CacheMediaPosterPayload): Promise<CachedMediaFileResult>;
   openVideoPlayer(payload: VideoPlayerPayload): Promise<string>;
   openDownloadedFile(payload: Omit<CacheMediaFilePayload, 'kind'>): Promise<string>;
@@ -333,6 +334,7 @@ export const desktopIpcChannelByMethod = {
   downloadUpdate: 'desktop:download-update',
   installUpdate: 'desktop:install-update',
   getCachedMediaStatus: 'desktop:get-cached-media-status',
+  readMediaFileAsDataUrl: 'desktop:read-media-file-as-data-url',
   notify: 'desktop:notify',
   quitApp: 'desktop:quit-app',
   getAppInstanceProfile: 'desktop:get-app-instance-profile',

@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { appProductName } from "../../../app/appMetadata";
 import { FileMessageCard } from "../../../media/components/FileMessageCard";
 import type { ImMediaItem } from "../../../media/domain/mediaMessage";
+import {
+  getMaterializedMediaFileUrl,
+  mediaMaterializationCacheKey,
+  subscribeMaterializedMediaFile,
+} from "../../../media/runtime/mediaMaterialization";
 import type {
   LocalUploadState,
   UploadAction,
@@ -38,7 +43,11 @@ export function FileMessageContent({
   const { t } = useI18n();
   const media = item?.media;
   const href = item?.sourceUrl;
-  const openUrl = item?.localOpenUrl || href;
+  const cacheKey = mediaMaterializationCacheKey("file", media, item?.remoteSourceUrl || href);
+  const [localFileSrc, setLocalFileSrc] = useState<string | null>(
+    () => getMaterializedMediaFileUrl(cacheKey) ?? null,
+  );
+  const openUrl = localFileSrc || item?.localOpenUrl || href;
   const fileName = item?.fileName || t("messages.fileContent.fileMessage");
   const [openError, setOpenError] = useState<string | null>(null);
   const { canOpenMediaFile } = getCurrentMediaActionCapabilities();
@@ -46,6 +55,12 @@ export function FileMessageContent({
   const translatedStatusText = uploadStatusText(uploadState, t);
   const displayStatusText = translatedStatusText || statusText || "";
   const uploadBlocked = Boolean(displayStatusText);
+
+  useEffect(() => {
+    const materialized = getMaterializedMediaFileUrl(cacheKey);
+    setLocalFileSrc(materialized ?? null);
+    return subscribeMaterializedMediaFile(cacheKey, setLocalFileSrc);
+  }, [cacheKey]);
 
   const handleFileOpen = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();

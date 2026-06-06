@@ -93,6 +93,7 @@ export function validateDesktopApiCall(
       return [validateCacheMediaFilePayload(args[0])];
     case 'cacheMediaFile':
     case 'getCachedMediaStatus':
+    case 'readMediaFileAsDataUrl':
     case 'openMediaFile':
     case 'editMediaFile':
     case 'copyMediaFile':

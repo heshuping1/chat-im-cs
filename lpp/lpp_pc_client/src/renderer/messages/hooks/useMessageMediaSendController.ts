@@ -29,6 +29,7 @@ import {
   registerVideoPosterForMedia,
 } from "../../lib/videoPoster";
 import { cacheLocalSentMediaForDesktop } from "../../media/runtime/localMediaCache";
+import { registerSentMediaMaterialization } from "../../media/runtime/mediaMaterialization";
 import {
   localMediaResourceForSend,
   requireVideoSendPayload,
@@ -359,6 +360,7 @@ export function useMessageMediaSendController({
             (await task.localCachedMediaPromise?.catch(() => undefined)) ??
             task.localOpenUrl;
           if (localOpenForSent) task.localOpenUrl = localOpenForSent;
+          registerSentMediaMaterialization(task.kind, normalizedMedia, localOpenForSent);
           const localPreviewForSent = task.localPreviewUrl;
           const serverMessageId = sent.messageId || task.localMessageId;
           if ((task.kind === "image" || task.kind === "video") && localPreviewForSent) {

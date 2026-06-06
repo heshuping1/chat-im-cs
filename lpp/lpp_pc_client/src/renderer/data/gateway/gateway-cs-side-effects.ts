@@ -19,8 +19,8 @@ import { getWorkspaceUiSnapshot } from "../workspace-ui/workspace-ui-store";
 import { workspaceScopeKeyFromSession } from "../workspace-scope";
 import {
   accountIdFromSession,
-  materializeReceivedImageMessage,
-} from "../../media/runtime/imageMaterialization";
+  materializeReceivedMediaMessage,
+} from "../../media/runtime/mediaMaterialization";
 import {
   isExplicitCustomerServiceThreadOpenSource,
   resolveCustomerServiceThreadReadVisibility,
@@ -101,7 +101,7 @@ export function mergeCustomerServiceGatewayMessage(
     threadId,
     threadType,
   });
-  void materializeReceivedImageMessage({
+  void materializeReceivedMediaMessage({
     accountId: accountIdFromSession(session),
     assetBaseUrl: session?.apiBaseUrl,
     authToken: session?.tenantToken,
