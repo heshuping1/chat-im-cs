@@ -6,6 +6,7 @@ import type { MediaResourceDto } from "../../../data/api-client";
 import {
   imageMediaCacheKey,
   isBrowserNativeUrl,
+  mediaStableCacheIdentity,
   resolveMediaUrl,
 } from "../../../data/im-message-normalize";
 import { ImageMessageFrame } from "../../../media/components/ImageMessageFrame";
@@ -84,6 +85,7 @@ export function ImagePart({
   const fileName = item?.fileName;
   const localImage = isInstantLocalImageSource(src);
   const cacheKey = item?.imageCacheKey ?? imageMediaCacheKey(media, src);
+  const cacheIdentity = mediaStableCacheIdentity(media, src);
   const [localFileSrc, setLocalFileSrc] = useState<string | null>(
     () => getPrefetchedImageFileUrl(cacheKey) ?? null,
   );
@@ -96,7 +98,7 @@ export function ImagePart({
     authToken,
     cacheKey,
   );
-  const imageSrc = localImage ? src : displaySrc || src;
+  const imageSrc = localImage ? src : displaySrc;
   const [imageLoaded, setImageLoaded] = useState(localImage);
   const [imageActionBusy, setImageActionBusy] = useState(false);
   const [imageActionNotice, setImageActionNotice] = useState<string | null>(null);
@@ -138,6 +140,7 @@ export function ImagePart({
       fileName: fileName || "image.png",
       kind: "image",
       authToken,
+      cacheIdentity,
       accountId: mediaCacheContext?.accountId,
       conversationId: mediaCacheContext?.conversationId,
     })
@@ -153,6 +156,7 @@ export function ImagePart({
   }, [
     authToken,
     canCacheMediaFile,
+    cacheIdentity,
     fileName,
     localImage,
     mediaCacheContext?.accountId,
@@ -179,6 +183,7 @@ export function ImagePart({
         fileName: fileName || "image.png",
         kind: "image" as const,
         authToken,
+        cacheIdentity,
         accountId: mediaCacheContext?.accountId,
         conversationId: mediaCacheContext?.conversationId,
       }

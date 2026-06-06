@@ -4,6 +4,7 @@ import {
   imageMediaCacheKey,
   isBrowserNativeUrl,
   mediaFileName,
+  mediaStableCacheIdentity,
   normalizeMessageType,
   resolveMediaUrl,
 } from "../../data/im-message-normalize";
@@ -23,6 +24,7 @@ type ImagePrecacheOptions = {
 };
 
 export type ImagePrecacheCandidate = {
+  cacheIdentity?: string;
   cacheKey: string;
   fileName: string;
   url: string;
@@ -133,7 +135,9 @@ function imagePrecacheCandidate(
   if (!url || isBrowserNativeUrl(url) || !/^https?:\/\//i.test(url)) return null;
   const cacheKey = imageMediaCacheKey(media, url);
   if (!cacheKey) return null;
+  const cacheIdentity = mediaStableCacheIdentity(media, url);
   return {
+    ...(cacheIdentity ? { cacheIdentity } : {}),
     cacheKey,
     fileName: mediaFileName(media) || "image.png",
     url,
@@ -155,6 +159,7 @@ async function prefetchImageCandidate({
     const result = await window.desktopApi.cacheMediaFile({
       accountId,
       authToken,
+      cacheIdentity: candidate.cacheIdentity,
       conversationId,
       fileName: candidate.fileName,
       kind: "image",

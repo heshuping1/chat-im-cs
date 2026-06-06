@@ -161,6 +161,7 @@ export interface CacheMediaFilePayload {
   fileName: string;
   kind: 'image' | 'video' | 'file';
   authToken?: string;
+  cacheIdentity?: string;
   accountId?: string;
   conversationId?: string;
 }

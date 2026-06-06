@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:lpp_mobile/app/theme/theme.dart';
 import 'package:lpp_mobile/core/utils/debouncer.dart';
 import 'package:lpp_mobile/core/widgets/app_toast.dart';
+import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_composer.dart';
@@ -444,18 +445,20 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
 
   Future<void> _openMentionPicker({bool replaceTypedAt = false}) async {
     if (_isMutedForUser || !widget.isGroup) return;
-    final selected = await showDialog<_MentionPickResult>(
+    final selected = await showModalBottomSheet<_MentionPickResult>(
       context: context,
-      barrierDismissible: true,
-      barrierColor: Colors.transparent,
-      builder: (_) {
-        return _MentionPickerPopup(
-          candidates: widget.mentionCandidates,
-          canMentionAll: widget.canMentionAll,
-        );
-      },
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => _MentionPickerSheet(
+        candidates: widget.mentionCandidates,
+        canMentionAll: widget.canMentionAll,
+      ),
     );
-    if (selected == null || !mounted) return;
+    if (selected == null || selected.items.isEmpty || !mounted) return;
     final selection = _textController.selection;
     var start =
         selection.start < 0 ? _textController.text.length : selection.start;
@@ -466,20 +469,32 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
         start -= 1;
       }
     }
-    final draft = selected.isAll
-        ? _mentionDraft.insertAll(selectionStart: start, selectionEnd: end)
-        : _mentionDraft.insertUser(
-            userId: selected.userId!,
-            displayName: selected.displayName!,
-            selectionStart: start,
-            selectionEnd: end,
-          );
-    final insertedLength =
-        selected.isAll ? '@所有人 '.length : '@${selected.displayName} '.length;
+    var draft = _mentionDraft;
+    var cursor = start;
+    for (var index = 0; index < selected.items.length; index++) {
+      final item = selected.items[index];
+      final selectionStart = index == 0 ? start : cursor;
+      final selectionEnd = index == 0 ? end : cursor;
+      if (item.isAll) {
+        draft = draft.insertAll(
+          selectionStart: selectionStart,
+          selectionEnd: selectionEnd,
+        );
+        cursor += '@所有人 '.length;
+      } else {
+        draft = draft.insertUser(
+          userId: item.userId!,
+          displayName: item.displayName!,
+          selectionStart: selectionStart,
+          selectionEnd: selectionEnd,
+        );
+        cursor += '@${item.displayName} '.length;
+      }
+    }
     _mentionDraft = draft;
     _textController.value = TextEditingValue(
       text: draft.text,
-      selection: TextSelection.collapsed(offset: start + insertedLength),
+      selection: TextSelection.collapsed(offset: cursor),
     );
     _scheduleDraftSave(draft.text);
     _setMode(_InputMode.text);
@@ -1061,153 +1076,465 @@ String _weekdayText(DateTime date) {
 }
 
 class _MentionPickResult {
+  final List<_MentionPickItem> items;
+
+  const _MentionPickResult.all() : items = const [_MentionPickItem.all()];
+
+  _MentionPickResult.user({
+    required String userId,
+    required String displayName,
+  }) : items = [
+          _MentionPickItem.user(userId: userId, displayName: displayName)
+        ];
+
+  _MentionPickResult.multiple(this.items);
+}
+
+class _MentionPickItem {
   final bool isAll;
   final String? userId;
   final String? displayName;
 
-  const _MentionPickResult.all()
+  const _MentionPickItem.all()
       : isAll = true,
         userId = null,
         displayName = null;
 
-  const _MentionPickResult.user({
+  const _MentionPickItem.user({
     required this.userId,
     required this.displayName,
   }) : isAll = false;
 }
 
-class _MentionPickerPopup extends StatelessWidget {
+class _MentionPickerSheet extends StatefulWidget {
   final List<ChatMentionCandidate> candidates;
   final bool canMentionAll;
 
-  const _MentionPickerPopup({
+  const _MentionPickerSheet({
     required this.candidates,
     required this.canMentionAll,
   });
 
   @override
+  State<_MentionPickerSheet> createState() => _MentionPickerSheetState();
+}
+
+class _MentionPickerSheetState extends State<_MentionPickerSheet> {
+  final _searchController = TextEditingController();
+  final _selectedUserIds = <String>{};
+  bool _multiSelect = false;
+  bool _selectedAll = false;
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<ChatMentionCandidate> get _visibleCandidates {
+    final query = _query.trim().toLowerCase();
+    final candidates = widget.candidates
+        .where((candidate) => candidate.displayName.trim().isNotEmpty)
+        .where((candidate) {
+      if (query.isEmpty) return true;
+      return candidate.displayName.toLowerCase().contains(query) ||
+          candidate.userId.toLowerCase().contains(query);
+    }).toList(growable: false);
+    return [...candidates]..sort((left, right) {
+        final leftInitial = _mentionCandidateInitial(left);
+        final rightInitial = _mentionCandidateInitial(right);
+        final groupCompare = leftInitial.compareTo(rightInitial);
+        if (groupCompare != 0) return groupCompare;
+        return left.displayName.compareTo(right.displayName);
+      });
+  }
+
+  int get _selectedCount => _selectedUserIds.length + (_selectedAll ? 1 : 0);
+
+  List<_MentionPickItem> get _selectedItems {
+    final items = <_MentionPickItem>[];
+    if (_selectedAll) items.add(const _MentionPickItem.all());
+    for (final candidate in widget.candidates) {
+      if (!_selectedUserIds.contains(candidate.userId)) continue;
+      items.add(
+        _MentionPickItem.user(
+          userId: candidate.userId,
+          displayName: candidate.displayName,
+        ),
+      );
+    }
+    return items;
+  }
+
+  void _toggleMultiSelect() {
+    setState(() {
+      _multiSelect = true;
+    });
+  }
+
+  void _cancelMultiSelect() {
+    setState(() {
+      _multiSelect = false;
+      _selectedAll = false;
+      _selectedUserIds.clear();
+    });
+  }
+
+  void _toggleAll() {
+    if (!_multiSelect) {
+      Navigator.of(context).pop(const _MentionPickResult.all());
+      return;
+    }
+    setState(() {
+      _selectedAll = !_selectedAll;
+    });
+  }
+
+  void _toggleCandidate(ChatMentionCandidate candidate) {
+    if (!_multiSelect) {
+      Navigator.of(context).pop(
+        _MentionPickResult.user(
+          userId: candidate.userId,
+          displayName: candidate.displayName,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      if (_selectedUserIds.contains(candidate.userId)) {
+        _selectedUserIds.remove(candidate.userId);
+      } else {
+        _selectedUserIds.add(candidate.userId);
+      }
+    });
+  }
+
+  void _completeMultiSelect() {
+    final items = _selectedItems;
+    if (items.isEmpty) return;
+    Navigator.of(context).pop(_MentionPickResult.multiple(items));
+  }
+
+  Map<String, List<ChatMentionCandidate>> _groupCandidates(
+    List<ChatMentionCandidate> candidates,
+  ) {
+    final groups = <String, List<ChatMentionCandidate>>{};
+    for (final candidate in candidates) {
+      final initial = _mentionCandidateInitial(candidate);
+      groups.putIfAbsent(initial, () => []).add(candidate);
+    }
+    return groups;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final media = MediaQuery.of(context);
-    final visibleCandidates = candidates
-        .where((candidate) => candidate.displayName.trim().isNotEmpty)
-        .toList(growable: false);
-    final popupWidth =
-        (media.size.width - 48).clamp(280.0, 340.0).toDouble();
-    final bottomInset = media.viewInsets.bottom + media.padding.bottom + 72;
-    final availableHeight =
-        media.size.height - bottomInset - media.padding.top - 24;
-    final maxHeight = availableHeight.clamp(220.0, 390.0).toDouble();
-
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final visibleCandidates = _visibleCandidates;
+    final groupedCandidates = _groupCandidates(visibleCandidates);
+    final groupKeys = groupedCandidates.keys.toList(growable: false);
     return SafeArea(
-      child: Stack(
-        children: [
-          Positioned(
-            bottom: bottomInset,
-            left: (media.size.width - popupWidth) / 2,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                width: popupWidth,
-                constraints: BoxConstraints(maxHeight: maxHeight),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: colorScheme.outline.withValues(alpha: 0.16),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.16),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (canMentionAll)
-                            _MentionTile(
-                              icon: Icons.person_outline_rounded,
-                              title: '所有人',
-                              highlighted: true,
-                              onTap: () => Navigator.of(context).pop(
-                                const _MentionPickResult.all(),
-                              ),
-                            ),
-                          Padding(
-                            padding: EdgeInsets.only(
-                              top: canMentionAll ? 12 : 2,
-                              left: 6,
-                              bottom: 8,
-                            ),
-                            child: Text(
-                              '群成员',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurface
-                                    .withValues(alpha: 0.42),
-                              ),
-                            ),
+      top: false,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.72,
+        child: Column(
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(top: 8, bottom: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.onSurface.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 72,
+                    child: _multiSelect
+                        ? TextButton(
+                            onPressed: _cancelMultiSelect,
+                            child: const Text('取消'),
+                          )
+                        : IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded),
                           ),
-                          if (visibleCandidates.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(6, 18, 6, 28),
-                              child: Text(
-                                '暂无可提醒成员',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: colorScheme.onSurface
-                                      .withValues(alpha: 0.56),
-                                ),
-                              ),
-                            )
-                          else
-                            Flexible(
-                              child: ListView.builder(
-                                shrinkWrap: true,
-                                padding: EdgeInsets.zero,
-                                itemCount: visibleCandidates.length,
-                                itemBuilder: (context, index) {
-                                  final candidate = visibleCandidates[index];
-                                  return _MentionTile(
-                                    avatarUrl: candidate.avatarUrl,
-                                    title: candidate.displayName,
-                                    onTap: () => Navigator.of(context).pop(
-                                      _MentionPickResult.user(
-                                        userId: candidate.userId,
-                                        displayName: candidate.displayName,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      left: popupWidth / 2 - 12,
-                      bottom: -12,
-                      child: CustomPaint(
-                        size: const Size(24, 12),
-                        painter: _MentionPopupArrowPainter(
-                          color: colorScheme.surface,
-                          borderColor:
-                              colorScheme.outline.withValues(alpha: 0.16),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        '选择提醒的人',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ),
-                  ],
+                  ),
+                  SizedBox(
+                    width: 72,
+                    child: _multiSelect
+                        ? FilledButton(
+                            onPressed: _selectedCount > 0
+                                ? _completeMultiSelect
+                                : null,
+                            style: FilledButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              backgroundColor: const Color(0xFF16C06E),
+                              disabledBackgroundColor:
+                                  colorScheme.onSurface.withValues(alpha: 0.12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text('完成 ($_selectedCount)'),
+                          )
+                        : TextButton(
+                            onPressed: _toggleMultiSelect,
+                            child: const Text('多选'),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: _MentionSearchField(
+                controller: _searchController,
+                selectedCandidates: widget.candidates
+                    .where((candidate) =>
+                        _selectedUserIds.contains(candidate.userId))
+                    .toList(growable: false),
+                selectedAll: _selectedAll,
+                onChanged: (value) => setState(() => _query = value),
+              ),
+            ),
+            if (widget.canMentionAll && _query.trim().isEmpty)
+              _MentionTile(
+                icon: Icons.campaign_outlined,
+                title: '@所有人',
+                subtitle: '提醒群内全部成员',
+                selected: _selectedAll,
+                multiSelect: _multiSelect,
+                onTap: _toggleAll,
+              ),
+            Expanded(
+              child: visibleCandidates.isEmpty
+                  ? Center(
+                      child: Text(
+                        _query.trim().isEmpty ? '暂无可提醒成员' : '未找到相关成员',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colorScheme.onSurface.withValues(alpha: 0.56),
+                        ),
+                      ),
+                    )
+                  : Stack(
+                      children: [
+                        ListView.builder(
+                          padding: EdgeInsets.only(bottom: 12 + bottomPadding),
+                          itemCount: groupKeys.length,
+                          itemBuilder: (context, groupIndex) {
+                            final key = groupKeys[groupIndex];
+                            final members = groupedCandidates[key]!;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(18, 14, 0, 6),
+                                  child: Text(
+                                    key,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.onSurface
+                                          .withValues(alpha: 0.56),
+                                    ),
+                                  ),
+                                ),
+                                ...members.map(
+                                  (candidate) => _MentionTile(
+                                    avatarUrl: candidate.avatarUrl,
+                                    title: candidate.displayName,
+                                    selected: _selectedUserIds
+                                        .contains(candidate.userId),
+                                    multiSelect: _multiSelect,
+                                    onTap: () => _toggleCandidate(candidate),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        Positioned(
+                          top: 16,
+                          right: 4,
+                          bottom: 16 + bottomPadding,
+                          child: _MentionIndexRail(labels: groupKeys),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _mentionCandidateInitial(ChatMentionCandidate candidate) {
+  final name = candidate.displayName.trim();
+  if (name.isEmpty) return '#';
+  final first = name.characters.first;
+  final codeUnit = first.codeUnitAt(0);
+  if (codeUnit >= 65 && codeUnit <= 90) return first;
+  if (codeUnit >= 97 && codeUnit <= 122) return first.toUpperCase();
+  const pinyinInitials = {
+    '阿': 'A',
+    '艾': 'A',
+    '安': 'A',
+    '昂': 'A',
+    '邦': 'B',
+    '半': 'B',
+    '保': 'B',
+    '别': 'B',
+    '波': 'B',
+    '蔡': 'C',
+    '曹': 'C',
+    '陈': 'C',
+    '程': 'C',
+    '戴': 'D',
+    '邓': 'D',
+    '丁': 'D',
+    '董': 'D',
+    '方': 'F',
+    '范': 'F',
+    '冯': 'F',
+    '傅': 'F',
+    '高': 'G',
+    '郭': 'G',
+    '何': 'H',
+    '韩': 'H',
+    '胡': 'H',
+    '黄': 'H',
+    '贾': 'J',
+    '姜': 'J',
+    '蒋': 'J',
+    '李': 'L',
+    '梁': 'L',
+    '林': 'L',
+    '刘': 'L',
+    '卢': 'L',
+    '吕': 'L',
+    '罗': 'L',
+    '马': 'M',
+    '潘': 'P',
+    '彭': 'P',
+    '任': 'R',
+    '沈': 'S',
+    '石': 'S',
+    '宋': 'S',
+    '苏': 'S',
+    '孙': 'S',
+    '唐': 'T',
+    '田': 'T',
+    '王': 'W',
+    '魏': 'W',
+    '吴': 'W',
+    '汪': 'W',
+    '夏': 'X',
+    '谢': 'X',
+    '许': 'X',
+    '徐': 'X',
+    '薛': 'X',
+    '杨': 'Y',
+    '姚': 'Y',
+    '叶': 'Y',
+    '余': 'Y',
+    '于': 'Y',
+    '袁': 'Y',
+    '张': 'Z',
+    '赵': 'Z',
+    '郑': 'Z',
+    '钟': 'Z',
+    '周': 'Z',
+    '朱': 'Z',
+  };
+  final initial = pinyinInitials[first];
+  if (initial != null) return initial;
+  return '#';
+}
+
+class _MentionSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final List<ChatMentionCandidate> selectedCandidates;
+  final bool selectedAll;
+  final ValueChanged<String> onChanged;
+
+  const _MentionSearchField({
+    required this.controller,
+    required this.selectedCandidates,
+    required this.selectedAll,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selectedItems = [
+      if (selectedAll)
+        const ChatMentionCandidate(userId: '__all__', displayName: '所有人'),
+      ...selectedCandidates,
+    ];
+    return Container(
+      constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          if (selectedItems.isEmpty)
+            Icon(
+              Icons.search_rounded,
+              color: colorScheme.onSurface.withValues(alpha: 0.36),
+            )
+          else
+            ...selectedItems.take(5).map(
+                  (candidate) => Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _MentionAvatar(
+                      icon: candidate.userId == '__all__'
+                          ? Icons.campaign_outlined
+                          : null,
+                      avatarUrl: candidate.avatarUrl,
+                      title: candidate.displayName,
+                      radius: 18,
+                    ),
+                  ),
                 ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                hintText: '搜索',
+                hintStyle: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.38),
+                  fontSize: 16,
+                ),
+                isCollapsed: true,
+                border: InputBorder.none,
               ),
             ),
           ),
@@ -1221,14 +1548,18 @@ class _MentionTile extends StatelessWidget {
   final IconData? icon;
   final String? avatarUrl;
   final String title;
-  final bool highlighted;
+  final String? subtitle;
+  final bool selected;
+  final bool multiSelect;
   final VoidCallback onTap;
 
   const _MentionTile({
     this.icon,
     this.avatarUrl,
     required this.title,
-    this.highlighted = false,
+    this.subtitle,
+    this.selected = false,
+    this.multiSelect = false,
     required this.onTap,
   });
 
@@ -1237,40 +1568,130 @@ class _MentionTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        height: highlighted ? 58 : 64,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        decoration: BoxDecoration(
-          color: highlighted
-              ? colorScheme.onSurface.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
+      child: SizedBox(
+        height: subtitle == null ? 56 : 64,
         child: Row(
           children: [
-            _MentionAvatar(
-              icon: icon,
-              avatarUrl: avatarUrl,
-              title: title,
-              highlighted: highlighted,
-            ),
+            const SizedBox(width: 16),
+            if (multiSelect) ...[
+              _MentionCheckbox(selected: selected),
+              const SizedBox(width: 12),
+            ],
+            _MentionAvatar(icon: icon, avatarUrl: avatarUrl, title: title),
             const SizedBox(width: 12),
             Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface.withValues(alpha: 0.56),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (!multiSelect)
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurface.withValues(alpha: 0.28),
+              ),
+            const SizedBox(width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MentionCheckbox extends StatelessWidget {
+  final bool selected;
+
+  const _MentionCheckbox({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? const Color(0xFF16C06E) : Colors.transparent,
+        border: selected
+            ? null
+            : Border.all(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.28),
+                width: 1.4,
+              ),
+      ),
+      alignment: Alignment.center,
+      child: selected
+          ? Icon(
+              Icons.check_rounded,
+              size: 18,
+              color: Theme.of(context).colorScheme.surface,
+            )
+          : null,
+    );
+  }
+}
+
+class _MentionIndexRail extends StatelessWidget {
+  final List<String> labels;
+
+  const _MentionIndexRail({required this.labels});
+
+  @override
+  Widget build(BuildContext context) {
+    if (labels.isEmpty) return const SizedBox.shrink();
+    final colorScheme = Theme.of(context).colorScheme;
+    return IgnorePointer(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_rounded,
+            size: 14,
+            color: colorScheme.onSurface.withValues(alpha: 0.54),
+          ),
+          ...labels.map(
+            (label) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 1),
               child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                label,
                 style: TextStyle(
-                  fontSize: 24,
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                  height: 1.1,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: label == labels.first
+                      ? const Color(0xFF16C06E)
+                      : colorScheme.onSurface.withValues(alpha: 0.72),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1280,108 +1701,32 @@ class _MentionAvatar extends StatelessWidget {
   final IconData? icon;
   final String? avatarUrl;
   final String title;
-  final bool highlighted;
+  final double radius;
 
   const _MentionAvatar({
     this.icon,
     this.avatarUrl,
     required this.title,
-    this.highlighted = false,
+    this.radius = 20,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final url = avatarUrl;
-    if (url != null && url.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(3),
-        child: Image.network(
-          url,
-          width: 48,
-          height: 48,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _MentionAvatarFallback(title: title),
-        ),
+    final size = radius * 2;
+    if (icon == null) {
+      return UserAvatar(
+        avatarUrl: avatarUrl,
+        name: title,
+        size: size,
+        borderRadius: radius * 0.3,
       );
     }
-    if (highlighted || icon != null) {
-      return Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: colorScheme.primary,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(
-          icon ?? Icons.person_outline_rounded,
-          size: 30,
-          color: colorScheme.onPrimary,
-        ),
-      );
-    }
-    return _MentionAvatarFallback(title: title);
-  }
-}
-
-class _MentionAvatarFallback extends StatelessWidget {
-  final String title;
-
-  const _MentionAvatarFallback({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: Center(
-        child: Text(
-          title.characters.take(1).string,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: colorScheme.primary,
-          ),
-        ),
-      ),
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+      child: Icon(icon, size: radius + 1, color: colorScheme.primary),
     );
-  }
-}
-
-class _MentionPopupArrowPainter extends CustomPainter {
-  final Color color;
-  final Color borderColor;
-
-  const _MentionPopupArrowPainter({
-    required this.color,
-    required this.borderColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width, 0)
-      ..close();
-    canvas.drawPath(path, Paint()..color = color);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = borderColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _MentionPopupArrowPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.borderColor != borderColor;
   }
 }
 

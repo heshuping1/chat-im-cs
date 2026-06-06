@@ -32,7 +32,7 @@ describe("selectImagePrecacheCandidates", () => {
 
     expect(candidates).toEqual([
       {
-        cacheKey: "image:/a.png",
+        cacheKey: "image:https://assets.example/a.png",
         fileName: "a.png",
         url: "https://assets.example/a.png",
       },
@@ -65,10 +65,43 @@ describe("selectImagePrecacheCandidates", () => {
 
     expect(candidates).toEqual([
       {
-        cacheKey: "image:/media/signed-photo",
+        cacheIdentity: "media:signed-photo",
+        cacheKey: "image:media:signed-photo",
         fileName: "signed.png",
         url: "https://assets.example/media/signed-photo?sig=ok",
       },
+    ]);
+  });
+
+  it("uses stable media identity for signed media urls", () => {
+    const candidates = selectImagePrecacheCandidates(
+      [
+        message(
+          "image",
+          { image: { fileName: "first.png", signedUrl: "/media/019e-image-id?sig=first" } },
+          "first",
+        ),
+        message(
+          "image",
+          {
+            image: {
+              fileName: "second.png",
+              signedUrl: "https://cdn.example/media/019e-image-id?sig=second#view",
+            },
+          },
+          "second",
+        ),
+      ],
+      "https://assets.example",
+    );
+
+    expect(candidates.map((candidate) => candidate.cacheKey)).toEqual([
+      "image:media:019e-image-id",
+      "image:media:019e-image-id",
+    ]);
+    expect(candidates.map((candidate) => candidate.cacheIdentity)).toEqual([
+      "media:019e-image-id",
+      "media:019e-image-id",
     ]);
   });
 

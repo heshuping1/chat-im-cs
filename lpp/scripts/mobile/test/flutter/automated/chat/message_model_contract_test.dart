@@ -54,15 +54,11 @@ void main() {
         'offset': 0,
         'length': 3,
       });
-      expect(allMention.toJson(), {
-        'type': 'all',
-        'userId': mentionAllUserId,
-        'offset': 5,
-        'length': 4,
-      });
+      expect(allMention.toJson(), {'type': 'all', 'offset': 5, 'length': 4});
       expect(Mention.fromJson(allMention.toJson()).isAll, isTrue);
       expect(
         Mention.fromJson({
+          'type': 'user',
           'userId': mentionAllUserId,
           'offset': 5,
           'length': 4,

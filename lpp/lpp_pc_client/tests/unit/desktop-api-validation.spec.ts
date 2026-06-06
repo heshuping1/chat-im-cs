@@ -161,6 +161,7 @@ describe("desktop api validation", () => {
       validateCacheMediaFilePayload({
         accountId: "u1",
         authToken: "token",
+        cacheIdentity: "media:019e-photo-id",
         conversationId: "c1",
         fileName: "report.xlsx",
         kind: "file",
@@ -169,6 +170,7 @@ describe("desktop api validation", () => {
     ).toEqual({
       accountId: "u1",
       authToken: "token",
+      cacheIdentity: "media:019e-photo-id",
       conversationId: "c1",
       fileName: "report.xlsx",
       kind: "file",

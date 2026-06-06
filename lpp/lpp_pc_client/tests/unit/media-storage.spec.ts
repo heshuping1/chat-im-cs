@@ -104,6 +104,47 @@ describe("media storage", () => {
     expect(await readFile(filePath)).toEqual(Buffer.from(freshBytes));
   });
 
+  it("uses cache identity instead of signed urls for stable media cache paths", async () => {
+    const { ensureLocalMediaFile } = await import("../../src/main/media-storage");
+    const cacheIdentity = "media:019e-photo-id";
+    const expectedPath = cachedMediaPath({
+      accountId: "u1",
+      conversationId: "c1",
+      directory: "Images",
+      fileName: "photo.png",
+      url: cacheIdentity,
+      userDataDir,
+    });
+    const freshBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    globalThis.fetch = vi.fn(async () => new Response(freshBytes, {
+      headers: { "content-type": "image/png" },
+      status: 200,
+    })) as typeof fetch;
+
+    const first = await ensureLocalMediaFile({
+      accountId: "u1",
+      authToken: "token",
+      cacheIdentity,
+      conversationId: "c1",
+      fileName: "photo.png",
+      kind: "image",
+      url: "https://cdn.example.test/media/019e-photo-id?sig=first",
+    });
+    const second = await ensureLocalMediaFile({
+      accountId: "u1",
+      authToken: "token",
+      cacheIdentity,
+      conversationId: "c1",
+      fileName: "photo.png",
+      kind: "image",
+      url: "https://cdn.example.test/media/019e-photo-id?sig=second",
+    });
+
+    expect(first.filePath).toBe(expectedPath);
+    expect(second.filePath).toBe(expectedPath);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("copies a preload-derived local media file into the app media cache", async () => {
     const { cacheLocalMediaFile } = await import("../../src/main/media-storage");
     const sourcePath = join(userDataDir, "..", "selected-video.mp4");
@@ -248,7 +289,7 @@ function cachedVideoPath({
 }) {
   const month = new Date().toISOString().slice(0, 7);
   const hash = createHash("sha1").update(url).digest("hex").slice(0, 16);
-  return join(userDataDir, "lppchat-files", accountId, conversationId, "Videos", month, `${hash}-${fileName}`);
+  return join(userDataDir, "LPP Files", accountId, conversationId, "Videos", month, `${hash}-${fileName}`);
 }
 
 function cachedMediaPath({
@@ -268,5 +309,5 @@ function cachedMediaPath({
 }) {
   const month = new Date().toISOString().slice(0, 7);
   const hash = createHash("sha1").update(url).digest("hex").slice(0, 16);
-  return join(userDataDir, "lppchat-files", accountId, conversationId, directory, month, `${hash}-${fileName}`);
+  return join(userDataDir, "LPP Files", accountId, conversationId, directory, month, `${hash}-${fileName}`);
 }

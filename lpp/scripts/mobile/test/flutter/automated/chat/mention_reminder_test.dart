@@ -18,9 +18,7 @@ void main() {
 
     test('returns me when a user mention targets the current user', () {
       final kind = mentionReminderKindForMessage(
-        mentions: const [
-          Mention.user(userId: 'me', offset: 0, length: 3),
-        ],
+        mentions: const [Mention.user(userId: 'me', offset: 0, length: 3)],
         currentUserId: 'me',
         isGroup: true,
         isSelf: false,
@@ -31,9 +29,7 @@ void main() {
 
     test('ignores user mentions that target another member', () {
       final kind = mentionReminderKindForMessage(
-        mentions: const [
-          Mention.user(userId: 'other', offset: 0, length: 5),
-        ],
+        mentions: const [Mention.user(userId: 'other', offset: 0, length: 5)],
         currentUserId: 'me',
         isGroup: true,
         isSelf: false,
@@ -44,9 +40,7 @@ void main() {
 
     test('returns all for all-member mentions in group conversations', () {
       final kind = mentionReminderKindForMessage(
-        mentions: const [
-          Mention.all(offset: 0, length: 4),
-        ],
+        mentions: const [Mention.all(offset: 0, length: 4)],
         currentUserId: 'me',
         isGroup: true,
         isSelf: false,
@@ -138,6 +132,34 @@ void main() {
       expect(reminder?.messageId, 'unread-me');
       expect(reminder?.kind, MentionReminderKind.me);
     });
+
+    test(
+      'prioritizes unread direct mentions over newer all-member mentions',
+      () {
+        final reminder = latestUnreadMentionReminderForMessages(
+          messages: [
+            _message(
+              id: 'unread-me',
+              seq: 2,
+              mentions: const [
+                Mention.user(userId: 'me', offset: 0, length: 2),
+              ],
+            ),
+            _message(
+              id: 'newer-all',
+              seq: 3,
+              mentions: const [Mention.all(offset: 0, length: 4)],
+            ),
+          ],
+          currentUserId: 'me',
+          isGroup: true,
+          lastReadSeq: 1,
+        );
+
+        expect(reminder?.messageId, 'unread-me');
+        expect(reminder?.kind, MentionReminderKind.me);
+      },
+    );
 
     test('ignores read and self-sent mentions', () {
       final reminder = latestUnreadMentionReminderForMessages(

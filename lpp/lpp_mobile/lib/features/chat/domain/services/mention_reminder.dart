@@ -58,6 +58,7 @@ UnreadMentionReminder? latestUnreadMentionReminderForMessages({
 }) {
   final userId = currentUserId?.trim();
   if (!isGroup || userId == null || userId.isEmpty) return null;
+  UnreadMentionReminder? latestAll;
   for (var index = messages.length - 1; index >= 0; index--) {
     final message = messages[index];
     if (message.conversationSeq <= lastReadSeq) continue;
@@ -67,9 +68,12 @@ UnreadMentionReminder? latestUnreadMentionReminderForMessages({
       isGroup: isGroup,
       isSelf: message.senderUserId == userId || message.isSelf,
     );
-    if (kind != MentionReminderKind.none) {
+    if (kind == MentionReminderKind.me) {
       return (kind: kind, messageId: message.messageId);
     }
+    if (kind == MentionReminderKind.all && latestAll == null) {
+      latestAll = (kind: kind, messageId: message.messageId);
+    }
   }
-  return null;
+  return latestAll;
 }

@@ -171,7 +171,7 @@ function mediaDirectory(payload: CacheMediaFilePayload) {
     payload.kind === 'image' ? 'Images' : payload.kind === 'video' ? 'Videos' : 'Files';
   return join(
     app.getPath('userData'),
-    'lppchat-files',
+    'LPP Files',
     safePathSegment(payload.accountId || 'default-account'),
     safePathSegment(payload.conversationId || 'default-conversation'),
     mediaKindDirectory,
@@ -190,12 +190,13 @@ export function assertAllowedLocalMediaFilePath(filePath: string) {
 
 function mediaCacheTarget(payload: CacheMediaFilePayload) {
   const url = payload.url;
+  const cacheIdentity = payload.cacheIdentity || url;
   const fileName = safeMediaFileName(
     payload.fileName || (isDownloadableMediaUrl(url) ? basename(new URL(url).pathname) : ''),
     payload.kind,
   );
   const directory = mediaDirectory(payload);
-  const hash = createHash('sha1').update(url).digest('hex').slice(0, 16);
+  const hash = createHash('sha1').update(cacheIdentity).digest('hex').slice(0, 16);
   const filePath = join(directory, `${hash}-${fileName}`);
   return { cacheKey: filePath, directory, fileName, filePath };
 }

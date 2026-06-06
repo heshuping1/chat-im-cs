@@ -255,6 +255,15 @@ export function mediaFileName(media?: MediaResourceDto) {
 }
 
 export function imageMediaCacheKey(media: MediaResourceDto | undefined, src: string | undefined) {
+  if (!src || isBrowserNativeUrl(src)) return undefined;
+  const stableKey = mediaStableCacheIdentity(media, src);
+  return stableKey ? `image:${stableKey}` : `image:${src}`;
+}
+
+export function mediaStableCacheIdentity(
+  media: MediaResourceDto | undefined,
+  src: string | undefined,
+) {
   const record = media as Record<string, unknown> | undefined;
   const stableKey =
     stringValue(record?.mediaId) ||
@@ -267,16 +276,34 @@ export function imageMediaCacheKey(media: MediaResourceDto | undefined, src: str
     stringValue(record?.object_key) ||
     stringValue(record?.storageKey) ||
     stringValue(record?.storage_key) ||
-    stringValue(record?.url) ||
-    stringValue(record?.contentUrl) ||
-    stringValue(record?.content_url) ||
-    stringValue(record?.thumbnailUrl) ||
-    stringValue(record?.thumbnail_url) ||
-    stringValue(record?.filePath) ||
-    stringValue(record?.path);
-  if (stableKey) return `image:${stableKey}`;
-  if (!src || isBrowserNativeUrl(src)) return undefined;
-  return `image:${src}`;
+    stringValue(record?.relativePath) ||
+    stringValue(record?.relative_path);
+  if (stableKey) return stableKey;
+  return mediaIdentityFromUrl(src);
+}
+
+function mediaIdentityFromUrl(value: string | undefined) {
+  if (!value || isBrowserNativeUrl(value)) return undefined;
+  const path = mediaUrlPath(value);
+  const match = /(?:^|\/)media\/([^/?#]+)/i.exec(path);
+  const mediaId = match?.[1];
+  return mediaId ? `media:${decodeURIComponentSafe(mediaId)}` : undefined;
+}
+
+function mediaUrlPath(value: string) {
+  try {
+    return new URL(value, "https://lpp.local").pathname;
+  } catch {
+    return value.split(/[?#]/, 1)[0] || value;
+  }
+}
+
+function decodeURIComponentSafe(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 export function resolveMediaUrl(

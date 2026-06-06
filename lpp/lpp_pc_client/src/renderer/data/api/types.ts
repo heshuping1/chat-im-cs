@@ -725,6 +725,12 @@ export interface GroupChatCreatedDto {
 
 export interface MediaResourceDto {
   url?: string;
+  mediaId?: string;
+  resourceId?: string;
+  fileId?: string;
+  objectKey?: string;
+  storageKey?: string;
+  relativePath?: string;
   signedUrl?: string;
   downloadUrl?: string;
   fileName?: string;

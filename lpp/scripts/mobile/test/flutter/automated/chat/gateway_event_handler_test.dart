@@ -38,6 +38,34 @@ void main() {
       },
     );
 
+    test('preserves mentions in realtime conversation summaries', () async {
+      Conversation? emittedConversation;
+
+      await GatewayEventHandler().onNewMessage(
+        {
+          'messageId': 'msg-mention',
+          'conversationId': 'group-1',
+          'conversationSeq': 13,
+          'senderUserId': 'u-1',
+          'conversationType': 'group',
+          'messageType': 'text',
+          'body': {'text': '@mouse hello'},
+          'mentions': [
+            {'type': 'user', 'userId': 'me', 'offset': 0, 'length': 6},
+          ],
+          'sentAt': '2026-05-15T10:00:01Z',
+        },
+        spaceId: 'space-1',
+        onMessage: (_, __, ___) {},
+        onConversationUpdate: (_, conversation) {
+          emittedConversation = conversation;
+        },
+      );
+
+      expect(emittedConversation?.lastMessage?.mentions, isNotNull);
+      expect(emittedConversation?.lastMessage?.mentions?.single.userId, 'me');
+    });
+
     test('ignores events without conversation id', () async {
       var messageCount = 0;
       var conversationCount = 0;

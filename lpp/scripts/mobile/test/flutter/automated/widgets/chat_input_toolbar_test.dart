@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
+import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
@@ -197,18 +198,92 @@ void main() {
     expect(scheduledAt!.isAfter(DateTime.now()), isTrue);
   });
 
-  testWidgets('group mention picker opens again after deleting and retyping @', (
+  testWidgets(
+    'group mention picker opens again after deleting and retyping @',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          ChatInputToolbar(
+            conversationId: 'group-1',
+            isGroup: true,
+            mentionCandidates: const [
+              ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+            ],
+            onSendText: (_) async => true,
+            onSendVoice: (_, __) {},
+            onSendMedia: (_) {},
+          ),
+        ),
+      );
+
+      await tester.showKeyboard(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), '@');
+      await tester.pumpAndSettle();
+      expect(find.text('选择提醒的人'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close_rounded).last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), '@');
+      await tester.pumpAndSettle();
+
+      expect(find.text('选择提醒的人'), findsOneWidget);
+      expect(find.text('张三'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'group mention picker accepts full-width @ from Chinese keyboard',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          ChatInputToolbar(
+            conversationId: 'group-1',
+            isGroup: true,
+            mentionCandidates: const [
+              ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+            ],
+            onSendText: (_) async => true,
+            onSendVoice: (_, __) {},
+            onSendMedia: (_) {},
+          ),
+        ),
+      );
+
+      await tester.showKeyboard(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), '＠');
+      await tester.pumpAndSettle();
+
+      expect(find.text('选择提醒的人'), findsOneWidget);
+      await tester.tap(find.text('张三'));
+      await tester.pumpAndSettle();
+      expect(find.text('@张三 '), findsOneWidget);
+    },
+  );
+
+  testWidgets('group mention picker searches and inserts multiple members', (
     tester,
   ) async {
+    ChatTextSendRequest? sentRequest;
+
     await tester.pumpWidget(
       _wrap(
         ChatInputToolbar(
           conversationId: 'group-1',
           isGroup: true,
           mentionCandidates: const [
-            ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+            ChatMentionCandidate(userId: 'user-a', displayName: 'AICai'),
+            ChatMentionCandidate(userId: 'user-b', displayName: 'Alexander'),
+            ChatMentionCandidate(userId: 'user-c', displayName: 'Andy'),
+            ChatMentionCandidate(userId: 'user-d', displayName: '邦顺'),
           ],
           onSendText: (_) async => true,
+          onSendTextRequest: (request) async {
+            sentRequest = request;
+            return true;
+          },
           onSendVoice: (_, __) {},
           onSendMedia: (_) {},
         ),
@@ -218,21 +293,47 @@ void main() {
     await tester.showKeyboard(find.byType(TextField));
     await tester.enterText(find.byType(TextField), '@');
     await tester.pumpAndSettle();
-    expect(find.text('群成员'), findsOneWidget);
 
-    await tester.tapAt(const Offset(8, 8));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), '');
-    await tester.pump();
+    expect(find.text('选择提醒的人'), findsOneWidget);
+    expect(find.text('多选'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), '@');
+    await tester.tap(find.text('多选'));
     await tester.pumpAndSettle();
 
-    expect(find.text('群成员'), findsOneWidget);
-    expect(find.text('张三'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('完成 (0)'), findsOneWidget);
+
+    final searchField = find.byType(TextField).last;
+    await tester.enterText(searchField, 'A');
+    await tester.pumpAndSettle();
+
+    expect(find.text('AICai'), findsOneWidget);
+    expect(find.text('Alexander'), findsOneWidget);
+    expect(find.text('邦顺'), findsNothing);
+
+    await tester.tap(find.text('AICai'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alexander'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('完成 (2)'), findsOneWidget);
+
+    await tester.tap(find.text('完成 (2)'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('@AICai @Alexander '), findsOneWidget);
+
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(sentRequest?.text, '@AICai @Alexander');
+    expect(sentRequest?.mentions?.map((mention) => mention.userId), [
+      'user-a',
+      'user-b',
+    ]);
   });
 
-  testWidgets('group mention picker accepts full-width @ from Chinese keyboard', (
+  testWidgets('group mention picker shows search, avatars, and pinyin groups', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -241,36 +342,8 @@ void main() {
           conversationId: 'group-1',
           isGroup: true,
           mentionCandidates: const [
-            ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
-          ],
-          onSendText: (_) async => true,
-          onSendVoice: (_, __) {},
-          onSendMedia: (_) {},
-        ),
-      ),
-    );
-
-    await tester.showKeyboard(find.byType(TextField));
-    await tester.enterText(find.byType(TextField), '＠');
-    await tester.pumpAndSettle();
-
-    expect(find.text('群成员'), findsOneWidget);
-    await tester.tap(find.text('张三'));
-    await tester.pumpAndSettle();
-    expect(find.text('@张三 '), findsOneWidget);
-  });
-
-  testWidgets('group mention picker shows all-member shortcut first', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        ChatInputToolbar(
-          conversationId: 'group-1',
-          isGroup: true,
-          canMentionAll: true,
-          mentionCandidates: const [
-            ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+            ChatMentionCandidate(userId: 'user-bang', displayName: '邦顺'),
+            ChatMentionCandidate(userId: 'user-ai', displayName: 'AICai'),
           ],
           onSendText: (_) async => true,
           onSendVoice: (_, __) {},
@@ -283,13 +356,48 @@ void main() {
     await tester.enterText(find.byType(TextField), '@');
     await tester.pumpAndSettle();
 
-    expect(find.text('所有人'), findsOneWidget);
-    expect(find.text('群成员'), findsOneWidget);
+    expect(find.text('搜索'), findsOneWidget);
+    expect(find.byType(UserAvatar), findsNWidgets(2));
+    expect(find.text('A'), findsWidgets);
+    expect(find.text('B'), findsWidgets);
+    expect(find.text('#'), findsNothing);
+  });
 
-    await tester.tap(find.text('所有人'));
+  testWidgets('@all mention is visible only when permission allows it', (
+    tester,
+  ) async {
+    Widget buildToolbar({required bool canMentionAll}) => _wrap(
+      ChatInputToolbar(
+        conversationId: 'group-1',
+        isGroup: true,
+        canMentionAll: canMentionAll,
+        mentionCandidates: const [
+          ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+        ],
+        onSendText: (_) async => true,
+        onSendVoice: (_, __) {},
+        onSendMedia: (_) {},
+      ),
+    );
+
+    await tester.pumpWidget(buildToolbar(canMentionAll: false));
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '@');
     await tester.pumpAndSettle();
 
-    expect(find.text('@所有人 '), findsOneWidget);
+    expect(find.text('@所有人'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(buildToolbar(canMentionAll: true));
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '@');
+    await tester.pumpAndSettle();
+
+    expect(find.text('@所有人'), findsOneWidget);
   });
 }
 

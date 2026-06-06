@@ -167,17 +167,7 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       body = const MessageBody();
     }
 
-    List<Mention>? mentions;
-    try {
-      final raw = row['mentions'] as String?;
-      if (raw != null) {
-        mentions = (jsonDecode(raw) as List<dynamic>)
-            .map((e) => Mention.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (_) {
-      mentions = null;
-    }
+    final mentions = _mentionsFromJson(row['mentions'] as String?);
 
     final isRecalled = (row['is_recalled'] as int) == 1;
     final status = isRecalled
@@ -282,17 +272,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     final lastMsgId = row['last_message_id'] as String?;
     if (lastMsgId != null) {
       final sentAtRaw = row['last_activity_at'] as int?;
-      List<Mention>? mentions;
-      try {
-        final raw = row['last_message_mentions'] as String?;
-        if (raw != null) {
-          mentions = (jsonDecode(raw) as List<dynamic>)
-              .map((e) => Mention.fromJson(e as Map<String, dynamic>))
-              .toList();
-        }
-      } catch (_) {
-        mentions = null;
-      }
+      final mentions =
+          _mentionsFromJson(row['last_message_mentions'] as String?);
       lastMessage = LastMessage(
         messageId: lastMsgId,
         text: row['last_message_preview'] as String?,
@@ -352,6 +333,18 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       memberAvatarUrls: memberAvatarUrls,
       memberNames: memberNames,
     );
+  }
+
+  List<Mention>? _mentionsFromJson(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final mentions = (jsonDecode(raw) as List<dynamic>)
+          .map((e) => Mention.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return mentions.isEmpty ? null : mentions;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── 新增方法实现 ──────────────────────────────────────────────────────────
@@ -426,11 +419,58 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
   @override
   Future<List<Conversation>> getConversations(String spaceId) async {
     final db = await AppDatabase.of(spaceId);
+    await _ensureConversationLastMessageColumns(db);
     final rows = await db.query(
       'conversations',
       orderBy: 'is_pinned DESC, last_activity_at DESC',
     );
-    return rows.map(_rowToConversation).toList();
+    final conversations = <Conversation>[];
+    for (final row in rows) {
+      conversations.add(await _rowToConversationWithMessageBackfill(db, row));
+    }
+    return conversations;
+  }
+
+  Future<Conversation> _rowToConversationWithMessageBackfill(
+    Database db,
+    Map<String, dynamic> row,
+  ) async {
+    final conversation = _rowToConversation(row);
+    final lastMessage = conversation.lastMessage;
+    if (lastMessage == null || lastMessage.mentions != null) {
+      return conversation;
+    }
+    final mentions =
+        await _lastMessageMentionsFromMessageTable(db, conversation);
+    if (mentions == null) return conversation;
+    return conversation.copyWith(
+      lastMessage: lastMessage.copyWith(mentions: mentions),
+    );
+  }
+
+  Future<List<Mention>?> _lastMessageMentionsFromMessageTable(
+    Database db,
+    Conversation conversation,
+  ) async {
+    final lastMessage = conversation.lastMessage;
+    if (lastMessage == null) return null;
+    final table = _messageTable(conversation.conversationId);
+    if (!await _tableExists(db, table)) return null;
+    final rows = await db.query(
+      table,
+      columns: const ['mentions'],
+      where: lastMessage.messageId.isNotEmpty
+          ? 'message_id = ?'
+          : 'conversation_seq = ?',
+      whereArgs: [
+        lastMessage.messageId.isNotEmpty
+            ? lastMessage.messageId
+            : conversation.lastMessageSeq,
+      ],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return _mentionsFromJson(rows.first['mentions'] as String?);
   }
 
   @override
@@ -441,7 +481,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     await _ensureConversationLastMessageColumns(db);
     final batch = db.batch();
     for (final c in conversations) {
-      batch.insert('conversations', _conversationToRow(c),
+      final merged = await _preserveExistingLastMessageMentions(db, c);
+      batch.insert('conversations', _conversationToRow(merged),
           conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
@@ -452,8 +493,32 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       String spaceId, Conversation conversation) async {
     final db = await AppDatabase.of(spaceId);
     await _ensureConversationLastMessageColumns(db);
-    await db.insert('conversations', _conversationToRow(conversation),
+    final merged = await _preserveExistingLastMessageMentions(db, conversation);
+    await db.insert('conversations', _conversationToRow(merged),
         conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Conversation> _preserveExistingLastMessageMentions(
+    Database db,
+    Conversation next,
+  ) async {
+    final nextLast = next.lastMessage;
+    if (nextLast == null || nextLast.mentions != null) return next;
+    final rows = await db.query(
+      'conversations',
+      where: 'conversation_id = ?',
+      whereArgs: [next.conversationId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return next;
+    final existing = _rowToConversation(rows.first);
+    final existingLast = existing.lastMessage;
+    if (existingLast?.mentions == null || !_isSameLastMessage(existing, next)) {
+      return next;
+    }
+    return next.copyWith(
+      lastMessage: nextLast.copyWith(mentions: existingLast!.mentions),
+    );
   }
 
   @override
@@ -530,6 +595,20 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     return conversation.lastMessageSeq > 0 &&
         message.conversationSeq > 0 &&
         conversation.lastMessageSeq == message.conversationSeq;
+  }
+
+  bool _isSameLastMessage(Conversation current, Conversation next) {
+    final currentLast = current.lastMessage;
+    final nextLast = next.lastMessage;
+    if (currentLast == null || nextLast == null) return false;
+    if (currentLast.messageId.isNotEmpty &&
+        nextLast.messageId.isNotEmpty &&
+        currentLast.messageId == nextLast.messageId) {
+      return true;
+    }
+    return current.lastMessageSeq > 0 &&
+        next.lastMessageSeq > 0 &&
+        current.lastMessageSeq == next.lastMessageSeq;
   }
 
   @override

@@ -629,8 +629,10 @@ Future<void> _syncMessages(Dio dio, String spaceId, Ref ref) async {
             sentAt: message.sentAt,
             isSelf: isSelf || message.isSelf,
             direction: isSelf || message.isSelf ? 'out' : null,
+            mentions: message.mentions,
           ),
           lastActivityAt: message.sentAt,
+          lastMessageSeq: message.conversationSeq,
         );
         ref
             .read(conversationsProvider(spaceId).notifier)

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/providers/font_size_provider.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/identity_badge.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
@@ -19,6 +20,30 @@ const _rowBorderLight = Color(0xFFF1F1F1);
 const _rowTitleLight = Color(0xFF191919);
 const _rowSubtitleLight = Color(0xFFA0A0A0);
 const _avatarSize = 42.0;
+
+final _conversationUnreadMentionProvider = FutureProvider.family<
+    UnreadMentionReminder?,
+    ({
+      String spaceId,
+      String conversationId,
+      String currentUserId,
+      bool isGroup,
+      int lastReadSeq,
+    })>((ref, args) async {
+  if (!args.isGroup || args.currentUserId.isEmpty) return null;
+  final messages = await ChatLocalDataSourceImpl().getMessages(
+    args.spaceId,
+    args.conversationId,
+    limit: 80,
+  );
+  messages.sort((a, b) => a.conversationSeq.compareTo(b.conversationSeq));
+  return latestUnreadMentionReminderForMessages(
+    messages: messages,
+    currentUserId: args.currentUserId,
+    isGroup: args.isGroup,
+    lastReadSeq: args.lastReadSeq,
+  );
+});
 
 class ConversationRow extends ConsumerWidget {
   final Conversation conversation;
@@ -48,8 +73,22 @@ class ConversationRow extends ConsumerWidget {
         conversation.type == ConversationType.tempSession;
     final rowTextScale =
         ref.watch(fontSizeScaleProvider).clamp(0.90, 1.15).toDouble();
-    final currentUserId = ref.watch(currentSpaceProvider)?.userId;
+    final currentSpace = ref.watch(currentSpaceProvider);
+    final currentUserId = currentSpace?.userId;
     final effectivePeerUserId = _effectivePeerUserId(currentUserId);
+    final localMentionReminder = isGroup &&
+            conversation.unreadCount > 0 &&
+            currentUserId?.isNotEmpty == true
+        ? ref
+            .watch(_conversationUnreadMentionProvider((
+              spaceId: currentSpace!.spaceId,
+              conversationId: conversation.conversationId,
+              currentUserId: currentUserId!,
+              isGroup: isGroup,
+              lastReadSeq: conversation.lastReadSeq,
+            )))
+            .valueOrNull
+        : null;
 
     bool isPeerOfficial = false;
     ({String label, String shortLabel, IdentityBadgeTone tone})? peerIdentity;
@@ -240,6 +279,7 @@ class ConversationRow extends ConsumerWidget {
                             conversation,
                             context,
                             currentUserId: currentUserId,
+                            mentionReminderKind: localMentionReminder?.kind,
                           ),
                           style: TextStyle(
                             fontSize: 12.5,
@@ -291,15 +331,17 @@ class ConversationRow extends ConsumerWidget {
     Conversation conversation,
     BuildContext context, {
     required String? currentUserId,
+    MentionReminderKind? mentionReminderKind,
   }) {
     final l10n = AppLocalizations.of(context);
     final msg = conversation.lastMessage;
     if (msg == null) return '';
     final label = mentionReminderLabel(
-      mentionReminderKindForConversation(
-        conversation,
-        currentUserId: currentUserId,
-      ),
+      mentionReminderKind ??
+          mentionReminderKindForConversation(
+            conversation,
+            currentUserId: currentUserId,
+          ),
     );
     final prefix = label == null ? '' : '$label ';
     if (msg.text != null && msg.text!.isNotEmpty) return '$prefix${msg.text!}';

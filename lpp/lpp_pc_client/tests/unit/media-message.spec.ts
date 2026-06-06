@@ -28,7 +28,7 @@ describe("normalizeMediaPart", () => {
       kind: "image",
       fileName: "photo.jpg",
       sourceUrl: "https://assets.example/thumbs/photo.jpg",
-      imageCacheKey: "image:/files/photo.jpg",
+      imageCacheKey: "image:https://assets.example/thumbs/photo.jpg",
     });
   });
 
@@ -48,6 +48,7 @@ describe("normalizeMediaPart", () => {
       fileName: "photo.jpg",
       remoteSourceUrl: "https://assets.example/media/photo?sig=ok",
       sourceUrl: "https://assets.example/media/photo?sig=ok",
+      imageCacheKey: "image:media:photo",
       imageSourceUrls: [
         "https://assets.example/media/photo?sig=ok",
         "https://assets.example/media/photo-thumb",
@@ -671,7 +672,9 @@ describe("message media upload presentation", () => {
     expect(imageFrame).toContain('t("media.image.reveal")');
     expect(imageFrame).toContain("message-image-retry");
     expect(mediaParts).toContain("imageActionSrc");
-    expect(mediaParts).toContain("const imageSrc = localImage ? src : displaySrc || src;");
+    expect(mediaParts).toContain("cacheIdentity");
+    expect(mediaParts).not.toContain("displaySrc || src");
+    expect(mediaParts).toContain("const imageSrc = localImage ? src : displaySrc;");
     expect(mediaParts).toContain("imageSourceUrls");
     expect(mediaParts).toContain("hasNextImageSource");
     expect(mediaParts).toContain("useNextImageSource");

@@ -188,9 +188,11 @@ export function validateCacheMediaFilePayload(value: unknown): CacheMediaFilePay
   const record = objectValue(value, 'media.payload');
   const kind = safeString(record.kind, 'media.kind') as CacheMediaFilePayload['kind'];
   if (!mediaKinds.has(kind)) throw new Error(`Invalid media.kind: ${kind}`);
+  const cacheIdentity = optionalString(record.cacheIdentity, 'media.cacheIdentity');
   return {
     accountId: optionalString(record.accountId, 'media.accountId'),
     authToken: optionalString(record.authToken, 'media.authToken'),
+    ...(cacheIdentity ? { cacheIdentity } : {}),
     conversationId: optionalString(record.conversationId, 'media.conversationId'),
     fileName: safeString(record.fileName, 'media.fileName'),
     kind,

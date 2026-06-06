@@ -531,11 +531,10 @@ class Mention {
   }) : type = MentionTargetType.user;
 
   const Mention.user({
-    required String userId,
+    required this.userId,
     required this.offset,
     required this.length,
-  })  : type = MentionTargetType.user,
-        userId = userId;
+  }) : type = MentionTargetType.user;
 
   const Mention.all({
     required this.offset,
@@ -547,15 +546,15 @@ class Mention {
 
   factory Mention.fromJson(Map<String, dynamic> json) {
     final rawType = json['type'] as String?;
-    final rawUserId = json['userId'] as String?;
-    if (rawType == 'all' || rawUserId == mentionAllUserId) {
+    final userId = json['userId'] as String?;
+    if (rawType == 'all' || userId == mentionAllUserId) {
       return Mention.all(
         offset: json['offset'] as int,
         length: json['length'] as int,
       );
     }
     return Mention(
-      userId: json['userId'] as String?,
+      userId: userId,
       offset: json['offset'] as int,
       length: json['length'] as int,
     );
@@ -564,8 +563,7 @@ class Mention {
   Map<String, dynamic> toJson() {
     return {
       'type': type == MentionTargetType.all ? 'all' : 'user',
-      if (isAll) 'userId': mentionAllUserId,
-      if (!isAll && userId != null && userId!.isNotEmpty) 'userId': userId,
+      if (userId != null && userId!.isNotEmpty) 'userId': userId,
       'offset': offset,
       'length': length,
     };

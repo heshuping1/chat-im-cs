@@ -104,6 +104,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _requestedScrollTarget = false;
   // 退出时上报已读的 seq（微信做法：进入立即本地清零，退出时才上报服务器）
   int? _pendingReadSeq;
+  int? _initialMentionLastReadSeq;
   // 非好友/无权限发消息（MSG_MEMBER_FORBIDDEN）
   bool _notFriend = false;
   bool _customerServiceDetailLoaded = false;
@@ -178,6 +179,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (!mounted || _spaceId.isEmpty) return;
       if (_isPendingDirectChat) return;
       if (_isReadOnlyConversation) return;
+      _captureInitialMentionReadSeq();
       ref
           .read(conversationsProvider(_spaceId).notifier)
           .markReadLocally(_activeConversationId);
@@ -226,6 +228,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         );
       }
     });
+  }
+
+  void _captureInitialMentionReadSeq() {
+    if (_initialMentionLastReadSeq != null) return;
+    final conversation = ref
+        .read(conversationsProvider(_spaceId))
+        .valueOrNull
+        ?.where((c) => c.conversationId == _activeConversationId)
+        .firstOrNull;
+    if (conversation == null || conversation.unreadCount <= 0) return;
+    _initialMentionLastReadSeq = conversation.lastReadSeq;
   }
 
   @override
@@ -1567,7 +1580,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       'MSG_GROUP_MUTED' => l10n.chatMutedFullNotice,
       'MSG_MEMBER_MUTED' => '你已被禁言，暂时无法发言',
       'MSG_USER_MUTED' => '当前账号已被禁言，暂时无法发言',
-      'MSG_AT_ALL_NOT_ALLOWED' => '当前群不允许普通成员 @所有人',
       'DIRECT_MESSAGE_BLOCKED_BY_MODERATION' => '内容不符合规范，已禁止发送',
       'GROUP_MESSAGE_BLOCKED_BY_MODERATION' => '内容不符合规范，已禁止发送',
       'TEMP_SESSION_SENSITIVE_BLOCKED' => '内容不符合规范，已禁止发送',
@@ -2167,9 +2179,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   String _sendFailureReason(Object error) {
     if (error is ServerError) {
-      if (error.code == 'MSG_AT_ALL_NOT_ALLOWED') {
-        return '当前群不允许普通成员 @所有人';
-      }
       return error.code.isNotEmpty ? error.code : error.message;
     }
     if (error is AuthError) return error.code;
@@ -2516,6 +2525,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     isGroup: _effectiveIsGroup,
                     conversationId: activeConversationId,
                     lastReadSeq: currentConversation?.lastReadSeq ?? 0,
+                    mentionReminderReadSeq: _initialMentionLastReadSeq,
                     allowAddFriendFromGroup: allowAddFriendFromGroup,
                     multiSelectMode: _multiSelectMode,
                     selectedMessages: _selectedMessages,
@@ -2556,6 +2566,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       isGroup: _effectiveIsGroup,
                       conversationId: activeConversationId,
                       lastReadSeq: currentConversation?.lastReadSeq ?? 0,
+                      mentionReminderReadSeq: _initialMentionLastReadSeq,
                       allowAddFriendFromGroup: allowAddFriendFromGroup,
                       multiSelectMode: _multiSelectMode,
                       selectedMessages: _selectedMessages,
@@ -4586,6 +4597,7 @@ class _MessageList extends ConsumerWidget {
   final bool isGroup;
   final String conversationId;
   final int lastReadSeq;
+  final int? mentionReminderReadSeq;
   final bool allowAddFriendFromGroup;
   final bool multiSelectMode;
   final Set<String> selectedMessages;
@@ -4608,6 +4620,7 @@ class _MessageList extends ConsumerWidget {
     required this.isGroup,
     required this.conversationId,
     this.lastReadSeq = 0,
+    this.mentionReminderReadSeq,
     required this.allowAddFriendFromGroup,
     required this.multiSelectMode,
     required this.selectedMessages,
@@ -4892,7 +4905,7 @@ class _MessageList extends ConsumerWidget {
       messages: messages,
       currentUserId: currentUserId,
       isGroup: isGroup,
-      lastReadSeq: lastReadSeq,
+      lastReadSeq: mentionReminderReadSeq ?? lastReadSeq,
     );
   }
 

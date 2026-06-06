@@ -45,6 +45,7 @@ class GatewayEventHandler {
         messageType: messageTypeToApiString(message.type),
         senderUserId: message.senderUserId,
         sentAt: message.sentAt,
+        mentions: message.mentions,
       ),
       lastActivityAt: message.sentAt,
       lastMessageSeq: message.conversationSeq,
