@@ -149,6 +149,31 @@ void main() {
     expect(favoriteTaps, 1);
   });
 
+  testWidgets('group tools panel does not show mention member entry', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'group-1',
+          isGroup: true,
+          mentionCandidates: const [
+            ChatMentionCandidate(userId: 'user-2', displayName: '张三'),
+          ],
+          onSendText: (_) async => true,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.add_circle_outline_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('@成员'), findsNothing);
+    expect(find.text('选择提醒的人'), findsNothing);
+  });
+
   testWidgets('scheduled message picker schedules typed content', (
     tester,
   ) async {

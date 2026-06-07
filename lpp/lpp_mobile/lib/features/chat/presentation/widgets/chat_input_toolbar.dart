@@ -736,7 +736,6 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
         onQuickReply: widget.quickReplyScope == null ? null : _openQuickReplies,
         onAiReply:
             widget.quickReplyScope == null ? null : _openAiReplySuggestions,
-        onMention: widget.isGroup ? _openMentionPicker : null,
       );
     }
 
@@ -1727,7 +1726,6 @@ class _ToolsPanel extends StatelessWidget {
   final VoidCallback onScheduleMessage;
   final VoidCallback? onQuickReply;
   final VoidCallback? onAiReply;
-  final VoidCallback? onMention;
 
   const _ToolsPanel({
     required this.isGroup,
@@ -1743,7 +1741,6 @@ class _ToolsPanel extends StatelessWidget {
     required this.onScheduleMessage,
     this.onQuickReply,
     this.onAiReply,
-    this.onMention,
   });
 
   @override
@@ -1777,12 +1774,6 @@ class _ToolsPanel extends StatelessWidget {
           onTap: () {
             onSendContactCard?.call();
           }),
-      if (onMention != null)
-        _ToolItem(
-          icon: Icons.alternate_email_rounded,
-          label: '@成员',
-          onTap: onMention!,
-        ),
       if (onQuickReply != null)
         _ToolItem(
           icon: Icons.quickreply_outlined,
