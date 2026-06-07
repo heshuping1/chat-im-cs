@@ -165,6 +165,66 @@ void main() {
     },
   );
 
+  testWidgets('self vertical image bubble keeps portrait aspect ratio', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.image,
+            body: const MessageBody(
+              image: MediaResource(
+                url: '/tmp/local-image.jpg',
+                width: 900,
+                height: 1600,
+              ),
+            ),
+          ),
+          isSelf: true,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    final imageRect = tester.getRect(
+      find.byKey(const ValueKey('message-image-frame')),
+    );
+
+    expect(imageRect.height, greaterThan(imageRect.width));
+    expect(imageRect.height, lessThanOrEqualTo(280));
+  });
+
+  testWidgets('self horizontal image bubble keeps landscape aspect ratio', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.image,
+            body: const MessageBody(
+              image: MediaResource(
+                url: '/tmp/local-image.jpg',
+                width: 1600,
+                height: 900,
+              ),
+            ),
+          ),
+          isSelf: true,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    final imageRect = tester.getRect(
+      find.byKey(const ValueKey('message-image-frame')),
+    );
+
+    expect(imageRect.width, greaterThan(imageRect.height));
+    expect(imageRect.width, 220);
+  });
+
   testWidgets('sending local video shows upload progress on video bubble', (
     tester,
   ) async {
@@ -196,6 +256,67 @@ void main() {
     );
     expect(find.byIcon(Icons.play_arrow), findsNothing);
     expect(find.text('50%'), findsOneWidget);
+  });
+
+  testWidgets('self vertical video bubble keeps portrait aspect ratio', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.video,
+            body: const MessageBody(
+              video: MediaResource(
+                url: '/tmp/local-video.mp4',
+                width: 720,
+                height: 1280,
+              ),
+            ),
+          ),
+          isSelf: true,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    final posterRect = tester.getRect(
+      find.byKey(const ValueKey('message-video-poster-frame')),
+    );
+    final playRect = tester.getRect(find.byIcon(Icons.play_arrow));
+
+    expect(posterRect.height, greaterThan(posterRect.width));
+    expect(playRect.center.dx, closeTo(posterRect.center.dx, 1));
+    expect(playRect.center.dy, closeTo(posterRect.center.dy, 1));
+  });
+
+  testWidgets('self horizontal video bubble keeps landscape aspect ratio', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.video,
+            body: const MessageBody(
+              video: MediaResource(
+                url: '/tmp/local-video.mp4',
+                width: 1280,
+                height: 720,
+              ),
+            ),
+          ),
+          isSelf: true,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    final posterRect = tester.getRect(
+      find.byKey(const ValueKey('message-video-poster-frame')),
+    );
+
+    expect(posterRect.width, greaterThan(posterRect.height));
   });
 
   testWidgets('text sending still shows progress spinner', (tester) async {

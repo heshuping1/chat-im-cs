@@ -130,6 +130,41 @@ class MediaOpenController {
     }
   }
 
+  Future<String?> cachedLocalPathFor(MediaOpenRequest request) async {
+    final rawUrl = request.remoteUrl.trim();
+    if (rawUrl.isEmpty) return null;
+
+    final localCandidate = request.localCandidateUrl?.trim();
+    if (localCandidate != null &&
+        localCandidate.isNotEmpty &&
+        _isLocalMediaPath(localCandidate)) {
+      final candidatePath = localPathFromUriOrPath(localCandidate);
+      if (await runtime.fileExists(candidatePath)) return candidatePath;
+    }
+
+    if (_isLocalMediaPath(rawUrl)) {
+      final localPath = localPathFromUriOrPath(rawUrl);
+      return await runtime.fileExists(localPath) ? localPath : null;
+    }
+
+    final file = await store.get(
+      spaceId: spaceId,
+      conversationId: request.conversationId,
+      messageId: request.messageId,
+      mediaKind: request.mediaKind,
+      variant: request.variant,
+    );
+    if (file == null ||
+        file.status != MediaLocalStatus.downloaded ||
+        file.localPath == null ||
+        file.localPath!.trim().isEmpty) {
+      return null;
+    }
+    if (!await runtime.fileExists(file.localPath)) return null;
+
+    return file.localPath;
+  }
+
   Future<String> _resolvePath(MediaOpenRequest request) async {
     var file = await store.upsertMissing(
       spaceId: spaceId,

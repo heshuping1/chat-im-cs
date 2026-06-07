@@ -60,6 +60,28 @@ MediaBubbleSize mediaBubbleSize(
   );
 }
 
+MediaBubbleSize imageBubbleSize(MediaResource? media) {
+  return mediaBubbleSize(
+    media,
+    fallbackAspectRatio: 1,
+    maxWidth: 220,
+    maxHeight: 280,
+    minWidth: 96,
+    minHeight: 96,
+  );
+}
+
+MediaBubbleSize videoBubbleSize(MediaResource? media) {
+  return mediaBubbleSize(
+    media,
+    fallbackAspectRatio: 16 / 9,
+    maxWidth: 220,
+    maxHeight: 280,
+    minWidth: 96,
+    minHeight: 96,
+  );
+}
+
 String? videoBubblePosterSource(
   MediaResource? media, {
   String? generatedPosterUrl,

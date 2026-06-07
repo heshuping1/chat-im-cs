@@ -1,7 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/gateway_service.dart';
 
 void main() {
+  test('times out a hung gateway connection start attempt', () async {
+    final pendingStart = Future<void>.delayed(const Duration(days: 1));
+
+    await expectLater(
+      awaitGatewayConnectionStart(
+        pendingStart,
+        timeout: const Duration(milliseconds: 1),
+      ),
+      throwsA(isA<TimeoutException>()),
+    );
+  });
+
   group('effectiveGatewayConnectionStatus', () {
     test('trusts the underlying SignalR connection when it is connected', () {
       expect(

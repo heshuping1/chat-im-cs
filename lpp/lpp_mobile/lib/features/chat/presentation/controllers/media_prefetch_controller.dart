@@ -1,12 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lpp_mobile/core/platform/local_video_poster.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
-
-const int defaultAutoVideoPosterSourceLimitBytes = 20 * 1024 * 1024;
 
 final mediaPrefetchControllerProvider =
     Provider.family<MediaPrefetchController, String>((ref, spaceId) {
@@ -34,9 +31,8 @@ class MediaPrefetchRequest {
 }
 
 List<MediaPrefetchRequest> mediaPrefetchRequestsForMessage(
-  Message message, {
-  int autoVideoPosterSourceLimitBytes = defaultAutoVideoPosterSourceLimitBytes,
-}) {
+  Message message,
+) {
   switch (message.type) {
     case MessageType.image:
       final image = message.body.image;
@@ -68,22 +64,7 @@ List<MediaPrefetchRequest> mediaPrefetchRequestsForMessage(
           ),
         ];
       }
-      final size = video.sizeBytes;
-      if (size != null && size > autoVideoPosterSourceLimitBytes) {
-        return const [];
-      }
-      final videoUrl = video.url.trim();
-      if (videoUrl.isEmpty) return const [];
-      return [
-        MediaPrefetchRequest(
-          message: message,
-          mediaKind: MediaKind.video,
-          variant: MediaVariant.videoSource,
-          resource: video,
-          fallbackName: video.fileName ?? 'video.mp4',
-          generatePoster: true,
-        ),
-      ];
+      return const [];
     default:
       return const [];
   }
@@ -106,7 +87,7 @@ class MediaPrefetchController {
     final requests = mediaPrefetchRequestsForMessage(message);
     for (final request in requests) {
       try {
-        final localPath = await opener.localPathFor(
+        await opener.localPathFor(
           MediaOpenRequest.fromResource(
             message: request.message,
             mediaKind: request.mediaKind,
@@ -115,12 +96,6 @@ class MediaPrefetchController {
             fallbackName: request.fallbackName,
           ),
         );
-        if (request.generatePoster) {
-          await generateLocalVideoPoster(
-            localPath,
-            cacheKey: request.resource.url,
-          );
-        }
       } catch (_) {
         // Prefetch is opportunistic; visible message state must not depend on it.
       }

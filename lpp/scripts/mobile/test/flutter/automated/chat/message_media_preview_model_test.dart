@@ -65,6 +65,12 @@ void main() {
       );
     });
 
+    test('returns empty video poster source when no cover is available', () {
+      const media = MediaResource(url: 'https://cdn.example.com/video.mp4');
+
+      expect(videoBubblePosterSource(media), isNull);
+    });
+
     test(
       'treats server relative media urls as remote displayable resources',
       () {
@@ -74,30 +80,87 @@ void main() {
       },
     );
 
-    test('sizes image bubbles with original aspect ratio constraints', () {
-      final wide = mediaBubbleSize(
+    test('sizes landscape image bubbles with original aspect ratio', () {
+      final size = imageBubbleSize(
         const MediaResource(url: '/media/wide.jpg', width: 1600, height: 900),
-        fallbackAspectRatio: 1,
-      );
-      final tall = mediaBubbleSize(
-        const MediaResource(url: '/media/tall.jpg', width: 900, height: 1600),
-        fallbackAspectRatio: 1,
       );
 
-      expect(wide.width, greaterThan(wide.height));
-      expect(tall.height, greaterThan(tall.width));
-      expect(wide.width, lessThanOrEqualTo(240));
-      expect(tall.height, lessThanOrEqualTo(280));
+      expect(size.width, greaterThan(size.height));
+      expect(size.width, 220);
+      expect(size.height, lessThanOrEqualTo(280));
+    });
+
+    test('sizes portrait image bubbles with original aspect ratio', () {
+      final size = imageBubbleSize(
+        const MediaResource(url: '/media/tall.jpg', width: 900, height: 1600),
+      );
+
+      expect(size.height, greaterThan(size.width));
+      expect(size.height, lessThanOrEqualTo(280));
+      expect(size.width, greaterThanOrEqualTo(96));
+    });
+
+    test('uses square fallback for image bubbles without metadata', () {
+      final size = imageBubbleSize(
+        const MediaResource(url: '/media/unknown.jpg'),
+      );
+
+      expect(size.width, 220);
+      expect(size.height, 220);
+    });
+
+    test('caps extreme image bubbles without breaking touch target', () {
+      final long = imageBubbleSize(
+        const MediaResource(url: '/media/long.jpg', width: 100, height: 2000),
+      );
+      final panorama = imageBubbleSize(
+        const MediaResource(
+          url: '/media/panorama.jpg',
+          width: 2000,
+          height: 100,
+        ),
+      );
+
+      expect(long.width, greaterThanOrEqualTo(96));
+      expect(long.height, 280);
+      expect(panorama.width, 220);
+      expect(panorama.height, greaterThanOrEqualTo(96));
     });
 
     test('uses compact 16:9 default for videos without metadata', () {
-      final size = mediaBubbleSize(
+      final size = videoBubbleSize(
         const MediaResource(url: '/media/video.mp4'),
-        fallbackAspectRatio: 16 / 9,
       );
 
       expect(size.width, 220);
       expect(size.height, 124);
+    });
+
+    test('sizes vertical videos as narrow tall cards', () {
+      final size = videoBubbleSize(
+        const MediaResource(
+          url: '/media/vertical.mp4',
+          width: 720,
+          height: 1280,
+        ),
+      );
+
+      expect(size.height, greaterThan(size.width));
+      expect(size.height, lessThanOrEqualTo(280));
+      expect(size.width, greaterThanOrEqualTo(96));
+    });
+
+    test('sizes horizontal videos as wide cards', () {
+      final size = videoBubbleSize(
+        const MediaResource(
+          url: '/media/horizontal.mp4',
+          width: 1280,
+          height: 720,
+        ),
+      );
+
+      expect(size.width, greaterThan(size.height));
+      expect(size.width, 220);
     });
   });
 }

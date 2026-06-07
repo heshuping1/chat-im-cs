@@ -30,7 +30,8 @@
     <application
         android:label="绿泡泡"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <!-- WebRTC external textures can render corrupted frames on some
              Vulkan/Impeller Android devices. Use Skia for stable call video. -->
         <meta-data

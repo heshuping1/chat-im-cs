@@ -65,6 +65,24 @@ GatewayConnectionStatus effectiveGatewayConnectionStatus(
   return status;
 }
 
+const Duration gatewayConnectionStartTimeout = Duration(seconds: 12);
+
+Future<T?> awaitGatewayConnectionStart<T>(
+  Future<T>? startFuture, {
+  Duration timeout = gatewayConnectionStartTimeout,
+}) {
+  if (startFuture == null) return Future<T?>.value();
+  return startFuture.timeout(
+    timeout,
+    onTimeout: () {
+      throw TimeoutException(
+        'Gateway connection start timed out after ${timeout.inSeconds}s',
+        timeout,
+      );
+    },
+  );
+}
+
 class NewMessageEvent extends GatewayEvent {
   final Map<String, dynamic> data;
   NewMessageEvent(this.data);
@@ -460,11 +478,21 @@ class GatewayService {
     _connection = connection;
 
     try {
-      await connection.start();
+      await awaitGatewayConnectionStart(connection.start());
+      if (_connection != connection) {
+        unawaited(connection.stop().catchError((_) {}));
+        return;
+      }
       _retryCount = 0;
       _setStatus(GatewayConnectionStatus.connected);
       _startHeartbeat();
-    } catch (_) {
+    } on TimeoutException catch (error) {
+      debugPrint('[GatewayService] connection start timeout: $error');
+      _setStatus(GatewayConnectionStatus.reconnecting);
+      _scheduleReconnect(accessToken, baseUrl);
+      unawaited(connection.stop().catchError((_) {}));
+    } catch (error) {
+      debugPrint('[GatewayService] connection start failed: $error');
       _setStatus(GatewayConnectionStatus.reconnecting);
       _scheduleReconnect(accessToken, baseUrl);
     }

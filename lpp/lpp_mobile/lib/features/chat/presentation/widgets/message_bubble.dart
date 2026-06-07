@@ -674,7 +674,7 @@ class _ImageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final media = message.body.image;
     final actionUrl = media?.url;
-    final size = mediaBubbleSize(media, fallbackAspectRatio: 1);
+    final size = imageBubbleSize(media);
 
     return GestureDetector(
       onTap: actionUrl != null && !isLocalVisualMediaUrl(actionUrl)
@@ -697,10 +697,15 @@ class _ImageBubble extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            _ImageVisualFrame(
-              media: media,
-              size: size,
-              placeholderBuilder: _placeholder,
+            SizedBox(
+              key: const ValueKey('message-image-frame'),
+              width: size.width,
+              height: size.height,
+              child: _ImageVisualFrame(
+                media: media,
+                size: size,
+                placeholderBuilder: _placeholder,
+              ),
             ),
           ],
         ),
@@ -1164,8 +1169,7 @@ class _VideoBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final posterUrl = videoBubblePosterSource(message.body.video);
     final duration = message.body.video?.durationSeconds;
-    final size =
-        mediaBubbleSize(message.body.video, fallbackAspectRatio: 16 / 9);
+    final size = videoBubbleSize(message.body.video);
     final uploadPresentation =
         videoMessageUploadPresentation(message.localUploadState);
     final isLocalPoster = isLocalVisualMediaUrl(posterUrl) &&
@@ -1190,14 +1194,19 @@ class _VideoBubble extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            _VideoPosterFrame(
-              message: message,
-              media: message.body.video,
-              posterUrl: posterUrl,
-              isLocalPoster: isLocalPoster,
+            SizedBox(
+              key: const ValueKey('message-video-poster-frame'),
               width: size.width,
               height: size.height,
-              placeholderBuilder: _placeholder,
+              child: _VideoPosterFrame(
+                message: message,
+                media: message.body.video,
+                posterUrl: posterUrl,
+                isLocalPoster: isLocalPoster,
+                width: size.width,
+                height: size.height,
+                placeholderBuilder: _placeholder,
+              ),
             ),
             if (uploadPresentation.active)
               _MediaUploadOverlay(
@@ -1358,6 +1367,11 @@ class _VideoPosterFrameState extends ConsumerState<_VideoPosterFrame> {
       final localVideoPath = _isLocalMediaPath(videoUrl)
           ? localPathFromUriOrPath(videoUrl)
           : await _localVideoPathForPoster();
+      if (localVideoPath == null || localVideoPath.trim().isEmpty) {
+        if (!mounted || _generatingForUrl != videoUrl) return;
+        setState(() => _generatedPosterPath = null);
+        return;
+      }
       final posterPath = await generateLocalVideoPoster(
         localVideoPath,
         cacheKey: videoUrl,
@@ -1372,12 +1386,12 @@ class _VideoPosterFrameState extends ConsumerState<_VideoPosterFrame> {
     }
   }
 
-  Future<String> _localVideoPathForPoster() async {
+  Future<String?> _localVideoPathForPoster() async {
     final media = widget.media;
     if (media == null) throw StateError('Video media is empty');
     final spaceId = ref.read(currentSpaceProvider)?.spaceId;
     if (spaceId == null) throw StateError('Current space is empty');
-    return ref.read(mediaOpenControllerProvider(spaceId)).localPathFor(
+    return ref.read(mediaOpenControllerProvider(spaceId)).cachedLocalPathFor(
           MediaOpenRequest.fromResource(
             message: widget.message,
             mediaKind: MediaKind.video,

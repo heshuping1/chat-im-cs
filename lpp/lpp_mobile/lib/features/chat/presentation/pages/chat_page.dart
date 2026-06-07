@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart' as dio_package;
 import 'package:flutter/material.dart';
@@ -14,6 +13,7 @@ import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/network/http_client.dart' as app_http;
 import 'package:lpp_mobile/core/platform/local_file.dart';
+import 'package:lpp_mobile/core/platform/local_image_dimensions.dart';
 import 'package:lpp_mobile/core/platform/local_video_poster.dart';
 import 'package:lpp_mobile/core/platform/media_file_runtime.dart';
 import 'package:lpp_mobile/core/platform/media_saver.dart';
@@ -1779,19 +1779,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         final sizeBytes = localized.sizeBytes > 0
             ? localized.sizeBytes
             : item.sizeBytes ?? await localFileLength(item.path);
-        final imageDimensions = item.isImage
-            ? await _readLocalImageDimensions(localized.localPath)
-            : null;
         final localPosterUrl = item.isVideo
             ? await generateLocalVideoPoster(localized.localPath)
             : null;
+        final mediaDimensions = item.isImage
+            ? await readLocalImageDimensions(localized.localPath)
+            : await readLocalImageDimensions(localPosterUrl);
         final resource = MediaResource(
           url: localized.localPath,
           fileName: item.fileName,
           mimeType: item.mimeType,
           sizeBytes: sizeBytes,
-          width: imageDimensions?.$1,
-          height: imageDimensions?.$2,
+          width: mediaDimensions?.$1,
+          height: mediaDimensions?.$2,
           localPreviewUrl: localized.localPath,
           localPosterUrl: localPosterUrl,
         );
@@ -1833,20 +1833,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           duration: const Duration(seconds: 3),
         );
       }
-    }
-  }
-
-  Future<(int, int)?> _readLocalImageDimensions(String path) async {
-    try {
-      final bytes = Uint8List.fromList(await readLocalFileBytes(path));
-      final completer = Completer<ui.Image>();
-      ui.decodeImageFromList(bytes, completer.complete);
-      final image = await completer.future;
-      final dimensions = (image.width, image.height);
-      image.dispose();
-      return dimensions;
-    } catch (_) {
-      return null;
     }
   }
 

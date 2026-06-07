@@ -28,32 +28,55 @@ void main() {
     expect(requests.single.resource.url, 'https://cdn.example.com/thumb.jpg');
   });
 
-  test(
-    'prefetches small video source for generated poster when thumbnail absent',
-    () {
-      final message = Message(
-        messageId: 'm-1',
-        conversationId: 'c-1',
-        conversationSeq: 1,
-        senderUserId: 'u-2',
-        type: MessageType.video,
-        body: const MessageBody(
-          video: MediaResource(
-            url: 'https://cdn.example.com/video.mp4',
-            sizeBytes: 3 * 1024 * 1024,
-          ),
+  test('does not prefetch video source when thumbnail is absent', () {
+    final message = Message(
+      messageId: 'm-1',
+      conversationId: 'c-1',
+      conversationSeq: 1,
+      senderUserId: 'u-2',
+      type: MessageType.video,
+      body: const MessageBody(
+        video: MediaResource(
+          url: 'https://cdn.example.com/video.mp4',
+          sizeBytes: 3 * 1024 * 1024,
         ),
-        sentAt: DateTime(2026),
-      );
+      ),
+      sentAt: DateTime(2026),
+    );
 
-      final requests = mediaPrefetchRequestsForMessage(message);
+    final requests = mediaPrefetchRequestsForMessage(message);
 
-      expect(requests, hasLength(1));
-      expect(requests.single.mediaKind, MediaKind.video);
-      expect(requests.single.variant, MediaVariant.videoSource);
-      expect(requests.single.generatePoster, isTrue);
-    },
-  );
+    expect(requests, isEmpty);
+  });
+
+  test('prefetches video poster when thumbnail is present', () {
+    final message = Message(
+      messageId: 'm-1',
+      conversationId: 'c-1',
+      conversationSeq: 1,
+      senderUserId: 'u-2',
+      type: MessageType.video,
+      body: const MessageBody(
+        video: MediaResource(
+          url: 'https://cdn.example.com/video.mp4',
+          thumbnailUrl: 'https://cdn.example.com/video-thumb.jpg',
+          sizeBytes: 30 * 1024 * 1024,
+        ),
+      ),
+      sentAt: DateTime(2026),
+    );
+
+    final requests = mediaPrefetchRequestsForMessage(message);
+
+    expect(requests, hasLength(1));
+    expect(requests.single.mediaKind, MediaKind.video);
+    expect(requests.single.variant, MediaVariant.videoPoster);
+    expect(
+      requests.single.resource.url,
+      'https://cdn.example.com/video-thumb.jpg',
+    );
+    expect(requests.single.generatePoster, isFalse);
+  });
 
   test('does not auto download files', () {
     final message = Message(
