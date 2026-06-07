@@ -6,7 +6,7 @@ pushd "%~dp0.."
 
 echo [LPP PC] Building Windows executable installer...
 call npm.cmd run dist:win
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Windows executable build failed.
   pause

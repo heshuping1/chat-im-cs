@@ -5,7 +5,7 @@ setlocal
 pushd "%~dp0.."
 
 call :ensure_dependencies
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Dependency check failed.
   pause
@@ -15,7 +15,7 @@ if errorlevel 1 (
 
 echo [LPP PC] Build started...
 call npm.cmd run build
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Build failed.
   pause
@@ -26,7 +26,7 @@ if errorlevel 1 (
 echo.
 echo [LPP PC] Build completed. Starting PC client from built output...
 call npm.cmd run start
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Start failed.
   pause
@@ -50,7 +50,7 @@ if exist package-lock.json (
 ) else (
   call npm.cmd install
 )
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Dependency install failed. Please run npm install manually and retry.
   exit /b 1

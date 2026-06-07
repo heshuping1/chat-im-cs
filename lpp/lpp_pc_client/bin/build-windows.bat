@@ -6,7 +6,7 @@ pushd "%~dp0.."
 
 echo [LPP PC] Build started...
 call npm.cmd run build
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Build failed.
   pause

@@ -7,7 +7,7 @@ pushd "%~dp0.."
 echo [LPP PC] Starting PC client in dev mode...
 echo [LPP PC] If port 5173 is already in use, close the existing dev instance or Electron window first.
 call npm.cmd run dev
-if errorlevel 1 (
+if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Start failed.
   pause
