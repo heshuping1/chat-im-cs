@@ -64,6 +64,10 @@ button.message-image-frame {
   opacity: 1;
 }
 
+.message-image-empty {
+  cursor: default;
+}
+
 .message-image-loading {
   position: absolute;
   inset: 0;
@@ -274,18 +278,6 @@ button.message-image-frame {
     max-width: calc(100vw - 28px);
     max-height: calc(100vh - 186px);
   }
-}
-
-.message-image-retry {
-  grid-column: 1 / -1;
-  justify-self: start;
-  padding: 5px 9px;
-  border: 1px solid rgba(194, 207, 222, 0.9);
-  border-radius: 8px;
-  background: #eef4f8;
-  color: #43546a;
-  font-size: 12px;
-  font-weight: 720;
 }
 
 .message-media-empty em {
@@ -1100,12 +1092,16 @@ button.message-image-frame {
 .message-video-fallback {
   display: grid;
   place-items: center;
-  color: #fff;
+  color: rgba(71, 85, 105, 0.58);
 }
 
-.message-video-fallback span {
-  margin-top: -18px;
-  font-size: 12px;
+.wechat-video-card .message-video-fallback {
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.34), transparent 30%),
+    linear-gradient(145deg, #eef3f8 0%, #e2e9f1 52%, #d8e1eb 100%);
 }
 
 .wechat-video-preview {

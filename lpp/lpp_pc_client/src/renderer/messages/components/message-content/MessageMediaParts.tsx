@@ -359,12 +359,6 @@ export function ImagePart({
         onOpenPreview={() => {
           if (imageReady && visibleImageSrc) setPreviewOpen(true);
         }}
-        onRetryImage={() => {
-          setBrokenImageSrc(null);
-          setActiveImageSourceIndex(0);
-          setImageLoaded(localImage);
-          loadCachedMedia();
-        }}
         onRevealImage={
           imageActionPayload
             ? () =>

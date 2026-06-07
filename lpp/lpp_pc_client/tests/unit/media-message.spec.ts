@@ -647,6 +647,9 @@ describe("message media upload presentation", () => {
     expect(videoMessagePreview).toContain("openable");
     expect(videoMessagePreview).toContain("const canAttemptOpen = Boolean(openable ?? src);");
     expect(videoMessagePreview).toContain("if (!src && !posterSrc && !canAttemptOpen)");
+    expect(videoMessagePreview).toContain('className="message-video-fallback"');
+    expect(videoMessagePreview).toContain('role="img"');
+    expect(videoMessagePreview).not.toContain('<span>{t("media.video.message")}</span>');
     expect(videoMessagePreview).toContain("const showFrameLoading = Boolean(src && !failed && !frameReady);");
     expect(videoMessagePreview).toContain("!uploadActive && openError && !loading");
     expect(videoMessagePreview).not.toContain("openError || failed");
@@ -735,7 +738,10 @@ describe("message media upload presentation", () => {
     expect(imageFrame).toContain("handlePointerDown");
     expect(imageFrame).toContain("event.ctrlKey && event.key.toLowerCase() === \"c\"");
     expect(imageFrame).toContain("event.ctrlKey && event.key.toLowerCase() === \"s\"");
-    expect(imageFrame).toContain("message-image-retry");
+    expect(imageFrame).toContain("message-image-empty");
+    expect(imageFrame).not.toContain("message-image-retry");
+    expect(imageFrame).not.toContain('fileName || t("media.image.message")');
+    expect(imageFrame).not.toContain("onRetryImage");
     expect(mediaParts).toContain("imageActionSrc");
     expect(mediaParts).toContain("cacheIdentity");
     expect(mediaParts).not.toContain("displaySrc || src");

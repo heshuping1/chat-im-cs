@@ -39,7 +39,6 @@ export function ImageMessageFrame({
   onImageError,
   onImageLoad,
   onOpenPreview,
-  onRetryImage,
   onRevealImage,
   onSaveImageAs,
   previewOpen,
@@ -57,7 +56,6 @@ export function ImageMessageFrame({
   onImageError: (event: SyntheticEvent<HTMLImageElement>) => void;
   onImageLoad: () => void;
   onOpenPreview: () => void;
-  onRetryImage?: () => void;
   onRevealImage?: () => void;
   onSaveImageAs?: () => void;
   previewOpen: boolean;
@@ -288,14 +286,15 @@ export function ImageMessageFrame({
           )}
         </button>
       ) : (
-        <span className="message-media-empty">
-          <ImageIcon size={18} />
-          <em>{fileName || t("media.image.message")}</em>
-          {onRetryImage && (
-            <button className="message-image-retry" type="button" onClick={onRetryImage}>
-              {t("media.image.reload")}
-            </button>
-          )}
+        <span
+          className={`message-image-frame message-image-empty ${presentationClassName}`}
+          style={mediaPreviewFrameStyle}
+          role="img"
+          aria-label={t("media.image.message")}
+        >
+          <span className="message-image-loading" aria-hidden="true">
+            <ImageIcon size={22} />
+          </span>
         </span>
       )}
       {previewOpen && src && (

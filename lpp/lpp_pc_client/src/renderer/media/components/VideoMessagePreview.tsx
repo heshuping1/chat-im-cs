@@ -87,9 +87,12 @@ export function VideoMessagePreview({
   const canAttemptOpen = Boolean(openable ?? src);
   if (!src && !posterSrc && !canAttemptOpen) {
     return (
-      <div className="message-video-fallback">
-        <Video size={24} />
-        <span>{t("media.video.message")}</span>
+      <div
+        className="message-video-fallback"
+        role="img"
+        aria-label={t("media.video.message")}
+      >
+        <Video size={24} aria-hidden="true" />
       </div>
     );
   }
