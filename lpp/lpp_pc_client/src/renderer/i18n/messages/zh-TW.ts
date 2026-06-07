@@ -1364,7 +1364,9 @@ export const zhTW: MessageDictionary = {
       latest: '最新 {time}',
       loadEarlier: '查看更早 {count} 條訊息',
       loadedCount: '已載入 {count} 條訊息',
+      loadedRange: '目前已載入範圍',
       loading: '正在載入聊天記錄...',
+      localRange: '本地快取範圍',
       matchCount: '{count} 條匹配',
       newMessages: '↓ {count} 條新訊息',
       noMatches: '沒有匹配的聊天記錄',
@@ -1372,6 +1374,7 @@ export const zhTW: MessageDictionary = {
       searchPlaceholder: '搜尋目前聊天內容',
       selectMessage: '選擇訊息 {preview}',
       stageAria: '訊息內容',
+      syncedRange: '已同步範圍',
       today: '今天',
     },
     mediaContent: {

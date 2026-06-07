@@ -1,7 +1,8 @@
 import { Copy, Download, FolderOpen, ImageIcon, X } from "lucide-react";
 import { useEffect } from "react";
-import type { SyntheticEvent } from "react";
+import type { CSSProperties, SyntheticEvent } from "react";
 import { useI18n } from "../../i18n/useI18n";
+import type { MediaPreviewPresentation } from "../domain/mediaPreviewPresentation";
 
 export function ImageMessageFrame({
   altText,
@@ -18,6 +19,7 @@ export function ImageMessageFrame({
   onRevealImage,
   onSaveImageAs,
   previewOpen,
+  presentation,
   src,
   sourceAvailable,
 }: {
@@ -35,11 +37,19 @@ export function ImageMessageFrame({
   onRevealImage?: () => void;
   onSaveImageAs?: () => void;
   previewOpen: boolean;
+  presentation?: MediaPreviewPresentation;
   src?: string;
   sourceAvailable: boolean;
 }) {
   const { t } = useI18n();
   const canRenderImage = sourceAvailable && Boolean(src);
+  const mediaPreviewFrameStyle = presentation
+    ? ({
+        "--media-preview-width": `${presentation.previewBox.width}px`,
+        "--media-preview-height": `${presentation.previewBox.height}px`,
+      } as CSSProperties)
+    : undefined;
+  const presentationClassName = presentation?.previewBox.className ?? "";
   useEffect(() => {
     if (!previewOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -53,7 +63,8 @@ export function ImageMessageFrame({
     <>
       {canRenderImage ? (
         <button
-          className={`message-image-frame ${imageLoaded ? "loaded" : ""}`}
+          className={`message-image-frame ${presentationClassName} ${imageLoaded ? "loaded" : ""}`}
+          style={mediaPreviewFrameStyle}
           type="button"
           aria-label={fileName ? t("media.image.previewNamed", { name: fileName }) : t("media.image.preview")}
           onClick={onOpenPreview}

@@ -127,4 +127,29 @@
 
 Gateway adapter 必须能接受历史别名字段，但输出 domain event 时字段名称稳定。
 
+### 22.7 普通 IM Gap Sync 合同
+
+当前 PC 端只允许声明 `fallback-refetch`，不能声明精确 gap sync。真实补洞能力需要服务端补齐至少一种合同。
+
+推荐会话级合同：
+
+```text
+GET /api/client/v1/conversations/{conversationId}/messages/changes?afterSeq={seq}&limit={limit}
+```
+
+最低响应字段：
+
+| 字段 | 必需 | 用途 | 缺失降级 |
+| --- | --- | --- | --- |
+| `conversationId` | 是 | 确认补洞归属。 | 阻断合并，记录服务端合同异常。 |
+| `conversationType` | 是 | 选择 direct/group 归约路径。 | 阻断或仅 fallback refetch。 |
+| `fromSeq` / `toSeq` | 是 | 标识本次补洞范围。 | 不能判断缺口是否闭合。 |
+| `messages` | 是 | 需要补齐的消息。 | 保持本地库现状，继续提示 fallback。 |
+| `hasMore` | 是 | 判断是否继续分页补洞。 | 不能声明补齐完成。 |
+| `deletedMessageIds` | 否 | 缺口期间删除事件。 | 删除状态可能需要后续 refetch 纠正。 |
+| `recalledMessageIds` | 否 | 缺口期间撤回事件。 | 撤回状态可能需要后续 refetch 纠正。 |
+| `nextAfterSeq` / `serverCursor` | 是 | 下一次补洞位置。 | 不能进行精确增量同步。 |
+
+如果服务端选择全局 cursor，则 Gateway event 必须携带单调递增 cursor，并提供按 `afterCursor` 拉取缺口事件的接口。PC 不得伪造 cursor。
+
 ---

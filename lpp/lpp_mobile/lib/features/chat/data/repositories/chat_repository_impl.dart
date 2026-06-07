@@ -96,13 +96,13 @@ class ChatRepositoryImpl implements ChatRepository {
         return remoteWithLocalMention;
       }
 
-      final lastSeq = remoteWithLocalMention.lastMessageSeq > local.lastMessageSeq
-          ? remoteWithLocalMention.lastMessageSeq
-          : local.lastMessageSeq;
-      final readSeq =
-          remoteWithLocalMention.lastReadSeq > lastSeq
-              ? remoteWithLocalMention.lastReadSeq
-              : lastSeq;
+      final lastSeq =
+          remoteWithLocalMention.lastMessageSeq > local.lastMessageSeq
+              ? remoteWithLocalMention.lastMessageSeq
+              : local.lastMessageSeq;
+      final readSeq = remoteWithLocalMention.lastReadSeq > lastSeq
+          ? remoteWithLocalMention.lastReadSeq
+          : lastSeq;
 
       return remoteWithLocalMention.copyWith(
         lastMessage: localLast,
@@ -218,7 +218,9 @@ class ChatRepositoryImpl implements ChatRepository {
     int limit = 50,
   }) async {
     try {
-      final messages = isGroup
+      final effectiveIsGroup =
+          await _resolveIsGroupFromCachedConversation(conversationId, isGroup);
+      final messages = effectiveIsGroup
           ? await _remote.getGroupMessages(
               conversationId,
               beforeSeq: beforeSeq,
@@ -252,9 +254,11 @@ class ChatRepositoryImpl implements ChatRepository {
   }) async {
     // 获取本地最大 seq 作为增量同步游标
     final localMaxSeq = await _local.getLocalMaxSeq(spaceId, conversationId);
+    final effectiveIsGroup =
+        await _resolveIsGroupFromCachedConversation(conversationId, isGroup);
 
     // 拉取最新一页
-    final fresh = isGroup
+    final fresh = effectiveIsGroup
         ? await _remote.getGroupMessages(conversationId, limit: 50)
         : await _remote.getDirectChatMessages(conversationId, limit: 50);
 
@@ -286,7 +290,9 @@ class ChatRepositoryImpl implements ChatRepository {
     required int beforeSeq,
     int limit = 50,
   }) async {
-    final messages = isGroup
+    final effectiveIsGroup =
+        await _resolveIsGroupFromCachedConversation(conversationId, isGroup);
+    final messages = effectiveIsGroup
         ? await _remote.getGroupMessages(conversationId,
             beforeSeq: beforeSeq, limit: limit)
         : await _remote.getDirectChatMessages(conversationId,
@@ -296,6 +302,24 @@ class ChatRepositoryImpl implements ChatRepository {
       await _local.upsertMessages(spaceId, conversationId, messages);
     }
     return messages;
+  }
+
+  Future<bool> _resolveIsGroupFromCachedConversation(
+    String conversationId,
+    bool fallback,
+  ) async {
+    if (fallback) return true;
+    try {
+      final conversations = await _local.getConversations(spaceId);
+      for (final conversation in conversations) {
+        if (conversation.conversationId == conversationId) {
+          return conversation.type == ConversationType.group;
+        }
+      }
+    } catch (_) {
+      return fallback;
+    }
+    return fallback;
   }
 
   @override
@@ -363,9 +387,14 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<MediaResource> uploadMedia(
     String filePath, {
+    String? mediaKind,
     MediaUploadProgressCallback? onProgress,
   }) async {
-    return _remote.uploadMedia(filePath, onProgress: onProgress);
+    return _remote.uploadMedia(
+      filePath,
+      mediaKind: mediaKind,
+      onProgress: onProgress,
+    );
   }
 
   @override

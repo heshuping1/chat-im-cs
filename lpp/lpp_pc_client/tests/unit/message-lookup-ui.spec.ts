@@ -134,6 +134,10 @@ describe("message lookup UI", () => {
     expect(listPanel).toContain("const lookupOpen = messageSearchOpen || historyOpen");
     expect(listPanel).toContain("chat-lookup-panel");
     expect(listPanel).toContain('t("messages.listPanel.closeSearch")');
+    expect(listPanel).toContain("lookupScope.limitedToLoadedRange");
+    expect(listPanel).toContain("t(lookupScope.labelKey)");
+    expect(messageListModel).toContain("createMessageLookupScope");
+    expect(messageCenter).toContain("messagesHydrationSource");
     expect(listPanel).toContain("emptyText");
     expect(listPanel).not.toContain("chat-inline-panel");
   });

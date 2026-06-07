@@ -758,7 +758,7 @@ describe("CustomerServiceApiClient", () => {
     });
   });
 
-  it("uses bounded im-list compat unread when direction is unknown and no staff send is known", async () => {
+  it("keeps bounded im-list compat unread as display fallback only", async () => {
     rememberCustomerServiceCompatUnreadCandidate({
       conversationId: "im-conversation-cs-compat",
       lastMessageAt: "2026-06-01T10:00:00.000Z",
@@ -793,13 +793,13 @@ describe("CustomerServiceApiClient", () => {
         {
           lastMessageId: "m-compat-5",
           lastMessagePreview: "visitor text",
-          unreadCount: 5,
+          unreadCount: 0,
         },
       ],
     });
   });
 
-  it("subtracts locally known staff-sent messages from unknown im-list compat unread", async () => {
+  it("does not let locally bounded im-list compat unread become final customer-service unread", async () => {
     rememberCustomerServiceStaffSentMessage({
       conversationId: "im-conversation-cs-bounded",
       message: {
@@ -856,11 +856,11 @@ describe("CustomerServiceApiClient", () => {
     });
 
     await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
-      activeItems: [{ unreadCount: 2 }],
+      activeItems: [{ unreadCount: 0 }],
     });
   });
 
-  it("uses trusted im-list compat unread when workbench unread and overlay are empty", async () => {
+  it("keeps trusted im-list compat unread as display fallback only", async () => {
     rememberCustomerServiceCompatUnreadCandidate({
       conversationId: "im-conversation-cs-compat-trusted",
       lastMessageAt: "2026-06-01T10:00:00.000Z",
@@ -896,7 +896,7 @@ describe("CustomerServiceApiClient", () => {
         {
           lastMessageId: "m-compat-trusted-5",
           lastMessagePreview: "visitor text",
-          unreadCount: 5,
+          unreadCount: 0,
         },
       ],
     });

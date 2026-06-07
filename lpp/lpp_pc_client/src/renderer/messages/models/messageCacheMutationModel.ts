@@ -19,6 +19,10 @@ import {
   reduceMessageCoreEvent,
   type MessageCoreEvent,
 } from "../../data/message-core/message-core";
+import {
+  getImMessageStore,
+  imMessageScopeKey,
+} from "../../data/message-store/im-message-store";
 import { pcQueryKeys } from "../../data/query-keys";
 import { isQueryInWorkspaceScope, workspaceScopeKeyFromSession } from "../../data/workspace-scope";
 import { currentIsoTimestamp, timestampFromDateValue } from "../../lib/format";
@@ -43,10 +47,26 @@ export type LocalUploadPhase =
   | "sent";
 export type OutgoingMessageType = "text" | "image" | "video" | "file" | "contact_card";
 
-export async function invalidateMessages(queryClient: QueryClient) {
+export async function invalidateMessages(
+  queryClient: QueryClient,
+  session?: AuthSession | null,
+) {
+  const scopeKey = session ? workspaceScopeKeyFromSession(session) : undefined;
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["pc-im-messages"] }),
-    queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] }),
+    scopeKey
+      ? queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "pc-im-messages" &&
+            isQueryInWorkspaceScope(query, scopeKey),
+        })
+      : queryClient.invalidateQueries({ queryKey: ["pc-im-messages"] }),
+    scopeKey
+      ? queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "pc-im-conversations" &&
+            isQueryInWorkspaceScope(query, scopeKey),
+        })
+      : queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] }),
   ]);
 }
 
@@ -245,6 +265,7 @@ export function replaceLocalMessageInCache(
       senderUserId: session?.userId || session?.platformUserId,
     },
   });
+  writeSuccessfulMessageToLocalStore(session, conversation, next);
   return next;
 }
 
@@ -285,9 +306,8 @@ export function markLocalMessageFailed(
   reason: string,
   failedAt = Date.now(),
 ) {
-  const queryKey = pcQueryKeys.imMessages(
-    session?.apiBaseUrl,
-    session?.tenantToken,
+  const queryKey = pcQueryKeys.imMessagesForSession(
+    session,
     getImConversationType(conversation),
     conversation.conversationId,
   );
@@ -342,9 +362,8 @@ export function patchLocalMessageSendState(
         ? { localSendStartedAt: patch.localSendStartedAt }
         : {}),
     } as MessageItemDto);
-  const queryKey = pcQueryKeys.imMessages(
-    session?.apiBaseUrl,
-    session?.tenantToken,
+  const queryKey = pcQueryKeys.imMessagesForSession(
+    session,
     getImConversationType(conversation),
     conversation.conversationId,
   );
@@ -397,9 +416,8 @@ export function patchLocalMediaMessage(
         ? { localFailedAt: patch.localFailedAt }
         : {}),
     } as MessageItemDto);
-  const queryKey = pcQueryKeys.imMessages(
-    session?.apiBaseUrl,
-    session?.tenantToken,
+  const queryKey = pcQueryKeys.imMessagesForSession(
+    session,
     getImConversationType(conversation),
     conversation.conversationId,
   );
@@ -482,9 +500,8 @@ export function appendForwardedMessagesToCache(
   messages: MessageItemDto[],
 ) {
   const conversationType = getImConversationType(conversation);
-  const queryKey = pcQueryKeys.imMessages(
-    session?.apiBaseUrl,
-    session?.tenantToken,
+  const queryKey = pcQueryKeys.imMessagesForSession(
+    session,
     conversationType,
     conversation.conversationId,
   );
@@ -515,6 +532,7 @@ export function appendForwardedMessagesToCache(
 export function markMessageRecalledInCache(
   queryClient: QueryClient,
   messageId: string,
+  session?: AuthSession | null,
 ) {
   const affected = messageSnapshotsForMutation(queryClient, messageId);
   queryClient.setQueriesData<MessageItemDto[]>(
@@ -536,11 +554,16 @@ export function markMessageRecalledInCache(
     type: "message.recalled",
     messageId,
   });
+  writeMessageMutationToLocalStore(session, affected, {
+    type: "message.recalled",
+    messageId,
+  });
 }
 
 export function removeMessageFromCache(
   queryClient: QueryClient,
   messageId: string,
+  session?: AuthSession | null,
 ) {
   const affected = messageSnapshotsForMutation(queryClient, messageId);
   queryClient.setQueriesData<MessageItemDto[]>(
@@ -559,6 +582,10 @@ export function removeMessageFromCache(
         : old,
   );
   patchConversationAfterMessageMutation(queryClient, affected, {
+    type: "message.deleted",
+    messageId,
+  });
+  writeMessageMutationToLocalStore(session, affected, {
     type: "message.deleted",
     messageId,
   });
@@ -589,6 +616,7 @@ export function applyConversationReadToCache(
   queryClient: QueryClient,
   conversationId: string,
   readSeq: number,
+  session?: AuthSession | null,
 ) {
   queryClient.setQueriesData<{ items: ConversationListItem[] }>(
     { queryKey: ["pc-im-conversations"] },
@@ -601,9 +629,21 @@ export function applyConversationReadToCache(
                 ? applyReadSeqToConversationListItem(item, readSeq)
                 : item,
             ),
-          }
+      }
         : old,
   );
+  const affected = conversationSnapshotForRead(queryClient, conversationId);
+  if (affected) {
+    void getImMessageStore().applyReadMetadata(
+      imMessageScopeKey(session),
+      affected.conversationType,
+      conversationId,
+      {
+        identity: null,
+        readSeq,
+      },
+    );
+  }
 }
 
 export function localMediaPreviewKeys(
@@ -744,6 +784,50 @@ function patchConversationAfterMessageMutation(
   );
 }
 
+function writeMessageMutationToLocalStore(
+  session: AuthSession | null | undefined,
+  affected: {
+    conversationId: string;
+    conversationType: "direct" | "group";
+  },
+  mutation: { type: "message.recalled" | "message.deleted"; messageId: string },
+) {
+  if (!session || !affected.conversationId) return;
+  const scopeKey = imMessageScopeKey(session);
+  const store = getImMessageStore();
+  if (mutation.type === "message.recalled") {
+    void store.markMessageRecalled(
+      scopeKey,
+      affected.conversationType,
+      affected.conversationId,
+      mutation.messageId,
+    );
+    return;
+  }
+  void store.deleteMessage(
+    scopeKey,
+    affected.conversationType,
+    affected.conversationId,
+    mutation.messageId,
+  );
+}
+
+function conversationSnapshotForRead(queryClient: QueryClient, conversationId: string) {
+  const snapshots = queryClient.getQueriesData<{ items: ConversationListItem[] }>({
+    queryKey: ["pc-im-conversations"],
+  });
+  for (const [, response] of snapshots) {
+    const conversation = response?.items.find((item) => item.conversationId === conversationId);
+    if (!conversation) continue;
+    return {
+      conversationType: getImConversationType(conversation) === "group"
+        ? ("group" as const)
+        : ("direct" as const),
+    };
+  }
+  return null;
+}
+
 function previewFromOutgoingBody(
   messageType: OutgoingMessageType,
   body: Record<string, unknown>,
@@ -767,5 +851,23 @@ function applyReadSeqToConversationListItem(
         identity: null,
       },
     ).state.conversation ?? item
+  );
+}
+
+function writeSuccessfulMessageToLocalStore(
+  session: AuthSession | null,
+  conversation: ConversationListItem,
+  message: MessageItemDto,
+) {
+  const status = String(message.status ?? "sent").trim().toLowerCase();
+  if (status && !["sent", "read", "delivered"].includes(status)) return;
+  const scopeKey = imMessageScopeKey(session);
+  const conversationType = getImConversationType(conversation);
+  if (!conversationType) return;
+  void getImMessageStore().upsertMessages(
+    scopeKey,
+    conversationType,
+    conversation.conversationId,
+    [message],
   );
 }

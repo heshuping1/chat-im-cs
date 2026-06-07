@@ -44,6 +44,10 @@ import {
   accountIdFromSession,
   materializeReceivedMediaMessage,
 } from "../../media/runtime/mediaMaterialization";
+import {
+  getImMessageStore,
+  imMessageScopeKey,
+} from "../message-store/im-message-store";
 
 export function mergeImGatewayMessage(
   queryClient: QueryClient,
@@ -177,6 +181,12 @@ export function mergeImGatewayMessage(
     currentTenantId: workspaceScope.tenantId,
     scopeKey: workspaceScope.key,
   });
+  void getImMessageStore().upsertMessages(
+    imMessageScopeKey(identity),
+    imConversationType,
+    message.conversationId,
+    [message],
+  );
   void materializeReceivedMediaMessage({
     accountId: accountIdFromSession(identity),
     assetBaseUrl: identity?.apiBaseUrl,
@@ -217,7 +227,7 @@ export function mergeReadEvent(
   identity: CurrentUserIdentity | null,
 ) {
   const event = imCoreEventFromGatewayReadForTest(payload);
-  if (!event || event.type !== "gateway.read_received") return;
+  if (!event || event.type !== "gateway.read_received") return false;
 
   const readSnapshot = getImReadSnapshot();
   const readActions = getImReadActions();
@@ -230,7 +240,7 @@ export function mergeReadEvent(
   });
   const nextState = result.stateByConversation[key];
   const nextView = result.viewByConversation[key];
-  if (!nextState) return;
+  if (!nextState) return false;
 
   readActions.upsertImReadState(nextState);
 
@@ -300,6 +310,7 @@ export function mergeReadEvent(
     currentTenantId: workspaceScope.tenantId,
     scopeKey: workspaceScope.key,
   });
+  return true;
 }
 
 function readReceiptTime(payload: Record<string, unknown>) {

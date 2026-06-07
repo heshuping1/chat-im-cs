@@ -52,7 +52,7 @@ export function createGatewayEventRouter(options: {
   const { clearAuthSession, queryClient, session, setCustomerServiceStatus } = options;
   const scopeKey = customerServiceIndexScopeKey(session);
   const invalidateIm = (conversationId?: string) =>
-    invalidateImGatewayQueries(queryClient, conversationId);
+    invalidateImGatewayQueries(queryClient, conversationId, scopeKey);
   const invalidateCustomerService = (threadId?: string) =>
     invalidateCustomerServiceGatewayQueries(queryClient, threadId);
   const delivery = createMessageDeliveryService({

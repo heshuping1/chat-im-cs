@@ -1,9 +1,17 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:lpp_mobile/core/diagnostics/app_diagnostics.dart';
 import 'package:lpp_mobile/core/storage/hive_storage.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
+
+typedef PendingRepositoryResolver = ChatRepository Function(
+    PendingMessage message);
+typedef PendingMessageResentCallback = FutureOr<void> Function(
+  PendingMessage pending,
+  Message sent,
+);
 
 // ---------------------------------------------------------------------------
 // PendingMessage 模型
@@ -16,6 +24,8 @@ class PendingMessage {
   final String messageType;
   final Map<String, dynamic> body;
   final List<Mention>? mentions;
+  final String? threadType;
+  final String? threadId;
   final int retryCount;
   final DateTime createdAt;
 
@@ -26,6 +36,8 @@ class PendingMessage {
     required this.messageType,
     required this.body,
     this.mentions,
+    this.threadType,
+    this.threadId,
     this.retryCount = 0,
     required this.createdAt,
   });
@@ -37,6 +49,8 @@ class PendingMessage {
     String? messageType,
     Map<String, dynamic>? body,
     List<Mention>? mentions,
+    String? threadType,
+    String? threadId,
     int? retryCount,
     DateTime? createdAt,
   }) {
@@ -47,6 +61,8 @@ class PendingMessage {
       messageType: messageType ?? this.messageType,
       body: body ?? this.body,
       mentions: mentions ?? this.mentions,
+      threadType: threadType ?? this.threadType,
+      threadId: threadId ?? this.threadId,
       retryCount: retryCount ?? this.retryCount,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -59,6 +75,8 @@ class PendingMessage {
         'messageType': messageType,
         'body': body,
         'mentions': mentions?.map((mention) => mention.toJson()).toList(),
+        if (threadType != null) 'threadType': threadType,
+        if (threadId != null) 'threadId': threadId,
         'retryCount': retryCount,
         'createdAt': createdAt.toIso8601String(),
       };
@@ -72,6 +90,8 @@ class PendingMessage {
         mentions: (json['mentions'] as List<dynamic>?)
             ?.map((e) => Mention.fromJson(e as Map<String, dynamic>))
             .toList(),
+        threadType: json['threadType'] as String?,
+        threadId: json['threadId'] as String?,
         retryCount: json['retryCount'] as int? ?? 0,
         createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
             DateTime.now(),
@@ -132,14 +152,24 @@ class PendingMessageQueue {
   /// 网络恢复后按序重发所有待发消息
   ///
   /// 发送成功后从队列移除；超过最大重试次数后也移除（避免无限积压）。
-  Future<void> flushAll(ChatRepository repository) async {
+  Future<void> flushAll(
+    ChatRepository repository, {
+    PendingRepositoryResolver? repositoryForMessage,
+    PendingMessageResentCallback? onMessageResent,
+  }) async {
     final pending = await getAll();
     for (final message in pending) {
       try {
+        final messageRepository =
+            repositoryForMessage?.call(message) ?? repository;
         final type = _parseMessageType(message.messageType);
-        final body = MessageBody.fromJson(message.body);
+        final body = await _resolvePendingMediaBody(
+          messageRepository,
+          type,
+          MessageBody.fromJson(message.body),
+        );
 
-        await repository.sendMessage(
+        final sent = await messageRepository.sendMessage(
           conversationId: message.conversationId,
           isGroup: message.isGroup,
           clientMsgId: message.clientMsgId,
@@ -147,6 +177,7 @@ class PendingMessageQueue {
           body: body,
           mentions: message.isGroup ? message.mentions : null,
         );
+        await onMessageResent?.call(message, sent);
 
         // 发送成功，从队列移除
         await remove(message.clientMsgId);
@@ -203,5 +234,136 @@ class PendingMessageQueue {
       default:
         return MessageType.text;
     }
+  }
+
+  static Future<MessageBody> _resolvePendingMediaBody(
+    ChatRepository repository,
+    MessageType type,
+    MessageBody body,
+  ) async {
+    final localPath = _localMediaPath(_mediaResourceForType(type, body)?.url);
+    if (localPath == null) return body;
+    final uploaded = await repository.uploadMedia(
+      localPath,
+      mediaKind: _mediaKind(type),
+    );
+    if (type == MessageType.video) {
+      final localVideo = body.video;
+      final posterPath = _localMediaPath(localVideo?.localPosterUrl);
+      if (posterPath != null) {
+        try {
+          final poster = await repository.uploadMedia(
+            posterPath,
+            mediaKind: 'image',
+          );
+          return _replaceMediaResource(
+            body,
+            type,
+            uploaded.copyWith(
+              thumbnailUrl: poster.url,
+              localPreviewUrl: localVideo?.localPreviewUrl ?? localVideo?.url,
+              localPosterUrl: localVideo?.localPosterUrl,
+            ),
+          );
+        } catch (_) {
+          return _replaceMediaResource(
+            body,
+            type,
+            uploaded.copyWith(
+              localPreviewUrl: localVideo?.localPreviewUrl ?? localVideo?.url,
+              localPosterUrl: localVideo?.localPosterUrl,
+            ),
+          );
+        }
+      }
+    }
+    return _replaceMediaResource(body, type, uploaded);
+  }
+
+  static MediaResource? _mediaResourceForType(
+      MessageType type, MessageBody body) {
+    switch (type) {
+      case MessageType.image:
+        return body.image;
+      case MessageType.video:
+        return body.video;
+      case MessageType.voice:
+        return body.voice;
+      case MessageType.file:
+        return body.file;
+      default:
+        return null;
+    }
+  }
+
+  static MessageBody _replaceMediaResource(
+    MessageBody body,
+    MessageType type,
+    MediaResource resource,
+  ) {
+    switch (type) {
+      case MessageType.image:
+        return MessageBody(
+          text: body.text,
+          image: resource,
+          video: body.video,
+          voice: body.voice,
+          file: body.file,
+        );
+      case MessageType.video:
+        return MessageBody(
+          text: body.text,
+          image: body.image,
+          video: resource,
+          voice: body.voice,
+          file: body.file,
+        );
+      case MessageType.voice:
+        return MessageBody(
+          text: body.text,
+          image: body.image,
+          video: body.video,
+          voice: resource,
+          file: body.file,
+        );
+      case MessageType.file:
+        return MessageBody(
+          text: body.text,
+          image: body.image,
+          video: body.video,
+          voice: body.voice,
+          file: resource,
+        );
+      default:
+        return body;
+    }
+  }
+
+  static String _mediaKind(MessageType type) {
+    switch (type) {
+      case MessageType.image:
+        return 'image';
+      case MessageType.video:
+        return 'video';
+      case MessageType.voice:
+        return 'voice';
+      case MessageType.file:
+        return 'file';
+      default:
+        return 'file';
+    }
+  }
+
+  static String? _localMediaPath(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final url = value.trim();
+    if (url.startsWith('http://') || url.startsWith('https://')) return null;
+    if (url.startsWith('/media') ||
+        url.startsWith('/api') ||
+        url.startsWith('/uploads') ||
+        url.startsWith('/files')) {
+      return null;
+    }
+    return url;
   }
 }

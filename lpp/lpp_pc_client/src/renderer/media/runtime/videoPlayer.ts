@@ -137,6 +137,7 @@ export function videoOpenErrorSummary(error: unknown) {
 }
 
 async function resolveDesktopVideoPosterUrl(posterUrl?: string) {
+  if (posterUrl && /^data:/i.test(posterUrl)) return undefined;
   if (!posterUrl || !/^blob:/i.test(posterUrl)) return posterUrl;
   const response = await fetch(posterUrl);
   const blob = await response.blob();

@@ -55,7 +55,7 @@ export function logApiContractDiagnostic(input: ApiContractDiagnosticInput) {
     target.__lppApiContractDiagnostics = [...current, record].slice(
       -apiContractDiagnosticsMaxRecords,
     );
-    if (shouldPrintApiContractDiagnostics(target)) {
+    if (shouldPrintApiContractDiagnostics(target, record)) {
       console.info("[lpp:api-contract]", record);
     }
   }
@@ -107,14 +107,18 @@ function createApiContractTraceId(phase: ApiContractDiagnosticPhase) {
   return `api-contract-${phase}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function shouldPrintApiContractDiagnostics(target: Window) {
+function shouldPrintApiContractDiagnostics(
+  target: Window,
+  record: ApiContractDiagnosticRecord,
+) {
   try {
     return (
-      import.meta.env.DEV ||
+      record.result === "failed" ||
+      record.result === "invalid" ||
       target.localStorage?.getItem(apiContractDiagnosticsFlag) === "1"
     );
   } catch {
-    return import.meta.env.DEV;
+    return record.result === "failed" || record.result === "invalid";
   }
 }
 

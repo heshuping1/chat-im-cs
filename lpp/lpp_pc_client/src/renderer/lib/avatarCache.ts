@@ -3,6 +3,7 @@ const avatarStoreName = "avatars";
 const avatarDbVersion = 1;
 const avatarRefreshIntervalMs = 12 * 60 * 60 * 1000;
 const avatarRetryIntervalMs = 5 * 60 * 1000;
+const avatarLocalMirrorPrefix = "lpp.pc.avatarMirror.";
 
 type AvatarCacheEntry = {
   blob: Blob;
@@ -23,7 +24,35 @@ export async function getCachedAvatar(url: string) {
   const entry = await getAvatarEntry(key);
   if (!entry?.blob?.size) return null;
   memoryCache.set(key, entry);
+  void writeAvatarLocalMirror(key, entry.blob);
   return entry.blob;
+}
+
+export function getCachedAvatarDataUrlSync(url: string) {
+  if (/^(blob:|data:)/i.test(url.trim())) return url.trim();
+  const key = avatarCacheKey(url);
+  try {
+    return window.localStorage.getItem(avatarLocalMirrorPrefix + encodeURIComponent(key)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function cachedAvatarObjectUrl({
+  token,
+  url,
+}: {
+  token?: string | null;
+  url: string;
+}) {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/^(blob:|data:)/i.test(trimmed)) return trimmed;
+  const mirrored = getCachedAvatarDataUrlSync(trimmed);
+  if (mirrored) return mirrored;
+  const blob = (await getCachedAvatar(trimmed)) ?? (await refreshCachedAvatar({ token, url: trimmed }));
+  if (!blob?.size) return null;
+  return URL.createObjectURL(blob);
 }
 
 export async function refreshCachedAvatar({
@@ -56,6 +85,7 @@ export async function refreshCachedAvatar({
       };
       memoryCache.set(key, nextEntry);
       await putAvatarEntry(nextEntry);
+      await writeAvatarLocalMirror(key, blob);
       return blob;
     })
     .catch(async () => {
@@ -76,8 +106,19 @@ export async function refreshCachedAvatar({
   return refreshPromise;
 }
 
-function avatarCacheKey(url: string) {
-  return url.trim();
+export function avatarCacheKey(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed || /^(blob:|data:|file:)/i.test(trimmed)) return trimmed;
+  try {
+    const baseUrl = window.location?.origin || "https://local.invalid";
+    const parsed = new URL(trimmed, baseUrl);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return `${parsed.origin}${parsed.pathname}`;
+    }
+  } catch {
+    // Fall through to a query-free string key.
+  }
+  return trimmed.split(/[?#]/, 1)[0] || trimmed;
 }
 
 async function fetchAvatarBlob(url: string, token?: string | null) {
@@ -115,6 +156,25 @@ async function putAvatarEntry(entry: AvatarCacheEntry) {
       .put(entry);
     request.onsuccess = () => resolve();
     request.onerror = () => resolve();
+  });
+}
+
+async function writeAvatarLocalMirror(key: string, blob: Blob) {
+  if (!blob.size || !blob.type.startsWith("image/")) return;
+  try {
+    const dataUrl = await blobToDataUrl(blob);
+    window.localStorage.setItem(avatarLocalMirrorPrefix + encodeURIComponent(key), dataUrl);
+  } catch {
+    // IndexedDB remains the authoritative avatar cache when localStorage is unavailable.
+  }
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error ?? new Error("Avatar mirror read failed"));
+    reader.readAsDataURL(blob);
   });
 }
 

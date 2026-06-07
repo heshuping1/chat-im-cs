@@ -11,6 +11,7 @@ describe("media action capabilities", () => {
       canEditMediaFile: false,
       canOpenMediaFile: false,
       canOpenVideoPlayer: false,
+      canReadMediaFileAsDataUrl: false,
       canRevealInFolder: false,
       canSaveMediaAs: false,
     });
@@ -33,6 +34,10 @@ describe("media action capabilities", () => {
       canRevealInFolder: true,
       canSaveMediaAs: true,
     });
+  });
+
+  it("reports desktop data-url read capability for materialized media previews", () => {
+    expect(getMediaActionCapabilities(apiWith("readMediaFileAsDataUrl")).canReadMediaFileAsDataUrl).toBe(true);
   });
 });
 

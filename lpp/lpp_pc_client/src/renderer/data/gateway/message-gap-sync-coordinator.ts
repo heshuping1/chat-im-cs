@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
+import { isQueryInWorkspaceScope } from "../workspace-scope";
 
 export type MessageGapSyncReason =
   | "gateway-started"
@@ -36,13 +37,22 @@ export function triggerMessageGapSync(
       scopeKey: input.scopeKey,
     },
     summary: {
-      mode: "conversation-snapshot-reconcile",
+      mode: "fallback-refetch",
+      preciseGapSync: false,
+      requiredServerContract: "conversation-after-seq-or-global-cursor",
+      requiresServerCursor: true,
       retryAttempt: input.retryAttempt ?? 0,
       note: "Existing APIs support conversation/message refetch; dedicated seq range gap sync requires server support.",
     },
   });
   const invalidations = [
-    queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] }),
+    input.scopeKey
+      ? queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "pc-im-conversations" &&
+            isQueryInWorkspaceScope(query, input.scopeKey),
+        })
+      : queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] }),
     queryClient.invalidateQueries({ queryKey: ["pc-cs-workbench-threads"] }),
   ];
   if (input.conversationId) {
@@ -50,6 +60,7 @@ export function triggerMessageGapSync(
       queryClient.invalidateQueries({
         predicate: (query) =>
           query.queryKey[0] === "pc-im-messages" &&
+          isQueryInWorkspaceScope(query, input.scopeKey) &&
           query.queryKey.includes(input.conversationId),
       }),
     );

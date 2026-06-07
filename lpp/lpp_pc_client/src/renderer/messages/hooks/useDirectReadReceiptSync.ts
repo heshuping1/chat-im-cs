@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
+import type { AuthSession } from "../../data/auth/auth-session";
 import {
   conversationKey as imConversationKey,
   type ConversationReadState,
@@ -9,6 +10,10 @@ import {
 import { logImReadDiagnostic } from "../../data/im-read/im-read-diagnostics";
 import { getImReadSnapshot } from "../../data/im-read/im-read-store";
 import { reduceMessageCoreEvent } from "../../data/message-core/message-core";
+import {
+  getImMessageStore,
+  imMessageScopeKey,
+} from "../../data/message-store/im-message-store";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { getImConversationType } from "./useMessageCenterViewModel";
 
@@ -18,6 +23,7 @@ export function useDirectReadReceiptSync({
   directReadStatus,
   markImPeerReadReceipt,
   queryClient,
+  session,
   unreadIdentity,
   upsertImReadState,
 }: {
@@ -26,6 +32,7 @@ export function useDirectReadReceiptSync({
   directReadStatus?: { peerLastReadSeq?: number | string | null };
   markImPeerReadReceipt: (conversationId: string, readSeq: number) => void;
   queryClient: QueryClient;
+  session: AuthSession | null;
   unreadIdentity: CurrentUserIdentity | null;
   upsertImReadState: (state: ConversationReadState) => void;
 }) {
@@ -101,6 +108,18 @@ export function useDirectReadReceiptSync({
             ).state.messages
           : old,
     );
+    if (session) {
+      void getImMessageStore().applyReadMetadata(
+        imMessageScopeKey(session),
+        "direct",
+        activeConversation.conversationId,
+        {
+          identity: unreadIdentity,
+          peerReadSeq,
+          readSeq: currentReadState?.myReadSeq ?? activeConversation.lastReadSeq ?? 0,
+        },
+      );
+    }
     logImReadDiagnostic({
       event: "im-read.read-status-merge",
       phase: "merge",
@@ -121,6 +140,7 @@ export function useDirectReadReceiptSync({
     directReadStatus,
     markImPeerReadReceipt,
     queryClient,
+    session,
     unreadIdentity,
     upsertImReadState,
   ]);

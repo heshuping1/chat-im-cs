@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/http_client.dart';
 import 'package:lpp_mobile/core/platform/local_file.dart';
+import 'package:lpp_mobile/core/platform/local_video_poster.dart';
 import 'package:lpp_mobile/core/platform/platform_capabilities.dart';
 import 'package:lpp_mobile/core/widgets/app_network_image.dart';
 import 'package:lpp_mobile/core/widgets/identity_badge.dart';
@@ -659,13 +660,9 @@ class _ImageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final media = message.body.image;
     final actionUrl = media?.url;
-    final url = imageBubbleVisualSource(media);
+    final size = mediaBubbleSize(media, fallbackAspectRatio: 1);
     final uploadPresentation =
         imageMessageUploadPresentation(message.localUploadState);
-    final isLocalFile = isLocalVisualMediaUrl(url) &&
-        url != null &&
-        !url.startsWith('/media') &&
-        !url.startsWith('/api');
 
     return GestureDetector(
       onTap: actionUrl != null && !isLocalVisualMediaUrl(actionUrl)
@@ -680,20 +677,11 @@ class _ImageBubble extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            url != null
-                ? isLocalFile
-                    // 发送中：本地文件路径，由平台适配层选择可用的渲染方式
-                    ? localImageWidget(localPathFromUriOrPath(url),
-                        width: 200, height: 200, fit: BoxFit.cover)
-                    : AppNetworkImage(
-                        url: url,
-                        width: 200,
-                        height: 200,
-                        fit: BoxFit.cover,
-                        placeholderBuilder: _placeholder,
-                        errorBuilder: _placeholder,
-                      )
-                : _placeholder(context),
+            _ImageVisualFrame(
+              media: media,
+              size: size,
+              placeholderBuilder: _placeholder,
+            ),
             if (uploadPresentation.active)
               _MediaUploadOverlay(
                 key: const ValueKey('message-image-upload-progress'),
@@ -705,14 +693,103 @@ class _ImageBubble extends ConsumerWidget {
     );
   }
 
-  Widget _placeholder(BuildContext ctx) => Container(
-        width: 200,
-        height: 200,
+  Widget _placeholder(BuildContext ctx, MediaBubbleSize size) => Container(
+        width: size.width,
+        height: size.height,
         color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
         child: Icon(Icons.image,
             size: 48,
             color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4)),
       );
+}
+
+class _ImageVisualFrame extends StatefulWidget {
+  final MediaResource? media;
+  final MediaBubbleSize size;
+  final Widget Function(BuildContext, MediaBubbleSize) placeholderBuilder;
+
+  const _ImageVisualFrame({
+    required this.media,
+    required this.size,
+    required this.placeholderBuilder,
+  });
+
+  @override
+  State<_ImageVisualFrame> createState() => _ImageVisualFrameState();
+}
+
+class _ImageVisualFrameState extends State<_ImageVisualFrame> {
+  String? _checkedLocalPreviewUrl;
+  bool _skipLocalPreview = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _verifyLocalPreviewAvailability();
+  }
+
+  @override
+  void didUpdateWidget(_ImageVisualFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.media?.localPreviewUrl != widget.media?.localPreviewUrl ||
+        oldWidget.media?.url != widget.media?.url ||
+        oldWidget.media?.thumbnailUrl != widget.media?.thumbnailUrl) {
+      _checkedLocalPreviewUrl = null;
+      _skipLocalPreview = false;
+      _verifyLocalPreviewAvailability();
+    }
+  }
+
+  void _verifyLocalPreviewAvailability() {
+    final previewUrl = widget.media?.localPreviewUrl?.trim();
+    if (previewUrl == null || previewUrl.isEmpty) return;
+    if (!isLocalVisualMediaUrl(previewUrl)) return;
+    if (_checkedLocalPreviewUrl == previewUrl) return;
+    _checkedLocalPreviewUrl = previewUrl;
+
+    unawaited(() async {
+      final exists = await localFileExists(localPathFromUriOrPath(previewUrl));
+      if (!mounted || widget.media?.localPreviewUrl?.trim() != previewUrl) {
+        return;
+      }
+      if (!exists) {
+        setState(() => _skipLocalPreview = true);
+      }
+    }());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageBubbleVisualSource(
+      widget.media,
+      skipLocalPreview: _skipLocalPreview,
+    );
+    if (url == null) {
+      return widget.placeholderBuilder(context, widget.size);
+    }
+
+    final isLocalFile = isLocalVisualMediaUrl(url) &&
+        !url.startsWith('/media') &&
+        !url.startsWith('/api');
+    if (isLocalFile) {
+      return localImageWidget(
+        localPathFromUriOrPath(url),
+        width: widget.size.width,
+        height: widget.size.height,
+        fit: BoxFit.cover,
+      );
+    }
+    return AppNetworkImage(
+      url: url,
+      width: widget.size.width,
+      height: widget.size.height,
+      fit: BoxFit.cover,
+      placeholderBuilder: (context) =>
+          widget.placeholderBuilder(context, widget.size),
+      errorBuilder: (context) =>
+          widget.placeholderBuilder(context, widget.size),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,6 +1103,8 @@ class _VideoBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final posterUrl = videoBubblePosterSource(message.body.video);
     final duration = message.body.video?.durationSeconds;
+    final size =
+        mediaBubbleSize(message.body.video, fallbackAspectRatio: 16 / 9);
     final uploadPresentation =
         videoMessageUploadPresentation(message.localUploadState);
     final isLocalPoster = isLocalVisualMediaUrl(posterUrl) &&
@@ -1047,22 +1126,14 @@ class _VideoBubble extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            posterUrl != null
-                ? isLocalPoster
-                    ? localImageWidget(
-                        localPathFromUriOrPath(posterUrl),
-                        width: 220,
-                        height: 160,
-                        fit: BoxFit.cover,
-                      )
-                    : AppNetworkImage(
-                        url: posterUrl,
-                        width: 220,
-                        height: 160,
-                        fit: BoxFit.cover,
-                        placeholderBuilder: _placeholder,
-                        errorBuilder: _placeholder)
-                : _placeholder(context),
+            _VideoPosterFrame(
+              media: message.body.video,
+              posterUrl: posterUrl,
+              isLocalPoster: isLocalPoster,
+              width: size.width,
+              height: size.height,
+              placeholderBuilder: _placeholder,
+            ),
             if (uploadPresentation.active)
               _MediaUploadOverlay(
                 key: const ValueKey('message-video-upload-progress'),
@@ -1099,15 +1170,191 @@ class _VideoBubble extends ConsumerWidget {
     );
   }
 
-  Widget _placeholder(context) => Container(
-        width: 220,
-        height: 160,
-        color: const Color(0xFF2C3E50),
-        child: const Icon(Icons.videocam, size: 48, color: Colors.white54),
+  Widget _placeholder(BuildContext context, double width, double height) =>
+      Container(
+        width: width,
+        height: height,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        child: Icon(
+          Icons.videocam,
+          size: 42,
+          color:
+              Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.34),
+        ),
       );
 
   String _fmt(int s) =>
       '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+}
+
+class _VideoPosterFrame extends ConsumerStatefulWidget {
+  final MediaResource? media;
+  final String? posterUrl;
+  final bool isLocalPoster;
+  final double width;
+  final double height;
+  final Widget Function(BuildContext, double, double) placeholderBuilder;
+
+  const _VideoPosterFrame({
+    required this.media,
+    required this.posterUrl,
+    required this.isLocalPoster,
+    required this.width,
+    required this.height,
+    required this.placeholderBuilder,
+  });
+
+  @override
+  ConsumerState<_VideoPosterFrame> createState() => _VideoPosterFrameState();
+}
+
+class _VideoPosterFrameState extends ConsumerState<_VideoPosterFrame> {
+  static final Map<String, String> _generatedPosterCache = {};
+
+  String? _generatedPosterPath;
+  String? _generatingForUrl;
+  String? _checkedLocalPosterUrl;
+  bool _skipLocalPoster = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreGeneratedPosterFromCache();
+    _verifyLocalPosterAvailability();
+    _maybeGeneratePoster();
+  }
+
+  @override
+  void didUpdateWidget(_VideoPosterFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.posterUrl != widget.posterUrl ||
+        oldWidget.media?.url != widget.media?.url) {
+      _generatedPosterPath = null;
+      _checkedLocalPosterUrl = null;
+      _skipLocalPoster = false;
+      _restoreGeneratedPosterFromCache();
+      _verifyLocalPosterAvailability();
+      _maybeGeneratePoster();
+    }
+  }
+
+  void _restoreGeneratedPosterFromCache() {
+    final videoUrl = widget.media?.url.trim();
+    if (videoUrl == null || videoUrl.isEmpty) return;
+    _generatedPosterPath = _generatedPosterCache[videoUrl];
+  }
+
+  void _maybeGeneratePoster() {
+    final availablePoster = videoBubblePosterSource(
+      widget.media,
+      generatedPosterUrl: _generatedPosterPath,
+      skipLocalPoster: _skipLocalPoster,
+    );
+    if (availablePoster?.trim().isNotEmpty == true) {
+      return;
+    }
+    final videoUrl = widget.media?.url.trim();
+    if (videoUrl == null || videoUrl.isEmpty || videoUrl == _generatingForUrl) {
+      return;
+    }
+    _generatingForUrl = videoUrl;
+    unawaited(_generatePoster(videoUrl));
+  }
+
+  void _verifyLocalPosterAvailability() {
+    final posterUrl = widget.posterUrl?.trim();
+    if (posterUrl == null || posterUrl.isEmpty) return;
+    if (!isLocalVisualMediaUrl(posterUrl)) return;
+    if (_checkedLocalPosterUrl == posterUrl) return;
+    _checkedLocalPosterUrl = posterUrl;
+
+    unawaited(() async {
+      final exists = await localFileExists(localPathFromUriOrPath(posterUrl));
+      if (!mounted || widget.posterUrl?.trim() != posterUrl) return;
+      if (!exists) {
+        setState(() => _skipLocalPoster = true);
+        _maybeGeneratePoster();
+      }
+    }());
+  }
+
+  Future<void> _generatePoster(String videoUrl) async {
+    try {
+      final cachedPosterPath = await cachedLocalVideoPosterPath(videoUrl);
+      if (cachedPosterPath?.trim().isNotEmpty == true) {
+        if (!mounted || _generatingForUrl != videoUrl) return;
+        _generatedPosterCache[videoUrl] = cachedPosterPath!;
+        setState(() => _generatedPosterPath = cachedPosterPath);
+        return;
+      }
+      final localVideoPath = _isLocalMediaPath(videoUrl)
+          ? localPathFromUriOrPath(videoUrl)
+          : await _downloadVideoForPoster(videoUrl);
+      final posterPath = await generateLocalVideoPoster(
+        localVideoPath,
+        cacheKey: videoUrl,
+      );
+      if (!mounted || _generatingForUrl != videoUrl) return;
+      if (posterPath?.trim().isNotEmpty == true) {
+        _generatedPosterCache[videoUrl] = posterPath!;
+      }
+      setState(() => _generatedPosterPath = posterPath);
+    } catch (error) {
+      debugPrint('[MessageBubble] generate video poster failed: $error');
+    }
+  }
+
+  Future<String> _downloadVideoForPoster(String videoUrl) async {
+    final resolvedUrl = _resolveMediaUrl(videoUrl);
+    final response = await ref.read(dioProvider).get<List<int>>(
+          resolvedUrl,
+          options: Options(responseType: ResponseType.bytes),
+        );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Video response is empty');
+    }
+    return cacheBytesToLocalFile(
+      bytes: bytes,
+      directoryName: 'lpp_video_posters_source',
+      fileName:
+          '${resolvedUrl.hashCode}_${_safeMediaFileName(widget.media!, 'video.mp4')}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final source = videoBubblePosterSource(
+      widget.media,
+      generatedPosterUrl: _generatedPosterPath,
+      skipLocalPoster: _skipLocalPoster,
+    );
+    if (source == null || source.trim().isEmpty) {
+      return widget.placeholderBuilder(context, widget.width, widget.height);
+    }
+
+    final isLocal = (!_skipLocalPoster && widget.isLocalPoster) ||
+        isLocalVisualMediaUrl(source);
+    if (isLocal) {
+      return localImageWidget(
+        localPathFromUriOrPath(source),
+        width: widget.width,
+        height: widget.height,
+        fit: BoxFit.cover,
+      );
+    }
+    return AppNetworkImage(
+      url: source,
+      width: widget.width,
+      height: widget.height,
+      fit: BoxFit.cover,
+      cacheInMemory: true,
+      placeholderBuilder: (context) =>
+          widget.placeholderBuilder(context, widget.width, widget.height),
+      errorBuilder: (context) =>
+          widget.placeholderBuilder(context, widget.width, widget.height),
+    );
+  }
 }
 
 class _MediaUploadOverlay extends StatelessWidget {

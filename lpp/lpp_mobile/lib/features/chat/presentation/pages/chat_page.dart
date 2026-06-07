@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart' as dio_package;
 import 'package:flutter/material.dart';
@@ -23,9 +24,14 @@ import 'package:lpp_mobile/core/widgets/identity_badge.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/gateway_event_handler.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/pending_message_queue.dart';
+import 'package:lpp_mobile/features/chat/data/mappers/message_send_failure_mapper.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
+import 'package:lpp_mobile/features/chat/domain/usecases/send_message_usecase.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
@@ -35,6 +41,7 @@ import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.
 import 'package:lpp_mobile/features/chat/presentation/pages/favorites_page.dart'
     show favoritesProvider, favoritesSummaryProvider;
 import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/chat_send_interaction_policy.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/marketing_toolbar.dart';
@@ -42,6 +49,7 @@ import 'package:lpp_mobile/features/chat/presentation/widgets/message_bubble.dar
 import 'package:lpp_mobile/features/contacts/presentation/pages/profile_page.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
+import 'package:lpp_mobile/features/customer_service/data/repositories/customer_service_chat_repository_adapter.dart';
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
 import 'package:lpp_mobile/features/profile/presentation/pages/my_page.dart';
 import 'package:lpp_mobile/features/settings/presentation/providers/chat_background_provider.dart';
@@ -49,7 +57,6 @@ import 'package:lpp_mobile/features/settings/presentation/providers/timezone_pro
 import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 import 'package:path/path.dart' as p;
-import 'package:uuid/uuid.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String conversationId;
@@ -974,22 +981,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return type == MessageType.video ? 'video/mp4' : 'image/jpeg';
   }
 
-  String _localUploadFileName(String path, MessageType type) {
-    final uri = Uri.tryParse(path);
-    final raw = uri != null && uri.scheme == 'file' ? uri.toFilePath() : path;
-    final name = p.basename(raw).trim();
-    if (name.isNotEmpty && name != '.' && p.extension(name).isNotEmpty) {
-      return name;
-    }
-    return switch (type) {
-      MessageType.image => 'image.jpg',
-      MessageType.video => 'video.mp4',
-      MessageType.voice => 'voice.m4a',
-      MessageType.file => 'file',
-      _ => 'file',
-    };
-  }
-
   void _handleReply(List<Message> messages) {
     final msg = _findSelectedMessage(messages);
     if (msg == null) return;
@@ -1380,6 +1371,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Future<Message> _sendChatMessage({
     required MessageType type,
     required MessageBody body,
+    String? clientMsgId,
     String? replyToMessageId,
     List<Mention>? mentions,
     required void Function(Message message) onOptimisticInsert,
@@ -1407,6 +1399,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       return _sendCustomerServiceMessage(
         type: type,
         body: body,
+        clientMsgId: clientMsgId,
         replyToMessageId: replyToMessageId,
         onOptimisticInsert: onOptimisticInsert,
         onMessageUpdate: onMessageUpdate,
@@ -1422,6 +1415,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       isGroup: isGroup,
       type: type,
       body: body,
+      clientMsgId: clientMsgId,
       replyToMessageId: replyToMessageId,
       mentions: mentions,
       onOptimisticInsert: onOptimisticInsert,
@@ -1433,13 +1427,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required String text,
     String? replyToMessageId,
     List<Mention>? mentions,
-    bool manageSendingState = true,
     bool clearReplyOnSuccess = false,
   }) async {
-    if (manageSendingState && _isSending) return false;
-    if (manageSendingState && mounted) {
-      setState(() => _isSending = true);
-    }
     var sent = false;
     try {
       final sendConversationId = await _ensureDirectConversationForSend();
@@ -1466,10 +1455,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       sent = true;
     } catch (e) {
       _handleSendError(e);
-    } finally {
-      if (manageSendingState && mounted) {
-        setState(() => _isSending = false);
-      }
     }
     if (sent && clearReplyOnSuccess && mounted) {
       setState(() => _replyingTo = null);
@@ -1595,6 +1580,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Future<Message> _sendCustomerServiceMessage({
     required MessageType type,
     required MessageBody body,
+    String? clientMsgId,
     String? replyToMessageId,
     required void Function(Message message) onOptimisticInsert,
     required void Function(String clientMsgId, Message updated) onMessageUpdate,
@@ -1611,89 +1597,62 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         message: '请先接入或人工接管后再回复',
       );
     }
-    const uuid = Uuid();
-    final clientMsgId = uuid.v4();
     final currentUserId = ref.read(currentSpaceProvider)?.userId ?? '';
-    final optimistic = Message(
-      messageId: clientMsgId,
-      clientMsgId: clientMsgId,
-      conversationId: widget.conversationId,
-      conversationSeq: 0,
+    final thread = _customerServiceThread();
+    final repository = CustomerServiceChatRepositoryAdapter(
+      customerServiceRepository: ref.read(customerServiceRepositoryProvider),
+      mediaRemote: ChatRemoteDataSourceImpl(ref.read(dioProvider)),
+      threadType: thread.threadType,
+      threadId: thread.threadId,
       senderUserId: currentUserId,
-      type: type,
-      body: body,
-      sentAt: DateTime.now(),
-      replyToMessageId: replyToMessageId,
-      status: MessageStatus.sending,
     );
-    onOptimisticInsert(optimistic);
+    final useCase = SendMessageUseCase(
+      repository: repository,
+      currentUserId: currentUserId,
+      failureMapper: mapAppErrorToMessageSendFailure,
+      onPendingEnqueue: ({
+        required clientMsgId,
+        required conversationId,
+        required isGroup,
+        required type,
+        required body,
+        mentions,
+      }) {
+        return PendingMessageQueue().enqueue(PendingMessage(
+          clientMsgId: clientMsgId,
+          conversationId: conversationId,
+          isGroup: false,
+          messageType: GatewayEventHandler.messageTypeToApiString(type),
+          body: body.toLocalJson(),
+          mentions: mentions,
+          threadType: thread.threadType,
+          threadId: thread.threadId,
+          createdAt: DateTime.now(),
+        ));
+      },
+    );
 
     try {
-      final hasLocalMedia = _customerServiceLocalMediaPath(type, body) != null;
-      final resolvedBody = await _resolveCustomerServiceMediaBody(
-        type,
-        body,
+      final sent = await useCase.execute(
+        conversationId: widget.conversationId,
+        isGroup: false,
+        type: type,
+        body: body,
         clientMsgId: clientMsgId,
-        optimistic: optimistic,
+        replyToMessageId: replyToMessageId,
+        onOptimisticInsert: onOptimisticInsert,
         onMessageUpdate: onMessageUpdate,
-        emitProgress: true,
       );
-      if (hasLocalMedia) {
-        onMessageUpdate(
-          clientMsgId,
-          optimistic.copyWith(
-            body: resolvedBody,
-            localUploadState: const MessageLocalUploadState(
-              status: MessageLocalUploadStatus.sending,
-              phase: MessageLocalUploadPhase.sending,
-              progress: 95,
-            ),
-          ),
-        );
-      }
-      final sent = await ref
-          .read(customerServiceRepositoryProvider)
-          .sendThreadMessage(
-            threadType: widget.customerServiceThreadType ?? 'direct_customer',
-            threadId: widget.customerServiceThreadId ?? '',
-            conversationId: widget.conversationId,
-            clientMsgId: clientMsgId,
-            type: type,
-            body: resolvedBody,
-            replyToMessageId: replyToMessageId,
-            senderUserId: currentUserId,
-          );
-      final confirmed = sent.copyWith(
-        body: resolvedBody,
-        senderUserId: currentUserId,
-        status: MessageStatus.sent,
-        clearLocalUploadState: true,
-      );
-      onMessageUpdate(clientMsgId, confirmed);
       await ChatLocalDataSourceImpl().upsertMessage(
         _spaceId,
         widget.conversationId,
-        confirmed,
+        sent,
       );
-      return confirmed;
+      return sent;
     } catch (e) {
       if (_isCustomerServiceTerminalWriteError(e)) {
         _markCustomerServiceThreadEnded(showToast: false);
       }
-      onMessageUpdate(
-        clientMsgId,
-        optimistic.copyWith(
-          status: MessageStatus.failed,
-          failureReason: _sendFailureReason(e),
-          localUploadState: _isMediaType(type)
-              ? MessageLocalUploadState(
-                  status: MessageLocalUploadStatus.failed,
-                  phase: MessageLocalUploadPhase.failed,
-                  error: _sendFailureReason(e),
-                )
-              : null,
-        ),
-      );
       rethrow;
     }
   }
@@ -1723,167 +1682,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return false;
   }
 
-  Future<MessageBody> _resolveCustomerServiceMediaBody(
-    MessageType type,
-    MessageBody body, {
-    required String clientMsgId,
-    required Message optimistic,
-    required void Function(String clientMsgId, Message updated) onMessageUpdate,
-    bool emitProgress = true,
-  }) async {
-    final localPath = _customerServiceLocalMediaPath(type, body);
-    if (localPath == null) return body;
-
-    if (emitProgress) {
-      onMessageUpdate(
-        clientMsgId,
-        optimistic.copyWith(
-          localUploadState: const MessageLocalUploadState(
-            status: MessageLocalUploadStatus.uploading,
-            phase: MessageLocalUploadPhase.preparing,
-            progress: 0,
-          ),
-        ),
-      );
-    }
-    final fallbackTotalBytes = _mediaSizeBytes(type, body);
-    final dio = ref.read(dioProvider);
-    final formData = dio_package.FormData.fromMap({
-      'file': dio_package.MultipartFile.fromBytes(
-        await readLocalFileBytes(localPath),
-        filename: _localUploadFileName(localPath, type),
-      ),
-      'mediaKind': switch (type) {
-        MessageType.image => 'image',
-        MessageType.video => 'video',
-        MessageType.voice => 'voice',
-        MessageType.file => 'file',
-        _ => 'file',
-      },
-    });
-    final uploadResp = await dio.post<Map<String, dynamic>>(
-      '/api/client/v1/media/upload',
-      data: formData,
-      onSendProgress: (sent, total) {
-        final progress = mediaUploadProgressPercent(
-          MediaUploadProgressEvent(
-            loaded: sent,
-            total: total > 0 ? total : fallbackTotalBytes,
-          ),
-          fallbackTotalBytes: fallbackTotalBytes,
-        );
-        if (emitProgress) {
-          onMessageUpdate(
-            clientMsgId,
-            optimistic.copyWith(
-              localUploadState: MessageLocalUploadState(
-                status: MessageLocalUploadStatus.uploading,
-                phase: MessageLocalUploadPhase.uploadingMedia,
-                progress: progress,
-              ),
-            ),
-          );
-        }
-      },
-    );
-    final data = uploadResp.data?['data'] as Map<String, dynamic>?;
-    if (data == null) return body;
-    final resource = MediaResource.fromJson(data);
-
-    return switch (type) {
-      MessageType.image => MessageBody(
-          text: body.text,
-          image: _preserveLocalMediaPreview(
-            uploaded: resource,
-            local: body.image,
-          ),
-          video: body.video,
-          voice: body.voice,
-          file: body.file,
-        ),
-      MessageType.video => MessageBody(
-          text: body.text,
-          image: body.image,
-          video: _preserveLocalMediaPreview(
-            uploaded: resource,
-            local: body.video,
-          ),
-          voice: body.voice,
-          file: body.file,
-        ),
-      MessageType.voice => MessageBody(
-          text: body.text,
-          image: body.image,
-          video: body.video,
-          voice: resource,
-          file: body.file,
-        ),
-      MessageType.file => MessageBody(
-          text: body.text,
-          image: body.image,
-          video: body.video,
-          voice: body.voice,
-          file: resource,
-        ),
-      _ => body,
-    };
-  }
-
-  String? _customerServiceLocalMediaPath(MessageType type, MessageBody body) {
-    return switch (type) {
-      MessageType.image =>
-        _isLocalMediaUrl(body.image?.url) ? body.image?.url : null,
-      MessageType.video =>
-        _isLocalMediaUrl(body.video?.url) ? body.video?.url : null,
-      MessageType.voice =>
-        _isLocalMediaUrl(body.voice?.url) ? body.voice?.url : null,
-      MessageType.file =>
-        _isLocalMediaUrl(body.file?.url) ? body.file?.url : null,
-      _ => null,
-    };
-  }
-
-  bool _isMediaType(MessageType type) {
-    return type == MessageType.image ||
-        type == MessageType.video ||
-        type == MessageType.voice ||
-        type == MessageType.file;
-  }
-
-  int? _mediaSizeBytes(MessageType type, MessageBody body) {
-    return switch (type) {
-      MessageType.image => body.image?.sizeBytes,
-      MessageType.video => body.video?.sizeBytes,
-      MessageType.voice => body.voice?.sizeBytes,
-      MessageType.file => body.file?.sizeBytes,
-      _ => null,
-    };
-  }
-
-  MediaResource _preserveLocalMediaPreview({
-    required MediaResource uploaded,
-    required MediaResource? local,
-  }) {
-    if (local == null) return uploaded;
-    final localUrl = _isLocalMediaUrl(local.url) ? local.url : null;
-    return uploaded.copyWith(
-      localPreviewUrl: local.localPreviewUrl ?? localUrl,
-      localPosterUrl: local.localPosterUrl,
-    );
-  }
-
-  bool _isLocalMediaUrl(String? url) {
-    if (url == null || url.isEmpty) return false;
-    return url.startsWith('/') ||
-        (!url.startsWith('http://') && !url.startsWith('https://'));
-  }
-
   /// 发送文件消息
   Future<void> _handleSendFile(
       String filePath, String fileName, String mimeType, int sizeBytes) async {
-    if (_isSending) return;
-    setState(() => _isSending = true);
-
     try {
       final sendConversationId = await _ensureDirectConversationForSend();
       if (!mounted) return;
@@ -1926,19 +1727,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           );
         }
       }
-    } finally {
-      if (mounted) setState(() => _isSending = false);
     }
   }
 
   Future<void> _handleSendMedia(List<ChatPickedMedia> mediaItems) async {
-    if (_isSending || mediaItems.isEmpty) return;
+    if (mediaItems.isEmpty) return;
     final l10n = AppLocalizations.of(context);
     final imagePreview = l10n.chatImageMessage;
     final videoPreview = l10n.chatVideoMessage;
     final uploadFailedText = l10n.chatImageUploadUnsupported;
-    setState(() => _isSending = true);
-
     try {
       final sendConversationId = await _ensureDirectConversationForSend();
       if (!mounted) return;
@@ -1948,6 +1745,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
       for (final item in mediaItems) {
         final sizeBytes = item.sizeBytes ?? await localFileLength(item.path);
+        final imageDimensions =
+            item.isImage ? await _readLocalImageDimensions(item.path) : null;
         final localPosterUrl =
             item.isVideo ? await generateLocalVideoPoster(item.path) : null;
         final resource = MediaResource(
@@ -1955,6 +1754,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           fileName: item.fileName,
           mimeType: item.mimeType,
           sizeBytes: sizeBytes,
+          width: imageDimensions?.$1,
+          height: imageDimensions?.$2,
           localPreviewUrl: item.isImage ? item.path : null,
           localPosterUrl: localPosterUrl,
         );
@@ -1995,13 +1796,30 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           duration: const Duration(seconds: 3),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<(int, int)?> _readLocalImageDimensions(String path) async {
+    try {
+      final bytes = Uint8List.fromList(await readLocalFileBytes(path));
+      final completer = Completer<ui.Image>();
+      ui.decodeImageFromList(bytes, completer.complete);
+      final image = await completer.future;
+      final dimensions = (image.width, image.height);
+      image.dispose();
+      return dimensions;
+    } catch (_) {
+      return null;
     }
   }
 
   Future<void> _handleSendLocation() async {
-    if (_isSending) return;
+    if (shouldBlockChatSendAction(
+      ChatSendAction.location,
+      isSingleActionRunning: _isSending,
+    )) {
+      return;
+    }
     if (!_locationSendingEnabled) {
       AppToast.comingSoon(context);
       return;
@@ -2139,7 +1957,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   /// 重发失败消息
   Future<void> _retryMessage(Message message) async {
-    if (_isSending) return;
+    if (shouldBlockChatSendAction(
+      ChatSendAction.retryFailed,
+      isSingleActionRunning: _isSending,
+    )) {
+      return;
+    }
     setState(() => _isSending = true);
     final notifier = ref.read(
         chatProvider((_spaceId, widget.conversationId, _effectiveIsGroup))
@@ -2153,6 +1976,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       await _sendChatMessage(
         type: message.type,
         body: message.body,
+        clientMsgId: message.clientMsgId ?? message.messageId,
         onOptimisticInsert: (_) {}, // 不重复插入，已有消息
         onMessageUpdate: (clientMsgId, updated) {
           notifier.updateMessage(message.messageId, updated);
@@ -2646,36 +2470,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     },
                     onScheduleText: _scheduleTextMessage,
                     onSendVoice: (filePath, duration) async {
-                      if (_isSending) return;
-                      setState(() => _isSending = true);
                       final notifier = ref.read(chatProvider((
                         _spaceId,
                         widget.conversationId,
                         _effectiveIsGroup
                       )).notifier);
                       try {
-                        // Upload voice file first
-                        final dio = ref.read(dioProvider);
-                        final formData = dio_package.FormData.fromMap({
-                          'file': dio_package.MultipartFile.fromBytes(
-                            await readLocalFileBytes(filePath),
-                            filename: 'voice.m4a',
-                          ),
-                          'mediaKind': 'voice',
-                        });
-                        final uploadResp = await dio.post<Map<String, dynamic>>(
-                          '/api/client/v1/media/upload',
-                          data: formData,
-                        );
-                        final uploadData =
-                            uploadResp.data?['data'] as Map<String, dynamic>?;
-                        final url = uploadData?['url'] as String? ?? filePath;
-
                         await _sendChatMessage(
                           type: MessageType.voice,
                           body: MessageBody(
                             voice: MediaResource(
-                              url: url,
+                              url: filePath,
                               durationSeconds: duration,
                               mimeType: 'audio/m4a',
                             ),
@@ -2690,8 +2495,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         );
                       } catch (e) {
                         _handleSendError(e);
-                      } finally {
-                        if (mounted) setState(() => _isSending = false);
                       }
                     },
                     onSendMedia: _handleSendMedia,

@@ -38,7 +38,11 @@ import {
   type AvatarProfilePopoverState,
   type UnreadJumpState,
 } from "../models/messageDisplayModel";
-import { messageActionPreview, type HistoryFilterKey } from "../models/messageListModel";
+import {
+  messageActionPreview,
+  type HistoryFilterKey,
+  type MessageLookupScope,
+} from "../models/messageListModel";
 import type { MessageCenterCommandModel } from "../hooks/useMessageCenterCommandModel";
 import { getImConversationType } from "../hooks/useMessageCenterViewModel";
 import type { MessageGroupManagement } from "../hooks/useMessageGroupManagement";
@@ -116,6 +120,7 @@ export function MessageCenterConversationStage({
   isMessageStageNearBottom,
   jumpToLatest,
   loadingGroupMembers,
+  lookupScope,
   messageAnnotations,
   messageCenterCommands,
   messageLayoutMode,
@@ -260,6 +265,7 @@ export function MessageCenterConversationStage({
   isMessageStageNearBottom: (distance?: number) => boolean;
   jumpToLatest: () => void;
   loadingGroupMembers: boolean;
+  lookupScope: MessageLookupScope;
   messageAnnotations: Record<string, string>;
   messageCenterCommands: MessageCenterCommandModel;
   messageLayoutMode: MessageLayoutMode;
@@ -490,6 +496,7 @@ export function MessageCenterConversationStage({
                 historyFilter={historyFilter}
                 historyOpen={historyOpen}
                 loadedMessages={messages}
+                lookupScope={lookupScope}
                 loading={messageList.loading}
                 messageAnnotations={messageAnnotations}
                 messageSearchKeyword={messageSearchKeyword}

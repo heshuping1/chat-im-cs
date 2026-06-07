@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  conversationBottomScrollTop,
   createConversationViewportRegistry,
   decideConversationViewportAfterAppend,
   restoreConversationViewport,
@@ -75,7 +76,13 @@ export function useWechatBottomFollow<TMessage>({
     (behavior: ScrollBehavior = "auto") => {
       const stage = stageRef.current;
       if (!stage) return;
-      stage.scrollTo({ top: stage.scrollHeight, behavior });
+      stage.scrollTo({
+        top: conversationBottomScrollTop({
+          clientHeight: stage.clientHeight,
+          scrollHeight: stage.scrollHeight,
+        }),
+        behavior,
+      });
       isAtBottomRef.current = true;
       updatePendingNewMessageCount(0);
     },
@@ -135,7 +142,13 @@ export function useWechatBottomFollow<TMessage>({
           const stage = stageRef.current;
           if (!stage) return;
           if (restore.state.atBottom) {
-            stage.scrollTo({ top: stage.scrollHeight, behavior: "auto" });
+            stage.scrollTo({
+              top: conversationBottomScrollTop({
+                clientHeight: stage.clientHeight,
+                scrollHeight: stage.scrollHeight,
+              }),
+              behavior: "auto",
+            });
           } else {
             stage.scrollTo({ top: restore.state.scrollTop, behavior: "auto" });
           }

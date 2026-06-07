@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lpp_mobile/core/branding/app_brand_assets.dart';
 import 'package:lpp_mobile/core/widgets/setting_tile.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
@@ -20,18 +21,13 @@ class AboutPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 48),
             child: Column(
               children: [
-                Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00B27A), Color(0xFF00D68F)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Center(
-                    child: Text('🫧', style: TextStyle(fontSize: 40)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    AppBrandAssets.appIcon,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -53,7 +49,7 @@ class AboutPage extends StatelessWidget {
               SettingTile(
                 label: l10n.aboutCheckUpdate,
                 onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.aboutLatestVersion))),
+                    SnackBar(content: Text(l10n.aboutLatestVersion))),
               ),
             ],
           ),
@@ -84,12 +80,10 @@ class AboutPage extends StatelessWidget {
             child: Column(
               children: [
                 Text('© 2026 绿泡泡科技有限公司',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFFAEAEB2))),
+                    style: TextStyle(fontSize: 12, color: Color(0xFFAEAEB2))),
                 SizedBox(height: 4),
                 Text('保留所有权利',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFFAEAEB2))),
+                    style: TextStyle(fontSize: 12, color: Color(0xFFAEAEB2))),
               ],
             ),
           ),

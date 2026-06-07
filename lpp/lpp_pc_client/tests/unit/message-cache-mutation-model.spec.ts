@@ -6,6 +6,7 @@ import type {
 } from "../../src/renderer/data/api-client";
 import {
   applyConversationReadToCache,
+  invalidateMessages,
   localMediaPreviewKeys,
   markLocalOutgoingMessageFailed,
   markMessageRecalledInCache,
@@ -18,9 +19,44 @@ import {
 } from "../../src/renderer/messages/models/messageCacheMutationModel";
 import type { ConversationListResponse } from "../../src/renderer/data/api-client";
 import type { AuthSession } from "../../src/renderer/data/auth/auth-session";
+import {
+  getImMessageStore,
+  imMessageConversationKey,
+  imMessageScopeKey,
+} from "../../src/renderer/data/message-store/im-message-store";
 import { pcQueryKeys } from "../../src/renderer/data/query-keys";
 
 describe("messageCacheMutationModel", () => {
+  it("invalidates message and conversation queries only inside the current workspace scope", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-1",
+      spaceType: 1,
+      tenantId: "tenant-1",
+      tenantToken: "tenant-token-1",
+      userId: "user-1",
+    } as AuthSession;
+    const currentScope = pcQueryKeys.imMessagesForSession(session, "direct", "c1")[1];
+    const otherScope = "workspace|https://api.example.test|personal|tenant-1|other-user|platform-user-2";
+    queryClient.setQueryData(pcQueryKeys.imMessagesForSession(session, "direct", "c1"), []);
+    queryClient.setQueryData(["pc-im-messages", otherScope, "direct", "c1"], []);
+    queryClient.setQueryData(pcQueryKeys.imConversationsForSession(session), { items: [] });
+    queryClient.setQueryData(["pc-im-conversations", otherScope, 100], { items: [] });
+
+    await invalidateMessages(queryClient, session);
+
+    expect(queryClient.getQueryCache().find({ queryKey: pcQueryKeys.imMessagesForSession(session, "direct", "c1") })?.state.isInvalidated)
+      .toBe(true);
+    expect(queryClient.getQueryCache().find({ queryKey: pcQueryKeys.imConversationsForSession(session) })?.state.isInvalidated)
+      .toBe(true);
+    expect(queryClient.getQueryCache().find({ queryKey: ["pc-im-messages", otherScope, "direct", "c1"] })?.state.isInvalidated)
+      .toBe(false);
+    expect(queryClient.getQueryCache().find({ queryKey: ["pc-im-conversations", otherScope, 100] })?.state.isInvalidated)
+      .toBe(false);
+    expect(currentScope).not.toBe(otherScope);
+  });
+
   it("upserts and replaces local outgoing messages by conversation key", () => {
     const first = { messageId: "local-1", sentAt: "2026-01-01T00:00:00.000Z" } as MessageItemDto;
     const sent = { messageId: "server-1", sentAt: "2026-01-01T00:00:01.000Z" } as MessageItemDto;
@@ -166,6 +202,41 @@ describe("messageCacheMutationModel", () => {
     ).toMatchObject({ messageId: "m2", preview: "消息已撤回" });
   });
 
+  it("writes recalled messages into the local message store", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-recall",
+      spaceType: 1,
+      tenantId: "tenant-recall",
+      tenantToken: "token-recall",
+      userId: "user-recall",
+    } as AuthSession;
+    const scopeKey = imMessageScopeKey(session);
+    const store = getImMessageStore();
+    await store.clearScope(scopeKey);
+    await store.upsertMessages(scopeKey, "direct", "c-recall", [
+      {
+        conversationId: "c-recall",
+        conversationSeq: 1,
+        messageId: "m-recall",
+        messageType: "text",
+        preview: "before",
+        sentAt: "2026-06-07T00:00:00.000Z",
+      } as MessageItemDto,
+    ]);
+    queryClient.setQueryData<MessageItemDto[]>(
+      pcQueryKeys.imMessagesForSession(session, "direct", "c-recall"),
+      await store.listMessages(imMessageConversationKey(scopeKey, "direct", "c-recall"), { limit: 50 }),
+    );
+
+    markMessageRecalledInCache(queryClient, "m-recall", session);
+    await Promise.resolve();
+
+    expect(await store.listMessages(imMessageConversationKey(scopeKey, "direct", "c-recall"), { limit: 50 }))
+      .toMatchObject([{ messageId: "m-recall", isRecalled: true, preview: "消息已撤回" }]);
+  });
+
   it("falls back to the previous message when deleting the last message", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData<MessageItemDto[]>(
@@ -213,6 +284,41 @@ describe("messageCacheMutationModel", () => {
     });
   });
 
+  it("deletes removed messages from the local message store", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-delete",
+      spaceType: 1,
+      tenantId: "tenant-delete",
+      tenantToken: "token-delete",
+      userId: "user-delete",
+    } as AuthSession;
+    const scopeKey = imMessageScopeKey(session);
+    const store = getImMessageStore();
+    await store.clearScope(scopeKey);
+    await store.upsertMessages(scopeKey, "direct", "c-delete", [
+      {
+        conversationId: "c-delete",
+        conversationSeq: 1,
+        messageId: "m-delete",
+        messageType: "text",
+        preview: "delete",
+        sentAt: "2026-06-07T00:00:00.000Z",
+      } as MessageItemDto,
+    ]);
+    queryClient.setQueryData<MessageItemDto[]>(
+      pcQueryKeys.imMessagesForSession(session, "direct", "c-delete"),
+      await store.listMessages(imMessageConversationKey(scopeKey, "direct", "c-delete"), { limit: 50 }),
+    );
+
+    removeMessageFromCache(queryClient, "m-delete", session);
+    await Promise.resolve();
+
+    expect(await store.listMessages(imMessageConversationKey(scopeKey, "direct", "c-delete"), { limit: 50 }))
+      .toEqual([]);
+  });
+
   it("applies read seq to conversation cache through the message core path", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData<ConversationListResponse>(["pc-im-conversations"], {
@@ -234,6 +340,53 @@ describe("messageCacheMutationModel", () => {
       queryClient.getQueryData<ConversationListResponse>(["pc-im-conversations"])
         ?.items[0],
     ).toMatchObject({ lastReadSeq: 3, unreadCount: 0 });
+  });
+
+  it("applies read metadata to the local message store", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-read",
+      spaceType: 1,
+      tenantId: "tenant-read",
+      tenantToken: "token-read",
+      userId: "user-read",
+    } as AuthSession;
+    const scopeKey = imMessageScopeKey(session);
+    const store = getImMessageStore();
+    await store.clearScope(scopeKey);
+    await store.upsertMessages(scopeKey, "direct", "c-read", [
+      {
+        conversationId: "c-read",
+        conversationSeq: 1,
+        direction: "out",
+        isMine: true,
+        isSelf: true,
+        messageId: "m-read",
+        messageType: "text",
+        preview: "read",
+        sentAt: "2026-06-07T00:00:00.000Z",
+        status: "sent",
+      } as MessageItemDto,
+    ]);
+    queryClient.setQueryData<ConversationListResponse>(pcQueryKeys.imConversationsForSession(session), {
+      items: [
+        {
+          conversationId: "c-read",
+          conversationType: "direct",
+          title: "Peer",
+          lastMessageSeq: 1,
+          lastReadSeq: 0,
+          unreadCount: 1,
+        },
+      ],
+    });
+
+    applyConversationReadToCache(queryClient, "c-read", 1, session);
+    await Promise.resolve();
+
+    expect(await store.listMessages(imMessageConversationKey(scopeKey, "direct", "c-read"), { limit: 50 }))
+      .toMatchObject([{ messageId: "m-read", status: "sent" }]);
   });
 
   it("replaces sent local messages only in the current workspace conversation cache", () => {
@@ -291,5 +444,52 @@ describe("messageCacheMutationModel", () => {
       lastMessage: { messageId: "pc-local-text-1", preview: "old" },
       title: "Other space peer",
     });
+  });
+
+  it("writes server-confirmed sent messages into the local message store", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-1",
+      spaceType: 1,
+      tenantId: "personal-tenant-store",
+      tenantToken: "personal-token",
+      userId: "personal-user-store",
+    } as AuthSession;
+    const conversation = {
+      conversationId: "c-store",
+      conversationType: "direct",
+      title: "Peer",
+    } as ConversationListItem;
+    const store = getImMessageStore();
+    const scopeKey = imMessageScopeKey(session);
+    await store.clearScope(scopeKey);
+
+    replaceLocalMessageInCache(
+      queryClient,
+      session,
+      conversation,
+      "pc-local-text-store",
+      "text",
+      { text: "persist me" },
+      {
+        conversationId: "c-store",
+        conversationSeq: 11,
+        messageId: "server-store-1",
+        serverTime: "2026-06-07T08:20:16.011Z",
+      },
+    );
+    await Promise.resolve();
+
+    expect(
+      await store.listMessages(imMessageConversationKey(scopeKey, "direct", "c-store"), { limit: 50 }),
+    ).toMatchObject([
+      {
+        conversationId: "c-store",
+        conversationSeq: 11,
+        messageId: "server-store-1",
+        preview: "persist me",
+      },
+    ]);
   });
 });

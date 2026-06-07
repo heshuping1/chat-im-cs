@@ -8,6 +8,7 @@ class AppNetworkImage extends StatelessWidget {
   final BoxFit fit;
   final WidgetBuilder? placeholderBuilder;
   final WidgetBuilder? errorBuilder;
+  final bool cacheInMemory;
 
   const AppNetworkImage({
     super.key,
@@ -17,6 +18,7 @@ class AppNetworkImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.placeholderBuilder,
     this.errorBuilder,
+    this.cacheInMemory = false,
   });
 
   @override
@@ -26,7 +28,7 @@ class AppNetworkImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
-      cacheInMemory: false,
+      cacheInMemory: cacheInMemory,
       errorBuilder: (ctx, error, stackTrace) {
         if (error == 'loading') {
           return placeholderBuilder?.call(ctx) ??

@@ -44,6 +44,19 @@ void main() {
     );
   });
 
+  test('retry send can reuse existing client message id', () async {
+    final sent = await useCase.execute(
+      conversationId: 'chat-1',
+      isGroup: false,
+      type: MessageType.text,
+      body: const MessageBody(text: 'retry'),
+      clientMsgId: 'client-retry-1',
+    );
+
+    expect(sent.clientMsgId, 'client-retry-1');
+    expect(repository.lastClientMsgId, 'client-retry-1');
+  });
+
   test(
     'group text send preserves mentions in optimistic and sent messages',
     () async {
@@ -181,6 +194,60 @@ void main() {
   );
 
   test(
+    'media upload failures enqueue local body so optimistic media can recover',
+    () async {
+      final queued = <Map<String, Object?>>[];
+      repository.uploadError = const MessageSendFailure.network(
+        'upload offline',
+      );
+      useCase = SendMessageUseCase(
+        repository: repository,
+        currentUserId: 'user-1',
+        onPendingEnqueue:
+            ({
+              required clientMsgId,
+              required conversationId,
+              required isGroup,
+              required type,
+              required body,
+              mentions,
+            }) async {
+              queued.add({
+                'clientMsgId': clientMsgId,
+                'conversationId': conversationId,
+                'type': type,
+                'url': body.image?.url,
+              });
+            },
+      );
+
+      Message? failed;
+      await expectLater(
+        useCase.execute(
+          conversationId: 'chat-1',
+          isGroup: false,
+          type: MessageType.image,
+          body: const MessageBody(
+            image: MediaResource(
+              url: '/tmp/local-image.jpg',
+              fileName: 'local-image.jpg',
+              sizeBytes: 2048,
+            ),
+          ),
+          onMessageUpdate: (_, message) => failed = message,
+        ),
+        throwsA(isA<MessageSendFailure>()),
+      );
+
+      expect(failed?.status, MessageStatus.failed);
+      expect(failed?.body.image?.url, '/tmp/local-image.jpg');
+      expect(queued, hasLength(1));
+      expect(queued.single['type'], MessageType.image);
+      expect(queued.single['url'], '/tmp/local-image.jpg');
+    },
+  );
+
+  test(
     'duplicate client message id is treated as idempotent success',
     () async {
       repository.sendError = const MessageSendFailure.duplicateClientMsgId(
@@ -235,13 +302,58 @@ void main() {
       expect(optimistic?.body.video?.url, '/tmp/local-video.mp4');
     },
   );
+
+  test(
+    'local video send publishes uploaded poster as thumbnail for receivers',
+    () async {
+      repository.uploadResults = [
+        const MediaResource(url: 'https://cdn.example.com/video.mp4'),
+        const MediaResource(url: 'https://cdn.example.com/video-poster.jpg'),
+      ];
+
+      Message? sentUpdate;
+      await useCase.execute(
+        conversationId: 'chat-1',
+        isGroup: false,
+        type: MessageType.video,
+        body: const MessageBody(
+          video: MediaResource(
+            url: '/tmp/local-video.mp4',
+            fileName: 'local-video.mp4',
+            sizeBytes: 4096,
+            localPosterUrl: '/tmp/local-video-poster.jpg',
+          ),
+        ),
+        onMessageUpdate: (_, message) => sentUpdate = message,
+      );
+
+      expect(repository.uploadedPaths, [
+        '/tmp/local-video.mp4',
+        '/tmp/local-video-poster.jpg',
+      ]);
+      expect(sentUpdate?.status, MessageStatus.sent);
+      expect(sentUpdate?.body.video?.url, 'https://cdn.example.com/video.mp4');
+      expect(
+        sentUpdate?.body.video?.thumbnailUrl,
+        'https://cdn.example.com/video-poster.jpg',
+      );
+      expect(
+        sentUpdate?.body.video?.localPosterUrl,
+        '/tmp/local-video-poster.jpg',
+      );
+    },
+  );
 }
 
 class _FakeChatRepository implements ChatRepository {
   Object? sendError;
+  Object? uploadError;
   void Function()? onUploadStarted;
   int sendCalls = 0;
+  String? lastClientMsgId;
   List<Mention>? lastMentions;
+  List<MediaResource>? uploadResults;
+  final uploadedPaths = <String>[];
 
   @override
   Future<Message> sendMessage({
@@ -254,6 +366,7 @@ class _FakeChatRepository implements ChatRepository {
     List<Mention>? mentions,
   }) async {
     sendCalls++;
+    lastClientMsgId = clientMsgId;
     lastMentions = mentions;
     final error = sendError;
     if (error != null) throw error;
@@ -274,10 +387,18 @@ class _FakeChatRepository implements ChatRepository {
   @override
   Future<MediaResource> uploadMedia(
     String filePath, {
+    String? mediaKind,
     MediaUploadProgressCallback? onProgress,
   }) async {
     onUploadStarted?.call();
+    uploadedPaths.add(filePath);
+    final error = uploadError;
+    if (error != null) throw error;
     onProgress?.call(const MediaUploadProgressEvent(loaded: 1, total: 2));
+    final queuedResults = uploadResults;
+    if (queuedResults != null && queuedResults.isNotEmpty) {
+      return queuedResults.removeAt(0);
+    }
     return const MediaResource(url: 'https://cdn.example.com/file.png');
   }
 

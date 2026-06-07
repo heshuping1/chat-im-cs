@@ -118,6 +118,16 @@ describe("customer service unread ledger", () => {
         overlayUnread: 0,
         compatUnreadCandidate: 5,
       }),
-    ).toEqual({ reason: "imListCompatCandidate", unreadCount: 5 });
+    ).toEqual({ reason: "none", unreadCount: 0 });
+  });
+
+  it("keeps im-list compat unread as display fallback only", () => {
+    expect(
+      resolveCustomerServiceThreadUnread({
+        compatUnreadCandidate: 7,
+        overlayUnread: 0,
+        serverUnread: 0,
+      }),
+    ).toEqual({ reason: "none", unreadCount: 0 });
   });
 });

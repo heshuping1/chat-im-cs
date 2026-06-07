@@ -133,6 +133,7 @@ export function ensureMaterializedMediaDisplayUrl({
   fileName,
   fileUrl,
   kind,
+  preferDesktopRead,
 }: {
   accountId?: string;
   authToken?: string;
@@ -142,11 +143,15 @@ export function ensureMaterializedMediaDisplayUrl({
   fileName: string;
   fileUrl: string | undefined;
   kind: MaterializedMediaKind;
+  preferDesktopRead?: boolean;
 }) {
   if (!cacheKey || !fileUrl) return Promise.resolve(undefined);
+  const shouldReadThroughDesktop = preferDesktopRead || /^file:/i.test(fileUrl);
   const cached = materializedMediaDisplayUrls.get(cacheKey);
-  if (cached) return Promise.resolve(cached);
-  if (!/^file:/i.test(fileUrl)) {
+  if (cached && (!shouldReadThroughDesktop || isBrowserNativeUrl(cached))) {
+    return Promise.resolve(cached);
+  }
+  if (!shouldReadThroughDesktop) {
     registerMaterializedMediaDisplayUrl(cacheKey, fileUrl);
     return Promise.resolve(fileUrl);
   }

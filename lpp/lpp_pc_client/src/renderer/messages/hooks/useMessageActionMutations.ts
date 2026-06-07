@@ -51,9 +51,9 @@ export function useMessageActionMutations({
       return requireApiClient(session).recallMessage(messageId);
     },
     onSuccess: async (_result, messageId) => {
-      markMessageRecalledInCache(queryClient, messageId);
+      markMessageRecalledInCache(queryClient, messageId, session);
       setNotice(t("messages.actionMutations.recallSuccess"));
-      await invalidateMessages(queryClient);
+      await invalidateMessages(queryClient, session);
     },
     onError: (error) =>
       setNotice(t("messages.actionMutations.recallFailed", { error: formatError(error) })),
@@ -65,9 +65,9 @@ export function useMessageActionMutations({
       return requireApiClient(session).deleteMessage(messageId);
     },
     onSuccess: async (_result, messageId) => {
-      removeMessageFromCache(queryClient, messageId);
+      removeMessageFromCache(queryClient, messageId, session);
       setNotice(t("messages.actionMutations.deleteSuccess"));
-      await invalidateMessages(queryClient);
+      await invalidateMessages(queryClient, session);
     },
     onError: (error) =>
       setNotice(t("messages.actionMutations.deleteFailed", { error: formatError(error) })),
@@ -91,7 +91,7 @@ export function useMessageActionMutations({
       );
       setNotice(t("messages.actionMutations.favoriteSuccess"));
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["pc-im-messages"] }),
+        invalidateMessages(queryClient, session),
         queryClient.invalidateQueries({ queryKey: ["pc-account-favorites"] }),
         queryClient.invalidateQueries({ queryKey: ["pc-account-favorites-summary"] }),
       ]);
@@ -106,13 +106,15 @@ export function useMessageActionMutations({
       return requireApiClient(session).batchDeleteMessages(messageIds);
     },
     onSuccess: async (result) => {
-      result.successIds.forEach((messageId) => removeMessageFromCache(queryClient, messageId));
+      result.successIds.forEach((messageId) =>
+        removeMessageFromCache(queryClient, messageId, session),
+      );
       const succeeded = messageBatchSucceededCount(result);
       const failed = messageBatchFailedCount(result);
       if (succeeded > 0) {
         setMultiSelectMode(false);
         setSelectedMessageIds(new Set());
-        await invalidateMessages(queryClient);
+        await invalidateMessages(queryClient, session);
       }
       if (failed > 0) {
         setNotice(
@@ -261,7 +263,7 @@ export function useMessageActionMutations({
               })
             : t("messages.actionMutations.forwardSuccess"),
       );
-      await invalidateMessages(queryClient);
+      await invalidateMessages(queryClient, session);
     },
     onError: (error) =>
       setNotice(t("messages.actionMutations.forwardFailed", { error: formatError(error) })),

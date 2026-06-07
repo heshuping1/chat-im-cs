@@ -27,8 +27,20 @@ describe("normalizeMediaPart", () => {
     expect(normalizeMediaPart({ assetBaseUrl: "https://assets.example", part })).toMatchObject({
       kind: "image",
       fileName: "photo.jpg",
-      sourceUrl: "https://assets.example/thumbs/photo.jpg",
-      imageCacheKey: "image:https://assets.example/thumbs/photo.jpg",
+      sourceUrl: "https://assets.example/files/photo.jpg",
+      imageCacheKey: "image:https://assets.example/files/photo.jpg",
+      imageSourceUrls: [
+        "https://assets.example/files/photo.jpg",
+        "https://assets.example/thumbs/photo.jpg",
+      ],
+      previewPresentation: {
+        previewKind: "image",
+        previewBox: {
+          width: 178,
+          height: 280,
+          className: "media-preview-image-unknown",
+        },
+      },
     });
   });
 
@@ -51,8 +63,8 @@ describe("normalizeMediaPart", () => {
       imageCacheKey: "image:media:photo",
       imageSourceUrls: [
         "https://assets.example/media/photo?sig=ok",
-        "https://assets.example/media/photo-thumb",
         "https://assets.example/media/photo",
+        "https://assets.example/media/photo-thumb",
       ],
     });
   });
@@ -146,8 +158,8 @@ describe("normalizeMediaPart", () => {
       imageSourceUrls: [
         "file:///app-cache/photo.jpg",
         "https://assets.example/media/photo?sig=ok",
-        "https://assets.example/thumbs/photo.jpg",
         "https://assets.example/media/photo",
+        "https://assets.example/thumbs/photo.jpg",
       ],
     });
   });
@@ -191,9 +203,37 @@ describe("message media action model", () => {
       expect.objectContaining({
         kind: "image",
         fileName: "photo.jpg",
-        sourceUrl: "https://assets.example/thumb.jpg",
+        sourceUrl: "https://assets.example/image.jpg",
+        imageSourceUrls: [
+          "https://assets.example/image.jpg",
+          "https://assets.example/thumb.jpg",
+        ],
       }),
     ]);
+  });
+
+  it("buckets image previews from metadata without deriving exact render height", () => {
+    const part: NormalizedMessagePart = {
+      type: "image",
+      media: {
+        fileName: "phone-screenshot.jpg",
+        height: 1608,
+        url: "/files/phone-screenshot.jpg",
+        width: 760,
+      },
+    };
+
+    expect(normalizeMediaPart({ assetBaseUrl: "https://assets.example", part })).toMatchObject({
+      kind: "image",
+      previewPresentation: {
+        previewKind: "image",
+        previewBox: {
+          width: 178,
+          height: 280,
+          className: "media-preview-image-tall",
+        },
+      },
+    });
   });
 
   it("resolves mediaId-only image messages through the protected media endpoint", () => {
@@ -575,7 +615,10 @@ describe("message media upload presentation", () => {
     expect(videoMessagePreview).toContain("poster-failed");
     expect(videoMessagePreview).toContain('className="message-video-poster"');
     expect(videoMessagePreview).toContain("markVideoPosterReady(posterKey, visiblePosterSrc)");
-    expect(videoMessagePreview).toContain("onError={() => setPosterLoadState(\"failed\")}");
+    expect(videoMessagePreview).toContain("onPosterError?.()");
+    expect(messageMediaParts).toContain("explicitPosterFailed");
+    expect(messageMediaParts).toContain("posterDisplaySrc");
+    expect(messageMediaParts).toContain("preferDesktopRead: true");
     expect(messageMediaParts).toContain("videoPosterRenderKey");
     expect(messageMediaParts).toContain("posterKey={posterKey}");
     expect(messageMediaParts).toContain("posterReadyHint={posterReadyHint}");
@@ -588,10 +631,11 @@ describe("message media upload presentation", () => {
 
   it("splits local file video open sources from inline preview sources", () => {
     expect(messageMediaParts).toContain("inlineVideoPreviewSrc");
-    expect(messageMediaParts).toContain("const openSrc = localVideoSrc || item?.localOpenUrl || src;");
+    expect(messageMediaParts).toContain("const localVideoOpenSrc = localVideoSrc || item?.localOpenUrl;");
+    expect(messageMediaParts).toContain("const openSrc = localVideoOpenSrc || remoteSrc || src;");
     expect(messageMediaParts).toContain("localVideoDisplaySrc");
     expect(messageMediaParts).toContain("const previewSource = localVideoDisplaySrc || src;");
-    expect(messageMediaParts).toContain("allowDesktopFile: Boolean(window.desktopApi)");
+    expect(messageMediaParts).toContain("allowDesktopFile: canOpenVideoPlayer || canReadMediaFileAsDataUrl");
     expect(messageMediaParts).toContain('kind: "video"');
     expect(messageMediaParts).toMatch(/useAuthenticatedMediaUrl\(\s*previewSrc,/);
     expect(messageMediaParts).toContain("displaySrc: openSrc");
@@ -608,7 +652,7 @@ describe("message media upload presentation", () => {
     expect(messageMediaParts).toContain("hasLocalOpenUrl");
     expect(messageMediaParts).toContain("openedWithInitialFileUrl");
     expect(messageMediaParts).toContain("prepareElapsedMs");
-    expect(messageMediaParts).toContain("localOpenSrc: localVideoSrc || item?.localOpenUrl");
+    expect(messageMediaParts).toContain("localOpenSrc: localVideoOpenSrc");
   });
 
   it("uses local open urls for file cards before remote source urls", () => {
@@ -691,11 +735,45 @@ describe("message media upload presentation", () => {
     expect(mediaParts).toContain("const visibleImageSrc = imageVisibleSource(localDisplaySrc, imageSrc, brokenImageSrc);");
     expect(mediaParts).toContain("if (failed && hasNextImageSource) advanceToNextImageSource();");
     expect(mediaParts).toContain("sourceAvailable={Boolean(visibleImageSrc)}");
+    expect(mediaParts).toContain("imagePreviewPresentation");
+    expect(imageFrame).toContain("presentation");
+    expect(imageFrame).toContain("--media-preview-width");
+    expect(imageFrame).toContain("--media-preview-height");
     expect(mediaParts).toContain("const imageReady =");
     expect(mediaParts).toContain("hasUsableLocalFile");
     expect(mediaParts).toContain("imageLoaded={imageReady}");
     expect(mediaParts).toContain("copyCurrentMessageImage");
     expect(mediaParts).toContain("saveCurrentMessageImageAs");
     expect(mediaParts).toContain("revealCurrentMessageImageInFolder");
+  });
+
+  it("keeps media message outer boxes stable while content loads", () => {
+    const imageFrame = readFileSync(
+      resolve(process.cwd(), "src/renderer/media/components/ImageMessageFrame.tsx"),
+      "utf8",
+    );
+    const messageCenterCss = readFileSync(
+      resolve(process.cwd(), "src/renderer/styles/messages/message-center.css"),
+      "utf8",
+    );
+    const mediaCss = readFileSync(
+      resolve(process.cwd(), "src/renderer/styles/messages/message-media-content.css"),
+      "utf8",
+    );
+
+    expect(imageFrame).toContain("mediaPreviewFrameStyle");
+    expect(mediaCss).toContain("width: var(--media-preview-width");
+    expect(mediaCss).toContain("height: var(--media-preview-height");
+    expect(mediaCss).toContain("object-fit: contain");
+    expect(mediaCss).toMatch(
+      /\.message-image-frame \.message-image \{[^}]*position: absolute;[^}]*inset: 0;[^}]*min-height: 0;[^}]*object-fit: contain;/s,
+    );
+    expect(mediaCss).not.toContain(".message-image-frame.loaded {\n  min-width: 0;\n  min-height: 0;");
+    expect(messageCenterCss).toContain("height: var(--media-preview-height");
+    expect(messageCenterCss).not.toContain(".pc-chat-bubble .message-image-frame.loaded {\n  min-width: 0;");
+    expect(messageMediaParts).toContain("videoPreviewPresentation");
+    expect(messageMediaParts).not.toContain("setVideoSize({ width: videoWidth, height: videoHeight });");
+    expect(mediaCss).toContain("height: var(--media-preview-file-height");
+    expect(messageCenterCss).toContain("height: var(--media-preview-file-height");
   });
 });

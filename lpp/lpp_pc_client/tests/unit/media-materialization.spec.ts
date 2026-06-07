@@ -168,6 +168,31 @@ describe("media materialization", () => {
     );
   });
 
+  it("can force authenticated remote poster urls through desktop display materialization", async () => {
+    const displayUrl = await ensureMaterializedMediaDisplayUrl({
+      accountId: "staff-1",
+      authToken: "tenant-token",
+      cacheIdentity: "video-poster:media:media-1",
+      cacheKey: "video-poster:media:media-1",
+      conversationId: "direct-1",
+      fileName: "clip-poster.jpg",
+      fileUrl: "https://cdn.example.test/media/poster.jpg?sig=one",
+      kind: "image",
+      preferDesktopRead: true,
+    });
+
+    expect(window.desktopApi?.readMediaFileAsDataUrl).toHaveBeenCalledWith({
+      accountId: "staff-1",
+      authToken: "tenant-token",
+      cacheIdentity: "video-poster:media:media-1",
+      conversationId: "direct-1",
+      fileName: "clip-poster.jpg",
+      kind: "image",
+      url: "https://cdn.example.test/media/poster.jpg?sig=one",
+    });
+    expect(displayUrl).toBe("data:image/png;base64,aW1hZ2U=");
+  });
+
   it("materializes received video and file messages before UI render", async () => {
     await materializeReceivedMediaMessage({
       accountId: "staff-1",

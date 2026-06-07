@@ -589,6 +589,52 @@ describe("architecture boundaries", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps UI components away from the persistent IM message store", () => {
+    const componentRoots = [
+      "src/renderer/App.tsx",
+      "src/renderer/main.tsx",
+      "src/renderer/components",
+      "src/renderer/messages/components",
+      "src/renderer/customer-service/components",
+    ];
+    const violations = files
+      .filter((file) => componentRoots.some((root) => isUnder(file, root)))
+      .flatMap((file) =>
+        importsOf(file).flatMap((specifier) => {
+          const resolvedImport = resolveImport(file, specifier);
+          return resolvedImport && isUnder(resolvedImport, "src/renderer/data/message-store")
+            ? [`${relative(file)} imports persistent IM message store ${relative(resolvedImport)}`]
+            : [];
+        }),
+      );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps runtime IM message query keys session-scoped", () => {
+    const violations = files
+      .filter((file) => isUnder(file, "src/renderer"))
+      .flatMap((file) => {
+        const source = readFileSync(file, "utf8");
+        return source.includes("pcQueryKeys.imMessages(")
+          ? [`${relative(file)} uses legacy token-scoped IM message query key`]
+          : [];
+      });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps customer-service compat unread from becoming a final unread source", () => {
+    const ledgerPath = "src/renderer/data/customer-service/customer-service-unread-ledger.ts";
+    const source = readFileSync(join(repoRoot, ledgerPath), "utf8");
+    const resolverBody = source.match(
+      /export function resolveCustomerServiceThreadUnread\([\s\S]*?\n\}/,
+    )?.[0] ?? "";
+
+    expect(resolverBody).not.toContain("imListCompatCandidate");
+    expect(resolverBody).not.toContain("compatUnreadCandidate > 0");
+  });
+
   it("keeps message models independent from hooks and components", () => {
     const violations = files
       .filter((file) => isUnder(file, "src/renderer/messages/models"))

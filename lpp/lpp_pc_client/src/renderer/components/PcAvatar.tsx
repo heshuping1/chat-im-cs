@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 import { UsersRound } from "lucide-react";
 import { useAuthSession } from "../data/auth/auth-store";
-import { getCachedAvatar, refreshCachedAvatar } from "../lib/avatarCache";
+import {
+  getCachedAvatar,
+  getCachedAvatarDataUrlSync,
+  refreshCachedAvatar,
+} from "../lib/avatarCache";
 
 export type PcAvatarKind = "person" | "group" | "tenant";
 
@@ -47,12 +51,13 @@ function PcAvatarImage({
   name: string;
 }) {
   const token = useAuthSession()?.tenantToken;
-  const [src, setSrc] = useState("");
-  const [failed, setFailed] = useState(!avatarUrl);
+  const [src, setSrc] = useState(() => initialAvatarSrc(avatarUrl));
+  const [failed, setFailed] = useState(() => !initialAvatarSrc(avatarUrl));
 
   useEffect(() => {
     let active = true;
     const objectUrls: string[] = [];
+    const initialSrc = initialAvatarSrc(avatarUrl);
 
     const showBlob = (blob: Blob | null) => {
       if (!blob?.size) return;
@@ -63,8 +68,8 @@ function PcAvatarImage({
       setFailed(false);
     };
 
-    setSrc("");
-    setFailed(!avatarUrl);
+    setSrc(initialSrc);
+    setFailed(!initialSrc);
     if (!avatarUrl) {
       return () => {
         active = false;
@@ -94,7 +99,7 @@ function PcAvatarImage({
         showBlob(blob);
       })
       .catch(() => {
-        if (active) setFailed(true);
+        if (active && !initialSrc) setFailed(true);
       });
 
     return () => {
@@ -118,4 +123,10 @@ function PcAvatarImage({
       onError={() => setFailed(true)}
     />
   );
+}
+
+function initialAvatarSrc(avatarUrl?: string | null) {
+  if (!avatarUrl) return "";
+  if (/^(blob:|data:)/i.test(avatarUrl)) return avatarUrl;
+  return getCachedAvatarDataUrlSync(avatarUrl) ?? "";
 }

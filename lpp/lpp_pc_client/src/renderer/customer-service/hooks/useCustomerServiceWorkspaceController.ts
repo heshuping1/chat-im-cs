@@ -9,7 +9,10 @@ import {
   markCustomerServiceThreadClosed,
 } from "../../data/customer-service/cs-cache-adapter";
 import { canUseCustomerServiceStaffEndpoints } from "../../data/customer-service/cs-role-capabilities";
-import { customerServiceRealtimePollIntervalMs } from "../../data/customer-service/cs-realtime-config";
+import {
+  customerServiceRealtimePollIntervalMs,
+  customerServiceRealtimeRefetchInBackground,
+} from "../../data/customer-service/cs-realtime-config";
 import { createCustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
 import {
   createCustomerServiceWorkspaceViewModel,
@@ -46,7 +49,7 @@ export function useCustomerServiceWorkspaceController({
     enabled: Boolean(client),
     queryFn: async () => client!.getWorkbenchThreads(),
     refetchInterval: customerServiceRealtimePollIntervalMs,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: customerServiceRealtimeRefetchInBackground,
   });
   const historyQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),

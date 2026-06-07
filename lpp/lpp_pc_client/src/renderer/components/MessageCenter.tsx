@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { GripVertical } from "lucide-react";
@@ -77,6 +77,7 @@ import { useMessageAuxiliaryData } from "../messages/hooks/useMessageAuxiliaryDa
 import { useMessageConversationSelection } from "../messages/hooks/useMessageConversationSelection";
 import { useMessageListScrollRegistry } from "../messages/hooks/useMessageListScrollRegistry";
 import { useMessageContactPickerData } from "../messages/hooks/useMessageContactPickerData";
+import { useImConversationsQuery } from "../messages/hooks/useImConversationsQuery";
 import { useMessageContactProfileController } from "../messages/hooks/useMessageContactProfileController";
 import { useMessageConversationActions } from "../messages/hooks/useMessageConversationActions";
 import { useAutoTranslateConversationPreference } from "../translation/hooks/useAutoTranslateConversationPreference";
@@ -302,16 +303,7 @@ export function MessageCenter() {
     );
   }, [messageContextPaneOrder]);
 
-  const conversationsQuery = useQuery({
-    queryKey: pcQueryKeys.imConversationsForSession(session),
-    enabled: Boolean(session),
-    queryFn: async () => requireApiClient(session).getConversations({ limit: 100 }),
-    gcTime: 30 * 60_000,
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: false,
-    staleTime: 2 * 60_000,
-  });
+  const conversationsQuery = useImConversationsQuery(session);
   useEffect(() => {
     if (!session || !conversationsQuery.data) return;
     recordMessageReminderDiagnostic({
@@ -371,6 +363,7 @@ export function MessageCenter() {
     directReadStatusQuery,
     groupMembersQuery,
     messages: hotServerMessages,
+    messagesHydrationSource,
     messagesLoaded,
     messagesLoading,
     messagesQuery,
@@ -537,7 +530,7 @@ export function MessageCenter() {
     setNotice,
   });
 
-  const { historyCounts, messages, visibleMessages } = useMessageListData({
+  const { historyCounts, lookupScope, messages, visibleMessages } = useMessageListData({
     activeConversation,
     activeConversationKey,
     activeConversationType,
@@ -548,6 +541,7 @@ export function MessageCenter() {
     localOutgoingMessagesByConversation,
     messageSearchKeyword,
     messageSearchOpen,
+    messagesHydrationSource,
     serverMessages: hotServerMessages,
     unreadIdentity,
   });
@@ -841,6 +835,7 @@ export function MessageCenter() {
     directReadStatus: directReadStatusQuery.data,
     markImPeerReadReceipt,
     queryClient,
+    session,
     unreadIdentity,
     upsertImReadState,
   });
@@ -1364,6 +1359,7 @@ export function MessageCenter() {
         unreadJump={unreadJump}
         userAvatarRegistry={userAvatarRegistry}
         visibleMessages={visibleMessages}
+        lookupScope={lookupScope}
       />
 
       {assistantPane && activeConversation && (

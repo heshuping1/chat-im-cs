@@ -44,6 +44,7 @@ abstract class ChatRepository {
   /// 上传媒体文件
   Future<MediaResource> uploadMedia(
     String filePath, {
+    String? mediaKind,
     MediaUploadProgressCallback? onProgress,
   });
 

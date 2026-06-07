@@ -4,10 +4,12 @@ import type { MutableRefObject } from "react";
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import { mergeLocalOutgoingMessages } from "../../data/im-local-outgoing";
 import { reduceMessageCoreEvent } from "../../data/message-core/message-core";
+import type { ImMessageHydrationSource } from "../../data/message-store/im-message-store-hydration";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { applyDirectReadReceiptToMessages } from "../../data/read-receipts";
 import { withLocalMediaPreviews } from "../models/messageCacheMutationModel";
 import {
+  createMessageLookupScope,
   filterMessagesByHistory,
   filterVisibleMessages,
   getHistoryFilterCounts,
@@ -26,6 +28,7 @@ export function useMessageListData({
   localOutgoingMessagesByConversation,
   messageSearchKeyword,
   messageSearchOpen,
+  messagesHydrationSource,
   serverMessages,
   unreadIdentity,
 }: {
@@ -39,6 +42,7 @@ export function useMessageListData({
   localOutgoingMessagesByConversation: Record<string, MessageItemDto[]>;
   messageSearchKeyword: string;
   messageSearchOpen: boolean;
+  messagesHydrationSource: ImMessageHydrationSource;
   serverMessages: MessageItemDto[];
   unreadIdentity: CurrentUserIdentity | null;
 }) {
@@ -89,6 +93,10 @@ export function useMessageListData({
     ],
   );
   const historyCounts = useMemo(() => getHistoryFilterCounts(messages), [messages]);
+  const lookupScope = useMemo(
+    () => createMessageLookupScope(messagesHydrationSource),
+    [messagesHydrationSource],
+  );
   const visibleMessages = useMemo(
     () =>
       filterVisibleMessages(
@@ -100,6 +108,7 @@ export function useMessageListData({
 
   return {
     historyCounts,
+    lookupScope,
     messages,
     visibleMessages,
   };

@@ -257,7 +257,7 @@ describe("createGatewayEventRouter", () => {
     expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
     expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["pc-im-conversations"],
+      predicate: expect.any(Function),
     });
   });
 
@@ -327,7 +327,7 @@ describe("createGatewayEventRouter", () => {
       ],
     });
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ["pc-im-conversations"],
+      predicate: expect.any(Function),
     });
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["pc-cs-workbench-threads"],

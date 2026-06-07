@@ -21,7 +21,7 @@ import { createChatMessageViewModel } from "../../data/message/message-view-mode
 import { formatChatMessageTime, formatChatTime } from "../../lib/format";
 import type { UploadActionHandler } from "../../components/MessageBodyView";
 import { useI18n } from "../../i18n/useI18n";
-import type { HistoryFilterKey } from "../models/messageListModel";
+import type { HistoryFilterKey, MessageLookupScope } from "../models/messageListModel";
 import { messageActionPreview } from "../models/messageListModel";
 import { chatMessageRenderKey } from "../models/messageRenderKey";
 import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
@@ -48,6 +48,7 @@ export interface MessageListPanelProps {
   historyCounts: Record<HistoryFilterKey, number>;
   historyFilter: HistoryFilterKey;
   historyOpen: boolean;
+  lookupScope: MessageLookupScope;
   loading: boolean;
   loadedMessages: MessageItemDto[];
   messageAnnotations: Record<string, string>;
@@ -119,6 +120,7 @@ export function MessageListPanel({
   historyCounts,
   historyFilter,
   historyOpen,
+  lookupScope,
   loading,
   loadedMessages,
   messageAnnotations,
@@ -287,6 +289,9 @@ export function MessageListPanel({
               {loadedMessages[loadedMessages.length - 1]?.sentAt
                 ? ` · ${t("messages.listPanel.latest", { time: formatChatTime(loadedMessages[loadedMessages.length - 1].sentAt) })}`
                 : ""}
+              {lookupScope.limitedToLoadedRange
+                ? ` · ${t(lookupScope.labelKey)}`
+                : ` · ${t("messages.listPanel.syncedRange")}`}
             </span>
           </div>
           <div className="chat-history-tags" aria-label={t("messages.listPanel.filtersAria")}>

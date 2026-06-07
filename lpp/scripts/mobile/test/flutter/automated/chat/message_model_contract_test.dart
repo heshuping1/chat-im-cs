@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/models/message_model.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 
@@ -90,6 +91,72 @@ void main() {
         },
       });
     });
+
+    test('keeps local media preview fields for local persistence', () {
+      const body = MessageBody(
+        video: MediaResource(
+          url: '/tmp/local-video.mp4',
+          thumbnailUrl: 'https://cdn.example.com/video-poster.jpg',
+          localPreviewUrl: '/tmp/local-video.mp4',
+          localPosterUrl: '/tmp/local-video-poster.jpg',
+        ),
+      );
+
+      final json = body.toLocalJson();
+      final restored = MessageBody.fromJson(json);
+
+      expect(
+        json['video'],
+        containsPair('localPreviewUrl', '/tmp/local-video.mp4'),
+      );
+      expect(
+        json['video'],
+        containsPair('localPosterUrl', '/tmp/local-video-poster.jpg'),
+      );
+      expect(restored.video?.localPreviewUrl, '/tmp/local-video.mp4');
+      expect(restored.video?.localPosterUrl, '/tmp/local-video-poster.jpg');
+    });
+
+    test(
+      'orders local message window by timeline while preserving video body',
+      () {
+        final restored = sortMessagesForTimeline([
+          Message(
+            messageId: 'msg-10',
+            conversationId: 'chat-1',
+            conversationSeq: 10,
+            senderUserId: 'user-1',
+            type: MessageType.text,
+            body: const MessageBody(text: 'later'),
+            sentAt: DateTime.utc(2026, 6, 7, 10),
+          ),
+          Message(
+            messageId: 'video-8',
+            conversationId: 'chat-1',
+            conversationSeq: 8,
+            senderUserId: 'user-2',
+            type: MessageType.video,
+            body: const MessageBody(
+              video: MediaResource(
+                url: '/media/video-8.mp4',
+                thumbnailUrl: '/media/video-8.jpg',
+                localPosterUrl: '/cache/video-8-poster.jpg',
+              ),
+            ),
+            sentAt: DateTime.utc(2026, 6, 7, 9),
+          ),
+        ]);
+
+        expect(restored.map((message) => message.conversationSeq), [8, 10]);
+        expect(restored.first.type, MessageType.video);
+        expect(restored.first.body.video?.url, '/media/video-8.mp4');
+        expect(restored.first.body.video?.thumbnailUrl, '/media/video-8.jpg');
+        expect(
+          restored.first.body.video?.localPosterUrl,
+          '/cache/video-8-poster.jpg',
+        );
+      },
+    );
 
     test('serializes rich message bodies with client API field names', () {
       const body = MessageBody(

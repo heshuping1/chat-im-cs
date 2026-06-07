@@ -181,7 +181,7 @@ export function useMessageTextSendController({
             ),
           );
           void runtime.deleteOutboxRecord(localMessageId);
-          void invalidateMessages(queryClient);
+          void invalidateMessages(queryClient, session);
           scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
@@ -413,7 +413,7 @@ export function useMessageTextSendController({
             ),
           );
           void runtime.deleteOutboxRecord(localMessageId);
-          void invalidateMessages(queryClient);
+          void invalidateMessages(queryClient, session);
           scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
@@ -597,7 +597,7 @@ export function useMessageTextSendController({
             ),
           );
           void runtime.deleteOutboxRecord(localMessageId);
-          void invalidateMessages(queryClient);
+          void invalidateMessages(queryClient, session);
           scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();

@@ -23,6 +23,16 @@ export type ConversationViewportRestore =
   | { kind: "initial-bottom" }
   | { kind: "restore"; state: ConversationViewportState };
 
+export function conversationBottomScrollTop({
+  clientHeight,
+  scrollHeight,
+}: {
+  clientHeight: number;
+  scrollHeight: number;
+}) {
+  return Math.max(0, scrollHeight - clientHeight);
+}
+
 export function createConversationViewportRegistry(): ConversationViewportRegistry {
   const states = new Map<string, ConversationViewportState>();
   return {

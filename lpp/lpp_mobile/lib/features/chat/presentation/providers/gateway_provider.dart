@@ -31,6 +31,7 @@ import 'package:lpp_mobile/features/contacts/application/friend_acceptance_conve
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/friend_acceptance_conversation_provider.dart';
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
+import 'package:lpp_mobile/features/customer_service/data/repositories/customer_service_chat_repository_adapter.dart';
 import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,7 @@ final gatewayProvider = Provider<GatewayService>((ref) {
     service.connect(space.accessToken, HttpClient.baseUrl).then((_) async {
       final dio = ref.read(dioProvider);
       await _syncMessages(dio, space.spaceId, ref);
-      await _flushPendingMessages(dio, space.spaceId);
+      await _flushPendingMessages(dio, space.spaceId, ref);
     }).catchError((Object error) {
       AppDiagnostics.instance.warning(
         'gateway.site_line',
@@ -74,7 +75,7 @@ final gatewayProvider = Provider<GatewayService>((ref) {
     if (space == null) return;
     final dio = ref.read(dioProvider);
     await _syncMessages(dio, space.spaceId, ref);
-    await _flushPendingMessages(dio, space.spaceId);
+    await _flushPendingMessages(dio, space.spaceId, ref);
   };
 
   // 监听空间变化
@@ -89,7 +90,7 @@ final gatewayProvider = Provider<GatewayService>((ref) {
         // 如果已有游标则补齐离线消息，如果没有则拿到初始 nextSinceSeq
         final dio = ref.read(dioProvider);
         await _syncMessages(dio, next.spaceId, ref);
-        await _flushPendingMessages(dio, next.spaceId);
+        await _flushPendingMessages(dio, next.spaceId, ref);
       });
 
       // 订阅事件流
@@ -112,7 +113,7 @@ final gatewayProvider = Provider<GatewayService>((ref) {
     service.connect(space.accessToken, HttpClient.baseUrl).then((_) async {
       final dio = ref.read(dioProvider);
       await _syncMessages(dio, space.spaceId, ref);
-      await _flushPendingMessages(dio, space.spaceId);
+      await _flushPendingMessages(dio, space.spaceId, ref);
     }).catchError((Object error) {
       AppDiagnostics.instance.warning(
         'gateway.connectivity',
@@ -668,17 +669,55 @@ Future<void> _syncMessages(Dio dio, String spaceId, Ref ref) async {
   }
 }
 
-Future<void> _flushPendingMessages(Dio dio, String spaceId) async {
+Future<void> _flushPendingMessages(Dio dio, String spaceId, Ref ref) async {
   try {
     final pending = PendingMessageQueue();
     final before = await pending.getAll();
     if (before.isEmpty) return;
+    final local = ChatLocalDataSourceImpl();
+    final defaultRepository = ChatRepositoryImpl(
+      remote: ChatRemoteDataSourceImpl(dio),
+      local: local,
+      spaceId: spaceId,
+    );
     await pending.flushAll(
-      ChatRepositoryImpl(
-        remote: ChatRemoteDataSourceImpl(dio),
-        local: ChatLocalDataSourceImpl(),
-        spaceId: spaceId,
-      ),
+      defaultRepository,
+      repositoryForMessage: (message) {
+        final threadType = message.threadType?.trim();
+        final threadId = message.threadId?.trim();
+        if (threadType != null &&
+            threadType.isNotEmpty &&
+            threadId != null &&
+            threadId.isNotEmpty) {
+          return CustomerServiceChatRepositoryAdapter(
+            customerServiceRepository:
+                ref.read(customerServiceRepositoryProvider),
+            mediaRemote: ChatRemoteDataSourceImpl(dio),
+            threadType: threadType,
+            threadId: threadId,
+            senderUserId: ref.read(currentSpaceProvider)?.userId ?? '',
+          );
+        }
+        return defaultRepository;
+      },
+      onMessageResent: (pendingMessage, sent) async {
+        final confirmed = sent.copyWith(
+          clientMsgId: pendingMessage.clientMsgId,
+          status: MessageStatus.sent,
+          clearLocalUploadState: true,
+        );
+        await local.upsertMessage(
+          spaceId,
+          pendingMessage.conversationId,
+          confirmed,
+        );
+        _appendMessageToChatIfKnown(
+          ref,
+          spaceId,
+          pendingMessage.conversationId,
+          confirmed,
+        );
+      },
     );
     final after = await pending.getAll();
     AppDiagnostics.instance.info(

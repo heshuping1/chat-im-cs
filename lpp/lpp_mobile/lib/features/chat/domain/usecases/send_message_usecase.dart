@@ -42,20 +42,23 @@ class SendMessageUseCase {
     required bool isGroup,
     required MessageType type,
     required MessageBody body,
+    String? clientMsgId,
     String? replyToMessageId,
     List<Mention>? mentions,
     OnOptimisticInsert? onOptimisticInsert,
     OnMessageUpdate? onMessageUpdate,
   }) async {
     // 1. 生成 clientMsgId
-    final clientMsgId = _uuid.v4();
+    final effectiveClientMsgId = clientMsgId?.trim().isNotEmpty == true
+        ? clientMsgId!.trim()
+        : _uuid.v4();
 
     final localPath = _isMediaType(type) ? _extractLocalPath(body, type) : null;
 
     // 2. 乐观插入（status: sending）
     final optimistic = Message(
-      messageId: clientMsgId, // 临时用 clientMsgId 作为 messageId
-      clientMsgId: clientMsgId,
+      messageId: effectiveClientMsgId, // 临时用 clientMsgId 作为 messageId
+      clientMsgId: effectiveClientMsgId,
       conversationId: conversationId,
       conversationSeq: 0,
       senderUserId: currentUserId,
@@ -82,7 +85,7 @@ class SendMessageUseCase {
               progress: 0,
             ),
           );
-          onMessageUpdate?.call(clientMsgId, preparing);
+          onMessageUpdate?.call(effectiveClientMsgId, preparing);
           MessageSendLifecycle.uploadStarted(
             optimistic,
             isGroup: isGroup,
@@ -91,13 +94,14 @@ class SendMessageUseCase {
           final fallbackTotalBytes = _mediaSizeBytes(body, type);
           final resource = await _repository.uploadMedia(
             localPath,
+            mediaKind: _mediaKind(type),
             onProgress: (event) {
               final progress = mediaUploadProgressPercent(
                 event,
                 fallbackTotalBytes: fallbackTotalBytes,
               );
               onMessageUpdate?.call(
-                clientMsgId,
+                effectiveClientMsgId,
                 optimistic.copyWith(
                   localUploadState: MessageLocalUploadState(
                     status: MessageLocalUploadStatus.uploading,
@@ -108,7 +112,7 @@ class SendMessageUseCase {
               );
             },
           );
-          resolvedBody = _replaceMediaResource(body, type, resource);
+          resolvedBody = await _replaceMediaResource(body, type, resource);
           sendBase = optimistic.copyWith(
             body: resolvedBody,
             localUploadState: const MessageLocalUploadState(
@@ -117,7 +121,7 @@ class SendMessageUseCase {
               progress: 95,
             ),
           );
-          onMessageUpdate?.call(clientMsgId, sendBase);
+          onMessageUpdate?.call(effectiveClientMsgId, sendBase);
           MessageSendLifecycle.uploadSucceeded(optimistic, isGroup: isGroup);
         } catch (e) {
           final failure = _failureMapper(e);
@@ -130,13 +134,24 @@ class SendMessageUseCase {
               error: _failureReason(failure),
             ),
           );
-          onMessageUpdate?.call(clientMsgId, failed);
+          onMessageUpdate?.call(effectiveClientMsgId, failed);
           MessageSendLifecycle.failed(
             failed,
             isGroup: isGroup,
             stage: 'upload',
             error: e,
           );
+          final pendingEnqueue = _onPendingEnqueue;
+          if (failure.shouldEnqueuePending && pendingEnqueue != null) {
+            await pendingEnqueue(
+              clientMsgId: effectiveClientMsgId,
+              conversationId: conversationId,
+              isGroup: isGroup,
+              type: type,
+              body: body,
+              mentions: isGroup ? mentions : null,
+            );
+          }
           rethrow;
         }
       }
@@ -157,7 +172,7 @@ class SendMessageUseCase {
         final sent = await _repository.sendMessage(
           conversationId: conversationId,
           isGroup: isGroup,
-          clientMsgId: clientMsgId,
+          clientMsgId: effectiveClientMsgId,
           type: type,
           body: resolvedBody,
           replyToMessageId: replyToMessageId,
@@ -165,13 +180,13 @@ class SendMessageUseCase {
         );
         // 5a. 成功 → 更新状态为 sent
         final confirmed = sent.copyWith(
-          clientMsgId: clientMsgId,
+          clientMsgId: effectiveClientMsgId,
           senderUserId: currentUserId,
           status: MessageStatus.sent,
           mentions: mentions,
           clearLocalUploadState: true,
         );
-        onMessageUpdate?.call(clientMsgId, confirmed);
+        onMessageUpdate?.call(effectiveClientMsgId, confirmed);
         MessageSendLifecycle.sent(confirmed, isGroup: isGroup);
         return confirmed;
       } catch (e) {
@@ -183,7 +198,7 @@ class SendMessageUseCase {
             body: resolvedBody,
             clearLocalUploadState: true,
           );
-          onMessageUpdate?.call(clientMsgId, confirmed);
+          onMessageUpdate?.call(effectiveClientMsgId, confirmed);
           MessageSendLifecycle.sent(
             confirmed,
             isGroup: isGroup,
@@ -235,13 +250,13 @@ class SendMessageUseCase {
             lastFailure ?? const MessageSendFailure.network('发送失败'),
           ),
         );
-    onMessageUpdate?.call(clientMsgId, terminal);
+    onMessageUpdate?.call(effectiveClientMsgId, terminal);
     final pendingEnqueue = _onPendingEnqueue;
     if (terminal.status == MessageStatus.failed &&
         lastFailure?.shouldEnqueuePending == true &&
         pendingEnqueue != null) {
       await pendingEnqueue(
-        clientMsgId: clientMsgId,
+        clientMsgId: effectiveClientMsgId,
         conversationId: conversationId,
         isGroup: isGroup,
         type: type,
@@ -282,6 +297,21 @@ class SendMessageUseCase {
     }
   }
 
+  String _mediaKind(MessageType type) {
+    switch (type) {
+      case MessageType.image:
+        return 'image';
+      case MessageType.video:
+        return 'video';
+      case MessageType.voice:
+        return 'voice';
+      case MessageType.file:
+        return 'file';
+      default:
+        return 'file';
+    }
+  }
+
   MessageLocalUploadState? _localUploadFailureState(
     MessageType type,
     MessageSendFailure failure,
@@ -297,32 +327,33 @@ class SendMessageUseCase {
   String? _extractLocalPath(MessageBody body, MessageType type) {
     switch (type) {
       case MessageType.image:
-        return body.image?.url.startsWith('/') == true ||
-                !body.image!.url.startsWith('http')
-            ? body.image?.url
-            : null;
+        return _localMediaPath(body.image?.url);
       case MessageType.video:
-        return body.video?.url.startsWith('/') == true ||
-                !body.video!.url.startsWith('http')
-            ? body.video?.url
-            : null;
+        return _localMediaPath(body.video?.url);
       case MessageType.voice:
-        return body.voice?.url.startsWith('/') == true ||
-                !body.voice!.url.startsWith('http')
-            ? body.voice?.url
-            : null;
+        return _localMediaPath(body.voice?.url);
       case MessageType.file:
-        return body.file?.url.startsWith('/') == true ||
-                !body.file!.url.startsWith('http')
-            ? body.file?.url
-            : null;
+        return _localMediaPath(body.file?.url);
       default:
         return null;
     }
   }
 
-  MessageBody _replaceMediaResource(
-      MessageBody body, MessageType type, MediaResource resource) {
+  String? _localMediaPath(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final url = value.trim();
+    if (url.startsWith('http://') || url.startsWith('https://')) return null;
+    if (url.startsWith('/media') ||
+        url.startsWith('/api') ||
+        url.startsWith('/uploads') ||
+        url.startsWith('/files')) {
+      return null;
+    }
+    return url;
+  }
+
+  Future<MessageBody> _replaceMediaResource(
+      MessageBody body, MessageType type, MediaResource resource) async {
     switch (type) {
       case MessageType.image:
         final image = _preserveLocalMediaPreview(
@@ -336,7 +367,7 @@ class SendMessageUseCase {
             voice: body.voice,
             file: body.file);
       case MessageType.video:
-        final video = _preserveLocalMediaPreview(
+        final video = await _videoResourceWithRemotePoster(
           uploaded: resource,
           local: body.video,
         );
@@ -375,6 +406,24 @@ class SendMessageUseCase {
       localPreviewUrl: local.localPreviewUrl ?? localUrl,
       localPosterUrl: local.localPosterUrl,
     );
+  }
+
+  Future<MediaResource> _videoResourceWithRemotePoster({
+    required MediaResource uploaded,
+    required MediaResource? local,
+  }) async {
+    final merged = _preserveLocalMediaPreview(uploaded: uploaded, local: local);
+    final posterPath = _localMediaPath(local?.localPosterUrl);
+    if (posterPath == null) return merged;
+    try {
+      final poster = await _repository.uploadMedia(
+        posterPath,
+        mediaKind: 'image',
+      );
+      return merged.copyWith(thumbnailUrl: poster.url);
+    } catch (_) {
+      return merged;
+    }
   }
 
   bool _isLocalUrl(String url) {

@@ -1,16 +1,36 @@
 import type { QueryClient } from "@tanstack/react-query";
 
+import { isQueryInWorkspaceScope } from "../workspace-scope";
+
 export function invalidateImGatewayQueries(
   queryClient: QueryClient,
   conversationId?: string,
+  scopeKey?: string,
 ) {
-  void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+  if (scopeKey) {
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-conversations" &&
+        isQueryInWorkspaceScope(query, scopeKey),
+    });
+  } else {
+    void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+  }
   invalidateImAvatarGatewayQueries(queryClient);
   if (conversationId) {
     void queryClient.invalidateQueries({
       predicate: (query) =>
         query.queryKey[0] === "pc-im-messages" &&
+        isQueryInWorkspaceScope(query, scopeKey) &&
         query.queryKey.includes(conversationId),
+    });
+    return;
+  }
+  if (scopeKey) {
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-messages" &&
+        isQueryInWorkspaceScope(query, scopeKey),
     });
     return;
   }

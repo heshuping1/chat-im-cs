@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  conversationBottomScrollTop,
   createConversationViewportRegistry,
   decideConversationViewportAfterAppend,
   restoreConversationViewport,
@@ -36,6 +37,11 @@ describe("message conversation viewport model", () => {
     });
   });
 
+  it("uses the maximum scrollable top as the bottom target", () => {
+    expect(conversationBottomScrollTop({ scrollHeight: 420, clientHeight: 700 })).toBe(0);
+    expect(conversationBottomScrollTop({ scrollHeight: 1000, clientHeight: 420 })).toBe(580);
+  });
+
   it("uses viewport restore in the message bottom-follow hook", () => {
     const hookSource = readFileSync(
       resolve(process.cwd(), "src/renderer/lib/useWechatBottomFollow.ts"),
@@ -43,6 +49,7 @@ describe("message conversation viewport model", () => {
     );
 
     expect(hookSource).toContain("restoreConversationViewport");
+    expect(hookSource).toContain("conversationBottomScrollTop");
     expect(hookSource).toContain('restore.kind === "restore"');
     expect(hookSource).toContain("rememberConversationViewport(previousConversationKey)");
     expect(hookSource).toContain("stage.scrollTo({ top: restore.state.scrollTop");
@@ -113,5 +120,17 @@ describe("message conversation viewport model", () => {
     expect(hookSource).not.toContain("scrollIntoView");
     expect(stageSource).not.toContain("onLoadCapture");
     expect(unreadControllerSource).not.toContain("invalidateQueries");
+  });
+
+  it("keeps a bottom safe area after the latest message", () => {
+    const messageCenterCss = readFileSync(
+      resolve(process.cwd(), "src/renderer/styles/messages/message-center.css"),
+      "utf8",
+    );
+
+    expect(messageCenterCss).toContain("--chat-bottom-safe-gap");
+    expect(messageCenterCss).toContain("scroll-padding-bottom: var(--chat-bottom-safe-gap");
+    expect(messageCenterCss).toContain("flex: 0 0 var(--chat-bottom-safe-gap");
+    expect(messageCenterCss).not.toContain("height: 1px;\n  flex: 0 0 1px;");
   });
 });

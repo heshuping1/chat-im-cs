@@ -24,7 +24,12 @@ import {
   type AiReplyThreadTarget,
 } from "../data/ai/ai-reply-thread-target";
 import { useAuthSession } from "../data/auth/auth-store";
-import { customerServiceRealtimePollIntervalMs } from "../data/customer-service/cs-realtime-config";
+import {
+  customerServiceReceptionPollIntervalMs,
+  customerServiceReceptionRefetchInBackground,
+  customerServiceRealtimePollIntervalMs,
+  customerServiceRealtimeRefetchInBackground,
+} from "../data/customer-service/cs-realtime-config";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
@@ -281,14 +286,14 @@ export function OnlineServicePage() {
     enabled: Boolean(client),
     queryFn: async () => client!.getWorkbenchThreads(),
     refetchInterval: customerServiceRealtimePollIntervalMs,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: customerServiceRealtimeRefetchInBackground,
   });
   const receptionStatusQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceReception(...queryBaseKey),
     enabled: Boolean(client && canUseStaffEndpoints),
     queryFn: async () => client!.getReceptionStatus(),
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: customerServiceReceptionPollIntervalMs,
+    refetchIntervalInBackground: customerServiceReceptionRefetchInBackground,
   });
 
   const selectableThreads = useMemo(

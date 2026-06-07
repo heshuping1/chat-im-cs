@@ -380,7 +380,7 @@ final sendMessageUseCaseProvider =
         conversationId: conversationId,
         isGroup: isGroup,
         messageType: GatewayEventHandler.messageTypeToApiString(type),
-        body: body.toJson(),
+        body: body.toLocalJson(),
         mentions: mentions,
         createdAt: DateTime.now(),
       ));

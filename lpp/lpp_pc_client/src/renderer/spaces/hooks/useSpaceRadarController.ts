@@ -5,6 +5,7 @@ import type { TenantInfoDto } from "../../data/api-client";
 import { mergePlatformTenants } from "../../data/auth/auth-tenant-role";
 import { useAuthSession } from "../../data/auth/auth-store";
 import { pcQueryKeys } from "../../data/query-keys";
+import { realtimeSyncPolicy } from "../../data/realtime/realtime-sync-policy";
 import { requireApiClient } from "../../data/runtime";
 import {
   clearSpaceReminder,
@@ -54,9 +55,9 @@ export function useSpaceRadarController({
       authSession?.platformToken,
     ),
     enabled: Boolean(authSession?.platformToken),
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: true,
+    staleTime: realtimeSyncPolicy.spaces.unreadSummaryStaleMs,
+    refetchInterval: realtimeSyncPolicy.spaces.unreadSummaryFallbackPollMs,
+    refetchIntervalInBackground: realtimeSyncPolicy.spaces.unreadSummaryRefetchInBackground,
     queryFn: async () => requireApiClient(authSession).getPlatformSpaceUnreadSummary(),
   });
   const switchController = useSpaceSwitchController({

@@ -91,6 +91,11 @@ abstract class ChatLocalDataSource {
       String spaceId, String conversationId, String messageId);
 }
 
+List<Message> sortMessagesForTimeline(Iterable<Message> messages) {
+  return messages.toList()
+    ..sort((a, b) => a.conversationSeq.compareTo(b.conversationSeq));
+}
+
 class ChatLocalDataSourceImpl implements ChatLocalDataSource {
   // ── 表名生成 ──────────────────────────────────────────────────────────────
 
@@ -143,7 +148,7 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       'conversation_seq': m.conversationSeq,
       'sender_user_id': m.senderUserId,
       'message_type': MessageModel.toJson(m)['messageType'] as String,
-      'body': jsonEncode(m.body.toJson()),
+      'body': jsonEncode(m.body.toLocalJson()),
       'is_recalled': m.isRecalled ? 1 : 0,
       'sent_at': m.sentAt.millisecondsSinceEpoch,
       'reply_to_message_id': m.replyToMessageId,
@@ -380,7 +385,7 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       );
     }
 
-    return rows.map(_rowToMessage).toList();
+    return sortMessagesForTimeline(rows.map(_rowToMessage));
   }
 
   @override

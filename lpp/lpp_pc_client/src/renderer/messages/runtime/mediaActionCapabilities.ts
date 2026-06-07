@@ -6,6 +6,7 @@ export type MediaActionCapabilities = {
   canEditMediaFile: boolean;
   canOpenMediaFile: boolean;
   canOpenVideoPlayer: boolean;
+  canReadMediaFileAsDataUrl: boolean;
   canRevealInFolder: boolean;
   canSaveMediaAs: boolean;
 };
@@ -20,6 +21,7 @@ export function getMediaActionCapabilities(
     canEditMediaFile: Boolean(desktopApi?.editMediaFile),
     canOpenMediaFile: Boolean(desktopApi?.openMediaFile),
     canOpenVideoPlayer: Boolean(desktopApi?.openVideoPlayer),
+    canReadMediaFileAsDataUrl: Boolean(desktopApi?.readMediaFileAsDataUrl),
     canRevealInFolder: Boolean(desktopApi?.revealMediaInFolder),
     canSaveMediaAs: Boolean(desktopApi?.saveMediaAs),
   };

@@ -1,7 +1,16 @@
 import type { ImConversationType } from "../../data/im-read-model";
+import { realtimeSyncPolicy } from "../../data/realtime/realtime-sync-policy";
 
 export function activeDirectReadStatusRefetchIntervalMs() {
-  return 1_000;
+  return realtimeSyncPolicy.im.directReadStatusFallbackPollMs;
+}
+
+export function activeDirectReadStatusRefetchInBackground() {
+  return realtimeSyncPolicy.im.directReadStatusRefetchInBackground;
+}
+
+export function activeDirectReadStatusStaleMs() {
+  return realtimeSyncPolicy.im.directReadStatusStaleMs;
 }
 
 export function shouldEnableDirectReadStatusQuery({

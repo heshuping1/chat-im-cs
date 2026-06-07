@@ -14,6 +14,9 @@ import { type CurrentUserIdentity } from "../message-display";
 import type { ConversationReadView } from "../im-read-model";
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 import { isQueryInWorkspaceScope } from "../workspace-scope";
+import {
+  getImMessageStore,
+} from "../message-store/im-message-store";
 
 export interface ApplyImGatewayMessageCacheInput {
   conversationId: string;
@@ -101,6 +104,18 @@ export function applyImGatewayReadCache(
           query.queryKey.includes(input.conversationId),
       },
       (old) => applyGatewayReadToMessages(old, input),
+    );
+  }
+  if (input.scopeKey) {
+    void getImMessageStore().applyReadMetadata(
+      input.scopeKey,
+      "direct",
+      input.conversationId,
+      {
+        identity: input.identity,
+        peerReadSeq: input.peerReadSeq,
+        readSeq: input.myReadSeq,
+      },
     );
   }
 }

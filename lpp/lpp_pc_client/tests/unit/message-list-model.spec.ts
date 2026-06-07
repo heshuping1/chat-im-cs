@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createMessageLookupScope,
   filterMessagesByHistory,
   filterVisibleMessages,
   getHistoryFilterCounts,
@@ -9,6 +10,21 @@ import {
 import type { MessageItemDto } from "../../src/renderer/data/api/types";
 
 describe("message list model", () => {
+  it("marks local and hot hydration as lookup-limited ranges", () => {
+    expect(createMessageLookupScope("local")).toMatchObject({
+      labelKey: "messages.listPanel.localRange",
+      limitedToLoadedRange: true,
+    });
+    expect(createMessageLookupScope("hot")).toMatchObject({
+      labelKey: "messages.listPanel.loadedRange",
+      limitedToLoadedRange: true,
+    });
+    expect(createMessageLookupScope("server")).toMatchObject({
+      labelKey: "messages.listPanel.syncedRange",
+      limitedToLoadedRange: false,
+    });
+  });
+
   it("filters by keyword across preview, sender, text and file names", () => {
     const text = message({
       messageId: "text",

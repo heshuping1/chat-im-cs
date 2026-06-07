@@ -1362,7 +1362,9 @@
       latest: '最新 {time}',
       loadEarlier: '查看更早 {count} 条消息',
       loadedCount: '已加载 {count} 条消息',
+      loadedRange: '当前已加载范围',
       loading: '正在加载聊天记录...',
+      localRange: '本地缓存范围',
       matchCount: '{count} 条匹配',
       newMessages: '↓ {count} 条新消息',
       noMatches: '没有匹配的聊天记录',
@@ -1370,6 +1372,7 @@
       searchPlaceholder: '搜索当前聊天内容',
       selectMessage: '选择消息 {preview}',
       stageAria: '消息内容',
+      syncedRange: '已同步范围',
       today: '今天',
     },
     mediaContent: {

@@ -18,6 +18,7 @@ import { logApiTrafficDiagnostic } from "../../src/renderer/data/api/api-traffic
 describe("api traffic diagnostics", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -121,6 +122,54 @@ describe("api traffic diagnostics", () => {
     );
     expect(JSON.stringify(mocks.writeRendererAppLog.mock.calls)).not.toContain("secret-password");
     expect(JSON.stringify(mocks.writeRendererAppLog.mock.calls)).not.toContain("1234");
+  });
+
+  it("does not print successful summary traffic to the console", () => {
+    mocks.getPcSettingsSnapshot.mockReturnValue({ apiTrafficLogLevel: "summary" });
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubGlobal("window", {
+      desktopApi: {
+        recordApiTrafficDiagnostic: vi.fn(() => Promise.resolve()),
+      },
+    });
+
+    logApiTrafficDiagnostic({
+      durationMs: 42,
+      method: "GET",
+      path: "/api/platform/v1/my/spaces/unread-summary",
+      phase: "request",
+      result: "success",
+      status: 200,
+    });
+
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("prints failed summary traffic to the console", () => {
+    mocks.getPcSettingsSnapshot.mockReturnValue({ apiTrafficLogLevel: "summary" });
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.stubGlobal("window", {
+      desktopApi: {
+        recordApiTrafficDiagnostic: vi.fn(() => Promise.resolve()),
+      },
+    });
+
+    logApiTrafficDiagnostic({
+      durationMs: 42,
+      method: "GET",
+      path: "/api/client/v1/customer-service/workbench/threads",
+      phase: "request",
+      result: "failed",
+      status: 500,
+    });
+
+    expect(info).toHaveBeenCalledWith(
+      "[lpp:api-traffic]",
+      expect.objectContaining({
+        path: "/api/client/v1/customer-service/workbench/threads",
+        result: "failed",
+      }),
+    );
   });
 
   it("masks email identifiers in summary app logs", () => {

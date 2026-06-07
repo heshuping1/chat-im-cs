@@ -34,6 +34,7 @@ export function VideoMessagePreview({
   onPause,
   onPlay,
   onEnded,
+  onPosterError,
   onUploadOverlayAction,
   openError,
   openable,
@@ -60,6 +61,7 @@ export function VideoMessagePreview({
   onPause: () => void;
   onPlay: () => void;
   onEnded: () => void;
+  onPosterError?: () => void;
   onUploadOverlayAction?: (action: UploadAction) => void;
   openError: boolean;
   openable?: boolean;
@@ -188,7 +190,10 @@ export function VideoMessagePreview({
             markVideoPosterReady(posterKey, visiblePosterSrc);
             setPosterLoadState("ready");
           }}
-          onError={() => setPosterLoadState("failed")}
+          onError={() => {
+            setPosterLoadState("failed");
+            onPosterError?.();
+          }}
         />
       )}
       {src && !failed && (

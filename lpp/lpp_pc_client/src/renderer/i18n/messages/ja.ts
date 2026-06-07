@@ -973,7 +973,9 @@ export const ja: MessageDictionary = {
       latest: 'Latest {time}',
       loadEarlier: 'Show {count} earlier messages',
       loadedCount: '{count} messages loaded',
+      loadedRange: 'Loaded range',
       loading: 'Loading chat history...',
+      localRange: 'Local cached range',
       matchCount: '{count} matches',
       newMessages: '↓ {count} new messages',
       noMatches: 'No matching chat history',
@@ -981,6 +983,7 @@ export const ja: MessageDictionary = {
       searchPlaceholder: 'Search current chat',
       selectMessage: 'Select message {preview}',
       stageAria: 'Message content',
+      syncedRange: 'Synced range',
       today: 'Today',
     },
     mediaContent: {

@@ -123,6 +123,7 @@ export function useImReadCommandExecutor({
           queryClient,
           command.conversationId,
           nextReadSeq,
+          session,
         );
         setUnreadJump((current) =>
           current?.conversationId === command.conversationId ? null : current,

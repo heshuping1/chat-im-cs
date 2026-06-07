@@ -17,6 +17,7 @@ import {
   classifyCustomerServiceGatewayPayload,
 } from "./gateway-cs-payload-utils";
 import {
+  invalidateImGatewayQueries,
   invalidateCustomerServiceGatewayQueries,
 } from "./gateway-query-invalidation";
 import {
@@ -203,8 +204,10 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
           message: deliveryPayloadSummary(input.payload),
         },
       });
-      mergeReadEvent(queryClient, input.payload, session);
-      void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+      const merged = mergeReadEvent(queryClient, input.payload, session);
+      if (!merged) {
+        invalidateImGatewayQueries(queryClient, input.conversationId, scopeKey);
+      }
     },
   };
 }

@@ -155,6 +155,50 @@ describe("gateway IM side effects", () => {
     ).toBe(1);
   });
 
+  it("writes received gateway messages into the local message store", async () => {
+    const { mergeImGatewayMessage } = await import(
+      "../../src/renderer/data/gateway/gateway-im-side-effects"
+    );
+    const {
+      getImMessageStore,
+      imMessageConversationKey,
+      imMessageScopeKey,
+    } = await import("../../src/renderer/data/message-store/im-message-store");
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-staff-1",
+      spaceType: 2,
+      tenantId: "tenant-1",
+      tenantToken: "tenant-token",
+      userId: "staff-1",
+    };
+    const store = getImMessageStore();
+    const scopeKey = imMessageScopeKey(session);
+    await store.clearScope(scopeKey);
+
+    mergeImGatewayMessage(
+      new QueryClient(),
+      imTextPayload({
+        conversationId: "direct-store",
+        messageId: "gateway-store-1",
+        preview: "persist gateway",
+      }),
+      "direct-store",
+      "direct",
+    );
+    await Promise.resolve();
+
+    expect(
+      await store.listMessages(imMessageConversationKey(scopeKey, "direct", "direct-store"), { limit: 50 }),
+    ).toMatchObject([
+      {
+        conversationId: "direct-store",
+        messageId: "gateway-store-1",
+        preview: "persist gateway",
+      },
+    ]);
+  });
+
   it("does not write unread for gateway echoes of the current user's own IM message", async () => {
     const { mergeImGatewayMessage } = await import(
       "../../src/renderer/data/gateway/gateway-im-side-effects"

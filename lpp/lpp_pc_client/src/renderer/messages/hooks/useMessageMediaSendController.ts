@@ -420,7 +420,7 @@ export function useMessageMediaSendController({
           );
           mediaUploadTasks.deleteTask(localTaskId);
           void storage.deleteRecord(scopeKey, task.localMessageId);
-          void invalidateMessages(queryClient);
+          void invalidateMessages(queryClient, session);
           scrollMessagesToBottom("smooth");
         } catch (error) {
           videoDisplayProgressTicker?.stop();

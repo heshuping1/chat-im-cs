@@ -13,6 +13,11 @@ import { ImageMessageFrame } from "../../../media/components/ImageMessageFrame";
 import { VideoMessagePreview } from "../../../media/components/VideoMessagePreview";
 import type { ImMediaItem } from "../../../media/domain/mediaMessage";
 import {
+  imagePreviewPresentation,
+  videoPreviewPresentation,
+  type MediaPreviewDisplayState,
+} from "../../../media/domain/mediaPreviewPresentation";
+import {
   forgetPrefetchedImageFileUrl,
   getPrefetchedImageFileUrl,
   registerPrefetchedImageFileUrl,
@@ -41,10 +46,15 @@ import {
   type VideoPlayerOpenDiagnostic,
 } from "../../../media/runtime/videoPlayer";
 import {
+  initialVideoDurationSeconds,
+  rememberVideoDurationSeconds,
+} from "../../../media/runtime/videoMetadataRuntime";
+import {
   isVideoPosterReady,
   isVideoSourceReady,
   markVideoSourceReady,
   useVideoPosterSource,
+  videoPosterFileName,
   videoPosterRenderKey,
 } from "../../../media/runtime/videoPosterRuntime";
 import {
@@ -256,6 +266,19 @@ export function ImagePart({
       localImage,
       src: sameMediaUrl(visibleImageSrc, brokenImageSrc) ? undefined : visibleImageSrc,
     });
+  const imageDisplayState: MediaPreviewDisplayState = !visibleImageSrc
+    ? "empty"
+    : imageReady
+      ? "ready"
+      : failed
+        ? "failed"
+        : "loading";
+  const imagePresentation = {
+    ...(item?.previewPresentation?.previewKind === "image"
+      ? item.previewPresentation
+      : imagePreviewPresentation()),
+    displayState: imageDisplayState,
+  };
   useEffect(() => {
     if (failed && hasNextImageSource) advanceToNextImageSource();
   }, [advanceToNextImageSource, failed, hasNextImageSource]);
@@ -361,6 +384,7 @@ export function ImagePart({
             : undefined
         }
         previewOpen={previewOpen}
+        presentation={imagePresentation}
         sourceAvailable={Boolean(visibleImageSrc)}
         src={visibleImageSrc}
       />
@@ -370,6 +394,15 @@ export function ImagePart({
 
 function isTransientImageUrl(value: string) {
   return /^(blob:|data:)/i.test(value);
+}
+
+function videoPosterDisplayCacheIdentity(
+  media: MediaResourceDto | undefined,
+  poster: string | undefined,
+) {
+  if (!poster || isBrowserNativeUrl(poster)) return undefined;
+  const stableIdentity = mediaStableCacheIdentity(media, poster);
+  return `video-poster:${stableIdentity || poster}`;
 }
 
 export function VoicePart({
@@ -443,12 +476,27 @@ export function VideoPart({
   const [localVideoDisplaySrc, setLocalVideoDisplaySrc] = useState<string | null>(
     () => getMaterializedMediaDisplayUrl(videoCacheKey) ?? null,
   );
-  const openSrc = localVideoSrc || item?.localOpenUrl || src;
+  const localVideoOpenSrc = localVideoSrc || item?.localOpenUrl;
+  const openSrc = localVideoOpenSrc || remoteSrc || src;
+  const {
+    canOpenVideoPlayer,
+    canReadMediaFileAsDataUrl,
+  } = getCurrentMediaActionCapabilities();
   const previewSource = localVideoDisplaySrc || src;
   const previewSrc = inlineVideoPreviewSrc(previewSource, {
-    allowDesktopFile: Boolean(window.desktopApi),
+    allowDesktopFile: canOpenVideoPlayer || canReadMediaFileAsDataUrl,
   });
   const poster = item?.posterUrl;
+  const posterCacheIdentity = videoPosterDisplayCacheIdentity(media, poster);
+  const posterCacheKey = posterCacheIdentity;
+  const directPosterSrc =
+    poster && (isBrowserNativeUrl(poster) || !canReadMediaFileAsDataUrl)
+      ? poster
+      : undefined;
+  const [posterDisplaySrc, setPosterDisplaySrc] = useState<string | null>(
+    () => getMaterializedMediaDisplayUrl(posterCacheKey) ?? null,
+  );
+  const [explicitPosterFailed, setExplicitPosterFailed] = useState(false);
   const { displaySrc, failed, loadAuthenticatedMedia } = useAuthenticatedMediaUrl(
     previewSrc,
     authToken,
@@ -457,22 +505,25 @@ export function VideoPart({
   const [hasStarted, setHasStarted] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [openError, setOpenError] = useState(false);
-  const [duration, setDuration] = useState<number | undefined>(media?.durationSeconds);
-  const [videoSize, setVideoSize] = useState<{ width: number; height: number } | null>(
-    typeof media?.width === "number" && typeof media?.height === "number"
-      ? { width: media.width, height: media.height }
-      : null,
+  const [duration, setDuration] = useState<number | undefined>(() =>
+    initialVideoDurationSeconds(videoCacheKey, media?.durationSeconds),
   );
   const [frameReady, setFrameReady] = useState(() =>
     isVideoSourceReady(displaySrc),
   );
-  const { canOpenVideoPlayer } = getCurrentMediaActionCapabilities();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const uploadOverlay = videoUploadOverlayState(uploadState);
-  const videoAspectRatio = videoBubbleAspectRatio(videoSize, media);
-  const videoCardStyle = videoAspectRatio
-    ? ({ "--video-bubble-aspect": String(videoAspectRatio) } as CSSProperties)
-    : undefined;
+  const videoPresentation =
+    item?.previewPresentation?.previewKind === "video"
+      ? item.previewPresentation
+      : videoPreviewPresentation();
+  const videoAspectRatio =
+    videoPresentation.previewBox.width / videoPresentation.previewBox.height;
+  const videoCardStyle = {
+    "--media-preview-video-width": `${videoPresentation.previewBox.width}px`,
+    "--media-preview-video-height": `${videoPresentation.previewBox.height}px`,
+    "--video-bubble-aspect": String(videoAspectRatio),
+  } as CSSProperties;
   useEffect(() => {
     const materialized = getMaterializedMediaFileUrl(videoCacheKey);
     const display = getMaterializedMediaDisplayUrl(videoCacheKey);
@@ -530,13 +581,79 @@ export function VideoPart({
     videoCacheKey,
   ]);
   useEffect(() => {
+    setExplicitPosterFailed(false);
+  }, [poster, posterCacheKey]);
+  useEffect(() => {
+    const display = getMaterializedMediaDisplayUrl(posterCacheKey);
+    setPosterDisplaySrc(display ?? null);
+    if (!posterCacheKey) return undefined;
+    return subscribeMaterializedMediaDisplayUrl(posterCacheKey, setPosterDisplaySrc);
+  }, [posterCacheKey]);
+  useEffect(() => {
+    let disposed = false;
+    const display = getMaterializedMediaDisplayUrl(posterCacheKey);
+    if (display) {
+      setPosterDisplaySrc(display);
+      return undefined;
+    }
+    if (!poster || !posterCacheKey) {
+      setPosterDisplaySrc(null);
+      return undefined;
+    }
+    if (isBrowserNativeUrl(poster)) {
+      setPosterDisplaySrc(poster);
+      return undefined;
+    }
+    if (!canReadMediaFileAsDataUrl) {
+      setPosterDisplaySrc(null);
+      return undefined;
+    }
+    void ensureMaterializedMediaDisplayUrl({
+      accountId: mediaCacheContext?.accountId,
+      authToken,
+      cacheIdentity: posterCacheIdentity,
+      cacheKey: posterCacheKey,
+      conversationId: mediaCacheContext?.conversationId,
+      fileName: videoPosterFileName(item?.fileName || "video.mp4"),
+      fileUrl: poster,
+      kind: "image",
+      preferDesktopRead: true,
+    })
+      .then((displayUrl) => {
+        if (!disposed) setPosterDisplaySrc(displayUrl ?? null);
+      })
+      .catch(() => {
+        if (!disposed) setPosterDisplaySrc(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [
+    authToken,
+    item?.fileName,
+    mediaCacheContext?.accountId,
+    mediaCacheContext?.conversationId,
+    poster,
+    posterCacheIdentity,
+    posterCacheKey,
+    canReadMediaFileAsDataUrl,
+  ]);
+  useEffect(() => {
     setFrameReady(isVideoSourceReady(displaySrc));
   }, [displaySrc]);
+  useEffect(() => {
+    const nextDuration = initialVideoDurationSeconds(videoCacheKey, media?.durationSeconds);
+    setDuration(nextDuration);
+    rememberVideoDurationSeconds(videoCacheKey, media?.durationSeconds);
+  }, [media?.durationSeconds, videoCacheKey]);
   const handlePosterReady = useCallback(() => setFrameReady(true), []);
+  const explicitPosterSrc = explicitPosterFailed
+    ? undefined
+    : posterDisplaySrc || directPosterSrc;
   const { posterSrc } = useVideoPosterSource({
     authToken,
     displaySrc,
-    explicitPoster: poster,
+    explicitPoster: explicitPosterSrc,
     media,
     mediaCacheContext,
     onPosterReady: handlePosterReady,
@@ -552,8 +669,9 @@ export function VideoPart({
     setOpenError(false);
     if (!uploadOverlay.canPlay) return;
     if (!openSrc || previewLoading) return;
+    const hasLocalOpenUrl = Boolean(localVideoOpenSrc);
     logVideoOpenDiagnostic("video.open_attempt", "ok", {
-      hasLocalOpenUrl: Boolean(localVideoSrc || item?.localOpenUrl),
+      hasLocalOpenUrl,
       openSrc,
       posterSrc,
       remoteSrc,
@@ -563,7 +681,7 @@ export function VideoPart({
       authToken,
       displaySrc: openSrc,
       durationSeconds: duration,
-      localOpenSrc: localVideoSrc || item?.localOpenUrl,
+      localOpenSrc: localVideoOpenSrc,
       media,
       mediaCacheContext,
       onDiagnostic: (diagnostic) =>
@@ -574,12 +692,11 @@ export function VideoPart({
         }),
       posterSrc,
       remoteSrc,
-      videoSize,
     })
       .then((opened) => {
         if (opened) {
           logVideoOpenDiagnostic("video.open_success", "ok", {
-            hasLocalOpenUrl: Boolean(item?.localOpenUrl),
+            hasLocalOpenUrl,
             openSrc,
             posterSrc,
             remoteSrc,
@@ -591,7 +708,7 @@ export function VideoPart({
           return;
         }
         logVideoOpenDiagnostic("video.open_failed", "failed", {
-          hasLocalOpenUrl: Boolean(item?.localOpenUrl),
+          hasLocalOpenUrl,
           openSrc,
           posterSrc,
           reason: "no_desktop_player",
@@ -605,7 +722,7 @@ export function VideoPart({
           return;
         }
         logVideoOpenDiagnostic("video.open_failed", "failed", {
-          hasLocalOpenUrl: Boolean(item?.localOpenUrl),
+          hasLocalOpenUrl,
           openSrc,
           posterSrc,
           reason: videoOpenErrorSummary(error),
@@ -638,11 +755,8 @@ export function VideoPart({
         onLoadedMetadata={(event) => {
           const nextDuration = event.currentTarget.duration;
           if (Number.isFinite(nextDuration) && nextDuration > 0) {
+            rememberVideoDurationSeconds(videoCacheKey, nextDuration);
             setDuration(nextDuration);
-          }
-          const { videoWidth, videoHeight } = event.currentTarget;
-          if (videoWidth > 0 && videoHeight > 0) {
-            setVideoSize({ width: videoWidth, height: videoHeight });
           }
         }}
         onPause={() => setPlaying(false)}
@@ -650,6 +764,7 @@ export function VideoPart({
           setHasStarted(true);
           setPlaying(true);
         }}
+        onPosterError={() => setExplicitPosterFailed(true)}
         onUploadOverlayAction={(action) => {
           if (uploadOverlay.taskId) onUploadAction?.(uploadOverlay.taskId, action);
         }}
@@ -750,16 +865,6 @@ function formatVideoDuration(value: number | null | undefined, t: ReturnType<typ
   if (!value || value <= 0) return t("messages.mediaContent.unknownDuration");
   const seconds = Math.round(value);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-function videoBubbleAspectRatio(
-  videoSize: { width: number; height: number } | null,
-  media?: MediaResourceDto,
-) {
-  const width = videoSize?.width ?? media?.width;
-  const height = videoSize?.height ?? media?.height;
-  if (!width || !height || width <= 0 || height <= 0) return undefined;
-  return Math.max(0.5625, Math.min(1.7778, width / height));
 }
 
 function useAuthenticatedMediaUrl(src: string | undefined, authToken: string | undefined) {

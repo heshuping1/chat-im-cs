@@ -8,19 +8,25 @@
 
 .message-image {
   display: block;
-  max-width: min(260px, 100%);
-  max-height: 220px;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   border-radius: 8px;
   object-fit: contain;
   background: #eef2f7;
 }
 
 .message-image-frame {
+  --media-preview-width: 178px;
+  --media-preview-height: 280px;
   position: relative;
   display: inline-grid;
-  min-width: 180px;
-  min-height: 112px;
-  max-width: min(260px, 100%);
+  width: var(--media-preview-width, 178px);
+  height: var(--media-preview-height, 280px);
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
   place-items: center;
   overflow: hidden;
   border: 1px solid rgba(216, 226, 237, 0.94);
@@ -36,13 +42,18 @@ button.message-image-frame {
 }
 
 .message-image-frame .message-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
   opacity: 0;
   transition: opacity 160ms ease;
 }
 
 .message-image-frame.loaded {
-  min-width: 0;
-  min-height: 0;
   border: 0;
   background: transparent;
 }
@@ -181,6 +192,13 @@ button.message-image-frame {
 }
 
 .message-media-empty,
+.message-file-card {
+  --media-preview-file-height: 108px;
+  box-sizing: border-box;
+  height: var(--media-preview-file-height, 108px);
+  overflow: hidden;
+}
+
 .message-file-card {
   display: inline-grid;
   align-items: center;
@@ -574,10 +592,13 @@ button.message-image-frame {
 }
 
 .wechat-video-card {
+  --media-preview-video-width: 178px;
+  --media-preview-video-height: 316px;
   display: block;
-  width: clamp(168px, calc(172px * var(--video-bubble-aspect, 0.5625)), min(320px, 46vw));
-  min-width: clamp(168px, calc(172px * var(--video-bubble-aspect, 0.5625)), min(320px, 46vw));
-  max-width: min(320px, 46vw);
+  width: var(--media-preview-video-width, 178px);
+  height: var(--media-preview-video-height, 316px);
+  min-width: var(--media-preview-video-width, 178px);
+  max-width: min(var(--media-preview-video-width, 178px), 46vw);
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -587,9 +608,10 @@ button.message-image-frame {
 .message-video-frame {
   position: relative;
   display: block;
-  width: clamp(168px, calc(172px * var(--video-bubble-aspect, 0.5625)), min(320px, 46vw));
-  max-width: min(320px, 46vw);
-  aspect-ratio: var(--video-bubble-aspect, 0.5625);
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: auto;
   overflow: hidden;
   padding: 0;
   border: 0;

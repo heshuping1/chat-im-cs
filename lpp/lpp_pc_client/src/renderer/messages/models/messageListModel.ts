@@ -1,4 +1,5 @@
 import type { MediaResourceDto, MessageItemDto } from "../../data/api/types";
+import type { ImMessageHydrationSource } from "../../data/message-store/im-message-store-hydration";
 import { normalizeMessageType } from "../../data/im-message-normalize";
 import {
   messageMediaFileName,
@@ -14,6 +15,36 @@ export type HistoryFilterKey =
   | "video"
   | "link"
   | "favorite";
+
+export interface MessageLookupScope {
+  source: ImMessageHydrationSource;
+  limitedToLoadedRange: boolean;
+  labelKey: string;
+}
+
+export function createMessageLookupScope(
+  source: ImMessageHydrationSource,
+): MessageLookupScope {
+  if (source === "local") {
+    return {
+      source,
+      limitedToLoadedRange: true,
+      labelKey: "messages.listPanel.localRange",
+    };
+  }
+  if (source === "hot") {
+    return {
+      source,
+      limitedToLoadedRange: true,
+      labelKey: "messages.listPanel.loadedRange",
+    };
+  }
+  return {
+    source,
+    limitedToLoadedRange: false,
+    labelKey: "messages.listPanel.syncedRange",
+  };
+}
 
 export function filterVisibleMessages(messages: MessageItemDto[], keyword: string) {
   const normalized = keyword.trim().toLowerCase();

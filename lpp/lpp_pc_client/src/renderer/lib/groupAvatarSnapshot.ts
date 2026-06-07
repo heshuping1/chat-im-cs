@@ -1,3 +1,5 @@
+import { cachedAvatarObjectUrl } from "./avatarCache";
+
 const snapshotDbName = "lpp-pc-group-avatar-snapshots";
 const snapshotStoreName = "snapshots";
 const snapshotDbVersion = 1;
@@ -180,12 +182,9 @@ async function loadAvatarImage(url: string, token?: string | null) {
 
 async function avatarUrlToObjectUrl(url: string, token?: string | null) {
   if (url.startsWith("data:")) return url;
-  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-  const response = await fetch(url, { cache: "force-cache", headers });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const blob = await response.blob();
-  if (!blob.size || !blob.type.startsWith("image/")) throw new Error("Invalid image");
-  return URL.createObjectURL(blob);
+  const objectUrl = await cachedAvatarObjectUrl({ token, url });
+  if (!objectUrl) throw new Error("Avatar unavailable");
+  return objectUrl;
 }
 
 function loadImageElement(url: string) {

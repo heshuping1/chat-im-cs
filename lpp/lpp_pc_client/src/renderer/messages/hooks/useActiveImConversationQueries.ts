@@ -1,17 +1,29 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
 import type { MessageItemDto } from "../../data/api/types";
 import type { ConversationListItem } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
 import { reuseStableMessageItems } from "../../data/message/message-domain";
+import {
+  getImMessageStore,
+  imMessageConversationKey,
+  imMessageScopeKey,
+} from "../../data/message-store/im-message-store";
+import {
+  imLocalMessagesQueryKey,
+  resolveLocalFirstMessages,
+} from "../../data/message-store/im-message-store-hydration";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import {
+  activeDirectReadStatusRefetchInBackground,
   activeDirectReadStatusRefetchIntervalMs,
+  activeDirectReadStatusStaleMs,
   shouldEnableDirectReadStatusQuery,
 } from "../models/imReadReceiptPolicy";
 import { createMessageQueryHotCache } from "../models/messageQueryHotCacheModel";
+import { realtimeSyncPolicy } from "../../data/realtime/realtime-sync-policy";
 
 type ImConversationType = "direct" | "group";
 const messageQueryHotCache = createMessageQueryHotCache<MessageItemDto[]>();
@@ -25,22 +37,50 @@ export function useActiveImConversationQueries({
   activeConversationType?: ImConversationType;
   session: AuthSession | null;
 }) {
+  const queryClient = useQueryClient();
+  const messageStore = getImMessageStore();
+  const scopeKey = imMessageScopeKey(session);
   const messagesQueryKey = useMemo(
     () =>
-      pcQueryKeys.imMessages(
-        session?.apiBaseUrl,
-        session?.tenantToken,
+      pcQueryKeys.imMessagesForSession(
+        session,
         activeConversationType,
         activeConversation?.conversationId,
       ),
     [
       activeConversation?.conversationId,
       activeConversationType,
-      session?.apiBaseUrl,
-      session?.tenantToken,
+      session,
     ],
   );
+  const localMessagesQueryKey = useMemo(
+    () =>
+      imLocalMessagesQueryKey(
+        scopeKey,
+        activeConversationType ?? "",
+        activeConversation?.conversationId ?? "",
+      ),
+    [activeConversation?.conversationId, activeConversationType, scopeKey],
+  );
+  const localConversationKey = useMemo(
+    () =>
+      imMessageConversationKey(
+        scopeKey,
+        activeConversationType ?? "",
+        activeConversation?.conversationId ?? "",
+      ),
+    [activeConversation?.conversationId, activeConversationType, scopeKey],
+  );
   const hotMessagesSnapshot = messageQueryHotCache.read(messagesQueryKey);
+  const localMessagesQuery = useQuery({
+    queryKey: localMessagesQueryKey,
+    enabled: Boolean(session && activeConversation && activeConversationType),
+    queryFn: async () =>
+      messageStore.listMessages(localConversationKey, { limit: 50 }),
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60_000,
+  });
   const messagesQuery = useQuery({
     queryKey: messagesQueryKey,
     enabled: Boolean(session && activeConversation && activeConversationType),
@@ -52,8 +92,8 @@ export function useActiveImConversationQueries({
         activeConversation!.conversationId,
       ),
     gcTime: 30 * 60_000,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
+    refetchInterval: realtimeSyncPolicy.im.activeMessagesFallbackPollMs,
+    refetchIntervalInBackground: realtimeSyncPolicy.im.activeMessagesRefetchInBackground,
     refetchOnWindowFocus: true,
     staleTime: 5 * 60_000,
     structuralSharing: (previous, next) => {
@@ -69,6 +109,35 @@ export function useActiveImConversationQueries({
       messageQueryHotCache.remember(messagesQueryKey, messagesQuery.data, messagesQuery.dataUpdatedAt);
     }
   }, [messagesQuery.data, messagesQuery.dataUpdatedAt, messagesQueryKey]);
+  useEffect(() => {
+    if (
+      !session ||
+      !activeConversation ||
+      !activeConversationType ||
+      !isMessageItemList(messagesQuery.data)
+    ) {
+      return;
+    }
+    void messageStore
+      .replaceConversationSnapshot(
+        scopeKey,
+        activeConversationType,
+        activeConversation.conversationId,
+        messagesQuery.data,
+      )
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: localMessagesQueryKey });
+      });
+  }, [
+    activeConversation,
+    activeConversationType,
+    localMessagesQueryKey,
+    messageStore,
+    messagesQuery.data,
+    queryClient,
+    scopeKey,
+    session,
+  ]);
 
   const directReadStatusQuery = useQuery({
     queryKey: pcQueryKeys.imDirectReadStatus(
@@ -86,9 +155,9 @@ export function useActiveImConversationQueries({
         activeConversation!.conversationId,
       ),
     refetchInterval: activeDirectReadStatusRefetchIntervalMs(),
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: activeDirectReadStatusRefetchInBackground(),
     refetchOnWindowFocus: true,
-    staleTime: 2_000,
+    staleTime: activeDirectReadStatusStaleMs(),
   });
 
   const groupMembersQuery = useQuery({
@@ -104,12 +173,22 @@ export function useActiveImConversationQueries({
     staleTime: 60_000,
   });
 
+  const localFirstMessages = resolveLocalFirstMessages({
+    hotMessages: hotMessagesSnapshot?.data,
+    localLoading: localMessagesQuery.isLoading,
+    localMessages: localMessagesQuery.data,
+    serverError: messagesQuery.error instanceof Error ? messagesQuery.error : null,
+    serverLoading: messagesQuery.isLoading,
+    serverMessages: messagesQuery.data,
+  });
+
   return {
     directReadStatusQuery,
     groupMembersQuery,
-    messages: messagesQuery.data ?? hotMessagesSnapshot?.data ?? [],
-    messagesLoaded: messagesQuery.data !== undefined || hotMessagesSnapshot !== undefined,
-    messagesLoading: messagesQuery.isLoading && !hotMessagesSnapshot,
+    messages: localFirstMessages.messages,
+    messagesHydrationSource: localFirstMessages.hydrationSource,
+    messagesLoaded: localFirstMessages.messagesLoaded,
+    messagesLoading: localFirstMessages.messagesLoading,
     messagesQuery,
   };
 }

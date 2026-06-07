@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lpp_mobile/app/router/router.dart';
 import 'package:lpp_mobile/app/theme/theme.dart';
+import 'package:lpp_mobile/core/branding/app_brand_assets.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/utils/validators.dart';
@@ -980,13 +981,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       onTap: _handleLogoTap,
       child: Column(
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: const BoxDecoration(
-                color: AppColors.primary, shape: BoxShape.circle),
-            child: Icon(Icons.chat_bubble_rounded,
-                color: Theme.of(context).colorScheme.surface, size: 36),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              AppBrandAssets.appIcon,
+              width: 72,
+              height: 72,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(height: 12),
           Text(l10n.authLoginTitle, style: AppTextStyles.headline2),

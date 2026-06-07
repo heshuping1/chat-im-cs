@@ -290,7 +290,7 @@ describe("MessageDeliveryService", () => {
     });
 
     expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pc-im-conversations"] });
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
     expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
       event: "message.delivery.guard",
       phase: "skip",
@@ -516,7 +516,7 @@ describe("MessageDeliveryService", () => {
     });
 
     expect(mocks.mergeImGatewayMessage).toHaveBeenCalledTimes(2);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pc-im-conversations"] });
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
     expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
       event: "message.delivery.guard",
       phase: "gap",
@@ -529,6 +529,49 @@ describe("MessageDeliveryService", () => {
       event: "message.gap-sync.triggered",
       phase: "push-seq-gap",
     }));
+  });
+
+  it("does not refetch IM queries after a read push is merged locally", () => {
+    mocks.mergeReadEvent.mockReturnValueOnce(true);
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverImRead({
+      conversationId: "direct-read",
+      payload: {
+        conversationId: "direct-read",
+        conversationType: "direct",
+        readSeq: 42,
+      },
+      route: "im-read",
+      source: "gateway-router",
+    });
+
+    expect(mocks.mergeReadEvent).toHaveBeenCalledWith(
+      queryClient,
+      expect.objectContaining({ conversationId: "direct-read" }),
+      expect.objectContaining({ tenantToken: "token" }),
+    );
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it("keeps query invalidation as a fallback when a read push cannot be merged", () => {
+    mocks.mergeReadEvent.mockReturnValueOnce(false);
+    const queryClient = new QueryClient();
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const service = createTestDeliveryService(queryClient);
+
+    service.deliverImRead({
+      conversationId: "direct-read-fallback",
+      payload: {
+        conversationId: "direct-read-fallback",
+      },
+      route: "im-read",
+      source: "gateway-router",
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
   });
 
   it("deduplicates customer-service messages before writing service cache", () => {

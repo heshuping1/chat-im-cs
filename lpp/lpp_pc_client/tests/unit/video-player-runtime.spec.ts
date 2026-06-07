@@ -116,6 +116,41 @@ describe("openDesktopVideoPlayer", () => {
     );
   });
 
+  it("opens an explicit local file url even when no inline display source exists", async () => {
+    const openVideoPlayer = vi.fn(async () => "cached-file");
+    const onDiagnostic = vi.fn();
+    (window as Window & { desktopApi: { openVideoPlayer: typeof openVideoPlayer } }).desktopApi = {
+      openVideoPlayer,
+    };
+
+    await expect(
+      openDesktopVideoPlayer({
+        localOpenSrc: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/materialized.mp4",
+        remoteSrc: undefined,
+        media: {
+          fileName: "materialized.mp4",
+          width: 720,
+          height: 1280,
+        },
+        onDiagnostic,
+      }),
+    ).resolves.toBe(true);
+
+    expect(openVideoPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/materialized.mp4",
+      }),
+    );
+    expect(onDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "open.prepare",
+        sourceKind: "file",
+        hasLocalOpenUrl: true,
+        openedWithInitialFileUrl: true,
+      }),
+    );
+  });
+
   it("records a degraded remote open when no local open url is available", async () => {
     const openVideoPlayer = vi.fn(async () => "cached-file");
     const onDiagnostic = vi.fn();
@@ -188,6 +223,32 @@ describe("openDesktopVideoPlayer", () => {
         sourceKind: "file",
       }),
     );
+  });
+
+  it("omits data url posters so poster validation cannot block opening cached videos", async () => {
+    const openVideoPlayer = vi.fn(async () => "cached-file");
+    (window as Window & { desktopApi: { openVideoPlayer: typeof openVideoPlayer } }).desktopApi = {
+      openVideoPlayer,
+    };
+
+    await expect(
+      openDesktopVideoPlayer({
+        displaySrc: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4",
+        posterSrc: `data:image/jpeg;base64,${"a".repeat(10_000)}`,
+        media: {
+          fileName: "clip.mp4",
+          width: 720,
+          height: 1280,
+        },
+      }),
+    ).resolves.toBe(true);
+
+    expect(openVideoPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4",
+      }),
+    );
+    expect(openVideoPlayer.mock.calls[0]?.[0]).not.toHaveProperty("posterUrl");
   });
 
   it("uses local file cache urls as inline video preview sources only inside desktop", () => {

@@ -75,6 +75,7 @@ export function logApiTrafficDiagnostic(input: ApiTrafficDiagnosticInput) {
   void target.desktopApi?.recordApiTrafficDiagnostic?.(record).catch((error) => {
     console.warn("[lpp:api-traffic] persist failed", error);
   });
+  if (!shouldPrintApiTrafficDiagnostic(record, level)) return record;
   if (level === "body") {
     console.info("[lpp:api-traffic]", record);
   } else {
@@ -89,6 +90,13 @@ export function logApiTrafficDiagnostic(input: ApiTrafficDiagnosticInput) {
     });
   }
   return record;
+}
+
+function shouldPrintApiTrafficDiagnostic(
+  record: ApiTrafficDiagnosticRecord,
+  level: ApiTrafficLogLevel,
+) {
+  return level === "body" || record.result === "failed";
 }
 
 export function createApiTrafficDiagnosticRecord(

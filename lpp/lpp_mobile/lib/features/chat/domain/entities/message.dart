@@ -272,6 +272,21 @@ class MessageBody {
       if (eventData == null && event != null) 'event': event,
     };
   }
+
+  Map<String, dynamic> toLocalJson() {
+    return {
+      if (text != null) 'text': text,
+      if (image != null) 'image': image!.toLocalJson(),
+      if (video != null) 'video': video!.toLocalJson(),
+      if (voice != null) 'voice': voice!.toLocalJson(),
+      if (file != null) 'file': file!.toLocalJson(),
+      if (contactCard != null) 'contactCard': contactCard!.toJson(),
+      if (callLog != null) 'callLog': callLog!.toJson(),
+      if (location != null) 'location': location!.toJson(),
+      if (eventData != null) 'event': eventData!.toJson(),
+      if (eventData == null && event != null) 'event': event,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -471,6 +486,8 @@ class MediaResource {
       height: json['height'] as int?,
       durationSeconds: json['durationSeconds'] as int?,
       thumbnailUrl: json['thumbnailUrl'] as String?,
+      localPreviewUrl: json['localPreviewUrl'] as String?,
+      localPosterUrl: json['localPosterUrl'] as String?,
     );
   }
 
@@ -510,6 +527,14 @@ class MediaResource {
       'height': height,
       'durationSeconds': durationSeconds,
       'thumbnailUrl': thumbnailUrl,
+    };
+  }
+
+  Map<String, dynamic> toLocalJson() {
+    return {
+      ...toJson(),
+      if (localPreviewUrl != null) 'localPreviewUrl': localPreviewUrl,
+      if (localPosterUrl != null) 'localPosterUrl': localPosterUrl,
     };
   }
 }

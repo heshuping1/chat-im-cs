@@ -113,6 +113,7 @@
 | P24 | 联系人与好友关系闭环 | 已完成 | [近期阶段 P20-P26 明细](./archive/PC端重构任务矩阵-近期阶段-P20-P26明细.md) |
 | P25 | 聊天查找体验治理 | 已完成 | [近期阶段 P20-P26 明细](./archive/PC端重构任务矩阵-近期阶段-P20-P26明细.md) |
 | P26 | 客户信息、联系人入口与设置稳态治理 | 已完成 | [近期阶段 P20-P26 明细](./archive/PC端重构任务矩阵-近期阶段-P20-P26明细.md) |
+| P27 | IM 本地消息库与核心链路纠偏 | 已完成 | [2026-06-07 P27 执行计划](../superpowers/plans/2026-06-07-pc-im-local-message-store-recovery.md) |
 
 ---
 
@@ -121,6 +122,14 @@
 | 编号 | 模块 | 目标 | 风险 | 验收 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | P23-PLAYER-001 | mpv/libmpv Assessment | 评估 mpv/libmpv 作为 PC 端全格式播放器能力的可行性，对比 Electron Chromium、系统播放器、外部 mpv 子进程和嵌入式 libmpv；覆盖 Windows 打包、签名、更新、体积、安全和 UX。新增 native 依赖、打包资源、外部播放器或 libmpv 嵌入前必须负责人确认。 | P1 | L1 | 待处理 |
+| P27-IM-001 | IM Query Scope | 统一 IM 消息读取、发送写入、Gateway invalidation 的 session/workspace query key，修复 `imMessages` 与 `imMessagesForSession` 分裂。 | P0 | L2 | 已完成 |
+| P27-IM-002 | IM Local Message Store | 新增 PC 端持久化本地消息仓库 owner，成功消息按 apiBaseUrl/tenant/user/conversation scope 物化到 IndexedDB，React Query 不再冒充消息本地库。 | P0 | L2 | 已完成 |
+| P27-IM-003 | Local-first Chat Entry | 进入已有本地消息的聊天窗口时先展示本地消息，再后台同步服务端；不得用整块 loading 遮挡本地已有消息。 | P0 | L3 | 已完成 |
+| P27-IM-004 | Message Write-through | 服务端快照、Gateway push、发送确认、撤回/删除/read metadata 统一写入本地消息仓库和 message core 归约路径。 | P0 | L3 | 已完成 |
+| P27-IM-005 | Gap Sync Contract | 明确当前 fallback refetch 与真实 afterSeq/cursor gap sync 的边界，补诊断和服务端合同缺口记录。 | P0 | L3 | 已完成 |
+| P27-IM-006 | History Search Source | 聊天历史分页和搜索不能只依赖当前 50 条 serverMessages；先接本地持久化范围，服务端全文搜索缺口显式呈现。 | P1 | L3 | 已完成 |
+| P27-CS-001 | CS Unread Ledger Boundary | 客服未读长期事实从 CS ledger/server/Gateway 明确来源归约，IM list compat 只能作为迁移期显示 fallback。 | P1 | L3 | 已完成 |
+| P27-ARCH-001 | P27 Boundary and Validation | 补架构边界测试、验证记录和任务矩阵闭环，防止再次把 React Query/hot cache 当消息本地库。 | P1 | L2 | 已完成 |
 
 ---
 
@@ -136,6 +145,9 @@
 | RISK-006 | 缺少核心链路自动化验证 | 重构靠手工感觉 | check:quick、test:core、CI workflow、架构边界、文档门禁和 lint:core 已建立。 | 已缓解 |
 | RISK-007 | 缺少结构化诊断日志 | 偶发消息/客服问题难排查 | 诊断字段规范、设置页诊断包导出和 send diagnostics 已建立。 | 已缓解 |
 | RISK-008 | Windows 实机验证不足 | 发布包和系统能力可能与本机开发态不一致 | 发布前必须按核心路径 smoke 和发布检查清单记录 Windows 实机验证；非 Windows 环境不得伪造结果。 | 待处理 |
+| RISK-009 | PC 端缺少真正本地消息库 | 新进入聊天窗口无法本地首屏可见，弱网/失败时成功历史消息被 loading 或远端失败影响。 | P27 已新增 IndexedDB 本地消息仓库，成功消息和服务端/Gateway 增量进入统一 read model；React Query/hot cache 不再作为本地库。 | 已缓解 |
+| RISK-010 | IM 消息 query key / scope key 分裂 | 发送写入、聊天读取、Gateway invalidation 可能不在同一 workspace owner，导致乐观消息、刷新、跨账号隔离不稳定。 | P27-IM-001 已统一活跃消息读取、发送/cache mutation 写入和有 session 的 Gateway invalidation scope；P27-ARCH-001 继续补长期边界测试。 | 已缓解 |
+| RISK-011 | Gap sync 只有 fallback refetch | 断线重连、离线恢复、seq 跳号无法精确补洞，可能丢增量或重复提示。 | P27-IM-005 已显式区分 fallback 与真实 afterSeq/cursor 合同；服务端合同未确认前不得宣称精确补洞。 | 已登记服务端合同缺口 |
 
 ---
 

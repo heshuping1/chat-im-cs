@@ -33,7 +33,12 @@ import {
 import { imConversationEffectiveUnreadCount } from "../data/im-read/im-conversation-read-view";
 import { isImConversation } from "../data/message-display";
 import { resolveCustomerServiceBadgeView } from "../data/customer-service/customer-service-badge-view";
-import { customerServiceRealtimePollIntervalMs } from "../data/customer-service/cs-realtime-config";
+import {
+  customerServiceRealtimePollIntervalMs,
+  customerServiceReceptionPollIntervalMs,
+  customerServiceRealtimeRefetchInBackground,
+  customerServiceReceptionRefetchInBackground,
+} from "../data/customer-service/cs-realtime-config";
 import { consumeCustomerServiceMessageReminder } from "../data/customer-service/cs-reminder-model";
 import { isExplicitCustomerServiceThreadOpenSource } from "../data/customer-service/customer-service-read-visibility";
 import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
@@ -104,6 +109,7 @@ import { formatBadgeCount, formatError } from "../lib/format";
 import { useFriendRequestReminderController } from "../contacts/hooks/useFriendRequestReminderController";
 import { SpaceRadarPopover } from "../spaces/components/SpaceRadarPopover";
 import { useSpaceRadarController } from "../spaces/hooks/useSpaceRadarController";
+import { useImConversationsQuery } from "../messages/hooks/useImConversationsQuery";
 import { useTenantJoinReminderController } from "../spaces/hooks/useTenantJoinReminderController";
 import { PcAvatar } from "./PcAvatar";
 import {
@@ -218,13 +224,7 @@ export function Sidebar() {
   const previousSlaRiskThreadIdsRef = useRef<Set<string>>(new Set());
   const previousQueuedCountRef = useRef(0);
   const previousServiceUnreadRef = useRef<Map<string, number>>(new Map());
-  const conversationsQuery = useQuery({
-    queryKey: pcQueryKeys.imConversationsForSession(authSession),
-    enabled: Boolean(authSession),
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: true,
-    queryFn: async () => requireApiClient(authSession).getConversations({ limit: 100 }),
-  });
+  const conversationsQuery = useImConversationsQuery(authSession);
   const serviceQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(
       authSession?.apiBaseUrl,
@@ -232,7 +232,7 @@ export function Sidebar() {
     ),
     enabled: Boolean(authSession && workspaceAccess.canReadServiceWorkbench),
     refetchInterval: customerServiceRealtimePollIntervalMs,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: customerServiceRealtimeRefetchInBackground,
     queryFn: async () => requireApiClient(authSession).getWorkbenchThreads(),
   });
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(authSession);
@@ -246,8 +246,8 @@ export function Sidebar() {
         workspaceAccess.canReadServiceWorkbench &&
         canUseStaffEndpoints,
     ),
-    refetchInterval: 15_000,
-    refetchIntervalInBackground: true,
+    refetchInterval: customerServiceReceptionPollIntervalMs,
+    refetchIntervalInBackground: customerServiceReceptionRefetchInBackground,
     queryFn: async () => requireApiClient(authSession).getReceptionStatus(),
   });
   const profileQuery = useQuery({

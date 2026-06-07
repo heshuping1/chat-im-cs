@@ -26,6 +26,27 @@ describe("gateway query invalidation", () => {
     );
   });
 
+  it("keeps IM gateway invalidation inside the current workspace scope", () => {
+    const queryClient = new QueryClient();
+    const currentScope = "workspace|api|tenant|user|platform";
+    const otherScope = "workspace|api|tenant|other-user|platform";
+    queryClient.setQueryData(["pc-im-conversations", currentScope, 100], { items: [] });
+    queryClient.setQueryData(["pc-im-conversations", otherScope, 100], { items: [] });
+    queryClient.setQueryData(["pc-im-messages", currentScope, "direct", "conversation-1"], []);
+    queryClient.setQueryData(["pc-im-messages", otherScope, "direct", "conversation-1"], []);
+
+    invalidateImGatewayQueries(queryClient, "conversation-1", currentScope);
+
+    expect(queryClient.getQueryCache().find({ queryKey: ["pc-im-conversations", currentScope, 100] })?.state.isInvalidated)
+      .toBe(true);
+    expect(queryClient.getQueryCache().find({ queryKey: ["pc-im-messages", currentScope, "direct", "conversation-1"] })?.state.isInvalidated)
+      .toBe(true);
+    expect(queryClient.getQueryCache().find({ queryKey: ["pc-im-conversations", otherScope, 100] })?.state.isInvalidated)
+      .toBe(false);
+    expect(queryClient.getQueryCache().find({ queryKey: ["pc-im-messages", otherScope, "direct", "conversation-1"] })?.state.isInvalidated)
+      .toBe(false);
+  });
+
   it("invalidates all customer service queries when no thread is scoped", () => {
     const queryClient = {
       invalidateQueries: vi.fn(),

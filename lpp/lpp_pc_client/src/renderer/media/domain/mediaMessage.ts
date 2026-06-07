@@ -8,6 +8,11 @@ import {
   normalizeMessageType,
   resolveMediaUrl,
 } from "../../data/im-message-normalize";
+import {
+  mediaPreviewPresentation,
+  type ImagePreviewBucket,
+  type MediaPreviewPresentation,
+} from "./mediaPreviewPresentation";
 
 export type ImMediaKind = "image" | "file" | "voice" | "video";
 export type ChatMediaKind = ImMediaKind;
@@ -23,6 +28,7 @@ export type ImMediaItem = {
   posterUrl?: string;
   imageCacheKey?: string;
   imageSourceUrls?: string[];
+  previewPresentation?: MediaPreviewPresentation;
 };
 export type ChatMediaItem = ImMediaItem & { kind: ChatMediaKind };
 
@@ -82,6 +88,7 @@ export function normalizeMediaPart({
       ? imageSourceUrls?.[0]
       : localPreviewUrl || (part.type === "video" ? localOpenUrl : undefined) || remoteSourceUrl;
   const fileName = normalizedMediaFileName(part.type, media, fallback);
+  const displayState = sourceUrl || remoteSourceUrl || localOpenUrl ? "loading" : "empty";
   return {
     kind: part.type,
     media,
@@ -95,6 +102,11 @@ export function normalizeMediaPart({
       : undefined,
     imageCacheKey: part.type === "image" ? imageMediaCacheKey(media, sourceUrl) : undefined,
     imageSourceUrls,
+    previewPresentation: mediaPreviewPresentation({
+      kind: part.type,
+      displayState,
+      imageBucket: part.type === "image" ? imagePreviewBucketFromMedia(media) : undefined,
+    }),
   };
 }
 
@@ -279,13 +291,13 @@ function mediaSourceUrl(
       assetBaseUrl,
       "signedUrl",
       "downloadUrl",
-      "thumbnailUrl",
-      "thumbUrl",
-      "previewUrl",
       "url",
       "fileUrl",
       "uri",
       "path",
+      "thumbnailUrl",
+      "thumbUrl",
+      "previewUrl",
     );
   }
   return resolveMediaUrl(
@@ -309,13 +321,13 @@ function imageVisualSourceUrl(
     assetBaseUrl,
     "signedUrl",
     "downloadUrl",
-    "thumbnailUrl",
-    "thumbUrl",
-    "previewUrl",
     "url",
     "fileUrl",
     "uri",
     "path",
+    "thumbnailUrl",
+    "thumbUrl",
+    "previewUrl",
   );
 }
 
@@ -328,14 +340,26 @@ function imageDisplaySourceUrls(
     mediaStringField(media, "localOpenUrl"),
     resolveMediaUrl(media, assetBaseUrl, "signedUrl"),
     resolveMediaUrl(media, assetBaseUrl, "downloadUrl"),
-    resolveMediaUrl(media, assetBaseUrl, "thumbnailUrl"),
-    resolveMediaUrl(media, assetBaseUrl, "thumbUrl"),
-    resolveMediaUrl(media, assetBaseUrl, "previewUrl"),
     resolveMediaUrl(media, assetBaseUrl, "url"),
     resolveMediaUrl(media, assetBaseUrl, "fileUrl"),
     resolveMediaUrl(media, assetBaseUrl, "uri"),
     resolveMediaUrl(media, assetBaseUrl, "path"),
+    resolveMediaUrl(media, assetBaseUrl, "thumbnailUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "thumbUrl"),
+    resolveMediaUrl(media, assetBaseUrl, "previewUrl"),
   ]);
+}
+
+function imagePreviewBucketFromMedia(
+  media: MediaResourceDto | undefined,
+): ImagePreviewBucket | undefined {
+  const width = mediaNumberField(media, "width");
+  const height = mediaNumberField(media, "height");
+  if (!width || !height) return undefined;
+  const ratio = width / height;
+  if (ratio >= 1.6) return "wide";
+  if (ratio <= 0.72) return "tall";
+  return "standard";
 }
 
 function uniqueMediaUrls(urls: Array<string | undefined>) {
@@ -418,6 +442,13 @@ function messageMediaFallbackName(message: MessageItemDto) {
 function mediaStringField(media: MediaResourceDto | undefined, key: string) {
   const value = (media as Record<string, unknown> | undefined)?.[key];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function mediaNumberField(media: MediaResourceDto | undefined, key: string) {
+  const value = (media as Record<string, unknown> | undefined)?.[key];
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
 }
 
 function isLocalVideoMessage(

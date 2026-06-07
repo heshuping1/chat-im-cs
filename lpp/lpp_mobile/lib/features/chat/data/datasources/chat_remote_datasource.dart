@@ -146,6 +146,7 @@ abstract class ChatRemoteDataSource {
   /// POST /api/client/v1/media/upload
   Future<MediaResource> uploadMedia(
     String filePath, {
+    String? mediaKind,
     MediaUploadProgressCallback? onProgress,
   });
 
@@ -453,12 +454,15 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   @override
   Future<MediaResource> uploadMedia(
     String filePath, {
+    String? mediaKind,
     MediaUploadProgressCallback? onProgress,
   }) async {
     try {
       final fallbackTotal = await _safeFileLength(filePath);
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(filePath),
+        if (mediaKind != null && mediaKind.trim().isNotEmpty)
+          'mediaKind': mediaKind.trim(),
       });
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/client/v1/media/upload',

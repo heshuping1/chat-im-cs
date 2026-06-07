@@ -41,7 +41,6 @@ export interface ResolveCustomerServiceThreadUnreadInput {
 export type CustomerServiceThreadUnreadReason =
   | "server"
   | "gatewayOverlay"
-  | "imListCompatCandidate"
   | "none";
 
 export function resolveCustomerServiceOverlayUnread(
@@ -125,11 +124,7 @@ export function resolveCustomerServiceThreadUnread(
 ): { reason: CustomerServiceThreadUnreadReason; unreadCount: number } {
   const serverUnread = Math.max(0, Number(input.serverUnread ?? 0));
   const overlayUnread = Math.max(0, Number(input.overlayUnread ?? 0));
-  const compatUnreadCandidate = Math.max(0, Number(input.compatUnreadCandidate ?? 0));
   if (serverUnread > 0) return { reason: "server", unreadCount: serverUnread };
   if (overlayUnread > 0) return { reason: "gatewayOverlay", unreadCount: overlayUnread };
-  if (compatUnreadCandidate > 0) {
-    return { reason: "imListCompatCandidate", unreadCount: compatUnreadCandidate };
-  }
   return { reason: "none", unreadCount: 0 };
 }

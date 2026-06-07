@@ -31,8 +31,13 @@ describe("MessageGapSyncCoordinator", () => {
       event: "message.gap-sync.triggered",
       phase: "gateway-reconnected",
       route: "gap-sync",
+      summary: expect.objectContaining({
+        mode: "fallback-refetch",
+        preciseGapSync: false,
+        requiresServerCursor: true,
+      }),
     }));
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pc-im-conversations"] });
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["pc-cs-workbench-threads"] });
     expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
   });

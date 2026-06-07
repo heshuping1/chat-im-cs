@@ -99,7 +99,93 @@ void main() {
 
         expect(conversation.lastMessage?.mentions, isNotNull);
         expect(conversation.lastMessage?.mentions?.single.isAll, isTrue);
-        expect(local.cachedConversations.single.lastMessage?.mentions, isNotNull);
+        expect(
+          local.cachedConversations.single.lastMessage?.mentions,
+          isNotNull,
+        );
+      },
+    );
+
+    test(
+      'uses cached group conversation type when route extra is lost',
+      () async {
+        final local = _FakeLocalDataSource(
+          cached: [_conversation(type: ConversationType.group)],
+        );
+        final remote = _FakeRemoteDataSource(
+          const [],
+          groupMessages: [
+            Message(
+              messageId: 'video-1',
+              conversationId: 'chat-1',
+              conversationSeq: 1,
+              senderUserId: 'user-2',
+              type: MessageType.video,
+              body: const MessageBody(
+                video: MediaResource(
+                  url: '/media/videos/video-1.mp4',
+                  thumbnailUrl: '/media/videos/video-1.jpg',
+                ),
+              ),
+              sentAt: DateTime.utc(2026, 6, 7),
+            ),
+          ],
+        );
+        final repo = ChatRepositoryImpl(
+          remote: remote,
+          local: local,
+          spaceId: 'space-1',
+        );
+
+        final messages = await repo.getMessages('chat-1', isGroup: false);
+
+        expect(remote.directMessageRequests, isEmpty);
+        expect(remote.groupMessageRequests, ['chat-1']);
+        expect(messages.single.type, MessageType.video);
+        expect(
+          messages.single.body.video?.thumbnailUrl,
+          '/media/videos/video-1.jpg',
+        );
+      },
+    );
+
+    test(
+      'syncs group messages from remote when cached conversation is group',
+      () async {
+        final local = _FakeLocalDataSource(
+          cached: [_conversation(type: ConversationType.group)],
+        );
+        final remote = _FakeRemoteDataSource(
+          const [],
+          groupMessages: [
+            Message(
+              messageId: 'video-2',
+              conversationId: 'chat-1',
+              conversationSeq: 10,
+              senderUserId: 'user-2',
+              type: MessageType.video,
+              body: const MessageBody(
+                video: MediaResource(url: '/media/videos/video-2.mp4'),
+              ),
+              sentAt: DateTime.utc(2026, 6, 7),
+            ),
+          ],
+        );
+        final repo = ChatRepositoryImpl(
+          remote: remote,
+          local: local,
+          spaceId: 'space-1',
+        );
+
+        final messages = await repo.syncMessagesFromRemote(
+          'chat-1',
+          isGroup: false,
+        );
+
+        expect(remote.directMessageRequests, isEmpty);
+        expect(remote.groupMessageRequests, ['chat-1']);
+        expect(messages.single.messageId, 'video-2');
+        expect(local.upsertedMessages.single.messageId, 'video-2');
       },
     );
   });
@@ -125,8 +211,16 @@ Conversation _conversation({
 
 class _FakeRemoteDataSource implements ChatRemoteDataSource {
   final List<Conversation> conversations;
+  final List<Message> directMessages;
+  final List<Message> groupMessages;
+  final directMessageRequests = <String>[];
+  final groupMessageRequests = <String>[];
 
-  _FakeRemoteDataSource(this.conversations);
+  _FakeRemoteDataSource(
+    this.conversations, {
+    this.directMessages = const [],
+    this.groupMessages = const [],
+  });
 
   @override
   Future<ConversationsPage> getConversations({
@@ -137,12 +231,34 @@ class _FakeRemoteDataSource implements ChatRemoteDataSource {
   }
 
   @override
+  Future<List<Message>> getDirectChatMessages(
+    String chatId, {
+    int? beforeSeq,
+    int limit = 50,
+  }) async {
+    directMessageRequests.add(chatId);
+    return directMessages;
+  }
+
+  @override
+  Future<List<Message>> getGroupMessages(
+    String groupId, {
+    int? beforeSeq,
+    int limit = 50,
+  }) async {
+    groupMessageRequests.add(groupId);
+    return groupMessages;
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeLocalDataSource implements ChatLocalDataSource {
   final List<Conversation> cached;
   List<Conversation> cachedConversations = const [];
+  List<Message> cachedMessages = const [];
+  List<Message> upsertedMessages = const [];
 
   _FakeLocalDataSource({required this.cached});
 
@@ -152,6 +268,20 @@ class _FakeLocalDataSource implements ChatLocalDataSource {
   @override
   Future<List<Conversation>?> getCachedConversations(String spaceId) async =>
       cached;
+
+  @override
+  Future<List<Message>?> getCachedMessages(
+    String spaceId,
+    String conversationId,
+  ) async => cachedMessages;
+
+  @override
+  Future<int> getLocalMaxSeq(String spaceId, String conversationId) async =>
+      cachedMessages.isEmpty
+      ? 0
+      : cachedMessages
+            .map((message) => message.conversationSeq)
+            .reduce((a, b) => a > b ? a : b);
 
   @override
   Future<void> cacheConversations(
@@ -167,6 +297,25 @@ class _FakeLocalDataSource implements ChatLocalDataSource {
     List<Conversation> conversations,
   ) async {
     cachedConversations = conversations;
+  }
+
+  @override
+  Future<void> cacheMessages(
+    String spaceId,
+    String conversationId,
+    List<Message> messages,
+  ) async {
+    cachedMessages = messages;
+  }
+
+  @override
+  Future<void> upsertMessages(
+    String spaceId,
+    String conversationId,
+    List<Message> messages,
+  ) async {
+    upsertedMessages = messages;
+    cachedMessages = messages;
   }
 
   @override
