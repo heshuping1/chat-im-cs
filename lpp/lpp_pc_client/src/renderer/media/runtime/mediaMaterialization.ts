@@ -1,10 +1,9 @@
 import type { AuthSession } from "../../data/auth/auth-session";
 import type { MediaResourceDto, MessageItemDto } from "../../data/api-client";
+import { mediaIdentityFromResource } from "../../../shared/local-media-identity";
 import {
-  imageMediaCacheKey,
   isBrowserNativeUrl,
   mediaFileName,
-  mediaStableCacheIdentity,
   normalizeMessageParts,
   resolveMediaUrl,
 } from "../../data/im-message-normalize";
@@ -46,6 +45,7 @@ export type MediaMaterializationCandidate = {
   cacheKey: string;
   fileName: string;
   kind: MaterializedMediaKind;
+  messageId?: string;
   url: string;
 };
 
@@ -77,11 +77,8 @@ export function mediaMaterializationCacheKey(
   media: MediaResourceDto | undefined,
   src: string | undefined,
 ) {
-  if (kind === "image") return imageMediaCacheKey(media, src);
-  const stableKey = mediaStableCacheIdentity(media, src);
-  if (stableKey) return `${kind}:${stableKey}`;
-  if (!src || isBrowserNativeUrl(src)) return undefined;
-  return `${kind}:${src}`;
+  const identity = mediaMaterializationIdentity(media, src);
+  return identity ? `${kind}:${identity}` : undefined;
 }
 
 export function getMaterializedMediaFileUrl(cacheKey: string | undefined) {
@@ -247,6 +244,7 @@ export function materializeMediaMessages({
 }: MediaMaterializationOptions) {
   const candidates = selectMediaMaterializationCandidates(messages, assetBaseUrl, { limit });
 
+  const tasks: Promise<void>[] = [];
   candidates.forEach((candidate) => {
     const failedAt = failedMediaMaterializations.get(candidate.cacheKey);
     if (failedAt && Date.now() - failedAt < mediaMaterializationRetryMs) return;
@@ -267,7 +265,9 @@ export function materializeMediaMessages({
       });
 
     pendingMediaMaterializations.set(candidate.cacheKey, task);
+    tasks.push(task);
   });
+  return Promise.allSettled(tasks).then(() => undefined);
 }
 
 export function materializeImageMessages(options: MediaMaterializationOptions) {
@@ -320,12 +320,13 @@ function mediaMaterializationCandidate(
   if (!url || isBrowserNativeUrl(url) || !/^https?:\/\//i.test(url)) return null;
   const cacheKey = mediaMaterializationCacheKey(kind, media, url);
   if (!cacheKey) return null;
-  const cacheIdentity = mediaStableCacheIdentity(media, url);
+  const cacheIdentity = mediaMaterializationIdentity(media, url);
   return {
     ...(cacheIdentity ? { cacheIdentity } : {}),
     cacheKey,
     fileName: mediaFileName(media) || defaultMaterializedMediaFileName(kind),
     kind,
+    messageId: message.messageId,
     url,
   };
 }
@@ -383,6 +384,33 @@ async function materializeMediaCandidate({
   conversationId?: string;
 }) {
   if (window.desktopApi?.cacheMediaFile) {
+    const mediaIdentity = candidate.cacheIdentity ?? candidate.cacheKey;
+    const localVariant = await window.desktopApi.localDataGetMediaVariant?.({
+      mediaIdentity,
+      variantKind: "original",
+    });
+    if (localVariant?.status === "cached" && localVariant.fileUrl) {
+      registerMaterializedMediaFileUrl(candidate.cacheKey, localVariant.fileUrl);
+      void window.desktopApi.localDataUpsertMedia?.({
+        asset: {
+          fileName: candidate.fileName,
+          identitySource: "materialization",
+          kind: candidate.kind,
+          mediaIdentity,
+          serverUrl: candidate.url,
+        },
+        messageRefs: candidate.messageId
+          ? [
+              {
+                mediaIdentity,
+                messageId: candidate.messageId,
+                refKind: candidate.kind,
+              },
+            ]
+          : undefined,
+      });
+      return;
+    }
     const result = await window.desktopApi.cacheMediaFile({
       accountId,
       authToken,
@@ -393,6 +421,33 @@ async function materializeMediaCandidate({
       url: candidate.url,
     });
     registerMaterializedMediaFileUrl(candidate.cacheKey, result.fileUrl);
+    void window.desktopApi.localDataUpsertMedia?.({
+      asset: {
+        fileName: candidate.fileName,
+        identitySource: "materialization",
+        kind: candidate.kind,
+        mediaIdentity,
+        serverUrl: candidate.url,
+      },
+      messageRefs: candidate.messageId
+        ? [
+            {
+              mediaIdentity,
+              messageId: candidate.messageId,
+              refKind: candidate.kind,
+            },
+          ]
+        : undefined,
+      variants: [
+        {
+          localUrl: result.fileUrl,
+          mediaIdentity,
+          serverUrl: candidate.url,
+          status: "cached",
+          variantKind: "original",
+        },
+      ],
+    });
     return;
   }
 
@@ -409,6 +464,10 @@ export function registerMaterializedMediaFileUrl(cacheKey: string, fileUrl: stri
   if (!fileUrl) return;
   failedMediaMaterializations.delete(cacheKey);
   materializedMediaFileUrls.set(cacheKey, fileUrl);
+  if (window.desktopApi?.localDataUpsertMedia) {
+    mediaMaterializationSubscribers.get(cacheKey)?.forEach((callback) => callback(fileUrl));
+    return;
+  }
   const persisted = readPersistedMediaFileUrls();
   persisted.set(cacheKey, fileUrl);
   writePersistedMediaFileUrls(persisted);
@@ -430,6 +489,7 @@ export function registerSentMediaMaterialization(
   kind: string,
   media: MediaResourceDto,
   fileUrl: string | undefined,
+  messageId?: string,
 ) {
   if (!fileUrl) return;
   const materializedKind = materializationKindFromValue(kind);
@@ -440,6 +500,34 @@ export function registerSentMediaMaterialization(
     materializationSourceUrl(materializedKind, media),
   );
   if (cacheKey) registerMaterializedMediaFileUrl(cacheKey, fileUrl);
+  const identity = mediaMaterializationIdentity(media, materializationSourceUrl(materializedKind, media));
+  if (identity) {
+    void window.desktopApi?.localDataUpsertMedia?.({
+      asset: {
+        fileName: mediaFileName(media) || defaultMaterializedMediaFileName(materializedKind),
+        identitySource: "local-send",
+        kind: materializedKind,
+        mediaIdentity: identity,
+      },
+      messageRefs: messageId
+        ? [
+            {
+              mediaIdentity: identity,
+              messageId,
+              refKind: materializedKind,
+            },
+          ]
+        : undefined,
+      variants: [
+        {
+          localUrl: fileUrl,
+          mediaIdentity: identity,
+          status: "cached",
+          variantKind: "original",
+        },
+      ],
+    });
+  }
 }
 
 export function registerPrefetchedImageFileUrl(cacheKey: string, fileUrl: string) {
@@ -500,4 +588,28 @@ function defaultMaterializedMediaFileName(kind: MaterializedMediaKind) {
   if (kind === "image") return "image.png";
   if (kind === "video") return "video.mp4";
   return "file";
+}
+
+function mediaMaterializationIdentity(
+  media: MediaResourceDto | undefined,
+  src: string | undefined,
+) {
+  if (!media && (!src || isBrowserNativeUrl(src))) return undefined;
+  const record = media as Record<string, unknown> | undefined;
+  return mediaIdentityFromResource({
+    downloadUrl: stringValue(record?.downloadUrl) ?? stringValue(record?.download_url),
+    fileId: stringValue(record?.fileId) ?? stringValue(record?.file_id),
+    fileName: mediaFileName(media),
+    mediaId: stringValue(record?.mediaId) ?? stringValue(record?.media_id),
+    objectKey: stringValue(record?.objectKey) ?? stringValue(record?.object_key),
+    relativePath: stringValue(record?.relativePath) ?? stringValue(record?.relative_path),
+    resourceId: stringValue(record?.resourceId) ?? stringValue(record?.resource_id),
+    signedUrl: stringValue(record?.signedUrl) ?? stringValue(record?.signed_url),
+    storageKey: stringValue(record?.storageKey) ?? stringValue(record?.storage_key),
+    url: src ?? stringValue(record?.url) ?? stringValue(record?.fileUrl),
+  }).value;
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : undefined;
 }

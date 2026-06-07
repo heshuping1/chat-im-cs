@@ -10,6 +10,7 @@
 
 - [PC端核心架构技术方案.md](./PC端核心架构技术方案.md)
 - [PC端AI文件路由表.md](./PC端AI文件路由表.md)
+- [PC端P28微信级本地数据任务清单.md](./PC端P28微信级本地数据任务清单.md)
 - [PC端重构任务矩阵-历史阶段-P0-P19.md](./archive/PC端重构任务矩阵-历史阶段-P0-P19.md)
 - [PC端重构任务矩阵-近期阶段-P20-P26明细.md](./archive/PC端重构任务矩阵-近期阶段-P20-P26明细.md)
 
@@ -114,6 +115,7 @@
 | P25 | 聊天查找体验治理 | 已完成 | [近期阶段 P20-P26 明细](./archive/PC端重构任务矩阵-近期阶段-P20-P26明细.md) |
 | P26 | 客户信息、联系人入口与设置稳态治理 | 已完成 | [近期阶段 P20-P26 明细](./archive/PC端重构任务矩阵-近期阶段-P20-P26明细.md) |
 | P27 | IM 本地消息库与核心链路纠偏 | 已完成 | [2026-06-07 P27 执行计划](../superpowers/plans/2026-06-07-pc-im-local-message-store-recovery.md) |
+| P28 | 微信级本地数据平面 | 进行中 | [P28 微信级本地数据任务清单](./PC端P28微信级本地数据任务清单.md) |
 
 ---
 
@@ -127,9 +129,10 @@
 | P27-IM-003 | Local-first Chat Entry | 进入已有本地消息的聊天窗口时先展示本地消息，再后台同步服务端；不得用整块 loading 遮挡本地已有消息。 | P0 | L3 | 已完成 |
 | P27-IM-004 | Message Write-through | 服务端快照、Gateway push、发送确认、撤回/删除/read metadata 统一写入本地消息仓库和 message core 归约路径。 | P0 | L3 | 已完成 |
 | P27-IM-005 | Gap Sync Contract | 明确当前 fallback refetch 与真实 afterSeq/cursor gap sync 的边界，补诊断和服务端合同缺口记录。 | P0 | L3 | 已完成 |
-| P27-IM-006 | History Search Source | 聊天历史分页和搜索不能只依赖当前 50 条 serverMessages；先接本地持久化范围，服务端全文搜索缺口显式呈现。 | P1 | L3 | 已完成 |
+| P27-IM-006 | History Search Source | 聊天历史分页和搜索不能只依赖当前 50 条 serverMessages；先接本地持久化范围，不新增跨设备全量历史搜索。 | P1 | L3 | 已完成 |
 | P27-CS-001 | CS Unread Ledger Boundary | 客服未读长期事实从 CS ledger/server/Gateway 明确来源归约，IM list compat 只能作为迁移期显示 fallback。 | P1 | L3 | 已完成 |
 | P27-ARCH-001 | P27 Boundary and Validation | 补架构边界测试、验证记录和任务矩阵闭环，防止再次把 React Query/hot cache 当消息本地库。 | P1 | L2 | 已完成 |
+| P28-LD-000 | WeChat-level Local Data Plane | 基于当前 API 建立 SQLite + 文件系统本地数据平面，统一消息、媒体、发送箱、搜索、客服本地模型、清理和诊断；详细任务见 P28 清单。 | P0 | L4 | 进行中 |
 
 ---
 
@@ -148,6 +151,7 @@
 | RISK-009 | PC 端缺少真正本地消息库 | 新进入聊天窗口无法本地首屏可见，弱网/失败时成功历史消息被 loading 或远端失败影响。 | P27 已新增 IndexedDB 本地消息仓库，成功消息和服务端/Gateway 增量进入统一 read model；React Query/hot cache 不再作为本地库。 | 已缓解 |
 | RISK-010 | IM 消息 query key / scope key 分裂 | 发送写入、聊天读取、Gateway invalidation 可能不在同一 workspace owner，导致乐观消息、刷新、跨账号隔离不稳定。 | P27-IM-001 已统一活跃消息读取、发送/cache mutation 写入和有 session 的 Gateway invalidation scope；P27-ARCH-001 继续补长期边界测试。 | 已缓解 |
 | RISK-011 | Gap sync 只有 fallback refetch | 断线重连、离线恢复、seq 跳号无法精确补洞，可能丢增量或重复提示。 | P27-IM-005 已显式区分 fallback 与真实 afterSeq/cursor 合同；服务端合同未确认前不得宣称精确补洞。 | 已登记服务端合同缺口 |
+| RISK-012 | 本地数据 owner 仍分裂 | P27 消息在 IndexedDB，媒体索引在 localStorage，文件本体在 Electron main，长期会导致首屏、提醒、搜索、清理不一致。 | P28-LD-000 已登记，按 P28 任务清单迁移到 SQLite + LocalDataProjection + LocalMediaLibrary。 | 待开始 |
 
 ---
 

@@ -17,8 +17,10 @@ import 'package:lpp_mobile/core/widgets/identity_badge.dart';
 import 'package:lpp_mobile/core/widgets/person_avatar_with_badge.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/audio_player_service.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/image_viewer_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/message_media_preview_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/message_upload_progress_model.dart';
@@ -29,7 +31,7 @@ import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
 class _C {
-  static const selfBgLight = Color(0xFFDCF8C6); // 微信风格浅绿（亮色）
+  static const selfBgLight = Color(0xFF95EC69); // 微信风格浅绿（亮色）
   static const selfBgDark = Color(0xFF3D7A4F); // 微信暗色深绿
   static const otherBgLight = Color(0xFFFFFFFF);
   static const otherBgDark = Color(0xFF2C2C2C); // 微信暗色对方气泡
@@ -314,11 +316,22 @@ class _StatusIndicator extends StatelessWidget {
       case MessageStatus.sending:
         if (!showSendingProgress) return const SizedBox.shrink();
         return SizedBox(
-          width: 14,
-          height: 14,
-          child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+          key: const ValueKey('message-text-send-progress'),
+          width: 26,
+          height: 26,
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.45),
+              ),
+            ),
+          ),
         );
       case MessageStatus.sent:
       case MessageStatus.delivered:
@@ -349,6 +362,7 @@ class _StatusIndicator extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 bool _suppressesExternalSendProgress(Message message) {
+  if (message.type == MessageType.image) return false;
   final uploadState = message.localUploadState;
   if (uploadState != null && uploadState.isActive) return true;
   final url = switch (message.type) {
@@ -661,14 +675,20 @@ class _ImageBubble extends ConsumerWidget {
     final media = message.body.image;
     final actionUrl = media?.url;
     final size = mediaBubbleSize(media, fallbackAspectRatio: 1);
-    final uploadPresentation =
-        imageMessageUploadPresentation(message.localUploadState);
 
     return GestureDetector(
       onTap: actionUrl != null && !isLocalVisualMediaUrl(actionUrl)
           ? () => Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => ImageViewerPage(imageUrls: [actionUrl]),
+                  builder: (_) => ImageViewerPage(
+                    imageUrls: [actionUrl],
+                    items: [
+                      ImageViewerItem.fromMessage(
+                        message: message,
+                        media: media!,
+                      ),
+                    ],
+                  ),
                 ),
               )
           : null,
@@ -682,11 +702,6 @@ class _ImageBubble extends ConsumerWidget {
               size: size,
               placeholderBuilder: _placeholder,
             ),
-            if (uploadPresentation.active)
-              _MediaUploadOverlay(
-                key: const ValueKey('message-image-upload-progress'),
-                uploadPresentation: uploadPresentation,
-              ),
           ],
         ),
       ),
@@ -865,7 +880,20 @@ class _VoiceBubbleState extends ConsumerState<_VoiceBubble>
     } else {
       try {
         final token = ref.read(currentSpaceProvider)?.accessToken;
-        await svc.play(widget.message.messageId, url, token: token);
+        final spaceId = ref.read(currentSpaceProvider)?.spaceId;
+        final media = widget.message.body.voice;
+        final source = spaceId == null || media == null
+            ? url
+            : await ref.read(mediaOpenControllerProvider(spaceId)).localPathFor(
+                  MediaOpenRequest.fromResource(
+                    message: widget.message,
+                    mediaKind: MediaKind.voice,
+                    variant: MediaVariant.voiceSource,
+                    resource: media,
+                    fallbackName: 'voice.m4a',
+                  ),
+                );
+        await svc.play(widget.message.messageId, source, token: token);
         _ctrl.repeat(reverse: true);
         setState(() => _listened = true);
       } catch (error) {
@@ -893,101 +921,88 @@ class _VoiceBubbleState extends ConsumerState<_VoiceBubble>
     final hasVoiceText = widget.message.translation?.isNotEmpty == true;
     final showVoiceText = _showText && hasVoiceText;
 
-    // 气泡宽度随时长变化（最小 80，最大 200）
-    final bubbleWidth = (80.0 + duration * 6.0).clamp(80.0, 200.0);
+    // 气泡宽度随时长变化（最小 96，最大 200）
+    final bubbleWidth = (96.0 + duration * 6.0).clamp(96.0, 200.0);
 
     return Column(
       crossAxisAlignment:
           widget.isSelf ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onTap: _togglePlay,
-          child: Container(
-            width: bubbleWidth,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: widget.bg,
-              borderRadius: widget.br,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: widget.isSelf
-                  ? [
-                      // 自己发的：时长 + 波形 + 播放图标
-                      Text(
-                        '$duration"',
-                        style: TextStyle(
-                            fontSize: 15,
-                            color: Theme.of(context).colorScheme.onSurface),
-                      ),
-                      const Spacer(),
-                      _buildAnimatedSpeaker(isPlaying),
-                    ]
-                  : [
-                      // 对方发的：播放图标 + 波形 + 时长 + 未听红点
-                      _buildAnimatedSpeaker(isPlaying),
-                      Spacer(),
-                      Text(
-                        '$duration"',
-                        style: TextStyle(
-                            fontSize: 15,
-                            color: Theme.of(context).colorScheme.onSurface),
-                      ),
-                      if (!_listened) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: _togglePlay,
+              child: Container(
+                width: bubbleWidth,
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: widget.bg,
+                  borderRadius: widget.br,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: widget.isSelf
+                      ? [
+                          Text(
+                            '$duration"',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Color(0xFF111111),
+                              height: 1,
+                            ),
                           ),
-                        ),
-                      ],
-                    ],
-            ),
-          ),
-        ),
-        // 转文字按钮（微信风格：灰色胶囊）
-        if (!widget.isSelf) ...[
-          const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () {
-              if (showVoiceText) {
-                setState(() => _showText = false);
-              } else if (hasVoiceText) {
-                setState(() => _showText = true);
-              } else {
-                widget.onConvertVoiceToText?.call();
-                setState(() => _showText = true);
-              }
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+                          const Spacer(),
+                          _buildAnimatedSpeaker(isPlaying),
+                        ]
+                      : [
+                          _buildAnimatedSpeaker(isPlaying),
+                          const Spacer(),
+                          Text(
+                            '$duration"',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Color(0xFF111111),
+                              height: 1,
+                            ),
+                          ),
+                        ],
+                ),
               ),
-              child: widget.message.isTranslating
-                  ? SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 1.5),
-                    )
-                  : Text(
-                      showVoiceText
-                          ? AppLocalizations.of(context).chatVoiceHideText
-                          : AppLocalizations.of(context).chatVoiceShowText,
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.5)),
-                    ),
             ),
-          ),
-        ],
+            if (!widget.isSelf && !_listened) ...[
+              const SizedBox(width: 10),
+              Container(
+                key: const ValueKey('message-voice-unread-dot'),
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFF4D4F),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+            if (!widget.isSelf) ...[
+              const SizedBox(width: 14),
+              _VoiceConvertChip(
+                isTranslating: widget.message.isTranslating,
+                showVoiceText: showVoiceText,
+                onTap: () {
+                  if (showVoiceText) {
+                    setState(() => _showText = false);
+                  } else if (hasVoiceText) {
+                    setState(() => _showText = true);
+                  } else {
+                    widget.onConvertVoiceToText?.call();
+                    setState(() => _showText = true);
+                  }
+                },
+              ),
+            ],
+          ],
+        ),
         // 转文字内容
         if (showVoiceText)
           Container(
@@ -1028,6 +1043,52 @@ class _VoiceBubbleState extends ConsumerState<_VoiceBubble>
     );
   }
 } // end _VoiceBubbleState
+
+class _VoiceConvertChip extends StatelessWidget {
+  final bool isTranslating;
+  final bool showVoiceText;
+  final VoidCallback onTap;
+
+  const _VoiceConvertChip({
+    required this.isTranslating,
+    required this.showVoiceText,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      key: const ValueKey('message-voice-convert-chip'),
+      onTap: onTap,
+      child: Container(
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6E6E6),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Center(
+          child: isTranslating
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                )
+              : Text(
+                  showVoiceText
+                      ? AppLocalizations.of(context).chatVoiceHideText
+                      : AppLocalizations.of(context).chatVoiceShowText,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF8A8A8A),
+                    height: 1,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Speaker Painter — 微信风格声波图标（三条弧线，播放时动画）
@@ -1118,6 +1179,9 @@ class _VideoBubble extends ConsumerWidget {
           : () => _openMediaResource(
                 context,
                 ref,
+                message,
+                MediaKind.video,
+                MediaVariant.videoSource,
                 message.body.video,
                 fallbackName: 'video.mp4',
               ),
@@ -1127,6 +1191,7 @@ class _VideoBubble extends ConsumerWidget {
           alignment: Alignment.center,
           children: [
             _VideoPosterFrame(
+              message: message,
               media: message.body.video,
               posterUrl: posterUrl,
               isLocalPoster: isLocalPoster,
@@ -1188,6 +1253,7 @@ class _VideoBubble extends ConsumerWidget {
 }
 
 class _VideoPosterFrame extends ConsumerStatefulWidget {
+  final Message message;
   final MediaResource? media;
   final String? posterUrl;
   final bool isLocalPoster;
@@ -1196,6 +1262,7 @@ class _VideoPosterFrame extends ConsumerStatefulWidget {
   final Widget Function(BuildContext, double, double) placeholderBuilder;
 
   const _VideoPosterFrame({
+    required this.message,
     required this.media,
     required this.posterUrl,
     required this.isLocalPoster,
@@ -1228,7 +1295,8 @@ class _VideoPosterFrameState extends ConsumerState<_VideoPosterFrame> {
   void didUpdateWidget(_VideoPosterFrame oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.posterUrl != widget.posterUrl ||
-        oldWidget.media?.url != widget.media?.url) {
+        oldWidget.media?.url != widget.media?.url ||
+        oldWidget.message.messageId != widget.message.messageId) {
       _generatedPosterPath = null;
       _checkedLocalPosterUrl = null;
       _skipLocalPoster = false;
@@ -1289,7 +1357,7 @@ class _VideoPosterFrameState extends ConsumerState<_VideoPosterFrame> {
       }
       final localVideoPath = _isLocalMediaPath(videoUrl)
           ? localPathFromUriOrPath(videoUrl)
-          : await _downloadVideoForPoster(videoUrl);
+          : await _localVideoPathForPoster();
       final posterPath = await generateLocalVideoPoster(
         localVideoPath,
         cacheKey: videoUrl,
@@ -1304,22 +1372,20 @@ class _VideoPosterFrameState extends ConsumerState<_VideoPosterFrame> {
     }
   }
 
-  Future<String> _downloadVideoForPoster(String videoUrl) async {
-    final resolvedUrl = _resolveMediaUrl(videoUrl);
-    final response = await ref.read(dioProvider).get<List<int>>(
-          resolvedUrl,
-          options: Options(responseType: ResponseType.bytes),
+  Future<String> _localVideoPathForPoster() async {
+    final media = widget.media;
+    if (media == null) throw StateError('Video media is empty');
+    final spaceId = ref.read(currentSpaceProvider)?.spaceId;
+    if (spaceId == null) throw StateError('Current space is empty');
+    return ref.read(mediaOpenControllerProvider(spaceId)).localPathFor(
+          MediaOpenRequest.fromResource(
+            message: widget.message,
+            mediaKind: MediaKind.video,
+            variant: MediaVariant.videoSource,
+            resource: media,
+            fallbackName: media.fileName ?? 'video.mp4',
+          ),
         );
-    final bytes = response.data;
-    if (bytes == null || bytes.isEmpty) {
-      throw StateError('Video response is empty');
-    }
-    return cacheBytesToLocalFile(
-      bytes: bytes,
-      directoryName: 'lpp_video_posters_source',
-      fileName:
-          '${resolvedUrl.hashCode}_${_safeMediaFileName(widget.media!, 'video.mp4')}',
-    );
   }
 
   @override
@@ -1438,6 +1504,9 @@ class _FileBubble extends ConsumerWidget {
             : () => _openMediaResource(
                   context,
                   ref,
+                  message,
+                  MediaKind.file,
+                  MediaVariant.attachment,
                   file,
                   fallbackName: name,
                 ),
@@ -1590,6 +1659,9 @@ class _UploadRingPainter extends CustomPainter {
 Future<void> _openMediaResource(
   BuildContext context,
   WidgetRef ref,
+  Message message,
+  MediaKind mediaKind,
+  MediaVariant variant,
   MediaResource? resource, {
   required String fallbackName,
 }) async {
@@ -1599,7 +1671,18 @@ Future<void> _openMediaResource(
   if (rawUrl.isEmpty) return;
 
   try {
-    final path = await _mediaOpenPath(ref, media, fallbackName);
+    final spaceId = ref.read(currentSpaceProvider)?.spaceId;
+    final path = spaceId == null
+        ? await _mediaOpenPath(ref, media, fallbackName)
+        : await ref.read(mediaOpenControllerProvider(spaceId)).localPathFor(
+              MediaOpenRequest.fromResource(
+                message: message,
+                mediaKind: mediaKind,
+                variant: variant,
+                resource: media,
+                fallbackName: fallbackName,
+              ),
+            );
     final result = await OpenFilex.open(path, type: media.mimeType);
     if (result.type != ResultType.done && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

@@ -104,6 +104,7 @@ export function createChatSendRuntime({
       };
     },
     deleteOutboxRecord(localMessageId) {
+      void deleteLocalDataOutbox(scopeKey, localMessageId).catch(() => undefined);
       return storage.deleteRecord(scopeKey, localMessageId);
     },
     log(input) {
@@ -114,18 +115,78 @@ export function createChatSendRuntime({
       });
     },
     patchOutboxRecord(localMessageId, patch) {
+      void patchLocalDataOutbox(storage, scopeKey, localMessageId, patch).catch(() => undefined);
       return storage.patchRecord(scopeKey, localMessageId, patch);
     },
     targetKey(targetType, targetId) {
       return sendOutboxTargetKey(channel, targetType, targetId);
     },
     upsertOutboxRecord(input) {
-      return storage.upsertRecord({
+      const record = {
         ...input,
         channel,
         scopeKey,
         updatedAt: input.updatedAt ?? input.createdAt,
-      });
+      };
+      void upsertLocalDataOutbox(record).catch(() => undefined);
+      return storage.upsertRecord(record);
     },
   };
+}
+
+async function patchLocalDataOutbox(
+  storage: SendOutboxStorage,
+  scopeKey: string,
+  localMessageId: string,
+  patch: Partial<SendOutboxRecord>,
+) {
+  if (!desktopLocalDataOutboxAvailable()) return;
+  const existing = (await storage.listRecords({ scopeKey }))
+    .find((record) => record.localMessageId === localMessageId);
+  if (!existing) return;
+  await upsertLocalDataOutbox({
+    ...existing,
+    ...patch,
+    updatedAt: patch.updatedAt ?? Date.now(),
+  });
+}
+
+async function upsertLocalDataOutbox(record: SendOutboxRecord) {
+  if (!desktopLocalDataOutboxAvailable()) return;
+  const desktopApi = window.desktopApi;
+  if (!desktopApi) return;
+  await desktopApi.localDataUpsertOutbox({
+    record: {
+      bodyJson: record.body,
+      clientMsgId: record.clientMsgId,
+      conversationId: record.targetId,
+      conversationType: localDataConversationTypeForOutbox(record.channel, record.targetType),
+      localMessageId: record.localMessageId,
+      messageType: record.messageType,
+      scopeKey: record.scopeKey,
+      status: record.status,
+      updatedAt: record.updatedAt,
+    },
+  });
+}
+
+async function deleteLocalDataOutbox(scopeKey: string, localMessageId: string) {
+  if (!desktopLocalDataOutboxAvailable()) return;
+  const desktopApi = window.desktopApi;
+  if (!desktopApi) return;
+  await desktopApi.localDataDeleteOutbox({ localMessageId, scopeKey });
+}
+
+function desktopLocalDataOutboxAvailable() {
+  return typeof window !== "undefined" && Boolean(
+    window.desktopApi?.localDataDeleteOutbox && window.desktopApi.localDataUpsertOutbox,
+  );
+}
+
+function localDataConversationTypeForOutbox(
+  channel: ChatSendChannel,
+  targetType: string,
+) {
+  if (channel === "customer_service") return "customer_service";
+  return targetType === "group" ? "group" : "direct";
 }

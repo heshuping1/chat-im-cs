@@ -2,6 +2,22 @@ import 'package:path/path.dart' as p;
 
 enum ChatPickedMediaKind { image, video }
 
+const chatFileAttachmentAllowedExtensions = <String>[
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
+  'csv',
+  'txt',
+  'zip',
+  'rar',
+  '7z',
+  'mp3',
+];
+
 class ChatPickedMedia {
   final String path;
   final ChatPickedMediaKind kind;
@@ -56,6 +72,25 @@ class ChatPickedMedia {
     String? mimeType,
     int? sizeBytes,
   }) {
+    return tryFromPickedFile(
+          path: path,
+          name: name,
+          mimeType: mimeType,
+          sizeBytes: sizeBytes,
+        ) ??
+        ChatPickedMedia.image(
+          path: path,
+          fileName: name,
+          sizeBytes: sizeBytes,
+        );
+  }
+
+  static ChatPickedMedia? tryFromPickedFile({
+    required String path,
+    String? name,
+    String? mimeType,
+    int? sizeBytes,
+  }) {
     final normalizedMime = mimeType?.trim().toLowerCase();
     if (normalizedMime != null && normalizedMime.startsWith('video/')) {
       return ChatPickedMedia.video(
@@ -74,6 +109,13 @@ class ChatPickedMedia {
       );
     }
 
+    if (_isImagePath(path)) {
+      return ChatPickedMedia.image(
+        path: path,
+        fileName: name,
+        sizeBytes: sizeBytes,
+      );
+    }
     if (_isVideoPath(path)) {
       return ChatPickedMedia.video(
         path: path,
@@ -81,11 +123,7 @@ class ChatPickedMedia {
         sizeBytes: sizeBytes,
       );
     }
-    return ChatPickedMedia.image(
-      path: path,
-      fileName: name,
-      sizeBytes: sizeBytes,
-    );
+    return null;
   }
 }
 
@@ -108,6 +146,65 @@ bool _isVideoPath(String path) {
     default:
       return false;
   }
+}
+
+bool _isImagePath(String path) {
+  switch (p.extension(path).toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+    case '.png':
+    case '.webp':
+    case '.gif':
+    case '.heic':
+    case '.heif':
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool isChatFileAttachmentExtension(String extension) {
+  final normalized = _normalizeExtension(extension);
+  if (normalized.isEmpty) return false;
+  return chatFileAttachmentAllowedExtensions.contains(normalized);
+}
+
+String chatFileAttachmentMimeType(String extension) {
+  switch (_normalizeExtension(extension)) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls':
+      return 'application/vnd.ms-excel';
+    case 'xlsx':
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'ppt':
+      return 'application/vnd.ms-powerpoint';
+    case 'pptx':
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    case 'csv':
+      return 'text/csv';
+    case 'txt':
+      return 'text/plain';
+    case 'zip':
+      return 'application/zip';
+    case 'rar':
+      return 'application/vnd.rar';
+    case '7z':
+      return 'application/x-7z-compressed';
+    case 'mp3':
+      return 'audio/mpeg';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+String _normalizeExtension(String extension) {
+  final value = extension.trim().toLowerCase();
+  return value.startsWith('.') ? value.substring(1) : value;
 }
 
 String _imageMimeTypeFromPath(String path) {

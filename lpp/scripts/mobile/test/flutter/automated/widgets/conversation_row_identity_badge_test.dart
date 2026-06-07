@@ -82,9 +82,7 @@ void main() {
           conversation: _groupConversation(
             unreadCount: 2,
             text: '@我 看一下',
-            mentions: const [
-              Mention.user(userId: 'me', offset: 0, length: 2),
-            ],
+            mentions: const [Mention.user(userId: 'me', offset: 0, length: 2)],
           ),
           isPersonal: false,
           isEmployee: true,
@@ -112,9 +110,7 @@ void main() {
           conversation: _groupConversation(
             unreadCount: 2,
             text: '@所有人 看一下',
-            mentions: const [
-              Mention.all(offset: 0, length: 4),
-            ],
+            mentions: const [Mention.all(offset: 0, length: 4)],
             isMuted: true,
           ),
           isPersonal: false,
@@ -143,9 +139,7 @@ void main() {
           conversation: _groupConversation(
             unreadCount: 0,
             text: '@所有人 看一下',
-            mentions: const [
-              Mention.all(offset: 0, length: 4),
-            ],
+            mentions: const [Mention.all(offset: 0, length: 4)],
           ),
           isPersonal: false,
           isEmployee: true,
@@ -156,6 +150,73 @@ void main() {
 
     expect(find.textContaining('[@'), findsNothing);
   });
+
+  testWidgets('conversation unread badge sits on the avatar corner', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        space: const SpaceContext(
+          spaceId: 'tenant-1',
+          accessToken: 'tenant-access',
+          refreshToken: 'tenant-refresh',
+          userId: 'me',
+          type: SpaceType.employee,
+        ),
+        child: ConversationRow(
+          conversation: _groupConversation(
+            unreadCount: 4,
+            text: '刷了也没破涕为笑',
+            mentions: const [],
+          ),
+          isPersonal: false,
+          isEmployee: true,
+          onTap: () {},
+        ),
+      ),
+    );
+
+    final badgeFinder = find.byKey(const ValueKey('conversation-unread-badge'));
+
+    expect(badgeFinder, findsOneWidget);
+    expect(find.text('4'), findsOneWidget);
+
+    final badgeRect = tester.getRect(badgeFinder);
+    expect(badgeRect.width, inInclusiveRange(20, 28));
+    expect(badgeRect.height, inInclusiveRange(20, 24));
+  });
+
+  testWidgets('conversation unread badge keeps 99 plus compact', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        space: const SpaceContext(
+          spaceId: 'tenant-1',
+          accessToken: 'tenant-access',
+          refreshToken: 'tenant-refresh',
+          userId: 'me',
+          type: SpaceType.employee,
+        ),
+        child: ConversationRow(
+          conversation: _groupConversation(
+            unreadCount: 120,
+            text: '新消息',
+            mentions: const [],
+          ),
+          isPersonal: false,
+          isEmployee: true,
+          onTap: () {},
+        ),
+      ),
+    );
+
+    final badgeFinder = find.byKey(const ValueKey('conversation-unread-badge'));
+
+    expect(badgeFinder, findsOneWidget);
+    expect(find.text('99+'), findsOneWidget);
+    expect(tester.getRect(badgeFinder).width, lessThanOrEqualTo(34));
+  });
 }
 
 Widget _wrap({required SpaceContext space, required Widget child}) {
@@ -163,9 +224,9 @@ Widget _wrap({required SpaceContext space, required Widget child}) {
     overrides: [
       currentSpaceProvider.overrideWith(() => _FakeSpaceManager(space)),
       dioProvider.overrideWithValue(_fakeDio()),
-      groupAvatarMembersProvider('group-1').overrideWith(
-        (ref) async => const <GroupAvatarMember>[],
-      ),
+      groupAvatarMembersProvider(
+        'group-1',
+      ).overrideWith((ref) async => const <GroupAvatarMember>[]),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,

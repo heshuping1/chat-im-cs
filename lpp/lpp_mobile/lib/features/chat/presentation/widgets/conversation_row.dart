@@ -19,7 +19,7 @@ const _rowSurfaceLight = Color(0xFFFFFFFF);
 const _rowBorderLight = Color(0xFFF1F1F1);
 const _rowTitleLight = Color(0xFF191919);
 const _rowSubtitleLight = Color(0xFFA0A0A0);
-const _avatarSize = 42.0;
+const _avatarSize = 40.0;
 
 final _conversationUnreadMentionProvider = FutureProvider.family<
     UnreadMentionReminder?,
@@ -424,9 +424,11 @@ class _UnreadBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isOverflowCount = count > 99;
     return Container(
-      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      key: const ValueKey('conversation-unread-badge'),
+      width: isOverflowCount ? 32 : 20,
+      height: 20,
       decoration: BoxDecoration(
         color: const Color(0xFFF04438),
         borderRadius: BorderRadius.circular(999),
@@ -434,10 +436,10 @@ class _UnreadBadge extends StatelessWidget {
       ),
       child: Center(
         child: Text(
-          count > 99 ? '99+' : '$count',
+          isOverflowCount ? '99+' : '$count',
           style: TextStyle(
             color: Theme.of(context).colorScheme.surface,
-            fontSize: 11,
+            fontSize: isOverflowCount ? 10 : 11,
             fontWeight: FontWeight.w800,
             height: 1,
           ),

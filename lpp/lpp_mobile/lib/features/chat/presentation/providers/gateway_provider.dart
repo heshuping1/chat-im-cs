@@ -23,6 +23,7 @@ import 'package:lpp_mobile/features/chat/data/repositories/chat_repository_impl.
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/media_prefetch_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/group_detail_provider.dart';
@@ -197,6 +198,11 @@ void _handleEvent(
         unawaited(Future<void>.microtask(() async {
           final local = ChatLocalDataSourceImpl();
           await local.upsertMessage(spaceId, conversationId, message);
+          unawaited(
+            ref
+                .read(mediaPrefetchControllerProvider(spaceId))
+                .prefetchMessage(message),
+          );
           if (isCustomerServiceConversation) {
             await local.deleteConversation(spaceId, conversationId);
           } else {

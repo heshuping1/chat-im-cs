@@ -33,6 +33,24 @@ import type {
 import { desktopIpcChannelByMethod } from '../shared/desktop-api.js';
 import { validateDesktopIpcCall } from '../shared/desktop-api-validation.js';
 import {
+  normalizeLocalDataMessage,
+  type LocalDataClearScopePayload,
+  type LocalDataCleanupPayload,
+  type LocalDataDeleteMessagePayload,
+  type LocalDataDeleteOutboxPayload,
+  type LocalDataGetMediaVariantPayload,
+  type LocalDataListCustomerServiceThreadsPayload,
+  type LocalDataListMessagesPayload,
+  type LocalDataListOutboxPayload,
+  type LocalDataRepairPayload,
+  type LocalDataSearchMessagesPayload,
+  type LocalDataStorageStatsPayload,
+  type LocalDataUpsertCustomerServiceThreadPayload,
+  type LocalDataUpsertMediaPayload,
+  type LocalDataUpsertMessagesPayload,
+  type LocalDataUpsertOutboxPayload,
+} from '../shared/local-data-contract.js';
+import {
   clearSecureAuthSession,
   readSecureAuthSession,
   saveSecureAuthSession,
@@ -69,6 +87,8 @@ import {
 } from './app-instance-profile.js';
 import { readOrCreateAppInstanceIdentity } from './app-instance-identity.js';
 import { registerUpdateManager } from './update-manager.js';
+import { createLocalDataService } from './local-data/local-data-service.js';
+import { SqliteLocalDataDriver } from './local-data/local-data-sqlite-driver.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -93,6 +113,28 @@ app.setAppLogsPath(logsDir);
 const diagnosticsDir = join(app.getPath('userData'), 'diagnostics');
 configureDefaultMainAppLogging({ logsDir, isDev });
 setElectronRuntimeDiagnosticLogger(mainAppLogBackend);
+const localDataService = createLocalDataService({
+  driver: new SqliteLocalDataDriver({
+    dbPath: join(
+      app.getPath('userData'),
+      'LPP Local Data',
+      'profiles',
+      appInstanceProfile.profileId ?? 'default',
+      'lpp-local-v1.sqlite',
+    ),
+    recordDiagnostic: (record) => {
+      recordDefaultMainAppLog({
+        module: 'local-data',
+        event: `local_data.${record.event}`,
+        phase: record.phase,
+        result: record.result === 'ok' ? 'ok' : record.result === 'ignored' ? 'ignored' : 'failed',
+        level: record.result === 'failed' ? 'error' : 'debug',
+        reason: record.reason,
+        context: record.context,
+      });
+    },
+  }),
+});
 const appTitle = formatProfileWindowTitle(
   appDisplayName,
   appInstanceProfile.profileId,
@@ -423,6 +465,73 @@ handleDesktopIpc('setTrayStatus', async (_event, status: TrayStatus) => {
   ensureTray();
   updateTrayTooltip();
 });
+
+handleDesktopIpc('localDataClearScope', async (_event, payload: LocalDataClearScopePayload) =>
+  localDataService.clearScope(payload),
+);
+
+handleDesktopIpc('localDataCleanup', async (_event, payload: LocalDataCleanupPayload) =>
+  localDataService.cleanup(payload),
+);
+
+handleDesktopIpc('localDataDeleteMessage', async (_event, payload: LocalDataDeleteMessagePayload) =>
+  localDataService.deleteMessage(payload),
+);
+
+handleDesktopIpc('localDataDeleteOutbox', async (_event, payload: LocalDataDeleteOutboxPayload) =>
+  localDataService.deleteOutbox(payload),
+);
+
+handleDesktopIpc('localDataGetMediaVariant', async (_event, payload: LocalDataGetMediaVariantPayload) =>
+  localDataService.getMediaVariant(payload),
+);
+
+handleDesktopIpc('localDataGetStorageStats', async (_event, payload: LocalDataStorageStatsPayload) =>
+  localDataService.getStorageStats(payload),
+);
+
+handleDesktopIpc(
+  'localDataListCustomerServiceThreads',
+  async (_event, payload: LocalDataListCustomerServiceThreadsPayload) =>
+    localDataService.listCustomerServiceThreads(payload),
+);
+
+handleDesktopIpc('localDataListMessages', async (_event, payload: LocalDataListMessagesPayload) =>
+  localDataService.listMessages(payload),
+);
+
+handleDesktopIpc('localDataListOutbox', async (_event, payload: LocalDataListOutboxPayload) =>
+  localDataService.listOutbox(payload),
+);
+
+handleDesktopIpc('localDataRepair', async (_event, payload: LocalDataRepairPayload) =>
+  localDataService.repair(payload),
+);
+
+handleDesktopIpc('localDataSearchMessages', async (_event, payload: LocalDataSearchMessagesPayload) =>
+  localDataService.searchMessages(payload),
+);
+
+handleDesktopIpc(
+  'localDataUpsertCustomerServiceThread',
+  async (_event, payload: LocalDataUpsertCustomerServiceThreadPayload) =>
+    localDataService.upsertCustomerServiceThread(payload),
+);
+
+handleDesktopIpc('localDataUpsertMedia', async (_event, payload: LocalDataUpsertMediaPayload) =>
+  localDataService.upsertMedia(payload),
+);
+
+handleDesktopIpc('localDataUpsertMessages', async (_event, payload: LocalDataUpsertMessagesPayload) =>
+  localDataService.upsertMessages({
+    messages: payload.messages.map((message) => normalizeLocalDataMessage(message)),
+    scopeKey: payload.scopeKey,
+  }),
+);
+
+handleDesktopIpc('localDataUpsertOutbox', async (_event, payload: LocalDataUpsertOutboxPayload) =>
+  localDataService.upsertOutbox(payload),
+);
 
 function getLaunchAtStartup() {
   return app.getLoginItemSettings().openAtLogin;

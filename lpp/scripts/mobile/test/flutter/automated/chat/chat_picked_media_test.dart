@@ -29,5 +29,35 @@ void main() {
         expect(video.mimeType, 'video/quicktime');
       },
     );
+
+    test('rejects non media files from the gallery picker path', () {
+      expect(
+        ChatPickedMedia.tryFromPickedFile(
+          path: '/tmp/report.pdf',
+          name: 'report.pdf',
+          mimeType: 'application/pdf',
+        ),
+        isNull,
+      );
+    });
+
+    test('file attachment picker excludes image and video extensions', () {
+      expect(isChatFileAttachmentExtension('pdf'), isTrue);
+      expect(isChatFileAttachmentExtension('docx'), isTrue);
+      expect(isChatFileAttachmentExtension('zip'), isTrue);
+      expect(isChatFileAttachmentExtension('jpg'), isFalse);
+      expect(isChatFileAttachmentExtension('png'), isFalse);
+      expect(isChatFileAttachmentExtension('mp4'), isFalse);
+      expect(isChatFileAttachmentExtension('mov'), isFalse);
+    });
+
+    test('file attachment picker exposes only non image video extensions', () {
+      expect(chatFileAttachmentAllowedExtensions, contains('pdf'));
+      expect(chatFileAttachmentAllowedExtensions, contains('docx'));
+      expect(chatFileAttachmentAllowedExtensions, isNot(contains('jpg')));
+      expect(chatFileAttachmentAllowedExtensions, isNot(contains('png')));
+      expect(chatFileAttachmentAllowedExtensions, isNot(contains('mp4')));
+      expect(chatFileAttachmentAllowedExtensions, isNot(contains('mov')));
+    });
   });
 }

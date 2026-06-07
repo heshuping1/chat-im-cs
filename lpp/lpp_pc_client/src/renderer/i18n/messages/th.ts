@@ -975,6 +975,7 @@ export const th: MessageDictionary = {
       loadedCount: '{count} messages loaded',
       loadedRange: 'Loaded range',
       loading: 'Loading chat history...',
+      localDatabaseRange: 'Local saved history',
       localRange: 'Local cached range',
       matchCount: '{count} matches',
       newMessages: '↓ {count} new messages',

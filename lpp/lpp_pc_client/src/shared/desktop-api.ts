@@ -1,3 +1,28 @@
+import type {
+  LocalDataListMessagesPayload,
+  LocalDataClearScopePayload,
+  LocalDataCustomerServiceThreadSnapshot,
+  LocalDataDeleteMessagePayload,
+  LocalDataDeleteOutboxPayload,
+  LocalDataGetMediaVariantPayload,
+  LocalDataListCustomerServiceThreadsPayload,
+  LocalDataListOutboxPayload,
+  LocalDataMediaVariantProjection,
+  LocalDataMessage,
+  LocalDataCleanupPayload,
+  LocalDataCleanupResult,
+  LocalDataOutboxRecord,
+  LocalDataRepairPayload,
+  LocalDataRepairResult,
+  LocalDataSearchMessagesPayload,
+  LocalDataStorageStats,
+  LocalDataStorageStatsPayload,
+  LocalDataUpsertCustomerServiceThreadPayload,
+  LocalDataUpsertMediaPayload,
+  LocalDataUpsertMessagesPayload,
+  LocalDataUpsertOutboxPayload,
+} from './local-data-contract.js';
+
 export type TrayStatus = 'online' | 'busy' | 'away' | 'invisible';
 
 export type DesktopNotificationTargetModule =
@@ -306,6 +331,21 @@ export interface DesktopApi {
   recordMessageReminderDiagnostic(payload: MessageReminderDiagnosticPayload): Promise<void>;
   setTaskbarBadge(payload: TaskbarBadgePayload): Promise<void>;
   setTrayStatus(status: TrayStatus): Promise<void>;
+  localDataListMessages(payload: LocalDataListMessagesPayload): Promise<LocalDataMessage[]>;
+  localDataSearchMessages(payload: LocalDataSearchMessagesPayload): Promise<LocalDataMessage[]>;
+  localDataUpsertMessages(payload: LocalDataUpsertMessagesPayload): Promise<void>;
+  localDataDeleteMessage(payload: LocalDataDeleteMessagePayload): Promise<void>;
+  localDataClearScope(payload: LocalDataClearScopePayload): Promise<void>;
+  localDataGetStorageStats(payload: LocalDataStorageStatsPayload): Promise<LocalDataStorageStats>;
+  localDataCleanup(payload: LocalDataCleanupPayload): Promise<LocalDataCleanupResult>;
+  localDataUpsertMedia(payload: LocalDataUpsertMediaPayload): Promise<void>;
+  localDataGetMediaVariant(payload: LocalDataGetMediaVariantPayload): Promise<LocalDataMediaVariantProjection | null>;
+  localDataUpsertOutbox(payload: LocalDataUpsertOutboxPayload): Promise<void>;
+  localDataListOutbox(payload: LocalDataListOutboxPayload): Promise<LocalDataOutboxRecord[]>;
+  localDataDeleteOutbox(payload: LocalDataDeleteOutboxPayload): Promise<void>;
+  localDataUpsertCustomerServiceThread(payload: LocalDataUpsertCustomerServiceThreadPayload): Promise<void>;
+  localDataListCustomerServiceThreads(payload: LocalDataListCustomerServiceThreadsPayload): Promise<LocalDataCustomerServiceThreadSnapshot[]>;
+  localDataRepair(payload: LocalDataRepairPayload): Promise<LocalDataRepairResult>;
 }
 
 export type DesktopApiMethod = Exclude<
@@ -334,6 +374,21 @@ export const desktopIpcChannelByMethod = {
   downloadUpdate: 'desktop:download-update',
   installUpdate: 'desktop:install-update',
   getCachedMediaStatus: 'desktop:get-cached-media-status',
+  localDataClearScope: 'desktop:local-data-clear-scope',
+  localDataCleanup: 'desktop:local-data-cleanup',
+  localDataDeleteMessage: 'desktop:local-data-delete-message',
+  localDataDeleteOutbox: 'desktop:local-data-delete-outbox',
+  localDataGetMediaVariant: 'desktop:local-data-get-media-variant',
+  localDataGetStorageStats: 'desktop:local-data-get-storage-stats',
+  localDataListCustomerServiceThreads: 'desktop:local-data-list-customer-service-threads',
+  localDataListMessages: 'desktop:local-data-list-messages',
+  localDataListOutbox: 'desktop:local-data-list-outbox',
+  localDataRepair: 'desktop:local-data-repair',
+  localDataSearchMessages: 'desktop:local-data-search-messages',
+  localDataUpsertCustomerServiceThread: 'desktop:local-data-upsert-customer-service-thread',
+  localDataUpsertMedia: 'desktop:local-data-upsert-media',
+  localDataUpsertMessages: 'desktop:local-data-upsert-messages',
+  localDataUpsertOutbox: 'desktop:local-data-upsert-outbox',
   readMediaFileAsDataUrl: 'desktop:read-media-file-as-data-url',
   notify: 'desktop:notify',
   quitApp: 'desktop:quit-app',

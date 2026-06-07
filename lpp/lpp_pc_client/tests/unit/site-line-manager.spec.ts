@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   configFetchCandidates,
   latencyText,
   latencyTone,
   parseSiteLineConfig,
+  probeSite,
   primarySiteLine,
   selectFirstAvailableSite,
   siteLineManager,
@@ -19,6 +20,10 @@ function memoryStorage(initial: Record<string, string> = {}): SiteLineStorage {
 }
 
 describe("site line manager", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("parses APP compatible site line config and normalizes urls", () => {
     const sites = parseSiteLineConfig({
       data: {
@@ -81,6 +86,29 @@ describe("site line manager", () => {
     );
 
     expect(selected.id).toBe("hk");
+  });
+
+  it("treats the primary configured site as reachable without requesting the API root", async () => {
+    const fetchMock = vi.fn(async () => ({ status: 0, type: "opaque" }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(probeSite(primarySiteLine)).resolves.toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not probe API roots during default bootstrap", async () => {
+    const fetchMock = vi.fn(async () => ({ status: 404, type: "basic" }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await siteLineManager.bootstrap({
+      storage: memoryStorage(),
+      fallbackS3ConfigFileUrl: "",
+    });
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      primarySiteLine.apiBaseUrl,
+      expect.anything(),
+    );
   });
 
   it("bootstraps from fallback config and persists only switchable sites", async () => {

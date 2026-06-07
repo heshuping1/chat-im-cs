@@ -117,7 +117,7 @@ void main() {
   });
 
   testWidgets(
-    'sending local image keeps preview gapless without gray placeholder',
+    'sending local image keeps preview visible with progress outside bubble',
     (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -146,12 +146,22 @@ void main() {
       final image = tester.widget<Image>(find.byType(Image));
       expect(image.gaplessPlayback, isTrue);
       expect(find.byIcon(Icons.image), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(
         find.byKey(const ValueKey('message-image-upload-progress')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('message-text-send-progress')),
         findsOneWidget,
       );
-      expect(find.text('50%'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('50%'), findsNothing);
+
+      final progressRect = tester.getRect(
+        find.byKey(const ValueKey('message-text-send-progress')),
+      );
+      final imageRect = tester.getRect(find.byType(Image));
+      expect(progressRect.right, lessThan(imageRect.left));
     },
   );
 
@@ -200,6 +210,86 @@ void main() {
     );
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('message-text-send-progress')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('self text sending progress sits outside the green bubble', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(status: MessageStatus.sending),
+          isSelf: true,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    final progressRect = tester.getRect(
+      find.byKey(const ValueKey('message-text-send-progress')),
+    );
+    final textRect = tester.getRect(find.text('hello'));
+
+    expect(progressRect.right, lessThan(textRect.left));
+    expect(progressRect.width, inInclusiveRange(24, 28));
+    expect(progressRect.height, inInclusiveRange(24, 28));
+  });
+
+  testWidgets(
+    'voice messages expose WeChat-style convert and unread affordances',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MessageBubble(
+            message: _message(
+              type: MessageType.voice,
+              body: const MessageBody(
+                voice: MediaResource(url: '/tmp/voice.m4a', durationSeconds: 2),
+              ),
+            ),
+            isSelf: false,
+            showTimestamp: false,
+            onConvertVoiceToText: () {},
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('message-voice-convert-chip')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('message-voice-unread-dot')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('self voice messages do not show convert chip', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.voice,
+            body: const MessageBody(
+              voice: MediaResource(url: '/tmp/voice.m4a', durationSeconds: 3),
+            ),
+          ),
+          isSelf: true,
+          showTimestamp: false,
+          onConvertVoiceToText: () {},
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('message-voice-convert-chip')),
+      findsNothing,
+    );
   });
 
   testWidgets('text bubble renders user and all-member mention spans', (

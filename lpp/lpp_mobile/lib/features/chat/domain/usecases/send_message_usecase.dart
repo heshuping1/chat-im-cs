@@ -385,12 +385,16 @@ class SendMessageUseCase {
             voice: resource,
             file: body.file);
       case MessageType.file:
+        final file = _preserveLocalMediaPreview(
+          uploaded: resource,
+          local: body.file,
+        );
         return MessageBody(
             text: body.text,
             image: body.image,
             video: body.video,
             voice: body.voice,
-            file: resource);
+            file: file);
       default:
         return body;
     }
@@ -403,6 +407,8 @@ class SendMessageUseCase {
     if (local == null) return uploaded;
     final localUrl = _isLocalUrl(local.url) ? local.url : null;
     return uploaded.copyWith(
+      width: local.width,
+      height: local.height,
       localPreviewUrl: local.localPreviewUrl ?? localUrl,
       localPosterUrl: local.localPosterUrl,
     );

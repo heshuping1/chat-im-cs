@@ -482,7 +482,7 @@ export function VideoPart({
     canOpenVideoPlayer,
     canReadMediaFileAsDataUrl,
   } = getCurrentMediaActionCapabilities();
-  const previewSource = localVideoDisplaySrc || src;
+  const previewSource = localVideoDisplaySrc || item?.localOpenUrl;
   const previewSrc = inlineVideoPreviewSrc(previewSource, {
     allowDesktopFile: canOpenVideoPlayer || canReadMediaFileAsDataUrl,
   });

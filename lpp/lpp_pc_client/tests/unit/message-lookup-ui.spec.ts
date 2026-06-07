@@ -197,12 +197,14 @@ describe("message lookup UI", () => {
     expect(messageCenterCss).toContain(".pc-chat-empty-event");
   });
 
-  it("loads im_direct profile-card for ordinary IM customer info and refreshes existing caches after edits", () => {
+  it("keeps ordinary IM profile data on friend/profile sources instead of customer-service profile-card", () => {
     expect(messageCenter).toContain("useMessageContactProfileController");
     expect(messageCenter).toContain("contactProfileController.profileQuery.data");
-    expect(contactProfileController).toContain('getThreadProfileCard(');
-    expect(contactProfileController).toContain('"im_direct"');
-    expect(contactProfileController).toContain("pcQueryKeys.customerServiceThreadProfile");
+    expect(contactProfileController).not.toContain('getThreadProfileCard(');
+    expect(contactProfileController).not.toContain('"im_direct"');
+    expect(contactProfileController).not.toContain("pcQueryKeys.customerServiceThreadProfile");
+    expect(contactProfileController).toContain("pcQueryKeys.friendProfileExtra");
+    expect(contactProfileController).toContain("activeFriend");
     expect(contactProfileController).toContain("getFriendProfileExtra(activeFriendUserId)");
     expect(contactProfileController).toContain("updateFriendProfileMutation");
     expect(contactProfileController).toContain('queryClient.invalidateQueries({ queryKey: ["pc-friends"] })');

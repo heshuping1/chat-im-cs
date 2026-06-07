@@ -251,7 +251,7 @@ describe("openDesktopVideoPlayer", () => {
     expect(openVideoPlayer.mock.calls[0]?.[0]).not.toHaveProperty("posterUrl");
   });
 
-  it("uses local file cache urls as inline video preview sources only inside desktop", () => {
+  it("uses local/browser-safe urls as inline video preview sources only inside desktop", () => {
     const fileUrl =
       "file:///Users/eric/Library/Application%20Support/lppchat/lppchat-files/u1/c1/Videos/clip.mp4";
     expect(inlineVideoPreviewSrc(fileUrl)).toBeUndefined();
@@ -259,9 +259,7 @@ describe("openDesktopVideoPlayer", () => {
     expect(inlineVideoPreviewSrc("blob:http://127.0.0.1:5173/video")).toBe(
       "blob:http://127.0.0.1:5173/video",
     );
-    expect(inlineVideoPreviewSrc("https://cdn.example.com/video.mp4")).toBe(
-      "https://cdn.example.com/video.mp4",
-    );
+    expect(inlineVideoPreviewSrc("https://cdn.example.com/video.mp4")).toBeUndefined();
   });
 
   it("falls back to the displayed source when no server video source is available", async () => {

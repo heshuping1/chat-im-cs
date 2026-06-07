@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 import type { MessageItemDto } from "../../src/renderer/data/api/types";
 import type { AuthSession } from "../../src/renderer/data/auth/auth-session";
 import {
+  createDesktopImMessageStore,
   createMemoryImMessageStore,
   imMessageConversationKey,
   imMessageScopeKey,
+  localDataInputsByScopeFromIndexedDbRecords,
   mergeMessagesForLocalStore,
+  parseImMessageConversationKey,
+  type ImMessageStoreRecord,
 } from "../../src/renderer/data/message-store/im-message-store";
+import type { DesktopApi } from "../../src/shared/desktop-api";
+import { normalizeLocalDataMessage, type LocalDataMessage } from "../../src/shared/local-data-contract";
 
 const session = {
   apiBaseUrl: "https://api.example.test",
@@ -34,6 +40,14 @@ function message(
 }
 
 describe("IM local message store", () => {
+  it("parses conversation keys from the right so scoped colons stay intact", () => {
+    expect(parseImMessageConversationKey("workspace|missing-tenant:abc:direct:c1")).toEqual({
+      conversationId: "c1",
+      conversationType: "direct",
+      scopeKey: "workspace|missing-tenant:abc",
+    });
+  });
+
   it("persists successful messages by workspace scope and conversation", async () => {
     const store = createMemoryImMessageStore();
     const scopeKey = imMessageScopeKey(session);
@@ -42,6 +56,132 @@ describe("IM local message store", () => {
     await store.upsertMessages(scopeKey, "direct", "c1", [message("m1", 1)]);
 
     expect(await store.listMessages(conversationKey, { limit: 50 })).toEqual([message("m1", 1)]);
+  });
+
+  it("can use desktop LocalDataService as the IM message store backend", async () => {
+    let records: LocalDataMessage[] = [];
+    const desktopApi = {
+      async localDataClearScope(payload) {
+        records = records.filter((record) => record.scopeKey !== payload.scopeKey);
+      },
+      async localDataDeleteMessage(payload) {
+        records = records.filter(
+          (record) =>
+            record.scopeKey !== payload.scopeKey ||
+            record.conversationId !== payload.conversationId ||
+            record.messageId !== payload.messageId,
+        );
+      },
+      async localDataListMessages(payload) {
+        return records
+          .filter((record) => record.scopeKey === payload.scopeKey)
+          .filter((record) => record.conversationId === payload.conversationId)
+          .filter((record) => record.conversationType === payload.conversationType)
+          .slice(-payload.limit);
+      },
+      async localDataSearchMessages(payload) {
+        return records
+          .filter((record) => record.scopeKey === payload.scopeKey)
+          .filter((record) => record.conversationId === payload.conversationId)
+          .filter((record) => record.conversationType === payload.conversationType)
+          .filter((record) => record.preview.includes(payload.keyword ?? ""))
+          .slice(0, payload.limit);
+      },
+      async localDataUpsertMessages(payload) {
+        records = payload.messages.map((item) => normalizeLocalDataMessage(item));
+      },
+    } satisfies Pick<
+      DesktopApi,
+      | "localDataClearScope"
+      | "localDataDeleteMessage"
+      | "localDataListMessages"
+      | "localDataSearchMessages"
+      | "localDataUpsertMessages"
+    >;
+    const store = createDesktopImMessageStore(desktopApi);
+    const scopeKey = imMessageScopeKey(session);
+    const conversationKey = imMessageConversationKey(scopeKey, "direct", "c1");
+
+    await store.upsertMessages(scopeKey, "direct", "c1", [message("m1", 1)]);
+
+    expect(await store.listMessages(conversationKey, { limit: 50 })).toMatchObject([
+      { messageId: "m1", conversationId: "c1" },
+    ]);
+    expect(
+      await store.searchMessages(scopeKey, "direct", "c1", "m1", 20),
+    ).toMatchObject([{ messageId: "m1", conversationId: "c1" }]);
+  });
+
+  it("paginates desktop LocalData reads within the IPC limit contract", async () => {
+    let records: LocalDataMessage[] = Array.from({ length: 501 }, (_, index) =>
+      normalizeLocalDataMessage(messageItemToLocalDataInputForTest(
+        imMessageScopeKey(session),
+        "direct",
+        "c1",
+        message(`m${index + 1}`, index + 1),
+      )),
+    );
+    const requestedLimits: number[] = [];
+    const desktopApi = {
+      async localDataClearScope() {},
+      async localDataDeleteMessage() {},
+      async localDataListMessages(payload) {
+        requestedLimits.push(payload.limit);
+        if (!Number.isInteger(payload.limit) || payload.limit < 1 || payload.limit > 500) {
+          throw new Error("localData.limit must be an integer between 1 and 500");
+        }
+        return records
+          .filter((record) => record.scopeKey === payload.scopeKey)
+          .filter((record) => record.conversationId === payload.conversationId)
+          .filter((record) => record.conversationType === payload.conversationType)
+          .filter((record) =>
+            typeof payload.beforeSeq === "number"
+              ? (record.conversationSeq ?? Number.MAX_SAFE_INTEGER) < payload.beforeSeq
+              : true,
+          )
+          .sort((left, right) => Number(right.conversationSeq ?? 0) - Number(left.conversationSeq ?? 0))
+          .slice(0, payload.limit)
+          .reverse();
+      },
+      async localDataSearchMessages() {
+        return [];
+      },
+      async localDataUpsertMessages(payload) {
+        for (const item of payload.messages) {
+          const next = normalizeLocalDataMessage(item);
+          records = records.filter((record) => record.id !== next.id).concat(next);
+        }
+      },
+    } satisfies Pick<
+      DesktopApi,
+      | "localDataClearScope"
+      | "localDataDeleteMessage"
+      | "localDataListMessages"
+      | "localDataSearchMessages"
+      | "localDataUpsertMessages"
+    >;
+    const store = createDesktopImMessageStore(desktopApi);
+    const scopeKey = imMessageScopeKey(session);
+
+    await store.markMessageRecalled(scopeKey, "direct", "c1", "m1");
+
+    expect(requestedLimits.length).toBeGreaterThan(1);
+    expect(requestedLimits.every((limit) => limit >= 1 && limit <= 500)).toBe(true);
+    expect(records.find((record) => record.messageId === "m1")?.status).toBe("recalled");
+  });
+
+  it("groups legacy IndexedDB records by scope before migrating to LocalDataService", () => {
+    const firstScope = imMessageScopeKey(session);
+    const secondScope = imMessageScopeKey({ ...session, userId: "user-2" } as AuthSession);
+    const records: ImMessageStoreRecord[] = [
+      legacyRecord(firstScope, "direct", "c1", message("m1", 1)),
+      legacyRecord(secondScope, "direct", "c1", message("m2", 1)),
+    ];
+
+    const byScope = localDataInputsByScopeFromIndexedDbRecords(records);
+
+    expect(byScope.get(firstScope)).toMatchObject([{ messageId: "m1", scopeKey: firstScope }]);
+    expect(byScope.get(secondScope)).toMatchObject([{ messageId: "m2", scopeKey: secondScope }]);
   });
 
   it("deduplicates by server messageId and prefers newer sequence metadata", () => {
@@ -96,6 +236,20 @@ describe("IM local message store", () => {
     expect(await store.listMessages(conversationKey, { limit: 2 })).toMatchObject([
       { messageId: "m2" },
       { messageId: "m3" },
+    ]);
+  });
+
+  it("searches stored messages beyond the currently loaded display range", async () => {
+    const store = createMemoryImMessageStore();
+    const scopeKey = imMessageScopeKey(session);
+    await store.upsertMessages(scopeKey, "direct", "c1", [
+      message("m1", 1),
+      { ...message("m2", 2), preview: "needle from local database" },
+      message("m3", 3),
+    ]);
+
+    expect(await store.searchMessages(scopeKey, "direct", "c1", "needle", 20)).toMatchObject([
+      { messageId: "m2" },
     ]);
   });
 
@@ -213,3 +367,52 @@ describe("IM local message store", () => {
       ]);
   });
 });
+
+function legacyRecord(
+  scopeKey: string,
+  conversationType: string,
+  conversationId: string,
+  item: MessageItemDto,
+): ImMessageStoreRecord {
+  const conversationKey = imMessageConversationKey(scopeKey, conversationType, conversationId);
+  return {
+    conversationId,
+    conversationKey,
+    conversationSeq: item.conversationSeq,
+    conversationType,
+    id: `${conversationKey}:${item.messageId}`,
+    message: item,
+    messageId: item.messageId,
+    scopeKey,
+    sentAt: item.sentAt,
+    updatedAt: 1,
+  };
+}
+
+function messageItemToLocalDataInputForTest(
+  scopeKey: string,
+  conversationType: string,
+  conversationId: string,
+  item: MessageItemDto,
+) {
+  const conversationKey = imMessageConversationKey(scopeKey, conversationType, conversationId);
+  return {
+    bodyJson: item.body,
+    clientMsgId: item.clientMsgId,
+    conversationId,
+    conversationSeq: item.conversationSeq,
+    conversationType,
+    direction: item.direction,
+    isRead: item.isRead,
+    messageId: item.messageId,
+    messageType: item.messageType,
+    preview: item.preview,
+    scopeKey,
+    senderId: item.senderId,
+    sentAt: item.sentAt,
+    status: item.status,
+    updatedAt: 1,
+    conversationKey,
+    id: `${conversationKey}:${item.messageId}`,
+  };
+}

@@ -31,8 +31,7 @@ import {
 import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
 import {
   getSendOutboxStorage,
-  sendOutboxScopeKey,
-  sendOutboxTargetKey,
+  type SendOutboxRecord,
   type SendOutboxStatus,
 } from "../../data/send/send-outbox";
 import { currentIsoTimestamp, formatError } from "../../lib/format";
@@ -98,9 +97,14 @@ export function useCustomerServiceSendController({
     let canceled = false;
     const objectUrls: string[] = [];
     const storage = getSendOutboxStorage();
-    const scopeKey = sendOutboxScopeKey(session);
-    const targetKey = sendOutboxTargetKey(
-      "customer_service",
+    const runtime = createChatSendRuntime({
+      channel: "customer_service",
+      session,
+      storage,
+      taskId: "P4-MSG-005D",
+    });
+    const scopeKey = runtime.scopeKey;
+    const targetKey = runtime.targetKey(
       selectedThread.threadType,
       selectedThread.threadId,
     );
@@ -130,14 +134,14 @@ export function useCustomerServiceSendController({
             videoPoster: restored.videoPoster,
           });
         } else if (isCustomerServiceMediaRecord(record) && record.localTaskId) {
-          await storage.patchRecord(scopeKey, record.localMessageId, {
+          await runtime.patchOutboxRecord(record.localMessageId, {
             localError: t("customerService.send.localFileExpired"),
             status: "failed",
             updatedAt: Date.now(),
           });
         }
         if (["queued", "uploading", "sending", "paused"].includes(record.status)) {
-          await storage.patchRecord(scopeKey, record.localMessageId, {
+          await runtime.patchOutboxRecord(record.localMessageId, {
             localError: t("customerService.send.sendInterruptedRetry"),
             status: "failed",
             updatedAt: Date.now(),
@@ -334,17 +338,22 @@ export function useCustomerServiceSendController({
       const task = mediaUploadTasksRef.current.get(localTaskId);
       if (!task || !client || !session) return;
       const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
+      const runtime = createChatSendRuntime({
+        channel: "customer_service",
+        session,
+        storage,
+        taskId: "P4-MSG-005D",
+      });
       const controller = new AbortController();
       task.controller = controller;
       task.controlState = undefined;
       let videoMediaForDiagnostics: MediaResourceDto | undefined;
       const patchLocalUpload = (patch: Parameters<typeof patchCustomerServiceLocalMessage>[3]) => {
         patchCustomerServiceLocalMessage(queryClient, task.thread, task.localMessageId, patch);
-        void storage.patchRecord(scopeKey, task.localMessageId, {
+        void runtime.patchOutboxRecord(task.localMessageId, {
           ...patch,
           updatedAt: patch.localFailedAt ?? Date.now(),
-        } as Parameters<typeof storage.patchRecord>[2]);
+        } as Partial<SendOutboxRecord>);
       };
       const videoDisplayProgressTicker = task.kind === "video"
         ? createVideoUploadDisplayProgressTicker(({ phase, progress }) => {
@@ -523,7 +532,12 @@ export function useCustomerServiceSendController({
             (await task.localCachedMediaPromise?.catch(() => undefined)) ??
             task.localOpenUrl;
           if (localOpenForSent) task.localOpenUrl = localOpenForSent;
-          registerSentMediaMaterialization(task.kind, media, localOpenForSent);
+          registerSentMediaMaterialization(
+            task.kind,
+            media,
+            localOpenForSent,
+            result.messageId || task.localMessageId,
+          );
           const localPreviewForSent = task.localPreviewUrl;
           removeCustomerServiceLocalMessage(queryClient, task.thread, task.localMessageId);
           mergeSentCustomerServiceMessage(queryClient, {
@@ -563,7 +577,7 @@ export function useCustomerServiceSendController({
             },
           });
           mediaUploadTasksRef.current.delete(localTaskId);
-          void storage.deleteRecord(scopeKey, task.localMessageId);
+          void runtime.deleteOutboxRecord(task.localMessageId);
           setNotice(null);
           await invalidateCustomerServiceQueries(queryClient);
           scrollMessagesToBottom("smooth");
@@ -793,11 +807,17 @@ export function useCustomerServiceSendController({
           localError: undefined,
         });
         if (session) {
-          void getSendOutboxStorage().patchRecord(
-            sendOutboxScopeKey(session),
-            task.localMessageId,
-            { localError: undefined, status: "paused", updatedAt: Date.now() },
-          );
+          const runtime = createChatSendRuntime({
+            channel: "customer_service",
+            session,
+            storage: getSendOutboxStorage(),
+            taskId: "P4-MSG-005D",
+          });
+          void runtime.patchOutboxRecord(task.localMessageId, {
+            localError: undefined,
+            status: "paused",
+            updatedAt: Date.now(),
+          });
         }
         return;
       }
@@ -825,11 +845,17 @@ export function useCustomerServiceSendController({
           localError: undefined,
         });
         if (session) {
-          void getSendOutboxStorage().patchRecord(
-            sendOutboxScopeKey(session),
-            task.localMessageId,
-            { localError: undefined, status: "canceled", updatedAt: Date.now() },
-          );
+          const runtime = createChatSendRuntime({
+            channel: "customer_service",
+            session,
+            storage: getSendOutboxStorage(),
+            taskId: "P4-MSG-005D",
+          });
+          void runtime.patchOutboxRecord(task.localMessageId, {
+            localError: undefined,
+            status: "canceled",
+            updatedAt: Date.now(),
+          });
         }
         return;
       }
@@ -851,7 +877,7 @@ export function useCustomerServiceSendController({
       });
       startServiceMediaUpload(localTaskId);
     },
-    [queryClient, startServiceMediaUpload],
+    [queryClient, session, startServiceMediaUpload],
   );
 
   return {

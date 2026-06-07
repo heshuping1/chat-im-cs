@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:lpp_mobile/core/database/app_database.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/chat_local_search_index.dart';
 import 'package:lpp_mobile/features/chat/data/models/message_model.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
@@ -405,6 +406,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
           conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
+    await const ChatLocalSearchIndex()
+        .upsertMessages(spaceId, conversationId, messages);
   }
 
   @override
@@ -701,6 +704,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       where: 'message_id = ?',
       whereArgs: [messageId],
     );
+    await const ChatLocalSearchIndex()
+        .deleteMessage(spaceId, conversationId, messageId);
   }
 
   // ── 旧方法委托（保持接口兼容）────────────────────────────────────────────
@@ -741,6 +746,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     batch.insert(table, _messageToRow(message),
         conflictAlgorithm: ConflictAlgorithm.replace);
     await batch.commit(noResult: true);
+    await const ChatLocalSearchIndex()
+        .upsertMessages(spaceId, conversationId, [message]);
   }
 
   @override
@@ -755,6 +762,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       where: 'message_id = ? OR client_msg_id = ?',
       whereArgs: [messageId, messageId],
     );
+    await const ChatLocalSearchIndex()
+        .deleteMessage(spaceId, conversationId, messageId);
   }
 
   // ── 内部工具 ──────────────────────────────────────────────────────────────

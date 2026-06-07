@@ -1,4 +1,5 @@
 import { endpointPlan } from "./endpoints";
+import { ApiError } from "./base";
 import { ProfileApiClient } from "./profile-client";
 import type {
   DepartmentDto,
@@ -123,7 +124,10 @@ export class ContactsApiClient extends ProfileApiClient {
   getFriendProfileExtra(friendUserId: string) {
     return this.request<FriendProfileExtraDto>(
       endpointPlan.friendProfileExtra.replace("{friendUserId}", encodeURIComponent(friendUserId)),
-    );
+    ).catch((error) => {
+      if (error instanceof ApiError && error.status === 404) return undefined;
+      throw error;
+    });
   }
 
   getTenantMembers() {

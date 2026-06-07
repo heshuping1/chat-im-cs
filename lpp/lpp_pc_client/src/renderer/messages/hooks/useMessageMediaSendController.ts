@@ -19,7 +19,6 @@ import {
 import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
 import {
   getSendOutboxStorage,
-  sendOutboxScopeKey,
   type SendOutboxStatus,
 } from "../../data/send/send-outbox";
 import type { ComposerMediaKind } from "../../composer/domain/detectComposerMediaKind";
@@ -88,7 +87,12 @@ export function useMessageMediaSendController({
       const task = mediaUploadTasks.getTask(localTaskId);
       if (!task || !session) return;
       const storage = getSendOutboxStorage();
-      const scopeKey = sendOutboxScopeKey(session);
+      const runtime = createChatSendRuntime({
+        channel: "im",
+        session,
+        storage,
+        taskId: "P4-MSG-005C",
+      });
       const controller = new AbortController();
       task.controller = controller;
       task.controlState = undefined;
@@ -111,7 +115,7 @@ export function useMessageMediaSendController({
               },
               setLocalOutgoingMessagesByConversation,
             );
-            void storage.patchRecord(scopeKey, task.localMessageId, {
+            void runtime.patchOutboxRecord(task.localMessageId, {
               localError: undefined,
               status,
               updatedAt: Date.now(),
@@ -155,7 +159,7 @@ export function useMessageMediaSendController({
         },
         setLocalOutgoingMessagesByConversation,
       );
-      void storage.patchRecord(scopeKey, task.localMessageId, {
+      void runtime.patchOutboxRecord(task.localMessageId, {
         localError: undefined,
         status: "uploading",
         updatedAt: Date.now(),
@@ -193,7 +197,7 @@ export function useMessageMediaSendController({
               },
               setLocalOutgoingMessagesByConversation,
             );
-            void storage.patchRecord(scopeKey, task.localMessageId, {
+            void runtime.patchOutboxRecord(task.localMessageId, {
               body: task.body,
               localError: undefined,
               status: "uploading",
@@ -226,7 +230,7 @@ export function useMessageMediaSendController({
                 },
                 setLocalOutgoingMessagesByConversation,
               );
-              void storage.patchRecord(scopeKey, task.localMessageId, {
+              void runtime.patchOutboxRecord(task.localMessageId, {
                 status: "uploading",
                 updatedAt: Date.now(),
                 uploadPhase: "uploading_media",
@@ -280,7 +284,7 @@ export function useMessageMediaSendController({
                       },
                       setLocalOutgoingMessagesByConversation,
                     );
-                    void storage.patchRecord(scopeKey, task.localMessageId, {
+                    void runtime.patchOutboxRecord(task.localMessageId, {
                       status: "uploading",
                       updatedAt: Date.now(),
                       uploadPhase: "uploading_poster",
@@ -342,7 +346,7 @@ export function useMessageMediaSendController({
             { status: "sending", uploadPhase: "sending", uploadProgress: 95 },
             setLocalOutgoingMessagesByConversation,
           );
-          void storage.patchRecord(scopeKey, task.localMessageId, {
+          void runtime.patchOutboxRecord(task.localMessageId, {
             status: "sending",
             updatedAt: Date.now(),
             uploadPhase: "sending",
@@ -360,9 +364,14 @@ export function useMessageMediaSendController({
             (await task.localCachedMediaPromise?.catch(() => undefined)) ??
             task.localOpenUrl;
           if (localOpenForSent) task.localOpenUrl = localOpenForSent;
-          registerSentMediaMaterialization(task.kind, normalizedMedia, localOpenForSent);
           const localPreviewForSent = task.localPreviewUrl;
           const serverMessageId = sent.messageId || task.localMessageId;
+          registerSentMediaMaterialization(
+            task.kind,
+            normalizedMedia,
+            localOpenForSent,
+            serverMessageId,
+          );
           if ((task.kind === "image" || task.kind === "video") && localPreviewForSent) {
             localMediaPreviewKeys(serverMessageId, normalizedMedia).forEach((key) => {
               localImagePreviewByMessageIdRef.current.set(key, localPreviewForSent);
@@ -419,7 +428,7 @@ export function useMessageMediaSendController({
             ),
           );
           mediaUploadTasks.deleteTask(localTaskId);
-          void storage.deleteRecord(scopeKey, task.localMessageId);
+          void runtime.deleteOutboxRecord(task.localMessageId);
           void invalidateMessages(queryClient, session);
           scrollMessagesToBottom("smooth");
         } catch (error) {
@@ -460,7 +469,7 @@ export function useMessageMediaSendController({
             { status: "failed", uploadPhase: "failed", localError: reason, localFailedAt: failedAt },
             setLocalOutgoingMessagesByConversation,
           );
-          void storage.patchRecord(scopeKey, task.localMessageId, {
+          void runtime.patchOutboxRecord(task.localMessageId, {
             localFailedAt: failedAt,
             localError: reason,
             status: "failed",
@@ -672,6 +681,12 @@ export function useMessageMediaSendController({
     (localTaskId: string, action: "pause" | "resume" | "cancel" | "retry") => {
       const task = mediaUploadTasks.getTask(localTaskId);
       if (!task || !session) return;
+      const runtime = createChatSendRuntime({
+        channel: "im",
+        session,
+        storage: getSendOutboxStorage(),
+        taskId: "P4-MSG-005C",
+      });
       if (action === "pause") {
         task.controlState = "paused";
         task.controller?.abort();
@@ -700,11 +715,11 @@ export function useMessageMediaSendController({
           { status: "paused", localError: undefined },
           setLocalOutgoingMessagesByConversation,
         );
-        void getSendOutboxStorage().patchRecord(
-          sendOutboxScopeKey(session),
-          task.localMessageId,
-          { localError: undefined, status: "paused", updatedAt: Date.now() },
-        );
+        void runtime.patchOutboxRecord(task.localMessageId, {
+          localError: undefined,
+          status: "paused",
+          updatedAt: Date.now(),
+        });
         return;
       }
       if (action === "cancel") {
@@ -735,11 +750,11 @@ export function useMessageMediaSendController({
           { status: "canceled", localError: undefined },
           setLocalOutgoingMessagesByConversation,
         );
-        void getSendOutboxStorage().patchRecord(
-          sendOutboxScopeKey(session),
-          task.localMessageId,
-          { localError: undefined, status: "canceled", updatedAt: Date.now() },
-        );
+        void runtime.patchOutboxRecord(task.localMessageId, {
+          localError: undefined,
+          status: "canceled",
+          updatedAt: Date.now(),
+        });
         return;
       }
       logChatSendDiagnostic({

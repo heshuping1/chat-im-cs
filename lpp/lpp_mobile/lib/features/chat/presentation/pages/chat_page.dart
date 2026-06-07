@@ -15,6 +15,7 @@ import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/network/http_client.dart' as app_http;
 import 'package:lpp_mobile/core/platform/local_file.dart';
 import 'package:lpp_mobile/core/platform/local_video_poster.dart';
+import 'package:lpp_mobile/core/platform/media_file_runtime.dart';
 import 'package:lpp_mobile/core/platform/media_saver.dart';
 import 'package:lpp_mobile/core/permissions/app_permissions.dart';
 import 'package:lpp_mobile/core/providers/locale_provider.dart';
@@ -29,10 +30,12 @@ import 'package:lpp_mobile/features/chat/data/datasources/gateway_event_handler.
 import 'package:lpp_mobile/features/chat/data/datasources/pending_message_queue.dart';
 import 'package:lpp_mobile/features/chat/data/mappers/message_send_failure_mapper.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/send_message_usecase.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/outgoing_media_localizer.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/group_detail_provider.dart';
@@ -57,6 +60,7 @@ import 'package:lpp_mobile/features/settings/presentation/providers/timezone_pro
 import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String conversationId;
@@ -99,6 +103,8 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
+  static const _uuid = Uuid();
+
   static bool get _locationSendingEnabled => false;
   static const PlatformMediaSaver _mediaSaver = PlatformMediaSaver();
 
@@ -1688,17 +1694,31 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     try {
       final sendConversationId = await _ensureDirectConversationForSend();
       if (!mounted) return;
+      final clientMsgId = _uuid.v4();
+      final localized = await const OutgoingMediaLocalizer(
+        runtime: MediaFileRuntime(),
+      ).localize(
+        spaceId: _spaceId,
+        conversationId: sendConversationId,
+        messageId: clientMsgId,
+        variant: MediaVariant.attachment,
+        sourcePath: filePath,
+        fileName: fileName,
+      );
       final notifier = ref.read(
           chatProvider((_spaceId, sendConversationId, _effectiveIsGroup))
               .notifier);
       await _sendChatMessage(
         type: MessageType.file,
+        clientMsgId: clientMsgId,
         body: MessageBody(
           file: MediaResource(
-            url: filePath,
+            url: localized.localPath,
             fileName: fileName,
             mimeType: mimeType,
-            sizeBytes: sizeBytes,
+            sizeBytes:
+                localized.sizeBytes > 0 ? localized.sizeBytes : sizeBytes,
+            localPreviewUrl: localized.localPath,
           ),
         ),
         onOptimisticInsert: (message) {
@@ -1744,19 +1764,35 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             .notifier,
       );
       for (final item in mediaItems) {
-        final sizeBytes = item.sizeBytes ?? await localFileLength(item.path);
-        final imageDimensions =
-            item.isImage ? await _readLocalImageDimensions(item.path) : null;
-        final localPosterUrl =
-            item.isVideo ? await generateLocalVideoPoster(item.path) : null;
+        final clientMsgId = _uuid.v4();
+        final localized = await const OutgoingMediaLocalizer(
+          runtime: MediaFileRuntime(),
+        ).localize(
+          spaceId: _spaceId,
+          conversationId: sendConversationId,
+          messageId: clientMsgId,
+          variant:
+              item.isVideo ? MediaVariant.videoSource : MediaVariant.original,
+          sourcePath: item.path,
+          fileName: item.fileName,
+        );
+        final sizeBytes = localized.sizeBytes > 0
+            ? localized.sizeBytes
+            : item.sizeBytes ?? await localFileLength(item.path);
+        final imageDimensions = item.isImage
+            ? await _readLocalImageDimensions(localized.localPath)
+            : null;
+        final localPosterUrl = item.isVideo
+            ? await generateLocalVideoPoster(localized.localPath)
+            : null;
         final resource = MediaResource(
-          url: item.path,
+          url: localized.localPath,
           fileName: item.fileName,
           mimeType: item.mimeType,
           sizeBytes: sizeBytes,
           width: imageDimensions?.$1,
           height: imageDimensions?.$2,
-          localPreviewUrl: item.isImage ? item.path : null,
+          localPreviewUrl: localized.localPath,
           localPosterUrl: localPosterUrl,
         );
         final type = item.isVideo ? MessageType.video : MessageType.image;
@@ -1766,6 +1802,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         await _sendChatMessage(
           type: type,
           body: body,
+          clientMsgId: clientMsgId,
           replyToMessageId: _replyingTo?.id,
           onOptimisticInsert: (msg) {
             notifier.optimisticInsert(msg);

@@ -1364,6 +1364,7 @@
       loadedCount: '已加载 {count} 条消息',
       loadedRange: '当前已加载范围',
       loading: '正在加载聊天记录...',
+      localDatabaseRange: '本机已落库范围',
       localRange: '本地缓存范围',
       matchCount: '{count} 条匹配',
       newMessages: '↓ {count} 条新消息',
@@ -1427,7 +1428,9 @@
   },
   me: {
     action: {
+      check: '检查',
       clean: '清理',
+      processing: '处理中',
     },
     chatArchive: {
       aria: '聊天记录管理',
@@ -1635,7 +1638,26 @@
       chatCacheCleared: '已清理聊天缓存',
       diagnosticsExportCancelled: '已取消导出诊断包',
       diagnosticsExported: '诊断包已导出',
+      localDataCleaned: '已清理本机消息索引 {count} 条',
+      localDataCleanFailed: '清理本机消息索引失败：{error}',
+      localDataRepairDone: '本地库检查完成：DB {status}，失效媒体 {stale} 个',
+      localDataRepairFailed: '本地库检查失败：{error}',
+      localMediaCleaned: '已清理本机媒体缓存 {size}',
+      localMediaCleanFailed: '清理本机媒体缓存失败：{error}',
       saved: '已保存',
+    },
+    localDataStorage: {
+      cleanupConfirm: '确认清理本机已落库消息索引？不会删除云端消息，但本机历史搜索和离线首屏会重新依赖服务端同步。',
+      cleanupDesc: '清理当前账号空间的本机消息索引，并保留云端消息。',
+      cleanupTitle: '清理本机消息索引',
+      loading: '正在读取本地消息库...',
+      mediaCleanupDesc: '清理本机图片、视频和文件缓存，不删除云端消息。',
+      mediaCleanupTitle: '清理本机媒体缓存',
+      repairDesc: '检查 DB、重建搜索索引，并标记丢失的本机媒体文件。',
+      repairTitle: '检查并修复本地库',
+      stats: '本机消息 {messages} 条，媒体 {media} 个，发送箱 {outbox} 条，占用 {size}',
+      title: '本地消息库',
+      unavailable: '当前客户端未接入本地消息库统计',
     },
     option: {
       apiLog: {

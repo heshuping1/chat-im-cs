@@ -1,9 +1,15 @@
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { MutableRefObject } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
+import type { AuthSession } from "../../data/auth/auth-session";
 import { mergeLocalOutgoingMessages } from "../../data/im-local-outgoing";
 import { reduceMessageCoreEvent } from "../../data/message-core/message-core";
+import {
+  getImMessageStore,
+  imMessageScopeKey,
+} from "../../data/message-store/im-message-store";
 import type { ImMessageHydrationSource } from "../../data/message-store/im-message-store-hydration";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { applyDirectReadReceiptToMessages } from "../../data/read-receipts";
@@ -29,6 +35,7 @@ export function useMessageListData({
   messageSearchKeyword,
   messageSearchOpen,
   messagesHydrationSource,
+  session,
   serverMessages,
   unreadIdentity,
 }: {
@@ -43,6 +50,7 @@ export function useMessageListData({
   messageSearchKeyword: string;
   messageSearchOpen: boolean;
   messagesHydrationSource: ImMessageHydrationSource;
+  session: AuthSession | null;
   serverMessages: MessageItemDto[];
   unreadIdentity: CurrentUserIdentity | null;
 }) {
@@ -93,17 +101,57 @@ export function useMessageListData({
     ],
   );
   const historyCounts = useMemo(() => getHistoryFilterCounts(messages), [messages]);
+  const scopeKey = imMessageScopeKey(session);
+  const localSearchKeyword = messageSearchOpen ? messageSearchKeyword.trim() : "";
+  const localSearchQuery = useQuery({
+    queryKey: [
+      "pc-im-local-message-search",
+      scopeKey,
+      activeConversationType ?? "",
+      activeConversation?.conversationId ?? "",
+      localSearchKeyword,
+    ],
+    enabled: Boolean(
+      session &&
+        activeConversation?.conversationId &&
+        activeConversationType &&
+        localSearchKeyword,
+    ),
+    queryFn: () =>
+      getImMessageStore().searchMessages(
+        scopeKey,
+        activeConversationType!,
+        activeConversation!.conversationId,
+        localSearchKeyword,
+        200,
+      ),
+    staleTime: 15_000,
+  });
+  const localDatabaseSearchActive = Boolean(localSearchKeyword && localSearchQuery.data);
   const lookupScope = useMemo(
-    () => createMessageLookupScope(messagesHydrationSource),
-    [messagesHydrationSource],
+    () =>
+      createMessageLookupScope(messagesHydrationSource, {
+        localDatabaseSearch: localDatabaseSearchActive,
+      }),
+    [localDatabaseSearchActive, messagesHydrationSource],
   );
   const visibleMessages = useMemo(
-    () =>
-      filterVisibleMessages(
-        filterMessagesByHistory(messages, historyOpen ? historyFilter : "all"),
-        messageSearchOpen ? messageSearchKeyword : "",
-      ),
-    [historyFilter, historyOpen, messageSearchKeyword, messageSearchOpen, messages],
+    () => {
+      const searchSource = localDatabaseSearchActive ? localSearchQuery.data ?? [] : messages;
+      return filterVisibleMessages(
+        filterMessagesByHistory(searchSource, historyOpen ? historyFilter : "all"),
+        localDatabaseSearchActive ? "" : messageSearchOpen ? messageSearchKeyword : "",
+      );
+    },
+    [
+      historyFilter,
+      historyOpen,
+      localDatabaseSearchActive,
+      localSearchQuery.data,
+      messageSearchKeyword,
+      messageSearchOpen,
+      messages,
+    ],
   );
 
   return {

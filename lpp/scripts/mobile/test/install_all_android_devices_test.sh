@@ -16,11 +16,21 @@ xml='<hierarchy>
   <node text="继续安装" resource-id="android:id/button1" bounds="[760,2050][1030,2160]" />
 </hierarchy>'
 
-keep_bounds="$(extract_uiautomator_bounds_by_text_regex "$xml" '保留数据|覆盖安装|替换安装')"
-button_bounds="$(extract_uiautomator_bounds_by_text_regex "$xml" '继续安装|仍要安装|安装|确定')"
+reinstall_xml='<hierarchy>
+  <node text="重新安装" resource-id="android:id/button1" bounds="[760,1820][1030,1930]" />
+</hierarchy>'
+
+keep_bounds="$(extract_uiautomator_bounds_by_text_regex "$xml" "$VIVO_INSTALL_CHOICE_TEXT_REGEX")"
+reinstall_bounds="$(extract_uiautomator_bounds_by_text_regex "$reinstall_xml" "$VIVO_INSTALL_CONFIRM_TEXT_REGEX")"
+button_bounds="$(extract_uiautomator_bounds_by_text_regex "$xml" "$VIVO_INSTALL_CONFIRM_TEXT_REGEX")"
 
 if [ "$keep_bounds" != "80 540 1000 640" ]; then
   echo "Expected keep-data duplicate install option bounds, got: $keep_bounds" >&2
+  exit 1
+fi
+
+if [ "$reinstall_bounds" != "760 1820 1030 1930" ]; then
+  echo "Expected reinstall/continue install button bounds, got: $reinstall_bounds" >&2
   exit 1
 fi
 

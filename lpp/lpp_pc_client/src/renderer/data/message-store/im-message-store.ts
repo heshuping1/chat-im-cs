@@ -1,10 +1,14 @@
 import type { MessageItemDto } from "../api/types";
 import type { CurrentUserIdentity } from "../message-display";
+import type { DesktopApi } from "../../../shared/desktop-api";
+import type { LocalDataMessage, LocalDataMessageInput } from "../../../shared/local-data-contract";
+import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 import { reduceMessageCoreEvent } from "../message-core/message-core";
 import {
   imMessageConversationKey,
   imMessageRecordKey,
   imMessageScopeKey,
+  parseImMessageConversationKey,
 } from "./im-message-store-scope";
 import {
   compareMessagesForLocalStore,
@@ -15,6 +19,7 @@ export {
   imMessageConversationKey,
   imMessageRecordKey,
   imMessageScopeKey,
+  parseImMessageConversationKey,
   mergeMessagesForLocalStore,
 };
 
@@ -54,6 +59,13 @@ export interface ImMessageStore {
     conversationId: string,
     messages: MessageItemDto[],
   ): Promise<void>;
+  searchMessages(
+    scopeKey: string,
+    conversationType: string,
+    conversationId: string,
+    keyword: string,
+    limit: number,
+  ): Promise<MessageItemDto[]>;
   upsertMessages(
     scopeKey: string,
     conversationType: string,
@@ -62,7 +74,7 @@ export interface ImMessageStore {
   ): Promise<void>;
 }
 
-interface ImMessageStoreRecord {
+export interface ImMessageStoreRecord {
   conversationId: string;
   conversationKey: string;
   conversationSeq?: number;
@@ -78,6 +90,8 @@ interface ImMessageStoreRecord {
 const imMessageDbName = "lpp-pc-im-message-store";
 const imMessageDbVersion = 1;
 const messagesStoreName = "messages";
+const indexedDbMigrationJournalKey = "lpp-pc-im-message-store:indexeddb-migration-v1";
+const desktopLocalDataMessagePageSize = 500;
 
 export function createMemoryImMessageStore(): ImMessageStore {
   const records = new Map<string, ImMessageStoreRecord>();
@@ -134,6 +148,14 @@ export function createMemoryImMessageStore(): ImMessageStore {
         records.set(record.id, record);
       }
     },
+    async searchMessages(scopeKey, conversationType, conversationId, keyword, limit) {
+      const conversationKey = imMessageConversationKey(scopeKey, conversationType, conversationId);
+      return listRecordsForConversation(Array.from(records.values()), conversationKey, {
+        limit: Number.MAX_SAFE_INTEGER,
+      })
+        .filter((message) => messageMatchesSearchKeyword(message, keyword))
+        .slice(0, Math.max(0, limit));
+    },
     async upsertMessages(scopeKey, conversationType, conversationId, messages) {
       for (const record of createRecords(scopeKey, conversationType, conversationId, messages)) {
         const previous = records.get(record.id);
@@ -149,11 +171,342 @@ export function createMemoryImMessageStore(): ImMessageStore {
 }
 
 export function getImMessageStore(): ImMessageStore {
+  const desktopStore = getDesktopImMessageStore();
+  if (desktopStore) return desktopStore;
   if (typeof indexedDB === "undefined") return memoryImMessageStore;
   return indexedDbImMessageStore;
 }
 
 const memoryImMessageStore = createMemoryImMessageStore();
+let desktopImMessageStore: ImMessageStore | null = null;
+
+function getDesktopImMessageStore() {
+  const desktopApi = typeof window !== "undefined" ? window.desktopApi : undefined;
+  if (
+    !desktopApi?.localDataListMessages ||
+    !desktopApi.localDataSearchMessages ||
+    !desktopApi.localDataUpsertMessages ||
+    !desktopApi.localDataDeleteMessage ||
+    !desktopApi.localDataClearScope
+  ) {
+    return null;
+  }
+  desktopImMessageStore ??= createDesktopImMessageStore(desktopApi);
+  void migrateIndexedDbMessagesToDesktopStore(desktopApi);
+  return desktopImMessageStore;
+}
+
+export function createDesktopImMessageStore(
+  desktopApi: Pick<
+    DesktopApi,
+    | "localDataClearScope"
+    | "localDataDeleteMessage"
+    | "localDataListMessages"
+    | "localDataSearchMessages"
+    | "localDataUpsertMessages"
+  >,
+): ImMessageStore {
+  return {
+    async applyReadMetadata(scopeKey, conversationType, conversationId, metadata) {
+      const messages = await listAllDesktopMessages(
+        desktopApi,
+        scopeKey,
+        conversationType,
+        conversationId,
+      );
+      const next = applyReadMetadataToMessages(conversationType, conversationId, messages, metadata);
+      await desktopApi.localDataUpsertMessages({
+        messages: next.map((message) =>
+          messageItemToLocalDataInput(scopeKey, conversationType, conversationId, message),
+        ),
+        scopeKey,
+      });
+    },
+    async clearScope(scopeKey) {
+      await desktopApi.localDataClearScope({ scopeKey });
+    },
+    async deleteMessage(scopeKey, conversationType, conversationId, messageId) {
+      await desktopApi.localDataDeleteMessage({
+        conversationId,
+        conversationType,
+        messageId,
+        scopeKey,
+      });
+    },
+    async listMessages(conversationKey, options) {
+      const parsed = parseImMessageConversationKey(conversationKey);
+      if (!parsed) return [];
+      return (
+        await desktopApi.localDataListMessages({
+          beforeSeq: options.beforeSeq,
+          conversationId: parsed.conversationId,
+          conversationType: parsed.conversationType,
+          limit: localDataMessageLimit(options.limit),
+          scopeKey: parsed.scopeKey,
+        })
+      ).map(localDataMessageToMessageItem);
+    },
+    async markMessageRecalled(scopeKey, conversationType, conversationId, messageId) {
+      const messages = await listAllDesktopMessages(
+        desktopApi,
+        scopeKey,
+        conversationType,
+        conversationId,
+      );
+      const next = reduceMessageCoreEvent(
+        { messages },
+        {
+          type: "message.recalled",
+          conversationId,
+          conversationType: conversationType === "group" ? "group" : "direct",
+          messageId,
+        },
+      ).state.messages;
+      await desktopApi.localDataUpsertMessages({
+        messages: next.map((message) =>
+          messageItemToLocalDataInput(scopeKey, conversationType, conversationId, message),
+        ),
+        scopeKey,
+      });
+    },
+    async replaceConversationSnapshot(scopeKey, conversationType, conversationId, messages) {
+      const existing = await listAllDesktopMessages(
+        desktopApi,
+        scopeKey,
+        conversationType,
+        conversationId,
+      );
+      await Promise.all(
+        existing.map((message) =>
+          desktopApi.localDataDeleteMessage({
+            conversationId,
+            conversationType,
+            messageId: message.messageId,
+            scopeKey,
+          }),
+        ),
+      );
+      await desktopApi.localDataUpsertMessages({
+        messages: messages.map((message) =>
+          messageItemToLocalDataInput(scopeKey, conversationType, conversationId, message),
+        ),
+        scopeKey,
+      });
+    },
+    async searchMessages(scopeKey, conversationType, conversationId, keyword, limit) {
+      return (
+        await desktopApi.localDataSearchMessages({
+          conversationId,
+          conversationType,
+          keyword,
+          limit: localDataMessageLimit(limit),
+          scopeKey,
+        })
+      ).map(localDataMessageToMessageItem);
+    },
+    async upsertMessages(scopeKey, conversationType, conversationId, messages) {
+      await desktopApi.localDataUpsertMessages({
+        messages: messages.map((message) =>
+          messageItemToLocalDataInput(scopeKey, conversationType, conversationId, message),
+        ),
+        scopeKey,
+      });
+    },
+  };
+}
+
+let indexedDbMigrationPromise: Promise<void> | null = null;
+
+export function migrateIndexedDbMessagesToDesktopStore(
+  desktopApi: Pick<DesktopApi, "localDataUpsertMessages">,
+) {
+  if (indexedDbMigrationPromise) return indexedDbMigrationPromise;
+  indexedDbMigrationPromise = migrateIndexedDbMessagesToDesktopStoreOnce(desktopApi).catch((error) => {
+    indexedDbMigrationPromise = null;
+    recordLocalDataMigrationDiagnostic("failed", {
+      reason: error instanceof Error ? error.message : "unknown-error",
+    });
+  });
+  return indexedDbMigrationPromise;
+}
+
+export function localDataInputsByScopeFromIndexedDbRecords(records: ImMessageStoreRecord[]) {
+  const byScope = new Map<string, LocalDataMessageInput[]>();
+  for (const record of records) {
+    if (!record.messageId?.trim()) continue;
+    const next = byScope.get(record.scopeKey) ?? [];
+    next.push(
+      messageItemToLocalDataInput(
+        record.scopeKey,
+        record.conversationType,
+        record.conversationId,
+        record.message,
+      ),
+    );
+    byScope.set(record.scopeKey, next);
+  }
+  return byScope;
+}
+
+async function migrateIndexedDbMessagesToDesktopStoreOnce(
+  desktopApi: Pick<DesktopApi, "localDataUpsertMessages">,
+) {
+  if (typeof indexedDB === "undefined") return;
+  if (readIndexedDbMigrationJournal()?.completedAt) return;
+  const records = await readIndexedDbMessageRecordsForMigration();
+  if (!records) return;
+  const byScope = localDataInputsByScopeFromIndexedDbRecords(records);
+  let migratedCount = 0;
+  for (const [scopeKey, messages] of byScope) {
+    if (messages.length === 0) continue;
+    await desktopApi.localDataUpsertMessages({ messages, scopeKey });
+    migratedCount += messages.length;
+  }
+  writeIndexedDbMigrationJournal({
+    completedAt: new Date().toISOString(),
+    migratedCount,
+    scopeCount: byScope.size,
+  });
+  recordLocalDataMigrationDiagnostic("ok", {
+    migratedCount,
+    scopeCount: byScope.size,
+  });
+}
+
+async function readIndexedDbMessageRecordsForMigration() {
+  try {
+    const db = await openImMessageDb();
+    return await getAllFromStore<ImMessageStoreRecord>(db, messagesStoreName);
+  } catch (error) {
+    recordLocalDataMigrationDiagnostic("failed", {
+      phase: "read-indexeddb",
+      reason: error instanceof Error ? error.message : "unknown-error",
+    });
+    return null;
+  }
+}
+
+function readIndexedDbMigrationJournal() {
+  try {
+    const raw = globalThis.window?.localStorage?.getItem(indexedDbMigrationJournalKey);
+    return raw ? JSON.parse(raw) as { completedAt?: string } : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeIndexedDbMigrationJournal(value: {
+  completedAt: string;
+  migratedCount: number;
+  scopeCount: number;
+}) {
+  try {
+    globalThis.window?.localStorage?.setItem(indexedDbMigrationJournalKey, JSON.stringify(value));
+  } catch {
+    // Migration remains idempotent through LocalDataService upsert even when localStorage is unavailable.
+  }
+}
+
+function recordLocalDataMigrationDiagnostic(
+  result: "ok" | "failed",
+  summary: Record<string, unknown>,
+) {
+  recordMessageReminderDiagnostic({
+    event: "local-data.indexeddb-migration",
+    phase: "migration",
+    route: "im-message-store",
+    source: "local-data",
+    summary: { ...summary, result },
+  });
+}
+
+async function listAllDesktopMessages(
+  desktopApi: Pick<DesktopApi, "localDataListMessages">,
+  scopeKey: string,
+  conversationType: string,
+  conversationId: string,
+) {
+  let beforeSeq: number | undefined;
+  let all: MessageItemDto[] = [];
+  for (;;) {
+    const page = (
+      await desktopApi.localDataListMessages({
+        ...(typeof beforeSeq === "number" ? { beforeSeq } : {}),
+        conversationId,
+        conversationType,
+        limit: desktopLocalDataMessagePageSize,
+        scopeKey,
+      })
+    ).map(localDataMessageToMessageItem);
+    all = page.concat(all);
+    if (page.length < desktopLocalDataMessagePageSize) return all;
+    const nextBeforeSeq = earliestConversationSeq(page);
+    if (typeof nextBeforeSeq !== "number") return all;
+    beforeSeq = nextBeforeSeq;
+  }
+}
+
+function localDataMessageLimit(value: number) {
+  if (!Number.isFinite(value)) return desktopLocalDataMessagePageSize;
+  return Math.min(desktopLocalDataMessagePageSize, Math.max(1, Math.trunc(value)));
+}
+
+function earliestConversationSeq(messages: MessageItemDto[]) {
+  for (const message of messages) {
+    if (typeof message.conversationSeq === "number" && Number.isFinite(message.conversationSeq)) {
+      return message.conversationSeq;
+    }
+  }
+  return undefined;
+}
+
+function messageItemToLocalDataInput(
+  scopeKey: string,
+  conversationType: string,
+  conversationId: string,
+  message: MessageItemDto,
+): LocalDataMessageInput {
+  const record = message as unknown as Record<string, unknown>;
+  return {
+    bodyJson: message.body ?? {},
+    clientMsgId: message.clientMsgId ?? message.clientMessageId ?? undefined,
+    conversationId: message.conversationId || conversationId,
+    conversationSeq: message.conversationSeq,
+    conversationType: conversationType === "group" ? "group" : "direct",
+    isRead: message.isRead,
+    messageId: message.messageId,
+    messageType: message.messageType,
+    preview: message.preview,
+    scopeKey,
+    senderUserId:
+      message.senderUserId ??
+      message.senderId ??
+      message.fromUserId ??
+      message.senderPlatformUserId,
+    sentAt: message.sentAt ?? stringValue(record.serverTime),
+    status: message.status,
+  };
+}
+
+function localDataMessageToMessageItem(message: LocalDataMessage): MessageItemDto {
+  return {
+    body: message.bodyJson,
+    ...(message.clientMsgId ? { clientMsgId: message.clientMsgId } : {}),
+    conversationId: message.conversationId,
+    conversationSeq: message.conversationSeq,
+    isRead: message.isRead,
+    messageId: message.messageId,
+    messageType: message.messageType,
+    preview: message.preview,
+    senderUserId: message.senderUserId,
+    sentAt: message.sentAt,
+    status: message.status,
+  };
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : undefined;
+}
 
 function createRecords(
   scopeKey: string,
@@ -269,6 +622,16 @@ const indexedDbImMessageStore: ImMessageStore = {
     }
     await transactionDone(transaction);
   },
+  async searchMessages(scopeKey, conversationType, conversationId, keyword, limit) {
+    const db = await openImMessageDb();
+    const conversationKey = imMessageConversationKey(scopeKey, conversationType, conversationId);
+    const records = await getAllFromStore<ImMessageStoreRecord>(db, messagesStoreName);
+    return listRecordsForConversation(records, conversationKey, {
+      limit: Number.MAX_SAFE_INTEGER,
+    })
+      .filter((message) => messageMatchesSearchKeyword(message, keyword))
+      .slice(0, Math.max(0, limit));
+  },
   async upsertMessages(scopeKey, conversationType, conversationId, messages) {
     const db = await openImMessageDb();
     for (const record of createRecords(scopeKey, conversationType, conversationId, messages)) {
@@ -379,4 +742,26 @@ function transactionDone(transaction: IDBTransaction) {
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
+}
+
+function messageMatchesSearchKeyword(message: MessageItemDto, keyword: string) {
+  const normalized = keyword.trim().toLowerCase();
+  if (!normalized) return true;
+  return [
+    message.preview,
+    message.senderDisplayName,
+    typeof message.body?.text === "string" ? message.body.text : "",
+    fileNameFromUnknown(message.body?.file),
+    fileNameFromUnknown(message.body?.image),
+    fileNameFromUnknown(message.body?.video),
+  ]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(normalized));
+}
+
+function fileNameFromUnknown(value: unknown) {
+  if (!value || typeof value !== "object") return "";
+  const fileName = (value as { fileName?: unknown; name?: unknown }).fileName ??
+    (value as { name?: unknown }).name;
+  return typeof fileName === "string" ? fileName : "";
 }

@@ -19,6 +19,7 @@ import type { AppInstanceProfilePayload } from "../../shared/desktop-api";
 import { getAppInstanceProfile } from "../data/app-instance/app-instance";
 import { pcQueryKeys } from "../data/query-keys";
 import { requireApiClient } from "../data/runtime";
+import { workspaceScopeFromSession } from "../data/workspace-scope";
 import type { TenantInfoDto, UserProfileDto } from "../data/api-client";
 import type { AuthSession } from "../data/auth/auth-session";
 import { useAuthSession, useClearAuthSession, useSetAuthSession } from "../data/auth/auth-store";
@@ -28,6 +29,7 @@ import { pcUserTimezoneLabels, pcUserTimezoneOptions } from "../data/time/user-t
 import { localeLabels, supportedLocales, type AppLocale } from "../i18n/locales";
 import { useI18n } from "../i18n/useI18n";
 import { formatError, formatShortDate } from "../lib/format";
+import { requestMessageCustomConfirmation } from "../messages/runtime/messageConfirm";
 import { PcAvatar } from "./PcAvatar";
 import { exportCurrentDiagnosticsPackage } from "../settings/runtime/diagnosticsExport";
 import {
@@ -456,6 +458,10 @@ function renderSection(
               localStorage.removeItem("lpp.pc.message-cache");
               actions.setNotice(t("me.notice.chatCacheCleared"));
             }}
+          />
+          <LocalDataStorageRows
+            authSession={actions.authSession}
+            setNotice={actions.setNotice}
           />
           <ConnectivityHealthSection authSession={actions.authSession} />
           <SelectRow
@@ -1100,6 +1106,119 @@ function AppProfileInfoRow() {
   );
 }
 
+function LocalDataStorageRows({
+  authSession,
+  setNotice,
+}: {
+  authSession: AuthSession | null;
+  setNotice: (notice: string) => void;
+}) {
+  const { t } = useI18n();
+  const scopeKey = useMemo(() => workspaceScopeFromSession(authSession).key, [authSession]);
+  const desktopApi = typeof window !== "undefined" ? window.desktopApi : undefined;
+  const statsQuery = useQuery({
+    queryKey: ["pc-local-data-storage-stats", scopeKey],
+    enabled: Boolean(desktopApi?.localDataGetStorageStats),
+    queryFn: () => desktopApi!.localDataGetStorageStats({ scopeKey }),
+    staleTime: 30_000,
+  });
+  const cleanupMutation = useMutation({
+    mutationFn: async () => {
+      if (!desktopApi?.localDataCleanup) {
+        throw new Error(t("me.localDataStorage.unavailable"));
+      }
+      localStorage.removeItem("lpp.pc.message-cache");
+      return desktopApi.localDataCleanup({ scopeKey, target: "message-index" });
+    },
+    onSuccess: (result) => {
+      void statsQuery.refetch();
+      setNotice(t("me.notice.localDataCleaned", { count: result.deletedMessages }));
+    },
+    onError: (error) => {
+      setNotice(t("me.notice.localDataCleanFailed", { error: formatError(error) }));
+    },
+  });
+  const cleanupMediaMutation = useMutation({
+    mutationFn: async () => {
+      if (!desktopApi?.localDataCleanup) {
+        throw new Error(t("me.localDataStorage.unavailable"));
+      }
+      return desktopApi.localDataCleanup({ scopeKey, target: "media-cache" });
+    },
+    onSuccess: (result) => {
+      void statsQuery.refetch();
+      setNotice(t("me.notice.localMediaCleaned", { size: formatStorageSize(result.deletedBytes) }));
+    },
+    onError: (error) => {
+      setNotice(t("me.notice.localMediaCleanFailed", { error: formatError(error) }));
+    },
+  });
+  const repairMutation = useMutation({
+    mutationFn: async () => {
+      if (!desktopApi?.localDataRepair) {
+        throw new Error(t("me.localDataStorage.unavailable"));
+      }
+      return desktopApi.localDataRepair({ rebuildFts: true, scopeKey });
+    },
+    onSuccess: (result) => {
+      void statsQuery.refetch();
+      setNotice(t("me.notice.localDataRepairDone", {
+        stale: result.staleMediaVariants,
+        status: result.dbIntegrity,
+      }));
+    },
+    onError: (error) => {
+      setNotice(t("me.notice.localDataRepairFailed", { error: formatError(error) }));
+    },
+  });
+  const stats = statsQuery.data;
+  const confirmCleanup = () => {
+    if (!requestMessageCustomConfirmation(t("me.localDataStorage.cleanupConfirm"))) return;
+    cleanupMutation.mutate();
+  };
+
+  return (
+    <>
+      <InfoRow
+        label={t("me.localDataStorage.title")}
+        desc={
+          stats
+            ? t("me.localDataStorage.stats", {
+                media: stats.mediaCount,
+                messages: stats.messageCount,
+                outbox: stats.outboxCount,
+                size: formatStorageSize(stats.totalBytes),
+              })
+            : statsQuery.isError
+              ? t("me.localDataStorage.unavailable")
+              : t("me.localDataStorage.loading")
+        }
+      />
+      <ActionRow
+        action={cleanupMutation.isPending ? t("me.action.processing") : t("me.action.clean")}
+        desc={t("me.localDataStorage.cleanupDesc")}
+        enabled={Boolean(desktopApi?.localDataCleanup) && !cleanupMutation.isPending}
+        label={t("me.localDataStorage.cleanupTitle")}
+        onClick={confirmCleanup}
+      />
+      <ActionRow
+        action={cleanupMediaMutation.isPending ? t("me.action.processing") : t("me.action.clean")}
+        desc={t("me.localDataStorage.mediaCleanupDesc")}
+        enabled={Boolean(desktopApi?.localDataCleanup) && !cleanupMediaMutation.isPending}
+        label={t("me.localDataStorage.mediaCleanupTitle")}
+        onClick={() => cleanupMediaMutation.mutate()}
+      />
+      <ActionRow
+        action={repairMutation.isPending ? t("me.action.processing") : t("me.action.check")}
+        desc={t("me.localDataStorage.repairDesc")}
+        enabled={Boolean(desktopApi?.localDataRepair) && !repairMutation.isPending}
+        label={t("me.localDataStorage.repairTitle")}
+        onClick={() => repairMutation.mutate()}
+      />
+    </>
+  );
+}
+
 function DevelopmentDiagnosticsSection({ authSession }: { authSession: AuthSession | null }) {
   const { t } = useI18n();
   const [version, setVersion] = useState(t("me.development.browserDebug"));
@@ -1137,6 +1256,18 @@ function DevelopmentDiagnosticsSection({ authSession }: { authSession: AuthSessi
       <InfoRow label={t("me.development.recentDiagnostics")} desc={t("me.development.recentDiagnosticsCount", { count: diagnosticsCount })} />
     </div>
   );
+}
+
+function formatStorageSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
 }
 
 function shouldShowDevelopmentDiagnostics(authSession: AuthSession | null) {

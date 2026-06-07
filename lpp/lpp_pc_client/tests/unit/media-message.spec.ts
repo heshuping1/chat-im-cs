@@ -429,6 +429,10 @@ describe("message media upload presentation", () => {
     resolve(process.cwd(), "src/renderer/media/components/VideoMessagePreview.tsx"),
     "utf8",
   );
+  const videoPlayerRuntime = readFileSync(
+    resolve(process.cwd(), "src/renderer/media/runtime/videoPlayer.ts"),
+    "utf8",
+  );
   const imMediaSendController = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/hooks/useMessageMediaSendController.ts"),
     "utf8",
@@ -634,11 +638,11 @@ describe("message media upload presentation", () => {
     expect(messageMediaParts).toContain("const localVideoOpenSrc = localVideoSrc || item?.localOpenUrl;");
     expect(messageMediaParts).toContain("const openSrc = localVideoOpenSrc || remoteSrc || src;");
     expect(messageMediaParts).toContain("localVideoDisplaySrc");
-    expect(messageMediaParts).toContain("const previewSource = localVideoDisplaySrc || src;");
+    expect(messageMediaParts).toContain("const previewSource = localVideoDisplaySrc || item?.localOpenUrl;");
     expect(messageMediaParts).toContain("allowDesktopFile: canOpenVideoPlayer || canReadMediaFileAsDataUrl");
     expect(messageMediaParts).toContain('kind: "video"');
     expect(messageMediaParts).toMatch(/useAuthenticatedMediaUrl\(\s*previewSrc,/);
-    expect(messageMediaParts).toContain("displaySrc: openSrc");
+    expect(videoPlayerRuntime).toContain("if (/^https?:/i.test(url)) return undefined;");
     expect(messageMediaParts).toContain("openable={Boolean(openSrc)}");
     expect(videoMessagePreview).toContain("openable");
     expect(videoMessagePreview).toContain("const canAttemptOpen = Boolean(openable ?? src);");

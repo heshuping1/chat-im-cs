@@ -38,6 +38,8 @@ describe("media materialization", () => {
             filePath: "/cache/images/media-1.png",
             fileUrl: "file:///cache/images/media-1.png",
           }),
+          localDataGetMediaVariant: vi.fn().mockResolvedValue(null),
+          localDataUpsertMedia: vi.fn().mockResolvedValue(undefined),
           readMediaFileAsDataUrl: vi.fn().mockResolvedValue(
             "data:image/png;base64,aW1hZ2U=",
           ),
@@ -100,13 +102,13 @@ describe("media materialization", () => {
 
   it("builds a stable cache key from media identity even when no remote url is present yet", () => {
     expect(mediaMaterializationCacheKey("image", { mediaId: "media-1" }, undefined)).toBe(
-      "image:media-1",
+      "image:media:media-1",
     );
     expect(mediaMaterializationCacheKey("video", { mediaId: "media-1" }, undefined)).toBe(
-      "video:media-1",
+      "video:media:media-1",
     );
     expect(mediaMaterializationCacheKey("file", { mediaId: "media-1" }, undefined)).toBe(
-      "file:media-1",
+      "file:media:media-1",
     );
   });
 
@@ -138,6 +140,60 @@ describe("media materialization", () => {
     );
     expect(getMaterializedMediaFileUrl("image:media:media-1")).toBe(
       "file:///cache/images/media-1.png",
+    );
+    expect(window.desktopApi?.localDataUpsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        asset: expect.objectContaining({
+          kind: "image",
+          mediaIdentity: "media:media-1",
+        }),
+        messageRefs: [
+          {
+            mediaIdentity: "media:media-1",
+            messageId: "image-1",
+            refKind: "image",
+          },
+        ],
+      }),
+    );
+  });
+
+  it("links received messages to an existing local media variant without refetching", async () => {
+    vi.mocked(window.desktopApi?.localDataGetMediaVariant).mockResolvedValueOnce({
+      fileUrl: "file:///cache/images/existing.png",
+      mediaIdentity: "media:media-1",
+      status: "cached",
+      updatedAt: Date.now(),
+      variantKind: "original",
+    });
+
+    await materializeReceivedMediaMessage({
+      accountId: "staff-1",
+      assetBaseUrl: "https://api.example.test",
+      authToken: "tenant-token",
+      conversationId: "direct-1",
+      message: mediaMessage("image", {
+        image: {
+          fileName: "photo.png",
+          signedUrl: "/media/media-1?sig=cached",
+        },
+      }, "image-cached"),
+    });
+
+    expect(window.desktopApi?.cacheMediaFile).not.toHaveBeenCalled();
+    expect(getMaterializedMediaFileUrl("image:media:media-1")).toBe(
+      "file:///cache/images/existing.png",
+    );
+    expect(window.desktopApi?.localDataUpsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageRefs: [
+          {
+            mediaIdentity: "media:media-1",
+            messageId: "image-cached",
+            refKind: "image",
+          },
+        ],
+      }),
     );
   });
 
@@ -275,12 +331,23 @@ describe("media materialization", () => {
   });
 
   it("registers sent media local files into the same materialized index", () => {
-    registerSentMediaMaterialization("image", { mediaId: "media-1" }, "file:///cache/sent.png");
+    registerSentMediaMaterialization("image", { mediaId: "media-1" }, "file:///cache/sent.png", "msg-image");
     registerSentMediaMaterialization("video", { mediaId: "media-1" }, "file:///cache/sent.mp4");
     registerSentMediaMaterialization("file", { mediaId: "media-1" }, "file:///cache/sent.zip");
 
-    expect(getMaterializedMediaFileUrl("image:media-1")).toBe("file:///cache/sent.png");
-    expect(getMaterializedMediaFileUrl("video:media-1")).toBe("file:///cache/sent.mp4");
-    expect(getMaterializedMediaFileUrl("file:media-1")).toBe("file:///cache/sent.zip");
+    expect(getMaterializedMediaFileUrl("image:media:media-1")).toBe("file:///cache/sent.png");
+    expect(getMaterializedMediaFileUrl("video:media:media-1")).toBe("file:///cache/sent.mp4");
+    expect(getMaterializedMediaFileUrl("file:media:media-1")).toBe("file:///cache/sent.zip");
+    expect(window.desktopApi?.localDataUpsertMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageRefs: [
+          {
+            mediaIdentity: "media:media-1",
+            messageId: "msg-image",
+            refKind: "image",
+          },
+        ],
+      }),
+    );
   });
 });

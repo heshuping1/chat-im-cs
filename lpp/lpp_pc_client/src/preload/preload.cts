@@ -151,6 +151,44 @@ const desktopApi: DesktopApi = {
     validatedInvoke('setTaskbarBadge', 'desktop:set-taskbar-badge', payload),
   setTrayStatus: (status: TrayStatus) =>
     validatedInvoke('setTrayStatus', 'desktop:set-tray-status', status),
+  localDataClearScope: (payload) =>
+    validatedInvoke('localDataClearScope', 'desktop:local-data-clear-scope', payload),
+  localDataCleanup: (payload) =>
+    validatedInvoke('localDataCleanup', 'desktop:local-data-cleanup', payload),
+  localDataDeleteMessage: (payload) =>
+    validatedInvoke('localDataDeleteMessage', 'desktop:local-data-delete-message', payload),
+  localDataDeleteOutbox: (payload) =>
+    validatedInvoke('localDataDeleteOutbox', 'desktop:local-data-delete-outbox', payload),
+  localDataGetMediaVariant: (payload) =>
+    validatedInvoke('localDataGetMediaVariant', 'desktop:local-data-get-media-variant', payload),
+  localDataGetStorageStats: (payload) =>
+    validatedInvoke('localDataGetStorageStats', 'desktop:local-data-get-storage-stats', payload),
+  localDataListCustomerServiceThreads: (payload) =>
+    validatedInvoke(
+      'localDataListCustomerServiceThreads',
+      'desktop:local-data-list-customer-service-threads',
+      payload,
+    ),
+  localDataListMessages: (payload) =>
+    validatedInvoke('localDataListMessages', 'desktop:local-data-list-messages', payload),
+  localDataListOutbox: (payload) =>
+    validatedInvoke('localDataListOutbox', 'desktop:local-data-list-outbox', payload),
+  localDataRepair: (payload) =>
+    validatedInvoke('localDataRepair', 'desktop:local-data-repair', payload),
+  localDataSearchMessages: (payload) =>
+    validatedInvoke('localDataSearchMessages', 'desktop:local-data-search-messages', payload),
+  localDataUpsertCustomerServiceThread: (payload) =>
+    validatedInvoke(
+      'localDataUpsertCustomerServiceThread',
+      'desktop:local-data-upsert-customer-service-thread',
+      payload,
+    ),
+  localDataUpsertMedia: (payload) =>
+    validatedInvoke('localDataUpsertMedia', 'desktop:local-data-upsert-media', payload),
+  localDataUpsertMessages: (payload) =>
+    validatedInvoke('localDataUpsertMessages', 'desktop:local-data-upsert-messages', payload),
+  localDataUpsertOutbox: (payload) =>
+    validatedInvoke('localDataUpsertOutbox', 'desktop:local-data-upsert-outbox', payload),
 };
 
 contextBridge.exposeInMainWorld('desktopApi', desktopApi);

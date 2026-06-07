@@ -26,6 +26,23 @@ import type {
   TrayStatus,
   VideoPlayerPayload,
 } from './desktop-api.js';
+import {
+  validateLocalDataClearScopePayload,
+  validateLocalDataCleanupPayload,
+  validateLocalDataDeleteMessagePayload,
+  validateLocalDataDeleteOutboxPayload,
+  validateLocalDataGetMediaVariantPayload,
+  validateLocalDataListCustomerServiceThreadsPayload,
+  validateLocalDataListMessagesPayload,
+  validateLocalDataListOutboxPayload,
+  validateLocalDataRepairPayload,
+  validateLocalDataSearchMessagesPayload,
+  validateLocalDataStorageStatsPayload,
+  validateLocalDataUpsertCustomerServiceThreadPayload,
+  validateLocalDataUpsertMediaPayload,
+  validateLocalDataUpsertMessagesPayload,
+  validateLocalDataUpsertOutboxPayload,
+} from './local-data-ipc-validation.js';
 
 const maxShortTextLength = 4_096;
 const maxSavedContentLength = 5 * 1024 * 1024;
@@ -44,11 +61,7 @@ const notificationChannels = new Set<DesktopNotificationChannel>(['im', 'service
 const appLogModules = new Set<AppLogModule>(['main', 'auth', 'api']);
 const appLogLevels = new Set<AppLogLevel>(['debug', 'info', 'warn', 'error']);
 const appLogResults = new Set<AppLogResult>(['ok', 'degraded', 'ignored', 'invalid', 'failed']);
-const notificationTargetModules = new Set<DesktopNotificationTargetModule>([
-  'contacts',
-  'messages',
-  'onlineService',
-]);
+const notificationTargetModules = new Set<DesktopNotificationTargetModule>(['contacts', 'messages', 'onlineService']);
 const sensitiveDiagnosticsKeyPattern = /token|password|authorization|secret|credential/i;
 const diagnosticsContentKeyPattern = /^(body|content|messageText|rawText)$/i;
 const diagnosticsScopeKeyPattern = /^scopeKey$/i;
@@ -130,6 +143,36 @@ export function validateDesktopApiCall(
       return [validateCsRoutingDiagnosticPayload(args[0])];
     case 'recordMessageReminderDiagnostic':
       return [validateMessageReminderDiagnosticPayload(args[0])];
+    case 'localDataListMessages':
+      return [validateLocalDataListMessagesPayload(args[0])];
+    case 'localDataDeleteMessage':
+      return [validateLocalDataDeleteMessagePayload(args[0])];
+    case 'localDataDeleteOutbox':
+      return [validateLocalDataDeleteOutboxPayload(args[0])];
+    case 'localDataGetMediaVariant':
+      return [validateLocalDataGetMediaVariantPayload(args[0])];
+    case 'localDataClearScope':
+      return [validateLocalDataClearScopePayload(args[0])];
+    case 'localDataGetStorageStats':
+      return [validateLocalDataStorageStatsPayload(args[0])];
+    case 'localDataCleanup':
+      return [validateLocalDataCleanupPayload(args[0])];
+    case 'localDataListCustomerServiceThreads':
+      return [validateLocalDataListCustomerServiceThreadsPayload(args[0])];
+    case 'localDataSearchMessages':
+      return [validateLocalDataSearchMessagesPayload(args[0])];
+    case 'localDataListOutbox':
+      return [validateLocalDataListOutboxPayload(args[0])];
+    case 'localDataRepair':
+      return [validateLocalDataRepairPayload(args[0])];
+    case 'localDataUpsertCustomerServiceThread':
+      return [validateLocalDataUpsertCustomerServiceThreadPayload(args[0])];
+    case 'localDataUpsertMedia':
+      return [validateLocalDataUpsertMediaPayload(args[0])];
+    case 'localDataUpsertMessages':
+      return [validateLocalDataUpsertMessagesPayload(args[0])];
+    case 'localDataUpsertOutbox':
+      return [validateLocalDataUpsertOutboxPayload(args[0])];
     case 'setTaskbarBadge':
       return [validateTaskbarBadgePayload(args[0])];
     case 'setTrayStatus':
@@ -473,6 +516,12 @@ function objectValue(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function arrayValue(value: unknown, label: string, maxLength: number) {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  if (value.length > maxLength) throw new Error(`${label} is too long`);
+  return value;
+}
+
 function safeString(value: unknown, label: string, maxLength = maxShortTextLength) {
   if (typeof value !== 'string') throw new Error(`${label} must be a string`);
   if (value.length > maxLength) throw new Error(`${label} is too long`);
@@ -552,6 +601,11 @@ function optionalNullableString(value: unknown, label: string, maxLength = maxSh
   return safeString(value, label, maxLength);
 }
 
+function optionalJsonRecord(value: unknown, label: string) {
+  if (value === undefined || value === null) return {};
+  return objectValue(value, label);
+}
+
 function safeExternalUrl(value: unknown, label: string) {
   const url = safeString(value, label);
   try {
@@ -580,6 +634,11 @@ function boundedInteger(value: unknown, label: string, min: number, max: number)
     throw new Error(`${label} must be an integer between ${min} and ${max}`);
   }
   return numberValue;
+}
+
+function optionalBoundedInteger(value: unknown, label: string, min: number, max: number) {
+  if (value === undefined || value === null) return undefined;
+  return boundedInteger(value, label, min, max);
 }
 
 function stringArray(value: unknown, label: string) {

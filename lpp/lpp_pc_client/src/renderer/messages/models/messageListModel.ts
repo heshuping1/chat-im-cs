@@ -24,7 +24,15 @@ export interface MessageLookupScope {
 
 export function createMessageLookupScope(
   source: ImMessageHydrationSource,
+  options?: { localDatabaseSearch?: boolean },
 ): MessageLookupScope {
+  if (options?.localDatabaseSearch) {
+    return {
+      source,
+      limitedToLoadedRange: false,
+      labelKey: "messages.listPanel.localDatabaseRange",
+    };
+  }
   if (source === "local") {
     return {
       source,

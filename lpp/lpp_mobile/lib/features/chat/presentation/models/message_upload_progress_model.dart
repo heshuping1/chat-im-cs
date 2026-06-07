@@ -67,6 +67,7 @@ MessageUploadPresentation imageMessageUploadPresentation(
       phase: state.phase,
       rawProgress: state.progress,
     ),
+    showPercent: false,
   );
 }
 

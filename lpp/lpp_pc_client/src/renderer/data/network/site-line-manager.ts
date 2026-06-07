@@ -236,9 +236,15 @@ export async function selectFirstAvailableSite(
 }
 
 export async function probeSite(site: AppSiteLine) {
+  const normalized = normalizeSiteLine(site);
+  const probeUrl = normalized.configFileUrl?.trim();
+  if (!probeUrl) return normalized.isPrimary === true;
+
   try {
-    const response = await fetchWithTimeout(site.apiBaseUrl, probeTimeoutMs);
-    return response.status > 0 && response.status < 500;
+    const response = await fetchWithTimeout(probeUrl, probeTimeoutMs, {
+      mode: "no-cors",
+    });
+    return response.type === "opaque" || (response.status > 0 && response.status < 500);
   } catch {
     return false;
   }
@@ -375,14 +381,19 @@ async function fetchConfigFile(configFileUrl: string) {
   return parseSiteLineConfig(await response.text());
 }
 
-async function fetchWithTimeout(url: string, timeoutMs: number) {
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs: number,
+  options: { mode?: RequestMode } = {},
+) {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
       cache: "no-store",
       credentials: "omit",
-      redirect: "manual",
+      mode: options.mode,
+      redirect: options.mode === "no-cors" ? "follow" : "manual",
       signal: controller.signal,
     });
   } finally {

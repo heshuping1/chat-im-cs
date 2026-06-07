@@ -1366,6 +1366,7 @@ export const zhTW: MessageDictionary = {
       loadedCount: '已載入 {count} 條訊息',
       loadedRange: '目前已載入範圍',
       loading: '正在載入聊天記錄...',
+      localDatabaseRange: '本機已落庫範圍',
       localRange: '本地快取範圍',
       matchCount: '{count} 條匹配',
       newMessages: '↓ {count} 條新訊息',
@@ -1429,7 +1430,9 @@ export const zhTW: MessageDictionary = {
   },
   me: {
     action: {
+      check: '檢查',
       clean: '清理',
+      processing: '處理中',
     },
     chatArchive: {
       aria: '聊天記錄管理',
@@ -1637,7 +1640,26 @@ export const zhTW: MessageDictionary = {
       chatCacheCleared: '已清理聊天快取',
       diagnosticsExportCancelled: '已取消匯出診斷包',
       diagnosticsExported: '診斷包已匯出',
+      localDataCleaned: '已清理本機訊息索引 {count} 條',
+      localDataCleanFailed: '清理本機訊息索引失敗：{error}',
+      localDataRepairDone: '本地庫檢查完成：DB {status}，失效媒體 {stale} 個',
+      localDataRepairFailed: '本地庫檢查失敗：{error}',
+      localMediaCleaned: '已清理本機媒體快取 {size}',
+      localMediaCleanFailed: '清理本機媒體快取失敗：{error}',
       saved: '已儲存',
+    },
+    localDataStorage: {
+      cleanupConfirm: '確認清理本機已落庫訊息索引？不會刪除雲端訊息，但本機歷史搜尋和離線首屏會重新依賴服務端同步。',
+      cleanupDesc: '清理目前帳號空間的本機訊息索引，並保留雲端訊息。',
+      cleanupTitle: '清理本機訊息索引',
+      loading: '正在讀取本地訊息庫...',
+      mediaCleanupDesc: '清理本機圖片、影片和檔案快取，不刪除雲端訊息。',
+      mediaCleanupTitle: '清理本機媒體快取',
+      repairDesc: '檢查 DB、重建搜尋索引，並標記遺失的本機媒體檔案。',
+      repairTitle: '檢查並修復本地庫',
+      stats: '本機訊息 {messages} 條，媒體 {media} 個，發送箱 {outbox} 條，佔用 {size}',
+      title: '本地訊息庫',
+      unavailable: '目前客戶端未接入本地訊息庫統計',
     },
     option: {
       apiLog: {

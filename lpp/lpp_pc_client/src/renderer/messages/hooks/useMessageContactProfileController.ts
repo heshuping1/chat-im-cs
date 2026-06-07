@@ -3,6 +3,7 @@ import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 
 import type {
   ConversationListItem,
+  CustomerProfileCard,
   FriendDto,
   FriendProfileUpdateDto,
 } from "../../data/api-client";
@@ -82,31 +83,36 @@ export function useMessageContactProfileController({
     session,
   ]);
 
-  const profileQuery = useQuery({
-    queryKey: pcQueryKeys.customerServiceThreadProfile(
+  const profileQuery = useQuery<CustomerProfileCard | undefined>({
+    queryKey: [
+      "pc-im-direct-profile-card-disabled",
       session?.apiBaseUrl,
       session?.tenantToken,
-      activeConversationType,
       activeConversation?.conversationId,
-    ),
-    enabled: Boolean(session && activeConversation && activeConversationType === "direct"),
-    queryFn: async () =>
-      requireApiClient(session).getThreadProfileCard(
-        "im_direct",
-        activeConversation!.conversationId,
-      ),
+    ],
+    enabled: false,
+    queryFn: async () => undefined,
     retry: false,
     staleTime: 60_000,
   });
 
   const activeFriendUserId = activeConversation?.peerUserId || "";
+  const activeFriend = useMemo(
+    () => friends.some((friend) => friend.friendUserId === activeFriendUserId),
+    [activeFriendUserId, friends],
+  );
   const profileExtraQuery = useQuery({
     queryKey: pcQueryKeys.friendProfileExtra(
       session?.apiBaseUrl,
       session?.tenantToken,
       activeFriendUserId,
     ),
-    enabled: Boolean(session && activeConversationType === "direct" && activeFriendUserId),
+    enabled: Boolean(
+      session &&
+      activeConversationType === "direct" &&
+      activeFriendUserId &&
+      activeFriend
+    ),
     queryFn: async () => requireApiClient(session).getFriendProfileExtra(activeFriendUserId),
     retry: false,
     staleTime: 60_000,
@@ -226,6 +232,7 @@ export function useMessageContactProfileController({
 
   return {
     activeFriendUserId,
+    activeFriend,
     blockUser: (userId: string) => blockUserMutation.mutate(userId),
     blockUserPending: blockUserMutation.isPending,
     acceptContactRequest: (requestId: string) =>

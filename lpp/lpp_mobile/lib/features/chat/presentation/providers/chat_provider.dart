@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
@@ -11,6 +13,7 @@ import 'package:lpp_mobile/features/chat/domain/entities/group_entities.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/send_message_usecase.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/media_prefetch_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +61,9 @@ class ChatNotifier
       if (cached != null && cached.isNotEmpty) {
         _hasMore = cached.length >= 50;
         state = AsyncData(cached);
+        ref.read(mediaPrefetchControllerProvider(spaceId)).prefetchMessages(
+              cached,
+            );
 
         // 2. 后台增量同步：只拉比本地更新的消息
         _syncInBackground(conversationId, isGroup);
@@ -71,6 +77,9 @@ class ChatNotifier
       final messages =
           await _repo.getMessages(conversationId, isGroup: isGroup);
       _hasMore = messages.length >= 50;
+      ref.read(mediaPrefetchControllerProvider(spaceId)).prefetchMessages(
+            messages,
+          );
       return _mergeMessages(state.valueOrNull, messages);
     } catch (e) {
       // 网络失败时返回空列表，不显示错误页
@@ -95,6 +104,9 @@ class ChatNotifier
         );
 
         if (newMsgs.isNotEmpty) {
+          ref.read(mediaPrefetchControllerProvider(arg.$1)).prefetchMessages(
+                newMsgs,
+              );
           // 合并新消息到当前状态
           state = state.whenData((list) {
             final map = <String, Message>{};
@@ -166,6 +178,9 @@ class ChatNotifier
 
       _hasMore = older.length >= 20;
       if (older.isNotEmpty) {
+        ref.read(mediaPrefetchControllerProvider(spaceId)).prefetchMessages(
+              older,
+            );
         state = AsyncData([...older, ...current]);
       }
     } finally {
@@ -190,6 +205,9 @@ class ChatNotifier
               beforeSeq: beforeSeq,
             );
       if (messages.isEmpty) return;
+      ref.read(mediaPrefetchControllerProvider(spaceId)).prefetchMessages(
+            messages,
+          );
       state = AsyncData(_mergeMessages(state.valueOrNull, messages));
     } catch (_) {
       // 定位补拉失败不影响当前会话展示。
@@ -240,6 +258,11 @@ class ChatNotifier
       return;
     }
     state = AsyncData(_mergeMessages(current, [message]));
+    unawaited(
+      ref.read(mediaPrefetchControllerProvider(spaceId)).prefetchMessage(
+            message,
+          ),
+    );
     _persistMessage(spaceId, conversationId, message);
   }
 

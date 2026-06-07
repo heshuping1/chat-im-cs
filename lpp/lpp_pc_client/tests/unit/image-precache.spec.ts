@@ -32,12 +32,14 @@ describe("selectImagePrecacheCandidates", () => {
 
     expect(candidates).toEqual([
       {
-        cacheKey: "image:https://assets.example/a.png",
+        cacheIdentity: expect.stringMatching(/^url:[a-f0-9]{40}$/),
+        cacheKey: expect.stringMatching(/^image:url:[a-f0-9]{40}$/),
         fileName: "a.png",
         url: "https://assets.example/a.png",
       },
       {
-        cacheKey: "image:https://assets.example/d.png",
+        cacheIdentity: expect.stringMatching(/^url:[a-f0-9]{40}$/),
+        cacheKey: expect.stringMatching(/^image:url:[a-f0-9]{40}$/),
         fileName: "d.png",
         url: "https://assets.example/d.png",
       },

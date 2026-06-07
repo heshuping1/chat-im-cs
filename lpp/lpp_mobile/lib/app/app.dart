@@ -17,6 +17,8 @@ import 'package:lpp_mobile/core/storage/secure_storage.dart';
 import 'package:lpp_mobile/core/widgets/network_status_banner.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/call/presentation/widgets/incoming_call_overlay.dart';
+import 'package:lpp_mobile/features/chat/domain/services/chat_startup_recovery.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/gateway_provider.dart';
 
 class App extends ConsumerStatefulWidget {
@@ -51,6 +53,13 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         spaceId: next?.spaceId,
         userId: next?.userId,
       );
+      if (next != null && previous?.spaceId != next.spaceId) {
+        final recovery = ChatStartupRecovery(
+          store: ref.read(mediaLocalStoreProvider),
+          runtime: ref.read(mediaFileRuntimeProvider),
+        );
+        unawaited(recovery.recoverSpace(next.spaceId));
+      }
     }, fireImmediately: true);
   }
 

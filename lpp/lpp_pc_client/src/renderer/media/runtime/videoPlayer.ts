@@ -94,6 +94,7 @@ export function inlineVideoPreviewSrc(
 ) {
   if (!url) return undefined;
   if (/^file:/i.test(url)) return options.allowDesktopFile ? url : undefined;
+  if (/^https?:/i.test(url)) return undefined;
   return url;
 }
 

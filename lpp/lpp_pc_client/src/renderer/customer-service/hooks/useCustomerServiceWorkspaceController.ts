@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { createApiClient } from "../../data/runtime";
@@ -9,6 +9,12 @@ import {
   markCustomerServiceThreadClosed,
 } from "../../data/customer-service/cs-cache-adapter";
 import { canUseCustomerServiceStaffEndpoints } from "../../data/customer-service/cs-role-capabilities";
+import {
+  listLocalCustomerServiceThreadSnapshots,
+  profileFromLocalCustomerSnapshot,
+  upsertLocalCustomerServiceProfileSnapshot,
+  upsertLocalCustomerServiceThreads,
+} from "../../data/customer-service/cs-local-data-repository";
 import {
   customerServiceRealtimePollIntervalMs,
   customerServiceRealtimeRefetchInBackground,
@@ -113,9 +119,45 @@ export function useCustomerServiceWorkspaceController({
     queryFn: async () =>
       client!.getThreadProfileCard(selectedThread!.threadType, selectedThread!.threadId),
   });
+  const localThreadsQuery = useQuery({
+    queryKey: [
+      "pc-local-data-cs-threads",
+      session?.apiBaseUrl,
+      session?.tenantId,
+      session?.userId,
+      selectedThread?.threadId ?? "",
+    ],
+    enabled: Boolean(session && selectedThread),
+    queryFn: async () => listLocalCustomerServiceThreadSnapshots(session),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (!session || !threadsQuery.data) return;
+    const threads = [
+      ...(threadsQuery.data.queueItems ?? []),
+      ...(threadsQuery.data.activeItems ?? []),
+    ];
+    upsertLocalCustomerServiceThreads(session, threads);
+  }, [session, threadsQuery.data]);
+
+  useEffect(() => {
+    if (!session || !selectedThread || !profileQuery.data) return;
+    upsertLocalCustomerServiceProfileSnapshot({
+      profile: profileQuery.data,
+      session,
+      thread: selectedThread,
+    });
+  }, [profileQuery.data, selectedThread, session]);
 
   const detail = detailQuery.data;
-  const profile = profileQuery.data;
+  const localSelectedThread = localThreadsQuery.data?.find(
+    (thread) =>
+      thread.threadId === selectedThread?.threadId &&
+      thread.threadType === selectedThread?.threadType,
+  );
+  const localProfile = profileFromLocalCustomerSnapshot(localSelectedThread?.customerSnapshotJson);
+  const profile = profileQuery.data ?? (profileQuery.error ? localProfile : undefined);
   const workspaceViewModel = useMemo(
     () =>
       createCustomerServiceWorkspaceViewModel({
@@ -159,6 +201,7 @@ export function useCustomerServiceWorkspaceController({
     workspaceViewModel,
   };
 }
+
 
 function actionSuccessText(action: CustomerServiceThreadAction) {
   if (action === "claim") return "Conversation claimed.";

@@ -16,7 +16,7 @@ class AppDatabase {
   static final Map<String, Database> _instances = {};
 
   // ── 当前 Schema 版本 ──────────────────────────────────────────────────────
-  static const int _currentVersion = 2;
+  static const int _currentVersion = 3;
 
   // ── DDL：conversations 表 ─────────────────────────────────────────────────
   static const String _createConversationsTable = '''
@@ -57,11 +57,52 @@ class AppDatabase {
     )
   ''';
 
+  static const String createMediaLocalFilesTable = '''
+    CREATE TABLE IF NOT EXISTS media_local_files (
+      id               TEXT PRIMARY KEY,
+      space_id         TEXT NOT NULL,
+      conversation_id  TEXT NOT NULL,
+      message_id       TEXT NOT NULL,
+      media_kind       TEXT NOT NULL,
+      variant          TEXT NOT NULL,
+      remote_url       TEXT NOT NULL,
+      local_path       TEXT,
+      file_name        TEXT,
+      mime_type        TEXT,
+      size_bytes       INTEGER,
+      status           TEXT NOT NULL,
+      failure_reason   TEXT,
+      created_at       INTEGER NOT NULL,
+      updated_at       INTEGER NOT NULL,
+      last_accessed_at INTEGER,
+      UNIQUE(space_id, conversation_id, message_id, media_kind, variant)
+    )
+  ''';
+
+  static const List<String> createMediaLocalFilesIndexes = [
+    '''
+    CREATE INDEX IF NOT EXISTS idx_media_local_files_conversation
+      ON media_local_files (space_id, conversation_id, updated_at)
+    ''',
+    '''
+    CREATE INDEX IF NOT EXISTS idx_media_local_files_message
+      ON media_local_files (space_id, conversation_id, message_id)
+    ''',
+    '''
+    CREATE INDEX IF NOT EXISTS idx_media_local_files_status
+      ON media_local_files (space_id, status)
+    ''',
+  ];
+
   // ── 版本迁移脚本 map（key = 目标版本号，支持多条语句用 ';' 分隔）──────────
   static const Map<int, List<String>> _migrations = {
     2: [
       'ALTER TABLE conversations ADD COLUMN last_read_seq INTEGER NOT NULL DEFAULT 0',
       'ALTER TABLE conversations ADD COLUMN last_message_seq INTEGER NOT NULL DEFAULT 0',
+    ],
+    3: [
+      createMediaLocalFilesTable,
+      ...createMediaLocalFilesIndexes,
     ],
   };
 
@@ -120,6 +161,10 @@ class AppDatabase {
     await db.execute(_createConversationsTable);
     await db.execute(_createConversationsIndex);
     await db.execute(_createMigrationFlagsTable);
+    await db.execute(createMediaLocalFilesTable);
+    for (final script in createMediaLocalFilesIndexes) {
+      await db.execute(script);
+    }
   }
 
   /// 数据库升级时按序执行迁移脚本。

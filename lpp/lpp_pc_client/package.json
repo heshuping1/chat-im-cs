@@ -60,6 +60,7 @@
     "@lexical/utils": "^0.44.0",
     "@microsoft/signalr": "^8.0.17",
     "@tanstack/react-query": "^5.85.5",
+    "better-sqlite3": "^12.10.0",
     "electron-log": "^5.4.4",
     "electron-updater": "^6.8.3",
     "lexical": "^0.44.0",
@@ -72,6 +73,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.49.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.17.10",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.17",

@@ -542,6 +542,7 @@ export function MessageCenter() {
     messageSearchKeyword,
     messageSearchOpen,
     messagesHydrationSource,
+    session,
     serverMessages: hotServerMessages,
     unreadIdentity,
   });

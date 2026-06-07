@@ -13,6 +13,8 @@ LAUNCH=true
 APK_PATH=""
 INSTALL_METHOD="adb"
 AUTO_CONFIRM_VIVO=true
+VIVO_INSTALL_CHOICE_TEXT_REGEX="保留数据安装|保留数据|覆盖安装|替换安装"
+VIVO_INSTALL_CONFIRM_TEXT_REGEX="继续安装|仍要安装|^安装$|重新安装|重新安裝|确定|允许"
 
 extract_uiautomator_bounds_by_resource_id_from_xml() {
   local xml="$1"
@@ -178,13 +180,13 @@ auto_confirm_vivo_install_prompt() {
 
   sleep 1
   for _ in $(seq 1 60); do
-    tap_vivo_installer_text_regex "$serial" "保留数据安装|保留数据|覆盖安装|替换安装" "50" "74"
+    tap_vivo_installer_text_regex "$serial" "$VIVO_INSTALL_CHOICE_TEXT_REGEX" "50" "74"
     sleep 0.2
     tap_vivo_installer_control "$serial" "com.android.packageinstaller:id/deleted_file_state_cb" "50" "87"
     sleep 0.2
     tap_vivo_installer_control "$serial" "android:id/button1" "50" "93"
     sleep 0.2
-    tap_vivo_installer_text_regex "$serial" "继续安装|仍要安装|^安装$|确定|允许" "78" "93"
+    tap_vivo_installer_text_regex "$serial" "$VIVO_INSTALL_CONFIRM_TEXT_REGEX" "78" "93"
     sleep 1
   done
 }

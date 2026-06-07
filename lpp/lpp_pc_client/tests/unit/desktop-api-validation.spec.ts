@@ -45,6 +45,19 @@ describe("desktop api validation", () => {
     expect(methods).toContain("recordCsRoutingDiagnostic");
     expect(methods).toContain("writeAppLog");
     expect(methods).toContain("recordMessageReminderDiagnostic");
+    expect(methods).toContain("localDataCleanup");
+    expect(methods).toContain("localDataDeleteOutbox");
+    expect(methods).toContain("localDataGetMediaVariant");
+    expect(methods).toContain("localDataGetStorageStats");
+    expect(methods).toContain("localDataListCustomerServiceThreads");
+    expect(methods).toContain("localDataListMessages");
+    expect(methods).toContain("localDataListOutbox");
+    expect(methods).toContain("localDataRepair");
+    expect(methods).toContain("localDataSearchMessages");
+    expect(methods).toContain("localDataUpsertCustomerServiceThread");
+    expect(methods).toContain("localDataUpsertMedia");
+    expect(methods).toContain("localDataUpsertMessages");
+    expect(methods).toContain("localDataUpsertOutbox");
     expect(methods).toContain("saveChatArchiveFile");
     expect(methods).toContain("openChatArchiveFile");
     expect(desktopIpcChannelByMethod.cacheLocalMediaFile).toBe("desktop:cache-local-media-file");
@@ -79,6 +92,27 @@ describe("desktop api validation", () => {
     expect(desktopIpcChannelByMethod.writeAppLog).toBe("desktop:write-app-log");
     expect(desktopIpcChannelByMethod.recordMessageReminderDiagnostic).toBe(
       "desktop:record-message-reminder-diagnostic",
+    );
+    expect(desktopIpcChannelByMethod.localDataCleanup).toBe(
+      "desktop:local-data-cleanup",
+    );
+    expect(desktopIpcChannelByMethod.localDataGetMediaVariant).toBe(
+      "desktop:local-data-get-media-variant",
+    );
+    expect(desktopIpcChannelByMethod.localDataGetStorageStats).toBe(
+      "desktop:local-data-get-storage-stats",
+    );
+    expect(desktopIpcChannelByMethod.localDataListMessages).toBe(
+      "desktop:local-data-list-messages",
+    );
+    expect(desktopIpcChannelByMethod.localDataSearchMessages).toBe(
+      "desktop:local-data-search-messages",
+    );
+    expect(desktopIpcChannelByMethod.localDataUpsertMessages).toBe(
+      "desktop:local-data-upsert-messages",
+    );
+    expect(desktopIpcChannelByMethod.localDataUpsertMedia).toBe(
+      "desktop:local-data-upsert-media",
     );
     expect(channels.every((channel) => channel.startsWith("desktop:"))).toBe(true);
     expect(new Set(channels).size).toBe(channels.length);
@@ -235,6 +269,103 @@ describe("desktop api validation", () => {
         url: "blob:local-video",
       },
     ]);
+  });
+
+  it("validates local data payloads", () => {
+    expect(
+      validateDesktopApiCall("localDataListMessages", [
+        {
+          conversationId: "c1",
+          conversationType: "direct",
+          limit: 50,
+          scopeKey: "scope-a",
+        },
+      ]),
+    ).toEqual([
+      {
+        conversationId: "c1",
+        conversationType: "direct",
+        limit: 50,
+        scopeKey: "scope-a",
+      },
+    ]);
+
+    expect(
+      validateDesktopApiCall("localDataSearchMessages", [
+        {
+          keyword: "hello",
+          limit: 20,
+          scopeKey: "scope-a",
+        },
+      ]),
+    ).toEqual([
+      {
+        keyword: "hello",
+        limit: 20,
+        scopeKey: "scope-a",
+      },
+    ]);
+
+    expect(
+      validateDesktopApiCall("localDataGetStorageStats", [{ scopeKey: "scope-a" }]),
+    ).toEqual([{ scopeKey: "scope-a" }]);
+
+    expect(
+      validateDesktopApiCall("localDataCleanup", [
+        { scopeKey: "scope-a", target: "message-index" },
+      ]),
+    ).toEqual([{ scopeKey: "scope-a", target: "message-index" }]);
+
+    expect(
+      validateDesktopApiCall("localDataUpsertMessages", [
+        {
+          messages: [
+            {
+              bodyJson: { text: "hello" },
+              conversationId: "c1",
+              conversationType: "direct",
+              messageId: "m1",
+              messageType: "text",
+              preview: "hello",
+              scopeKey: "scope-a",
+            },
+          ],
+          scopeKey: "scope-a",
+        },
+      ]),
+    ).toMatchObject([
+      {
+        messages: [
+          {
+            bodyJson: { text: "hello" },
+            conversationId: "c1",
+            conversationType: "direct",
+            messageId: "m1",
+            messageType: "text",
+            preview: "hello",
+            scopeKey: "scope-a",
+          },
+        ],
+        scopeKey: "scope-a",
+      },
+    ]);
+
+    expect(() =>
+      validateDesktopApiCall("localDataListMessages", [
+        { conversationId: "c1", conversationType: "direct", limit: 0, scopeKey: "scope-a" },
+      ]),
+    ).toThrow("localData.limit");
+    expect(() =>
+      validateDesktopApiCall("localDataUpsertMessages", [
+        {
+          messages: [{ conversationId: "c1", conversationType: "direct", messageId: "" }],
+          scopeKey: "scope-a",
+        },
+      ]),
+    ).toThrow("localData.messageId");
+    expect(() =>
+      validateDesktopApiCall("localDataCleanup", [{ scopeKey: "scope-a", target: "avatars" }]),
+    ).toThrow("localData.cleanup.target");
   });
 
   it("keeps preload-derived local media sources when validating main ipc args", () => {

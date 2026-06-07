@@ -1211,6 +1211,7 @@ export const en: MessageDictionary = {
       loadedCount: '{count} messages loaded',
       loadedRange: 'Loaded range',
       loading: 'Loading chat history...',
+      localDatabaseRange: 'Local saved history',
       localRange: 'Local cached range',
       matchCount: '{count} matches',
       newMessages: '↓ {count} new messages',
@@ -1274,7 +1275,9 @@ export const en: MessageDictionary = {
   },
   me: {
     action: {
+      check: 'Check',
       clean: 'Clean',
+      processing: 'Processing',
     },
     chatArchive: {
       aria: 'Chat archive management',
@@ -1482,7 +1485,26 @@ export const en: MessageDictionary = {
       chatCacheCleared: 'Chat cache cleared',
       diagnosticsExportCancelled: 'Diagnostics export cancelled',
       diagnosticsExported: 'Diagnostics package exported',
+      localDataCleaned: 'Cleared {count} local indexed messages',
+      localDataCleanFailed: 'Failed to clear local message index: {error}',
+      localDataRepairDone: 'Local store check finished: DB {status}, stale media {stale}',
+      localDataRepairFailed: 'Failed to check local store: {error}',
+      localMediaCleaned: 'Cleared {size} of local media cache',
+      localMediaCleanFailed: 'Failed to clear local media cache: {error}',
       saved: 'Saved',
+    },
+    localDataStorage: {
+      cleanupConfirm: 'Clear the local indexed message store for this device? Cloud messages are not deleted, but local history search and offline first paint will resync from the server.',
+      cleanupDesc: 'Clear this account scope local message index while keeping cloud messages.',
+      cleanupTitle: 'Clear local message index',
+      loading: 'Reading local message store...',
+      mediaCleanupDesc: 'Clear local image, video and file cache without deleting cloud messages.',
+      mediaCleanupTitle: 'Clear local media cache',
+      repairDesc: 'Check the DB, rebuild the search index, and mark missing local media files.',
+      repairTitle: 'Check and repair local store',
+      stats: '{messages} local messages, {media} media items, {outbox} outbox items, {size}',
+      title: 'Local Message Store',
+      unavailable: 'Local message store stats are not available in this client',
     },
     option: {
       apiLog: {

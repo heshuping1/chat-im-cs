@@ -60,6 +60,20 @@ void main() {
       );
     });
 
+    test('image upload progress is rendered as a quiet side ring', () {
+      final presentation = imageMessageUploadPresentation(
+        const MessageLocalUploadState(
+          status: MessageLocalUploadStatus.uploading,
+          phase: MessageLocalUploadPhase.uploadingMedia,
+          progress: 42,
+        ),
+      );
+
+      expect(presentation.active, isTrue);
+      expect(presentation.progress, 42);
+      expect(presentation.showPercent, isFalse);
+    });
+
     test('derives upload progress from bytes when percent is absent', () {
       expect(
         mediaUploadProgressPercent(

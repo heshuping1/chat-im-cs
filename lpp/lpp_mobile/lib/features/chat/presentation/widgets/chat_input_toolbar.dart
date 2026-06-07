@@ -274,15 +274,14 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   Future<void> _pickMediaFromGallery() async {
     if (_isMutedForUser) return;
     try {
-      final files = await _imagePicker.pickMultipleMedia(imageQuality: 85);
+      final files = await _imagePicker.pickMultipleMedia();
       if (files.isNotEmpty) {
         await _sendPickedFiles(files);
       }
     } catch (e) {
       // 部分系统相册能力不可用时降级为单张选图，至少保留旧体验。
       try {
-        final file = await _imagePicker.pickImage(
-            source: ImageSource.gallery, imageQuality: 85);
+        final file = await _imagePicker.pickImage(source: ImageSource.gallery);
         if (file != null) {
           await _sendPickedFiles([file]);
         }
@@ -327,20 +326,23 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   Future<void> _sendPickedFiles(List<XFile> files) async {
     final media = <ChatPickedMedia>[];
     for (final file in files) {
-      media.add(await _pickedMediaFromXFile(file));
+      final picked = await _pickedMediaFromXFile(file);
+      if (picked != null) {
+        media.add(picked);
+      }
     }
     if (media.isEmpty) return;
     await Future.sync(() => widget.onSendMedia(media));
   }
 
-  Future<ChatPickedMedia> _pickedMediaFromXFile(XFile file) async {
+  Future<ChatPickedMedia?> _pickedMediaFromXFile(XFile file) async {
     int? sizeBytes;
     try {
       sizeBytes = await file.length();
     } catch (_) {
       sizeBytes = null;
     }
-    return ChatPickedMedia.fromPickedFile(
+    return ChatPickedMedia.tryFromPickedFile(
       path: file.path,
       name: file.name,
       mimeType: file.mimeType,
@@ -350,9 +352,15 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
 
   Future<void> _pickFile() async {
     if (_isMutedForUser) return;
-    final result = await FilePicker.platform.pickFiles(allowMultiple: false);
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      type: FileType.custom,
+      allowedExtensions: chatFileAttachmentAllowedExtensions,
+    );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.single;
+    final extension = file.extension ?? '';
+    if (!isChatFileAttachmentExtension(extension)) return;
     if (file.size > 100 * 1024 * 1024) {
       if (mounted) {
         AppToast.error(context, AppLocalizations.of(context).chatFileTooLarge);
@@ -360,37 +368,8 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
       return;
     }
     if (file.path == null) return;
-    final mimeType = _mimeTypeFromExtension(file.extension ?? '');
+    final mimeType = chatFileAttachmentMimeType(extension);
     widget.onSendFile?.call(file.path!, file.name, mimeType, file.size);
-  }
-
-  String _mimeTypeFromExtension(String ext) {
-    switch (ext.toLowerCase()) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'doc':
-        return 'application/msword';
-      case 'docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      case 'xls':
-        return 'application/vnd.ms-excel';
-      case 'xlsx':
-        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      case 'ppt':
-        return 'application/vnd.ms-powerpoint';
-      case 'pptx':
-        return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-      case 'zip':
-        return 'application/zip';
-      case 'txt':
-        return 'text/plain';
-      case 'mp4':
-        return 'video/mp4';
-      case 'mp3':
-        return 'audio/mpeg';
-      default:
-        return 'application/octet-stream';
-    }
   }
 
   void _insertEmoji(String emoji) {

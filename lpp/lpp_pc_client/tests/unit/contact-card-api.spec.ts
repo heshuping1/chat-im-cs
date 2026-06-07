@@ -124,6 +124,27 @@ describe("contact card and friend relation api", () => {
     });
   });
 
+  it("treats missing friend profile extra as an optional empty profile extension", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        method: init?.method ?? "GET",
+        url: String(input),
+      });
+      return new Response(JSON.stringify({
+        code: "NOT_FOUND",
+        message: "profile extra not found",
+      }), { status: 404 });
+    }) as typeof fetch;
+    const client = apiClient();
+
+    await expect(client.getFriendProfileExtra("u-missing")).resolves.toBeUndefined();
+    expect(requests[0]).toMatchObject({
+      method: "GET",
+      url: "https://api.example/api/client/v1/friends/u-missing/profile-extra",
+    });
+  });
+
   it("creates group chats using the documented title payload only", async () => {
     const client = apiClient();
 
