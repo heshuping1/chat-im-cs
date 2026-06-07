@@ -14,11 +14,22 @@ export interface MediaPreviewPresentation {
   displayState: MediaPreviewDisplayState;
 }
 
+export interface ImagePreviewSize {
+  width?: number;
+  height?: number;
+}
+
+const imagePreviewBounds = {
+  maxHeight: 280,
+  maxWidth: 260,
+  standardMaxSide: 220,
+};
+
 const imagePreviewBoxes: Record<ImagePreviewBucket, MediaPreviewBox> = {
   standard: { width: 220, height: 220, className: "media-preview-image-standard" },
   wide: { width: 260, height: 146, className: "media-preview-image-wide" },
   tall: { width: 178, height: 280, className: "media-preview-image-tall" },
-  unknown: { width: 178, height: 280, className: "media-preview-image-unknown" },
+  unknown: { width: 180, height: 180, className: "media-preview-image-unknown" },
 };
 
 const previewBoxes: Record<Exclude<MediaPreviewKind, "image">, MediaPreviewBox> = {
@@ -32,14 +43,37 @@ const previewBoxes: Record<Exclude<MediaPreviewKind, "image">, MediaPreviewBox> 
 export function imagePreviewPresentation({
   bucket = "unknown",
   displayState = "loading",
+  imageSize,
 }: {
   bucket?: ImagePreviewBucket;
   displayState?: MediaPreviewDisplayState;
+  imageSize?: ImagePreviewSize;
 } = {}): MediaPreviewPresentation {
   return {
     previewKind: "image",
-    previewBox: imagePreviewBoxes[bucket],
+    previewBox: imagePreviewBoxFromSize(imageSize) ?? imagePreviewBoxes[bucket],
     displayState,
+  };
+}
+
+export function imagePreviewBoxFromSize(
+  imageSize: ImagePreviewSize | undefined,
+): MediaPreviewBox | undefined {
+  const width = safePositiveSize(imageSize?.width);
+  const height = safePositiveSize(imageSize?.height);
+  if (!width || !height) return undefined;
+  const ratio = width / height;
+  const maxWidth =
+    ratio > 1.2 ? imagePreviewBounds.maxWidth : imagePreviewBounds.standardMaxSide;
+  const maxHeight =
+    ratio < 0.8 ? imagePreviewBounds.maxHeight : imagePreviewBounds.standardMaxSide;
+  const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+  const previewWidth = Math.max(1, Math.round(width * scale));
+  const previewHeight = Math.max(1, Math.round(height * scale));
+  return {
+    width: previewWidth,
+    height: previewHeight,
+    className: imagePreviewClassName(ratio),
   };
 }
 
@@ -70,14 +104,16 @@ export function filePreviewPresentation({
 export function mediaPreviewPresentation({
   displayState = "loading",
   imageBucket,
+  imageSize,
   kind,
 }: {
   kind: MediaPreviewKind;
   imageBucket?: ImagePreviewBucket;
+  imageSize?: ImagePreviewSize;
   displayState?: MediaPreviewDisplayState;
 }): MediaPreviewPresentation {
   if (kind === "image") {
-    return imagePreviewPresentation({ bucket: imageBucket, displayState });
+    return imagePreviewPresentation({ bucket: imageBucket, displayState, imageSize });
   }
   if (kind === "video") return videoPreviewPresentation({ displayState });
   if (kind === "file") return filePreviewPresentation({ displayState });
@@ -86,4 +122,16 @@ export function mediaPreviewPresentation({
     previewBox: previewBoxes[kind] ?? previewBoxes.unknown,
     displayState,
   };
+}
+
+function imagePreviewClassName(ratio: number) {
+  if (ratio >= 1.6) return "media-preview-image-wide";
+  if (ratio <= 0.72) return "media-preview-image-tall";
+  return "media-preview-image-standard";
+}
+
+function safePositiveSize(value: number | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
 }

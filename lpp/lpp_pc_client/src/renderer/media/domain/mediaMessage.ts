@@ -10,7 +10,6 @@ import {
 } from "../../data/im-message-normalize";
 import {
   mediaPreviewPresentation,
-  type ImagePreviewBucket,
   type MediaPreviewPresentation,
 } from "./mediaPreviewPresentation";
 
@@ -105,7 +104,7 @@ export function normalizeMediaPart({
     previewPresentation: mediaPreviewPresentation({
       kind: part.type,
       displayState,
-      imageBucket: part.type === "image" ? imagePreviewBucketFromMedia(media) : undefined,
+      imageSize: part.type === "image" ? imagePreviewSizeFromMedia(media) : undefined,
     }),
   };
 }
@@ -350,16 +349,13 @@ function imageDisplaySourceUrls(
   ]);
 }
 
-function imagePreviewBucketFromMedia(
+function imagePreviewSizeFromMedia(
   media: MediaResourceDto | undefined,
-): ImagePreviewBucket | undefined {
+): { width: number; height: number } | undefined {
   const width = mediaNumberField(media, "width");
   const height = mediaNumberField(media, "height");
   if (!width || !height) return undefined;
-  const ratio = width / height;
-  if (ratio >= 1.6) return "wide";
-  if (ratio <= 0.72) return "tall";
-  return "standard";
+  return { width, height };
 }
 
 function uniqueMediaUrls(urls: Array<string | undefined>) {

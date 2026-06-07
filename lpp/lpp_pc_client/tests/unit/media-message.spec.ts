@@ -36,8 +36,8 @@ describe("normalizeMediaPart", () => {
       previewPresentation: {
         previewKind: "image",
         previewBox: {
-          width: 178,
-          height: 280,
+          width: 180,
+          height: 180,
           className: "media-preview-image-unknown",
         },
       },
@@ -212,7 +212,7 @@ describe("message media action model", () => {
     ]);
   });
 
-  it("buckets image previews from metadata without deriving exact render height", () => {
+  it("sizes image previews from metadata without fixed frame padding", () => {
     const part: NormalizedMessagePart = {
       type: "image",
       media: {
@@ -228,7 +228,7 @@ describe("message media action model", () => {
       previewPresentation: {
         previewKind: "image",
         previewBox: {
-          width: 178,
+          width: 132,
           height: 280,
           className: "media-preview-image-tall",
         },
@@ -717,11 +717,24 @@ describe("message media upload presentation", () => {
     );
 
     expect(imageFrame).toContain("message-image-viewer-toolbar");
+    expect(imageFrame).toContain("message-image-viewer-topbar");
     expect(imageFrame).toContain("const canRenderImage = sourceAvailable && Boolean(src);");
     expect(imageFrame).toContain("{canRenderImage ? (");
     expect(imageFrame).toContain('t("media.image.copy")');
     expect(imageFrame).toContain('t("media.image.saveAs")');
     expect(imageFrame).toContain('t("media.image.reveal")');
+    expect(imageFrame).toContain('t("media.image.zoomIn")');
+    expect(imageFrame).toContain('t("media.image.zoomOut")');
+    expect(imageFrame).toContain('t("media.image.rotate")');
+    expect(imageFrame).toContain('t("media.image.resetView")');
+    expect(imageFrame).toContain("const [viewerScale, setViewerScale]");
+    expect(imageFrame).toContain("const [viewerRotation, setViewerRotation]");
+    expect(imageFrame).toContain("const [viewerOffset, setViewerOffset]");
+    expect(imageFrame).toContain("handlePreviewWheel");
+    expect(imageFrame).toContain("handlePreviewDoubleClick");
+    expect(imageFrame).toContain("handlePointerDown");
+    expect(imageFrame).toContain("event.ctrlKey && event.key.toLowerCase() === \"c\"");
+    expect(imageFrame).toContain("event.ctrlKey && event.key.toLowerCase() === \"s\"");
     expect(imageFrame).toContain("message-image-retry");
     expect(mediaParts).toContain("imageActionSrc");
     expect(mediaParts).toContain("cacheIdentity");
@@ -740,9 +753,13 @@ describe("message media upload presentation", () => {
     expect(mediaParts).toContain("if (failed && hasNextImageSource) advanceToNextImageSource();");
     expect(mediaParts).toContain("sourceAvailable={Boolean(visibleImageSrc)}");
     expect(mediaParts).toContain("imagePreviewPresentation");
+    expect(imageFrame).toContain("imagePreviewBoxFromSize");
+    expect(imageFrame).toContain("naturalPreviewBox");
+    expect(imageFrame).toContain("handleInlineImageLoad");
     expect(imageFrame).toContain("presentation");
     expect(imageFrame).toContain("--media-preview-width");
     expect(imageFrame).toContain("--media-preview-height");
+    expect(imageFrame).toContain("--media-preview-aspect-ratio");
     expect(mediaParts).toContain("const imageReady =");
     expect(mediaParts).toContain("hasUsableLocalFile");
     expect(mediaParts).toContain("imageLoaded={imageReady}");
@@ -766,14 +783,17 @@ describe("message media upload presentation", () => {
     );
 
     expect(imageFrame).toContain("mediaPreviewFrameStyle");
+    expect(imageFrame).toContain("setNaturalPreviewBox");
+    expect(imageFrame).toContain("--media-preview-aspect-ratio");
     expect(mediaCss).toContain("width: var(--media-preview-width");
-    expect(mediaCss).toContain("height: var(--media-preview-height");
-    expect(mediaCss).toContain("object-fit: contain");
+    expect(mediaCss).toContain("aspect-ratio: var(--media-preview-aspect-ratio");
+    expect(mediaCss).toContain("object-fit: fill");
     expect(mediaCss).toMatch(
-      /\.message-image-frame \.message-image \{[^}]*position: absolute;[^}]*inset: 0;[^}]*min-height: 0;[^}]*object-fit: contain;/s,
+      /\.message-image-frame \.message-image \{[^}]*position: absolute;[^}]*inset: 0;[^}]*min-height: 0;[^}]*object-fit: fill;/s,
     );
     expect(mediaCss).not.toContain(".message-image-frame.loaded {\n  min-width: 0;\n  min-height: 0;");
-    expect(messageCenterCss).toContain("height: var(--media-preview-height");
+    expect(messageCenterCss).toContain("aspect-ratio: var(--media-preview-aspect-ratio");
+    expect(messageCenterCss).not.toContain("height: var(--media-preview-height");
     expect(messageCenterCss).not.toContain(".pc-chat-bubble .message-image-frame.loaded {\n  min-width: 0;");
     expect(messageMediaParts).toContain("videoPreviewPresentation");
     expect(messageMediaParts).not.toContain("setVideoSize({ width: videoWidth, height: videoHeight });");

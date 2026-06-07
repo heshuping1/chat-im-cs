@@ -1318,9 +1318,13 @@ export const ja: MessageDictionary = {
       previewNamed: '画像 {name} をプレビュー',
       reload: '再読み込み',
       reveal: '場所を表示',
+      resetView: '表示をリセット',
+      rotate: '回転',
       saveAs: '名前を付けて保存',
       viewer: '画像プレビュー',
       viewerNamed: '画像プレビュー {name}',
+      zoomIn: '拡大',
+      zoomOut: '縮小',
     },
     video: {
       loading: '動画を読み込み中',

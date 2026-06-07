@@ -12,15 +12,15 @@ describe("media preview presentation", () => {
     expect(imagePreviewPresentation()).toEqual({
       previewKind: "image",
       previewBox: {
-        width: 178,
-        height: 280,
+        width: 180,
+        height: 180,
         className: "media-preview-image-unknown",
       },
       displayState: "loading",
     });
   });
 
-  it("keeps image buckets finite instead of deriving chat height at render time", () => {
+  it("keeps image bucket fallbacks finite before natural dimensions are known", () => {
     expect(imagePreviewPresentation({ bucket: "standard" }).previewBox).toEqual({
       width: 220,
       height: 220,
@@ -35,6 +35,24 @@ describe("media preview presentation", () => {
       width: 178,
       height: 280,
       className: "media-preview-image-tall",
+    });
+  });
+
+  it("sizes image previews from image dimensions without adding a fixed empty frame", () => {
+    expect(imagePreviewPresentation({ imageSize: { width: 760, height: 1608 } }).previewBox).toEqual({
+      width: 132,
+      height: 280,
+      className: "media-preview-image-tall",
+    });
+    expect(imagePreviewPresentation({ imageSize: { width: 1600, height: 900 } }).previewBox).toEqual({
+      width: 260,
+      height: 146,
+      className: "media-preview-image-wide",
+    });
+    expect(imagePreviewPresentation({ imageSize: { width: 1200, height: 1000 } }).previewBox).toEqual({
+      width: 220,
+      height: 183,
+      className: "media-preview-image-standard",
     });
   });
 

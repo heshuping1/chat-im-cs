@@ -1318,9 +1318,13 @@ export const vi: MessageDictionary = {
       previewNamed: 'Xem trước hình ảnh {name}',
       reload: 'Tải lại',
       reveal: 'Hiển thị vị trí',
+      resetView: 'Đặt lại chế độ xem',
+      rotate: 'Xoay',
       saveAs: 'Lưu thành',
       viewer: 'Xem trước hình ảnh',
       viewerNamed: 'Xem trước hình ảnh {name}',
+      zoomIn: 'Phóng to',
+      zoomOut: 'Thu nhỏ',
     },
     video: {
       loading: 'Đang tải video',

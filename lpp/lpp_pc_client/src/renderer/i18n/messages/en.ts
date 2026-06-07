@@ -2468,9 +2468,13 @@ export const en: MessageDictionary = {
       previewNamed: 'Preview image {name}',
       reload: 'Reload',
       reveal: 'Show location',
+      resetView: 'Reset view',
+      rotate: 'Rotate',
       saveAs: 'Save as',
       viewer: 'Image preview',
       viewerNamed: 'Image preview {name}',
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
     },
     message: {
       file: 'File',

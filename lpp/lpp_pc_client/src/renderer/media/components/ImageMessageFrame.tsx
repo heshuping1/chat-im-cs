@@ -1,8 +1,32 @@
-import { Copy, Download, FolderOpen, ImageIcon, X } from "lucide-react";
-import { useEffect } from "react";
-import type { CSSProperties, SyntheticEvent } from "react";
+import {
+  Copy,
+  Download,
+  FolderOpen,
+  ImageIcon,
+  RotateCw,
+  Scan,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type {
+  CSSProperties,
+  MouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  SyntheticEvent,
+  WheelEvent,
+} from "react";
 import { useI18n } from "../../i18n/useI18n";
-import type { MediaPreviewPresentation } from "../domain/mediaPreviewPresentation";
+import {
+  imagePreviewBoxFromSize,
+  type MediaPreviewPresentation,
+} from "../domain/mediaPreviewPresentation";
+
+const minViewerScale = 0.25;
+const maxViewerScale = 4;
+const scaleStep = 0.25;
 
 export function ImageMessageFrame({
   altText,
@@ -42,22 +66,200 @@ export function ImageMessageFrame({
   sourceAvailable: boolean;
 }) {
   const { t } = useI18n();
+  const [viewerScale, setViewerScale] = useState(1);
+  const [viewerRotation, setViewerRotation] = useState(0);
+  const [viewerOffset, setViewerOffset] = useState({ x: 0, y: 0 });
+  const [naturalPreviewBox, setNaturalPreviewBox] =
+    useState<MediaPreviewPresentation["previewBox"] | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+    moved: boolean;
+  } | null>(null);
   const canRenderImage = sourceAvailable && Boolean(src);
-  const mediaPreviewFrameStyle = presentation
-    ? ({
-        "--media-preview-width": `${presentation.previewBox.width}px`,
-        "--media-preview-height": `${presentation.previewBox.height}px`,
-      } as CSSProperties)
+  const effectivePreviewBox = naturalPreviewBox ?? presentation?.previewBox;
+  const mediaPreviewFrameStyle = effectivePreviewBox
+      ? ({
+          "--media-preview-width": `${effectivePreviewBox.width}px`,
+          "--media-preview-height": `${effectivePreviewBox.height}px`,
+          "--media-preview-aspect-ratio": `${effectivePreviewBox.width} / ${effectivePreviewBox.height}`,
+        } as CSSProperties)
     : undefined;
-  const presentationClassName = presentation?.previewBox.className ?? "";
+  const presentationClassName = effectivePreviewBox?.className ?? "";
+  const resetViewer = useCallback(() => {
+    setViewerScale(1);
+    setViewerRotation(0);
+    setViewerOffset({ x: 0, y: 0 });
+    dragRef.current = null;
+  }, []);
+  const updateViewerScale = useCallback((nextScale: number | ((current: number) => number)) => {
+    setViewerScale((current) => clampScale(typeof nextScale === "function" ? nextScale(current) : nextScale));
+  }, []);
+  const zoomIn = useCallback(() => updateViewerScale((current) => current + scaleStep), [updateViewerScale]);
+  const zoomOut = useCallback(() => {
+    updateViewerScale((current) => {
+      const next = current - scaleStep;
+      if (next <= 1) setViewerOffset({ x: 0, y: 0 });
+      return next;
+    });
+  }, [updateViewerScale]);
+  const rotateImage = useCallback(() => setViewerRotation((current) => (current + 90) % 360), []);
+  const copyImage = useCallback(() => {
+    if (!actionBusy) onCopyImage?.();
+  }, [actionBusy, onCopyImage]);
+  const saveImageAs = useCallback(() => {
+    if (!actionBusy) onSaveImageAs?.();
+  }, [actionBusy, onSaveImageAs]);
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    resetViewer();
+    return undefined;
+  }, [previewOpen, resetViewer, src]);
+
+  useEffect(() => {
+    setNaturalPreviewBox(null);
+  }, [src]);
+
   useEffect(() => {
     if (!previewOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClosePreview();
+      if (event.key === "Escape") {
+        onClosePreview();
+        return;
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "c" && onCopyImage) {
+        event.preventDefault();
+        copyImage();
+        return;
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "s" && onSaveImageAs) {
+        event.preventDefault();
+        saveImageAs();
+        return;
+      }
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        zoomIn();
+        return;
+      }
+      if (event.key === "-") {
+        event.preventDefault();
+        zoomOut();
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        resetViewer();
+        return;
+      }
+      if (event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        rotateImage();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClosePreview, previewOpen]);
+  }, [
+    copyImage,
+    onClosePreview,
+    onCopyImage,
+    onSaveImageAs,
+    previewOpen,
+    resetViewer,
+    rotateImage,
+    saveImageAs,
+    zoomIn,
+    zoomOut,
+  ]);
+
+  const handlePreviewWheel = (event: WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const direction = event.deltaY < 0 ? 1 : -1;
+    updateViewerScale((current) => {
+      const next = current + direction * scaleStep;
+      if (next <= 1) setViewerOffset({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const handlePreviewDoubleClick = (event: MouseEvent<HTMLImageElement>) => {
+    event.stopPropagation();
+    if (viewerScale > 1) {
+      setViewerOffset({ x: 0, y: 0 });
+      setViewerScale(1);
+      return;
+    }
+    setViewerScale(2);
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLImageElement>) => {
+    if (viewerScale <= 1) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startOffsetX: viewerOffset.x,
+      startOffsetY: viewerOffset.y,
+      moved: false,
+    };
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLImageElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaX = event.clientX - drag.startClientX;
+    const deltaY = event.clientY - drag.startClientY;
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) drag.moved = true;
+    setViewerOffset({
+      x: drag.startOffsetX + deltaX,
+      y: drag.startOffsetY + deltaY,
+    });
+  };
+
+  const handlePointerEnd = (event: ReactPointerEvent<HTMLImageElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragRef.current = null;
+  };
+
+  const handleInlineImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    const nextPreviewBox = imagePreviewBoxFromSize({
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    });
+    if (nextPreviewBox) {
+      setNaturalPreviewBox((current) =>
+        current &&
+        current.width === nextPreviewBox.width &&
+        current.height === nextPreviewBox.height &&
+        current.className === nextPreviewBox.className
+          ? current
+          : nextPreviewBox,
+      );
+    }
+    onImageLoad();
+  };
+
+  const viewerImageStyle = {
+    "--wechat-image-scale": viewerScale,
+    "--wechat-image-rotation": `${viewerRotation}deg`,
+    "--wechat-image-offset-x": `${viewerOffset.x}px`,
+    "--wechat-image-offset-y": `${viewerOffset.y}px`,
+  } as CSSProperties;
+  const viewerPercent = `${Math.round(viewerScale * 100)}%`;
+  const canDragViewerImage = viewerScale > 1;
 
   return (
     <>
@@ -80,7 +282,7 @@ export function ImageMessageFrame({
               className="message-image"
               src={src}
               alt={altText}
-              onLoad={onImageLoad}
+              onLoad={handleInlineImageLoad}
               onError={onImageError}
             />
           )}
@@ -98,47 +300,92 @@ export function ImageMessageFrame({
       )}
       {previewOpen && src && (
         <div
-          className="message-image-preview"
+          className="message-image-preview wechat-image-preview"
           role="dialog"
           aria-modal="true"
           aria-label={fileName ? t("media.image.viewerNamed", { name: fileName }) : t("media.image.viewer")}
           onClick={onClosePreview}
+          onWheel={handlePreviewWheel}
         >
-          <button
-            className="message-image-preview-close"
-            type="button"
-            aria-label={t("media.image.closePreview")}
-            onClick={onClosePreview}
+          <div
+            className="message-image-viewer-topbar"
+            onClick={(event) => event.stopPropagation()}
           >
-            <X size={20} />
-          </button>
+            <button
+              className="message-image-preview-close"
+              type="button"
+              title={t("media.image.closePreview")}
+              aria-label={t("media.image.closePreview")}
+              onClick={onClosePreview}
+            >
+              <X size={18} />
+            </button>
+            <div className="message-image-viewer-title">
+              <ImageIcon size={15} />
+              <span>{fileName || t("media.image.viewer")}</span>
+            </div>
+            <div className="message-image-viewer-actions">
+              <IconButton
+                disabled={actionBusy || !onCopyImage}
+                label={t("media.image.copy")}
+                onClick={copyImage}
+              >
+                <Copy size={17} />
+              </IconButton>
+              <IconButton
+                disabled={actionBusy || !onSaveImageAs}
+                label={t("media.image.saveAs")}
+                onClick={saveImageAs}
+              >
+                <Download size={17} />
+              </IconButton>
+              <IconButton
+                disabled={actionBusy || !onRevealImage}
+                label={t("media.image.reveal")}
+                onClick={onRevealImage}
+              >
+                <FolderOpen size={17} />
+              </IconButton>
+            </div>
+          </div>
           <div
             className="message-image-viewer-toolbar"
             onClick={(event) => event.stopPropagation()}
           >
             <button
-              disabled={actionBusy || !onCopyImage}
-              onClick={onCopyImage}
+              disabled={viewerScale <= minViewerScale}
+              onClick={zoomOut}
+              title={t("media.image.zoomOut")}
+              aria-label={t("media.image.zoomOut")}
               type="button"
             >
-              <Copy size={16} />
-              {t("media.image.copy")}
+              <ZoomOut size={18} />
+            </button>
+            <span className="message-image-viewer-scale">{viewerPercent}</span>
+            <button
+              disabled={viewerScale >= maxViewerScale}
+              onClick={zoomIn}
+              title={t("media.image.zoomIn")}
+              aria-label={t("media.image.zoomIn")}
+              type="button"
+            >
+              <ZoomIn size={18} />
             </button>
             <button
-              disabled={actionBusy || !onSaveImageAs}
-              onClick={onSaveImageAs}
+              onClick={rotateImage}
+              title={t("media.image.rotate")}
+              aria-label={t("media.image.rotate")}
               type="button"
             >
-              <Download size={16} />
-              {t("media.image.saveAs")}
+              <RotateCw size={18} />
             </button>
             <button
-              disabled={actionBusy || !onRevealImage}
-              onClick={onRevealImage}
+              onClick={resetViewer}
+              title={t("media.image.resetView")}
+              aria-label={t("media.image.resetView")}
               type="button"
             >
-              <FolderOpen size={16} />
-              {t("media.image.reveal")}
+              <Scan size={18} />
             </button>
           </div>
           {actionNotice && (
@@ -150,12 +397,48 @@ export function ImageMessageFrame({
             </div>
           )}
           <img
+            className={`message-image-viewer-img ${canDragViewerImage ? "can-drag" : ""}`}
             src={src}
             alt={fileName || t("media.image.viewer")}
+            draggable={false}
+            style={viewerImageStyle}
+            onDoubleClick={handlePreviewDoubleClick}
+            onPointerCancel={handlePointerEnd}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerEnd}
             onClick={(event) => event.stopPropagation()}
           />
         </div>
       )}
     </>
   );
+}
+
+function IconButton({
+  children,
+  disabled,
+  label,
+  onClick,
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+  label: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function clampScale(value: number) {
+  return Math.min(maxViewerScale, Math.max(minViewerScale, Number(value.toFixed(2))));
 }

@@ -2850,9 +2850,13 @@
       previewNamed: '预览图片 {name}',
       reload: '重新加载',
       reveal: '显示位置',
+      resetView: '复位',
+      rotate: '旋转',
       saveAs: '另存为',
       viewer: '图片预览',
       viewerNamed: '图片预览 {name}',
+      zoomIn: '放大',
+      zoomOut: '缩小',
     },
     message: {
       file: '文件',

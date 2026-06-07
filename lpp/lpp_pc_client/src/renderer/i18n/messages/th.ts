@@ -1318,9 +1318,13 @@ export const th: MessageDictionary = {
       previewNamed: 'ดูตัวอย่างรูปภาพ {name}',
       reload: 'โหลดใหม่',
       reveal: 'แสดงตำแหน่ง',
+      resetView: 'รีเซ็ตมุมมอง',
+      rotate: 'หมุน',
       saveAs: 'บันทึกเป็น',
       viewer: 'ตัวอย่างรูปภาพ',
       viewerNamed: 'ตัวอย่างรูปภาพ {name}',
+      zoomIn: 'ซูมเข้า',
+      zoomOut: 'ซูมออก',
     },
     video: {
       loading: 'กำลังโหลดวิดีโอ',

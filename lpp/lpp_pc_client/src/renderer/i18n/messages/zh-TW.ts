@@ -2852,9 +2852,13 @@ export const zhTW: MessageDictionary = {
       previewNamed: '預覽圖片 {name}',
       reload: '重新載入',
       reveal: '顯示位置',
+      resetView: '復位',
+      rotate: '旋轉',
       saveAs: '另存為',
       viewer: '圖片預覽',
       viewerNamed: '圖片預覽 {name}',
+      zoomIn: '放大',
+      zoomOut: '縮小',
     },
     message: {
       file: '檔案',
