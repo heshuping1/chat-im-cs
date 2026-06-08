@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/chat_draft_local_store.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/presentation/providers/chat_draft_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 
 final conversationActionsControllerProvider =
@@ -215,6 +217,19 @@ class ConversationActionsController {
     required bool isGroup,
     required String text,
   }) async {
+    final space = _ref.read(currentSpaceProvider);
+    final spaceId = space?.spaceId ?? '';
+    final userId = space?.userId ?? '';
+    if (spaceId.isNotEmpty && userId.isNotEmpty) {
+      await const ChatDraftLocalStore().saveDraft(
+        spaceId: spaceId,
+        userId: userId,
+        conversationId: conversationId,
+        text: text,
+      );
+      _ref.invalidate(chatDraftProvider((spaceId, userId, conversationId)));
+    }
+
     final dio = _ref.read(dioProvider);
     try {
       final path = isGroup

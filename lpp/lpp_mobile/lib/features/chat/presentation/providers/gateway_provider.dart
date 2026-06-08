@@ -536,7 +536,9 @@ void _handleMessageRecalled(
 Future<void> _syncMessages(Dio dio, String spaceId, Ref ref) async {
   try {
     final Box<dynamic> cursorsBox = HiveStorage.syncCursorsBox;
-    final sinceSeq = cursorsBox.get('sync_cursor_$spaceId') as int?;
+    final userId = ref.read(currentSpaceProvider)?.userId ?? '';
+    final cursorKey = syncCursorStorageKey(spaceId: spaceId, userId: userId);
+    final sinceSeq = cursorsBox.get(cursorKey) as int?;
 
     final response = await dio.get<Map<String, dynamic>>(
       '/api/client/v1/sync',
@@ -649,13 +651,14 @@ Future<void> _syncMessages(Dio dio, String spaceId, Ref ref) async {
 
     // 保存新游标
     if (nextSinceSeq != null) {
-      await cursorsBox.put('sync_cursor_$spaceId', nextSinceSeq);
+      await cursorsBox.put(cursorKey, nextSinceSeq);
     }
     AppDiagnostics.instance.info(
       'gateway.sync',
       'completed',
       context: {
         'spaceId': spaceId,
+        'userId': userId,
         'sinceSeq': sinceSeq,
         'nextSinceSeq': nextSinceSeq,
         'conversationCount': conversations.length,
@@ -678,7 +681,8 @@ Future<void> _syncMessages(Dio dio, String spaceId, Ref ref) async {
 Future<void> _flushPendingMessages(Dio dio, String spaceId, Ref ref) async {
   try {
     final pending = PendingMessageQueue();
-    final before = await pending.getAll();
+    final userId = ref.read(currentSpaceProvider)?.userId ?? '';
+    final before = await pending.getAll(spaceId: spaceId, userId: userId);
     if (before.isEmpty) return;
     final local = ChatLocalDataSourceImpl();
     final defaultRepository = ChatRepositoryImpl(
@@ -688,6 +692,8 @@ Future<void> _flushPendingMessages(Dio dio, String spaceId, Ref ref) async {
     );
     await pending.flushAll(
       defaultRepository,
+      spaceId: spaceId,
+      userId: userId,
       repositoryForMessage: (message) {
         final threadType = message.threadType?.trim();
         final threadId = message.threadId?.trim();
@@ -725,7 +731,7 @@ Future<void> _flushPendingMessages(Dio dio, String spaceId, Ref ref) async {
         );
       },
     );
-    final after = await pending.getAll();
+    final after = await pending.getAll(spaceId: spaceId, userId: userId);
     AppDiagnostics.instance.info(
       'chat.pending',
       'flushed',

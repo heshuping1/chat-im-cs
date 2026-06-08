@@ -897,6 +897,30 @@ abstract class AppLocalizations {
   /// **'文件上传失败，请重试'**
   String get chatFileUploadFailed;
 
+  /// File message status when the attachment has not been downloaded
+  ///
+  /// In zh, this message translates to:
+  /// **'未下载'**
+  String get chatFileStatusNotDownloaded;
+
+  /// File message status when the attachment is available locally
+  ///
+  /// In zh, this message translates to:
+  /// **'已下载'**
+  String get chatFileStatusDownloaded;
+
+  /// File message status while upload is in progress
+  ///
+  /// In zh, this message translates to:
+  /// **'上传中'**
+  String get chatFileStatusUploading;
+
+  /// File message status when upload failed
+  ///
+  /// In zh, this message translates to:
+  /// **'上传失败'**
+  String get chatFileStatusUploadFailed;
+
   /// Card send failed
   ///
   /// In zh, this message translates to:

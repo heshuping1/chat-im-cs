@@ -10,6 +10,7 @@ import type {
   MessageItemDto,
   StaffReceptionStatusDto,
   StaffServiceHistoryResponse,
+  TempSessionStatsDto,
 } from "./types";
 import { logApiContractDiagnostic } from "../api-contract/contract-diagnostics";
 import {
@@ -66,6 +67,16 @@ export class CustomerServiceApiClient extends MessagesApiClient {
         normalizeAdminTempSessionsResponse(response),
         customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
       ),
+    );
+  }
+
+  async getTempSessionStats() {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<TempSessionStatsDto>(
+      endpointPlan.adminCustomerServiceTempSessionStats,
+      {},
+      true,
     );
   }
 

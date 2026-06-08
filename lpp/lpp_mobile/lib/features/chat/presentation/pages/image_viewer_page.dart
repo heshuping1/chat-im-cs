@@ -7,6 +7,7 @@ import 'package:lpp_mobile/core/widgets/app_network_image.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/message_media_preview_model.dart';
 
 class ImageViewerItem {
   final String conversationId;
@@ -87,14 +88,24 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
               return InteractiveViewer(
                 minScale: 0.5,
                 maxScale: 5.0,
-                child: Center(
-                  child: _ViewerImage(
-                    item: item,
-                    fallbackUrl: widget.imageUrls[i],
+                child: SizedBox.expand(
+                  child: Center(
+                    child: _ViewerImage(
+                      item: item,
+                      fallbackUrl: widget.imageUrls[i],
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
                   ),
                 ),
               );
             },
+          ),
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(context).pop(),
+              child: const SizedBox.expand(),
+            ),
           ),
           SafeArea(
             child: Padding(
@@ -137,10 +148,12 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
 class _ViewerImage extends ConsumerStatefulWidget {
   final ImageViewerItem? item;
   final String fallbackUrl;
+  final VoidCallback onTap;
 
   const _ViewerImage({
     required this.item,
     required this.fallbackUrl,
+    required this.onTap,
   });
 
   @override
@@ -155,6 +168,15 @@ class _ViewerImageState extends ConsumerState<_ViewerImage> {
     final item = widget.item;
     final spaceId = ref.watch(currentSpaceProvider)?.spaceId;
     if (item == null || spaceId == null) {
+      if (isLocalVisualMediaUrl(widget.fallbackUrl)) {
+        return GestureDetector(
+          onTap: widget.onTap,
+          child: localImageWidget(
+            localPathFromUriOrPath(widget.fallbackUrl),
+            fit: BoxFit.contain,
+          ),
+        );
+      }
       return _networkImage(widget.fallbackUrl);
     }
 
@@ -167,6 +189,7 @@ class _ViewerImageState extends ConsumerState<_ViewerImage> {
               mediaKind: MediaKind.image,
               variant: MediaVariant.original,
               remoteUrl: item.media.url,
+              localCandidateUrl: item.media.localPreviewUrl,
               fileName: item.media.fileName?.trim().isNotEmpty == true
                   ? item.media.fileName!.trim()
                   : 'image.jpg',
@@ -176,9 +199,12 @@ class _ViewerImageState extends ConsumerState<_ViewerImage> {
           ),
       builder: (context, snapshot) {
         if (snapshot.hasData) {
-          return localImageWidget(
-            snapshot.data!,
-            fit: BoxFit.contain,
+          return GestureDetector(
+            onTap: widget.onTap,
+            child: localImageWidget(
+              snapshot.data!,
+              fit: BoxFit.contain,
+            ),
           );
         }
         if (snapshot.hasError) {
@@ -201,15 +227,18 @@ class _ViewerImageState extends ConsumerState<_ViewerImage> {
   }
 
   Widget _networkImage(String url) {
-    return AppNetworkImage(
-      url: url,
-      fit: BoxFit.contain,
-      placeholderBuilder: (_) => Center(
-        child: CircularProgressIndicator(
-          color: Theme.of(context).colorScheme.surface,
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AppNetworkImage(
+        url: url,
+        fit: BoxFit.contain,
+        placeholderBuilder: (_) => Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.surface,
+          ),
         ),
+        errorBuilder: (_) => _error(),
       ),
-      errorBuilder: (_) => _error(),
     );
   }
 

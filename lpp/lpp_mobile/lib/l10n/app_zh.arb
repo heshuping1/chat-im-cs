@@ -543,6 +543,22 @@
   "@chatFileUploadFailed": {
     "description": "File upload failed"
   },
+  "chatFileStatusNotDownloaded": "未下载",
+  "@chatFileStatusNotDownloaded": {
+    "description": "File message status when the attachment has not been downloaded"
+  },
+  "chatFileStatusDownloaded": "已下载",
+  "@chatFileStatusDownloaded": {
+    "description": "File message status when the attachment is available locally"
+  },
+  "chatFileStatusUploading": "上传中",
+  "@chatFileStatusUploading": {
+    "description": "File message status while upload is in progress"
+  },
+  "chatFileStatusUploadFailed": "上传失败",
+  "@chatFileStatusUploadFailed": {
+    "description": "File message status when upload failed"
+  },
   "chatCardSendFailed": "名片发送失败",
   "@chatCardSendFailed": {
     "description": "Card send failed"

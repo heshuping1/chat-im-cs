@@ -412,6 +412,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get chatFileUploadFailed => 'ファイルのアップロードに失敗しました';
 
   @override
+  String get chatFileStatusNotDownloaded => '未ダウンロード';
+
+  @override
+  String get chatFileStatusDownloaded => 'ダウンロード済み';
+
+  @override
+  String get chatFileStatusUploading => 'アップロード中';
+
+  @override
+  String get chatFileStatusUploadFailed => 'アップロード失敗';
+
+  @override
   String get chatCardSendFailed => '連絡先カードの送信に失敗しました';
 
   @override

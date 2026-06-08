@@ -188,6 +188,27 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("loads temp-session stats through the admin API for owner workspaces", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        staffPerformance: [],
+        totalSessions: 1,
+      },
+    });
+
+    await expect(client.getTempSessionStats()).resolves.toMatchObject({
+      totalSessions: 1,
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/temp-sessions/stats",
+      },
+    ]);
+  });
+
   it("keeps customer service workbench queries on the tenant token for staff workspaces", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 2,

@@ -88,6 +88,60 @@ void main() {
       expect(dashboard.avgWaitSeconds, 12);
     });
 
+    test('parses admin temp session stats with cross-channel staff KPI', () {
+      final stats = AdminTempSessionStats.fromJson({
+        'totalSessions': 24,
+        'totalQueued': 3,
+        'totalServed': 21,
+        'avgWaitSeconds': 42,
+        'avgFirstResponseSeconds': 58,
+        'avgDurationSeconds': 360,
+        'avgRating': 4.8,
+        'channelDistribution': [
+          {'label': 'app', 'value': 8},
+          {'label': 'web', 'value': 16},
+        ],
+        'staffPerformance': [
+          {
+            'staffUserId': 'staff-1',
+            'displayName': '客服 A',
+            'sessionsServed': 10,
+            'avgFirstResponseSeconds': 30,
+            'avgDurationSeconds': 300,
+            'avgRating': 4.9,
+            'excellentRate': 0.92,
+            'byChannel': [
+              {
+                'channel': 'widget',
+                'sessionsServed': 4,
+                'avgFirstResponseSeconds': 40,
+                'avgDurationSeconds': 260,
+                'avgRating': 4.8,
+                'excellentRate': 0.9,
+              },
+              {
+                'channel': 'im_direct',
+                'sessionsServed': 6,
+                'avgFirstResponseSeconds': 24,
+                'avgDurationSeconds': 326,
+                'avgRating': 5,
+                'excellentRate': 0.94,
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(stats.totalSessions, 24);
+      expect(stats.avgRating, 4.8);
+      expect(stats.channelDistribution.first.label, 'app');
+      expect(stats.staffPerformance.single.sessionsServed, 10);
+      expect(stats.staffPerformance.single.servedCountMatchesBreakdown, isTrue);
+      expect(stats.staffPerformance.single.byChannel, hasLength(2));
+      expect(stats.staffPerformance.single.byChannel.last.channel, 'im_direct');
+      expect(stats.staffPerformance.single.byChannel.last.channelLabel, '注册客户');
+    });
+
     test('parses reception status from documented client API payload', () {
       final status = CsReceptionStatus.fromJson({
         'staffUserId': 'staff-1',
@@ -510,6 +564,47 @@ void main() {
         expect(card.visitor?.visitorId, 'visitor-1');
         expect(card.account, isNull);
         expect(card.tickets, isEmpty);
+      },
+    );
+
+    test(
+      'parses visitor acquisition fields without inventing missing values',
+      () {
+        final card = CustomerProfileCard.fromJson({
+          'identity': {'displayName': '访客-来源', 'registered': false},
+          'visitor': {
+            'visitorId': 'visitor-acquisition',
+            'sourceUrl': 'https://example.com/landing',
+            'locale': 'zh-CN',
+            'totalSessions': 2,
+            'acquisition': {
+              'applicationId': 'landing-app',
+              'sourcePlatform': 'h5',
+              'chatTool': 'wechat',
+              'deviceType': 'mobile',
+              'os': 'android',
+              'utmSource': 'google',
+              'utmCampaign': 'summer',
+              'appVersion': '1.2.3',
+              'timezone': 'Asia/Shanghai',
+            },
+          },
+        });
+
+        final acquisition = card.visitor?.acquisition;
+
+        expect(acquisition?.sourcePlatform, 'h5');
+        expect(acquisition?.chatToolLabel, '微信');
+        expect(acquisition?.deviceTypeLabel, '移动端');
+        expect(
+          acquisition?.displayItems.map((item) => item.label),
+          contains('UTM来源'),
+        );
+        expect(
+          acquisition?.displayItems.map((item) => item.value),
+          contains('google'),
+        );
+        expect(acquisition?.utmMedium, isNull);
       },
     );
 

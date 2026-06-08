@@ -384,14 +384,15 @@ class CsThread {
         'ownerStaffDisplayName',
       ]),
       source: _firstNonBlankString(json, const [
-        'source',
-        'from',
-        'channel',
-        'sourceChannel',
-        'entryChannel',
-        'platform',
-        'provider',
-      ]),
+            'source',
+            'from',
+            'channel',
+            'sourceChannel',
+            'entryChannel',
+            'platform',
+            'provider',
+          ]) ??
+          _sourceFromAcquisition(json['acquisition']),
       lastMessageType: json['lastMessageType'] as String?,
       lastMessagePreview: json['lastMessagePreview'] as String?,
       lastMessageAt: json['lastMessageAt'] != null
@@ -642,14 +643,15 @@ class CsThread {
         'ownerStaffDisplayName',
       ]),
       source: _firstNonBlankString(json, const [
-        'source',
-        'from',
-        'channel',
-        'sourceChannel',
-        'entryChannel',
-        'platform',
-        'provider',
-      ]),
+            'source',
+            'from',
+            'channel',
+            'sourceChannel',
+            'entryChannel',
+            'platform',
+            'provider',
+          ]) ??
+          _sourceFromAcquisition(json['acquisition']),
       lastMessageType: json['lastMessageType'] as String?,
       lastMessagePreview: json['lastMessagePreview'] as String?,
       lastMessageAt: json['lastMessageAt'] != null
@@ -824,6 +826,20 @@ List<String> _stringListValue(Object? value) {
 Map<String, dynamic> _mapValue(Object? value) {
   if (value is Map) return Map<String, dynamic>.from(value);
   return const {};
+}
+
+List<Map<String, dynamic>> _mapList(Object? value) {
+  if (value is! List) return const [];
+  return value
+      .whereType<Map>()
+      .map((item) => Map<String, dynamic>.from(item))
+      .toList(growable: false);
+}
+
+String? _sourceFromAcquisition(Object? value) {
+  final json = _mapValue(value);
+  if (json.isEmpty) return null;
+  return TempSessionAcquisition.fromJson(json).primarySourceLabel;
 }
 
 List<String> _firstNonEmptyStringList(
@@ -1087,21 +1103,164 @@ class VisitorProfileSummary {
   final String? sourceUrl;
   final String? locale;
   final int totalSessions;
+  final TempSessionAcquisition? acquisition;
 
   const VisitorProfileSummary({
     this.visitorId,
     this.sourceUrl,
     this.locale,
     this.totalSessions = 0,
+    this.acquisition,
   });
 
   factory VisitorProfileSummary.fromJson(Map<String, dynamic> json) {
+    final acquisitionJson = _mapValue(json['acquisition']);
     return VisitorProfileSummary(
       visitorId: _firstNonBlankString(json, const ['visitorId']),
       sourceUrl: _firstNonBlankString(json, const ['sourceUrl']),
       locale: _firstNonBlankString(json, const ['locale', 'language']),
       totalSessions: _intValue(json['totalSessions']),
+      acquisition: acquisitionJson.isNotEmpty
+          ? TempSessionAcquisition.fromJson(acquisitionJson)
+          : null,
     );
+  }
+}
+
+class TempSessionAcquisition {
+  final String? applicationId;
+  final String? sourcePlatform;
+  final String? chatTool;
+  final String? deviceType;
+  final String? os;
+  final String? osVersion;
+  final String? utmSource;
+  final String? utmMedium;
+  final String? utmCampaign;
+  final String? appVersion;
+  final String? country;
+  final String? region;
+  final String? timezone;
+
+  const TempSessionAcquisition({
+    this.applicationId,
+    this.sourcePlatform,
+    this.chatTool,
+    this.deviceType,
+    this.os,
+    this.osVersion,
+    this.utmSource,
+    this.utmMedium,
+    this.utmCampaign,
+    this.appVersion,
+    this.country,
+    this.region,
+    this.timezone,
+  });
+
+  factory TempSessionAcquisition.fromJson(Map<String, dynamic> json) {
+    return TempSessionAcquisition(
+      applicationId: _firstNonBlankString(json, const ['applicationId']),
+      sourcePlatform: _firstNonBlankString(json, const ['sourcePlatform']),
+      chatTool: _firstNonBlankString(json, const ['chatTool']),
+      deviceType: _firstNonBlankString(json, const ['deviceType']),
+      os: _firstNonBlankString(json, const ['os']),
+      osVersion: _firstNonBlankString(json, const ['osVersion']),
+      utmSource: _firstNonBlankString(json, const ['utmSource']),
+      utmMedium: _firstNonBlankString(json, const ['utmMedium']),
+      utmCampaign: _firstNonBlankString(json, const ['utmCampaign']),
+      appVersion: _firstNonBlankString(json, const ['appVersion']),
+      country: _firstNonBlankString(json, const ['country']),
+      region: _firstNonBlankString(json, const ['region']),
+      timezone: _firstNonBlankString(json, const ['timezone']),
+    );
+  }
+
+  String? get sourcePlatformLabel {
+    switch (sourcePlatform?.trim().toLowerCase()) {
+      case 'app':
+        return 'App';
+      case 'h5':
+        return 'H5';
+      case 'web':
+        return '网页';
+      case 'miniprogram':
+        return '小程序';
+    }
+    return sourcePlatform;
+  }
+
+  String? get chatToolLabel {
+    switch (chatTool?.trim().toLowerCase()) {
+      case 'wechat':
+        return '微信';
+      case 'telegram':
+        return 'Telegram';
+      case 'whatsapp':
+        return 'WhatsApp';
+      case 'line':
+        return 'LINE';
+      case 'messenger':
+        return 'Messenger';
+    }
+    return chatTool;
+  }
+
+  String? get deviceTypeLabel {
+    switch (deviceType?.trim().toLowerCase()) {
+      case 'mobile':
+        return '移动端';
+      case 'desktop':
+        return '桌面端';
+      case 'tablet':
+        return '平板';
+    }
+    return deviceType;
+  }
+
+  String? get primarySourceLabel =>
+      sourcePlatformLabel ?? chatToolLabel ?? applicationId;
+
+  List<AcquisitionDisplayItem> get displayItems {
+    return [
+      AcquisitionDisplayItem.maybe('来源平台', sourcePlatformLabel),
+      AcquisitionDisplayItem.maybe('聊天工具', chatToolLabel),
+      AcquisitionDisplayItem.maybe('设备', deviceTypeLabel),
+      AcquisitionDisplayItem.maybe(
+        '系统',
+        [os, osVersion]
+            .where((item) => item?.trim().isNotEmpty == true)
+            .join(' '),
+      ),
+      AcquisitionDisplayItem.maybe('应用', applicationId),
+      AcquisitionDisplayItem.maybe('App版本', appVersion),
+      AcquisitionDisplayItem.maybe('UTM来源', utmSource),
+      AcquisitionDisplayItem.maybe('UTM媒介', utmMedium),
+      AcquisitionDisplayItem.maybe('UTM活动', utmCampaign),
+      AcquisitionDisplayItem.maybe(
+        '地区',
+        [country, region]
+            .where((item) => item?.trim().isNotEmpty == true)
+            .join(' / '),
+      ),
+      AcquisitionDisplayItem.maybe('时区', timezone),
+    ].whereType<AcquisitionDisplayItem>().toList(growable: false);
+  }
+}
+
+class AcquisitionDisplayItem {
+  final String label;
+  final String value;
+
+  const AcquisitionDisplayItem({
+    required this.label,
+    required this.value,
+  });
+
+  static AcquisitionDisplayItem? maybe(String label, String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) return null;
+    return AcquisitionDisplayItem(label: label, value: normalized);
   }
 }
 
@@ -2025,6 +2184,192 @@ class AdminCustomerServiceDashboard {
       todayServed: json['todayServed'] as int?,
       avgWaitSeconds: json['avgWaitSeconds'] as int?,
     );
+  }
+}
+
+class AdminTempSessionStats {
+  final int totalSessions;
+  final int totalQueued;
+  final int totalServed;
+  final int totalAbandoned;
+  final int avgWaitSeconds;
+  final int avgFirstResponseSeconds;
+  final int avgDurationSeconds;
+  final double avgRating;
+  final int aiServedSessions;
+  final int aiHandoffSessions;
+  final int aiResolvedSessions;
+  final int aiMessageCount;
+  final int failedAiJobs;
+  final int avgAiLatencyMs;
+  final double aiEstimatedCostUsd;
+  final List<AdminDistributionPoint> sessionTrend;
+  final List<AdminDistributionPoint> channelDistribution;
+  final List<AdminDistributionPoint> categoryDistribution;
+  final List<AdminDistributionPoint> localeDistribution;
+  final List<AdminStaffPerformance> staffPerformance;
+
+  const AdminTempSessionStats({
+    this.totalSessions = 0,
+    this.totalQueued = 0,
+    this.totalServed = 0,
+    this.totalAbandoned = 0,
+    this.avgWaitSeconds = 0,
+    this.avgFirstResponseSeconds = 0,
+    this.avgDurationSeconds = 0,
+    this.avgRating = 0,
+    this.aiServedSessions = 0,
+    this.aiHandoffSessions = 0,
+    this.aiResolvedSessions = 0,
+    this.aiMessageCount = 0,
+    this.failedAiJobs = 0,
+    this.avgAiLatencyMs = 0,
+    this.aiEstimatedCostUsd = 0,
+    this.sessionTrend = const [],
+    this.channelDistribution = const [],
+    this.categoryDistribution = const [],
+    this.localeDistribution = const [],
+    this.staffPerformance = const [],
+  });
+
+  factory AdminTempSessionStats.fromJson(Map<String, dynamic> json) {
+    return AdminTempSessionStats(
+      totalSessions: _intValue(json['totalSessions']),
+      totalQueued: _intValue(json['totalQueued']),
+      totalServed: _intValue(json['totalServed']),
+      totalAbandoned: _intValue(json['totalAbandoned']),
+      avgWaitSeconds: _intValue(json['avgWaitSeconds']),
+      avgFirstResponseSeconds: _intValue(json['avgFirstResponseSeconds']),
+      avgDurationSeconds: _intValue(json['avgDurationSeconds']),
+      avgRating: _doubleValue(json['avgRating']),
+      aiServedSessions: _intValue(json['aiServedSessions']),
+      aiHandoffSessions: _intValue(json['aiHandoffSessions']),
+      aiResolvedSessions: _intValue(json['aiResolvedSessions']),
+      aiMessageCount: _intValue(json['aiMessageCount']),
+      failedAiJobs: _intValue(json['failedAiJobs']),
+      avgAiLatencyMs: _intValue(json['avgAiLatencyMs']),
+      aiEstimatedCostUsd: _doubleValue(json['aiEstimatedCostUsd']),
+      sessionTrend: _distributionList(json['sessionTrend']),
+      channelDistribution: _distributionList(json['channelDistribution']),
+      categoryDistribution: _distributionList(json['categoryDistribution']),
+      localeDistribution: _distributionList(json['localeDistribution']),
+      staffPerformance: _mapList(json['staffPerformance'])
+          .map(AdminStaffPerformance.fromJson)
+          .toList(growable: false),
+    );
+  }
+
+  static List<AdminDistributionPoint> _distributionList(Object? value) {
+    return _mapList(value)
+        .map(AdminDistributionPoint.fromJson)
+        .toList(growable: false);
+  }
+}
+
+class AdminDistributionPoint {
+  final String label;
+  final int value;
+
+  const AdminDistributionPoint({
+    required this.label,
+    required this.value,
+  });
+
+  factory AdminDistributionPoint.fromJson(Map<String, dynamic> json) {
+    return AdminDistributionPoint(
+      label: _firstNonBlankString(json, const ['label', 'name']) ?? '',
+      value: _intValue(json['value']),
+    );
+  }
+}
+
+class AdminStaffPerformance {
+  final String staffUserId;
+  final String displayName;
+  final int sessionsServed;
+  final int avgFirstResponseSeconds;
+  final int avgDurationSeconds;
+  final double avgRating;
+  final double excellentRate;
+  final List<AdminStaffChannelBreakdown> byChannel;
+
+  const AdminStaffPerformance({
+    required this.staffUserId,
+    required this.displayName,
+    this.sessionsServed = 0,
+    this.avgFirstResponseSeconds = 0,
+    this.avgDurationSeconds = 0,
+    this.avgRating = 0,
+    this.excellentRate = 0,
+    this.byChannel = const [],
+  });
+
+  factory AdminStaffPerformance.fromJson(Map<String, dynamic> json) {
+    return AdminStaffPerformance(
+      staffUserId: _firstNonBlankString(json, const ['staffUserId']) ?? '',
+      displayName: _firstNonBlankString(json, const [
+            'displayName',
+            'staffDisplayName',
+          ]) ??
+          '客服',
+      sessionsServed: _intValue(json['sessionsServed']),
+      avgFirstResponseSeconds: _intValue(json['avgFirstResponseSeconds']),
+      avgDurationSeconds: _intValue(json['avgDurationSeconds']),
+      avgRating: _doubleValue(json['avgRating']),
+      excellentRate: _doubleValue(json['excellentRate']),
+      byChannel: _mapList(json['byChannel'])
+          .map(AdminStaffChannelBreakdown.fromJson)
+          .toList(growable: false),
+    );
+  }
+
+  bool get servedCountMatchesBreakdown {
+    if (byChannel.isEmpty) return true;
+    final total = byChannel.fold<int>(
+      0,
+      (sum, item) => sum + item.sessionsServed,
+    );
+    return total == sessionsServed;
+  }
+}
+
+class AdminStaffChannelBreakdown {
+  final String channel;
+  final int sessionsServed;
+  final int avgFirstResponseSeconds;
+  final int avgDurationSeconds;
+  final double avgRating;
+  final double excellentRate;
+
+  const AdminStaffChannelBreakdown({
+    required this.channel,
+    this.sessionsServed = 0,
+    this.avgFirstResponseSeconds = 0,
+    this.avgDurationSeconds = 0,
+    this.avgRating = 0,
+    this.excellentRate = 0,
+  });
+
+  factory AdminStaffChannelBreakdown.fromJson(Map<String, dynamic> json) {
+    return AdminStaffChannelBreakdown(
+      channel: _firstNonBlankString(json, const ['channel']) ?? '',
+      sessionsServed: _intValue(json['sessionsServed']),
+      avgFirstResponseSeconds: _intValue(json['avgFirstResponseSeconds']),
+      avgDurationSeconds: _intValue(json['avgDurationSeconds']),
+      avgRating: _doubleValue(json['avgRating']),
+      excellentRate: _doubleValue(json['excellentRate']),
+    );
+  }
+
+  String get channelLabel {
+    switch (channel) {
+      case 'widget':
+        return '访客';
+      case 'im_direct':
+        return '注册客户';
+      default:
+        return channel.isEmpty ? '未知渠道' : channel;
+    }
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/presentation/pages/image_viewer_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/message_bubble.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
@@ -40,9 +41,11 @@ void main() {
     expect(find.byIcon(Icons.done_all), findsOneWidget);
   });
 
-  testWidgets('group self messages do not show read receipt ticks', (
+  testWidgets('group self messages show read count receipt entry', (
     tester,
   ) async {
+    var tapped = false;
+
     await tester.pumpWidget(
       _wrap(
         MessageBubble(
@@ -50,14 +53,89 @@ void main() {
           isSelf: true,
           groupId: 'group-1',
           showTimestamp: false,
+          onGroupReadReceiptTap: () => tapped = true,
         ),
       ),
     );
 
     expect(find.byIcon(Icons.done), findsNothing);
     expect(find.byIcon(Icons.done_all), findsNothing);
-    expect(find.textContaining('已读'), findsNothing);
+    expect(find.text('已读 3 人'), findsOneWidget);
     expect(find.textContaining('未读'), findsNothing);
+
+    await tester.tap(find.text('已读 3 人'));
+    await tester.pump();
+
+    expect(tapped, isTrue);
+  });
+
+  testWidgets('group self messages show unread receipt entry when count is zero', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(readCount: 0),
+          isSelf: true,
+          groupId: 'group-1',
+          showTimestamp: false,
+          onGroupReadReceiptTap: () {},
+        ),
+      ),
+    );
+
+    expect(find.text('未读'), findsOneWidget);
+    expect(find.textContaining('已读'), findsNothing);
+  });
+
+  testWidgets('group read receipt entry is hidden for peer and unsent messages', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        Column(
+          children: [
+            MessageBubble(
+              message: _message(readCount: 3),
+              isSelf: false,
+              groupId: 'group-1',
+              showTimestamp: false,
+              onGroupReadReceiptTap: () {},
+            ),
+            MessageBubble(
+              message: _message(status: MessageStatus.sending, readCount: 3),
+              isSelf: true,
+              groupId: 'group-1',
+              showTimestamp: false,
+              onGroupReadReceiptTap: () {},
+            ),
+            MessageBubble(
+              message: _message(status: MessageStatus.failed, readCount: 3),
+              isSelf: true,
+              groupId: 'group-1',
+              showTimestamp: false,
+              onGroupReadReceiptTap: () {},
+            ),
+            MessageBubble(
+              message: _message(readCount: 3),
+              isSelf: true,
+              showTimestamp: false,
+              onGroupReadReceiptTap: () {},
+            ),
+            MessageBubble(
+              message: _message(readCount: 3, isRecalled: true),
+              isSelf: true,
+              groupId: 'group-1',
+              showTimestamp: false,
+              onGroupReadReceiptTap: () {},
+            ),
+          ],
+        ),
+      ),
+    );
+
+    expect(find.textContaining('已读'), findsNothing);
+    expect(find.text('未读'), findsNothing);
   });
 
   testWidgets('local media sending avoids immediate progress spinner', (
@@ -110,10 +188,106 @@ void main() {
     );
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.textContaining('上传中'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('message-file-upload-progress')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('file bubble uses WeChat-style card with type and status', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.file,
+            body: const MessageBody(
+              file: MediaResource(
+                url: 'https://cdn.example.com/manual.pdf',
+                fileName: 'manual.pdf',
+                mimeType: 'application/pdf',
+                sizeBytes: 280 * 1024,
+              ),
+            ),
+          ),
+          isSelf: false,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('message-file-card')), findsOneWidget);
+    expect(find.text('manual.pdf'), findsOneWidget);
+    expect(find.text('280KB 未下载'), findsOneWidget);
+    expect(find.text('PDF'), findsOneWidget);
+
+    final card = tester.widget<Ink>(
+      find.byKey(const ValueKey('message-file-card')),
+    );
+    final decoration = card.decoration! as BoxDecoration;
+    expect(decoration.color, Colors.white);
+  });
+
+  testWidgets('file bubble marks preserved local attachment as downloaded', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.file,
+            body: const MessageBody(
+              file: MediaResource(
+                url: 'https://cdn.example.com/manual.docx',
+                fileName: 'manual.docx',
+                mimeType:
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                sizeBytes: 1536,
+                localPreviewUrl: '/tmp/manual.docx',
+              ),
+            ),
+          ),
+          isSelf: true,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    expect(find.text('1.5KB 已下载'), findsOneWidget);
+    expect(find.text('DOC'), findsOneWidget);
+  });
+
+  testWidgets('long file name stays inside stable file card', (tester) async {
+    const longName = '【后端开发工程师_深圳15-25K】李家乐9年项目经验和作品集.pdf';
+
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.file,
+            body: const MessageBody(
+              file: MediaResource(
+                url: 'https://cdn.example.com/resume.pdf',
+                fileName: longName,
+                mimeType: 'application/pdf',
+                sizeBytes: 280 * 1024,
+              ),
+            ),
+          ),
+          isSelf: false,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    final cardRect = tester.getRect(
+      find.byKey(const ValueKey('message-file-card')),
+    );
+
+    expect(find.text(longName), findsOneWidget);
+    expect(cardRect.width, inInclusiveRange(244, 286));
   });
 
   testWidgets(
@@ -225,6 +399,33 @@ void main() {
     expect(imageRect.width, 220);
   });
 
+  testWidgets('local image bubble opens image viewer on tap', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(
+            type: MessageType.image,
+            body: const MessageBody(
+              image: MediaResource(
+                url: '/tmp/local-image.jpg',
+                width: 900,
+                height: 1600,
+              ),
+            ),
+          ),
+          isSelf: true,
+          showTimestamp: false,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('message-image-frame')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.byType(ImageViewerPage), findsOneWidget);
+  });
+
   testWidgets('sending local video shows upload progress on video bubble', (
     tester,
   ) async {
@@ -319,7 +520,7 @@ void main() {
     expect(posterRect.width, greaterThan(posterRect.height));
   });
 
-  testWidgets('text sending still shows progress spinner', (tester) async {
+  testWidgets('text sending hides immediate progress spinner', (tester) async {
     await tester.pumpWidget(
       _wrap(
         MessageBubble(
@@ -330,34 +531,33 @@ void main() {
       ),
     );
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(
       find.byKey(const ValueKey('message-text-send-progress')),
-      findsOneWidget,
+      findsNothing,
     );
   });
 
-  testWidgets('self text sending progress sits outside the green bubble', (
-    tester,
-  ) async {
+  testWidgets('failed text message keeps retry affordance', (tester) async {
+    var tapped = false;
+
     await tester.pumpWidget(
       _wrap(
         MessageBubble(
-          message: _message(status: MessageStatus.sending),
+          message: _message(status: MessageStatus.failed),
           isSelf: true,
           showTimestamp: false,
+          onFailedTap: () => tapped = true,
         ),
       ),
     );
 
-    final progressRect = tester.getRect(
-      find.byKey(const ValueKey('message-text-send-progress')),
-    );
-    final textRect = tester.getRect(find.text('hello'));
+    expect(find.byIcon(Icons.error_outline), findsOneWidget);
 
-    expect(progressRect.right, lessThan(textRect.left));
-    expect(progressRect.width, inInclusiveRange(24, 28));
-    expect(progressRect.height, inInclusiveRange(24, 28));
+    await tester.tap(find.byIcon(Icons.error_outline));
+    await tester.pump();
+
+    expect(tapped, isTrue);
   });
 
   testWidgets(
@@ -462,6 +662,7 @@ Message _message({
   MessageBody body = const MessageBody(text: 'hello'),
   MessageLocalUploadState? localUploadState,
   List<Mention>? mentions,
+  bool isRecalled = false,
 }) {
   return Message(
     messageId: 'msg-1',
@@ -476,5 +677,6 @@ Message _message({
     readCount: readCount,
     localUploadState: localUploadState,
     mentions: mentions,
+    isRecalled: isRecalled,
   );
 }

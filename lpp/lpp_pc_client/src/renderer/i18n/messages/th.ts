@@ -714,6 +714,15 @@ export const th: MessageDictionary = {
       selectedConversationEmpty: 'Select a conversation',
       sendContactCardFailed: 'Failed to send contact card',
     },
+    groupReadReceipts: {
+      loadFailed: 'Failed to load receipts',
+      loading: 'Loading receipts...',
+      readEmpty: 'No one has read this yet',
+      readTab: 'Read {count}',
+      title: 'Read receipts',
+      unreadEmpty: 'Everyone has read this',
+      unreadTab: 'Unread {count}',
+    },
     interactions: {
       batchDeletePartial: 'Deleted {succeeded}; {failed} failed. Try again later.',
       batchDeleteSuccess: 'Deleted {count} messages',

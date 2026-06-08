@@ -1829,10 +1829,14 @@ class _AdminWorkbenchFeatureContent extends ConsumerWidget {
       case 'admin_service_center':
         return _AdminServiceCenterContent(config: config);
       case 'owner_service_efficiency':
+      case 'admin_by_staff':
         return ref.watch(adminCustomerServiceDashboardProvider).when(
               loading: () => const _AdminLoadingCard(),
               error: (error, _) => const _AdminDashboardContent.empty(),
-              data: (data) => _AdminDashboardContent(data: data),
+              data: (data) => _AdminServicePerformanceContent(
+                dashboard: data,
+                emptyMessage: config.emptyText,
+              ),
             );
       case 'owner_thread_management':
         return _AdminThreadManagementContent(config: config);
@@ -2496,6 +2500,214 @@ class _AdminDashboardContentState extends State<_AdminDashboardContent> {
   }
 }
 
+class _AdminServicePerformanceContent extends ConsumerWidget {
+  final AdminCustomerServiceDashboard dashboard;
+  final String emptyMessage;
+
+  const _AdminServicePerformanceContent({
+    required this.dashboard,
+    required this.emptyMessage,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _AdminDashboardContent(data: dashboard),
+        const SizedBox(height: 12),
+        ref.watch(adminTempSessionStatsProvider).when(
+              loading: () => const _AdminLoadingCard(),
+              error: (_, __) => const _AdminErrorCard(
+                message: '客服绩效接口暂不可用',
+              ),
+              data: (stats) => _AdminStaffPerformanceSection(
+                stats: stats,
+                emptyMessage: emptyMessage,
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _AdminStaffPerformanceSection extends StatelessWidget {
+  final AdminTempSessionStats stats;
+  final String emptyMessage;
+
+  const _AdminStaffPerformanceSection({
+    required this.stats,
+    required this.emptyMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (stats.staffPerformance.isEmpty) {
+      return _WorkbenchEmptyState(
+        icon: Icons.support_agent_outlined,
+        message: emptyMessage,
+        minHeight: 120,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _WorkbenchStatsStrip(
+          stats: [
+            _WorkbenchStat('已服务', '${stats.totalServed}'),
+            _WorkbenchStat(
+                '平均首响', _formatDuration(stats.avgFirstResponseSeconds)),
+            _WorkbenchStat('平均时长', _formatDuration(stats.avgDurationSeconds)),
+            _WorkbenchStat('平均评分', _formatDecimal(stats.avgRating)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _AdminStaffPerformanceList(items: stats.staffPerformance),
+      ],
+    );
+  }
+}
+
+class _AdminStaffPerformanceList extends StatelessWidget {
+  final List<AdminStaffPerformance> items;
+
+  const _AdminStaffPerformanceList({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: items.asMap().entries.map((entry) {
+          final item = entry.value;
+          final isLast = entry.key == items.length - 1;
+          return Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        PersonAvatarWithBadge(
+                          avatarUrl: null,
+                          name: item.displayName,
+                          size: 40,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${item.sessionsServed} 单',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        _MiniMetric(
+                          label: '首响',
+                          value: _formatDuration(item.avgFirstResponseSeconds),
+                        ),
+                        _MiniMetric(
+                          label: '时长',
+                          value: _formatDuration(item.avgDurationSeconds),
+                        ),
+                        _MiniMetric(
+                          label: '评分',
+                          value: _formatDecimal(item.avgRating),
+                        ),
+                        _MiniMetric(
+                          label: '合格率',
+                          value: _formatPercent(item.excellentRate),
+                        ),
+                      ],
+                    ),
+                    if (item.byChannel.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: item.byChannel.map((channel) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '${channel.channelLabel} ${channel.sessionsServed} 单'
+                              ' · 首响 ${_formatDuration(channel.avgFirstResponseSeconds)}'
+                              ' · 评分 ${_formatDecimal(channel.avgRating)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.56),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!isLast)
+                Divider(
+                  height: 1,
+                  indent: 66,
+                  color: Theme.of(context).dividerColor,
+                ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _MiniMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MiniMetric({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Text(
+      '$label $value',
+      style: TextStyle(
+        fontSize: 12,
+        color: colorScheme.onSurface.withValues(alpha: 0.58),
+      ),
+    );
+  }
+}
+
 class _ServiceEfficiencyScopeBar extends StatelessWidget {
   final String? selectedScope;
   final ValueChanged<String?> onChanged;
@@ -2547,6 +2759,19 @@ String _formatRatio(int part, int total) {
 String _formatOptionalDuration(int? seconds) {
   if (seconds == null) return '--';
   return _formatDuration(seconds);
+}
+
+String _formatDecimal(double value) {
+  if (value <= 0) return '--';
+  final rounded = value.toStringAsFixed(1);
+  return rounded.endsWith('.0')
+      ? rounded.substring(0, rounded.length - 2)
+      : rounded;
+}
+
+String _formatPercent(double value) {
+  if (value <= 0) return '--';
+  return '${(value * 100).round()}%';
 }
 
 class _AdminStaffStatusList extends StatelessWidget {
@@ -2680,9 +2905,7 @@ class _AdminThreadList extends ConsumerWidget {
                     ),
                   ),
                   subtitle: Text(
-                    thread.lastMessagePreview?.isNotEmpty == true
-                        ? thread.lastMessagePreview!
-                        : '暂无消息',
+                    _adminThreadSubtitle(thread),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -2775,6 +2998,18 @@ class _AdminThreadList extends ConsumerWidget {
       if (context.mounted) AppToast.error(context, '操作失败，请重试');
     }
   }
+}
+
+String _adminThreadSubtitle(CsThread thread) {
+  final preview = thread.lastMessagePreview?.trim();
+  final source = thread.source?.trim();
+  if (source != null && source.isNotEmpty) {
+    if (preview != null && preview.isNotEmpty) {
+      return '$source · $preview';
+    }
+    return source;
+  }
+  return preview != null && preview.isNotEmpty ? preview : '暂无消息';
 }
 
 class _AdminStatusPill extends StatelessWidget {

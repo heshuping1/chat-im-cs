@@ -419,6 +419,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatFileUploadFailed => 'File upload failed, please try again';
 
   @override
+  String get chatFileStatusNotDownloaded => 'Not downloaded';
+
+  @override
+  String get chatFileStatusDownloaded => 'Downloaded';
+
+  @override
+  String get chatFileStatusUploading => 'Uploading';
+
+  @override
+  String get chatFileStatusUploadFailed => 'Upload failed';
+
+  @override
   String get chatCardSendFailed => 'Failed to send contact card';
 
   @override

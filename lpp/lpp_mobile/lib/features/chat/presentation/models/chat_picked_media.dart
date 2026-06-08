@@ -2,6 +2,13 @@ import 'package:path/path.dart' as p;
 
 enum ChatPickedMediaKind { image, video }
 
+Future<void> sendChatPickedMediaBatch<T>(
+  Iterable<T> items,
+  Future<void> Function(T item) sendOne,
+) {
+  return Future.wait(items.map(sendOne));
+}
+
 const chatFileAttachmentAllowedExtensions = <String>[
   'pdf',
   'doc',
@@ -16,6 +23,11 @@ const chatFileAttachmentAllowedExtensions = <String>[
   'rar',
   '7z',
   'mp3',
+  'xml',
+  'json',
+  'md',
+  'log',
+  'rtf',
 ];
 
 class ChatPickedMedia {
@@ -189,6 +201,16 @@ String chatFileAttachmentMimeType(String extension) {
       return 'text/csv';
     case 'txt':
       return 'text/plain';
+    case 'xml':
+      return 'application/xml';
+    case 'json':
+      return 'application/json';
+    case 'md':
+      return 'text/markdown';
+    case 'log':
+      return 'text/plain';
+    case 'rtf':
+      return 'application/rtf';
     case 'zip':
       return 'application/zip';
     case 'rar':

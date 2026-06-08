@@ -25,6 +25,11 @@ import { pcQueryKeys } from "../data/query-keys";
 import { normalizeKnowledgeBasesResponse } from "../data/api/knowledge-normalizers";
 import { createApiClient } from "../data/runtime";
 import {
+  canViewTeamServicePerformance,
+  createServicePerformanceModel,
+  type ServicePerformanceModel,
+} from "../customer-service/models/servicePerformanceModel";
+import {
   roleFromSession,
   workbenchShortcuts,
 } from "../data/static-config";
@@ -127,6 +132,20 @@ export function WorkbenchPage() {
   const announcementCount = announcementsQuery.data?.length;
   const receptionStatus = receptionQuery.data?.serviceStatus;
   const knowledgeBases = normalizeKnowledgeBasesResponse(knowledgeBasesQuery.data);
+  const canViewTeamPerformance = canViewTeamServicePerformance(authSession);
+  const performanceQuery = useQuery({
+    queryKey: pcQueryKeys.customerServiceTempSessionStats(...queryBaseKey),
+    enabled: Boolean(client && canViewTeamPerformance),
+    queryFn: async () => client!.getTempSessionStats(),
+  });
+  const performanceModel = useMemo(
+    () =>
+      createServicePerformanceModel({
+        stats: performanceQuery.data,
+        translate: t,
+      }),
+    [performanceQuery.data, t],
+  );
 
   function handleShortcutAction(item: WorkbenchShortcut) {
     setSelectedShortcutId(item.id);
@@ -247,6 +266,13 @@ export function WorkbenchPage() {
                   : ""
               }
               onOpenModule={setActiveModule}
+              canViewTeamPerformance={canViewTeamPerformance}
+              performanceError={
+                performanceQuery.isError ? formatError(performanceQuery.error) : ""
+              }
+              performanceLoading={performanceQuery.isLoading}
+              performanceModel={performanceModel}
+              retryPerformance={() => void performanceQuery.refetch()}
               reception={receptionQuery.data}
               threads={threadsQuery.data}
               threadsError={
@@ -385,11 +411,16 @@ function ShortcutCard({
 function WorkbenchDetail({
   announcements,
   announcementsError,
+  canViewTeamPerformance,
   item,
   markRead,
   knowledgeBases,
   knowledgeError,
   onOpenModule,
+  performanceError,
+  performanceLoading,
+  performanceModel,
+  retryPerformance,
   reception,
   t,
   threads,
@@ -397,11 +428,16 @@ function WorkbenchDetail({
 }: {
   announcements: EnterpriseAnnouncementDto[];
   announcementsError: string;
+  canViewTeamPerformance: boolean;
   item: WorkbenchShortcut;
   markRead: (id: string) => void;
   knowledgeBases: KnowledgeBaseDto[];
   knowledgeError: string;
   onOpenModule: (module: ModuleKey) => void;
+  performanceError: string;
+  performanceLoading: boolean;
+  performanceModel: ServicePerformanceModel;
+  retryPerformance: () => void;
   reception?: StaffReceptionStatusDto;
   t: WorkbenchTranslate;
   threads?: CustomerServiceThreadsResponse;
@@ -498,6 +534,20 @@ function WorkbenchDetail({
   }
 
   if (item.id === "wb-cs-performance") {
+    if (canViewTeamPerformance) {
+      return (
+        <>
+          <DetailHeader icon={BarChart3} item={item} t={t} />
+          <TeamPerformancePanel
+            error={performanceError}
+            loading={performanceLoading}
+            model={performanceModel}
+            retry={retryPerformance}
+            t={t}
+          />
+        </>
+      );
+    }
     return (
       <>
         <DetailHeader icon={BarChart3} item={item} t={t} />
@@ -545,6 +595,135 @@ function WorkbenchDetail({
         <InfoRow label={t("workbench.dataScope")} value={t("workbench.dataScopeValue")} />
       </div>
     </>
+  );
+}
+
+function TeamPerformancePanel({
+  error,
+  loading,
+  model,
+  retry,
+  t,
+}: {
+  error: string;
+  loading: boolean;
+  model: ServicePerformanceModel;
+  retry: () => void;
+  t: WorkbenchTranslate;
+}) {
+  if (loading) {
+    return (
+      <EmptyBlock
+        icon={Sparkles}
+        title={t("workbench.performance.loadingTitle")}
+        text={t("workbench.performance.loadingText")}
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="workbench-performance-panel">
+        <EmptyBlock
+          icon={TriangleAlert}
+          title={t("workbench.performance.errorTitle")}
+          text={error}
+        />
+        <button className="workbench-detail-link" onClick={retry} type="button">
+          {t("workbench.performance.retry")}
+        </button>
+      </div>
+    );
+  }
+
+  if (model.isEmpty) {
+    return (
+      <EmptyBlock
+        icon={BarChart3}
+        title={t("workbench.performance.emptyTitle")}
+        text={t("workbench.performance.emptyText")}
+      />
+    );
+  }
+
+  return (
+    <div className="workbench-performance-panel">
+      <div className="workbench-performance-kpis">
+        {model.kpis.map((item) => (
+          <div className="workbench-performance-kpi" key={item.key}>
+            <span>{t(item.labelKey)}</span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
+      </div>
+
+      <section className="workbench-performance-section">
+        <header>
+          <strong>{t("workbench.performance.sourcePlatformTitle")}</strong>
+          <p>{model.channelDistributionHint}</p>
+        </header>
+        <div className="workbench-performance-distribution">
+          {model.channelDistribution.length ? (
+            model.channelDistribution.map((item) => (
+              <div className="workbench-performance-distribution-row" key={item.label}>
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+            ))
+          ) : (
+            <p className="workbench-performance-muted">
+              {t("workbench.performance.emptyDistribution")}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="workbench-performance-section">
+        <header>
+          <strong>{t("workbench.performance.staffRankTitle")}</strong>
+          <p>{t("workbench.performance.staffRankHint")}</p>
+        </header>
+        <div className="workbench-performance-staff-list">
+          {model.staffRows.map((row) => (
+            <article className="performance-staff-row" key={row.staffUserId}>
+              <div className="performance-staff-head">
+                <strong>{row.displayName}</strong>
+                <span>{t("workbench.performance.sessionsServed", { count: row.sessionsServed })}</span>
+              </div>
+              <div className="performance-staff-metrics">
+                <InfoRow
+                  label={t("workbench.performance.avgFirstResponse")}
+                  value={row.avgFirstResponse}
+                />
+                <InfoRow
+                  label={t("workbench.performance.avgDuration")}
+                  value={row.avgDuration}
+                />
+                <InfoRow label={t("workbench.performance.avgRating")} value={row.avgRating} />
+                <InfoRow
+                  label={t("workbench.performance.excellentRate")}
+                  value={row.excellentRate}
+                />
+              </div>
+              <div className="performance-channel-breakdown">
+                {row.channelBreakdown.map((channel) => (
+                  <div className="performance-channel-card" key={channel.channel}>
+                    <span>{t(channel.labelKey)}</span>
+                    <strong>{channel.sessionsServed}</strong>
+                    <small>
+                      {t("workbench.performance.channelMeta", {
+                        first: channel.avgFirstResponse,
+                        rating: channel.avgRating,
+                      })}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 

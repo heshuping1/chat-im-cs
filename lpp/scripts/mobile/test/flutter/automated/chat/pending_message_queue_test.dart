@@ -35,6 +35,8 @@ void main() {
         Message? callbackSent;
         await queue.enqueue(
           PendingMessage(
+            spaceId: 'space-a',
+            userId: 'user-a',
             clientMsgId: 'client-1',
             conversationId: 'chat-1',
             isGroup: false,
@@ -51,6 +53,8 @@ void main() {
 
         await queue.flushAll(
           repository,
+          spaceId: 'space-a',
+          userId: 'user-a',
           onMessageResent: (pending, sent) {
             callbackPending = pending;
             callbackSent = sent;
@@ -76,6 +80,8 @@ void main() {
         final repository = _FakePendingRepository();
         await queue.enqueue(
           PendingMessage(
+            spaceId: 'space-a',
+            userId: 'user-a',
             clientMsgId: 'client-video',
             conversationId: 'chat-1',
             isGroup: false,
@@ -90,7 +96,7 @@ void main() {
           ),
         );
 
-        await queue.flushAll(repository);
+        await queue.flushAll(repository, spaceId: 'space-a', userId: 'user-a');
 
         expect(repository.uploadedPaths, [
           '/tmp/local-video.mp4',
@@ -116,6 +122,8 @@ void main() {
         final customerRepository = _FakePendingRepository();
         await queue.enqueue(
           PendingMessage(
+            spaceId: 'space-a',
+            userId: 'user-a',
             clientMsgId: 'client-cs',
             conversationId: 'cs-chat-1',
             isGroup: false,
@@ -129,6 +137,8 @@ void main() {
 
         await queue.flushAll(
           defaultRepository,
+          spaceId: 'space-a',
+          userId: 'user-a',
           repositoryForMessage: (message) => message.threadId == 'thread-1'
               ? customerRepository
               : defaultRepository,
@@ -137,6 +147,59 @@ void main() {
         expect(defaultRepository.sentBodies, isEmpty);
         expect(customerRepository.sentBodies.single.text, '客服回复');
         expect(HiveStorage.pendingMessagesBox.isEmpty, isTrue);
+      },
+    );
+
+    test(
+      'flushes only pending messages for the active space and user',
+      () async {
+        final queue = PendingMessageQueue();
+        final activeRepository = _FakePendingRepository();
+        final otherRepository = _FakePendingRepository();
+        await queue.enqueue(
+          PendingMessage(
+            spaceId: 'space-a',
+            userId: 'user-a',
+            clientMsgId: 'client-active',
+            conversationId: 'chat-active',
+            isGroup: false,
+            messageType: 'text',
+            body: const MessageBody(text: 'active').toLocalJson(),
+            createdAt: DateTime(2026),
+          ),
+        );
+        await queue.enqueue(
+          PendingMessage(
+            spaceId: 'space-b',
+            userId: 'user-b',
+            clientMsgId: 'client-other',
+            conversationId: 'chat-other',
+            isGroup: false,
+            messageType: 'text',
+            body: const MessageBody(text: 'other').toLocalJson(),
+            createdAt: DateTime(2026, 1, 2),
+          ),
+        );
+
+        await queue.flushAll(
+          activeRepository,
+          spaceId: 'space-a',
+          userId: 'user-a',
+          repositoryForMessage: (message) =>
+              message.spaceId == 'space-b' ? otherRepository : activeRepository,
+        );
+
+        expect(activeRepository.sentBodies.map((body) => body.text), [
+          'active',
+        ]);
+        expect(otherRepository.sentBodies, isEmpty);
+        final remaining = await queue.getAll(
+          spaceId: 'space-b',
+          userId: 'user-b',
+        );
+        expect(remaining.map((message) => message.clientMsgId), [
+          'client-other',
+        ]);
       },
     );
   });

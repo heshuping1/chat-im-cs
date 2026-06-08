@@ -11,13 +11,17 @@ import {
   TextCursorInput,
   X,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { CSSProperties, MouseEvent, Ref } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatMessageBubble } from "../../components/ChatMessageBubble";
 import { PanelState } from "../../components/PanelState";
 import type { ConversationListItem, GroupMemberDto, MessageItemDto } from "../../data/api-client";
+import type { AuthSession } from "../../data/auth/auth-session";
+import { groupReadReceiptQueryKey } from "../../data/message/group-read-receipts-model";
 import { createChatMessageViewModel } from "../../data/message/message-view-model";
+import { requireApiClient } from "../../data/runtime";
 import { formatChatMessageTime, formatChatTime } from "../../lib/format";
 import type { UploadActionHandler } from "../../components/MessageBodyView";
 import { useI18n } from "../../i18n/useI18n";
@@ -36,10 +40,12 @@ import {
   openMessageVideoPlayer,
 } from "../runtime/messageMediaActions";
 import { useCachedImageMediaUrl } from "../../media/runtime/useCachedImageMediaUrl";
+import { GroupReadReceiptPopover } from "./GroupReadReceiptPopover";
 
 export interface MessageListPanelProps {
   accountId?: string;
   assetBaseUrl?: string;
+  authSession?: AuthSession | null;
   authToken?: string;
   conversation: ConversationListItem;
   chatBackgroundPreset?: unknown;
@@ -111,6 +117,7 @@ const historyFilterTabs: Array<{
 export function MessageListPanel({
   accountId,
   assetBaseUrl,
+  authSession,
   authToken,
   chatBackgroundPreset,
   conversation,
@@ -162,6 +169,12 @@ export function MessageListPanel({
     fileName: string;
     src: string;
   } | null>(null);
+  const [activeGroupReadReceipt, setActiveGroupReadReceipt] = useState<{
+    anchorRect: DOMRect;
+    groupId: string;
+    messageId: string;
+    messageSeq: number;
+  } | null>(null);
   const lastWindowDiagnosticKeyRef = useRef("");
   const lookupOpen = messageSearchOpen || historyOpen;
   const windowingEnabled = !lookupOpen && !unreadJump;
@@ -190,7 +203,39 @@ export function MessageListPanel({
 
   useEffect(() => {
     setExpandedOlderCount(0);
+    setActiveGroupReadReceipt(null);
   }, [conversation.conversationId, historyOpen, messageSearchOpen, messages.length]);
+
+  useEffect(() => {
+    if (!activeGroupReadReceipt) return;
+    if (messages.some((message) => message.messageId === activeGroupReadReceipt.messageId)) return;
+    setActiveGroupReadReceipt(null);
+  }, [activeGroupReadReceipt, messages]);
+
+  const groupReadReceiptQuery = useQuery({
+    enabled: Boolean(authSession && activeGroupReadReceipt),
+    queryKey: activeGroupReadReceipt
+      ? groupReadReceiptQueryKey({
+          apiBaseUrl: authSession?.apiBaseUrl,
+          groupId: activeGroupReadReceipt.groupId,
+          messageId: activeGroupReadReceipt.messageId,
+          messageSeq: activeGroupReadReceipt.messageSeq,
+          tenantToken: authSession?.tenantToken,
+        })
+      : ["pc-group-read-receipts", "idle"],
+    queryFn: async () => {
+      if (!authSession || !activeGroupReadReceipt) {
+        throw new Error("No active group read receipt target");
+      }
+      return requireApiClient(authSession).getGroupReadReceipts(
+        activeGroupReadReceipt.groupId,
+        activeGroupReadReceipt.messageId,
+        activeGroupReadReceipt.messageSeq,
+      );
+    },
+    retry: false,
+    staleTime: 5_000,
+  });
 
   const openLookupMediaPreview = (item: LookupMediaPreviewItem) => {
     const openUrl = item.openUrl || item.previewUrl;
@@ -469,6 +514,16 @@ export function MessageListPanel({
                   onContactClick={onContactClick}
                   onContextMenu={multiSelectMode ? undefined : onContextMenu}
                   onFailedMessageClick={onFailedMessageClick}
+                  onGroupReadReceiptClick={(targetMessage, anchor) => {
+                    const messageSeq = targetMessage.conversationSeq ?? 0;
+                    if (conversation.conversationType !== "group" || messageSeq <= 0) return;
+                    setActiveGroupReadReceipt({
+                      anchorRect: anchor.getBoundingClientRect(),
+                      groupId: conversation.conversationId,
+                      messageId: targetMessage.messageId,
+                      messageSeq,
+                    });
+                  }}
                   onUploadAction={onUploadAction}
                   senderFallback={senderFallback}
                   senderAvatarUrl={senderAvatarUrl}
@@ -483,6 +538,16 @@ export function MessageListPanel({
             </div>
           );
         })}
+      {activeGroupReadReceipt && (
+        <GroupReadReceiptPopover
+          anchorRect={activeGroupReadReceipt.anchorRect}
+          error={groupReadReceiptQuery.error}
+          loading={groupReadReceiptQuery.isLoading || groupReadReceiptQuery.isFetching}
+          receipts={groupReadReceiptQuery.data}
+          onClose={() => setActiveGroupReadReceipt(null)}
+          onRetry={() => void groupReadReceiptQuery.refetch()}
+        />
+      )}
       <div ref={messagesBottomRef} className="pc-chat-bottom-sentinel" />
       {!loading && messages.length === 0 && (
         <div className="pc-chat-empty-event" role="status">

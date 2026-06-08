@@ -51,4 +51,21 @@ void main() {
       );
     });
   });
+
+  group('syncCursorStorageKey', () {
+    test('isolates sync cursors by space and user', () {
+      expect(
+        syncCursorStorageKey(spaceId: 'space-a', userId: 'user-1'),
+        'sync_cursor_space-a_user-1',
+      );
+      expect(
+        syncCursorStorageKey(spaceId: 'space-a', userId: 'user-2'),
+        'sync_cursor_space-a_user-2',
+      );
+      expect(
+        syncCursorStorageKey(spaceId: 'space-b', userId: 'user-1'),
+        'sync_cursor_space-b_user-1',
+      );
+    });
+  });
 }

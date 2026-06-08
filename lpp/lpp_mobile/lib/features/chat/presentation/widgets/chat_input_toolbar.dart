@@ -12,6 +12,7 @@ import 'package:lpp_mobile/core/widgets/app_toast.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/services/asr_service.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_composer.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/chat_camera_capture_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
@@ -21,6 +22,7 @@ import 'package:lpp_mobile/features/customer_service/data/models/customer_servic
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
 import 'package:lpp_mobile/features/settings/presentation/providers/chat_input_settings_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
+import 'package:path/path.dart' as p;
 
 enum _InputMode { text, voice, emoji, tools }
 
@@ -66,7 +68,7 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
       onScheduleText;
   final Function(String filePath, int duration) onSendVoice;
   final FutureOr<void> Function(List<ChatPickedMedia> media) onSendMedia;
-  final Function(
+  final FutureOr<void> Function(
           String filePath, String fileName, String mimeType, int sizeBytes)?
       onSendFile;
   final VoidCallback? onVoiceCall;
@@ -80,6 +82,9 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
   final int externalInsertToken;
   final List<ChatMentionCandidate> mentionCandidates;
   final bool canMentionAll;
+  final VoiceRecordingBackend? voiceRecordingBackend;
+  final AsrService? voiceAsrService;
+  final ChatGalleryPicker? galleryPicker;
 
   const ChatInputToolbar({
     super.key,
@@ -106,6 +111,9 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
     this.externalInsertToken = 0,
     this.mentionCandidates = const [],
     this.canMentionAll = false,
+    this.voiceRecordingBackend,
+    this.voiceAsrService,
+    this.galleryPicker,
   });
 
   @override
@@ -116,7 +124,7 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   _InputMode _mode = _InputMode.text;
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
-  final _imagePicker = ImagePicker();
+  late final ChatGalleryPicker _galleryPicker;
   MentionComposerDraft _mentionDraft = const MentionComposerDraft.empty();
   Timer? _draftTimer;
   bool _sendingText = false;
@@ -128,6 +136,7 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   @override
   void initState() {
     super.initState();
+    _galleryPicker = widget.galleryPicker ?? ImagePickerChatGalleryPicker();
     // 恢复草稿
     if (widget.initialDraft != null && widget.initialDraft!.isNotEmpty) {
       _textController.text = widget.initialDraft!;
@@ -144,6 +153,20 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   @override
   void didUpdateWidget(covariant ChatInputToolbar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final nextDraft = widget.initialDraft;
+    if (nextDraft != oldWidget.initialDraft &&
+        nextDraft != null &&
+        nextDraft.isNotEmpty &&
+        _textController.text.isEmpty) {
+      _textController.text = nextDraft;
+      _mentionDraft = MentionComposerDraft(
+        text: nextDraft,
+        tokens: const [],
+      );
+      _textController.selection = TextSelection.fromPosition(
+        TextPosition(offset: nextDraft.length),
+      );
+    }
     if (widget.externalInsertToken == oldWidget.externalInsertToken) return;
     final text = widget.externalInsertText?.trim();
     if (text == null || text.isEmpty || _isMutedForUser) return;
@@ -274,16 +297,16 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   Future<void> _pickMediaFromGallery() async {
     if (_isMutedForUser) return;
     try {
-      final files = await _imagePicker.pickMultipleMedia();
+      final files = await _galleryPicker.pickMedia();
       if (files.isNotEmpty) {
-        await _sendPickedFiles(files);
+        await _sendPickedFiles(files, allowFileAttachments: false);
       }
     } catch (e) {
       // 部分系统相册能力不可用时降级为单张选图，至少保留旧体验。
       try {
-        final file = await _imagePicker.pickImage(source: ImageSource.gallery);
+        final file = await _galleryPicker.pickFallbackImage();
         if (file != null) {
-          await _sendPickedFiles([file]);
+          await _sendPickedFiles([file], allowFileAttachments: false);
         }
       } catch (_) {
         // 静默失败
@@ -323,31 +346,34 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     await Future.sync(() => widget.onSendMedia([media]));
   }
 
-  Future<void> _sendPickedFiles(List<XFile> files) async {
-    final media = <ChatPickedMedia>[];
-    for (final file in files) {
-      final picked = await _pickedMediaFromXFile(file);
-      if (picked != null) {
-        media.add(picked);
+  Future<void> _sendPickedFiles(
+    List<XFile> files, {
+    bool allowFileAttachments = true,
+  }) async {
+    final dispatch = await classifyChatPickedFiles(
+      files,
+      allowFileAttachments: allowFileAttachments,
+    );
+    for (final file in dispatch.files) {
+      await Future.sync(
+        () => widget.onSendFile?.call(
+          file.filePath,
+          file.fileName,
+          file.mimeType,
+          file.sizeBytes,
+        ),
+      );
+    }
+    if (dispatch.oversizedFiles.isNotEmpty) {
+      if (mounted) {
+        AppToast.error(context, AppLocalizations.of(context).chatFileTooLarge);
       }
     }
-    if (media.isEmpty) return;
-    await Future.sync(() => widget.onSendMedia(media));
-  }
-
-  Future<ChatPickedMedia?> _pickedMediaFromXFile(XFile file) async {
-    int? sizeBytes;
-    try {
-      sizeBytes = await file.length();
-    } catch (_) {
-      sizeBytes = null;
+    if (dispatch.unsupportedFiles.isNotEmpty && mounted) {
+      AppToast.error(context, _unsupportedFileTypeText(context));
     }
-    return ChatPickedMedia.tryFromPickedFile(
-      path: file.path,
-      name: file.name,
-      mimeType: file.mimeType,
-      sizeBytes: sizeBytes,
-    );
+    if (dispatch.media.isEmpty) return;
+    await Future.sync(() => widget.onSendMedia(dispatch.media));
   }
 
   Future<void> _pickFile() async {
@@ -355,21 +381,41 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
       type: FileType.custom,
-      allowedExtensions: chatFileAttachmentAllowedExtensions,
+      allowedExtensions: chatFilePickerAllowedExtensions,
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.single;
-    final extension = file.extension ?? '';
-    if (!isChatFileAttachmentExtension(extension)) return;
-    if (file.size > 100 * 1024 * 1024) {
+    final pickedFile = ChatPickedFileAttachment.fromPlatformFile(file);
+    if (pickedFile == null ||
+        !isChatFileAttachmentExtension(pickedFile.extension)) {
+      if (mounted) {
+        AppToast.error(context, _unsupportedFileTypeText(context));
+      }
+      return;
+    }
+    if (pickedFile.sizeBytes > chatFileAttachmentMaxSizeBytes) {
       if (mounted) {
         AppToast.error(context, AppLocalizations.of(context).chatFileTooLarge);
       }
       return;
     }
-    if (file.path == null) return;
-    final mimeType = chatFileAttachmentMimeType(extension);
-    widget.onSendFile?.call(file.path!, file.name, mimeType, file.size);
+    await Future.sync(
+      () => widget.onSendFile?.call(
+        pickedFile.filePath,
+        pickedFile.fileName,
+        pickedFile.mimeType,
+        pickedFile.sizeBytes,
+      ),
+    );
+  }
+
+  String _unsupportedFileTypeText(BuildContext context) {
+    final languageCode = Localizations.localeOf(context).languageCode;
+    if (languageCode == 'en') return 'This file type is not supported yet';
+    if (languageCode == 'ja') return 'このファイル形式はまだ対応していません';
+    if (languageCode == 'ko') return '아직 지원하지 않는 파일 형식입니다';
+    if (languageCode == 'vi') return 'Chưa hỗ trợ loại tệp này';
+    return '暂不支持发送此类型文件';
   }
 
   void _insertEmoji(String emoji) {
@@ -641,6 +687,8 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
         onSendVoice: widget.onSendVoice,
         onSendText: widget.onSendText,
         onCancel: () => setState(() => _mode = _InputMode.voice),
+        recordingBackend: widget.voiceRecordingBackend,
+        asrService: widget.voiceAsrService,
       );
     }
 
@@ -741,6 +789,158 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
 
     return const SizedBox.shrink();
   }
+}
+
+const chatFileAttachmentMaxSizeBytes = 100 * 1024 * 1024;
+const chatFilePickerAllowedExtensions = chatFileAttachmentAllowedExtensions;
+
+abstract class ChatGalleryPicker {
+  Future<List<XFile>> pickMedia();
+  Future<XFile?> pickFallbackImage();
+}
+
+class ImagePickerChatGalleryPicker implements ChatGalleryPicker {
+  final ImagePicker _imagePicker;
+
+  ImagePickerChatGalleryPicker({ImagePicker? imagePicker})
+      : _imagePicker = imagePicker ?? ImagePicker();
+
+  @override
+  Future<List<XFile>> pickMedia() {
+    return _imagePicker.pickMultipleMedia();
+  }
+
+  @override
+  Future<XFile?> pickFallbackImage() {
+    return _imagePicker.pickImage(source: ImageSource.gallery);
+  }
+}
+
+class ChatPickedFileAttachment {
+  final String filePath;
+  final String fileName;
+  final String extension;
+  final String mimeType;
+  final int sizeBytes;
+
+  const ChatPickedFileAttachment({
+    required this.filePath,
+    required this.fileName,
+    required this.extension,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  factory ChatPickedFileAttachment.fromXFile(
+    XFile file, {
+    required int sizeBytes,
+  }) {
+    final fileName = _pickedFileName(file.name, file.path);
+    final extension = _fileExtension(fileName, file.path);
+    return ChatPickedFileAttachment(
+      filePath: file.path,
+      fileName: fileName,
+      extension: extension,
+      mimeType: chatFileAttachmentMimeType(extension),
+      sizeBytes: sizeBytes,
+    );
+  }
+
+  static ChatPickedFileAttachment? fromPlatformFile(PlatformFile file) {
+    final path = file.path;
+    if (path == null || path.trim().isEmpty) return null;
+    final fileName = _pickedFileName(file.name, path);
+    final extension = _fileExtension(fileName, path);
+    return ChatPickedFileAttachment(
+      filePath: path,
+      fileName: fileName,
+      extension: extension,
+      mimeType: chatFileAttachmentMimeType(extension),
+      sizeBytes: file.size,
+    );
+  }
+}
+
+class ChatPickedFilesDispatch {
+  final List<ChatPickedMedia> media;
+  final List<ChatPickedFileAttachment> files;
+  final List<ChatPickedFileAttachment> oversizedFiles;
+  final List<XFile> unsupportedFiles;
+
+  const ChatPickedFilesDispatch({
+    required this.media,
+    required this.files,
+    required this.oversizedFiles,
+    required this.unsupportedFiles,
+  });
+}
+
+Future<ChatPickedFilesDispatch> classifyChatPickedFiles(
+  List<XFile> files, {
+  int maxFileSizeBytes = chatFileAttachmentMaxSizeBytes,
+  bool allowFileAttachments = true,
+}) async {
+  final media = <ChatPickedMedia>[];
+  final attachments = <ChatPickedFileAttachment>[];
+  final oversized = <ChatPickedFileAttachment>[];
+  final unsupported = <XFile>[];
+  for (final file in files) {
+    final sizeBytes = await _xFileSize(file);
+    final picked = ChatPickedMedia.tryFromPickedFile(
+      path: file.path,
+      name: file.name,
+      mimeType: file.mimeType,
+      sizeBytes: sizeBytes,
+    );
+    if (picked != null) {
+      media.add(picked);
+      continue;
+    }
+    if (!allowFileAttachments) {
+      unsupported.add(file);
+      continue;
+    }
+    final attachment = ChatPickedFileAttachment.fromXFile(
+      file,
+      sizeBytes: sizeBytes ?? 0,
+    );
+    if (!isChatFileAttachmentExtension(attachment.extension)) {
+      unsupported.add(file);
+      continue;
+    }
+    if (attachment.sizeBytes > maxFileSizeBytes) {
+      oversized.add(attachment);
+      continue;
+    }
+    attachments.add(attachment);
+  }
+  return ChatPickedFilesDispatch(
+    media: media,
+    files: attachments,
+    oversizedFiles: oversized,
+    unsupportedFiles: unsupported,
+  );
+}
+
+Future<int?> _xFileSize(XFile file) async {
+  try {
+    return await file.length();
+  } catch (_) {
+    return null;
+  }
+}
+
+String _pickedFileName(String fileName, String filePath) {
+  final trimmed = fileName.trim();
+  if (trimmed.isNotEmpty) return trimmed;
+  final basename = p.basename(filePath);
+  return basename.isEmpty ? 'file' : basename;
+}
+
+String _fileExtension(String fileName, String filePath) {
+  final fromName = p.extension(fileName).replaceFirst('.', '');
+  if (fromName.trim().isNotEmpty) return fromName;
+  return p.extension(filePath).replaceFirst('.', '');
 }
 
 // ---------------------------------------------------------------------------

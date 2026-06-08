@@ -183,30 +183,47 @@ describe("message status model", () => {
     ).toMatchObject({ receiptState: "unread", statusLabel: "未读" });
   });
 
-  it("consumes only existing group receipt fields without inventing receipts", () => {
+  it("shows group read receipts only from server readCount", () => {
     expect(
       deriveChatMessageStatus({
         conversationType: "group",
-        message: message({ readCount: 3 }),
+        message: message({ conversationSeq: 9, readCount: 3 }),
         mine: true,
       }),
-    ).toMatchObject({ receiptState: "group_partial", statusLabel: "3人已读" });
+    ).toMatchObject({ receiptState: "group_partial", statusLabel: "已读 3 人" });
 
     expect(
       deriveChatMessageStatus({
         conversationType: "group",
-        message: message({ unreadCount: 2 } as Partial<MessageItemDto>),
+        message: message({ conversationSeq: 9, readCount: 0 }),
         mine: true,
       }),
-    ).toMatchObject({ receiptState: "group_partial", statusLabel: "2人未读" });
+    ).toMatchObject({ receiptState: "group_unread", statusLabel: "未读" });
 
     expect(
       deriveChatMessageStatus({
         conversationType: "group",
-        message: message(),
+        message: message({ conversationSeq: 9, unreadCount: 2 } as Partial<MessageItemDto>),
         mine: true,
       }),
     ).toMatchObject({ receiptState: "group_unknown", statusLabel: undefined });
+  });
+
+  it("hides group read receipts for unsent, failed, recalled and seq-less messages", () => {
+    for (const item of [
+      message({ conversationSeq: 9, readCount: 3, status: "sending" }),
+      message({ conversationSeq: 9, readCount: 3, status: "failed" }),
+      message({ conversationSeq: 9, isRecalled: true, readCount: 3, status: "recalled" }),
+      message({ readCount: 3 }),
+    ]) {
+      expect(
+        deriveChatMessageStatus({
+          conversationType: "group",
+          message: item,
+          mine: true,
+        }),
+      ).toMatchObject({ statusLabel: undefined });
+    }
   });
 
   it("keeps the external sending slot for image uploads only", () => {

@@ -843,6 +843,70 @@ export interface CustomerServiceThreadsResponse {
   summary?: WorkbenchSummary;
 }
 
+export interface TempSessionAcquisitionDto {
+  applicationId?: string | null;
+  sourcePlatform?: string | null;
+  chatTool?: string | null;
+  deviceType?: string | null;
+  os?: string | null;
+  osVersion?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  appVersion?: string | null;
+  country?: string | null;
+  region?: string | null;
+  timezone?: string | null;
+}
+
+export interface TempDistributionPointDto {
+  label: string;
+  value: number;
+}
+
+export interface StaffChannelBreakdownDto {
+  channel: "widget" | "im_direct" | string;
+  sessionsServed?: number;
+  avgFirstResponseSeconds?: number;
+  avgDurationSeconds?: number;
+  avgRating?: number;
+  excellentRate?: number;
+}
+
+export interface TempStaffPerformanceDto {
+  staffUserId: string;
+  displayName: string;
+  sessionsServed?: number;
+  avgFirstResponseSeconds?: number;
+  avgDurationSeconds?: number;
+  avgRating?: number;
+  excellentRate?: number;
+  byChannel?: StaffChannelBreakdownDto[];
+}
+
+export interface TempSessionStatsDto {
+  totalSessions?: number;
+  totalQueued?: number;
+  totalServed?: number;
+  totalAbandoned?: number;
+  avgWaitSeconds?: number;
+  avgFirstResponseSeconds?: number;
+  avgDurationSeconds?: number;
+  avgRating?: number;
+  aiServedSessions?: number;
+  aiHandoffSessions?: number;
+  aiResolvedSessions?: number;
+  aiMessageCount?: number;
+  failedAiJobs?: number;
+  avgAiLatencyMs?: number;
+  aiEstimatedCostUsd?: number;
+  sessionTrend?: TempDistributionPointDto[];
+  channelDistribution?: TempDistributionPointDto[];
+  categoryDistribution?: TempDistributionPointDto[];
+  localeDistribution?: TempDistributionPointDto[];
+  staffPerformance?: TempStaffPerformanceDto[];
+}
+
 export interface StaffServiceHistoryItem {
   threadType: CustomerServiceThreadType | "direct" | string;
   threadId: string;

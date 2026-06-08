@@ -40,6 +40,7 @@ export interface ChatMessageViewModel {
   status: {
     delivery: ChatMessageDeliveryState;
     failureTooltip?: string;
+    groupReadReceiptClickable: boolean;
     receipt: ChatMessageReceiptState;
     sendStatusSlot: ChatMessageSendStatusSlot;
     showFailureMarker: boolean;
@@ -118,6 +119,7 @@ export function createChatMessageViewModel(
     status: {
       delivery,
       failureTooltip: status.failureTooltip,
+      groupReadReceiptClickable: status.groupReadReceiptClickable,
       receipt: status.receiptState,
       sendStatusSlot: status.sendStatusSlot,
       showFailureMarker: status.showFailureMarker,

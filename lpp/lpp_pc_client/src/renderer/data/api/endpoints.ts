@@ -75,6 +75,7 @@ export const endpointPlan = {
   groupPin: "/api/client/v1/groups/{conversationId}/pin",
   groupMute: "/api/client/v1/groups/{conversationId}/mute",
   groupRead: "/api/client/v1/groups/{conversationId}/read",
+  groupReadReceipts: "/api/client/v1/groups/{conversationId}/read-receipts",
   mediaUpload: "/api/client/v1/media/upload",
   messageRecall: "/api/client/v1/messages/{messageId}/recall",
   messageDelete: "/api/client/v1/messages/{messageId}/delete",
@@ -99,6 +100,8 @@ export const endpointPlan = {
     "/api/admin/v1/customer-service/temp-sessions",
   adminCustomerServiceTempSession:
     "/api/admin/v1/customer-service/temp-sessions/{sessionId}",
+  adminCustomerServiceTempSessionStats:
+    "/api/admin/v1/customer-service/temp-sessions/stats",
   threadProfileCard:
     "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/profile-card",
   clientErrors: "/api/client/v1/client-errors",

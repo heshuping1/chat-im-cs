@@ -12,4 +12,17 @@ describe("pc query keys", () => {
       "platform-token",
     ]);
   });
+
+  it("scopes customer-service temp-session stats by api base url and tenant token", () => {
+    expect(
+      pcQueryKeys.customerServiceTempSessionStats(
+        "https://api.example.test",
+        "tenant-token",
+      ),
+    ).toEqual([
+      "pc-cs-temp-session-stats",
+      "https://api.example.test",
+      "tenant-token",
+    ]);
+  });
 });

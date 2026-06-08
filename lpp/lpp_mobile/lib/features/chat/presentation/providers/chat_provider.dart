@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
+import 'package:lpp_mobile/core/space/space_context.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/pending_message_queue.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
@@ -12,6 +13,7 @@ import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/group_entities.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_send_policy.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/send_message_usecase.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_prefetch_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
@@ -385,11 +387,15 @@ final sendMessageUseCaseProvider =
     Provider.family<SendMessageUseCase, (String, String, bool)>((ref, args) {
   final (spaceId, _, _) = args;
   final repo = ref.watch(_chatRepositoryProvider(spaceId));
-  final currentUserId = ref.watch(currentSpaceProvider)?.userId ?? '';
+  final space = ref.watch(currentSpaceProvider);
+  final currentUserId = space?.userId ?? '';
   return SendMessageUseCase(
     repository: repo,
     currentUserId: currentUserId,
     failureMapper: mapAppErrorToMessageSendFailure,
+    sendPolicy: MessageSendPolicy(
+      context: messageSendPolicyContextForSpace(space),
+    ),
     onPendingEnqueue: ({
       required clientMsgId,
       required conversationId,
@@ -399,6 +405,8 @@ final sendMessageUseCaseProvider =
       mentions,
     }) {
       return PendingMessageQueue().enqueue(PendingMessage(
+        spaceId: spaceId,
+        userId: currentUserId,
         clientMsgId: clientMsgId,
         conversationId: conversationId,
         isGroup: isGroup,
@@ -410,6 +418,18 @@ final sendMessageUseCaseProvider =
     },
   );
 });
+
+MessageSendPolicyContext messageSendPolicyContextForSpace(
+  SpaceContext? space,
+) {
+  if (space?.isCustomer == true) {
+    return MessageSendPolicyContext.enterpriseCustomer;
+  }
+  if (space?.isEmployee == true) {
+    return MessageSendPolicyContext.enterpriseEmployee;
+  }
+  return MessageSendPolicyContext.personal;
+}
 
 // ---------------------------------------------------------------------------
 // Group Providers

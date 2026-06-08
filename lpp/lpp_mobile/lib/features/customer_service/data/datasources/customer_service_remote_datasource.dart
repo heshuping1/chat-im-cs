@@ -704,6 +704,14 @@ class AdminCustomerServiceRemoteDataSource {
         .toList();
   }
 
+  Future<AdminTempSessionStats> getTempSessionStats() async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/api/admin/v1/customer-service/temp-sessions/stats',
+    );
+    final data = resp.data?['data'] as Map<String, dynamic>? ?? {};
+    return AdminTempSessionStats.fromJson(data);
+  }
+
   Future<List<AdminGroup>> getGroups() async {
     final resp = await _dio.get<Map<String, dynamic>>(
       '/api/admin/v1/groups',

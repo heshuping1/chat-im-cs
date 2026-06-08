@@ -2,64 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
+import 'package:lpp_mobile/features/chat/data/mappers/group_read_receipts_mapper.dart';
 
 // ---------------------------------------------------------------------------
 // 群聊已读回执页
-// GET /api/client/v1/groups/{groupId}/read-receipts?messageId={messageId}
+// GET /api/client/v1/groups/{groupId}/read-receipts
 // ---------------------------------------------------------------------------
 
-class _ReadReceiptUser {
-  final String userId;
-  final String displayName;
-  final String? avatarUrl;
-  final bool hasRead;
-
-  const _ReadReceiptUser({
-    required this.userId,
-    required this.displayName,
-    this.avatarUrl,
-    required this.hasRead,
-  });
-
-  factory _ReadReceiptUser.fromJson(Map<String, dynamic> json) {
-    return _ReadReceiptUser(
-      userId: json['userId'] as String? ?? '',
-      displayName: json['displayName'] as String? ?? '',
-      avatarUrl: json['avatarUrl'] as String?,
-      hasRead: json['hasRead'] as bool? ?? false,
-    );
-  }
-}
-
 final _readReceiptsProvider = FutureProvider.autoDispose
-    .family<List<_ReadReceiptUser>, (String groupId, String messageId)>(
+    .family<GroupReadReceipts,
+        (String groupId, String messageId, int messageSeq)>(
   (ref, args) async {
     final dio = ref.read(dioProvider);
     final resp = await dio.get<Map<String, dynamic>>(
       '/api/client/v1/groups/${args.$1}/read-receipts',
       queryParameters: {'messageId': args.$2},
     );
-    final list = resp.data?['data'] as List<dynamic>? ?? [];
-    return list
-        .map((e) => _ReadReceiptUser.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return parseGroupReadReceiptsPayload(
+      resp.data?['data'],
+      messageSeq: args.$3,
+    );
   },
 );
 
 class GroupReadReceiptsPage extends ConsumerWidget {
   final String groupId;
   final String messageId;
+  final int messageSeq;
 
   const GroupReadReceiptsPage({
     super.key,
     required this.groupId,
     required this.messageId,
+    required this.messageSeq,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final receiptsAsync =
-        ref.watch(_readReceiptsProvider((groupId, messageId)));
+    final providerKey = (groupId, messageId, messageSeq);
+    final receiptsAsync = ref.watch(_readReceiptsProvider(providerKey));
 
     return Scaffold(
       backgroundColor: null,
@@ -79,8 +60,7 @@ class GroupReadReceiptsPage extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, size: 20, color: Color(0xFF1C1C1E)),
-            onPressed: () =>
-                ref.invalidate(_readReceiptsProvider((groupId, messageId))),
+            onPressed: () => ref.invalidate(_readReceiptsProvider(providerKey)),
           ),
         ],
       ),
@@ -88,20 +68,19 @@ class GroupReadReceiptsPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: TextButton.icon(
-            onPressed: () =>
-                ref.invalidate(_readReceiptsProvider((groupId, messageId))),
+            onPressed: () => ref.invalidate(_readReceiptsProvider(providerKey)),
             icon: const Icon(Icons.refresh),
             label: const Text('加载失败，点击重试'),
           ),
         ),
-        data: (users) {
-          final readUsers = users.where((u) => u.hasRead).toList();
-          final unreadUsers = users.where((u) => !u.hasRead).toList();
+        data: (receipts) {
+          final readUsers = receipts.readMembers;
+          final unreadUsers = receipts.unreadMembers;
 
           return RefreshIndicator(
             onRefresh: () async {
-              final _ = await ref
-                  .refresh(_readReceiptsProvider((groupId, messageId)).future);
+              final _ =
+                  await ref.refresh(_readReceiptsProvider(providerKey).future);
             },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -168,7 +147,7 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _UserList extends StatelessWidget {
-  final List<_ReadReceiptUser> users;
+  final List<GroupReadReceiptMember> users;
 
   const _UserList({required this.users});
 

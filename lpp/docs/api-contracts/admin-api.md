@@ -902,6 +902,12 @@ POST /api/platform/v1/auth/admin-token
 
 临时会话统计。返回当前租户的临时会话运营统计数据，包含趋势、渠道分布、分类分布、语言分布和客服绩效。
 
+> **2026-06-07 变更 — 客服绩效跨渠道统一**：`staffPerformance` 已从「仅临时会话(Widget)」
+> 扩成「**按客服本人合并**临时会话 + IM 注册客户直聊两个渠道」。顶层字段是**跨渠道合并** KPI
+> (看人不看渠道,首响/时长按会话量加权、合格率按质检数合并);新增 `byChannel` 数组做**渠道下钻**
+> (`widget` / `im_direct` 各自 KPI)。合并不变量:顶层 `sessionsServed` == Σ `byChannel[].sessionsServed`。
+> 数据由后台 Worker 周期聚合(约 5 分钟一次,UPSERT 当天+昨天),故统计有分钟级延迟,不是实时。
+
 权限要求：`customer_service.temp_stats.view`
 
 无请求参数。
@@ -938,17 +944,29 @@ POST /api/platform/v1/auth/admin-token
 | `label` | string | 标签（日期 / 渠道名 / 分类名 / 语言代码） |
 | `value` | int | 数值 |
 
-`staffPerformance` 数组项（`TempStaffPerformanceDto`）：
+`staffPerformance` 数组项（`TempStaffPerformanceDto`）—— 顶层为**跨渠道合并** KPI：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `staffUserId` | GUID | 客服用户 ID |
 | `displayName` | string | 客服显示名 |
-| `sessionsServed` | int | 服务会话数 |
-| `avgFirstResponseSeconds` | int | 平均首次响应秒数 |
-| `avgDurationSeconds` | int | 平均会话时长秒数 |
-| `avgRating` | decimal | 平均评分 |
-| `excellentRate` | decimal | 优秀率 |
+| `sessionsServed` | int | 服务会话数（两渠道合并;== Σ `byChannel[].sessionsServed`） |
+| `avgFirstResponseSeconds` | int | 平均首次响应秒数（按会话量加权合并） |
+| `avgDurationSeconds` | int | 平均会话时长秒数（按会话量加权合并） |
+| `avgRating` | decimal | 平均评分（按评分数加权合并） |
+| `excellentRate` | decimal | 质检合格率（(优秀+合格)/被质检会话总数;两渠道合并） |
+| `byChannel` | array | 渠道下钻（见下） |
+
+`byChannel` 数组项（`StaffChannelBreakdownDto`）—— 单个渠道的 KPI：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `channel` | string | 渠道判别符：`widget`（临时会话 / Web Widget 匿名访客）\| `im_direct`（IM 注册客户直聊） |
+| `sessionsServed` | int | 该渠道服务会话数 |
+| `avgFirstResponseSeconds` | int | 该渠道平均首次响应秒数 |
+| `avgDurationSeconds` | int | 该渠道平均会话时长秒数 |
+| `avgRating` | decimal | 该渠道平均评分 |
+| `excellentRate` | decimal | 该渠道质检合格率 |
 
 #### 3.2B.4 `GET /api/admin/v1/customer-service/temp-sessions/visitors/{visitorId}`
 
@@ -976,7 +994,28 @@ POST /api/platform/v1/auth/admin-token
 | `ipMasked` | string? | 脱敏 IP |
 | `userAgent` | string? | 浏览器 User-Agent |
 | `metadata` | object? | 自定义元数据 |
+| `acquisition` | object | 获客入口结构化字段（见下；2026-06-07 起） |
 | `sessions` | array | 历史会话列表，结构同 `TempSessionAdminListItemDto` |
+
+`acquisition` 字段（`TempSessionAcquisitionDto`，2026-06-07 新增）—— 临时会话/访客的结构化获客来源。也出现在临时会话列表项 `TempSessionAdminListItemDto.acquisition` 与访客列表项里。全部可选，缺失为 `null`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `applicationId` | string? | 接入方自定义的应用/站点标识（区别于 `customerId` 业务客户标识） |
+| `sourcePlatform` | string? | 来源渠道：`app` / `h5` / `web` / `miniprogram` / 其它（服务层宽松归一，已知值小写收敛，未知原样存） |
+| `chatTool` | string? | 聊天工具：`wechat` / `telegram` / `whatsapp` / `line` / `messenger` / 其它 |
+| `deviceType` | string? | 设备：`mobile` / `desktop` / `tablet` / 其它 |
+| `os` | string? | 操作系统名（`ios` / `android` / `windows` …） |
+| `osVersion` | string? | 操作系统版本 |
+| `utmSource` | string? | 营销归因 source |
+| `utmMedium` | string? | 营销归因 medium |
+| `utmCampaign` | string? | 营销归因 campaign |
+| `appVersion` | string? | 接入 App 版本号（配合 `applicationId`） |
+| `country` | string? | 地区（国家） |
+| `region` | string? | 地区（省/州/城市，接入方自定义粒度） |
+| `timezone` | string? | IANA 时区，如 `Asia/Shanghai` |
+
+> 渠道分布统计 `channelDistribution` 自 2026-06-07 起优先按 `sourcePlatform` 分组（旧数据无 `sourcePlatform` 时回退 `sourceChannel`）。Widget 进线上报这些字段的入口见 client/widget 接入文档。
 
 `visitor` 字段（`TempVisitorListItemDto`）：
 

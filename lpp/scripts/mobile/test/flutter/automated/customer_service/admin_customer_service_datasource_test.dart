@@ -176,6 +176,23 @@ void main() {
       expect(groups.single.memberCount, 12);
     });
 
+    test('loads temp session stats from documented admin endpoint', () async {
+      final adapter = _AdminApiAdapter();
+      final dio = Dio(BaseOptions(baseUrl: 'https://test.local'))
+        ..httpClientAdapter = adapter;
+      final datasource = AdminCustomerServiceRemoteDataSource(dio);
+
+      final stats = await datasource.getTempSessionStats();
+
+      expect(
+        adapter.requests.single.path,
+        '/api/admin/v1/customer-service/temp-sessions/stats',
+      );
+      expect(stats.staffPerformance.single.displayName, '客服 A');
+      expect(stats.staffPerformance.single.byChannel.last.channel, 'im_direct');
+      expect(stats.staffPerformance.single.servedCountMatchesBreakdown, isTrue);
+    });
+
     test('freezes group conversation from documented admin endpoint', () async {
       final adapter = _AdminApiAdapter();
       final dio = Dio(BaseOptions(baseUrl: 'https://test.local'))
@@ -404,6 +421,33 @@ class _AdminApiAdapter implements HttpClientAdapter {
               'memberCount': 12,
               'lastMessagePreview': '欢迎',
               'updatedAt': '2026-05-23T10:30:00Z',
+            },
+          ],
+        },
+      });
+    }
+    if (options.path == '/api/admin/v1/customer-service/temp-sessions/stats') {
+      return _json({
+        'code': 'OK',
+        'message': 'success',
+        'data': {
+          'totalSessions': 24,
+          'totalQueued': 3,
+          'totalServed': 21,
+          'avgFirstResponseSeconds': 58,
+          'staffPerformance': [
+            {
+              'staffUserId': 'staff-1',
+              'displayName': '客服 A',
+              'sessionsServed': 10,
+              'avgFirstResponseSeconds': 30,
+              'avgDurationSeconds': 300,
+              'avgRating': 4.9,
+              'excellentRate': 0.92,
+              'byChannel': [
+                {'channel': 'widget', 'sessionsServed': 4},
+                {'channel': 'im_direct', 'sessionsServed': 6},
+              ],
             },
           ],
         },

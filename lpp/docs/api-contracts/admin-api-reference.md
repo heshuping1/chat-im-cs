@@ -687,7 +687,7 @@ Base URL：`/api/admin/v1/customer-service/temp-sessions`
 | `channelDistribution` | array | 渠道分布 |
 | `categoryDistribution` | array | 分类分布 |
 | `localeDistribution` | array | 语言分布 |
-| `staffPerformance` | array | 客服绩效 |
+| `staffPerformance` | array | 客服绩效(2026-06-07 起**跨渠道合并**:每项顶层为临时会话+IM直聊合并 KPI,新增 `byChannel` 渠道下钻 `widget`/`im_direct`。详见 `admin-api.md` 3.2B.3) |
 
 #### 2.6.10 临时会话枚举
 

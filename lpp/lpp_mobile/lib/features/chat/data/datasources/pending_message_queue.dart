@@ -18,6 +18,8 @@ typedef PendingMessageResentCallback = FutureOr<void> Function(
 // ---------------------------------------------------------------------------
 
 class PendingMessage {
+  final String spaceId;
+  final String userId;
   final String clientMsgId;
   final String conversationId;
   final bool isGroup;
@@ -30,6 +32,8 @@ class PendingMessage {
   final DateTime createdAt;
 
   const PendingMessage({
+    required this.spaceId,
+    required this.userId,
     required this.clientMsgId,
     required this.conversationId,
     required this.isGroup,
@@ -43,6 +47,8 @@ class PendingMessage {
   });
 
   PendingMessage copyWith({
+    String? spaceId,
+    String? userId,
     String? clientMsgId,
     String? conversationId,
     bool? isGroup,
@@ -55,6 +61,8 @@ class PendingMessage {
     DateTime? createdAt,
   }) {
     return PendingMessage(
+      spaceId: spaceId ?? this.spaceId,
+      userId: userId ?? this.userId,
       clientMsgId: clientMsgId ?? this.clientMsgId,
       conversationId: conversationId ?? this.conversationId,
       isGroup: isGroup ?? this.isGroup,
@@ -69,6 +77,8 @@ class PendingMessage {
   }
 
   Map<String, dynamic> toJson() => {
+        'spaceId': spaceId,
+        'userId': userId,
         'clientMsgId': clientMsgId,
         'conversationId': conversationId,
         'isGroup': isGroup,
@@ -82,6 +92,8 @@ class PendingMessage {
       };
 
   factory PendingMessage.fromJson(Map<String, dynamic> json) => PendingMessage(
+        spaceId: json['spaceId'] as String? ?? '',
+        userId: json['userId'] as String? ?? '',
         clientMsgId: json['clientMsgId'] as String,
         conversationId: json['conversationId'] as String,
         isGroup: json['isGroup'] as bool? ?? false,
@@ -113,11 +125,13 @@ class PendingMessageQueue {
   Future<void> enqueue(PendingMessage message) async {
     final box = HiveStorage.pendingMessagesBox;
     final encoded = jsonEncode(message.toJson());
-    await box.put(message.clientMsgId, encoded);
+    await box.put(_keyFor(message), encoded);
     AppDiagnostics.instance.info(
       'chat.pending',
       'enqueued',
       context: {
+        'spaceId': message.spaceId,
+        'userId': message.userId,
         'conversationId': message.conversationId,
         'clientMsgId': message.clientMsgId,
         'messageType': message.messageType,
@@ -126,7 +140,10 @@ class PendingMessageQueue {
   }
 
   /// 获取所有待发消息（按创建时间升序）
-  Future<List<PendingMessage>> getAll() async {
+  Future<List<PendingMessage>> getAll({
+    String? spaceId,
+    String? userId,
+  }) async {
     final box = HiveStorage.pendingMessagesBox;
     final messages = <PendingMessage>[];
     for (final key in box.keys) {
@@ -134,7 +151,11 @@ class PendingMessageQueue {
       if (raw == null) continue;
       try {
         final json = jsonDecode(raw as String) as Map<String, dynamic>;
-        messages.add(PendingMessage.fromJson(json));
+        final message = PendingMessage.fromJson(json);
+        if (!_matchesIdentity(message, spaceId: spaceId, userId: userId)) {
+          continue;
+        }
+        messages.add(message);
       } catch (_) {
         // 跳过损坏的记录
       }
@@ -144,8 +165,16 @@ class PendingMessageQueue {
   }
 
   /// 删除已发送消息
-  Future<void> remove(String clientMsgId) async {
+  Future<void> remove(
+    String clientMsgId, {
+    String? spaceId,
+    String? userId,
+  }) async {
     final box = HiveStorage.pendingMessagesBox;
+    if (spaceId != null && userId != null) {
+      await box.delete(_storageKey(spaceId, userId, clientMsgId));
+      return;
+    }
     await box.delete(clientMsgId);
   }
 
@@ -154,10 +183,12 @@ class PendingMessageQueue {
   /// 发送成功后从队列移除；超过最大重试次数后也移除（避免无限积压）。
   Future<void> flushAll(
     ChatRepository repository, {
+    required String spaceId,
+    required String userId,
     PendingRepositoryResolver? repositoryForMessage,
     PendingMessageResentCallback? onMessageResent,
   }) async {
-    final pending = await getAll();
+    final pending = await getAll(spaceId: spaceId, userId: userId);
     for (final message in pending) {
       try {
         final messageRepository =
@@ -180,11 +211,13 @@ class PendingMessageQueue {
         await onMessageResent?.call(message, sent);
 
         // 发送成功，从队列移除
-        await remove(message.clientMsgId);
+        await _remove(message);
         AppDiagnostics.instance.info(
           'chat.pending',
           'resent',
           context: {
+            'spaceId': message.spaceId,
+            'userId': message.userId,
             'conversationId': message.conversationId,
             'clientMsgId': message.clientMsgId,
           },
@@ -194,11 +227,13 @@ class PendingMessageQueue {
         final updated = message.copyWith(retryCount: message.retryCount + 1);
         if (updated.retryCount >= _maxRetries) {
           // 超过最大重试次数，移除（标记为失败由上层处理）
-          await remove(message.clientMsgId);
+          await _remove(message);
           AppDiagnostics.instance.warning(
             'chat.pending',
             'dropped',
             context: {
+              'spaceId': message.spaceId,
+              'userId': message.userId,
               'conversationId': message.conversationId,
               'clientMsgId': message.clientMsgId,
               'retryCount': updated.retryCount,
@@ -210,6 +245,30 @@ class PendingMessageQueue {
       }
     }
   }
+
+  Future<void> _remove(PendingMessage message) {
+    return remove(
+      message.clientMsgId,
+      spaceId: message.spaceId,
+      userId: message.userId,
+    );
+  }
+
+  static bool _matchesIdentity(
+    PendingMessage message, {
+    String? spaceId,
+    String? userId,
+  }) {
+    if (spaceId == null && userId == null) return true;
+    return message.spaceId == spaceId && message.userId == userId;
+  }
+
+  static String _keyFor(PendingMessage message) =>
+      _storageKey(message.spaceId, message.userId, message.clientMsgId);
+
+  static String _storageKey(
+          String spaceId, String userId, String clientMsgId) =>
+      '$spaceId:$userId:$clientMsgId';
 
   static MessageType _parseMessageType(String raw) {
     switch (raw) {

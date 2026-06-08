@@ -1,14 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
+import 'package:lpp_mobile/features/chat/domain/services/asr_service.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
+import 'package:lpp_mobile/features/chat/presentation/widgets/voice_recorder.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
 void main() {
@@ -100,6 +105,66 @@ void main() {
     expect(tester.testTextInput.isVisible, isTrue);
   });
 
+  testWidgets('hydrates draft when local draft arrives after first build', (
+    tester,
+  ) async {
+    Widget buildToolbar({String? initialDraft}) => _wrap(
+      ChatInputToolbar(
+        conversationId: 'chat-1',
+        isGroup: false,
+        initialDraft: initialDraft,
+        onSendText: (_) async => true,
+        onSendVoice: (_, __) {},
+        onSendMedia: (_) {},
+      ),
+    );
+
+    await tester.pumpWidget(buildToolbar());
+    expect(find.text('offline draft'), findsNothing);
+
+    await tester.pumpWidget(buildToolbar(initialDraft: 'offline draft'));
+    await tester.pump();
+
+    expect(find.text('offline draft'), findsOneWidget);
+  });
+
+  testWidgets('voice input starts feedback when pressing hold-to-talk', (
+    tester,
+  ) async {
+    final recordingBackend = _FakeVoiceRecordingBackend();
+
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'chat-1',
+          isGroup: false,
+          onSendText: (_) async => true,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+          voiceRecordingBackend: recordingBackend,
+          voiceAsrService: _NoopAsrService(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.mic_none_rounded));
+    await tester.pump();
+    expect(find.text('按住 说话'), findsOneWidget);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('按住 说话')),
+    );
+    await tester.pump();
+
+    expect(find.text('录音中...'), findsOneWidget);
+    expect(recordingBackend.startedPaths, ['/tmp/voice.m4a']);
+
+    await gesture.up();
+    await tester.pump();
+    expect(recordingBackend.stopCalls, 1);
+    expect(find.text('录音时长不足1秒'), findsOneWidget);
+  });
+
   testWidgets('favorites tool is hidden without a favorite handler', (
     tester,
   ) async {
@@ -147,6 +212,69 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(favoriteTaps, 1);
+  });
+
+  test('media-only picker rejects xml instead of dispatching a file', () async {
+    final file = await _pickedFile('report.xml', '<window />');
+
+    final dispatch = await classifyChatPickedFiles([
+      file,
+    ], allowFileAttachments: false);
+
+    expect(dispatch.media, isEmpty);
+    expect(dispatch.files, isEmpty);
+    expect(dispatch.unsupportedFiles.map((item) => item.name), ['report.xml']);
+  });
+
+  test('picked gallery results keep media and allowed files', () async {
+    final image = await _pickedFile('photo.png', 'png');
+    final xml = await _pickedFile('window.xml', '<window />');
+
+    final dispatch = await classifyChatPickedFiles([image, xml]);
+
+    expect(dispatch.media, hasLength(1));
+    expect(dispatch.media.single.kind, ChatPickedMediaKind.image);
+    expect(dispatch.files, hasLength(1));
+    expect(dispatch.files.single.fileName, 'window.xml');
+    expect(dispatch.unsupportedFiles, isEmpty);
+  });
+
+  test('picked gallery executable is rejected as unsupported', () async {
+    final file = await _pickedFile('setup.exe', 'binary');
+
+    final dispatch = await classifyChatPickedFiles([file]);
+
+    expect(dispatch.media, isEmpty);
+    expect(dispatch.files, isEmpty);
+    expect(dispatch.unsupportedFiles.map((item) => item.name), ['setup.exe']);
+  });
+
+  test('file picker extension filter excludes image and video media', () {
+    expect(chatFilePickerAllowedExtensions, contains('xml'));
+    expect(chatFilePickerAllowedExtensions, contains('json'));
+    expect(chatFilePickerAllowedExtensions, contains('zip'));
+    expect(chatFilePickerAllowedExtensions, isNot(contains('jpg')));
+    expect(chatFilePickerAllowedExtensions, isNot(contains('png')));
+    expect(chatFilePickerAllowedExtensions, isNot(contains('mp4')));
+    expect(chatFilePickerAllowedExtensions, isNot(contains('mov')));
+  });
+
+  test('gallery picker dispatches mixed images and videos', () async {
+    final image = await _pickedFile('photo.jpg', 'jpg');
+    final video = await _pickedFile('clip.mp4', 'mp4');
+    final picker = _FakeGalleryPicker([image, video]);
+
+    final picked = await picker.pickMedia();
+    final dispatch = await classifyChatPickedFiles(
+      picked,
+      allowFileAttachments: false,
+    );
+
+    expect(picker.pickMediaCalls, 1);
+    expect(dispatch.media.map((item) => item.kind), [
+      ChatPickedMediaKind.image,
+      ChatPickedMediaKind.video,
+    ]);
   });
 
   testWidgets('group tools panel does not show mention member entry', (
@@ -465,4 +593,71 @@ class _DraftAdapter implements HttpClientAdapter {
 
   @override
   void close({bool force = false}) {}
+}
+
+class _FakeVoiceRecordingBackend implements VoiceRecordingBackend {
+  final startedPaths = <String>[];
+  var stopCalls = 0;
+
+  @override
+  Future<String> createOutputPath() async => '/tmp/voice.m4a';
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  Future<bool> hasPermission() async => true;
+
+  @override
+  Future<void> start(String path) async {
+    startedPaths.add(path);
+  }
+
+  @override
+  Future<String?> stop() async {
+    stopCalls += 1;
+    return '/tmp/voice.m4a';
+  }
+}
+
+class _NoopAsrService implements AsrService {
+  @override
+  Future<void> startListening({
+    required void Function(String text, double confidence) onResult,
+    String language = 'zh-CN',
+  }) async {}
+
+  @override
+  Future<void> stopListening() async {}
+
+  @override
+  Future<AsrResult> transcribe(
+    String audioFilePath, {
+    String language = 'zh-CN',
+  }) async {
+    return const AsrResult(text: '', confidence: 0);
+  }
+}
+
+class _FakeGalleryPicker implements ChatGalleryPicker {
+  final List<XFile> files;
+  var pickMediaCalls = 0;
+
+  _FakeGalleryPicker(this.files);
+
+  @override
+  Future<List<XFile>> pickMedia() async {
+    pickMediaCalls += 1;
+    return files;
+  }
+
+  @override
+  Future<XFile?> pickFallbackImage() async => null;
+}
+
+Future<XFile> _pickedFile(String name, String content) async {
+  final directory = await Directory.systemTemp.createTemp('chat-input-picker-');
+  final file = File('${directory.path}/$name');
+  await file.writeAsString(content);
+  return XFile(file.path, name: name);
 }

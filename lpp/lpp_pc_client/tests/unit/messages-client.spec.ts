@@ -253,4 +253,16 @@ describe("MessagesApiClient", () => {
       ],
     });
   });
+
+  it("requests group read receipts with message id query", async () => {
+    const client = new CapturingMessagesApiClient();
+
+    await client.getGroupReadReceipts("group-1", "message-1", 16);
+
+    expect(client.requests).toHaveLength(1);
+    expect(client.requests[0]?.path).toBe(
+      "/api/client/v1/groups/group-1/read-receipts?messageId=message-1",
+    );
+    expect(client.requests[0]?.init.method).toBeUndefined();
+  });
 });

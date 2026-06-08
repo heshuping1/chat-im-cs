@@ -208,6 +208,56 @@ void main() {
     expect(find.text('访客咨询 A'), findsOneWidget);
   });
 
+  testWidgets('service efficiency shows cross-channel staff performance', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          effectiveCurrentSpaceProvider.overrideWithValue(
+            const SpaceContext(
+              spaceId: 'tenant-1',
+              accessToken: 'tenant-access',
+              refreshToken: 'tenant-refresh',
+              userId: 'owner-1',
+              type: SpaceType.employee,
+              membershipRole: 4,
+            ),
+          ),
+          currentSpaceProvider.overrideWith(
+            () => _FakeSpaceManager(
+              const SpaceContext(
+                spaceId: 'tenant-1',
+                accessToken: 'tenant-access',
+                refreshToken: 'tenant-refresh',
+                userId: 'owner-1',
+                type: SpaceType.employee,
+                membershipRole: 4,
+              ),
+            ),
+          ),
+          adminCustomerServiceRepositoryProvider.overrideWithValue(
+            _FakeAdminCustomerServiceRepository(),
+          ),
+        ],
+        child: const MaterialApp(
+          home: OwnerWorkbenchFeaturePage(
+            title: '团队服务效率',
+            featureKey: 'owner_service_efficiency',
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('客服小王'), findsOneWidget);
+    expect(find.text('10 单'), findsOneWidget);
+    expect(find.textContaining('访客 4 单'), findsOneWidget);
+    expect(find.textContaining('注册客户 6 单'), findsOneWidget);
+    expect(find.text('平均首响'), findsOneWidget);
+  });
+
   testWidgets('service center opens customer conversation as read-only', (
     tester,
   ) async {
@@ -366,6 +416,40 @@ class _FakeAdminCustomerServiceRepository
       maxConcurrentSessions: 5,
     ),
   ];
+
+  @override
+  Future<AdminTempSessionStats> getTempSessionStats() async =>
+      const AdminTempSessionStats(
+        totalServed: 21,
+        avgFirstResponseSeconds: 58,
+        avgDurationSeconds: 360,
+        avgRating: 4.8,
+        staffPerformance: [
+          AdminStaffPerformance(
+            staffUserId: 'staff-1',
+            displayName: '客服小王',
+            sessionsServed: 10,
+            avgFirstResponseSeconds: 30,
+            avgDurationSeconds: 300,
+            avgRating: 4.9,
+            excellentRate: 0.92,
+            byChannel: [
+              AdminStaffChannelBreakdown(
+                channel: 'widget',
+                sessionsServed: 4,
+                avgFirstResponseSeconds: 40,
+                avgRating: 4.8,
+              ),
+              AdminStaffChannelBreakdown(
+                channel: 'im_direct',
+                sessionsServed: 6,
+                avgFirstResponseSeconds: 24,
+                avgRating: 5,
+              ),
+            ],
+          ),
+        ],
+      );
 
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

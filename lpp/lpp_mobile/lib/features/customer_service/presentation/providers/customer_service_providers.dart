@@ -241,6 +241,14 @@ final adminCustomerServiceStaffStatusesProvider =
   return ref.read(adminCustomerServiceRepositoryProvider).getStaffStatuses();
 });
 
+final adminTempSessionStatsProvider =
+    FutureProvider<AdminTempSessionStats>((ref) async {
+  if (!ref.watch(currentSpaceHasAdminConsoleAccessProvider)) {
+    throw StateError('当前角色不能查看客服绩效');
+  }
+  return ref.read(adminCustomerServiceRepositoryProvider).getTempSessionStats();
+});
+
 final adminGroupsProvider = FutureProvider<List<AdminGroup>>((ref) async {
   if (!ref.watch(currentSpaceHasAdminConsoleAccessProvider)) {
     throw StateError('当前角色不能查看群列表');

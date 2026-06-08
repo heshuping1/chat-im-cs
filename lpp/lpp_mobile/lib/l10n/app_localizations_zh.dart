@@ -412,6 +412,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatFileUploadFailed => '文件上传失败，请重试';
 
   @override
+  String get chatFileStatusNotDownloaded => '未下载';
+
+  @override
+  String get chatFileStatusDownloaded => '已下载';
+
+  @override
+  String get chatFileStatusUploading => '上传中';
+
+  @override
+  String get chatFileStatusUploadFailed => '上传失败';
+
+  @override
   String get chatCardSendFailed => '名片发送失败';
 
   @override
@@ -2576,6 +2588,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get chatFileUploadFailed => '檔案上傳失敗，請重試';
+
+  @override
+  String get chatFileStatusNotDownloaded => '未下載';
+
+  @override
+  String get chatFileStatusDownloaded => '已下載';
+
+  @override
+  String get chatFileStatusUploading => '上傳中';
+
+  @override
+  String get chatFileStatusUploadFailed => '上傳失敗';
 
   @override
   String get chatCardSendFailed => '名片傳送失敗';

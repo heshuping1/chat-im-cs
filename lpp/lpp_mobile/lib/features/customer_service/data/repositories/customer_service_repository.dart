@@ -168,6 +168,9 @@ class AdminCustomerServiceRepository {
   Future<List<AdminStaffStatus>> getStaffStatuses() =>
       _remote.getStaffStatuses();
 
+  Future<AdminTempSessionStats> getTempSessionStats() =>
+      _remote.getTempSessionStats();
+
   Future<List<AdminGroup>> getGroups() => _remote.getGroups();
 
   Future<CsBroadcastPreview> previewBroadcast({

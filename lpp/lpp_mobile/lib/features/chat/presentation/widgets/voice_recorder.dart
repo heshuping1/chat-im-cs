@@ -6,16 +6,62 @@ import 'package:lpp_mobile/features/chat/domain/services/asr_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+abstract class VoiceRecordingBackend {
+  Future<bool> hasPermission();
+  Future<String> createOutputPath();
+  Future<void> start(String path);
+  Future<String?> stop();
+  Future<void> dispose();
+}
+
+class DeviceVoiceRecordingBackend implements VoiceRecordingBackend {
+  final AudioRecorder _recorder;
+
+  DeviceVoiceRecordingBackend({AudioRecorder? recorder})
+      : _recorder = recorder ?? AudioRecorder();
+
+  @override
+  Future<bool> hasPermission() => _recorder.hasPermission();
+
+  @override
+  Future<String> createOutputPath() async {
+    final dir = await getTemporaryDirectory();
+    return '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+  }
+
+  @override
+  Future<void> start(String path) {
+    return _recorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        sampleRate: 44100,
+        bitRate: 128000,
+      ),
+      path: path,
+    );
+  }
+
+  @override
+  Future<String?> stop() => _recorder.stop();
+
+  @override
+  Future<void> dispose() => _recorder.dispose();
+}
+
 class VoiceRecorder extends StatefulWidget {
   final Function(String filePath, int durationSeconds) onSendVoice;
   final FutureOr<bool> Function(String text) onSendText;
   final VoidCallback onCancel;
+  final VoiceRecordingBackend? recordingBackend;
+  final AsrService? asrService;
 
   const VoiceRecorder({
     super.key,
     required this.onSendVoice,
     required this.onSendText,
     required this.onCancel,
+    this.recordingBackend,
+    this.asrService,
   });
 
   @override
@@ -24,10 +70,14 @@ class VoiceRecorder extends StatefulWidget {
 
 class _VoiceRecorderState extends State<VoiceRecorder>
     with TickerProviderStateMixin {
-  final _recorder = AudioRecorder();
-  final _asr = deviceAsrService; // 真实设备端 ASR
+  late final VoiceRecordingBackend _recorder;
+  late final AsrService _asr;
 
   bool _isRecording = false;
+  bool _isStartingRecording = false;
+  bool _shouldStopAfterStart = false;
+  bool _cancelAfterStart = false;
+  Offset? _pressStartGlobalPosition;
   int _durationSeconds = 0;
   Timer? _timer;
   String? _recordedFilePath;
@@ -54,6 +104,8 @@ class _VoiceRecorderState extends State<VoiceRecorder>
   @override
   void initState() {
     super.initState();
+    _recorder = widget.recordingBackend ?? DeviceVoiceRecordingBackend();
+    _asr = widget.asrService ?? deviceAsrService;
     _waveControllers = List.generate(5, (i) {
       final ctrl = AnimationController(
         vsync: this,
@@ -80,7 +132,7 @@ class _VoiceRecorderState extends State<VoiceRecorder>
     _tipTimer?.cancel();
     _hideRecordingOverlay();
     _hideConvertSheetOverlay();
-    _recorder.dispose();
+    unawaited(_recorder.dispose());
     super.dispose();
   }
 
@@ -149,57 +201,99 @@ class _VoiceRecorderState extends State<VoiceRecorder>
   }
 
   Future<void> _startRecording() async {
-    final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) {
-      if (mounted) {
-        AppToast.error(context, '需要麦克风权限');
+    if (_isRecording || _isStartingRecording) return;
+    _isStartingRecording = true;
+    _shouldStopAfterStart = false;
+    _cancelAfterStart = false;
+
+    try {
+      final hasPermission = await _recorder.hasPermission();
+      if (!hasPermission) {
+        _isStartingRecording = false;
+        if (mounted) {
+          AppToast.error(context, '需要麦克风权限');
+        }
+        return;
       }
+
+      final path = await _recorder.createOutputPath();
+      await _recorder.start(path);
+
+      // 同步启动实时 ASR
+      _liveAsrText = '';
+      _liveAsrConfidence = 0.8;
+      await _asr.startListening(
+        onResult: (text, confidence) {
+          if (mounted) {
+            setState(() {
+              _liveAsrText = text;
+              _liveAsrConfidence = confidence;
+            });
+          }
+        },
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isRecording = true;
+        _isStartingRecording = false;
+        _durationSeconds = 0;
+        _recordedFilePath = path;
+      });
+      _showRecordingOverlay();
+
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() => _durationSeconds++);
+        _recordingOverlayEntry?.markNeedsBuild();
+        // 60 秒自动停止
+        if (_durationSeconds >= 60) {
+          _stopRecording(cancel: false, convertToText: false);
+        }
+      });
+
+      if (_shouldStopAfterStart) {
+        unawaited(
+          _stopRecording(
+            cancel: _cancelAfterStart,
+            convertToText: false,
+          ),
+        );
+      }
+    } catch (_) {
+      _isStartingRecording = false;
+      _isRecording = false;
+      _timer?.cancel();
+      _timer = null;
+      _hideRecordingOverlay();
+      if (mounted) {
+        AppToast.error(context, '录音启动失败');
+      }
+    }
+  }
+
+  void _handlePressStart(Offset globalPosition) {
+    if (_isRecording || _isStartingRecording) return;
+    _pressStartGlobalPosition = globalPosition;
+    unawaited(_startRecording());
+  }
+
+  void _handlePressEnd({required bool cancel}) {
+    _pressStartGlobalPosition = null;
+    if (_isStartingRecording && !_isRecording) {
+      _shouldStopAfterStart = true;
+      _cancelAfterStart = cancel;
       return;
     }
+    unawaited(_stopRecording(cancel: cancel, convertToText: false));
+  }
 
-    final dir = await getTemporaryDirectory();
-    final path =
-        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-    await _recorder.start(
-      const RecordConfig(
-        encoder: AudioEncoder.aacLc,
-        sampleRate: 44100,
-        bitRate: 128000,
-      ),
-      path: path,
-    );
-
-    // 同步启动实时 ASR
-    _liveAsrText = '';
-    _liveAsrConfidence = 0.8;
-    await _asr.startListening(
-      onResult: (text, confidence) {
-        if (mounted) {
-          setState(() {
-            _liveAsrText = text;
-            _liveAsrConfidence = confidence;
-          });
-        }
-      },
-    );
-
-    setState(() {
-      _isRecording = true;
-      _durationSeconds = 0;
-      _recordedFilePath = path;
-    });
-    _showRecordingOverlay();
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() => _durationSeconds++);
-      _recordingOverlayEntry?.markNeedsBuild();
-      // 60 秒自动停止
-      if (_durationSeconds >= 60) {
-        _stopRecording(cancel: false, convertToText: false);
-      }
-    });
+  void _handlePressMove(Offset globalPosition) {
+    final start = _pressStartGlobalPosition;
+    if (start == null || !_isRecording) return;
+    if (globalPosition.dy - start.dy < -50) {
+      _handlePressEnd(cancel: true);
+    }
   }
 
   Future<void> _stopRecording({
@@ -208,6 +302,7 @@ class _VoiceRecorderState extends State<VoiceRecorder>
   }) async {
     if (!_isRecording) return;
     _timer?.cancel();
+    _timer = null;
     final path = await _recorder.stop();
     await _asr.stopListening(); // 停止实时 ASR
 
@@ -221,9 +316,7 @@ class _VoiceRecorderState extends State<VoiceRecorder>
     }
 
     if (_durationSeconds < 1) {
-      if (convertToText) {
-        _showTooShort();
-      }
+      _showTooShort();
       widget.onCancel();
       return;
     }
@@ -262,16 +355,11 @@ class _VoiceRecorderState extends State<VoiceRecorder>
     return Stack(
       children: [
         // 按住说话按钮
-        GestureDetector(
-          onLongPressStart: (_) => _startRecording(),
-          onLongPressEnd: (_) =>
-              _stopRecording(cancel: false, convertToText: false),
-          onLongPressMoveUpdate: (details) {
-            // 上滑超过 50dp 取消录音
-            if (details.offsetFromOrigin.dy < -50 && _isRecording) {
-              _stopRecording(cancel: true, convertToText: false);
-            }
-          },
+        Listener(
+          onPointerDown: (event) => _handlePressStart(event.position),
+          onPointerUp: (_) => _handlePressEnd(cancel: false),
+          onPointerCancel: (_) => _handlePressEnd(cancel: true),
+          onPointerMove: (event) => _handlePressMove(event.position),
           child: Container(
             width: double.infinity,
             height: 36,

@@ -20,6 +20,7 @@ export function ChatMessageBubble({
   onAvatarClick,
   onContactClick,
   onFailedMessageClick,
+  onGroupReadReceiptClick,
   senderFallback,
   senderAvatarUrl,
   mineAvatarUrl,
@@ -40,6 +41,10 @@ export function ChatMessageBubble({
   onAvatarClick?: (event: MouseEvent<HTMLButtonElement>, message: MessageItemDto, mine: boolean) => void;
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
   onFailedMessageClick?: (message: MessageItemDto) => void;
+  onGroupReadReceiptClick?: (
+    message: MessageItemDto,
+    anchor: HTMLElement,
+  ) => void;
   onUploadAction?: UploadActionHandler;
   senderFallback: string;
   senderAvatarUrl?: string | null;
@@ -90,8 +95,13 @@ export function ChatMessageBubble({
   const senderName = model.sender.name;
   const reply = model.bubble.reply;
   const readReceipt = model.status.receipt === "read";
-  const statusReceipt = model.status.statusText ? (
-    <span className={`pc-chat-receipt${readReceipt ? " read" : ""}`}>
+  const groupReadReceipt =
+    model.status.groupReadReceiptClickable && Boolean(onGroupReadReceiptClick);
+  const receiptClassName = `pc-chat-receipt${readReceipt ? " read" : ""}${
+    groupReadReceipt ? " group" : ""
+  }`;
+  const receiptContent = (
+    <>
       {readReceipt && (
         <Check
           aria-hidden="true"
@@ -101,7 +111,23 @@ export function ChatMessageBubble({
         />
       )}
       <span>{model.status.statusText}</span>
-    </span>
+    </>
+  );
+  const statusReceipt = model.status.statusText ? (
+    groupReadReceipt ? (
+      <button
+        className={`${receiptClassName} pc-chat-group-receipt-button`}
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onGroupReadReceiptClick?.(message, event.currentTarget);
+        }}
+      >
+        {receiptContent}
+      </button>
+    ) : (
+      <span className={receiptClassName}>{receiptContent}</span>
+    )
   ) : null;
   const sendStatusSlot = mine && model.status.sendStatusSlot !== "none" ? (
     <MessageSendStatusSlot

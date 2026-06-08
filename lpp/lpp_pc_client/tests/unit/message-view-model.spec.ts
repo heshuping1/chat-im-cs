@@ -97,6 +97,101 @@ describe("message view model", () => {
     });
   });
 
+  it("exposes clickable group read receipt status for sent own group messages", () => {
+    const message = {
+      body: { text: "hello" },
+      conversationSeq: 16,
+      direction: "out",
+      isMine: true,
+      messageId: "m-group-read",
+      messageType: "text",
+      readCount: 2,
+      sentAt: "2026-05-29T12:00:00.000Z",
+      status: "sent",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "群聊",
+        conversationType: "group",
+        message,
+        mine: true,
+        senderFallback: "群聊",
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      status: {
+        groupReadReceiptClickable: true,
+        receipt: "group_partial",
+        statusText: "已读 2 人",
+      },
+    });
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "群聊",
+        conversationType: "group",
+        message: { ...message, readCount: 0 },
+        mine: true,
+        senderFallback: "群聊",
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      status: {
+        groupReadReceiptClickable: true,
+        receipt: "group_unread",
+        statusText: "未读",
+      },
+    });
+  });
+
+  it("does not expose group read receipt actions for peer, direct or local messages", () => {
+    const message = {
+      body: { text: "hello" },
+      conversationSeq: 16,
+      direction: "out",
+      isMine: true,
+      messageId: "m-group-hidden",
+      messageType: "text",
+      readCount: 2,
+      sentAt: "2026-05-29T12:00:00.000Z",
+      status: "sent",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "群聊",
+        conversationType: "group",
+        message,
+        mine: false,
+        senderFallback: "Alice",
+        timeText: "12:00",
+      }).status.groupReadReceiptClickable,
+    ).toBe(false);
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Alice",
+        conversationType: "direct",
+        message,
+        mine: true,
+        senderFallback: "Alice",
+        timeText: "12:00",
+      }).status.groupReadReceiptClickable,
+    ).toBe(false);
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "群聊",
+        conversationType: "group",
+        message: { ...message, conversationSeq: undefined },
+        mine: true,
+        senderFallback: "群聊",
+        timeText: "12:00",
+      }).status.groupReadReceiptClickable,
+    ).toBe(false);
+  });
+
   it("shows optimistic unread before delayed text sending feedback", () => {
     const message = {
       body: { text: "hello" },

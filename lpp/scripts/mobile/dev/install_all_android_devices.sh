@@ -14,7 +14,7 @@ APK_PATH=""
 INSTALL_METHOD="adb"
 AUTO_CONFIRM_VIVO=true
 VIVO_INSTALL_CHOICE_TEXT_REGEX="保留数据安装|保留数据|覆盖安装|替换安装"
-VIVO_INSTALL_CONFIRM_TEXT_REGEX="继续安装|仍要安装|^安装$|重新安装|重新安裝|确定|允许"
+VIVO_INSTALL_CONFIRM_TEXT_REGEX="继续安装|仍要安装|^安装$|重新安装|重新安装应用|重新安裝|重新安裝應用|从新安装|重装|确定|允许"
 
 extract_uiautomator_bounds_by_resource_id_from_xml() {
   local xml="$1"
@@ -36,10 +36,25 @@ extract_uiautomator_bounds_by_text_regex() {
 
   node="$(printf '%s\n' "$xml" |
     grep -o '<node [^>]*>' |
-    grep -E "text=\"[^\"]*($text_regex)[^\"]*\"" |
+    grep -E "(text|content-desc)=\"[^\"]*($text_regex)[^\"]*\"" |
     tail -n 1 || true)"
   printf '%s' "$node" |
     sed -n 's/.*bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]".*/\1 \2 \3 \4/p'
+}
+
+should_retry_vivo_pm_install() {
+  local serial="$1"
+  local install_status="$2"
+  local install_output="$3"
+
+  if [ "$install_status" -eq 0 ]; then
+    return 1
+  fi
+  if ! is_vivo_device "$serial"; then
+    return 1
+  fi
+  printf '%s\n' "$install_output" |
+    grep -Eq 'INSTALL_FAILED_ABORTED|User rejected permissions'
 }
 
 if [ "${LPP_INSTALL_ANDROID_DEVICES_SOURCE_ONLY:-false}" = true ]; then
@@ -276,6 +291,43 @@ run_install_command() {
   return "$status"
 }
 
+install_with_pm() {
+  local serial="$1"
+  local remote_apk="/data/local/tmp/lpp-mobile-$BUILD_MODE.apk"
+  local install_status=0
+
+  if adb -s "$serial" push "$APK_PATH" "$remote_apk"; then
+    run_install_command "$serial" adb -s "$serial" shell pm install -r -d "$remote_apk" || install_status=$?
+  else
+    install_status=$?
+  fi
+  adb -s "$serial" shell rm -f "$remote_apk" >/dev/null 2>&1 || true
+  return "$install_status"
+}
+
+install_with_adb_or_vivo_pm_fallback() {
+  local serial="$1"
+  local install_output
+  local install_status
+
+  set +e
+  install_output="$(run_install_command "$serial" adb -s "$serial" install -r -d "$APK_PATH" 2>&1)"
+  install_status=$?
+  set -e
+
+  if [ -n "$install_output" ]; then
+    printf '%s\n' "$install_output"
+  fi
+
+  if should_retry_vivo_pm_install "$serial" "$install_status" "$install_output"; then
+    echo "adb install was rejected by vivo/iQOO installer on $serial; retrying with pm install..."
+    install_with_pm "$serial"
+    return $?
+  fi
+
+  return "$install_status"
+}
+
 echo "Installing $APK_PATH to ${#PHYSICAL_DEVICES[@]} physical Android device(s)..."
 
 failures=0
@@ -283,30 +335,19 @@ for serial in "${PHYSICAL_DEVICES[@]}"; do
   echo "Installing to $serial ..."
   install_status=0
   if [ "$INSTALL_METHOD" = "pm" ]; then
-    remote_apk="/data/local/tmp/lpp-mobile-$BUILD_MODE.apk"
-    if adb -s "$serial" push "$APK_PATH" "$remote_apk"; then
-      run_install_command "$serial" adb -s "$serial" shell pm install -r -d "$remote_apk" || install_status=$?
-    else
-      install_status=$?
-    fi
+    install_with_pm "$serial" || install_status=$?
   else
-    run_install_command "$serial" adb -s "$serial" install -r -d "$APK_PATH" || install_status=$?
+    install_with_adb_or_vivo_pm_fallback "$serial" || install_status=$?
   fi
 
   if [ "$install_status" -eq 0 ]; then
     echo "Installed to $serial"
-    if [ "$INSTALL_METHOD" = "pm" ]; then
-      adb -s "$serial" shell rm -f "/data/local/tmp/lpp-mobile-$BUILD_MODE.apk" >/dev/null 2>&1 || true
-    fi
     if [ "$LAUNCH" = true ]; then
       adb -s "$serial" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null
       echo "Launched on $serial"
     fi
   else
     echo "Install failed on $serial" >&2
-    if [ "$INSTALL_METHOD" = "pm" ]; then
-      adb -s "$serial" shell rm -f "/data/local/tmp/lpp-mobile-$BUILD_MODE.apk" >/dev/null 2>&1 || true
-    fi
     failures=$((failures + 1))
   fi
 done

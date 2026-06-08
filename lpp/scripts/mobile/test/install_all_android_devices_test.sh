@@ -20,8 +20,13 @@ reinstall_xml='<hierarchy>
   <node text="重新安装" resource-id="android:id/button1" bounds="[760,1820][1030,1930]" />
 </hierarchy>'
 
+content_desc_reinstall_xml='<hierarchy>
+  <node text="" content-desc="重新安装" resource-id="android:id/button1" bounds="[720,1800][1040,1930]" />
+</hierarchy>'
+
 keep_bounds="$(extract_uiautomator_bounds_by_text_regex "$xml" "$VIVO_INSTALL_CHOICE_TEXT_REGEX")"
 reinstall_bounds="$(extract_uiautomator_bounds_by_text_regex "$reinstall_xml" "$VIVO_INSTALL_CONFIRM_TEXT_REGEX")"
+content_desc_reinstall_bounds="$(extract_uiautomator_bounds_by_text_regex "$content_desc_reinstall_xml" "$VIVO_INSTALL_CONFIRM_TEXT_REGEX")"
 button_bounds="$(extract_uiautomator_bounds_by_text_regex "$xml" "$VIVO_INSTALL_CONFIRM_TEXT_REGEX")"
 
 if [ "$keep_bounds" != "80 540 1000 640" ]; then
@@ -34,8 +39,25 @@ if [ "$reinstall_bounds" != "760 1820 1030 1930" ]; then
   exit 1
 fi
 
+if [ "$content_desc_reinstall_bounds" != "720 1800 1040 1930" ]; then
+  echo "Expected content-desc reinstall button bounds, got: $content_desc_reinstall_bounds" >&2
+  exit 1
+fi
+
 if [ "$button_bounds" != "760 2050 1030 2160" ]; then
   echo "Expected continue install button bounds, got: $button_bounds" >&2
+  exit 1
+fi
+
+is_vivo_device() { return 0; }
+if ! should_retry_vivo_pm_install "vivo-serial" 1 "Failure [INSTALL_FAILED_ABORTED: User rejected permissions]"; then
+  echo "Expected vivo user-rejected adb install to retry with pm install" >&2
+  exit 1
+fi
+
+is_vivo_device() { return 1; }
+if should_retry_vivo_pm_install "other-serial" 1 "Failure [INSTALL_FAILED_ABORTED: User rejected permissions]"; then
+  echo "Expected non-vivo user-rejected adb install not to retry with pm install" >&2
   exit 1
 fi
 

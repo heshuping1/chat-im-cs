@@ -63,6 +63,10 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/components/ChatMessageBubble.tsx"),
     "utf8",
   );
+  const groupReadReceiptPopover = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/GroupReadReceiptPopover.tsx"),
+    "utf8",
+  );
   const chatContextMenus = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/components/ChatContextMenus.tsx"),
     "utf8",
@@ -313,9 +317,28 @@ describe("message lookup UI", () => {
   it("marks direct read receipts with a green check without changing unread receipts", () => {
     expect(chatMessageBubble).toContain('model.status.receipt === "read"');
     expect(chatMessageBubble).toContain("pc-chat-receipt-icon");
-    expect(chatMessageBubble).toContain('className={`pc-chat-receipt${readReceipt ? " read" : ""}`}');
+    expect(chatMessageBubble).toContain('const receiptClassName = `pc-chat-receipt${readReceipt ? " read" : ""}');
+    expect(chatMessageBubble).toContain('<span className={receiptClassName}>{receiptContent}</span>');
     expect(messageCenterCss).toContain(".pc-chat-receipt.read");
     expect(messageCenterCss).toContain("color: #10b981");
+  });
+
+  it("opens group read receipts as a message-anchored popover", () => {
+    expect(chatMessageBubble).toContain("onGroupReadReceiptClick");
+    expect(chatMessageBubble).toContain("pc-chat-group-receipt-button");
+    expect(chatMessageBubble).toContain("model.status.groupReadReceiptClickable");
+    expect(listPanel).toContain("GroupReadReceiptPopover");
+    expect(listPanel).toContain("groupReadReceiptQuery");
+    expect(listPanel).toContain("setActiveGroupReadReceipt");
+    expect(listPanel).toContain("onGroupReadReceiptClick");
+    expect(groupReadReceiptPopover).toContain('role="dialog"');
+    expect(groupReadReceiptPopover).toContain('aria-modal="false"');
+    expect(groupReadReceiptPopover).toContain("readMembers");
+    expect(groupReadReceiptPopover).toContain("unreadMembers");
+    expect(groupReadReceiptPopover).toContain("onRetry");
+    expect(groupReadReceiptPopover).toContain("Escape");
+    expect(messageCenterCss).toContain(".pc-group-read-receipt-popover");
+    expect(messageCenterCss).toContain(".pc-group-read-receipt-tabs");
   });
 
   it("surfaces incoming friend requests across navigation, message plus and reminders", () => {

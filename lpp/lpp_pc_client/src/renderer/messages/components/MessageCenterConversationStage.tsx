@@ -486,6 +486,7 @@ export function MessageCenterConversationStage({
                   session?.tenantId
                 }
                 assetBaseUrl={session?.apiBaseUrl}
+                authSession={session}
                 authToken={session?.tenantToken}
                 chatBackgroundPreset={pcSettings.chatBackgroundPreset}
                 conversation={activeConversation}

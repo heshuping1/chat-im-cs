@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lpp_mobile/core/diagnostics/app_diagnostics.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_send_failure.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_send_policy.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation_page.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
@@ -192,6 +193,154 @@ void main() {
       expect(queued.single['text'], 'hello');
     },
   );
+
+  test(
+    'local policy blocks exe files before upload send or pending recovery',
+    () async {
+      final queued = <Map<String, Object?>>[];
+      useCase = SendMessageUseCase(
+        repository: repository,
+        currentUserId: 'user-1',
+        sendPolicy: const MessageSendPolicy(
+          context: MessageSendPolicyContext.enterpriseEmployee,
+        ),
+        onPendingEnqueue:
+            ({
+              required clientMsgId,
+              required conversationId,
+              required isGroup,
+              required type,
+              required body,
+              mentions,
+            }) async {
+              queued.add({'clientMsgId': clientMsgId});
+            },
+      );
+
+      Message? inserted;
+      Message? updated;
+      await expectLater(
+        useCase.execute(
+          conversationId: 'chat-1',
+          isGroup: false,
+          type: MessageType.file,
+          body: const MessageBody(
+            file: MediaResource(
+              url: '/tmp/setup.EXE',
+              fileName: 'setup.EXE',
+              mimeType: 'application/x-msdownload',
+              sizeBytes: 2048,
+            ),
+          ),
+          onOptimisticInsert: (message) => inserted = message,
+          onMessageUpdate: (_, message) => updated = message,
+        ),
+        throwsA(isA<MessageSendFailure>()),
+      );
+
+      expect(inserted?.status, MessageStatus.failed);
+      expect(updated?.status, MessageStatus.failed);
+      expect(inserted?.failureReason, 'LOCAL_POLICY_EXECUTABLE_FILE_BLOCKED');
+      expect(repository.sendCalls, 0);
+      expect(repository.uploadedPaths, isEmpty);
+      expect(queued, isEmpty);
+    },
+  );
+
+  test(
+    'enterprise customer link text fails locally without repository send',
+    () async {
+      useCase = SendMessageUseCase(
+        repository: repository,
+        currentUserId: 'user-1',
+        sendPolicy: const MessageSendPolicy(
+          context: MessageSendPolicyContext.enterpriseCustomer,
+        ),
+      );
+
+      Message? inserted;
+      await expectLater(
+        useCase.execute(
+          conversationId: 'chat-1',
+          isGroup: false,
+          type: MessageType.text,
+          body: const MessageBody(text: '看一下 https://example.com/a'),
+          onOptimisticInsert: (message) => inserted = message,
+        ),
+        throwsA(isA<MessageSendFailure>()),
+      );
+
+      expect(inserted?.status, MessageStatus.failed);
+      expect(inserted?.failureReason, 'LOCAL_POLICY_ENTERPRISE_LINK_BLOCKED');
+      expect(repository.sendCalls, 0);
+    },
+  );
+
+  test(
+    'enterprise customer bare domains are links but emails are not',
+    () async {
+      useCase = SendMessageUseCase(
+        repository: repository,
+        currentUserId: 'user-1',
+        sendPolicy: const MessageSendPolicy(
+          context: MessageSendPolicyContext.enterpriseCustomer,
+        ),
+      );
+
+      await expectLater(
+        useCase.execute(
+          conversationId: 'chat-1',
+          isGroup: false,
+          type: MessageType.text,
+          body: const MessageBody(text: '官网 example.com/path'),
+        ),
+        throwsA(isA<MessageSendFailure>()),
+      );
+      expect(repository.sendCalls, 0);
+
+      final sent = await useCase.execute(
+        conversationId: 'chat-1',
+        isGroup: false,
+        type: MessageType.text,
+        body: const MessageBody(text: '邮箱 help@example.com'),
+      );
+      expect(sent.status, MessageStatus.sent);
+      expect(repository.sendCalls, 1);
+    },
+  );
+
+  test('enterprise employee and personal contexts can send links', () async {
+    useCase = SendMessageUseCase(
+      repository: repository,
+      currentUserId: 'user-1',
+      sendPolicy: const MessageSendPolicy(
+        context: MessageSendPolicyContext.enterpriseEmployee,
+      ),
+    );
+
+    await useCase.execute(
+      conversationId: 'chat-1',
+      isGroup: false,
+      type: MessageType.text,
+      body: const MessageBody(text: 'https://example.com'),
+    );
+
+    useCase = SendMessageUseCase(
+      repository: repository,
+      currentUserId: 'user-1',
+      sendPolicy: const MessageSendPolicy(
+        context: MessageSendPolicyContext.personal,
+      ),
+    );
+    await useCase.execute(
+      conversationId: 'chat-1',
+      isGroup: false,
+      type: MessageType.text,
+      body: const MessageBody(text: 'www.example.com'),
+    );
+
+    expect(repository.sendCalls, 2);
+  });
 
   test(
     'media upload failures enqueue local body so optimistic media can recover',

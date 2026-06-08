@@ -609,7 +609,13 @@ class AppRouter {
         builder: (context, state) {
           final groupId = state.pathParameters['groupId']!;
           final messageId = state.pathParameters['messageId']!;
-          return GroupReadReceiptsPage(groupId: groupId, messageId: messageId);
+          final messageSeq =
+              int.tryParse(state.uri.queryParameters['seq'] ?? '') ?? 0;
+          return GroupReadReceiptsPage(
+            groupId: groupId,
+            messageId: messageId,
+            messageSeq: messageSeq,
+          );
         },
       ),
     ],

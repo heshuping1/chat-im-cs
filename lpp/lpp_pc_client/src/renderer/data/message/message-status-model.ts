@@ -10,6 +10,7 @@ export type ChatMessageReceiptState =
   | "none"
   | "unread"
   | "read"
+  | "group_unread"
   | "group_partial"
   | "group_all"
   | "group_unknown";
@@ -19,6 +20,7 @@ export type ChatMessageSendStatusSlot = "none" | "sending" | "failed";
 export interface ChatMessageStatusModel {
   failureReason?: string;
   failureTooltip?: string;
+  groupReadReceiptClickable: boolean;
   receiptState: ChatMessageReceiptState;
   sendStatusSlot: ChatMessageSendStatusSlot;
   sendState: ChatMessageDeliveryState;
@@ -61,6 +63,7 @@ export function deriveChatMessageStatus({
     return {
       failureReason: failure.dialogHint,
       failureTooltip: failure.markerTooltip,
+      groupReadReceiptClickable: false,
       receiptState: "none",
       sendStatusSlot: "failed",
       sendState,
@@ -146,6 +149,8 @@ function baseStatus({
 }): ChatMessageStatusModel {
   return {
     receiptState,
+    groupReadReceiptClickable:
+      receiptState === "group_partial" || receiptState === "group_unread",
     sendStatusSlot,
     sendState,
     showFailureMarker: false,
@@ -162,27 +167,19 @@ function groupReceiptStatus(
     return baseStatus({ receiptState: "none", sendState });
   }
   const record = message as unknown as Record<string, unknown>;
-  const allRead = record.allRead === true || record.isAllRead === true;
-  if (allRead) {
-    return baseStatus({ receiptState: "group_all", sendState, statusLabel: "全部已读" });
+  const conversationSeq = numberField(record, "conversationSeq", "conversation_seq", "seq");
+  const readCount = numberFieldAllowZero(record, "readCount", "read_count");
+  if (!conversationSeq || readCount === undefined) {
+    return baseStatus({ receiptState: "group_unknown", sendState });
   }
-  const unreadCount = numberField(record, "unreadCount", "unread_count");
-  if (unreadCount && unreadCount > 0) {
+  if (readCount > 0) {
     return baseStatus({
       receiptState: "group_partial",
       sendState,
-      statusLabel: `${unreadCount}人未读`,
+      statusLabel: `已读 ${readCount} 人`,
     });
   }
-  const readCount = numberField(record, "readCount", "read_count");
-  if (readCount && readCount > 0) {
-    return baseStatus({
-      receiptState: "group_partial",
-      sendState,
-      statusLabel: `${readCount}人已读`,
-    });
-  }
-  return baseStatus({ receiptState: "group_unknown", sendState });
+  return baseStatus({ receiptState: "group_unread", sendState, statusLabel: "未读" });
 }
 
 function isDirectRead(message: MessageItemDto) {
@@ -298,6 +295,16 @@ function numberField(record: Record<string, unknown>, ...keys: string[]) {
     const value = record[key];
     const number = typeof value === "number" ? value : Number(value);
     if (Number.isFinite(number) && number > 0) return Math.floor(number);
+  }
+  return undefined;
+}
+
+function numberFieldAllowZero(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    if (!(key in record)) continue;
+    const value = record[key];
+    const number = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(number) && number >= 0) return Math.floor(number);
   }
   return undefined;
 }

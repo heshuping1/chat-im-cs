@@ -44,6 +44,33 @@ export const workbenchFallback = {
   openKnowledgeBase: 'Open knowledge base',
   openOnlineService: 'Open customer service',
   openShortcut: 'Open {title}',
+  performance: {
+    avgDuration: 'Avg duration',
+    avgFirstResponse: 'Avg first response',
+    avgRating: 'Rating',
+    channel: {
+      imDirect: 'IM direct',
+      widget: 'Widget visitors',
+    },
+    channelMeta: 'First {first} · Rating {rating}',
+    emptyDistribution: 'No source platform distribution yet.',
+    emptyText: 'The server has not returned team performance statistics yet.',
+    emptyTitle: 'No team statistics',
+    errorTitle: 'Failed to load team performance',
+    excellentRate: 'Quality pass rate',
+    loadingText: 'Syncing admin statistics. Existing workbench data remains visible.',
+    loadingTitle: 'Loading team performance',
+    retry: 'Retry',
+    sessionsServed: '{count} sessions',
+    sourcePlatformHint:
+      'Channel distribution groups by sourcePlatform first, and falls back to sourceChannel for legacy data.',
+    sourcePlatformTitle: 'Source platform distribution',
+    staffRankHint:
+      'Top-level metrics merge Widget temp sessions and IM registered-customer direct chats.',
+    staffRankTitle: 'Agent efficiency ranking',
+    totalServed: 'Served',
+    totalSessions: 'Total sessions',
+  },
   performanceLoadFailed: 'Failed to load performance data',
   priority: {
     important: 'Important',

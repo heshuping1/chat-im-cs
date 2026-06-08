@@ -33,10 +33,15 @@ import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_send_failure.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_send_policy.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/send_message_usecase.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/direct_chat_entry_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/message_translation_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/outgoing_media_localizer.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
+import 'package:lpp_mobile/features/chat/presentation/providers/chat_draft_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/group_detail_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.dart'
@@ -45,6 +50,7 @@ import 'package:lpp_mobile/features/chat/presentation/pages/favorites_page.dart'
     show favoritesProvider, favoritesSummaryProvider;
 import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/chat_send_interaction_policy.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/message_context_action_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/marketing_toolbar.dart';
@@ -651,61 +657,46 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       _selectedMessageId = selectedMessageId;
     });
 
-    final isSelf =
-        message.senderUserId == (ref.read(currentSpaceProvider)?.userId ?? '');
-    final isText = message.type == MessageType.text ||
-        message.type == MessageType.markdown;
-    final isVoice = message.type == MessageType.voice;
-    final isImageOrVideo =
-        message.type == MessageType.image || message.type == MessageType.video;
-    final isSent = message.status.isServerUsable;
-    final canUseServerMessage = !message.isRecalled && isSent;
-    final canCopy = !message.isRecalled &&
-        isText &&
-        (message.body.text?.isNotEmpty ?? false);
-    final canReply = canUseServerMessage && isText;
-    final canAiReply = canUseServerMessage &&
-        isText &&
-        (message.body.text?.trim().isNotEmpty ?? false);
-    final canSaveToAlbum = canUseServerMessage && isImageOrVideo;
-    final isRecallable = isSelf &&
-        isSent &&
-        DateTime.now().difference(message.sentAt).inMinutes < 2;
+    final capabilities = messageContextCapabilities(
+      message,
+      currentUserId: ref.read(currentSpaceProvider)?.userId ?? '',
+    );
 
     // 构建菜单项列表
     final items = <_WxMenuItem>[
-      if (canUseServerMessage)
+      if (capabilities.canMultiSelect)
         _WxMenuItem('multiselect', Icons.check_box_outlined,
             AppLocalizations.of(context).chatMenuMultiSelect),
-      if (canReply)
+      if (capabilities.canReply)
         _WxMenuItem('reply', Icons.reply_outlined,
             AppLocalizations.of(context).chatMenuReply),
-      if (canAiReply)
+      if (capabilities.canAiReply)
         const _WxMenuItem('ai_reply', Icons.auto_awesome_outlined, 'AI回复'),
-      if (canCopy)
+      if (capabilities.canCopy)
         _WxMenuItem('copy', Icons.copy_outlined,
             AppLocalizations.of(context).chatMenuCopy),
-      if (canUseServerMessage && isVoice)
+      if (capabilities.canVoiceToText)
         _WxMenuItem('voice_to_text', Icons.text_fields_outlined,
             AppLocalizations.of(context).chatMenuVoiceToText),
-      if (canUseServerMessage && isText)
+      if (capabilities.canTranslate)
         _WxMenuItem('translate', Icons.translate_outlined,
             AppLocalizations.of(context).chatMenuTranslate),
-      if (canSaveToAlbum)
+      if (capabilities.canSaveToAlbum)
         const _WxMenuItem('save_album', Icons.save_alt_outlined, '保存到相册'),
-      if (canUseServerMessage) ...[
+      if (capabilities.canForward)
         _WxMenuItem('forward', Icons.forward_outlined,
             AppLocalizations.of(context).chatMenuForward),
+      if (capabilities.canFavorite)
         _WxMenuItem('favorite', Icons.star_outline,
             AppLocalizations.of(context).chatMenuFavorite),
-      ],
-      if (isRecallable)
+      if (capabilities.canRecall)
         _WxMenuItem('recall', Icons.undo_outlined,
             AppLocalizations.of(context).chatMenuRecall,
             danger: true),
-      _WxMenuItem('delete', Icons.delete_outline,
-          AppLocalizations.of(context).chatMenuDelete,
-          danger: true),
+      if (capabilities.canDelete)
+        _WxMenuItem('delete', Icons.delete_outline,
+            AppLocalizations.of(context).chatMenuDelete,
+            danger: true),
     ];
 
     // 微信风格：无暗色遮罩，菜单在长按位置附近弹出。
@@ -1228,21 +1219,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       fallback: msg,
     );
 
-    // 调用翻译 API：POST /translate/message
-    final dio = ref.read(dioProvider);
     final targetLanguage =
         translationTargetLanguageForLocale(ref.read(localeProvider));
     try {
-      final resp = await dio.post<Map<String, dynamic>>(
-        '/api/client/v1/translate/message',
-        data: {
-          'messageId': msg.messageId,
-          'targetLanguage': targetLanguage,
-          'model': 'fast',
-        },
-      );
-      _throwIfApiFailed(resp.data);
-      final translated = _extractTextResult(resp.data);
+      final translated =
+          await ref.read(messageTranslationControllerProvider).translateMessage(
+                messageId: msg.messageId,
+                targetLanguage: targetLanguage,
+              );
       if (translated == null) {
         _updateChatMessage(
           msg.messageId,
@@ -1282,27 +1266,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
       return false;
     }
-  }
-
-  String? _extractTextResult(Map<String, dynamic>? body) {
-    final payload = body?['data'];
-    Object? value;
-    if (payload is Map) {
-      value = payload['translatedText'] ??
-          payload['translation'] ??
-          payload['text'] ??
-          payload['content'];
-    } else if (payload is String) {
-      value = payload;
-    }
-    value ??= body?['translatedText'] ??
-        body?['translation'] ??
-        body?['text'] ??
-        body?['content'];
-
-    if (value is! String) return null;
-    final translated = value.trim();
-    return translated.isEmpty ? null : translated;
   }
 
   /// 语音消息转文字
@@ -1518,21 +1481,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<String> _ensureDirectConversationForSend() async {
-    if (!_isPendingDirectChat) return _activeConversationId;
-    final peerUserId = widget.peerUserId;
-    if (peerUserId == null || peerUserId.isEmpty) {
-      throw StateError('Missing peer user id');
-    }
-    final dio = ref.read(dioProvider);
-    final resp = await dio.post<Map<String, dynamic>>(
-      '/api/client/v1/direct-chats',
-      data: {'peerUserId': peerUserId},
-    );
-    final chatId = resp.data?['data']?['conversationId'] as String? ??
-        resp.data?['data']?['chatId'] as String?;
-    if (chatId == null || chatId.isEmpty) {
-      throw StateError('Missing direct chat id');
-    }
+    final chatId =
+        await ref.read(directChatEntryControllerProvider).ensureConversationId(
+              isPendingDirectChat: _isPendingDirectChat,
+              activeConversationId: _activeConversationId,
+              peerUserId: widget.peerUserId,
+            );
     if (mounted) {
       setState(() => _createdConversationId = chatId);
     } else {
@@ -1554,7 +1508,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
     if (!mounted) return;
 
-    final code = error is ServerError ? error.code : error.toString();
+    final code = error is ServerError
+        ? error.code
+        : error is MessageSendFailure
+            ? error.code ?? error.message
+            : error.toString();
     if (code.contains('TEMP_SESSION_CLOSED')) {
       _markCustomerServiceThreadEnded(showToast: false);
       if (showSnack) AppToast.info(context, '会话已结束，不能继续发送消息');
@@ -1604,6 +1562,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     }
     final currentUserId = ref.read(currentSpaceProvider)?.userId ?? '';
+    final currentSpaceId = ref.read(currentSpaceProvider)?.spaceId ?? '';
     final thread = _customerServiceThread();
     final repository = CustomerServiceChatRepositoryAdapter(
       customerServiceRepository: ref.read(customerServiceRepositoryProvider),
@@ -1616,6 +1575,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       repository: repository,
       currentUserId: currentUserId,
       failureMapper: mapAppErrorToMessageSendFailure,
+      sendPolicy: const MessageSendPolicy(
+        context: MessageSendPolicyContext.enterpriseEmployee,
+      ),
       onPendingEnqueue: ({
         required clientMsgId,
         required conversationId,
@@ -1625,6 +1587,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         mentions,
       }) {
         return PendingMessageQueue().enqueue(PendingMessage(
+          spaceId: currentSpaceId,
+          userId: currentUserId,
           clientMsgId: clientMsgId,
           conversationId: conversationId,
           isGroup: false,
@@ -1738,7 +1702,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       );
     } catch (e) {
       if (mounted) {
-        if (e is ServerError) {
+        if (e is ServerError || e is MessageSendFailure) {
           _handleSendError(e);
         } else {
           AppToast.error(
@@ -1763,7 +1727,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         chatProvider((_spaceId, sendConversationId, _effectiveIsGroup))
             .notifier,
       );
-      for (final item in mediaItems) {
+      await sendChatPickedMediaBatch(mediaItems, (item) async {
         final clientMsgId = _uuid.v4();
         final localized = await const OutgoingMediaLocalizer(
           runtime: MediaFileRuntime(),
@@ -1819,7 +1783,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             }
           },
         );
-      }
+      });
       if (mounted) setState(() => _replyingTo = null);
     } catch (e) {
       if (!mounted) return;
@@ -2115,15 +2079,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return true;
   }
 
-  void _throwIfApiFailed(Map<String, dynamic>? body) {
-    if (body == null) throw StateError('Empty API response');
-    final code = body['code'];
-    if (code is String && code.isNotEmpty && code != 'OK') {
-      final message = body['message'] as String? ?? code;
-      throw StateError(message);
-    }
-  }
-
   void _handleEnterMultiSelect() {
     setState(() {
       _multiSelectMode = true;
@@ -2282,6 +2237,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         : currentConversation?.avatarUrl ?? widget.avatarUrl;
     final currentMemberCount =
         groupDetailValue?.memberCount ?? currentConversation?.memberCount;
+    final localDraft = ref
+        .watch(
+            chatDraftProvider((_spaceId, currentUserId, activeConversationId)))
+        .valueOrNull;
+    final initialDraft = localDraft ?? currentConversation?.draft;
     final chatBackground =
         ref.watch(chatBackgroundProvider(activeConversationId));
     final receptionThread = _customerServiceDetail == null
@@ -2470,12 +2430,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     isMuted: groupMutedForMe,
                     canSpeak: !groupMutedForMe,
                     muteReason: groupPermissions?.muteReason,
-                    initialDraft: ref
-                        .read(conversationsProvider(_spaceId))
-                        .valueOrNull
-                        ?.where((c) => c.conversationId == activeConversationId)
-                        .firstOrNull
-                        ?.draft,
+                    initialDraft: initialDraft,
                     onSendText: (text) async {
                       return _sendTextMessage(
                         text: text,
@@ -4695,6 +4650,17 @@ class _MessageList extends ConsumerWidget {
                             })()
                           : null,
                       groupId: isGroup ? conversationId : null,
+                      onGroupReadReceiptTap: isGroup &&
+                              isSelf &&
+                              message.status.isServerUsable &&
+                              message.conversationSeq > 0
+                          ? () => context.push(
+                                '/group-read-receipts/'
+                                '${Uri.encodeComponent(conversationId)}/'
+                                '${Uri.encodeComponent(message.messageId)}'
+                                '?seq=${message.conversationSeq}',
+                              )
+                          : null,
                       onFailedTap: message.status.isSendFailure && isSelf
                           ? () => onFailedTap?.call(message)
                           : null,

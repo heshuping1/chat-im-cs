@@ -39,6 +39,7 @@ import {
   type CreateGroupChatInput,
 } from "../group-create-contract";
 import { normalizeMessageBatchActionResult } from "../message/message-batch-action-result";
+import { parseGroupReadReceiptsPayload } from "../message/group-read-receipts-model";
 
 export type MediaUploadOptions = UploadRequestOptions;
 export type MessageMentionPayload =
@@ -386,6 +387,21 @@ export class MessagesApiClient extends ContactsApiClient {
       });
   }
 
+  getGroupReadReceipts(
+    groupId: string,
+    messageId: string,
+    messageSeq: number,
+  ) {
+    const search = new URLSearchParams({ messageId });
+    const path = `${endpointPlan.groupReadReceipts.replace(
+      "{conversationId}",
+      encodeURIComponent(groupId),
+    )}?${search.toString()}`;
+    return this.request<unknown>(path).then((payload) =>
+      parseGroupReadReceiptsPayload(readEnvelopeData(payload), { messageSeq }),
+    );
+  }
+
   private sendConversationMessage(
     conversationType: "direct" | "group",
     conversationId: string,
@@ -629,6 +645,18 @@ function latestMessage(messages: MessageItemDto[]) {
     if (seqDiff !== 0) return seqDiff;
     return Date.parse(right.sentAt ?? "") - Date.parse(left.sentAt ?? "");
   })[0];
+}
+
+function readEnvelopeData(payload: unknown) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    "data" in payload
+  ) {
+    return (payload as { data?: unknown }).data;
+  }
+  return payload;
 }
 
 function stringField(record: Record<string, unknown>, ...keys: string[]) {

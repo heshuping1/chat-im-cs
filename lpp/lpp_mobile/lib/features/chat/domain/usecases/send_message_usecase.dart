@@ -3,6 +3,7 @@ import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_send_failure.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_send_lifecycle.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_send_policy.dart';
 
 typedef OnOptimisticInsert = void Function(Message message);
 typedef OnMessageUpdate = void Function(String clientMsgId, Message updated);
@@ -20,6 +21,7 @@ class SendMessageUseCase {
   final String currentUserId;
   final OnPendingEnqueue? _onPendingEnqueue;
   final MessageSendFailureMapper _failureMapper;
+  final MessageSendPolicy _sendPolicy;
 
   static const int _maxRetries = 3;
   static const _uuid = Uuid();
@@ -29,9 +31,11 @@ class SendMessageUseCase {
     required this.currentUserId,
     OnPendingEnqueue? onPendingEnqueue,
     MessageSendFailureMapper? failureMapper,
+    MessageSendPolicy sendPolicy = MessageSendPolicy.allowAll,
   })  : _repository = repository,
         _onPendingEnqueue = onPendingEnqueue,
-        _failureMapper = failureMapper ?? defaultMessageSendFailureMapper;
+        _failureMapper = failureMapper ?? defaultMessageSendFailureMapper,
+        _sendPolicy = sendPolicy;
 
   /// 发送消息
   ///
@@ -52,6 +56,33 @@ class SendMessageUseCase {
     final effectiveClientMsgId = clientMsgId?.trim().isNotEmpty == true
         ? clientMsgId!.trim()
         : _uuid.v4();
+
+    final policyFailure = _sendPolicy.validate(type: type, body: body);
+    if (policyFailure != null) {
+      final failed = Message(
+        messageId: effectiveClientMsgId,
+        clientMsgId: effectiveClientMsgId,
+        conversationId: conversationId,
+        conversationSeq: 0,
+        senderUserId: currentUserId,
+        type: type,
+        body: body,
+        sentAt: DateTime.now(),
+        replyToMessageId: replyToMessageId,
+        mentions: mentions,
+        status: MessageStatus.failed,
+        failureReason: _failureReason(policyFailure),
+      );
+      onOptimisticInsert?.call(failed);
+      onMessageUpdate?.call(effectiveClientMsgId, failed);
+      MessageSendLifecycle.failed(
+        failed,
+        isGroup: isGroup,
+        stage: 'policy',
+        error: policyFailure,
+      );
+      throw policyFailure;
+    }
 
     final localPath = _isMediaType(type) ? _extractLocalPath(body, type) : null;
 

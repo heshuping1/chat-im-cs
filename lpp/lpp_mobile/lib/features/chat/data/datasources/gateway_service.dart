@@ -83,6 +83,13 @@ Future<T?> awaitGatewayConnectionStart<T>(
   );
 }
 
+String syncCursorStorageKey({
+  required String spaceId,
+  required String userId,
+}) {
+  return 'sync_cursor_${spaceId}_$userId';
+}
+
 class NewMessageEvent extends GatewayEvent {
   final Map<String, dynamic> data;
   NewMessageEvent(this.data);

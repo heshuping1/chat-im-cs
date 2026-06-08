@@ -77,6 +77,8 @@ class MessageBubble extends ConsumerWidget {
 
   /// 是否显示时间戳（相邻消息时间差 < 5 分钟时隐藏）
   final bool showTimestamp;
+  final bool showGroupReadReceipt;
+  final VoidCallback? onGroupReadReceiptTap;
 
   const MessageBubble({
     super.key,
@@ -97,6 +99,8 @@ class MessageBubble extends ConsumerWidget {
     this.groupId,
     this.onFailedTap,
     this.showTimestamp = true,
+    this.showGroupReadReceipt = true,
+    this.onGroupReadReceiptTap,
   });
 
   @override
@@ -207,6 +211,17 @@ class MessageBubble extends ConsumerWidget {
                     ),
                   ],
                 ),
+                if (_shouldShowGroupReadReceipt(
+                  message,
+                  isSelf: isSelf,
+                  groupId: groupId,
+                  showGroupReadReceipt: showGroupReadReceipt,
+                  onTap: onGroupReadReceiptTap,
+                ))
+                  _GroupReadReceiptEntry(
+                    readCount: message.readCount,
+                    onTap: onGroupReadReceiptTap!,
+                  ),
                 // 时间戳（相邻消息时间差 < 5 分钟时隐藏）
                 if (showTimestamp)
                   Padding(
@@ -362,6 +377,10 @@ class _StatusIndicator extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 bool _suppressesExternalSendProgress(Message message) {
+  if (message.type == MessageType.text ||
+      message.type == MessageType.markdown) {
+    return true;
+  }
   if (message.type == MessageType.image) return false;
   final uploadState = message.localUploadState;
   if (uploadState != null && uploadState.isActive) return true;
@@ -373,6 +392,56 @@ bool _suppressesExternalSendProgress(Message message) {
   if (url == null || url.isEmpty) return false;
   return url.startsWith('/') ||
       (!url.startsWith('http://') && !url.startsWith('https://'));
+}
+
+bool _shouldShowGroupReadReceipt(
+  Message message, {
+  required bool isSelf,
+  required String? groupId,
+  required bool showGroupReadReceipt,
+  required VoidCallback? onTap,
+}) {
+  return showGroupReadReceipt &&
+      isSelf &&
+      groupId != null &&
+      onTap != null &&
+      message.status.isServerUsable &&
+      message.conversationSeq > 0 &&
+      !message.isRecalled;
+}
+
+class _GroupReadReceiptEntry extends StatelessWidget {
+  final int readCount;
+  final VoidCallback onTap;
+
+  const _GroupReadReceiptEntry({
+    required this.readCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text =
+        readCount > 0 ? l10n.chatReadCount(readCount) : l10n.chatUnread;
+    return Padding(
+      padding: const EdgeInsets.only(top: 3, right: 2),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Text(
+          text,
+          key: const ValueKey('message-group-read-receipt-entry'),
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurface.withValues(
+                  alpha: 0.55,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 // Recalled Bubble
 // ---------------------------------------------------------------------------
@@ -455,7 +524,7 @@ class _BubbleContent extends StatelessWidget {
       case MessageType.video:
         return _VideoBubble(message: message);
       case MessageType.file:
-        return _FileBubble(message: message, bg: bg, br: _br);
+        return _FileBubble(message: message, br: _br);
       case MessageType.event:
         return _EventBubble(message: message);
       case MessageType.contactCard:
@@ -673,19 +742,19 @@ class _ImageBubble extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final media = message.body.image;
-    final actionUrl = media?.url;
+    final viewerUrl = imageBubbleVisualSource(media);
     final size = imageBubbleSize(media);
 
     return GestureDetector(
-      onTap: actionUrl != null && !isLocalVisualMediaUrl(actionUrl)
+      onTap: viewerUrl != null && media != null
           ? () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => ImageViewerPage(
-                    imageUrls: [actionUrl],
+                    imageUrls: [viewerUrl],
                     items: [
                       ImageViewerItem.fromMessage(
                         message: message,
-                        media: media!,
+                        media: media,
                       ),
                     ],
                   ),
@@ -1496,19 +1565,28 @@ class _MediaUploadOverlay extends StatelessWidget {
 
 class _FileBubble extends ConsumerWidget {
   final Message message;
-  final Color bg;
   final BorderRadius br;
-  const _FileBubble(
-      {required this.message, required this.bg, required this.br});
+  const _FileBubble({required this.message, required this.br});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final file = message.body.file;
-    final name =
-        file?.fileName ?? AppLocalizations.of(context).chatFileDefaultName;
+    final name = file?.fileName ?? l10n.chatFileDefaultName;
     final size = file?.sizeBytes;
     final uploadPresentation =
         fileMessageUploadPresentation(message.localUploadState);
+    final fileType = _FileTypeStyle.from(file: file, fallbackName: name);
+    final statusText = _fileStatusText(
+      context: context,
+      sizeBytes: size,
+      file: file,
+      uploadPresentation: uploadPresentation,
+    );
+    final cardWidth = math.min(
+      286.0,
+      math.max(244.0, MediaQuery.sizeOf(context).width - 112),
+    );
 
     return Material(
       color: Colors.transparent,
@@ -1526,40 +1604,47 @@ class _FileBubble extends ConsumerWidget {
                 ),
         borderRadius: br,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 240),
+          constraints: BoxConstraints.tightFor(width: cardWidth),
           child: Ink(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: bg, borderRadius: br),
+            key: const ValueKey('message-file-card'),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: br,
+              border: Border.all(color: const Color(0xFFE8EAED)),
+            ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                _FileIconWithUploadProgress(
-                  uploadPresentation: uploadPresentation,
-                ),
-                const SizedBox(width: 10),
-                Flexible(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(name,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w500)),
-                      if (size != null) ...[
-                        const SizedBox(height: 2),
-                        Text(_fmtSize(size),
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.5))),
-                      ],
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.18,
+                            color: Color(0xFF1D2129),
+                            fontWeight: FontWeight.w600,
+                          )),
+                      const SizedBox(height: 8),
+                      Text(statusText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.1,
+                            color: Color(0xFF9AA0A6),
+                          )),
                     ],
                   ),
+                ),
+                const SizedBox(width: 14),
+                _FileIconWithUploadProgress(
+                  fileType: fileType,
+                  uploadPresentation: uploadPresentation,
                 ),
               ],
             ),
@@ -1569,57 +1654,219 @@ class _FileBubble extends ConsumerWidget {
     );
   }
 
-  String _fmtSize(int b) {
-    if (b < 1024) return '$b B';
-    if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
-    return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
+  String _fileStatusText({
+    required BuildContext context,
+    required int? sizeBytes,
+    required MediaResource? file,
+    required MessageUploadPresentation uploadPresentation,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    final status = uploadPresentation.failed
+        ? l10n.chatFileStatusUploadFailed
+        : uploadPresentation.active
+            ? uploadPresentation.showPercent
+                ? '${l10n.chatFileStatusUploading} '
+                    '${uploadPresentation.progress}%'
+                : l10n.chatFileStatusUploading
+            : _hasLocalFileCandidate(file)
+                ? l10n.chatFileStatusDownloaded
+                : l10n.chatFileStatusNotDownloaded;
+    final sizeText = _fmtSize(sizeBytes);
+    return sizeText == null ? status : '$sizeText $status';
+  }
+
+  bool _hasLocalFileCandidate(MediaResource? file) {
+    if (file == null) return false;
+    final url = file.url.trim();
+    if (url.isNotEmpty && _isLocalMediaPath(url)) return true;
+    final localPreviewUrl = file.localPreviewUrl?.trim();
+    return localPreviewUrl != null &&
+        localPreviewUrl.isNotEmpty &&
+        _isLocalMediaPath(localPreviewUrl);
+  }
+
+  String? _fmtSize(int? bytes) {
+    if (bytes == null) return null;
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1024 * 1024) return _fmtUnit(bytes / 1024, 'KB');
+    if (bytes < 1024 * 1024 * 1024) {
+      return _fmtUnit(bytes / (1024 * 1024), 'MB');
+    }
+    return _fmtUnit(bytes / (1024 * 1024 * 1024), 'GB');
+  }
+
+  String _fmtUnit(double value, String unit) {
+    final rounded = value.roundToDouble();
+    final compact = value >= 100 || value == rounded
+        ? rounded.toInt().toString()
+        : value.toStringAsFixed(1);
+    return '$compact$unit';
+  }
+}
+
+class _FileTypeStyle {
+  final String label;
+  final Color color;
+
+  const _FileTypeStyle({required this.label, required this.color});
+
+  factory _FileTypeStyle.from({
+    required MediaResource? file,
+    required String fallbackName,
+  }) {
+    final ext = _fileExtension(file, fallbackName);
+    switch (ext) {
+      case 'pdf':
+        return const _FileTypeStyle(label: 'PDF', color: Color(0xFFE94343));
+      case 'doc':
+      case 'docx':
+        return const _FileTypeStyle(label: 'DOC', color: Color(0xFF3478F6));
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return const _FileTypeStyle(label: 'XLS', color: Color(0xFF22A06B));
+      case 'ppt':
+      case 'pptx':
+        return const _FileTypeStyle(label: 'PPT', color: Color(0xFFFF8A34));
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return const _FileTypeStyle(label: 'ZIP', color: Color(0xFF7A8599));
+      case 'mp3':
+        return const _FileTypeStyle(label: 'MP3', color: Color(0xFF8E64D8));
+      case 'txt':
+        return const _FileTypeStyle(label: 'TXT', color: Color(0xFF6B778C));
+      default:
+        final label = ext.isEmpty ? 'FILE' : ext.toUpperCase();
+        return _FileTypeStyle(
+          label: label.length > 4 ? label.substring(0, 4) : label,
+          color: const Color(0xFF7A8599),
+        );
+    }
+  }
+
+  static String _fileExtension(MediaResource? file, String fallbackName) {
+    final fromName = p.extension(file?.fileName ?? fallbackName).toLowerCase();
+    if (fromName.isNotEmpty) return fromName.substring(1);
+
+    switch (file?.mimeType?.trim().toLowerCase()) {
+      case 'application/pdf':
+        return 'pdf';
+      case 'application/msword':
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        return 'doc';
+      case 'application/vnd.ms-excel':
+      case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      case 'text/csv':
+        return 'xls';
+      case 'application/vnd.ms-powerpoint':
+      case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+        return 'ppt';
+      case 'application/zip':
+      case 'application/vnd.rar':
+      case 'application/x-7z-compressed':
+        return 'zip';
+      case 'audio/mpeg':
+        return 'mp3';
+      case 'text/plain':
+        return 'txt';
+      default:
+        return '';
+    }
   }
 }
 
 class _FileIconWithUploadProgress extends StatelessWidget {
+  final _FileTypeStyle fileType;
   final MessageUploadPresentation uploadPresentation;
 
   const _FileIconWithUploadProgress({
+    required this.fileType,
     required this.uploadPresentation,
   });
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF4A90E2);
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: blue.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
+    final tone = uploadPresentation.failed ? Colors.redAccent : fileType.color;
+    return SizedBox(
+      key: const ValueKey('message-file-type-icon'),
+      width: 54,
+      height: 58,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Icon(
-            uploadPresentation.failed
-                ? Icons.error_outline
-                : Icons.insert_drive_file,
-            color: uploadPresentation.failed ? Colors.redAccent : blue,
-            size: 24,
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _FileDocumentPainter(color: tone),
+            ),
+          ),
+          Text(
+            uploadPresentation.failed ? '!' : fileType.label,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              height: 1,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           if (uploadPresentation.active)
             SizedBox(
               key: const ValueKey('message-file-upload-progress'),
-              width: 34,
-              height: 34,
+              width: 52,
+              height: 52,
               child: CustomPaint(
                 painter: _UploadRingPainter(
                   progress: uploadPresentation.progress,
-                  color: uploadPresentation.failed ? Colors.redAccent : blue,
-                  trackColor: blue.withValues(alpha: 0.18),
-                  strokeWidth: 2.4,
+                  color: Colors.white,
+                  trackColor: Colors.white.withValues(alpha: 0.32),
+                  strokeWidth: 2.6,
                 ),
               ),
             ),
         ],
       ),
     );
+  }
+}
+
+class _FileDocumentPainter extends CustomPainter {
+  final Color color;
+
+  const _FileDocumentPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fold = size.width * 0.28;
+    final body = Path()
+      ..moveTo(4, 0)
+      ..lineTo(size.width - fold, 0)
+      ..lineTo(size.width, fold)
+      ..lineTo(size.width, size.height - 4)
+      ..quadraticBezierTo(size.width, size.height, size.width - 4, size.height)
+      ..lineTo(4, size.height)
+      ..quadraticBezierTo(0, size.height, 0, size.height - 4)
+      ..lineTo(0, 4)
+      ..quadraticBezierTo(0, 0, 4, 0)
+      ..close();
+
+    canvas.drawPath(body, Paint()..color = color);
+
+    final foldPath = Path()
+      ..moveTo(size.width - fold, 0)
+      ..lineTo(size.width - fold, fold)
+      ..lineTo(size.width, fold)
+      ..close();
+    canvas.drawPath(
+      foldPath,
+      Paint()..color = Colors.white.withValues(alpha: 0.34),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FileDocumentPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
 

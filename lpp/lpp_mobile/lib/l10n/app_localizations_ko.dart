@@ -412,6 +412,18 @@ class AppLocalizationsKo extends AppLocalizations {
   String get chatFileUploadFailed => '파일 업로드에 실패했습니다';
 
   @override
+  String get chatFileStatusNotDownloaded => '다운로드 전';
+
+  @override
+  String get chatFileStatusDownloaded => '다운로드됨';
+
+  @override
+  String get chatFileStatusUploading => '업로드 중';
+
+  @override
+  String get chatFileStatusUploadFailed => '업로드 실패';
+
+  @override
   String get chatCardSendFailed => '연락처 카드 전송에 실패했습니다';
 
   @override

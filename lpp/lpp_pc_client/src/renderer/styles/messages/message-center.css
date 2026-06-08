@@ -880,10 +880,161 @@
   font-weight: 760;
 }
 
+.pc-chat-receipt.group {
+  color: #4b6f91;
+  font-weight: 760;
+}
+
+.pc-chat-group-receipt-button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4b6f91;
+  cursor: pointer;
+  font: inherit;
+}
+
+.pc-chat-group-receipt-button:hover {
+  color: #1463d8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .pc-chat-receipt-icon {
   display: block;
   flex: 0 0 auto;
   color: currentColor;
+}
+
+.pc-group-read-receipt-popover {
+  position: fixed;
+  z-index: 180;
+  display: grid;
+  gap: 10px;
+  width: 280px;
+  max-height: min(420px, calc(100vh - 24px));
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid rgba(207, 218, 230, 0.96);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(21, 31, 45, 0.18);
+}
+
+.pc-group-read-receipt-popover header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pc-group-read-receipt-popover header strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 820;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-group-read-receipt-popover header button,
+.pc-group-read-receipt-error button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border: 1px solid #d8e2ed;
+  border-radius: 6px;
+  background: #fff;
+  color: #53657a;
+}
+
+.pc-group-read-receipt-popover header button:hover,
+.pc-group-read-receipt-error button:hover {
+  border-color: #b9cee5;
+  color: #1463d8;
+}
+
+.pc-group-read-receipt-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f7f9fc;
+}
+
+.pc-group-read-receipt-tabs button {
+  min-width: 0;
+  min-height: 28px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.pc-group-read-receipt-tabs button.is-active {
+  background: #fff;
+  color: #1463d8;
+  box-shadow: 0 1px 3px rgba(31, 41, 55, 0.08);
+}
+
+.pc-group-read-receipt-body {
+  min-height: 96px;
+  max-height: 292px;
+  overflow: auto;
+}
+
+.pc-group-read-receipt-loading,
+.pc-group-read-receipt-empty,
+.pc-group-read-receipt-error {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+  color: #7a8aa0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.pc-group-read-receipt-error {
+  gap: 8px;
+}
+
+.pc-group-read-receipt-error button {
+  gap: 5px;
+  min-width: 72px;
+  padding: 0 9px;
+}
+
+.pc-group-read-receipt-members {
+  display: grid;
+  gap: 2px;
+}
+
+.pc-group-read-receipt-member {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 4px 2px;
+}
+
+.pc-group-read-receipt-member span {
+  min-width: 0;
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pc-message-translation {

@@ -414,6 +414,18 @@ class AppLocalizationsVi extends AppLocalizations {
   String get chatFileUploadFailed => 'Tải file thất bại, vui lòng thử lại';
 
   @override
+  String get chatFileStatusNotDownloaded => 'Chưa tải';
+
+  @override
+  String get chatFileStatusDownloaded => 'Đã tải';
+
+  @override
+  String get chatFileStatusUploading => 'Đang tải lên';
+
+  @override
+  String get chatFileStatusUploadFailed => 'Tải lên thất bại';
+
+  @override
   String get chatCardSendFailed => 'Gửi danh thiếp thất bại';
 
   @override

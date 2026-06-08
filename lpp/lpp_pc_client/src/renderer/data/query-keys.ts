@@ -49,6 +49,8 @@ export const pcQueryKeys = {
     ["pc-cs-staff-service-history", ...sessionKey(apiBaseUrl, tenantToken), limit] as const,
   customerServiceReception: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-cs-reception-status", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  customerServiceTempSessionStats: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-cs-temp-session-stats", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   customerServiceThreadDetail: (
     apiBaseUrl?: string,
     tenantToken?: string,
