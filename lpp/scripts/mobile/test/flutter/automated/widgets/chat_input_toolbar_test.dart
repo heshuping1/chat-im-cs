@@ -128,6 +128,70 @@ void main() {
     expect(find.text('offline draft'), findsOneWidget);
   });
 
+  testWidgets('keeps input empty when stale draft arrives after send', (
+    tester,
+  ) async {
+    String? sentText;
+    Widget buildToolbar({String? initialDraft}) => _wrap(
+      ChatInputToolbar(
+        conversationId: 'chat-1',
+        isGroup: false,
+        initialDraft: initialDraft,
+        onSendText: (text) async {
+          sentText = text;
+          return true;
+        },
+        onSendVoice: (_, __) {},
+        onSendMedia: (_) {},
+      ),
+    );
+
+    await tester.pumpWidget(buildToolbar());
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump();
+
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+    expect(sentText, 'hello');
+    expect(find.text('hello'), findsNothing);
+
+    await tester.pumpWidget(buildToolbar(initialDraft: 'hello'));
+    await tester.pump();
+
+    expect(find.text('hello'), findsNothing);
+  });
+
+  testWidgets('restores new conversation draft after previous send', (
+    tester,
+  ) async {
+    Widget buildToolbar(String conversationId, {String? initialDraft}) => _wrap(
+      ChatInputToolbar(
+        conversationId: conversationId,
+        isGroup: false,
+        initialDraft: initialDraft,
+        onSendText: (_) async => true,
+        onSendVoice: (_, __) {},
+        onSendMedia: (_) {},
+      ),
+    );
+
+    await tester.pumpWidget(buildToolbar('chat-1'));
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+    expect(find.text('hello'), findsNothing);
+
+    await tester.pumpWidget(
+      buildToolbar('chat-2', initialDraft: 'chat two draft'),
+    );
+    await tester.pump();
+
+    expect(find.text('chat two draft'), findsOneWidget);
+  });
+
   testWidgets('voice input starts feedback when pressing hold-to-talk', (
     tester,
   ) async {

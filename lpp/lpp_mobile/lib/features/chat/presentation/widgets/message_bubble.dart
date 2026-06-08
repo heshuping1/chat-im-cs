@@ -1,17 +1,15 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:dio/dio.dart' show Options, ResponseType;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
-import 'package:lpp_mobile/core/di/injector.dart';
-import 'package:lpp_mobile/core/network/http_client.dart';
 import 'package:lpp_mobile/core/platform/local_file.dart';
 import 'package:lpp_mobile/core/platform/local_video_poster.dart';
 import 'package:lpp_mobile/core/platform/platform_capabilities.dart';
+import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/app_network_image.dart';
 import 'package:lpp_mobile/core/widgets/identity_badge.dart';
 import 'package:lpp_mobile/core/widgets/person_avatar_with_badge.dart';
@@ -1933,9 +1931,11 @@ Future<void> _openMediaResource(
 
   try {
     final spaceId = ref.read(currentSpaceProvider)?.spaceId;
-    final path = spaceId == null
-        ? await _mediaOpenPath(ref, media, fallbackName)
-        : await ref.read(mediaOpenControllerProvider(spaceId)).localPathFor(
+    if (spaceId == null || spaceId.isEmpty) {
+      throw StateError('Current space is empty');
+    }
+    final path =
+        await ref.read(mediaOpenControllerProvider(spaceId)).localPathFor(
               MediaOpenRequest.fromResource(
                 message: message,
                 mediaKind: mediaKind,
@@ -1960,33 +1960,6 @@ Future<void> _openMediaResource(
   }
 }
 
-Future<String> _mediaOpenPath(
-  WidgetRef ref,
-  MediaResource resource,
-  String fallbackName,
-) async {
-  final rawUrl = resource.url.trim();
-  if (_isLocalMediaPath(rawUrl)) {
-    return localPathFromUriOrPath(rawUrl);
-  }
-
-  final url = _resolveMediaUrl(rawUrl);
-  final fileName = _safeMediaFileName(resource, fallbackName);
-  final response = await ref.read(dioProvider).get<List<int>>(
-        url,
-        options: Options(responseType: ResponseType.bytes),
-      );
-  final bytes = response.data;
-  if (bytes == null || bytes.isEmpty) {
-    throw StateError('Media response is empty');
-  }
-  return cacheBytesToLocalFile(
-    bytes: bytes,
-    directoryName: 'lpp_media',
-    fileName: '${url.hashCode}_$fileName',
-  );
-}
-
 bool _isLocalMediaPath(String url) {
   final uri = Uri.tryParse(url);
   if (uri != null && uri.scheme == 'file') return true;
@@ -1997,43 +1970,6 @@ bool _isLocalMediaPath(String url) {
       !url.startsWith('/api') &&
       !url.startsWith('/uploads') &&
       !url.startsWith('/files');
-}
-
-String _resolveMediaUrl(String url) {
-  final parsed = Uri.tryParse(url);
-  if (parsed != null && parsed.hasScheme) return url;
-  return Uri.parse(HttpClient.baseUrl).resolve(url).toString();
-}
-
-String _safeMediaFileName(MediaResource resource, String fallbackName) {
-  final rawName = resource.fileName?.trim().isNotEmpty == true
-      ? resource.fileName!
-      : fallbackName;
-  final safeName = rawName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-  if (p.extension(safeName).isNotEmpty) return safeName;
-
-  final extension = _extensionForMime(resource.mimeType);
-  return extension == null ? safeName : '$safeName$extension';
-}
-
-String? _extensionForMime(String? mimeType) {
-  switch (mimeType?.toLowerCase()) {
-    case 'video/mp4':
-      return '.mp4';
-    case 'video/quicktime':
-      return '.mov';
-    case 'audio/mpeg':
-      return '.mp3';
-    case 'audio/mp4':
-    case 'audio/m4a':
-      return '.m4a';
-    case 'application/pdf':
-      return '.pdf';
-    case 'text/plain':
-      return '.txt';
-    default:
-      return null;
-  }
 }
 
 // ---------------------------------------------------------------------------

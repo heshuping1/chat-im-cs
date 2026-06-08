@@ -1486,6 +1486,13 @@ class _InfoSectionState extends ConsumerState<_InfoSection> {
               'conversationTitle': widget.detail.title,
             }),
           ),
+          const _Div(),
+          _Row(
+            icon: Icons.schedule_send_outlined,
+            label: '定时消息',
+            onTap: () => GoRouter.of(context)
+                .push('/chat/${widget.groupId}/scheduled-messages'),
+          ),
         ],
       ),
     );
@@ -1603,11 +1610,10 @@ class _Div extends StatelessWidget {
   const _Div();
 
   @override
-  Widget build(BuildContext context) =>
-      Divider(
-          height: 1,
-          indent: _groupSettingsSideInset,
-          color: Theme.of(context).dividerColor);
+  Widget build(BuildContext context) => Divider(
+      height: 1,
+      indent: _groupSettingsSideInset,
+      color: Theme.of(context).dividerColor);
 }
 
 // ---------------------------------------------------------------------------

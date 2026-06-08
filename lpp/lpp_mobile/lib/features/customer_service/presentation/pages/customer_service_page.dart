@@ -652,6 +652,11 @@ class _ManagementWorkbenchPage extends ConsumerWidget {
                   title: '客服中心',
                   featureKey: 'admin_service_center',
                 ),
+                _WorkbenchAction(
+                  icon: Icons.query_stats_outlined,
+                  title: '团队服务效率',
+                  featureKey: 'owner_service_efficiency',
+                ),
               ],
             ),
             const _WorkbenchSection(
@@ -729,6 +734,11 @@ class _ManagementWorkbenchPage extends ConsumerWidget {
                   icon: Icons.support_agent_outlined,
                   title: '客服中心',
                   featureKey: 'admin_service_center',
+                ),
+                _WorkbenchAction(
+                  icon: Icons.query_stats_outlined,
+                  title: '按客服查看',
+                  featureKey: 'admin_by_staff',
                 ),
               ],
             ),

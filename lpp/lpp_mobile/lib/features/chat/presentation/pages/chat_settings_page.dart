@@ -120,6 +120,14 @@ class _ChatSettingsPageState extends ConsumerState<ChatSettingsPage> {
                       'conversationTitle': _peerName,
                     }),
                   ),
+                  const _Divider(),
+                  _SettingItem(
+                    icon: Icons.schedule_send_outlined,
+                    label: '定时消息',
+                    showArrow: true,
+                    onTap: () => context
+                        .push('/chat/${widget.chatId}/scheduled-messages'),
+                  ),
                 ]),
                 const SizedBox(height: 8),
                 _buildSection([

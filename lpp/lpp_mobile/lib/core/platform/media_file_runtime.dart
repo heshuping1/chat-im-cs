@@ -61,6 +61,10 @@ class MediaFileRuntime {
     return file.length();
   }
 
+  Future<List<int>> readFileBytes(String path) async {
+    return File(path).readAsBytes();
+  }
+
   Future<void> promotePartFile({
     required String partPath,
     required String finalPath,

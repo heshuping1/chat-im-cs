@@ -75,6 +75,68 @@ void main() {
       expect(await controller.cachedLocalPathFor(_request()), isNull);
     });
   });
+
+  group('MediaOpenController bytesForResource', () {
+    test('reads bytes from local media path', () async {
+      final controller = MediaOpenController(
+        spaceId: 'space-1',
+        store: _FakeMediaLocalStore(null),
+        runtime: _FakeMediaFileRuntime(
+          existingPaths: const {'/local/image-1.jpg'},
+          fileBytes: const {
+            '/local/image-1.jpg': [1, 2, 3],
+          },
+        ),
+        downloadService: _FakeMediaDownloadService(),
+      );
+
+      final bytes = await controller.bytesForResource(
+        const MediaResource(url: 'file:///local/image-1.jpg'),
+      );
+
+      expect(bytes, [1, 2, 3]);
+    });
+
+    test(
+      'loads bytes through download service for remote media path',
+      () async {
+        final downloadService = _FakeMediaDownloadService(
+          remoteBytes: const {
+            '/media/image-1': [4, 5, 6],
+          },
+        );
+        final controller = MediaOpenController(
+          spaceId: 'space-1',
+          store: _FakeMediaLocalStore(null),
+          runtime: const _FakeMediaFileRuntime(existingPaths: {}),
+          downloadService: downloadService,
+        );
+
+        final bytes = await controller.bytesForResource(
+          const MediaResource(url: '/media/image-1'),
+        );
+
+        expect(bytes, [4, 5, 6]);
+        expect(downloadService.requestedUrls, ['/media/image-1']);
+      },
+    );
+
+    test('throws when remote media response is empty', () async {
+      final controller = MediaOpenController(
+        spaceId: 'space-1',
+        store: _FakeMediaLocalStore(null),
+        runtime: const _FakeMediaFileRuntime(existingPaths: {}),
+        downloadService: _FakeMediaDownloadService(
+          remoteBytes: const {'/media/empty': []},
+        ),
+      );
+
+      await expectLater(
+        controller.bytesForResource(const MediaResource(url: '/media/empty')),
+        throwsStateError,
+      );
+    });
+  });
 }
 
 MediaOpenRequest _request() {
@@ -121,11 +183,31 @@ class _FakeMediaLocalStore extends MediaLocalStore {
 
 class _FakeMediaFileRuntime extends MediaFileRuntime {
   final Set<String> existingPaths;
+  final Map<String, List<int>> fileBytes;
 
-  const _FakeMediaFileRuntime({required this.existingPaths});
+  const _FakeMediaFileRuntime({
+    required this.existingPaths,
+    this.fileBytes = const {},
+  });
 
   @override
   Future<bool> fileExists(String? path) async {
     return path != null && existingPaths.contains(path);
+  }
+
+  @override
+  Future<List<int>> readFileBytes(String path) async => fileBytes[path] ?? [];
+}
+
+class _FakeMediaDownloadService extends MediaDownloadService {
+  final Map<String, List<int>> remoteBytes;
+  final requestedUrls = <String>[];
+
+  _FakeMediaDownloadService({this.remoteBytes = const {}}) : super(Dio());
+
+  @override
+  Future<List<int>> fetchBytes(String remoteUrl) async {
+    requestedUrls.add(remoteUrl);
+    return remoteBytes[remoteUrl] ?? const [];
   }
 }

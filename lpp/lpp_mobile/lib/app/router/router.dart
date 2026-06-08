@@ -28,6 +28,7 @@ import 'package:lpp_mobile/features/chat/presentation/pages/select_group_member_
 import 'package:lpp_mobile/features/chat/presentation/pages/transfer_owner_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/scan_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/search_page.dart';
+import 'package:lpp_mobile/features/chat/presentation/pages/scheduled_messages_page.dart';
 import 'package:lpp_mobile/features/contacts/presentation/pages/contacts_page.dart';
 import 'package:lpp_mobile/features/contacts/presentation/pages/new_friends_page.dart';
 import 'package:lpp_mobile/features/contacts/presentation/pages/profile_page.dart';
@@ -91,6 +92,7 @@ class AppRoutes {
   static const home = '/';
   static const chat = '/chat/:id';
   static const chatSettings = '/chat-settings/:id';
+  static const chatScheduledMessages = '/chat/:id/scheduled-messages';
   static const profile = '/profile/:id';
   static const groupSettings = '/group-settings/:id';
   static const groupRemark = '/group-settings/:id/remark';
@@ -286,6 +288,14 @@ class AppRouter {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return ChatSettingsPage(chatId: id);
+        },
+      ),
+
+      GoRoute(
+        path: AppRoutes.chatScheduledMessages,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ScheduledMessagesPage(conversationId: id);
         },
       ),
 

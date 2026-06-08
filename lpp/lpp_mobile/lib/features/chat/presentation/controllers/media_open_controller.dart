@@ -165,6 +165,19 @@ class MediaOpenController {
     return file.localPath;
   }
 
+  Future<List<int>> bytesForResource(MediaResource resource) async {
+    final rawUrl = resource.url.trim();
+    if (rawUrl.isEmpty) throw ArgumentError('Media url is empty');
+    if (_isLocalMediaPath(rawUrl)) {
+      final bytes = await runtime.readFileBytes(localPathFromUriOrPath(rawUrl));
+      if (bytes.isEmpty) throw StateError('Media response is empty');
+      return bytes;
+    }
+    final bytes = await downloadService.fetchBytes(rawUrl);
+    if (bytes.isEmpty) throw StateError('Media response is empty');
+    return bytes;
+  }
+
   Future<String> _resolvePath(MediaOpenRequest request) async {
     var file = await store.upsertMissing(
       spaceId: spaceId,

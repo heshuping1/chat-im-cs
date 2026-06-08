@@ -11,7 +11,6 @@ import 'package:http/http.dart' as http;
 import 'package:lpp_mobile/core/diagnostics/app_diagnostics.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
-import 'package:lpp_mobile/core/network/http_client.dart' as app_http;
 import 'package:lpp_mobile/core/platform/local_file.dart';
 import 'package:lpp_mobile/core/platform/local_image_dimensions.dart';
 import 'package:lpp_mobile/core/platform/local_video_poster.dart';
@@ -25,19 +24,15 @@ import 'package:lpp_mobile/core/widgets/identity_badge.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
-import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
-import 'package:lpp_mobile/features/chat/data/datasources/gateway_event_handler.dart';
-import 'package:lpp_mobile/features/chat/data/datasources/pending_message_queue.dart';
-import 'package:lpp_mobile/features/chat/data/mappers/message_send_failure_mapper.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_send_failure.dart';
-import 'package:lpp_mobile/features/chat/domain/services/message_send_policy.dart';
-import 'package:lpp_mobile/features/chat/domain/usecases/send_message_usecase.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/customer_service_chat_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/direct_chat_entry_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/message_translation_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/outgoing_media_localizer.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
@@ -49,7 +44,9 @@ import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.
 import 'package:lpp_mobile/features/chat/presentation/pages/favorites_page.dart'
     show favoritesProvider, favoritesSummaryProvider;
 import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/chat_call_launch_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/chat_send_interaction_policy.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/customer_service_chat_state_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/message_context_action_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
@@ -58,7 +55,6 @@ import 'package:lpp_mobile/features/chat/presentation/widgets/message_bubble.dar
 import 'package:lpp_mobile/features/contacts/presentation/pages/profile_page.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
-import 'package:lpp_mobile/features/customer_service/data/repositories/customer_service_chat_repository_adapter.dart';
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
 import 'package:lpp_mobile/features/profile/presentation/pages/my_page.dart';
 import 'package:lpp_mobile/features/settings/presentation/providers/chat_background_provider.dart';
@@ -153,12 +149,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   bool get _isReadOnlyConversation => widget.customerServiceReadOnly;
 
+  CustomerServiceChatState get _customerServiceChatState =>
+      CustomerServiceChatState.fromDetail(
+        _customerServiceDetail,
+        isCustomerServiceThread: _isCustomerServiceThread,
+        readOnly: _isReadOnlyConversation,
+      );
+
   bool get _customerServiceRequiresManualEntry {
-    if (!_isCustomerServiceThread || _customerServiceDetail == null) {
+    if (_customerServiceDetail == null) {
       return false;
     }
-    return _customerServiceReplyGate(_customerServiceDetail!) !=
-        _CustomerServiceReplyGate.open;
+    return _customerServiceChatState.requiresManualEntry;
   }
 
   String get _activeConversationId =>
@@ -295,6 +297,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  CsThreadDetail _customerServiceThreadDetailForSend() {
+    final detail = _customerServiceDetail;
+    if (detail != null) return detail;
+    final base = _customerServiceThread();
+    return CsThreadDetail(
+      threadType: base.threadType,
+      threadId: base.threadId,
+      conversationId: base.conversationId,
+      status: base.status,
+      title: base.title,
+      avatarUrl: base.avatarUrl,
+      customerUserId: base.customerUserId,
+      visitorId: base.visitorId,
+      source: base.source,
+    );
+  }
+
   CsThread _customerServiceThreadForDisplay() {
     final detail = _customerServiceDetail;
     final base = _customerServiceThread();
@@ -320,7 +339,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           thread?.source ??
           widget.customerServiceSource ??
           '',
-      if (_isReadOnlyConversation) _customerServiceStatusLabel(thread?.status),
+      if (_isReadOnlyConversation)
+        CustomerServiceChatState.statusLabelFor(thread?.status),
     ]
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty && item != '--')
@@ -328,21 +348,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return parts.isEmpty ? '在线客服' : parts.join(' · ');
   }
 
-  String _customerServiceStatusLabel(String? status) {
-    final normalized = normalizeCustomerServiceThreadStatus(status);
-    return switch (normalized) {
-      '5' || 'closed_by_visitor' => '访客关闭',
-      '6' || 'closed_by_staff' => '客服关闭',
-      '7' || 'closed_timeout' => '超时关闭',
-      '8' || 'closed_system' => '系统关闭',
-      '9' || 'archived' => '已归档',
-      _ when normalized.startsWith('closed') => '已结束',
-      _ => '',
-    };
-  }
-
-  bool get _customerServiceThreadEnded =>
-      _isCustomerServiceThread && (_customerServiceDetail?.isTerminal ?? false);
+  bool get _customerServiceThreadEnded => _customerServiceChatState.ended;
 
   void _markCustomerServiceThreadEnded({
     String status = 'closed',
@@ -390,8 +396,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (!_isCustomerServiceThread || _spaceId.isEmpty) return;
     try {
       final detail = await ref
-          .read(customerServiceRepositoryProvider)
-          .getThread(_customerServiceThread());
+          .read(customerServiceChatControllerProvider)
+          .fetchThread(_customerServiceThread());
       final wasEnded = _customerServiceThreadEnded;
       if (mounted) {
         setState(() => _customerServiceDetail = detail);
@@ -428,7 +434,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     setState(() => _isReceptionActionRunning = true);
     try {
       final detail = await ref
-          .read(customerServiceRepositoryProvider)
+          .read(customerServiceChatControllerProvider)
           .takeoverThread(thread);
       if (!mounted) return;
       setState(() => _customerServiceDetail = detail);
@@ -525,7 +531,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return null;
   }
 
-  void _startCall({required bool isVideo}) {
+  Future<void> _startCall({required bool isVideo}) async {
     final targetUserId = _resolveCallTargetUserId();
     final currentUserId = ref.read(currentSpaceProvider)?.userId;
     if (targetUserId == null ||
@@ -535,12 +541,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           context, AppLocalizations.of(context).commonOperationFailed);
       return;
     }
+    final callLogChatId = await resolveCallLogChatId(
+      activeConversationId: _activeConversationId,
+      ensureDirectConversationId: _ensureDirectConversationForSend,
+      isPendingDirectChat: _isPendingDirectChat,
+    );
+    if (!mounted) return;
     context.push('/call/$targetUserId', extra: {
       'isVideo': isVideo,
       'title': widget.title,
       'targetUserId': targetUserId,
       'avatarUrl': widget.avatarUrl,
-      'callLogChatId': widget.conversationId,
+      'callLogChatId': callLogChatId,
     });
   }
 
@@ -908,7 +920,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     try {
       final fileName = _safeGalleryFileName(resource, msg.type);
       final mimeType = resource.mimeType ?? _defaultMimeType(msg.type);
-      final bytes = await _loadMediaBytes(resource);
+      final bytes = await ref
+          .read(mediaOpenControllerProvider(_spaceId))
+          .bytesForResource(resource);
       final result = await _mediaSaver.saveMedia(
         bytes: bytes,
         fileName: fileName,
@@ -925,43 +939,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         AppLocalizations.of(context).commonOperationFailed,
       );
     }
-  }
-
-  Future<List<int>> _loadMediaBytes(MediaResource resource) async {
-    final rawUrl = resource.url.trim();
-    if (_isLocalMediaPath(rawUrl)) {
-      return readLocalFileBytes(localPathFromUriOrPath(rawUrl));
-    }
-
-    final url = _resolveMediaUrl(rawUrl);
-    final response = await ref.read(dioProvider).get<List<int>>(
-          url,
-          options:
-              dio_package.Options(responseType: dio_package.ResponseType.bytes),
-        );
-    final data = response.data;
-    if (data == null || data.isEmpty) {
-      throw StateError('Media response is empty');
-    }
-    return data;
-  }
-
-  bool _isLocalMediaPath(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri != null && uri.scheme == 'file') return true;
-    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
-      return false;
-    }
-    return !url.startsWith('/media') &&
-        !url.startsWith('/api') &&
-        !url.startsWith('/uploads') &&
-        !url.startsWith('/files');
-  }
-
-  String _resolveMediaUrl(String url) {
-    final parsed = Uri.tryParse(url);
-    if (parsed != null && parsed.hasScheme) return url;
-    return Uri.parse(app_http.HttpClient.baseUrl).resolve(url).toString();
   }
 
   String _safeGalleryFileName(MediaResource resource, MessageType type) {
@@ -1549,76 +1526,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required void Function(Message message) onOptimisticInsert,
     required void Function(String clientMsgId, Message updated) onMessageUpdate,
   }) async {
-    if (_customerServiceThreadEnded) {
-      throw const ServerError(
-        code: 'TEMP_SESSION_CLOSED',
-        message: '会话已结束，不能继续发送消息',
-      );
-    }
-    if (_customerServiceRequiresManualEntry) {
-      throw const ServerError(
-        code: 'TEMP_SESSION_NOT_CLAIMED',
-        message: '请先接入或人工接管后再回复',
-      );
-    }
-    final currentUserId = ref.read(currentSpaceProvider)?.userId ?? '';
-    final currentSpaceId = ref.read(currentSpaceProvider)?.spaceId ?? '';
-    final thread = _customerServiceThread();
-    final repository = CustomerServiceChatRepositoryAdapter(
-      customerServiceRepository: ref.read(customerServiceRepositoryProvider),
-      mediaRemote: ChatRemoteDataSourceImpl(ref.read(dioProvider)),
-      threadType: thread.threadType,
-      threadId: thread.threadId,
-      senderUserId: currentUserId,
-    );
-    final useCase = SendMessageUseCase(
-      repository: repository,
-      currentUserId: currentUserId,
-      failureMapper: mapAppErrorToMessageSendFailure,
-      sendPolicy: const MessageSendPolicy(
-        context: MessageSendPolicyContext.enterpriseEmployee,
-      ),
-      onPendingEnqueue: ({
-        required clientMsgId,
-        required conversationId,
-        required isGroup,
-        required type,
-        required body,
-        mentions,
-      }) {
-        return PendingMessageQueue().enqueue(PendingMessage(
-          spaceId: currentSpaceId,
-          userId: currentUserId,
-          clientMsgId: clientMsgId,
-          conversationId: conversationId,
-          isGroup: false,
-          messageType: GatewayEventHandler.messageTypeToApiString(type),
-          body: body.toLocalJson(),
-          mentions: mentions,
-          threadType: thread.threadType,
-          threadId: thread.threadId,
-          createdAt: DateTime.now(),
-        ));
-      },
-    );
+    final thread = _customerServiceThreadDetailForSend();
 
     try {
-      final sent = await useCase.execute(
-        conversationId: widget.conversationId,
-        isGroup: false,
-        type: type,
-        body: body,
-        clientMsgId: clientMsgId,
-        replyToMessageId: replyToMessageId,
-        onOptimisticInsert: onOptimisticInsert,
-        onMessageUpdate: onMessageUpdate,
-      );
-      await ChatLocalDataSourceImpl().upsertMessage(
-        _spaceId,
-        widget.conversationId,
-        sent,
-      );
-      return sent;
+      return await ref.read(customerServiceChatControllerProvider).sendMessage(
+            spaceId: _spaceId,
+            currentUserId: ref.read(currentSpaceProvider)?.userId ?? '',
+            thread: thread,
+            conversationId: widget.conversationId,
+            type: type,
+            body: body,
+            clientMsgId: clientMsgId,
+            replyToMessageId: replyToMessageId,
+            readOnly: widget.customerServiceReadOnly,
+            onOptimisticInsert: onOptimisticInsert,
+            onMessageUpdate: onMessageUpdate,
+          );
     } catch (e) {
       if (_isCustomerServiceTerminalWriteError(e)) {
         _markCustomerServiceThreadEnded(showToast: false);
@@ -2417,7 +2340,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 const _CustomerServiceEndedNotice()
               else if (_customerServiceRequiresManualEntry)
                 _CustomerServiceManualEntryNotice(
-                  gate: _customerServiceReplyGate(_customerServiceDetail!),
+                  gate: _customerServiceChatState.replyGate,
                 )
               else if (_notFriend)
                 const _NotFriendNotice()
@@ -4253,39 +4176,14 @@ class _ReadOnlyConversationNotice extends StatelessWidget {
   }
 }
 
-enum _CustomerServiceReplyGate { claim, takeover, open }
-
-_CustomerServiceReplyGate _customerServiceReplyGate(CsThreadDetail detail) {
-  final status = detail.status.toLowerCase().replaceAll('-', '_');
-  final responder =
-      detail.currentResponderType?.toLowerCase().replaceAll('-', '_') ?? '';
-  final ai = detail.aiStatus?.toLowerCase().replaceAll('-', '_') ?? '';
-  if (status == '1' ||
-      status == 'queued' ||
-      status == 'created' ||
-      status.contains('queue') ||
-      status.contains('pending') ||
-      status.contains('waiting')) {
-    return _CustomerServiceReplyGate.claim;
-  }
-  if (responder == 'ai' ||
-      ai == 'bot_active' ||
-      status == 'bot_active' ||
-      status.contains('ai') ||
-      status == 'bot') {
-    return _CustomerServiceReplyGate.takeover;
-  }
-  return _CustomerServiceReplyGate.open;
-}
-
 class _CustomerServiceManualEntryNotice extends StatelessWidget {
-  final _CustomerServiceReplyGate gate;
+  final CustomerServiceReplyGate gate;
 
   const _CustomerServiceManualEntryNotice({required this.gate});
 
   @override
   Widget build(BuildContext context) {
-    final isClaim = gate == _CustomerServiceReplyGate.claim;
+    final isClaim = gate == CustomerServiceReplyGate.claim;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: const BoxDecoration(

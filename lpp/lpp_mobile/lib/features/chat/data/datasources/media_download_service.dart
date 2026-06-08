@@ -19,6 +19,18 @@ class MediaDownloadService {
     );
   }
 
+  Future<List<int>> fetchBytes(String remoteUrl) async {
+    final response = await _dio.get<List<int>>(
+      _resolveMediaUrl(remoteUrl),
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final data = response.data;
+    if (data == null || data.isEmpty) {
+      throw StateError('Media response is empty');
+    }
+    return data;
+  }
+
   String failureReason(Object error) {
     if (error is DioException) {
       final status = error.response?.statusCode;

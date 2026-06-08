@@ -87,7 +87,7 @@ void main() {
     expect(find.text('客户管理'), findsOneWidget);
     expect(find.text('加入企业申请'), findsOneWidget);
     expect(find.text('待分配客户'), findsNothing);
-    expect(find.text('按客服查看'), findsNothing);
+    expect(find.text('按客服查看'), findsOneWidget);
     expect(find.text('客服中心'), findsOneWidget);
     expect(find.text('客服状态'), findsNothing);
 
@@ -126,7 +126,7 @@ void main() {
       expect(find.text('加入企业申请'), findsOneWidget);
       expect(find.text('待分配客户'), findsNothing);
       expect(find.text('客服中心'), findsOneWidget);
-      expect(find.text('团队服务效率'), findsNothing);
+      expect(find.text('团队服务效率'), findsOneWidget);
       expect(find.text('客服会话管理'), findsNothing);
 
       await tester.scrollUntilVisible(find.text('风控治理'), 180);

@@ -179,6 +179,23 @@ void main() {
         expect(filtered.map((e) => e.conversationId), ['direct', 'group']);
       },
     );
+
+    test('drops empty duplicate direct placeholders for the same peer', () {
+      final items = [
+        _conversation('placeholder', title: '测试客户A', peerUserId: 'peer-1'),
+        _conversation(
+          'chat-real',
+          title: '测试客户A',
+          peerUserId: 'peer-1',
+          preview: '[图片]',
+          lastMessageSeq: 26,
+        ),
+      ];
+
+      final filtered = filterHomeConversations(items);
+
+      expect(filtered.map((e) => e.conversationId), ['chat-real']);
+    });
   });
 
   group('ConversationActionsController', () {
@@ -216,6 +233,8 @@ Conversation _conversation(
   bool isPinned = false,
   DateTime? lastActivityAt,
   String? preview,
+  String? peerUserId,
+  int lastMessageSeq = 0,
 }) {
   return Conversation(
     conversationId: id,
@@ -223,6 +242,8 @@ Conversation _conversation(
     title: title,
     isPinned: isPinned,
     lastActivityAt: lastActivityAt,
+    peerUserId: peerUserId,
+    lastMessageSeq: lastMessageSeq,
     lastMessage: preview == null
         ? null
         : LastMessage(

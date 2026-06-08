@@ -13,6 +13,7 @@ import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/asr_service.dart';
+import 'package:lpp_mobile/features/chat/domain/services/chat_draft_hydration_policy.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_composer.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/chat_camera_capture_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
@@ -121,6 +122,8 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
 }
 
 class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
+  static const _draftHydrationPolicy = ChatDraftHydrationPolicy();
+
   _InputMode _mode = _InputMode.text;
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
@@ -128,6 +131,8 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   MentionComposerDraft _mentionDraft = const MentionComposerDraft.empty();
   Timer? _draftTimer;
   bool _sendingText = false;
+  bool _hasLocalInputInteraction = false;
+  bool _wasClearedBySend = false;
   DateTime? _scheduledSendAt;
   int? _lastMentionPromptTextLength;
 
@@ -139,33 +144,36 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     _galleryPicker = widget.galleryPicker ?? ImagePickerChatGalleryPicker();
     // 恢复草稿
     if (widget.initialDraft != null && widget.initialDraft!.isNotEmpty) {
-      _textController.text = widget.initialDraft!;
-      _mentionDraft = MentionComposerDraft(
-        text: widget.initialDraft!,
-        tokens: const [],
-      );
-      _textController.selection = TextSelection.fromPosition(
-        TextPosition(offset: widget.initialDraft!.length),
-      );
+      _hydrateDraft(widget.initialDraft!);
     }
   }
 
   @override
   void didUpdateWidget(covariant ChatInputToolbar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final conversationChanged =
+        widget.conversationId != oldWidget.conversationId;
+    if (conversationChanged) {
+      _draftTimer?.cancel();
+      _textController.clear();
+      _mentionDraft = const MentionComposerDraft.empty();
+      _hasLocalInputInteraction = false;
+      _wasClearedBySend = false;
+      _lastMentionPromptTextLength = null;
+    }
+
     final nextDraft = widget.initialDraft;
-    if (nextDraft != oldWidget.initialDraft &&
-        nextDraft != null &&
-        nextDraft.isNotEmpty &&
-        _textController.text.isEmpty) {
-      _textController.text = nextDraft;
-      _mentionDraft = MentionComposerDraft(
-        text: nextDraft,
-        tokens: const [],
-      );
-      _textController.selection = TextSelection.fromPosition(
-        TextPosition(offset: nextDraft.length),
-      );
+    final draftChanged = nextDraft != oldWidget.initialDraft;
+    if ((conversationChanged || draftChanged) &&
+        _draftHydrationPolicy.shouldHydrate(
+          currentConversationId: widget.conversationId,
+          previousConversationId: oldWidget.conversationId,
+          incomingDraft: nextDraft,
+          currentInput: _textController.text,
+          hasLocalInputInteraction: _hasLocalInputInteraction,
+          wasClearedBySend: _wasClearedBySend,
+        )) {
+      _hydrateDraft(nextDraft!);
     }
     if (widget.externalInsertToken == oldWidget.externalInsertToken) return;
     final text = widget.externalInsertText?.trim();
@@ -173,6 +181,17 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     _insertTextAtCursor(text);
     _setMode(_InputMode.text);
     _focusNode.requestFocus();
+  }
+
+  void _hydrateDraft(String draft) {
+    _textController.text = draft;
+    _mentionDraft = MentionComposerDraft(
+      text: draft,
+      tokens: const [],
+    );
+    _textController.selection = TextSelection.fromPosition(
+      TextPosition(offset: draft.length),
+    );
   }
 
   @override
@@ -225,9 +244,11 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
       mentions: widget.isGroup ? _mentionDraft.mentions : null,
     );
     final scheduledAt = _scheduledSendAt;
+    _hasLocalInputInteraction = true;
     setState(() => _sendingText = true);
     _textController.clear();
     _mentionDraft = const MentionComposerDraft.empty();
+    _wasClearedBySend = true;
     _draftTimer?.cancel();
     try {
       final sent = scheduledAt == null
@@ -424,6 +445,8 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   }
 
   void _insertTextAtCursor(String insertedText) {
+    _hasLocalInputInteraction = true;
+    _wasClearedBySend = false;
     final text = _textController.text;
     final sel = _textController.selection;
     final start = sel.start < 0 ? text.length : sel.start;
@@ -442,6 +465,10 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
   }
 
   void _handleTextChanged(String text) {
+    _hasLocalInputInteraction = true;
+    if (text.isNotEmpty) {
+      _wasClearedBySend = false;
+    }
     _mentionDraft = MentionComposerDraft(
       text: text,
       tokens: _mentionDraft.tokens,
@@ -517,6 +544,8 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
       }
     }
     _mentionDraft = draft;
+    _hasLocalInputInteraction = true;
+    _wasClearedBySend = false;
     _textController.value = TextEditingValue(
       text: draft.text,
       selection: TextSelection.collapsed(offset: cursor),
@@ -575,6 +604,8 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     if (chars.isEmpty) return;
     final newPrefix = chars.skipLast(1).string;
     final newText = newPrefix + text.substring(pos);
+    _hasLocalInputInteraction = true;
+    _wasClearedBySend = false;
     _textController.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(offset: newPrefix.length),
