@@ -4,6 +4,9 @@ setlocal
 
 pushd "%~dp0.."
 
+set "VITE_DEV_SERVER_URL="
+call :stop_running_client
+
 call :ensure_dependencies
 if not "%ERRORLEVEL%"=="0" (
   echo.
@@ -25,6 +28,8 @@ if not "%ERRORLEVEL%"=="0" (
 
 echo.
 echo [LPP PC] Build completed. Starting PC client from built output...
+set "VITE_DEV_SERVER_URL="
+call :stop_running_client
 call npm.cmd run start
 if not "%ERRORLEVEL%"=="0" (
   echo.
@@ -35,6 +40,10 @@ if not "%ERRORLEVEL%"=="0" (
 )
 
 popd
+exit /b 0
+
+:stop_running_client
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$root=(Resolve-Path '.').Path; Get-CimInstance Win32_Process -Filter \"name = 'electron.exe' or name = 'node.exe'\" | Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*' + $root + '*') -or $_.CommandLine -like '*127.0.0.1:5173*') } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; Write-Host ('[LPP PC] Stopped old process PID ' + $_.ProcessId) } catch { Write-Host ('[LPP PC] Could not stop old process PID ' + $_.ProcessId + ': ' + $_.Exception.Message) } }"
 exit /b 0
 
 :ensure_dependencies

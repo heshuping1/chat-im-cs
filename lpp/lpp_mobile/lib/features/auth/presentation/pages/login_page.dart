@@ -363,7 +363,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final type = await storage.read(_lastLoginTypeKey);
       final mobile = await storage.read(_lastLoginIdentifierMobileKey);
       final email = await storage.read(_lastLoginIdentifierEmailKey);
-      final lppId = await storage.read(_lastLoginIdentifierLppIdKey);
       final legacyIdentifier = await storage.read(_lastLoginIdentifierKey);
       if (!mounted) return;
 
@@ -372,11 +371,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ..addAll({
           if (mobile != null && mobile.isNotEmpty) _LoginTab.mobile: mobile,
           if (email != null && email.isNotEmpty) _LoginTab.email: email,
-          if (lppId != null && lppId.isNotEmpty) _LoginTab.loginName: lppId,
         });
 
       final tab = _tabFromLoginType(type);
       if (tab != null &&
+          tab != _LoginTab.loginName &&
           !_rememberedIdentifiers.containsKey(tab) &&
           legacyIdentifier != null &&
           legacyIdentifier.isNotEmpty) {

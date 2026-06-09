@@ -59,6 +59,8 @@ describe("auth page contract", () => {
   it("does not expose a production login default account", () => {
     expect(authSource).not.toContain("lpp_gs9fn2c7");
     expect(authSource).toContain("auth.identifierPlaceholder");
+    expect(partsSource).toContain('autoComplete="off"');
+    expect(partsSource).toContain('autoComplete="new-password"');
   });
 
   it("uses a post-login space picker instead of forcing tenant id in the main form", () => {

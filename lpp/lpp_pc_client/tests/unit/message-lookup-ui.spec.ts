@@ -477,9 +477,10 @@ describe("message lookup UI", () => {
     expect(chatMessageBubble).toContain("groupReadPiePath");
     expect(chatMessageBubble).toContain("model.status.groupReadReceipt");
     expect(chatMessageBubble).toContain('model.status.receipt !== "group_all"');
+    expect(chatMessageBubble).not.toContain("title={groupReadLabel}");
     expect(chatMessageBubble).toContain("model.status.groupReadReceiptClickable");
     expect(chatMessageBubble).toContain("groupReadVisualRatio");
-    expect(chatMessageBubble).toContain('groupReadCount > 0 ? "read" : "unread"');
+    expect(chatMessageBubble).not.toContain('groupReadCount > 0 ? "read" : "unread"');
     expect(listPanel).toContain("GroupReadReceiptPopover");
     expect(listPanel).toContain("pendingGroupReadReceiptSnapshotTargets");
     expect(listPanel).toContain("groupReadReceiptAutoSyncTargets");
@@ -523,10 +524,11 @@ describe("message lookup UI", () => {
     expect(groupReadReceiptPopover).toContain("Escape");
     expect(messageCenterCss).toContain(".pc-chat-group-read-pie-icon");
     expect(messageCenterCss).toContain(".pc-chat-group-read-pie-empty");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-ring");
     expect(messageCenterCss).toContain(".pc-chat-group-read-pie-track");
     expect(messageCenterCss).toContain(".pc-chat-group-read-pie-fill");
-    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-button.read");
-    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-button.unread");
+    expect(messageCenterCss).not.toContain(".pc-chat-group-read-pie-button.read");
+    expect(messageCenterCss).not.toContain(".pc-chat-group-read-pie-button.unread");
     expect(messageCenterCss).toContain("color: #13bfa6");
     expect(messageCenterCss).toContain("fill: #ffffff");
     expect(messageCenterCss).toContain("stroke: currentColor");

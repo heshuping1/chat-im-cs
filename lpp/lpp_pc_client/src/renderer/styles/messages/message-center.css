@@ -1370,6 +1370,7 @@
   height: 14px;
   place-items: center;
   flex: 0 0 auto;
+  line-height: 0;
 }
 
 .pc-chat-direct-read-receipt {
@@ -1398,6 +1399,8 @@
 }
 
 .pc-chat-group-read-pie-button {
+  appearance: none;
+  -webkit-appearance: none;
   color: #13bfa6;
   margin: 0;
   padding: 0;
@@ -1406,18 +1409,11 @@
   background: transparent;
   box-shadow: none;
   cursor: pointer;
+  line-height: 0;
 }
 
 .pc-chat-group-read-pie-button:hover {
   transform: scale(1.06);
-}
-
-.pc-chat-group-read-pie-button.unread {
-  color: #aeb8c5;
-}
-
-.pc-chat-group-read-pie-button.read {
-  color: #13bfa6;
 }
 
 .pc-chat-group-read-pie-button:focus-visible {
@@ -1432,10 +1428,11 @@
   overflow: visible;
 }
 
-.pc-chat-group-read-pie-empty {
+.pc-chat-group-read-pie-empty,
+.pc-chat-group-read-pie-ring {
   fill: #ffffff;
   stroke: currentColor;
-  stroke-width: 1.55;
+  stroke-width: 1.45;
 }
 
 .pc-chat-group-read-pie-track {
@@ -1444,12 +1441,6 @@
 
 .pc-chat-group-read-pie-fill {
   fill: currentColor;
-}
-
-.pc-chat-group-read-pie-outline {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.55;
 }
 
 .pc-group-read-receipt-popover {

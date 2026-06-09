@@ -101,33 +101,27 @@ export function ChatMessageBubble({
     model.status.receipt !== "group_all" &&
     model.status.groupReadReceiptClickable &&
     Boolean(onGroupReadReceiptClick);
-  const groupReadRatio = model.status.groupReadReceipt?.ratio ?? 0;
-  const groupReadCount = model.status.groupReadReceipt?.readCount ?? 0;
-  const groupReadVisualRatio = groupReadCount > 0 ? Math.max(groupReadRatio, 0.14) : 0;
+  const groupReadVisualRatio = 0.42;
   const groupReadLabel = groupReadReceiptLabel(model.status.groupReadReceipt);
   const statusReceipt = directReadReceipt ? (
     <span
       aria-label="已读"
       className="pc-chat-bubble-receipt pc-chat-direct-read-receipt"
       role="img"
-      title="已读"
     >
       <DirectReadReceiptIcon />
     </span>
   ) : groupReadReceipt ? (
     <button
       aria-label={groupReadLabel}
-      className={`pc-chat-bubble-receipt pc-chat-group-read-pie-button ${
-        groupReadCount > 0 ? "read" : "unread"
-      }`}
-      title={groupReadLabel}
+      className="pc-chat-bubble-receipt pc-chat-group-read-pie-button"
       type="button"
       onClick={(event) => {
         event.stopPropagation();
         onGroupReadReceiptClick?.(message, event.currentTarget);
       }}
     >
-      <GroupReadPieIcon ratio={groupReadVisualRatio} read={groupReadCount > 0} />
+      <GroupReadPieIcon ratio={groupReadVisualRatio} />
     </button>
   ) : null;
   const inlineStatusText = model.status.statusText ? (
@@ -235,11 +229,12 @@ function DirectReadReceiptIcon() {
   );
 }
 
-function GroupReadPieIcon({ ratio, read }: { ratio: number; read: boolean }) {
+function GroupReadPieIcon({ ratio }: { ratio: number }) {
   const center = 7;
-  const radius = 5.35;
+  const outerRadius = 5.35;
+  const pieRadius = 3.25;
   const clampedRatio = Math.max(0, Math.min(1, ratio));
-  const wedgePath = read ? groupReadPiePath(center, radius, clampedRatio) : undefined;
+  const wedgePath = groupReadPiePath(center, pieRadius, clampedRatio);
   return (
     <svg
       aria-hidden="true"
@@ -249,19 +244,13 @@ function GroupReadPieIcon({ ratio, read }: { ratio: number; read: boolean }) {
       viewBox="0 0 14 14"
       width="13"
     >
-      {read ? (
-        <>
-          <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-track" />
-          {clampedRatio >= 0.995 ? (
-            <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-fill" />
-          ) : wedgePath ? (
-            <path className="pc-chat-group-read-pie-fill" d={wedgePath} />
-          ) : null}
-          <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-outline" />
-        </>
-      ) : (
-        <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-empty" />
-      )}
+      <circle cx={center} cy={center} r={outerRadius} className="pc-chat-group-read-pie-ring" />
+      <circle cx={center} cy={center} r={pieRadius} className="pc-chat-group-read-pie-track" />
+      {clampedRatio >= 0.995 ? (
+        <circle cx={center} cy={center} r={pieRadius} className="pc-chat-group-read-pie-fill" />
+      ) : wedgePath ? (
+        <path className="pc-chat-group-read-pie-fill" d={wedgePath} />
+      ) : null}
     </svg>
   );
 }

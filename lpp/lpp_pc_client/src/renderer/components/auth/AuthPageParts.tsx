@@ -152,6 +152,7 @@ export function LoginFields({
           value={identifier}
           onChange={(event) => onIdentifierChange(event.target.value)}
           placeholder={t("auth.identifierPlaceholder")}
+          autoComplete="off"
           autoFocus
         />
       </label>
@@ -162,6 +163,7 @@ export function LoginFields({
           onChange={(event) => onPasswordChange(event.target.value)}
           placeholder={t("auth.passwordPlaceholder")}
           type="password"
+          autoComplete="new-password"
           onKeyDown={(event) => submitOnEnter(event, onSubmit)}
         />
       </label>
