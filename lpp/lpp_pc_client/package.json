@@ -47,7 +47,7 @@
     "start:packaged": "node scripts/start-packaged.mjs",
     "start:profile:a": "npm run rebuild:native && electron . --profile=agent-a",
     "start:profile:b": "npm run rebuild:native && electron . --profile=agent-b",
-    "dist:win": "npm run rebuild:native && npm run build && electron-builder --win nsis",
+    "dist:win": "node scripts/patch-electron-builder-nsis-spawn.mjs && npm run rebuild:native && npm run build && electron-builder --win nsis",
     "dist:mac": "npm run build && electron-builder --mac dmg",
     "build:win:full": "npm run dist:win",
     "build:win:update-metadata": "node scripts/build-win-update-metadata.mjs",
@@ -127,7 +127,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
     }
   }
 }
