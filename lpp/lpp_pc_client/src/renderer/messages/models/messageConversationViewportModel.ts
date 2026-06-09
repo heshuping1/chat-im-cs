@@ -67,7 +67,7 @@ export function decideConversationViewportAfterAppend({
   wasAtBottom,
 }: ConversationViewportAppendInput): ConversationViewportAppendDecision {
   if (wasAtBottom) return { kind: "follow-bottom", behavior: "auto" };
-  if (addedMineCount > 0) return { kind: "follow-bottom", behavior: "smooth" };
+  if (addedMineCount > 0) return { kind: "follow-bottom", behavior: "auto" };
   return {
     kind: "keep-position",
     pendingNewMessageDelta: Math.max(0, addedIncomingCount),

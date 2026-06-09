@@ -1,5 +1,5 @@
 import type { MediaResourceDto } from "../../data/api-client";
-import { mediaFileName } from "../../data/im-message-normalize";
+import { mediaFileName, mediaStableCacheIdentity } from "../../data/im-message-normalize";
 
 export type MediaCacheContext = {
   accountId?: string;
@@ -76,6 +76,7 @@ export async function openDesktopVideoPlayer({
     fileName: mediaFileName(media) || "video.mp4",
     kind: "video",
     authToken,
+    cacheIdentity: mediaStableCacheIdentity(media, desktopVideoUrl),
     accountId: mediaCacheContext?.accountId,
     conversationId: mediaCacheContext?.conversationId,
     ...(desktopPosterUrl ? { posterUrl: absolutizeDesktopMediaUrl(desktopPosterUrl) } : {}),

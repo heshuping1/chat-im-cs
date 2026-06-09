@@ -37,12 +37,20 @@ describe("chatMessageRenderKey", () => {
   });
 
   it("wires the stable key into the PC message list row", () => {
+    const messageCenter = readFileSync(
+      resolve(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
+      "utf8",
+    );
     const messageListPanel = readFileSync(
       resolve(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
       "utf8",
     );
 
+    expect(messageCenter).toContain('from "../messages/models/messageRenderKey"');
+    expect(messageCenter).toContain("messageKey: chatMessageRenderKey");
     expect(messageListPanel).toContain("chatMessageRenderKey");
-    expect(messageListPanel).toContain("key={chatMessageRenderKey(message)}");
+    expect(messageListPanel).toContain("const renderKey = chatMessageRenderKey(message)");
+    expect(messageListPanel).toContain("data-message-render-key={renderKey}");
+    expect(messageListPanel).toContain("key={renderKey}");
   });
 });

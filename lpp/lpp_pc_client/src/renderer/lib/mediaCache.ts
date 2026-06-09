@@ -41,7 +41,7 @@ export async function refreshCachedMedia({
   if (!force && entry?.updatedAt && now - entry.updatedAt < mediaRefreshIntervalMs) {
     return entry.blob;
   }
-  if (!force && entry?.failedAt && now - entry.failedAt < mediaRetryIntervalMs) {
+  if (!force && entry?.failedAt && entry.url === url && now - entry.failedAt < mediaRetryIntervalMs) {
     return entry.blob?.size ? entry.blob : null;
   }
 

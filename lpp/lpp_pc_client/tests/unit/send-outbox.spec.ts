@@ -164,6 +164,18 @@ describe("send outbox", () => {
     expect(sendOutboxRetentionMs).toBe(30 * 24 * 60 * 60 * 1000);
   });
 
+  it("does not restore discarded failed history records for the same target", async () => {
+    const storage = createMemorySendOutboxStorage();
+    await storage.upsertRecord(record());
+
+    await storage.deleteRecord("scope-1", "local-1");
+
+    expect(await storage.listRecords({
+      scopeKey: "scope-1",
+      targetKey: sendOutboxTargetKey("im", "direct", "c1"),
+    })).toEqual([]);
+  });
+
   it("restores files from blobs and reports when the local file is gone", async () => {
     const storage = createMemorySendOutboxStorage();
     await storage.putBlob("blob-file", new Blob(["video"], { type: "video/mp4" }));

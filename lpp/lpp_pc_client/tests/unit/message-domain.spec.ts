@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chatMessageEntityFromDto,
   chatMessageEntityToDto,
+  mergeStableMessagePage,
   normalizeChatMessageDeliveryState,
   normalizeChatMessageDirection,
   reuseStableMessageItems,
@@ -203,4 +204,59 @@ describe("message domain", () => {
 
     expect(result?.[0]).toBe(next);
   });
+
+  it("keeps previously loaded older messages when the latest server page shifts", () => {
+    const previous = Array.from({ length: 51 }, (_, index) =>
+      message({
+        conversationSeq: 520 + index,
+        messageId: `m-${520 + index}`,
+        sentAt: `2026-06-09T10:${String(index).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+    const next = Array.from({ length: 50 }, (_, index) =>
+      message({
+        conversationSeq: 521 + index,
+        messageId: `m-${521 + index}`,
+        sentAt: `2026-06-09T10:${String(index + 1).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+
+    const result = mergeStableMessagePage(previous, next);
+
+    expect(result?.map((item) => item.messageId)).toEqual(
+      Array.from({ length: 51 }, (_, index) => `m-${520 + index}`),
+    );
+    expect(result?.[0]).toBe(previous[0]);
+  });
+
+  it("still lets messages disappear inside the returned server page range", () => {
+    const previous = [
+      message({ conversationSeq: 10, messageId: "m-10" }),
+      message({ conversationSeq: 11, messageId: "m-11" }),
+      message({ conversationSeq: 12, messageId: "m-12" }),
+    ];
+    const next = [
+      message({ conversationSeq: 10, messageId: "m-10" }),
+      message({ conversationSeq: 12, messageId: "m-12" }),
+    ];
+
+    const result = mergeStableMessagePage(previous, next);
+
+    expect(result?.map((item) => item.messageId)).toEqual(["m-10", "m-12"]);
+  });
 });
+
+function message(overrides: Partial<MessageItemDto>): MessageItemDto {
+  return {
+    body: { text: overrides.messageId ?? "message" },
+    conversationId: "c1",
+    direction: "out",
+    isMine: true,
+    messageId: "m1",
+    messageType: "text",
+    preview: "message",
+    sentAt: "2026-06-09T10:00:00.000Z",
+    status: "sent",
+    ...overrides,
+  };
+}

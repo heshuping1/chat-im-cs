@@ -64,19 +64,8 @@ export function ImageMessageFrame({
   sourceAvailable: boolean;
 }) {
   const { t } = useI18n();
-  const [viewerScale, setViewerScale] = useState(1);
-  const [viewerRotation, setViewerRotation] = useState(0);
-  const [viewerOffset, setViewerOffset] = useState({ x: 0, y: 0 });
   const [naturalPreviewBox, setNaturalPreviewBox] =
     useState<MediaPreviewPresentation["previewBox"] | null>(null);
-  const dragRef = useRef<{
-    pointerId: number;
-    startClientX: number;
-    startClientY: number;
-    startOffsetX: number;
-    startOffsetY: number;
-    moved: boolean;
-  } | null>(null);
   const canRenderImage = sourceAvailable && Boolean(src);
   const effectivePreviewBox = naturalPreviewBox ?? presentation?.previewBox;
   const mediaPreviewFrameStyle = effectivePreviewBox
@@ -87,6 +76,115 @@ export function ImageMessageFrame({
         } as CSSProperties)
     : undefined;
   const presentationClassName = effectivePreviewBox?.className ?? "";
+
+  useEffect(() => {
+    setNaturalPreviewBox(null);
+  }, [src]);
+
+  const handleInlineImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    const nextPreviewBox = imagePreviewBoxFromSize({
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    });
+    if (nextPreviewBox) {
+      setNaturalPreviewBox((current) =>
+        current &&
+        current.width === nextPreviewBox.width &&
+        current.height === nextPreviewBox.height &&
+        current.className === nextPreviewBox.className
+          ? current
+          : nextPreviewBox,
+      );
+    }
+    onImageLoad();
+  };
+
+  return (
+    <>
+      {canRenderImage ? (
+        <button
+          className={`message-image-frame ${presentationClassName} ${imageLoaded ? "loaded" : ""}`}
+          style={mediaPreviewFrameStyle}
+          type="button"
+          aria-label={fileName ? t("media.image.previewNamed", { name: fileName }) : t("media.image.preview")}
+          onClick={onOpenPreview}
+        >
+          {!imageLoaded && (
+            <span className="message-image-loading" aria-label={t("media.image.loading")}>
+              <ImageIcon size={22} />
+              <em>{t("media.image.loading")}</em>
+            </span>
+          )}
+          {src && (
+            <img
+              className="message-image"
+              src={src}
+              alt={altText}
+              onLoad={handleInlineImageLoad}
+              onError={onImageError}
+            />
+          )}
+        </button>
+      ) : (
+        <span
+          className={`message-image-frame message-image-empty ${presentationClassName}`}
+          style={mediaPreviewFrameStyle}
+          role="img"
+          aria-label={t("media.image.message")}
+        >
+          <span className="message-image-loading" aria-hidden="true">
+            <ImageIcon size={22} />
+          </span>
+        </span>
+      )}
+      {previewOpen && src && (
+        <ImagePreviewViewer
+          actionBusy={actionBusy}
+          actionNotice={actionNotice}
+          fileName={fileName}
+          onClosePreview={onClosePreview}
+          onCopyImage={onCopyImage}
+          onRevealImage={onRevealImage}
+          onSaveImageAs={onSaveImageAs}
+          src={src}
+        />
+      )}
+    </>
+  );
+}
+
+export function ImagePreviewViewer({
+  actionBusy = false,
+  actionNotice,
+  fileName,
+  onClosePreview,
+  onCopyImage,
+  onRevealImage,
+  onSaveImageAs,
+  src,
+}: {
+  actionBusy?: boolean;
+  actionNotice?: string | null;
+  fileName?: string;
+  onClosePreview: () => void;
+  onCopyImage?: () => void;
+  onRevealImage?: () => void;
+  onSaveImageAs?: () => void;
+  src: string;
+}) {
+  const { t } = useI18n();
+  const [viewerScale, setViewerScale] = useState(1);
+  const [viewerRotation, setViewerRotation] = useState(0);
+  const [viewerOffset, setViewerOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+    moved: boolean;
+  } | null>(null);
   const resetViewer = useCallback(() => {
     setViewerScale(1);
     setViewerRotation(0);
@@ -111,18 +209,12 @@ export function ImageMessageFrame({
   const saveImageAs = useCallback(() => {
     if (!actionBusy) onSaveImageAs?.();
   }, [actionBusy, onSaveImageAs]);
+
   useEffect(() => {
-    if (!previewOpen) return undefined;
     resetViewer();
-    return undefined;
-  }, [previewOpen, resetViewer, src]);
+  }, [resetViewer, src]);
 
   useEffect(() => {
-    setNaturalPreviewBox(null);
-  }, [src]);
-
-  useEffect(() => {
-    if (!previewOpen) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClosePreview();
@@ -165,7 +257,6 @@ export function ImageMessageFrame({
     onClosePreview,
     onCopyImage,
     onSaveImageAs,
-    previewOpen,
     resetViewer,
     rotateImage,
     saveImageAs,
@@ -231,25 +322,6 @@ export function ImageMessageFrame({
     dragRef.current = null;
   };
 
-  const handleInlineImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
-    const image = event.currentTarget;
-    const nextPreviewBox = imagePreviewBoxFromSize({
-      width: image.naturalWidth,
-      height: image.naturalHeight,
-    });
-    if (nextPreviewBox) {
-      setNaturalPreviewBox((current) =>
-        current &&
-        current.width === nextPreviewBox.width &&
-        current.height === nextPreviewBox.height &&
-        current.className === nextPreviewBox.className
-          ? current
-          : nextPreviewBox,
-      );
-    }
-    onImageLoad();
-  };
-
   const viewerImageStyle = {
     "--wechat-image-scale": viewerScale,
     "--wechat-image-rotation": `${viewerRotation}deg`,
@@ -260,157 +332,117 @@ export function ImageMessageFrame({
   const canDragViewerImage = viewerScale > 1;
 
   return (
-    <>
-      {canRenderImage ? (
+    <div
+      className="message-image-preview wechat-image-preview"
+      role="dialog"
+      aria-modal="true"
+      aria-label={fileName ? t("media.image.viewerNamed", { name: fileName }) : t("media.image.viewer")}
+      onClick={onClosePreview}
+      onWheel={handlePreviewWheel}
+    >
+      <div
+        className="message-image-viewer-topbar"
+        onClick={(event) => event.stopPropagation()}
+      >
         <button
-          className={`message-image-frame ${presentationClassName} ${imageLoaded ? "loaded" : ""}`}
-          style={mediaPreviewFrameStyle}
+          className="message-image-preview-close"
           type="button"
-          aria-label={fileName ? t("media.image.previewNamed", { name: fileName }) : t("media.image.preview")}
-          onClick={onOpenPreview}
-        >
-          {!imageLoaded && (
-            <span className="message-image-loading" aria-label={t("media.image.loading")}>
-              <ImageIcon size={22} />
-              <em>{t("media.image.loading")}</em>
-            </span>
-          )}
-          {src && (
-            <img
-              className="message-image"
-              src={src}
-              alt={altText}
-              onLoad={handleInlineImageLoad}
-              onError={onImageError}
-            />
-          )}
-        </button>
-      ) : (
-        <span
-          className={`message-image-frame message-image-empty ${presentationClassName}`}
-          style={mediaPreviewFrameStyle}
-          role="img"
-          aria-label={t("media.image.message")}
-        >
-          <span className="message-image-loading" aria-hidden="true">
-            <ImageIcon size={22} />
-          </span>
-        </span>
-      )}
-      {previewOpen && src && (
-        <div
-          className="message-image-preview wechat-image-preview"
-          role="dialog"
-          aria-modal="true"
-          aria-label={fileName ? t("media.image.viewerNamed", { name: fileName }) : t("media.image.viewer")}
+          title={t("media.image.closePreview")}
+          aria-label={t("media.image.closePreview")}
           onClick={onClosePreview}
-          onWheel={handlePreviewWheel}
         >
-          <div
-            className="message-image-viewer-topbar"
-            onClick={(event) => event.stopPropagation()}
+          <X size={18} />
+        </button>
+        <div className="message-image-viewer-title">
+          <ImageIcon size={15} />
+          <span>{fileName || t("media.image.viewer")}</span>
+        </div>
+        <div className="message-image-viewer-actions">
+          <IconButton
+            disabled={actionBusy || !onCopyImage}
+            label={t("media.image.copy")}
+            onClick={copyImage}
           >
-            <button
-              className="message-image-preview-close"
-              type="button"
-              title={t("media.image.closePreview")}
-              aria-label={t("media.image.closePreview")}
-              onClick={onClosePreview}
-            >
-              <X size={18} />
-            </button>
-            <div className="message-image-viewer-title">
-              <ImageIcon size={15} />
-              <span>{fileName || t("media.image.viewer")}</span>
-            </div>
-            <div className="message-image-viewer-actions">
-              <IconButton
-                disabled={actionBusy || !onCopyImage}
-                label={t("media.image.copy")}
-                onClick={copyImage}
-              >
-                <Copy size={17} />
-              </IconButton>
-              <IconButton
-                disabled={actionBusy || !onSaveImageAs}
-                label={t("media.image.saveAs")}
-                onClick={saveImageAs}
-              >
-                <Download size={17} />
-              </IconButton>
-              <IconButton
-                disabled={actionBusy || !onRevealImage}
-                label={t("media.image.reveal")}
-                onClick={onRevealImage}
-              >
-                <FolderOpen size={17} />
-              </IconButton>
-            </div>
-          </div>
-          <div
-            className="message-image-viewer-toolbar"
-            onClick={(event) => event.stopPropagation()}
+            <Copy size={17} />
+          </IconButton>
+          <IconButton
+            disabled={actionBusy || !onSaveImageAs}
+            label={t("media.image.saveAs")}
+            onClick={saveImageAs}
           >
-            <button
-              disabled={viewerScale <= minViewerScale}
-              onClick={zoomOut}
-              title={t("media.image.zoomOut")}
-              aria-label={t("media.image.zoomOut")}
-              type="button"
-            >
-              <ZoomOut size={18} />
-            </button>
-            <span className="message-image-viewer-scale">{viewerPercent}</span>
-            <button
-              disabled={viewerScale >= maxViewerScale}
-              onClick={zoomIn}
-              title={t("media.image.zoomIn")}
-              aria-label={t("media.image.zoomIn")}
-              type="button"
-            >
-              <ZoomIn size={18} />
-            </button>
-            <button
-              onClick={rotateImage}
-              title={t("media.image.rotate")}
-              aria-label={t("media.image.rotate")}
-              type="button"
-            >
-              <RotateCw size={18} />
-            </button>
-            <button
-              onClick={resetViewer}
-              title={t("media.image.resetView")}
-              aria-label={t("media.image.resetView")}
-              type="button"
-            >
-              <Scan size={18} />
-            </button>
-          </div>
-          {actionNotice && (
-            <div
-              className="message-image-viewer-notice"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {actionNotice}
-            </div>
-          )}
-          <img
-            className={`message-image-viewer-img ${canDragViewerImage ? "can-drag" : ""}`}
-            src={src}
-            alt={fileName || t("media.image.viewer")}
-            draggable={false}
-            style={viewerImageStyle}
-            onDoubleClick={handlePreviewDoubleClick}
-            onPointerCancel={handlePointerEnd}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerEnd}
-            onClick={(event) => event.stopPropagation()}
-          />
+            <Download size={17} />
+          </IconButton>
+          <IconButton
+            disabled={actionBusy || !onRevealImage}
+            label={t("media.image.reveal")}
+            onClick={onRevealImage}
+          >
+            <FolderOpen size={17} />
+          </IconButton>
+        </div>
+      </div>
+      <div
+        className="message-image-viewer-toolbar"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          disabled={viewerScale <= minViewerScale}
+          onClick={zoomOut}
+          title={t("media.image.zoomOut")}
+          aria-label={t("media.image.zoomOut")}
+          type="button"
+        >
+          <ZoomOut size={18} />
+        </button>
+        <span className="message-image-viewer-scale">{viewerPercent}</span>
+        <button
+          disabled={viewerScale >= maxViewerScale}
+          onClick={zoomIn}
+          title={t("media.image.zoomIn")}
+          aria-label={t("media.image.zoomIn")}
+          type="button"
+        >
+          <ZoomIn size={18} />
+        </button>
+        <button
+          onClick={rotateImage}
+          title={t("media.image.rotate")}
+          aria-label={t("media.image.rotate")}
+          type="button"
+        >
+          <RotateCw size={18} />
+        </button>
+        <button
+          onClick={resetViewer}
+          title={t("media.image.resetView")}
+          aria-label={t("media.image.resetView")}
+          type="button"
+        >
+          <Scan size={18} />
+        </button>
+      </div>
+      {actionNotice && (
+        <div
+          className="message-image-viewer-notice"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {actionNotice}
         </div>
       )}
-    </>
+      <img
+        className={`message-image-viewer-img ${canDragViewerImage ? "can-drag" : ""}`}
+        src={src}
+        alt={fileName || t("media.image.viewer")}
+        draggable={false}
+        style={viewerImageStyle}
+        onDoubleClick={handlePreviewDoubleClick}
+        onPointerCancel={handlePointerEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onClick={(event) => event.stopPropagation()}
+      />
+    </div>
   );
 }
 

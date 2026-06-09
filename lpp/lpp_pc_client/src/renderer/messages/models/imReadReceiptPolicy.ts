@@ -5,6 +5,14 @@ export function activeDirectReadStatusRefetchIntervalMs() {
   return realtimeSyncPolicy.im.directReadStatusFallbackPollMs;
 }
 
+export function activeDirectReadStatusFastTrackIntervalMs() {
+  return 1_000;
+}
+
+export function activeDirectReadStatusFastTrackWindowMs() {
+  return 15_000;
+}
+
 export function activeDirectReadStatusRefetchInBackground() {
   return realtimeSyncPolicy.im.directReadStatusRefetchInBackground;
 }

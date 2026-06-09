@@ -5,6 +5,7 @@ import type {
   ConversationListItem,
   CustomerProfileCard,
   FriendDto,
+  FriendProfileExtraDto,
   FriendProfileUpdateDto,
 } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
@@ -101,19 +102,14 @@ export function useMessageContactProfileController({
     () => friends.some((friend) => friend.friendUserId === activeFriendUserId),
     [activeFriendUserId, friends],
   );
-  const profileExtraQuery = useQuery({
+  const profileExtraQuery = useQuery<FriendProfileExtraDto | undefined>({
     queryKey: pcQueryKeys.friendProfileExtra(
       session?.apiBaseUrl,
       session?.tenantToken,
       activeFriendUserId,
     ),
-    enabled: Boolean(
-      session &&
-      activeConversationType === "direct" &&
-      activeFriendUserId &&
-      activeFriend
-    ),
-    queryFn: async () => requireApiClient(session).getFriendProfileExtra(activeFriendUserId),
+    enabled: false,
+    queryFn: async () => undefined,
     retry: false,
     staleTime: 60_000,
   });
@@ -193,13 +189,6 @@ export function useMessageContactProfileController({
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["pc-friends"] }),
-        queryClient.invalidateQueries({
-          queryKey: pcQueryKeys.friendProfileExtra(
-            session?.apiBaseUrl,
-            session?.tenantToken,
-            activeFriendUserId,
-          ),
-        }),
         queryClient.invalidateQueries({
           queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
         }),

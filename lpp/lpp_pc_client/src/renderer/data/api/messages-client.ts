@@ -398,7 +398,15 @@ export class MessagesApiClient extends ContactsApiClient {
       encodeURIComponent(groupId),
     )}?${search.toString()}`;
     return this.request<unknown>(path).then((payload) =>
-      parseGroupReadReceiptsPayload(readEnvelopeData(payload), { messageSeq }),
+      parseGroupReadReceiptsPayload(readEnvelopeData(payload), {
+        currentUser: {
+          displayName: this.options.displayName,
+          lppId: this.options.lppId,
+          platformUserId: this.options.platformUserId,
+          userId: this.options.userId,
+        },
+        messageSeq,
+      }),
     );
   }
 

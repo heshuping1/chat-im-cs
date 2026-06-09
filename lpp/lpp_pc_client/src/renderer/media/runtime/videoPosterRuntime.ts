@@ -1,6 +1,6 @@
 import type { MediaResourceDto } from "../../data/api-client";
 import { useEffect, useState } from "react";
-import { mediaFileName } from "../../data/im-message-normalize";
+import { mediaFileName, mediaStableCacheIdentity } from "../../data/im-message-normalize";
 import {
   registerVideoPosterForMedia,
   resolveRegisteredVideoPoster,
@@ -181,6 +181,7 @@ export async function ensureLocalVideoPoster({
           fileName,
           kind: "video",
           authToken,
+          cacheIdentity: mediaStableCacheIdentity(media, src),
           accountId: mediaCacheContext?.accountId,
           conversationId: mediaCacheContext?.conversationId,
         })
@@ -191,6 +192,7 @@ export async function ensureLocalVideoPoster({
       kind: "video",
       dataUrl: posterFromMemory,
       authToken,
+      cacheIdentity: `video-poster:${mediaStableCacheIdentity(media, cachedVideo?.fileUrl || src) || cachedVideo?.fileUrl || src}`,
       accountId: mediaCacheContext?.accountId,
       conversationId: mediaCacheContext?.conversationId,
     });

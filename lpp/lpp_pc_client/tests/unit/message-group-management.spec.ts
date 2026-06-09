@@ -10,8 +10,10 @@ import {
   canModifyGroupTitle,
   groupMemberDisplayName,
   groupManagementPermissions,
+  groupReadReceiptMemberProfileTarget,
   groupMemberRoleRank,
   normalizeGroupRole,
+  readableGroupReadReceiptMemberCount,
   visibleGroupInfoTabs,
 } from "../../src/renderer/messages/models/groupManagementModel";
 import type { GroupMemberDto } from "../../src/renderer/data/api-client";
@@ -55,6 +57,30 @@ describe("message group management", () => {
   );
   const messageListPanel = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
+    "utf8",
+  );
+  const messageStartDialogs = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/MessageStartDialogs.tsx"),
+    "utf8",
+  );
+  const messageDialogsLayer = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/MessageDialogsLayer.tsx"),
+    "utf8",
+  );
+  const conversationActionsHook = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/hooks/useMessageConversationActions.ts"),
+    "utf8",
+  );
+  const conversationSelectionHook = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/hooks/useMessageConversationSelection.ts"),
+    "utf8",
+  );
+  const conversationBackgroundDialog = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/ConversationChatBackgroundDialog.tsx"),
+    "utf8",
+  );
+  const conversationBackgroundModel = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/models/conversationChatBackgroundModel.ts"),
     "utf8",
   );
   const messageProfileDock = readFileSync(
@@ -129,6 +155,98 @@ describe("message group management", () => {
       displayName: "Account name",
       groupAlias: " ",
     } as GroupMemberDto)).toBe("Account name");
+  });
+
+  it("counts readable group read receipt members from members before conversation fallback", () => {
+    const members = new Map<string, GroupMemberDto>([
+      ["mine", { userId: "mine", displayName: "Me" } as GroupMemberDto],
+      ["u1", { userId: "u1", displayName: "One" } as GroupMemberDto],
+      ["u2", { userId: "u2", displayName: "Two" } as GroupMemberDto],
+    ]);
+
+    expect(
+      readableGroupReadReceiptMemberCount({
+        authSession: { userId: "mine" },
+        fallbackMemberCount: 99,
+        groupMemberMap: members,
+      }),
+    ).toBe(2);
+
+    expect(
+      readableGroupReadReceiptMemberCount({
+        authSession: { userId: "mine" },
+        fallbackMemberCount: 4,
+        groupMemberMap: new Map(),
+      }),
+    ).toBe(3);
+  });
+
+  it("resolves group read receipt members to profile targets only when member list is visible", () => {
+    const member = {
+      avatarUrl: "profile.png",
+      displayName: "Alice",
+      signature: "Ready",
+      userId: "u1",
+    } as GroupMemberDto;
+    const groupMemberMap = new Map<string, GroupMemberDto>([
+      ["u1", member],
+      ["alice", member],
+    ]);
+    const receiptMember = {
+      avatarUrl: "receipt.png",
+      displayName: "Alice",
+      hasRead: true,
+      lastReadSeq: 12,
+      userId: "u1",
+    };
+
+    expect(
+      groupReadReceiptMemberProfileTarget({
+        canViewMembers: true,
+        groupMemberMap,
+        member: receiptMember,
+      }),
+    ).toBe(member);
+    expect(
+      groupReadReceiptMemberProfileTarget({
+        canViewMembers: false,
+        groupMemberMap,
+        member: receiptMember,
+      }),
+    ).toBeUndefined();
+    expect(
+      groupReadReceiptMemberProfileTarget({
+        canViewMembers: true,
+        groupMemberMap: new Map(),
+        member: receiptMember,
+      }),
+    ).toMatchObject({ avatarUrl: "receipt.png", displayName: "Alice", userId: "u1" });
+    expect(
+      groupReadReceiptMemberProfileTarget({
+        canViewMembers: true,
+        groupMemberMap: new Map(),
+        member: { ...receiptMember, platformUserId: "platform-u1", userId: "" },
+      }),
+    ).toMatchObject({ displayName: "Alice", platformUserId: "platform-u1", userId: "platform-u1" });
+    expect(
+      groupReadReceiptMemberProfileTarget({
+        canViewMembers: true,
+        groupMemberMap: new Map(),
+        member: { ...receiptMember, lppId: "", platformUserId: "", userId: "" },
+      }),
+    ).toBeUndefined();
+    expect(
+      groupReadReceiptMemberProfileTarget({
+        canViewMembers: true,
+        groupMemberMap: new Map(),
+        member: {
+          ...receiptMember,
+          lppId: "",
+          platformUserId: "",
+          userId: "00000000-0000-0000-0000-000000000000",
+        },
+      }),
+    ).toBeUndefined();
   });
 
   it("prevents admins from handling owners or other admins", () => {
@@ -206,6 +324,23 @@ describe("message group management", () => {
     expect(messageCenter).toContain("submitFeedback");
     expect(conversationStage).toContain("openMessageLookupFromInfo");
     expect(conversationStage).toContain("handleConversationMenuAction");
+    expect(messageCenter).toContain("openCreateGroupFromActiveConversation");
+    expect(messageCenter).toContain("contactPickerItemFromDirectConversation");
+    expect(messageCenter).toContain("ConversationChatBackgroundDialog");
+    expect(messageStartDialogs).toContain("lockedContacts");
+    expect(messageStartDialogs).toContain("totalSelectedCount < 2");
+    expect(messageStartDialogs).toContain("memberUserIds: Array.from(new Set([...lockedIds, ...selectedIds]))");
+    expect(messageDialogsLayer).toContain("groupLockedContacts");
+    expect(conversationActionsHook).toContain("setLocalPinnedConversationOverrides");
+    expect(conversationActionsHook).toContain("setLocalMutedConversationOverrides");
+    expect(conversationActionsHook).toContain('conversation.conversationType === "group"');
+    expect(conversationActionsHook).toContain("api.setGroupPinned");
+    expect(conversationActionsHook).toContain("api.setGroupMuted");
+    expect(conversationActionsHook).toContain("isApiNotFoundError");
+    expect(conversationSelectionHook).toContain("localPinnedConversationOverrides");
+    expect(conversationSelectionHook).toContain("localMutedConversationOverrides");
+    expect(conversationBackgroundDialog).toContain("messages.conversationBackground.title");
+    expect(conversationBackgroundModel).toContain("effectiveConversationChatBackground");
   });
 
   it("renders conversation boolean states as real toggles instead of read-only labels", () => {
@@ -441,7 +576,9 @@ describe("message group management", () => {
 
   it("routes group member profile clicks to the full contact profile actions", () => {
     expect(messageCenter).toContain("handleGroupMemberProfileOpen");
+    expect(messageCenter).toContain("if (!member.userId) return false");
     expect(messageCenter).toContain("setContactCardProfile");
+    expect(messageCenter).toContain("return true");
     expect(messageCenter).toContain("normalizeContactCard");
     expect(messageCenter).toContain("canAddCurrentGroupMemberFriend");
     expect(messageCenter).toContain("allowFriendRequest: options?.canAddFriend ?? canAddCurrentGroupMemberFriend");

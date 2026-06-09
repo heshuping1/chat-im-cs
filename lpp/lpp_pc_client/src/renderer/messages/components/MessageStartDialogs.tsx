@@ -123,11 +123,13 @@ export function DirectChatDialog({
 
 export function GroupChatDialog({
   contacts,
+  lockedContacts = [],
   onClose,
   onSubmit,
   pending,
 }: {
   contacts: ContactPickerItem[];
+  lockedContacts?: ContactPickerItem[];
   onClose: () => void;
   onSubmit: (payload: { title: string; memberUserIds: string[] }) => void;
   pending: boolean;
@@ -136,8 +138,15 @@ export function GroupChatDialog({
   const [keyword, setKeyword] = useState("");
   const [name, setName] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
-  const targets = filterContactPickerItems(contacts, keyword);
-  const selectedContacts = contacts.filter((item) => selectedIds.has(item.id));
+  const lockedIds = new Set(lockedContacts.map((item) => item.id));
+  const targets = filterContactPickerItems(
+    contacts.filter((item) => !lockedIds.has(item.id)),
+    keyword,
+  );
+  const selectedContacts = [
+    ...lockedContacts,
+    ...contacts.filter((item) => selectedIds.has(item.id) && !lockedIds.has(item.id)),
+  ];
   const groupName = name.trim() || defaultGroupName(selectedContacts, t);
   return (
     <ContactPickerDialog
@@ -145,10 +154,10 @@ export function GroupChatDialog({
       emptyText={t("messages.start.emptyGroupMembers")}
       groupName={name}
       keyword={keyword}
+      lockedContacts={lockedContacts}
       mode="multi"
       pending={pending}
       selectedIds={selectedIds}
-      selectedSummary={selectedContacts.map((item) => item.name).join(", ")}
       title={t("messages.start.group")}
       t={t}
       onClose={onClose}
@@ -165,7 +174,7 @@ export function GroupChatDialog({
       onMultiSubmit={() =>
         onSubmit({
           title: groupName,
-          memberUserIds: Array.from(selectedIds),
+          memberUserIds: Array.from(new Set([...lockedIds, ...selectedIds])),
         })
       }
     />
@@ -267,6 +276,7 @@ function ContactPickerDialog({
   emptyText,
   groupName,
   keyword,
+  lockedContacts,
   mode,
   onClose,
   onGroupNameChange,
@@ -276,7 +286,6 @@ function ContactPickerDialog({
   onSingleSubmit,
   pending,
   selectedIds,
-  selectedSummary,
   t,
   title,
 }: {
@@ -284,6 +293,7 @@ function ContactPickerDialog({
   emptyText: string;
   groupName?: string;
   keyword: string;
+  lockedContacts?: ContactPickerItem[];
   mode: "single" | "multi";
   onClose: () => void;
   onGroupNameChange?: (value: string) => void;
@@ -293,11 +303,12 @@ function ContactPickerDialog({
   onSingleSubmit?: (id: string) => void;
   pending: boolean;
   selectedIds?: Set<string>;
-  selectedSummary?: string;
   t: Translate;
   title: string;
 }) {
   const selectedCount = selectedIds?.size ?? 0;
+  const lockedCount = lockedContacts?.length ?? 0;
+  const totalSelectedCount = selectedCount + lockedCount;
   return (
     <div className="pc-modal-backdrop" role="presentation" onClick={onClose}>
       <section
@@ -332,10 +343,24 @@ function ContactPickerDialog({
               onChange={(event) => onGroupNameChange?.(event.target.value)}
               placeholder={t("messages.start.groupNamePlaceholder")}
             />
-            <small>{selectedSummary || t("messages.start.minMembers")}</small>
           </div>
         )}
         <div className="pc-forward-targets message-contact-targets">
+          {mode === "multi" && lockedContacts?.map((item) => (
+            <button
+              key={`locked-${item.source}-${item.id}`}
+              type="button"
+              className="selected locked"
+              disabled
+            >
+              <PcAvatar avatarUrl={item.avatarUrl} className="e-avatar" name={item.name} />
+              <span>
+                <strong>{item.name}</strong>
+                <small>{item.subtitle}</small>
+              </span>
+              <Check size={16} />
+            </button>
+          ))}
           {contacts.map((item) => {
             const selected = selectedIds?.has(item.id) ?? false;
             return (
@@ -365,12 +390,12 @@ function ContactPickerDialog({
             <button
               className="primary"
               type="button"
-              disabled={pending || selectedCount < 2}
+              disabled={pending || totalSelectedCount < 2}
               onClick={() => onMultiSubmit?.()}
             >
               {pending
                 ? t("messages.start.creating")
-                : t("messages.start.createCount", { count: selectedCount })}
+                : t("messages.start.createCount", { count: totalSelectedCount })}
             </button>
           </footer>
         )}

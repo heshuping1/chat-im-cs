@@ -76,7 +76,7 @@ describe("message view model", () => {
     ).toMatchObject({
       status: {
         receipt: "unread",
-        statusText: "未读",
+        statusText: undefined,
       },
     });
 
@@ -92,7 +92,7 @@ describe("message view model", () => {
     ).toMatchObject({
       status: {
         receipt: "read",
-        statusText: "已读",
+        statusText: undefined,
       },
     });
   });
@@ -114,16 +114,18 @@ describe("message view model", () => {
       createChatMessageViewModel({
         conversationFallbackName: "群聊",
         conversationType: "group",
-        message,
+        groupReadReceiptTotal: 3,
+        message: { ...message, readCount: 1 },
         mine: true,
         senderFallback: "群聊",
         timeText: "12:00",
       }),
     ).toMatchObject({
       status: {
+        groupReadReceipt: { readCount: 1, totalCount: 3, ratio: 1 / 3 },
         groupReadReceiptClickable: true,
         receipt: "group_partial",
-        statusText: "已读 2 人",
+        statusText: undefined,
       },
     });
 
@@ -131,6 +133,7 @@ describe("message view model", () => {
       createChatMessageViewModel({
         conversationFallbackName: "群聊",
         conversationType: "group",
+        groupReadReceiptTotal: 4,
         message: { ...message, readCount: 0 },
         mine: true,
         senderFallback: "群聊",
@@ -138,9 +141,29 @@ describe("message view model", () => {
       }),
     ).toMatchObject({
       status: {
+        groupReadReceipt: { readCount: 0, totalCount: 4, ratio: 0 },
         groupReadReceiptClickable: true,
         receipt: "group_unread",
-        statusText: "未读",
+        statusText: undefined,
+      },
+    });
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "缇よ亰",
+        conversationType: "group",
+        groupReadReceiptTotal: 4,
+        message: { ...message, readCount: undefined },
+        mine: true,
+        senderFallback: "缇よ亰",
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      status: {
+        groupReadReceipt: { readCount: 0, totalCount: 4, ratio: 0 },
+        groupReadReceiptClickable: true,
+        receipt: "group_unread",
+        statusText: undefined,
       },
     });
   });
@@ -160,7 +183,7 @@ describe("message view model", () => {
 
     expect(
       createChatMessageViewModel({
-        conversationFallbackName: "群聊",
+        conversationFallbackName: "缇よ亰",
         conversationType: "group",
         message,
         mine: false,
@@ -182,17 +205,17 @@ describe("message view model", () => {
 
     expect(
       createChatMessageViewModel({
-        conversationFallbackName: "群聊",
+        conversationFallbackName: "缇よ亰",
         conversationType: "group",
         message: { ...message, conversationSeq: undefined },
         mine: true,
-        senderFallback: "群聊",
+        senderFallback: "缇よ亰",
         timeText: "12:00",
       }).status.groupReadReceiptClickable,
     ).toBe(false);
   });
 
-  it("shows optimistic unread before delayed text sending feedback", () => {
+  it("keeps text sending optimistic without external sending feedback", () => {
     const message = {
       body: { text: "hello" },
       direction: "out",
@@ -219,7 +242,7 @@ describe("message view model", () => {
         receipt: "unread",
         sendStatusSlot: "none",
         showSendingIndicator: false,
-        statusText: "未读",
+        statusText: undefined,
         timeText: "12:00",
       },
     });
@@ -230,16 +253,16 @@ describe("message view model", () => {
         conversationType: "direct",
         message,
         mine: true,
-        nowMs: 1_700,
+        nowMs: 4_000,
         senderFallback: "Alice",
         timeText: "12:00",
       }),
     ).toMatchObject({
       status: {
         receipt: "unread",
-        sendStatusSlot: "sending",
-        showSendingIndicator: true,
-        statusText: "未读",
+        sendStatusSlot: "none",
+        showSendingIndicator: false,
+        statusText: undefined,
         timeText: "12:00",
       },
     });
@@ -268,7 +291,7 @@ describe("message view model", () => {
       status: {
         receipt: "unread",
         sendStatusSlot: "none",
-        statusText: "未读",
+        statusText: undefined,
         timeText: "12:00",
       },
     });
@@ -286,7 +309,7 @@ describe("message view model", () => {
       status: {
         receipt: "read",
         sendStatusSlot: "none",
-        statusText: "已读",
+        statusText: undefined,
         timeText: "12:01",
       },
     });
@@ -308,7 +331,7 @@ describe("message view model", () => {
       status: {
         receipt: "read",
         sendStatusSlot: "none",
-        statusText: "已读",
+        statusText: undefined,
         timeText: "12:02",
       },
     });

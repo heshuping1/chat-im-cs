@@ -4,6 +4,7 @@ import {
   firstMessageMedia,
   imageMediaCacheKey,
   mediaFileName,
+  mediaStableCacheIdentity,
   normalizeMessageParts,
   normalizeMessageType,
   resolveMediaUrl,
@@ -42,6 +43,7 @@ export type MessageMediaActionPayload = {
   fileName: string;
   kind: "image" | "video" | "file";
   authToken?: string;
+  cacheIdentity?: string;
   accountId?: string;
   conversationId?: string;
 };
@@ -177,12 +179,12 @@ export function resolveMessageMediaUrl(
           media,
           baseUrl,
           "localOpenUrl",
-          "signedUrl",
-          "downloadUrl",
+          "url",
           "fileUrl",
           "uri",
           "path",
-          "url",
+          "downloadUrl",
+          "signedUrl",
           "thumbnailUrl",
           "thumbUrl",
           "previewUrl",
@@ -191,12 +193,12 @@ export function resolveMessageMediaUrl(
           media,
           baseUrl,
           "localOpenUrl",
-          "signedUrl",
-          "downloadUrl",
           "url",
           "fileUrl",
           "uri",
           "path",
+          "downloadUrl",
+          "signedUrl",
           "thumbnailUrl",
         );
   if (!raw) return undefined;
@@ -214,12 +216,12 @@ function resolveVideoPlaybackUrl(
   return resolveMediaUrl(
     media,
     assetBaseUrl || globalThis.location?.origin,
-    "signedUrl",
-    "downloadUrl",
     "url",
     "fileUrl",
     "uri",
     "path",
+    "downloadUrl",
+    "signedUrl",
   );
 }
 
@@ -234,11 +236,14 @@ export function messageMediaActionPayload({
   message: MessageItemDto;
   url: string;
 }): MessageMediaActionPayload {
+  const media = firstMessageMedia(message);
+  const cacheIdentity = mediaStableCacheIdentity(media, url);
   return {
     url,
     fileName: cacheContext?.fileName || messageMediaFileName(message),
     kind: messageMediaKind(message),
     authToken,
+    ...(cacheIdentity ? { cacheIdentity } : {}),
     accountId: cacheContext?.accountId,
     conversationId: cacheContext?.conversationId,
   };
@@ -288,12 +293,12 @@ function mediaSourceUrl(
     return resolveMediaUrl(
       media,
       assetBaseUrl,
-      "signedUrl",
-      "downloadUrl",
       "url",
       "fileUrl",
       "uri",
       "path",
+      "downloadUrl",
+      "signedUrl",
       "thumbnailUrl",
       "thumbUrl",
       "previewUrl",
@@ -302,12 +307,12 @@ function mediaSourceUrl(
   return resolveMediaUrl(
     media,
     assetBaseUrl,
-    "signedUrl",
-    "downloadUrl",
     "url",
     "fileUrl",
     "uri",
     "path",
+    "downloadUrl",
+    "signedUrl",
   );
 }
 
@@ -374,12 +379,12 @@ function imageActionSourceUrl(
   return resolveMediaUrl(
     media,
     assetBaseUrl,
-    "signedUrl",
-    "downloadUrl",
     "url",
     "fileUrl",
     "uri",
     "path",
+    "downloadUrl",
+    "signedUrl",
     "thumbnailUrl",
     "thumbUrl",
     "previewUrl",

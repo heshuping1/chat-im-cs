@@ -54,6 +54,7 @@ import { StandaloneConversationInfoView } from "./ConversationInfoViews";
 import { MessageChatHeader } from "./MessageChatHeader";
 import { MessageComposerDock } from "./MessageComposerDock";
 import { MessageDialogsLayer } from "./MessageDialogsLayer";
+import { MessageHistoryLookupDialog } from "./MessageHistoryLookupDialog";
 import { MessageListPanel } from "./MessageListPanel";
 import { MessageContextRail, type MessageContextPane } from "./MessageContextRail";
 import { MessageOverlayLayer } from "./MessageOverlayLayer";
@@ -83,14 +84,17 @@ export function MessageCenterConversationStage({
   contactCardProfileLoading,
   contactCardRelation,
   chatPanelRef,
+  chatBackgroundPreset,
   composerRef,
   canOpenAiAssistant,
   canOpenKnowledgeBase,
+  canOpenGroupReadReceiptMemberProfile,
   composerDialog,
   composerDisabled,
   composerDisabledReason,
   composerHeight,
   contactPickerItems,
+  groupLockedContacts,
   conversationMenu,
   conversations,
   createDirectPending,
@@ -226,14 +230,17 @@ export function MessageCenterConversationStage({
   contactCardProfileLoading: MessageOverlayProps["contactCardProfileLoading"];
   contactCardRelation: MessageOverlayProps["contactCardRelation"];
   chatPanelRef: Ref<HTMLElement>;
+  chatBackgroundPreset?: unknown;
   composerRef?: Ref<MessageComposerHandle>;
   canOpenAiAssistant: boolean;
   canOpenKnowledgeBase: boolean;
+  canOpenGroupReadReceiptMemberProfile?: boolean;
   composerDialog: "direct" | "group" | "qr" | "card" | null;
   composerDisabled?: boolean;
   composerDisabledReason?: string;
   composerHeight: number;
   contactPickerItems: ContactPickerItem[];
+  groupLockedContacts?: ContactPickerItem[];
   conversationMenu: MessageOverlayProps["conversationMenu"];
   conversations: ConversationListItem[];
   createDirectPending: boolean;
@@ -488,20 +495,14 @@ export function MessageCenterConversationStage({
                 assetBaseUrl={session?.apiBaseUrl}
                 authSession={session}
                 authToken={session?.tenantToken}
-                chatBackgroundPreset={pcSettings.chatBackgroundPreset}
+                chatBackgroundPreset={chatBackgroundPreset}
                 conversation={activeConversation}
                 emptyText={messageList.emptyText}
                 eventMessageText={eventMessageText}
                 groupMemberMap={groupMemberMap}
-                historyCounts={historyCounts}
-                historyFilter={historyFilter}
-                historyOpen={historyOpen}
-                loadedMessages={messages}
-                lookupScope={lookupScope}
+                canOpenGroupReadReceiptMemberProfile={Boolean(canOpenGroupReadReceiptMemberProfile)}
                 loading={messageList.loading}
                 messageAnnotations={messageAnnotations}
-                messageSearchKeyword={messageSearchKeyword}
-                messageSearchOpen={messageSearchOpen}
                 messages={visibleMessages}
                 messagesBottomRef={messagesBottomRef}
                 messageStageRef={messageStageRef}
@@ -513,20 +514,13 @@ export function MessageCenterConversationStage({
                 unreadJump={unreadJump}
                 isMineMessage={(message) => isMineMessage(message, session)}
                 onAvatarClick={handleAvatarClick}
-                onClearMessageSearch={() => setMessageSearchKeyword("")}
-                onCloseMessageLookup={() => {
-                  setHistoryOpen(false);
-                  setMessageSearchOpen(false);
-                }}
                 onContactClick={handleContactCardClick}
                 onContextMenu={openMessageMenu}
                 onFailedMessageClick={onFailedMessageClick}
-                onHistoryFilterChange={setHistoryFilter}
                 onJumpToLatest={jumpToLatest}
                 onMessageElementRef={onMessageElementRef}
-                onMessageSearchKeywordChange={setMessageSearchKeyword}
                 onMessageStageScroll={handleMessageStageScroll}
-                onScrollToMessage={scrollToMessage}
+                onOpenGroupMemberProfile={onOpenGroupMemberProfile}
                 onSelectMessageToggle={(messageId) =>
                   setSelectedMessageIds((current) => {
                     const next = new Set(current);
@@ -555,6 +549,34 @@ export function MessageCenterConversationStage({
                   )
                 }
                 shouldShowInlineStatus={shouldShowFileInlineStatus}
+              />
+            )}
+
+            {(historyOpen || messageSearchOpen) && (
+              <MessageHistoryLookupDialog
+                accountId={
+                  session?.userId ||
+                  session?.platformUserId ||
+                  session?.lppId ||
+                  session?.tenantId
+                }
+                assetBaseUrl={session?.apiBaseUrl}
+                authToken={session?.tenantToken}
+                conversation={activeConversation}
+                historyCounts={historyCounts}
+                historyFilter={historyFilter}
+                loadedMessages={messages}
+                lookupScope={lookupScope}
+                messageSearchKeyword={messageSearchKeyword}
+                messages={visibleMessages}
+                onClearMessageSearch={() => setMessageSearchKeyword("")}
+                onClose={() => {
+                  setHistoryOpen(false);
+                  setMessageSearchOpen(false);
+                }}
+                onHistoryFilterChange={setHistoryFilter}
+                onMessageSearchKeywordChange={setMessageSearchKeyword}
+                onScrollToMessage={scrollToMessage}
               />
             )}
 
@@ -651,6 +673,7 @@ export function MessageCenterConversationStage({
               activeConversationId={activeConversation.conversationId}
               composerDialog={composerDialog}
               contactPickerItems={contactPickerItems}
+              groupLockedContacts={groupLockedContacts}
               conversations={conversations}
               createDirectPending={createDirectPending}
               createGroupPending={createGroupPending}

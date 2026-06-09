@@ -1,5 +1,4 @@
 import {
-  BellOff,
   Check,
   ChevronRight,
   Crown,
@@ -137,7 +136,7 @@ export function ConversationInfoPanel({
   onUpdateTags?: (tags: string[]) => Promise<void> | void;
   onDragOver?: (event: DragEvent<HTMLElement>) => void;
   onDrop?: (event: DragEvent<HTMLElement>) => void;
-  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => void;
+  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => boolean;
   onOpenMessageLookup?: () => void;
   onOpenChatBackgroundSettings?: () => void;
   onOpenCreateGroup?: () => void;
@@ -197,6 +196,7 @@ export function ConversationInfoPanel({
             onOpenCreateGroup={onOpenCreateGroup}
             onOpenMessageLookup={onOpenMessageLookup}
             onSubmitComplaint={onSubmitComplaint}
+            pending={profileActionPending}
             t={t}
           />
         }
@@ -303,7 +303,7 @@ function GroupInfoTabContent({
   groupManagement?: MessageGroupManagement;
   loadingGroupMembers: boolean;
   members: GroupMemberDto[];
-  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => void;
+  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => boolean;
   onOpenChatBackgroundSettings?: () => void;
   onOpenMessageLookup?: () => void;
   onConversationAction?: (action: ConversationContextAction, conversation: ConversationListItem) => void;
@@ -369,6 +369,7 @@ function ConversationSettingsActions({
   onOpenCreateGroup,
   onOpenMessageLookup,
   onSubmitComplaint,
+  pending,
   t,
 }: {
   conversation: ConversationListItem;
@@ -377,56 +378,87 @@ function ConversationSettingsActions({
   onOpenCreateGroup?: () => void;
   onOpenMessageLookup?: () => void;
   onSubmitComplaint?: (conversation: ConversationListItem, content: string) => Promise<void> | void;
+  pending?: boolean;
   t: Translate;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+
   return (
     <section className="customer-info-block conversation-settings-actions">
       <h3>{t("messages.conversationInfo.chatSettings")}</h3>
-      <div className="group-management-actions">
+      <div className="conversation-tool-layout">
         <ActionButton
+          className="conversation-tool-search"
           icon={<Search size={14} />}
           label={t("messages.conversationInfo.actions.searchMessages")}
           onClick={() => onOpenMessageLookup?.()}
         />
-        <ActionButton
-          icon={<UserPlus size={14} />}
-          label={t("messages.conversationInfo.actions.addMembers")}
-          onClick={() => onOpenCreateGroup?.()}
-        />
-        <ActionButton
-          icon={<Pin size={14} />}
-          label={
-            conversation.isPinned
-              ? t("messages.conversationInfo.actions.unpinDirect")
-              : t("messages.conversationInfo.actions.pinDirect")
-          }
-          onClick={() => onConversationAction?.("pin", conversation)}
-        />
-        <ActionButton
-          icon={<BellOff size={14} />}
-          label={
-            conversation.isMuted
-              ? t("messages.conversationInfo.actions.disableDnd")
-              : t("messages.conversationInfo.actions.enableDnd")
-          }
-          onClick={() => onConversationAction?.("mute", conversation)}
-        />
-        <ActionButton
-          icon={<ImagePlus size={14} />}
-          label={t("messages.conversationInfo.actions.chatBackground")}
-          onClick={() => onOpenChatBackgroundSettings?.()}
-        />
-        <ActionButton
-          danger
-          icon={<Eraser size={14} />}
-          label={t("messages.conversationInfo.actions.clearHistory")}
-          onClick={() => onConversationAction?.("delete", conversation)}
-        />
-        <ComplaintActionButton
-          conversation={conversation}
-          onSubmitComplaint={onSubmitComplaint}
-          t={t}
-        />
+        <div className="conversation-tool-row">
+          <ActionButton
+            className="conversation-tool-chip"
+            icon={<UserPlus size={14} />}
+            label={t("messages.conversationInfo.actions.addMembers")}
+            onClick={() => onOpenCreateGroup?.()}
+          />
+          <ActionButton
+            className="conversation-tool-chip"
+            icon={<Pin size={14} />}
+            disabled={pending}
+            label={
+              conversation.isPinned
+                ? t("messages.conversationInfo.actions.unpinDirect")
+                : t("messages.conversationInfo.actions.pinDirect")
+            }
+            onClick={() => onConversationAction?.("pin", conversation)}
+          />
+          <button
+            className={`conversation-tool-toggle ${conversation.isMuted ? "on" : ""}`}
+            type="button"
+            disabled={pending}
+            aria-pressed={Boolean(conversation.isMuted)}
+            onClick={() => onConversationAction?.("mute", conversation)}
+          >
+            <span className="action-button-main">
+              {t("messages.conversationInfo.doNotDisturb")}
+            </span>
+            <i aria-hidden="true" />
+          </button>
+          <button
+            className={`conversation-tool-chip conversation-tool-more ${moreOpen ? "open" : ""}`}
+            type="button"
+            aria-expanded={moreOpen}
+            aria-label={t("messages.conversationInfo.actions.more")}
+            onClick={() => setMoreOpen((value) => !value)}
+          >
+            <span className="action-button-main">
+              <MoreHorizontal size={14} />
+              {t("messages.conversationInfo.actions.more")}
+            </span>
+          </button>
+        </div>
+        {moreOpen && (
+          <div className="conversation-tool-more-menu" role="menu">
+            <ActionButton
+              className="conversation-tool-menu-button"
+              icon={<ImagePlus size={14} />}
+              label={t("messages.conversationInfo.actions.chatBackground")}
+              onClick={() => onOpenChatBackgroundSettings?.()}
+            />
+            <ComplaintActionButton
+              conversation={conversation}
+              onSubmitComplaint={onSubmitComplaint}
+              t={t}
+            />
+            <ActionButton
+              danger
+              className="conversation-tool-menu-button"
+              disabled={pending}
+              icon={<Eraser size={14} />}
+              label={t("messages.conversationInfo.actions.clearHistory")}
+              onClick={() => onConversationAction?.("delete", conversation)}
+            />
+          </div>
+        )}
       </div>
     </section>
   );
@@ -715,7 +747,7 @@ function GroupProfileInfoList({
   members: GroupMemberDto[];
   onConversationAction?: (action: ConversationContextAction, conversation: ConversationListItem) => void;
   onOpenChatBackgroundSettings?: () => void;
-  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => void;
+  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => boolean;
   onOpenInviteMembers: () => void;
   onOpenMessageLookup?: () => void;
   onShowGroupMemberNicknamesChange?: (show: boolean) => void;
@@ -958,10 +990,11 @@ function GroupProfileInfoList({
         <section className="group-info-danger-section">
           <GroupInfoDangerButton
             label={t("messages.conversationInfo.actions.leaveGroup")}
-            onClick={() =>
-              confirmDanger(t("messages.conversationInfo.confirm.leaveGroup")) &&
-              groupManagement?.actions.leaveGroup()
-            }
+            onClick={async () => {
+              if (await confirmDanger(t("messages.conversationInfo.confirm.leaveGroup"))) {
+                groupManagement?.actions.leaveGroup();
+              }
+            }}
           />
         </section>
       )}
@@ -980,7 +1013,7 @@ function GroupMembersTab({
   groupManagement?: MessageGroupManagement;
   loading: boolean;
   members: GroupMemberDto[];
-  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => void;
+  onOpenGroupMemberProfile?: (target: HTMLElement, member: GroupMemberDto, options?: GroupMemberProfileOpenOptions) => boolean;
   setInviteOpen: (open: boolean) => void;
   t: Translate;
 }) {
@@ -1304,9 +1337,9 @@ function GroupMemberRow({
   const [muteEditorOpen, setMuteEditorOpen] = useState(false);
   const [muteDurationMinutes, setMuteDurationMinutes] = useState("0");
   const [muteReason, setMuteReason] = useState("");
-  const invokeAction = (action: () => void) => {
+  const invokeAction = (action: () => Promise<void> | void) => {
     onMenuClose();
-    action();
+    void action();
   };
   const submitMute = () => {
     const durationMinutes = Math.max(0, Number.parseInt(muteDurationMinutes, 10) || 0);
@@ -1324,9 +1357,9 @@ function GroupMemberRow({
     event.stopPropagation();
     onOpenProfile(event.currentTarget, member);
   };
-  const removeMember = () => {
+  const removeMember = async () => {
     if (
-      confirmDanger(
+      await confirmDanger(
         t("messages.conversationInfo.confirm.removeMember", {
           name: displayName || t("messages.conversationInfo.thisMember"),
         }),
@@ -1361,7 +1394,7 @@ function GroupMemberRow({
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            removeMember();
+            void removeMember();
           }}
         >
           <UserMinus size={12} />
@@ -1438,9 +1471,9 @@ function GroupMemberRow({
                   type="button"
                   role="menuitem"
                   onClick={() =>
-                    invokeAction(() => {
+                    invokeAction(async () => {
                       if (
-                        confirmDanger(
+                        await confirmDanger(
                           t("messages.conversationInfo.confirm.transferOwner", {
                             name: displayName || t("messages.conversationInfo.thisMember"),
                           }),
@@ -1462,7 +1495,7 @@ function GroupMemberRow({
                   role="menuitem"
                   onClick={() =>
                     invokeAction(() => {
-                      removeMember();
+                      void removeMember();
                     })
                   }
                 >
@@ -1717,10 +1750,13 @@ function GroupAnnouncementDetail({
               <button
                 className="danger"
                 type="button"
-                onClick={() =>
-                  confirmDanger(t("messages.conversationInfo.confirm.deleteAnnouncement")) &&
-                  groupManagement?.actions.deleteAnnouncement(item.announcementId)
-                }
+                onClick={async () => {
+                  if (
+                    await confirmDanger(t("messages.conversationInfo.confirm.deleteAnnouncement"))
+                  ) {
+                    groupManagement?.actions.deleteAnnouncement(item.announcementId);
+                  }
+                }}
               >
                 {t("common.delete")}
               </button>
@@ -1876,14 +1912,22 @@ function GroupManagementTab({
           disabled={!groupManagement?.permissions.canLeave}
           icon={<LogOut size={14} />}
           label={t("messages.conversationInfo.actions.leaveGroup")}
-          onClick={() => confirmDanger(t("messages.conversationInfo.confirm.leaveGroup")) && groupManagement?.actions.leaveGroup()}
+          onClick={async () => {
+            if (await confirmDanger(t("messages.conversationInfo.confirm.leaveGroup"))) {
+              groupManagement?.actions.leaveGroup();
+            }
+          }}
         />
         <ActionButton
           danger
           disabled={!groupManagement?.permissions.canDisband}
           icon={<Trash2 size={14} />}
           label={t("messages.conversationInfo.actions.disbandGroup")}
-          onClick={() => confirmDanger(t("messages.conversationInfo.confirm.disbandGroup")) && groupManagement?.actions.disbandGroup()}
+          onClick={async () => {
+            if (await confirmDanger(t("messages.conversationInfo.confirm.disbandGroup"))) {
+              groupManagement?.actions.disbandGroup();
+            }
+          }}
         />
       </div>
     </div>

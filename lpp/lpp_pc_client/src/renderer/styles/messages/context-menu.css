@@ -42,7 +42,7 @@
 
 .pc-avatar-profile-popover {
   position: fixed;
-  z-index: 72;
+  z-index: 190;
   width: 320px;
   padding: 14px;
   border: 1px solid rgba(211, 222, 234, 0.96);
@@ -350,4 +350,116 @@
 .pc-avatar-profile-popover.contact-card-profile-dialog footer {
   padding-top: 11px;
   border-top: 1px solid rgba(223, 230, 239, 0.9);
+}
+
+.message-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.42), transparent 34%),
+    rgba(20, 31, 44, 0.22);
+  backdrop-filter: blur(10px);
+}
+
+.message-confirm-dialog {
+  width: min(388px, calc(100vw - 48px));
+  padding: 18px;
+  border: 1px solid rgba(214, 224, 235, 0.96);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 28px 70px rgba(17, 31, 48, 0.24);
+  color: #142033;
+}
+
+.message-confirm-dialog header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.message-confirm-icon {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.message-confirm-dialog h2 {
+  margin: 1px 0 6px;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 860;
+  letter-spacing: 0;
+}
+
+.message-confirm-dialog p {
+  margin: 0;
+  color: #65758b;
+  font-size: 13px;
+  font-weight: 640;
+  line-height: 1.6;
+}
+
+.message-confirm-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.message-confirm-dialog button {
+  height: 36px;
+  min-width: 86px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 780;
+}
+
+.message-confirm-secondary {
+  border: 1px solid rgba(214, 224, 235, 0.96);
+  background: #fff;
+  color: #475569;
+}
+
+.message-confirm-secondary:hover {
+  background: rgba(242, 247, 250, 0.96);
+  color: #1f2937;
+}
+
+.message-confirm-primary {
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  background: #ef4444;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(239, 68, 68, 0.22);
+}
+
+.message-confirm-primary:hover {
+  background: #dc2626;
+}
+
+.message-confirm-dialog.default .message-confirm-icon {
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+}
+
+.message-confirm-dialog.default .message-confirm-primary {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: #10b981;
+  box-shadow: 0 10px 22px rgba(16, 185, 129, 0.2);
+}
+
+.message-confirm-dialog.default .message-confirm-primary:hover {
+  background: #059669;
 }

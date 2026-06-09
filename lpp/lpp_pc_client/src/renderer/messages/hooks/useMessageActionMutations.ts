@@ -11,6 +11,7 @@ import { requireApiClient } from "../../data/runtime";
 import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 import {
+  discardLocalFailedOutgoingMessage,
   appendForwardedMessagesToCache,
   invalidateMessages,
   markMessageFavoriteInCache,
@@ -19,25 +20,37 @@ import {
 } from "../models/messageCacheMutationModel";
 import { extractActionResultText } from "../models/messageComposerModel";
 import { extractMessageText } from "../models/messageDisplayModel";
+import type { ImConversationType } from "../models/messageCacheMutationModel";
+import type { useMediaUploadTaskRegistry } from "./useMediaUploadTaskRegistry";
 
 type MessageAnnotationMap = Record<string, string>;
 
 export function useMessageActionMutations({
   activeConversation,
+  activeConversationType,
   conversations,
+  mediaUploadTasks,
+  messages,
   queryClient,
   session,
   setForwardTargetMessages,
+  setLocalOutgoingMessagesByConversation,
   setMessageAnnotations,
   setMultiSelectMode,
   setNotice,
   setSelectedMessageIds,
 }: {
   activeConversation?: ConversationListItem;
+  activeConversationType?: ImConversationType;
   conversations: ConversationListItem[];
+  mediaUploadTasks: ReturnType<typeof useMediaUploadTaskRegistry>;
+  messages: MessageItemDto[];
   queryClient: QueryClient;
   session: AuthSession | null;
   setForwardTargetMessages: Dispatch<SetStateAction<MessageItemDto[]>>;
+  setLocalOutgoingMessagesByConversation: Dispatch<
+    SetStateAction<Record<string, MessageItemDto[]>>
+  >;
   setMessageAnnotations: Dispatch<SetStateAction<MessageAnnotationMap>>;
   setMultiSelectMode: Dispatch<SetStateAction<boolean>>;
   setNotice: Dispatch<SetStateAction<string | null>>;
@@ -60,14 +73,29 @@ export function useMessageActionMutations({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (messageId: string) => {
+    mutationFn: async (message: MessageItemDto) => {
       if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
-      return requireApiClient(session).deleteMessage(messageId);
+      const localDiscard = await discardLocalFailedOutgoingForMessage({
+        activeConversation,
+        activeConversationType,
+        mediaUploadTasks,
+        message,
+        queryClient,
+        session,
+        setLocalOutgoingMessagesByConversation,
+      });
+      if (localDiscard.discarded) {
+        return { kind: "local" as const, messageId: localDiscard.localMessageId };
+      }
+      await requireApiClient(session).deleteMessage(message.messageId);
+      return { kind: "server" as const, messageId: message.messageId };
     },
-    onSuccess: async (_result, messageId) => {
-      removeMessageFromCache(queryClient, messageId, session);
+    onSuccess: async (result) => {
+      if (result.kind === "server") {
+        removeMessageFromCache(queryClient, result.messageId, session);
+        await invalidateMessages(queryClient, session);
+      }
       setNotice(t("messages.actionMutations.deleteSuccess"));
-      await invalidateMessages(queryClient, session);
     },
     onError: (error) =>
       setNotice(t("messages.actionMutations.deleteFailed", { error: formatError(error) })),
@@ -103,10 +131,47 @@ export function useMessageActionMutations({
   const batchDeleteMutation = useMutation({
     mutationFn: async (messageIds: string[]) => {
       if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
-      return requireApiClient(session).batchDeleteMessages(messageIds);
+      const localSuccessIds: string[] = [];
+      const localFailedItems: { messageId: string; message?: string }[] = [];
+      const serverMessageIds: string[] = [];
+      for (const messageId of messageIds) {
+        const message = messages.find((item) => item.messageId === messageId);
+        if (!message) {
+          serverMessageIds.push(messageId);
+          continue;
+        }
+        try {
+          const localDiscard = await discardLocalFailedOutgoingForMessage({
+            activeConversation,
+            activeConversationType,
+            mediaUploadTasks,
+            message,
+            queryClient,
+            session,
+            setLocalOutgoingMessagesByConversation,
+          });
+          if (localDiscard.discarded) {
+            localSuccessIds.push(messageId);
+          } else {
+            serverMessageIds.push(messageId);
+          }
+        } catch (error) {
+          localFailedItems.push({ messageId, message: formatError(error) });
+        }
+      }
+      const serverResult = serverMessageIds.length > 0
+        ? await requireApiClient(session).batchDeleteMessages(serverMessageIds)
+        : { failedItems: [], requestedIds: [], successIds: [] };
+      return {
+        failedItems: [...serverResult.failedItems, ...localFailedItems],
+        localSuccessIds,
+        requestedIds: messageIds,
+        serverSuccessIds: serverResult.successIds,
+        successIds: [...serverResult.successIds, ...localSuccessIds],
+      };
     },
     onSuccess: async (result) => {
-      result.successIds.forEach((messageId) =>
+      result.serverSuccessIds.forEach((messageId) =>
         removeMessageFromCache(queryClient, messageId, session),
       );
       const succeeded = messageBatchSucceededCount(result);
@@ -278,4 +343,37 @@ export function useMessageActionMutations({
     translateMutation,
     voiceToTextMutation,
   };
+}
+
+async function discardLocalFailedOutgoingForMessage({
+  activeConversation,
+  activeConversationType,
+  mediaUploadTasks,
+  message,
+  queryClient,
+  session,
+  setLocalOutgoingMessagesByConversation,
+}: {
+  activeConversation?: ConversationListItem;
+  activeConversationType?: ImConversationType;
+  mediaUploadTasks: ReturnType<typeof useMediaUploadTaskRegistry>;
+  message: MessageItemDto;
+  queryClient: QueryClient;
+  session: AuthSession | null;
+  setLocalOutgoingMessagesByConversation: Dispatch<
+    SetStateAction<Record<string, MessageItemDto[]>>
+  >;
+}) {
+  const conversationId = message.conversationId || activeConversation?.conversationId;
+  const conversationType = activeConversationType;
+  if (!conversationId || !conversationType) return { discarded: false as const };
+  return discardLocalFailedOutgoingMessage({
+    conversationId,
+    conversationType,
+    mediaUploadTasks,
+    message,
+    queryClient,
+    session,
+    setLocalOutgoingMessagesByConversation,
+  });
 }

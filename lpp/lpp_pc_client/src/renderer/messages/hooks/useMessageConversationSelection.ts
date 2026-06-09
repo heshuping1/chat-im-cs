@@ -29,7 +29,8 @@ export function useMessageConversationSelection({
   imReadStateByConversation,
   keyword,
   localHiddenConversationIds,
-  localMutedConversationIds,
+  localMutedConversationOverrides,
+  localPinnedConversationOverrides,
   locallyReadConversationReads,
   messageFilter,
   session,
@@ -39,7 +40,8 @@ export function useMessageConversationSelection({
   imReadStateByConversation: Record<string, ConversationReadState>;
   keyword: string;
   localHiddenConversationIds: Set<string>;
-  localMutedConversationIds: Set<string>;
+  localMutedConversationOverrides: Map<string, boolean>;
+  localPinnedConversationOverrides: Map<string, boolean>;
   locallyReadConversationReads: Parameters<typeof mergeUnifiedReadStateForIdentity>[0];
   messageFilter: Parameters<typeof filterMessageConversations>[1];
   session: AuthSession | null;
@@ -67,17 +69,22 @@ export function useMessageConversationSelection({
         conversationItems
           .filter((item) => isVisibleImConversationInScope(item, ownershipScopeKey))
           .filter((item) => !localHiddenConversationIds.has(item.conversationId))
-          .map((item) =>
-            localMutedConversationIds.has(item.conversationId)
-              ? { ...item, isMuted: true }
-              : item,
-          ),
+          .map((item) => ({
+            ...item,
+            ...(localMutedConversationOverrides.has(item.conversationId)
+              ? { isMuted: localMutedConversationOverrides.get(item.conversationId) }
+              : {}),
+            ...(localPinnedConversationOverrides.has(item.conversationId)
+              ? { isPinned: localPinnedConversationOverrides.get(item.conversationId) }
+              : {}),
+          })),
         unreadIdentity,
       ),
     [
       conversationItems,
       localHiddenConversationIds,
-      localMutedConversationIds,
+      localMutedConversationOverrides,
+      localPinnedConversationOverrides,
       ownershipScopeKey,
       unreadIdentity,
     ],

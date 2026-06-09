@@ -22,6 +22,8 @@ export function GroupReadReceiptPopover({
   loading,
   receipts,
   onClose,
+  canOpenMemberProfile,
+  onOpenMemberProfile,
   onRetry,
 }: {
   anchorRect: DOMRect;
@@ -29,6 +31,8 @@ export function GroupReadReceiptPopover({
   loading: boolean;
   receipts?: GroupReadReceipts;
   onClose: () => void;
+  canOpenMemberProfile?: (member: GroupReadReceiptMember) => boolean;
+  onOpenMemberProfile?: (target: HTMLElement, member: GroupReadReceiptMember) => void;
   onRetry: () => void;
 }) {
   const { t } = useI18n();
@@ -44,8 +48,8 @@ export function GroupReadReceiptPopover({
       const target = event.target;
       if (
         target instanceof Node &&
-        popoverRef.current &&
-        popoverRef.current.contains(target)
+        ((popoverRef.current && popoverRef.current.contains(target)) ||
+          isContactCardProfileTarget(target))
       ) {
         return;
       }
@@ -123,7 +127,12 @@ export function GroupReadReceiptPopover({
         ) : (
           <div className="pc-group-read-receipt-members">
             {members.map((member) => (
-              <ReceiptMemberRow key={member.userId || member.displayName} member={member} />
+              <ReceiptMemberRow
+                key={member.userId || member.displayName}
+                canOpenProfile={Boolean(canOpenMemberProfile?.(member))}
+                member={member}
+                onOpenProfile={onOpenMemberProfile}
+              />
             ))}
           </div>
         )}
@@ -132,15 +141,46 @@ export function GroupReadReceiptPopover({
   );
 }
 
-function ReceiptMemberRow({ member }: { member: GroupReadReceiptMember }) {
-  return (
-    <div className="pc-group-read-receipt-member">
+function isContactCardProfileTarget(target: Node) {
+  return target instanceof Element
+    ? Boolean(target.closest(".contact-card-profile-dialog"))
+    : false;
+}
+
+function ReceiptMemberRow({
+  canOpenProfile,
+  member,
+  onOpenProfile,
+}: {
+  canOpenProfile: boolean;
+  member: GroupReadReceiptMember;
+  onOpenProfile?: (target: HTMLElement, member: GroupReadReceiptMember) => void;
+}) {
+  const content = (
+    <>
       <PcAvatar
         avatarUrl={member.avatarUrl}
         className="pc-group-read-receipt-avatar"
         name={member.displayName}
       />
       <span>{member.displayName}</span>
+    </>
+  );
+  return canOpenProfile && onOpenProfile ? (
+    <button
+      aria-label={member.displayName}
+      className="pc-group-read-receipt-member clickable"
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenProfile(event.currentTarget, member);
+      }}
+    >
+      {content}
+    </button>
+  ) : (
+    <div className="pc-group-read-receipt-member">
+      {content}
     </div>
   );
 }

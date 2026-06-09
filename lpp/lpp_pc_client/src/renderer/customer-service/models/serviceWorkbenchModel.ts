@@ -251,7 +251,7 @@ export function createServiceCommandMetrics(input: {
   } = liveCounters;
   const serviceStatus =
     input.receptionStatus?.serviceStatus ?? input.lastKnownStatus ?? "unknown";
-  const activeSessions = input.receptionStatus?.activeSessionCount ?? null;
+  const activeSessions = hasReceptionStatus && hasThreadData ? activeCount : null;
   const maxSessions = input.receptionStatus?.maxConcurrentSessions;
   const capacityText =
     activeSessions === null

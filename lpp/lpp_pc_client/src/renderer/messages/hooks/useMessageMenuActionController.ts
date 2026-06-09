@@ -60,7 +60,7 @@ export function useMessageMenuActionController({
   recallMessage,
 }: {
   activeConversation?: ConversationListItem;
-  deleteMessage: (messageId: string) => void;
+  deleteMessage: (message: MessageItemDto) => void;
   favoriteMessage: (message: MessageItemDto) => void;
   recallMessage: (messageId: string) => void;
   session: AuthSession | null;
@@ -206,13 +206,13 @@ export function useMessageMenuActionController({
         return;
       }
       if (action === "recall") {
-        if (!confirmMessageDanger("recall-message", t)) return;
+        if (!(await confirmMessageDanger("recall-message", t))) return;
         recallMessage(message.messageId);
         return;
       }
       if (action === "delete") {
-        if (!confirmMessageDanger("delete-message", t)) return;
-        deleteMessage(message.messageId);
+        if (!(await confirmMessageDanger("delete-message", t))) return;
+        deleteMessage(message);
       }
     },
     [

@@ -70,7 +70,7 @@ export function useMessageInteractionHandlers({
   runConversationAction: (
     action: ConversationContextAction,
     conversation: ConversationListItem,
-  ) => void;
+  ) => Promise<void> | void;
   selectedMessageIds: Set<string>;
   session: AuthSession | null;
   setAvatarProfilePopover: Dispatch<SetStateAction<AvatarProfilePopoverState | null>>;
@@ -196,11 +196,11 @@ export function useMessageInteractionHandlers({
     const messageIds = Array.from(selectedMessageIds);
     if (messageIds.length === 0) return;
     if (
-      !requestMessageDangerConfirmation({
+      !(await requestMessageDangerConfirmation({
         action: "batch-delete-messages",
         count: messageIds.length,
         message: confirmMessageDangerText("batch-delete-messages", t, messageIds.length),
-      })
+      }))
     ) {
       return;
     }

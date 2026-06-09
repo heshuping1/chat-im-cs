@@ -203,6 +203,25 @@ export function reuseStableMessageItems(
   return reusedEveryItem ? previous : stableNext;
 }
 
+export function mergeStableMessagePage(
+  previous: MessageItemDto[] | undefined,
+  next: MessageItemDto[] | undefined,
+): MessageItemDto[] | undefined {
+  if (!next || !previous?.length) return reuseStableMessageItems(previous, next);
+
+  const stableNext = reuseStableMessageItems(previous, next) ?? next;
+  const nextIdentityKeys = new Set(stableNext.flatMap(messageIdentityKeys));
+  const boundary = latestPageBoundary(stableNext);
+  const retainedPrevious = previous.filter((message) => {
+    if (messageIdentityKeys(message).some((key) => nextIdentityKeys.has(key))) {
+      return false;
+    }
+    return isPendingLocalMessage(message) || isOlderThanLatestPage(message, boundary);
+  });
+  if (retainedPrevious.length === 0) return stableNext;
+  return sortMessageItems([...retainedPrevious, ...stableNext]);
+}
+
 export function normalizeChatMessageDeliveryState(
   status?: string,
   isRecalled?: boolean,
@@ -267,6 +286,74 @@ function stableMessageKey(message: MessageItemDto) {
     ].join(":");
   }
   return "";
+}
+
+function messageIdentityKeys(message: MessageItemDto) {
+  const keys = new Set<string>();
+  const record = message as unknown as Record<string, unknown>;
+  if (message.messageId) keys.add(`message:${message.messageId}`);
+  if (typeof record.clientMsgId === "string" && record.clientMsgId.trim()) {
+    keys.add(`client:${record.clientMsgId.trim()}`);
+  }
+  if (typeof record.clientMessageId === "string" && record.clientMessageId.trim()) {
+    keys.add(`client:${record.clientMessageId.trim()}`);
+  }
+  if (message.conversationId && typeof message.conversationSeq === "number") {
+    keys.add(`seq:${message.conversationId}:${message.conversationSeq}`);
+  }
+  return [...keys];
+}
+
+function latestPageBoundary(messages: MessageItemDto[]) {
+  const seqs = messages
+    .map((message) => message.conversationSeq)
+    .filter((seq): seq is number => typeof seq === "number");
+  if (seqs.length > 0) {
+    return { kind: "seq" as const, value: Math.min(...seqs) };
+  }
+  const times = messages
+    .map((message) => Date.parse(message.sentAt ?? ""))
+    .filter((time) => Number.isFinite(time));
+  if (times.length > 0) {
+    return { kind: "time" as const, value: Math.min(...times) };
+  }
+  return undefined;
+}
+
+function isOlderThanLatestPage(
+  message: MessageItemDto,
+  boundary: ReturnType<typeof latestPageBoundary>,
+) {
+  if (!boundary) return false;
+  if (boundary.kind === "seq" && typeof message.conversationSeq === "number") {
+    return message.conversationSeq < boundary.value;
+  }
+  const sentAt = Date.parse(message.sentAt ?? "");
+  return Number.isFinite(sentAt) && sentAt < boundary.value;
+}
+
+function isPendingLocalMessage(message: MessageItemDto) {
+  const status = normalizeStatus(message.status);
+  return (
+    message.messageId?.startsWith("pc-local-") ||
+    status === "queued" ||
+    status === "sending" ||
+    status === "uploading" ||
+    status === "paused"
+  );
+}
+
+function sortMessageItems(messages: MessageItemDto[]) {
+  return [...messages].sort((left, right) => {
+    const leftSeq = typeof left.conversationSeq === "number"
+      ? left.conversationSeq
+      : Number.MAX_SAFE_INTEGER;
+    const rightSeq = typeof right.conversationSeq === "number"
+      ? right.conversationSeq
+      : Number.MAX_SAFE_INTEGER;
+    if (leftSeq !== rightSeq) return leftSeq - rightSeq;
+    return Date.parse(left.sentAt ?? "") - Date.parse(right.sentAt ?? "");
+  });
 }
 
 function stableMessageFingerprint(message: MessageItemDto) {

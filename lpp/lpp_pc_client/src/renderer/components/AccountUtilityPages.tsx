@@ -17,7 +17,6 @@ import {
   Search,
   Tag,
   TriangleAlert,
-  X,
 } from "lucide-react";
 import {
   ApiClient,
@@ -43,6 +42,8 @@ import {
   tenantJoinRequestsPollIntervalMs,
 } from "../spaces/models/tenantJoinReminderModel";
 import { chatMediaItemsFromMessage, type ChatMediaItem } from "../media/domain/mediaMessage";
+import { ImagePreviewViewer } from "../media/components/ImageMessageFrame";
+import { useCachedImageMediaUrl } from "../media/runtime/useCachedImageMediaUrl";
 import {
   openMessageMediaFile,
   openMessageVideoPlayer,
@@ -494,7 +495,7 @@ export function FavoritesPage() {
   const authSession = useAuthSession();
   const [category, setCategory] = useState("all");
   const [keyword, setKeyword] = useState("");
-  const [imagePreview, setImagePreview] = useState<{ fileName: string; src: string } | null>(null);
+  const [imagePreview, setImagePreview] = useState<FavoriteImagePreview | null>(null);
   const summaryQuery = useQuery({
     queryKey: pcQueryKeys.accountFavoritesSummary(authSession?.apiBaseUrl, authSession?.tenantToken),
     enabled: Boolean(authSession),
@@ -524,7 +525,11 @@ export function FavoritesPage() {
     const openUrl = preview.openUrl || preview.previewUrl;
     if (!openUrl) return;
     if (preview.kind === "image") {
-      setImagePreview({ fileName: preview.fileName, src: openUrl });
+      setImagePreview({
+        cacheKey: preview.cacheKey,
+        fileName: preview.fileName,
+        src: openUrl,
+      });
       return;
     }
     const cacheContext = {
@@ -541,7 +546,7 @@ export function FavoritesPage() {
   };
 
   return (
-    <main className="module-page account-utility-page">
+    <main className="module-page account-utility-page favorite-utility-page">
       <section className="account-utility-hero">
         <span className="eyebrow">FAVORITES</span>
         <h1>{t("accountUtility.favorites.title")}</h1>
@@ -648,30 +653,11 @@ export function FavoritesPage() {
         )}
       </section>
       {imagePreview && (
-        <div
-          className="message-image-preview favorite-image-preview"
-          role="dialog"
-          aria-modal="true"
-          aria-label={imagePreview.fileName}
-          onClick={() => setImagePreview(null)}
-        >
-          <button
-            className="message-image-preview-close"
-            type="button"
-            aria-label={t("accountUtility.favorites.closePreview")}
-            onClick={(event) => {
-              event.stopPropagation();
-              setImagePreview(null);
-            }}
-          >
-            <X size={18} />
-          </button>
-          <img
-            src={imagePreview.src}
-            alt={imagePreview.fileName}
-            onClick={(event) => event.stopPropagation()}
-          />
-        </div>
+        <FavoriteImagePreviewViewer
+          authToken={authToken}
+          preview={imagePreview}
+          onClose={() => setImagePreview(null)}
+        />
       )}
     </main>
   );
@@ -686,6 +672,25 @@ const favoriteCategories = [
   { key: "file", labelKey: "accountUtility.favorites.category.file" },
   { key: "other", labelKey: "accountUtility.favorites.category.other" },
 ];
+
+function FavoriteImagePreviewViewer({
+  authToken,
+  onClose,
+  preview,
+}: {
+  authToken?: string;
+  onClose: () => void;
+  preview: FavoriteImagePreview;
+}) {
+  const { displaySrc } = useCachedImageMediaUrl(preview.src, authToken, preview.cacheKey);
+  return (
+    <ImagePreviewViewer
+      fileName={preview.fileName}
+      onClosePreview={onClose}
+      src={displaySrc || preview.src}
+    />
+  );
+}
 
 function normalizeSpaces(
   remote?: PlatformTenant[],
@@ -737,12 +742,19 @@ function favoriteIcon(type?: string | null) {
 }
 
 type FavoriteMediaPreview = {
+  cacheKey?: string;
   durationSeconds?: number;
   fileName: string;
   kind: "image" | "video";
   message: MessageItemDto;
   openUrl?: string;
   previewUrl?: string;
+};
+
+type FavoriteImagePreview = {
+  cacheKey?: string;
+  fileName: string;
+  src: string;
 };
 
 function favoriteMediaPreviewFromItem({
@@ -765,6 +777,7 @@ function favoriteMediaPreviewFromItem({
         : undefined,
     fileName: mediaItem.fileName,
     kind: mediaItem.kind,
+    cacheKey: mediaItem.kind === "image" ? mediaItem.imageCacheKey : undefined,
     message,
     openUrl: mediaItem.localOpenUrl || mediaItem.remoteSourceUrl || mediaItem.sourceUrl,
     previewUrl:

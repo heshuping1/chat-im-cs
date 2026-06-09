@@ -33,6 +33,7 @@ import {
 } from "../../src/renderer/data/message-display";
 import {
   applyDirectReadReceiptToMessages,
+  latestPendingDirectReadReceiptSeq,
   mergePeerReadSeq,
   readReceiptReaderIsCurrentUser,
   viewedConversationReadSeq,
@@ -676,6 +677,57 @@ describe("IM peer read receipt rules", () => {
     });
 
     expect(applyDirectReadReceiptToMessages([peerMessage], 10, currentUser)[0]).toBe(peerMessage);
+  });
+
+  it("finds the latest own direct message still waiting for peer read receipt", () => {
+    const messages: MessageItemDto[] = [
+      message({
+        messageId: "covered",
+        conversationSeq: 8,
+        senderUserId: "pc-user",
+        status: "sent",
+      }),
+      message({
+        messageId: "pending",
+        conversationSeq: 12,
+        senderUserId: "pc-user",
+        status: "sent",
+      }),
+      message({
+        messageId: "peer",
+        conversationSeq: 14,
+        senderUserId: "peer-user",
+        status: "sent",
+      }),
+      message({
+        messageId: "sending",
+        conversationSeq: 15,
+        senderUserId: "pc-user",
+        status: "sending",
+      }),
+      message({
+        messageId: "already-read",
+        conversationSeq: 16,
+        isRead: true,
+        senderUserId: "pc-user",
+        status: "read",
+      }),
+    ];
+
+    expect(
+      latestPendingDirectReadReceiptSeq({
+        identity: currentUser,
+        messages,
+        peerReadSeq: 10,
+      }),
+    ).toBe(12);
+    expect(
+      latestPendingDirectReadReceiptSeq({
+        identity: currentUser,
+        messages,
+        peerReadSeq: 12,
+      }),
+    ).toBe(0);
   });
 });
 

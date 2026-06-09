@@ -1,4 +1,5 @@
 import type { ConversationListItem, GroupDetailDto, GroupMemberDto, GroupSettingsDto } from "../../data/api-client";
+import type { GroupReadReceiptMember } from "../../data/message/group-read-receipts-model";
 
 export type GroupRole = "owner" | "admin" | "member";
 export type GroupInfoTabKey = "profile" | "members" | "announcements" | "files" | "management";
@@ -75,6 +76,83 @@ export function groupMemberIdentityKeys(member: GroupMemberDto) {
   ]
     .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
     .filter(Boolean);
+}
+
+export function readableGroupReadReceiptMemberCount({
+  authSession,
+  fallbackMemberCount,
+  groupMemberMap,
+}: {
+  authSession?: {
+    displayName?: string | null;
+    lppId?: string | null;
+    platformUserId?: string | null;
+    userId?: string | null;
+  } | null;
+  fallbackMemberCount?: number | null;
+  groupMemberMap: Map<string, GroupMemberDto>;
+}) {
+  const uniqueMemberKeys = new Set<string>();
+  let hasCurrentUser = false;
+  const currentIdentityKeys = new Set(
+    [authSession?.userId, authSession?.platformUserId, authSession?.lppId, authSession?.displayName]
+      .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
+      .filter(Boolean),
+  );
+
+  for (const member of groupMemberMap.values()) {
+    const keys = groupMemberIdentityKeys(member);
+    const stableKey = keys[0] || member.userId;
+    if (!stableKey) continue;
+    uniqueMemberKeys.add(stableKey);
+    if (keys.some((key) => currentIdentityKeys.has(key))) {
+      hasCurrentUser = true;
+    }
+  }
+
+  if (uniqueMemberKeys.size > 0) {
+    return Math.max(0, uniqueMemberKeys.size - (hasCurrentUser ? 1 : 0));
+  }
+
+  const fallbackCount =
+    typeof fallbackMemberCount === "number" && Number.isFinite(fallbackMemberCount)
+      ? Math.floor(fallbackMemberCount)
+      : 0;
+  return fallbackCount > 0 ? Math.max(0, fallbackCount - 1) : undefined;
+}
+
+export function groupReadReceiptMemberProfileTarget({
+  canViewMembers,
+  groupMemberMap,
+  member,
+}: {
+  canViewMembers: boolean;
+  groupMemberMap: Map<string, GroupMemberDto>;
+  member: GroupReadReceiptMember;
+}) {
+  if (!canViewMembers) return undefined;
+  const existing = groupReadReceiptMemberLookupKeys(member)
+    .map((key) => groupMemberMap.get(key))
+    .find(Boolean);
+  if (existing) return existing;
+  const userId = usableProfileIdentity(member.userId) ??
+    usableProfileIdentity(member.platformUserId) ??
+    usableProfileIdentity(member.lppId);
+  if (!userId) return undefined;
+  return {
+    avatarUrl: member.avatarUrl,
+    displayName: member.displayName,
+    lppId: member.lppId ?? undefined,
+    platformUserId: member.platformUserId ?? undefined,
+    userId,
+  } as GroupMemberDto;
+}
+
+function usableProfileIdentity(value?: string | null) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!normalized) return undefined;
+  if (normalized === "00000000-0000-0000-0000-000000000000") return undefined;
+  return normalized;
 }
 
 export function resolveMyGroupRole({
@@ -179,4 +257,10 @@ function usableGroupMemberName(value: unknown) {
     return undefined;
   }
   return text;
+}
+
+function groupReadReceiptMemberLookupKeys(member: GroupReadReceiptMember) {
+  return [member.userId, member.platformUserId, member.lppId, member.displayName]
+    .map((value) => (typeof value === "string" ? value.trim().toLowerCase() : ""))
+    .filter(Boolean);
 }

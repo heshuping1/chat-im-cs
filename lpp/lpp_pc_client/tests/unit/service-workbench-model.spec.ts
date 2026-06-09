@@ -88,6 +88,33 @@ describe("customer service workbench model", () => {
     ]);
   });
 
+  it("uses visible online-service threads instead of reception active sessions for active counts", () => {
+    const metrics = createServiceCommandMetrics({
+      isRiskyThread: () => false,
+      receptionStatus: {
+        activeSessionCount: 1,
+        maxConcurrentSessions: 10,
+        queueAcceptEnabled: false,
+        serviceStatus: "online",
+      },
+      threads: {
+        activeItems: [
+          thread({ threadId: "im-direct-1", status: "active", threadType: "im_direct" }),
+        ],
+        queueItems: [],
+        summary: { activeCount: 1, allCount: 1, queuedCount: 0, vipCount: 0 },
+      },
+    });
+
+    expect(metrics).toMatchObject({
+      activeCount: 0,
+      activeSessions: 0,
+      capacityText: "0/10",
+      queuedCount: 0,
+      totalCount: 0,
+    });
+  });
+
   it("does not turn missing reception or thread data into fake status and counts", () => {
     const metrics = createServiceCommandMetrics({
       isRiskyThread: () => false,

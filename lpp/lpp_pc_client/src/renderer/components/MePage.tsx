@@ -1172,8 +1172,8 @@ function LocalDataStorageRows({
     },
   });
   const stats = statsQuery.data;
-  const confirmCleanup = () => {
-    if (!requestMessageCustomConfirmation(t("me.localDataStorage.cleanupConfirm"))) return;
+  const confirmCleanup = async () => {
+    if (!(await requestMessageCustomConfirmation(t("me.localDataStorage.cleanupConfirm")))) return;
     cleanupMutation.mutate();
   };
 

@@ -1,6 +1,5 @@
 import { MessageBodyView, type UploadActionHandler } from "./MessageBodyView";
 import { PcAvatar } from "./PcAvatar";
-import { Check } from "lucide-react";
 import type { MessageItemDto } from "../data/api-client";
 import {
   createChatMessageViewModel,
@@ -90,44 +89,49 @@ export function ChatMessageBubble({
     nowMs: statusNowMs,
   });
   const model = viewModel
-    ? { ...viewModel, actions: computedModel.actions, status: computedModel.status }
+    ? { ...viewModel, actions: computedModel.actions }
     : computedModel;
   const senderName = model.sender.name;
   const reply = model.bubble.reply;
-  const readReceipt = model.status.receipt === "read";
+  const directReadReceipt =
+    mine && (model.status.receipt === "read" || model.status.receipt === "group_all");
   const groupReadReceipt =
-    model.status.groupReadReceiptClickable && Boolean(onGroupReadReceiptClick);
-  const receiptClassName = `pc-chat-receipt${readReceipt ? " read" : ""}${
-    groupReadReceipt ? " group" : ""
-  }`;
-  const receiptContent = (
-    <>
-      {readReceipt && (
-        <Check
-          aria-hidden="true"
-          className="pc-chat-receipt-icon"
-          size={12}
-          strokeWidth={3}
-        />
-      )}
-      <span>{model.status.statusText}</span>
-    </>
-  );
-  const statusReceipt = model.status.statusText ? (
-    groupReadReceipt ? (
-      <button
-        className={`${receiptClassName} pc-chat-group-receipt-button`}
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onGroupReadReceiptClick?.(message, event.currentTarget);
-        }}
-      >
-        {receiptContent}
-      </button>
-    ) : (
-      <span className={receiptClassName}>{receiptContent}</span>
-    )
+    mine &&
+    model.status.groupReadReceipt &&
+    model.status.receipt !== "group_all" &&
+    model.status.groupReadReceiptClickable &&
+    Boolean(onGroupReadReceiptClick);
+  const groupReadRatio = model.status.groupReadReceipt?.ratio ?? 0;
+  const groupReadCount = model.status.groupReadReceipt?.readCount ?? 0;
+  const groupReadVisualRatio = groupReadCount > 0 ? Math.max(groupReadRatio, 0.14) : 0;
+  const groupReadLabel = groupReadReceiptLabel(model.status.groupReadReceipt);
+  const statusReceipt = directReadReceipt ? (
+    <span
+      aria-label="已读"
+      className="pc-chat-bubble-receipt pc-chat-direct-read-receipt"
+      role="img"
+      title="已读"
+    >
+      <DirectReadReceiptIcon />
+    </span>
+  ) : groupReadReceipt ? (
+    <button
+      aria-label={groupReadLabel}
+      className={`pc-chat-bubble-receipt pc-chat-group-read-pie-button ${
+        groupReadCount > 0 ? "read" : "unread"
+      }`}
+      title={groupReadLabel}
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onGroupReadReceiptClick?.(message, event.currentTarget);
+      }}
+    >
+      <GroupReadPieIcon ratio={groupReadVisualRatio} read={groupReadCount > 0} />
+    </button>
+  ) : null;
+  const inlineStatusText = model.status.statusText ? (
+    <span className="pc-chat-inline-status">{model.status.statusText}</span>
   ) : null;
   const sendStatusSlot = mine && model.status.sendStatusSlot !== "none" ? (
     <MessageSendStatusSlot
@@ -167,21 +171,24 @@ export function ChatMessageBubble({
         {!mine && showSenderName && <div className="pc-chat-sender">{senderName}</div>}
         <div className="pc-chat-bubble-row">
           {sendStatusSlot}
-          <div className="pc-chat-bubble">
-            {reply && (
-              <div className="pc-chat-reply-quote">
-                <span>{reply.sender}</span>
-                <strong>{reply.preview}</strong>
-              </div>
-            )}
-            <MessageBodyView
-              assetBaseUrl={assetBaseUrl}
-              authToken={authToken}
-              mediaCacheContext={mediaCacheContext}
-              message={message}
-              onContactClick={onContactClick}
-              onUploadAction={onUploadAction}
-            />
+          <div className={`pc-chat-bubble-shell${statusReceipt ? " has-receipt" : ""}`}>
+            <div className="pc-chat-bubble">
+              {reply && (
+                <div className="pc-chat-reply-quote">
+                  <span>{reply.sender}</span>
+                  <strong>{reply.preview}</strong>
+                </div>
+              )}
+              <MessageBodyView
+                assetBaseUrl={assetBaseUrl}
+                authToken={authToken}
+                mediaCacheContext={mediaCacheContext}
+                message={message}
+                onContactClick={onContactClick}
+                onUploadAction={onUploadAction}
+              />
+            </div>
+            {statusReceipt}
           </div>
         </div>
         {model.content.translationText && (
@@ -189,12 +196,12 @@ export function ChatMessageBubble({
         )}
         <time className="pc-chat-time">
           <span>{model.status.timeText}</span>
-          {statusReceipt && (
+          {inlineStatusText && (
             <>
               <span className="pc-chat-time-separator" aria-hidden="true">
                 ·
               </span>
-              {statusReceipt}
+              {inlineStatusText}
             </>
           )}
         </time>
@@ -202,6 +209,87 @@ export function ChatMessageBubble({
       {mine && avatar}
     </article>
   );
+}
+
+function DirectReadReceiptIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="pc-chat-direct-read-receipt-icon"
+      focusable="false"
+      height="13"
+      viewBox="0 0 14 14"
+      width="13"
+    >
+      <circle
+        className="pc-chat-direct-read-receipt-ring"
+        cx="7"
+        cy="7"
+        r="5.45"
+      />
+      <path
+        className="pc-chat-direct-read-receipt-check"
+        d="M4.45 7.05L6.12 8.68L9.58 5.28"
+      />
+    </svg>
+  );
+}
+
+function GroupReadPieIcon({ ratio, read }: { ratio: number; read: boolean }) {
+  const center = 7;
+  const radius = 5.35;
+  const clampedRatio = Math.max(0, Math.min(1, ratio));
+  const wedgePath = read ? groupReadPiePath(center, radius, clampedRatio) : undefined;
+  return (
+    <svg
+      aria-hidden="true"
+      className="pc-chat-group-read-pie-icon"
+      focusable="false"
+      height="13"
+      viewBox="0 0 14 14"
+      width="13"
+    >
+      {read ? (
+        <>
+          <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-track" />
+          {clampedRatio >= 0.995 ? (
+            <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-fill" />
+          ) : wedgePath ? (
+            <path className="pc-chat-group-read-pie-fill" d={wedgePath} />
+          ) : null}
+          <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-outline" />
+        </>
+      ) : (
+        <circle cx={center} cy={center} r={radius} className="pc-chat-group-read-pie-empty" />
+      )}
+    </svg>
+  );
+}
+
+function groupReadPiePath(center: number, radius: number, ratio: number) {
+  if (ratio <= 0) return undefined;
+  const startAngle = -Math.PI / 2;
+  const endAngle = startAngle + ratio * Math.PI * 2;
+  const startX = center + radius * Math.cos(startAngle);
+  const startY = center + radius * Math.sin(startAngle);
+  const endX = center + radius * Math.cos(endAngle);
+  const endY = center + radius * Math.sin(endAngle);
+  const largeArc = ratio > 0.5 ? 1 : 0;
+  return [
+    `M ${center} ${center}`,
+    `L ${startX.toFixed(3)} ${startY.toFixed(3)}`,
+    `A ${radius} ${radius} 0 ${largeArc} 1 ${endX.toFixed(3)} ${endY.toFixed(3)}`,
+    "Z",
+  ].join(" ");
+}
+
+function groupReadReceiptLabel(
+  receipt: ChatMessageViewModel["status"]["groupReadReceipt"],
+) {
+  if (!receipt) return "已读详情";
+  return receipt.totalCount !== undefined
+    ? `已读 ${receipt.readCount} / ${receipt.totalCount}`
+    : `已读 ${receipt.readCount}`;
 }
 
 function MessageSendStatusSlot({

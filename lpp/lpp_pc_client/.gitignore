@@ -3,5 +3,6 @@ dist/
 /release/
 playwright-report/
 test-results/
+.tmp-video-frames/
 .DS_Store
 *.log

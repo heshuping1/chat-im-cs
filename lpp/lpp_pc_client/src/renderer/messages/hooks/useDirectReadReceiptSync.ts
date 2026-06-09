@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
@@ -15,13 +15,21 @@ import {
   imMessageScopeKey,
 } from "../../data/message-store/im-message-store";
 import type { CurrentUserIdentity } from "../../data/message-display";
+import { latestPendingDirectReadReceiptSeq } from "../../data/read-receipts";
+import {
+  activeDirectReadStatusFastTrackIntervalMs,
+  activeDirectReadStatusFastTrackWindowMs,
+} from "../models/imReadReceiptPolicy";
 import { getImConversationType } from "./useMessageCenterViewModel";
 
 export function useDirectReadReceiptSync({
   activeConversation,
   activeConversationType,
   directReadStatus,
+  directReadStatusRefetch,
   markImPeerReadReceipt,
+  messages,
+  peerReadSeq,
   queryClient,
   session,
   unreadIdentity,
@@ -30,12 +38,82 @@ export function useDirectReadReceiptSync({
   activeConversation?: ConversationListItem;
   activeConversationType: ReturnType<typeof getImConversationType>;
   directReadStatus?: { peerLastReadSeq?: number | string | null };
+  directReadStatusRefetch?: () => Promise<unknown> | unknown;
   markImPeerReadReceipt: (conversationId: string, readSeq: number) => void;
+  messages: MessageItemDto[];
+  peerReadSeq?: number;
   queryClient: QueryClient;
   session: AuthSession | null;
   unreadIdentity: CurrentUserIdentity | null;
   upsertImReadState: (state: ConversationReadState) => void;
 }) {
+  const latestMessagesRef = useRef(messages);
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+  }, [messages]);
+  const pendingDirectReadSeq = useMemo(
+    () =>
+      activeConversationType === "direct"
+        ? latestPendingDirectReadReceiptSeq({
+            identity: unreadIdentity,
+            messages,
+            peerReadSeq,
+          })
+        : 0,
+    [activeConversationType, messages, peerReadSeq, unreadIdentity],
+  );
+
+  useEffect(() => {
+    if (
+      !activeConversation ||
+      activeConversationType !== "direct" ||
+      pendingDirectReadSeq <= 0 ||
+      !directReadStatusRefetch
+    ) {
+      return undefined;
+    }
+    const key = imConversationKey("direct", activeConversation.conversationId);
+    const startedAt = Date.now();
+    let stopped = false;
+    const interval = window.setInterval(() => {
+      if (stopped) return;
+      if (!shouldContinue()) {
+        stop();
+        return;
+      }
+      refetch();
+    }, activeDirectReadStatusFastTrackIntervalMs());
+    const stop = () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+    const refetch = () => {
+      void directReadStatusRefetch();
+    };
+    const shouldContinue = () => {
+      const currentPeerReadSeq =
+        getImReadSnapshot().imReadStateByConversation[key]?.peerReadSeq ?? peerReadSeq ?? 0;
+      return (
+        Date.now() - startedAt < activeDirectReadStatusFastTrackWindowMs() &&
+        latestPendingDirectReadReceiptSeq({
+          identity: unreadIdentity,
+          messages: latestMessagesRef.current,
+          peerReadSeq: currentPeerReadSeq,
+        }) > 0
+      );
+    };
+
+    refetch();
+    return stop;
+  }, [
+    activeConversation,
+    activeConversationType,
+    directReadStatusRefetch,
+    peerReadSeq,
+    pendingDirectReadSeq,
+    unreadIdentity,
+  ]);
+
   useEffect(() => {
     if (
       !activeConversation ||

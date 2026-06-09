@@ -138,21 +138,21 @@ export function ContactsPage() {
     setNotice(t("contacts.page.notice.addContact"));
   };
 
-  const onDeleteFriend = (contact: ContactItem) => {
+  const onDeleteFriend = async (contact: ContactItem) => {
     if (!contact.userId) {
       setNotice(t("contacts.page.notice.missingUserDelete"));
       return;
     }
-    if (!confirmMessageDanger("delete-friend", t)) return;
+    if (!(await confirmMessageDanger("delete-friend", t))) return;
     deleteFriend(contact);
   };
 
-  const onBlockContact = (contact: ContactItem) => {
+  const onBlockContact = async (contact: ContactItem) => {
     if (!contact.userId) {
       setNotice(t("contacts.page.notice.missingUserBlock"));
       return;
     }
-    if (!confirmMessageDanger("block-user", t)) return;
+    if (!(await confirmMessageDanger("block-user", t))) return;
     blockContact(contact);
   };
 

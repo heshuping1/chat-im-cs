@@ -1408,7 +1408,13 @@
 
 .favorite-filter-card {
   display: grid;
+  align-self: start;
   gap: 12px;
+}
+
+.favorite-utility-page {
+  grid-template-rows: auto auto auto auto;
+  align-content: start;
 }
 
 .favorite-search {

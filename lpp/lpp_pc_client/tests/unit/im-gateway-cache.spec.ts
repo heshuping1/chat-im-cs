@@ -197,7 +197,9 @@ describe("im gateway cache adapter", () => {
 
     applyImGatewayReadCache(queryClient, {
       conversationId: "direct-1",
+      conversationType: "direct",
       readerIsCurrentUser: true,
+      readSeq: 3,
       myReadSeq: 3,
       peerReadSeq: 0,
       previousPeerReadSeq: 0,
@@ -218,5 +220,82 @@ describe("im gateway cache adapter", () => {
     ])?.items[0];
     expect(item?.unreadCount).toBe(0);
     expect(item?.lastReadSeq).toBe(3);
+  });
+
+  it("increments cached own group message read counts idempotently by reader", () => {
+    const queryClient = new QueryClient();
+    const identity = { userId: "u-self", displayName: "Me" };
+    queryClient.setQueryData<MessageItemDto[]>(
+      ["pc-im-messages", "scope-group", "token", "group", "group-1"],
+      [
+        {
+          conversationId: "group-1",
+          conversationSeq: 3,
+          direction: "out",
+          isMine: true,
+          messageId: "own-covered",
+          messageType: "text",
+          sentAt: "2026-05-29T00:00:00.000Z",
+          senderUserId: "u-self",
+          status: "sent",
+        },
+        {
+          conversationId: "group-1",
+          conversationSeq: 5,
+          direction: "out",
+          isMine: true,
+          messageId: "own-uncovered",
+          messageType: "text",
+          readCount: 0,
+          sentAt: "2026-05-29T00:01:00.000Z",
+          senderUserId: "u-self",
+          status: "sent",
+        },
+        {
+          conversationId: "group-1",
+          conversationSeq: 2,
+          direction: "in",
+          isMine: false,
+          messageId: "peer-message",
+          messageType: "text",
+          readCount: 0,
+          sentAt: "2026-05-29T00:02:00.000Z",
+          senderUserId: "u-peer",
+          status: "sent",
+        },
+      ],
+    );
+
+    const applyPeerRead = (readSeq: number) =>
+      applyImGatewayReadCache(queryClient, {
+        conversationId: "group-1",
+        conversationType: "group",
+        readerIsCurrentUser: false,
+        readerKey: "reader-a",
+        readSeq,
+        myReadSeq: 0,
+        peerReadSeq: 0,
+        previousPeerReadSeq: 0,
+        identity,
+        scopeKey: "scope-group",
+      });
+
+    applyPeerRead(3);
+    applyPeerRead(3);
+    applyPeerRead(5);
+
+    expect(
+      queryClient.getQueryData<MessageItemDto[]>([
+        "pc-im-messages",
+        "scope-group",
+        "token",
+        "group",
+        "group-1",
+      ]),
+    ).toMatchObject([
+      { messageId: "own-covered", readCount: 1 },
+      { messageId: "own-uncovered", readCount: 1 },
+      { messageId: "peer-message", readCount: 0 },
+    ]);
   });
 });

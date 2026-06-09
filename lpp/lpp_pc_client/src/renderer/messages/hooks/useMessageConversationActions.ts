@@ -1,7 +1,7 @@
 import { useMutation, type QueryClient } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 
-import type { ConversationListItem } from "../../data/api-client";
+import { ApiError, type ConversationListItem } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
 import { requireApiClient } from "../../data/runtime";
 import { useI18n } from "../../i18n/useI18n";
@@ -24,7 +24,8 @@ export function useMessageConversationActions({
   session,
   setActiveConversation,
   setLocalHiddenConversationIds,
-  setLocalMutedConversationIds,
+  setLocalMutedConversationOverrides,
+  setLocalPinnedConversationOverrides,
   setNotice,
 }: {
   activeConversationId?: string | null;
@@ -32,7 +33,8 @@ export function useMessageConversationActions({
   session: AuthSession | null;
   setActiveConversation: (conversationId: string) => void;
   setLocalHiddenConversationIds: Dispatch<SetStateAction<Set<string>>>;
-  setLocalMutedConversationIds: Dispatch<SetStateAction<Set<string>>>;
+  setLocalMutedConversationOverrides: Dispatch<SetStateAction<Map<string, boolean>>>;
+  setLocalPinnedConversationOverrides: Dispatch<SetStateAction<Map<string, boolean>>>;
   setNotice: Dispatch<SetStateAction<string | null>>;
 }) {
   const { t } = useI18n();
@@ -45,10 +47,24 @@ export function useMessageConversationActions({
     mutationFn: async ({ conversation }: { conversation: ConversationListItem }) => {
       if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
       const isPinned = nextConversationPinned(conversation);
-      await requireApiClient(session).setConversationPinned(conversation.conversationId, isPinned);
+      const api = requireApiClient(session);
+      try {
+        if (conversation.conversationType === "group") {
+          await api.setGroupPinned(conversation.conversationId, isPinned);
+        } else {
+          await api.setConversationPinned(conversation.conversationId, isPinned);
+        }
+      } catch (error) {
+        if (!isApiNotFoundError(error)) throw error;
+      }
       return { conversationId: conversation.conversationId, isPinned };
     },
-    onSuccess: async ({ isPinned }) => {
+    onSuccess: async ({ conversationId, isPinned }) => {
+      setLocalPinnedConversationOverrides((current) => {
+        const next = new Map(current);
+        next.set(conversationId, isPinned);
+        return next;
+      });
       setNotice(
         isPinned
           ? t("messages.conversationActions.pinned")
@@ -64,14 +80,22 @@ export function useMessageConversationActions({
     mutationFn: async ({ conversation }: { conversation: ConversationListItem }) => {
       if (!session) throw new Error(t("messages.actionMutations.loginRequired"));
       const isMuted = nextConversationMuted(conversation);
-      await requireApiClient(session).setConversationMuted(conversation.conversationId, isMuted);
+      const api = requireApiClient(session);
+      try {
+        if (conversation.conversationType === "group") {
+          await api.setGroupMuted(conversation.conversationId, isMuted);
+        } else {
+          await api.setConversationMuted(conversation.conversationId, isMuted);
+        }
+      } catch (error) {
+        if (!isApiNotFoundError(error)) throw error;
+      }
       return { conversationId: conversation.conversationId, isMuted };
     },
     onSuccess: async ({ conversationId, isMuted }) => {
-      setLocalMutedConversationIds((current) => {
-        const next = new Set(current);
-        if (isMuted) next.add(conversationId);
-        else next.delete(conversationId);
+      setLocalMutedConversationOverrides((current) => {
+        const next = new Map(current);
+        next.set(conversationId, isMuted);
         return next;
       });
       setNotice(
@@ -119,13 +143,13 @@ export function useMessageConversationActions({
       setNotice(t("messages.conversationActions.failed", { error: formatError(error) })),
   });
 
-  const runConversationAction = (
+  const runConversationAction = async (
     action: ConversationContextAction,
     conversation: ConversationListItem,
   ) => {
     if (
       conversationActionRequiresDeleteConfirmation(action) &&
-      !confirmDeleteConversation(t)
+      !(await confirmDeleteConversation(t))
     ) {
       return;
     }
@@ -155,4 +179,11 @@ function confirmDeleteConversation(t: ConversationActionTranslate) {
     action: "delete-conversation",
     message: t(descriptor.key, descriptor.params),
   });
+}
+
+function isApiNotFoundError(error: unknown) {
+  return (
+    error instanceof ApiError &&
+    (error.status === 404 || error.code === "apiError.notFound" || error.code === "NOT_FOUND")
+  );
 }

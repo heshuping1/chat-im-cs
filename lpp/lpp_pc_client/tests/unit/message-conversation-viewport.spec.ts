@@ -55,7 +55,7 @@ describe("message conversation viewport model", () => {
     expect(hookSource).toContain("stage.scrollTo({ top: restore.state.scrollTop");
   });
 
-  it("only follows appended messages when the user is already at bottom or sends a message", () => {
+  it("follows appended own messages with instant bottom alignment", () => {
     expect(
       decideConversationViewportAfterAppend({
         addedIncomingCount: 3,
@@ -78,7 +78,15 @@ describe("message conversation viewport model", () => {
         addedMineCount: 1,
         wasAtBottom: false,
       }),
-    ).toEqual({ kind: "follow-bottom", behavior: "smooth" });
+    ).toEqual({ kind: "follow-bottom", behavior: "auto" });
+
+    expect(
+      decideConversationViewportAfterAppend({
+        addedIncomingCount: 0,
+        addedMineCount: 1,
+        wasAtBottom: true,
+      }),
+    ).toEqual({ kind: "follow-bottom", behavior: "auto" });
   });
 
   it("does not let layout shifts or resource loads fight recent user scrolling", () => {
@@ -122,13 +130,123 @@ describe("message conversation viewport model", () => {
     expect(unreadControllerSource).not.toContain("invalidateQueries");
   });
 
-  it("keeps a bottom safe area after the latest message", () => {
+  it("marks message rows with the stable render key for viewport anchoring", () => {
+    const stageSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
+      "utf8",
+    );
+
+    expect(stageSource).toContain("const renderKey = chatMessageRenderKey(message)");
+    expect(stageSource).toContain("data-message-render-key={renderKey}");
+    expect(stageSource).toContain("key={renderKey}");
+  });
+
+  it("does not reveal transient scrollbars for programmatic bottom-follow scrolling", () => {
+    const hookSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/lib/useWechatBottomFollow.ts"),
+      "utf8",
+    );
+    const appSource = readFileSync(resolve(process.cwd(), "src/renderer/App.tsx"), "utf8");
+
+    expect(hookSource).toContain("programmaticScrollSuppressMs");
+    expect(hookSource).toContain("layoutBottomFollowSuppressMs");
+    expect(hookSource).toContain("recentOwnAppendSuppressMs");
+    expect(hookSource).toContain("markProgrammaticScroll(stage)");
+    expect(hookSource).toContain("hasSuppressedLayoutBottomFollow");
+    expect(hookSource).toContain("hasRecentOwnAppend");
+    expect(hookSource).toContain("stabilizeViewportFromSnapshot(viewportSnapshotRef.current)");
+    expect(hookSource).toContain('stage.dataset.programmaticScroll = "true"');
+    expect(appSource).toContain("target.dataset.programmaticScroll === 'true'");
+    expect(appSource).toContain("target.classList.remove('is-scrolling')");
+  });
+
+  it("keeps automatic bottom alignment single-pass and anchor-compensated", () => {
+    const hookSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/lib/useWechatBottomFollow.ts"),
+      "utf8",
+    );
+
+    expect(hookSource).not.toContain("scheduledScrollFrameRef");
+    expect(hookSource).not.toContain("requestAnimationFrame(restoreScroll)");
+    expect(hookSource).not.toContain("followBottomIfNeeded");
+    expect(hookSource).not.toContain("shouldKeepBottomPinnedAfterLayout");
+    expect(hookSource).toContain("Math.abs(stage.scrollTop - nextTop) > 1");
+    expect(hookSource).toContain("stage.scrollTop = nextTop");
+    expect(hookSource).toContain("captureViewportSnapshot");
+    expect(hookSource).toContain("restoreAnchorPosition");
+    expect(hookSource).toContain("viewportSnapshotRef");
+    expect(hookSource).toContain("addedMessages.length === 0");
+    expect(hookSource).toContain("recentOwnAppendUntilRef.current = Date.now() + recentOwnAppendSuppressMs");
+    expect(hookSource).toContain("if (hasRecentOwnAppend())");
+    expect(hookSource).toContain("stabilizeViewportFromSnapshot(previousSnapshot)");
+  });
+
+  it("leaves IM send bottom-follow scrolling to the viewport hook", () => {
+    const textSendSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/hooks/useMessageTextSendController.ts"),
+      "utf8",
+    );
+    const mediaSendSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/hooks/useMessageMediaSendController.ts"),
+      "utf8",
+    );
+
+    expect(textSendSource).not.toContain('scrollMessagesToBottom("smooth")');
+    expect(mediaSendSource).not.toContain('scrollMessagesToBottom("smooth")');
+    expect(textSendSource).toContain('stage: "send.server_ack.observed"');
+  });
+
+  it("starts local echo before clearing the composer draft", () => {
+    const composerSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/components/MessageComposer.tsx"),
+      "utf8",
+    );
+    const sendDraftBlock = composerSource.slice(
+      composerSource.indexOf("const sendDraft = async () => {"),
+      composerSource.indexOf("const sendRichDraft = async () => {"),
+    );
+    const sendRichDraftBlock = composerSource.slice(
+      composerSource.indexOf("const sendRichDraft = async () => {"),
+      composerSource.indexOf("const addFiles = async"),
+    );
+
+    expect(sendDraftBlock.indexOf("const sendPromise = sendComposerPartsInOrder")).toBeLessThan(
+      sendDraftBlock.indexOf('updateDraft("")'),
+    );
+    expect(sendRichDraftBlock.indexOf("const sendPromise = sendComposerPartsInOrder")).toBeLessThan(
+      sendRichDraftBlock.indexOf("lexicalInputRef.current?.clear()"),
+    );
+    expect(sendRichDraftBlock.indexOf("const sendPromise = sendComposerPartsInOrder")).toBeLessThan(
+      sendRichDraftBlock.indexOf('updateDraft("")'),
+    );
+  });
+
+  it("does not double-write text local echo into the outgoing overlay", () => {
+    const textSendSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/hooks/useMessageTextSendController.ts"),
+      "utf8",
+    );
+    const sendTextBlock = textSendSource.slice(
+      textSendSource.indexOf("const sendTextOptimistically = useCallback("),
+      textSendSource.indexOf("const sendContactCardOptimistically = useCallback("),
+    );
+
+    expect(sendTextBlock).toContain("appendLocalMessage(");
+    expect(sendTextBlock).not.toContain("upsertLocalOutgoingMessage(");
+    expect(sendTextBlock).not.toContain("replaceLocalOutgoingMessage(");
+    expect(sendTextBlock).not.toContain("markLocalOutgoingMessageFailed(");
+    expect(sendTextBlock).not.toContain("setLocalOutgoingMessagesByConversation((current)");
+  });
+
+  it("keeps a compact bottom gap after the latest message", () => {
     const messageCenterCss = readFileSync(
       resolve(process.cwd(), "src/renderer/styles/messages/message-center.css"),
       "utf8",
     );
 
     expect(messageCenterCss).toContain("--chat-bottom-safe-gap");
+    expect(messageCenterCss).toContain("--chat-bottom-safe-gap: 0px");
+    expect(messageCenterCss).toContain("overflow-anchor: none");
     expect(messageCenterCss).toContain("scroll-padding-bottom: var(--chat-bottom-safe-gap");
     expect(messageCenterCss).toContain("flex: 0 0 var(--chat-bottom-safe-gap");
     expect(messageCenterCss).not.toContain("height: 1px;\n  flex: 0 0 1px;");

@@ -64,7 +64,6 @@ export function useMessageMediaSendController({
   mediaUploadTasks,
   queryClient,
   replyTarget,
-  scrollMessagesToBottom,
   session,
   setLocalOutgoingMessagesByConversation,
   setReplyTarget,
@@ -75,7 +74,6 @@ export function useMessageMediaSendController({
   mediaUploadTasks: ReturnType<typeof useMediaUploadTaskRegistry>;
   queryClient: QueryClient;
   replyTarget: ReplyTarget;
-  scrollMessagesToBottom: (behavior?: ScrollBehavior) => void;
   session: AuthSession | null;
   setLocalOutgoingMessagesByConversation: Dispatch<
     SetStateAction<Record<string, MessageItemDto[]>>
@@ -430,7 +428,6 @@ export function useMessageMediaSendController({
           mediaUploadTasks.deleteTask(localTaskId);
           void runtime.deleteOutboxRecord(task.localMessageId);
           void invalidateMessages(queryClient, session);
-          scrollMessagesToBottom("smooth");
         } catch (error) {
           videoDisplayProgressTicker?.stop();
           if (controller.signal.aborted && task.controlState) return;
@@ -483,7 +480,6 @@ export function useMessageMediaSendController({
       localImagePreviewByMessageIdRef,
       mediaUploadTasks,
       queryClient,
-      scrollMessagesToBottom,
       session,
       setLocalOutgoingMessagesByConversation,
     ],
@@ -660,7 +656,6 @@ export function useMessageMediaSendController({
         });
       }
       setReplyTarget(null);
-      scrollMessagesToBottom("smooth");
       if (!posterError) startMediaUpload(localTaskId);
     },
     [
@@ -669,7 +664,6 @@ export function useMessageMediaSendController({
       mediaUploadTasks,
       queryClient,
       replyTarget,
-      scrollMessagesToBottom,
       session,
       setLocalOutgoingMessagesByConversation,
       setReplyTarget,

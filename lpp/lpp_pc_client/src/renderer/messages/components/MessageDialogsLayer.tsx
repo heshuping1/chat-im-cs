@@ -27,6 +27,7 @@ export function MessageDialogsLayer({
   activeConversationId,
   composerDialog,
   contactPickerItems,
+  groupLockedContacts,
   conversations,
   createDirectPending,
   createGroupPending,
@@ -55,6 +56,7 @@ export function MessageDialogsLayer({
   activeConversationId: string;
   composerDialog: ComposerDialogKind;
   contactPickerItems: ContactPickerItem[];
+  groupLockedContacts?: ContactPickerItem[];
   conversations: ConversationListItem[];
   createDirectPending: boolean;
   createGroupPending: boolean;
@@ -118,6 +120,7 @@ export function MessageDialogsLayer({
       {composerDialog === "group" && (
         <GroupChatDialog
           contacts={contactPickerItems}
+          lockedContacts={groupLockedContacts}
           pending={createGroupPending}
           onClose={onCloseComposerDialog}
           onSubmit={onCreateGroupChat}

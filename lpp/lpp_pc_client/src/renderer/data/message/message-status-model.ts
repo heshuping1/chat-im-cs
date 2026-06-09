@@ -17,9 +17,16 @@ export type ChatMessageReceiptState =
 
 export type ChatMessageSendStatusSlot = "none" | "sending" | "failed";
 
+export interface ChatMessageGroupReadReceipt {
+  readCount: number;
+  totalCount?: number;
+  ratio?: number;
+}
+
 export interface ChatMessageStatusModel {
   failureReason?: string;
   failureTooltip?: string;
+  groupReadReceipt?: ChatMessageGroupReadReceipt;
   groupReadReceiptClickable: boolean;
   receiptState: ChatMessageReceiptState;
   sendStatusSlot: ChatMessageSendStatusSlot;
@@ -29,16 +36,17 @@ export interface ChatMessageStatusModel {
   statusLabel?: string;
 }
 
-export const chatTextSendingIndicatorDelayMs = 700;
 export const chatSendStatusFailedRevealDelayMs = 650;
 
 export function deriveChatMessageStatus({
   conversationType,
+  groupReadReceiptTotal,
   message,
   mine,
   nowMs = Date.now(),
 }: {
   conversationType?: string;
+  groupReadReceiptTotal?: number;
   message: MessageItemDto;
   mine: boolean;
   nowMs?: number;
@@ -75,23 +83,15 @@ export function deriveChatMessageStatus({
 
   const media = isExternalSlotMediaMessage(messageType);
   if (mine && !media && sendState === "sending") {
-    const showDelayedSendingIndicator = shouldShowDelayedSendingIndicator({
-      message,
-      nowMs,
-    });
     if (isGroupConversation(conversationType)) {
       return baseStatus({
         receiptState: "none",
         sendState,
-        sendStatusSlot: showDelayedSendingIndicator ? "sending" : "none",
-        showSendingIndicator: showDelayedSendingIndicator,
       });
     }
     return baseStatus({
       receiptState: "unread",
       sendState,
-      sendStatusSlot: showDelayedSendingIndicator ? "sending" : "none",
-      showSendingIndicator: showDelayedSendingIndicator,
       statusLabel: "未读",
     });
   }
@@ -119,7 +119,7 @@ export function deriveChatMessageStatus({
   }
 
   if (isGroupConversation(conversationType)) {
-    return groupReceiptStatus(message, sendState);
+    return groupReceiptStatus(message, sendState, groupReadReceiptTotal);
   }
 
   if (isSentLike(sendState)) {
@@ -135,12 +135,14 @@ export function deriveChatMessageStatus({
 }
 
 function baseStatus({
+  groupReadReceipt,
   receiptState,
   sendState,
   sendStatusSlot = "none",
   showSendingIndicator = false,
   statusLabel,
 }: {
+  groupReadReceipt?: ChatMessageGroupReadReceipt;
   receiptState: ChatMessageReceiptState;
   sendState: ChatMessageDeliveryState;
   sendStatusSlot?: ChatMessageSendStatusSlot;
@@ -148,9 +150,13 @@ function baseStatus({
   statusLabel?: string;
 }): ChatMessageStatusModel {
   return {
+    groupReadReceipt,
     receiptState,
     groupReadReceiptClickable:
-      receiptState === "group_partial" || receiptState === "group_unread",
+      Boolean(groupReadReceipt) &&
+      (receiptState === "group_partial" ||
+        receiptState === "group_unread" ||
+        receiptState === "group_all"),
     sendStatusSlot,
     sendState,
     showFailureMarker: false,
@@ -162,24 +168,43 @@ function baseStatus({
 function groupReceiptStatus(
   message: MessageItemDto,
   sendState: ChatMessageDeliveryState,
+  groupReadReceiptTotal?: number,
 ): ChatMessageStatusModel {
   if (!isSentLike(sendState)) {
     return baseStatus({ receiptState: "none", sendState });
   }
   const record = message as unknown as Record<string, unknown>;
   const conversationSeq = numberField(record, "conversationSeq", "conversation_seq", "seq");
-  const readCount = numberFieldAllowZero(record, "readCount", "read_count");
-  if (!conversationSeq || readCount === undefined) {
+  const rawReadCount = numberFieldAllowZero(record, "readCount", "read_count");
+  if (!conversationSeq) {
     return baseStatus({ receiptState: "group_unknown", sendState });
   }
-  if (readCount > 0) {
-    return baseStatus({
-      receiptState: "group_partial",
-      sendState,
-      statusLabel: `已读 ${readCount} 人`,
-    });
-  }
-  return baseStatus({ receiptState: "group_unread", sendState, statusLabel: "未读" });
+  const readCount = rawReadCount ?? 0;
+  const totalCount =
+    typeof groupReadReceiptTotal === "number" &&
+    Number.isFinite(groupReadReceiptTotal) &&
+    groupReadReceiptTotal >= 0
+      ? Math.floor(groupReadReceiptTotal)
+      : undefined;
+  const ratio =
+    totalCount && totalCount > 0
+      ? Math.max(0, Math.min(1, readCount / totalCount))
+      : undefined;
+  const receiptState: ChatMessageReceiptState =
+    totalCount !== undefined && totalCount > 0 && readCount >= totalCount
+      ? "group_all"
+      : readCount > 0
+        ? "group_partial"
+        : "group_unread";
+  return baseStatus({
+    groupReadReceipt: {
+      readCount,
+      totalCount,
+      ratio,
+    },
+    receiptState,
+    sendState,
+  });
 }
 
 function isDirectRead(message: MessageItemDto) {
@@ -226,37 +251,9 @@ export function nextChatMessageStatusRefreshDelay({
 }) {
   const record = message as unknown as Record<string, unknown>;
   const status = String(message.status ?? "").trim().toLowerCase();
-  const messageType = normalizeMessageType(message);
-  const revealAt =
-    status === "failed"
-      ? failedMarkerRevealAt(record)
-      : status === "sending" && isDelayedSendingIndicatorMessage(messageType)
-        ? delayedSendingIndicatorRevealAt(record)
-        : undefined;
+  const revealAt = status === "failed" ? failedMarkerRevealAt(record) : undefined;
   if (!revealAt || nowMs >= revealAt) return undefined;
   return Math.max(0, revealAt - nowMs + 16);
-}
-
-function shouldShowDelayedSendingIndicator({
-  message,
-  nowMs,
-}: {
-  message: MessageItemDto;
-  nowMs: number;
-}) {
-  const revealAt = delayedSendingIndicatorRevealAt(
-    message as unknown as Record<string, unknown>,
-  );
-  return !revealAt || nowMs >= revealAt;
-}
-
-function delayedSendingIndicatorRevealAt(record: Record<string, unknown>) {
-  const startedAt = numberField(record, "localSendStartedAt", "local_send_started_at");
-  return startedAt ? startedAt + chatTextSendingIndicatorDelayMs : undefined;
-}
-
-function isDelayedSendingIndicatorMessage(type: string) {
-  return !isExternalSlotMediaMessage(type) && !isCardOwnedLocalMediaMessage(type);
 }
 
 function shouldShowFailedMarker({

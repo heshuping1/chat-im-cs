@@ -9,6 +9,7 @@ import {
 } from "./message-domain";
 import {
   deriveChatMessageStatus,
+  type ChatMessageGroupReadReceipt,
   type ChatMessageReceiptState,
   type ChatMessageSendStatusSlot,
 } from "./message-status-model";
@@ -40,6 +41,7 @@ export interface ChatMessageViewModel {
   status: {
     delivery: ChatMessageDeliveryState;
     failureTooltip?: string;
+    groupReadReceipt?: ChatMessageGroupReadReceipt;
     groupReadReceiptClickable: boolean;
     receipt: ChatMessageReceiptState;
     sendStatusSlot: ChatMessageSendStatusSlot;
@@ -72,6 +74,7 @@ export interface CreateChatMessageViewModelInput {
   conversationType?: string;
   translationText?: string;
   contextMenuEnabled?: boolean;
+  groupReadReceiptTotal?: number;
   nowMs?: number;
 }
 
@@ -88,6 +91,7 @@ export function createChatMessageViewModel(
   const delivery = normalizeChatMessageDeliveryState(message.status, message.isRecalled);
   const status = deriveChatMessageStatus({
     conversationType: input.conversationType,
+    groupReadReceiptTotal: input.groupReadReceiptTotal,
     message,
     mine: input.mine,
     nowMs: input.nowMs,
@@ -119,12 +123,13 @@ export function createChatMessageViewModel(
     status: {
       delivery,
       failureTooltip: status.failureTooltip,
+      groupReadReceipt: status.groupReadReceipt,
       groupReadReceiptClickable: status.groupReadReceiptClickable,
       receipt: status.receiptState,
       sendStatusSlot: status.sendStatusSlot,
       showFailureMarker: status.showFailureMarker,
       showSendingIndicator: status.showSendingIndicator,
-      statusText: input.statusText ?? status.statusLabel,
+      statusText: visibleStatusText(input.statusText ?? status.statusLabel, status.receiptState),
       timeText: input.timeText,
     },
     actions: {
@@ -163,6 +168,19 @@ function uploadActionTaskId(
   return ["uploading", "paused", "failed", "canceled"].includes(delivery)
     ? message.localTaskId
     : undefined;
+}
+
+function visibleStatusText(
+  statusText: string | undefined,
+  receipt: ChatMessageReceiptState,
+) {
+  return receipt === "read" ||
+    receipt === "unread" ||
+    receipt === "group_unread" ||
+    receipt === "group_partial" ||
+    receipt === "group_all"
+    ? undefined
+    : statusText;
 }
 
 function stringField(record: Record<string, unknown>, ...keys: string[]) {

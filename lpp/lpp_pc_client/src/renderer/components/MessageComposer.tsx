@@ -57,6 +57,7 @@ import {
   type ScreenshotShortcut,
 } from "../composer/runtime/composerScreenshot";
 import { sendComposerPartsInOrder } from "../media/runtime/sendQueue";
+import { logChatScrollTrace } from "../lib/chatScrollTrace";
 import {
   captureScreenshotFile,
   isCaptureScreenshotCancelError,
@@ -390,13 +391,15 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
     const queued = attachments;
     if ((!content && queued.length === 0) || disabled) return;
     setError(null);
-    updateDraft("");
-    queued.forEach((item) => {
-      if (item.previewUrl) revokePreviewUrl(item.previewUrl, previewUrlsRef);
+    logChatScrollTrace({
+      context: {
+        attachmentCount: queued.length,
+        compactComposer: false,
+        hasText: Boolean(content),
+      },
+      event: "composer.send-draft.start",
     });
-    updateAttachments(() => []);
-    focusComposerInput(textareaRef);
-    await sendComposerPartsInOrder<PendingAttachment>({
+    const sendPromise = sendComposerPartsInOrder<PendingAttachment>({
       parts: [
         ...(content ? [{ type: "text" as const, text: content }] : []),
         ...queued.map((attachment) => ({ type: "attachment" as const, attachment })),
@@ -404,6 +407,37 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       sendText: onSendText,
       sendAttachment: (item) => onSendMedia(item.file, item.kind),
       onFailure: ({ error: err }) => setError(formatError(err)),
+    });
+    logChatScrollTrace({
+      context: {
+        attachmentCount: queued.length,
+        compactComposer: false,
+        hasText: Boolean(content),
+      },
+      event: "composer.send-draft.queue-started",
+    });
+    updateDraft("");
+    queued.forEach((item) => {
+      if (item.previewUrl) revokePreviewUrl(item.previewUrl, previewUrlsRef);
+    });
+    updateAttachments(() => []);
+    focusComposerInput(textareaRef);
+    logChatScrollTrace({
+      context: {
+        attachmentCount: queued.length,
+        compactComposer: false,
+        hasText: Boolean(content),
+      },
+      event: "composer.send-draft.cleared",
+    });
+    await sendPromise;
+    logChatScrollTrace({
+      context: {
+        attachmentCount: queued.length,
+        compactComposer: false,
+        hasText: Boolean(content),
+      },
+      event: "composer.send-draft.settled",
     });
   };
 
@@ -415,23 +449,55 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       .filter((part): part is Extract<typeof part, { type: "attachment" }> => part.type === "attachment")
       .map((part) => part.attachment.previewUrl)
       .filter((previewUrl): previewUrl is string => Boolean(previewUrl));
-    lexicalInputRef.current?.clear();
-    updateLexicalAttachments(() => []);
-    updateDraft("");
-    onDraftEditorStateChange?.("");
-    onDraftPreviewChange?.("");
-    setRichHasText(false);
-    focusComposerInput(textareaRef, compactComposer, lexicalInputRef);
+    logChatScrollTrace({
+      context: {
+        attachmentCount: attachmentPreviewUrls.length,
+        compactComposer,
+        partCount: sendableParts.length,
+      },
+      event: "composer.send-rich-draft.start",
+    });
+    const sendPromise = sendComposerPartsInOrder<LexicalPendingAttachment>({
+      parts: sendableParts,
+      sendText: onSendText,
+      sendAttachment: (item) => onSendMedia(item.file, item.kind),
+      onFailure: ({ error: err }) => setError(formatError(err)),
+    });
+    logChatScrollTrace({
+      context: {
+        attachmentCount: attachmentPreviewUrls.length,
+        compactComposer,
+        partCount: sendableParts.length,
+      },
+      event: "composer.send-rich-draft.queue-started",
+    });
     try {
-      await sendComposerPartsInOrder<LexicalPendingAttachment>({
-        parts: sendableParts,
-        sendText: onSendText,
-        sendAttachment: (item) => onSendMedia(item.file, item.kind),
-        onFailure: ({ error: err }) => setError(formatError(err)),
+      lexicalInputRef.current?.clear();
+      updateLexicalAttachments(() => []);
+      updateDraft("");
+      onDraftEditorStateChange?.("");
+      onDraftPreviewChange?.("");
+      setRichHasText(false);
+      focusComposerInput(textareaRef, compactComposer, lexicalInputRef);
+      logChatScrollTrace({
+        context: {
+          attachmentCount: attachmentPreviewUrls.length,
+          compactComposer,
+          partCount: sendableParts.length,
+        },
+        event: "composer.send-rich-draft.cleared",
+      });
+      await sendPromise;
+      logChatScrollTrace({
+        context: {
+          attachmentCount: attachmentPreviewUrls.length,
+          compactComposer,
+          partCount: sendableParts.length,
+        },
+        event: "composer.send-rich-draft.settled",
       });
     } finally {
       attachmentPreviewUrls.forEach((previewUrl) => revokePreviewUrl(previewUrl, previewUrlsRef));
-      focusComposerInput(textareaRef, compactComposer, lexicalInputRef);
     }
   };
 

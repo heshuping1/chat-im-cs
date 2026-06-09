@@ -469,8 +469,9 @@ export function Sidebar() {
   const productVersionLabel = t("sidebar.productVersion", { version: appVersion });
   const receptionStatus = receptionStatusQuery.data;
   const effectiveReceptionStatus = confirmedServiceStatus;
+  const activeServiceCount = hasServiceThreadData ? activeTempSessions.length : null;
   const receptionSummary = getReceptionControlSummary({
-    activeSessions: receptionStatus?.activeSessionCount ?? null,
+    activeSessions: activeServiceCount,
     maxSessions: receptionStatus?.maxConcurrentSessions,
     queueAcceptEnabled: confirmedQueueAcceptEnabled ?? receptionStatus?.queueAcceptEnabled,
     serviceStatus: effectiveReceptionStatus ?? undefined,
@@ -483,12 +484,11 @@ export function Sidebar() {
   const serviceStatusLabel = effectiveReceptionStatus
     ? t(`sidebar.service.status.${effectiveReceptionStatus}`)
     : t("sidebar.service.statusUnsynced");
-  const activeReceptionCount = receptionStatus?.activeSessionCount ?? null;
   const serviceStatusCounters: SidebarServiceCounter[] = [
     {
       label: t("sidebar.service.counterReceptionShort"),
       name: t("sidebar.service.counterReception"),
-      value: activeReceptionCount ?? "--",
+      value: activeServiceCount ?? "--",
       tone: "active",
     },
     {

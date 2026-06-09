@@ -44,7 +44,7 @@ describe("normalizeMediaPart", () => {
     });
   });
 
-  it("prefers signed image urls over protected raw media urls for display", () => {
+  it("keeps signed image urls for display while routing desktop actions to stable media urls", () => {
     const part: NormalizedMessagePart = {
       type: "image",
       media: {
@@ -58,7 +58,7 @@ describe("normalizeMediaPart", () => {
     expect(normalizeMediaPart({ assetBaseUrl: "https://assets.example", part })).toMatchObject({
       kind: "image",
       fileName: "photo.jpg",
-      remoteSourceUrl: "https://assets.example/media/photo?sig=ok",
+      remoteSourceUrl: "https://assets.example/media/photo",
       sourceUrl: "https://assets.example/media/photo?sig=ok",
       imageCacheKey: "image:media:photo",
       imageSourceUrls: [
@@ -153,7 +153,7 @@ describe("normalizeMediaPart", () => {
     expect(normalizeMediaPart({ assetBaseUrl: "https://assets.example", part })).toMatchObject({
       kind: "image",
       sourceUrl: "file:///app-cache/photo.jpg",
-      remoteSourceUrl: "https://assets.example/media/photo?sig=ok",
+      remoteSourceUrl: "https://assets.example/media/photo",
       localOpenUrl: "file:///app-cache/photo.jpg",
       imageSourceUrls: [
         "file:///app-cache/photo.jpg",
@@ -291,6 +291,41 @@ describe("message media action model", () => {
       fileName: "report.xlsx",
       kind: "file",
       authToken: "token",
+      accountId: "u1",
+      conversationId: "c1",
+    });
+  });
+
+  it("prefers stable media endpoints over expiring signed urls for desktop actions", () => {
+    const message = {
+      messageId: "m-file-signed",
+      conversationId: "c1",
+      messageType: "file",
+      body: {
+        file: {
+          mediaId: "file-1",
+          signedUrl: "https://cdn.example/media/file-1?sig=expired",
+          fileName: "debug.log",
+        },
+      },
+    } as never;
+
+    const url = resolveMessageMediaUrl(message, "https://assets.example");
+
+    expect(url).toBe("https://assets.example/media/file-1");
+    expect(
+      messageMediaActionPayload({
+        message,
+        url: url!,
+        authToken: "token",
+        cacheContext: { accountId: "u1", conversationId: "c1" },
+      }),
+    ).toEqual({
+      url: "https://assets.example/media/file-1",
+      fileName: "debug.log",
+      kind: "file",
+      authToken: "token",
+      cacheIdentity: "file-1",
       accountId: "u1",
       conversationId: "c1",
     });

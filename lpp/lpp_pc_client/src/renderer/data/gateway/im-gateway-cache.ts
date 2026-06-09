@@ -17,6 +17,7 @@ import { isQueryInWorkspaceScope } from "../workspace-scope";
 import {
   getImMessageStore,
 } from "../message-store/im-message-store";
+import { applyGroupReadReceiptToMessages } from "../read-receipts";
 
 export interface ApplyImGatewayMessageCacheInput {
   conversationId: string;
@@ -31,7 +32,10 @@ export interface ApplyImGatewayMessageCacheInput {
 
 export interface ApplyImGatewayReadCacheInput {
   conversationId: string;
+  conversationType: string;
   readerIsCurrentUser: boolean;
+  readerKey?: string;
+  readSeq: number;
   myReadSeq: number;
   peerReadSeq: number;
   previousPeerReadSeq: number;
@@ -40,6 +44,8 @@ export interface ApplyImGatewayReadCacheInput {
   currentTenantId?: string;
   scopeKey?: string;
 }
+
+const groupReaderReadSeqByConversation = new Map<string, number>();
 
 export function applyImGatewayMessageCache(
   queryClient: QueryClient,
@@ -95,7 +101,7 @@ export function applyImGatewayReadCache(
         : old,
   );
 
-  if (input.peerReadSeq > input.previousPeerReadSeq) {
+  if (shouldApplyDirectPeerRead(input)) {
     queryClient.setQueriesData<MessageItemDto[]>(
       {
         predicate: (query) =>
@@ -106,10 +112,23 @@ export function applyImGatewayReadCache(
       (old) => applyGatewayReadToMessages(old, input),
     );
   }
+  if (shouldApplyGroupReaderRead(input)) {
+    const previousReaderReadSeq = previousGroupReaderReadSeq(input);
+    queryClient.setQueriesData<MessageItemDto[]>(
+      {
+        predicate: (query) =>
+          query.queryKey[0] === "pc-im-messages" &&
+          isQueryInWorkspaceScope(query, input.scopeKey) &&
+          query.queryKey.includes(input.conversationId),
+      },
+      (old) => applyGatewayGroupReadToMessages(old, input, previousReaderReadSeq),
+    );
+    rememberGroupReaderReadSeq(input);
+  }
   if (input.scopeKey) {
     void getImMessageStore().applyReadMetadata(
       input.scopeKey,
-      "direct",
+      strictImConversationType(input.conversationType) ?? "direct",
       input.conversationId,
       {
         identity: input.identity,
@@ -232,6 +251,20 @@ function applyGatewayReadToMessages(
   ).state.messages;
 }
 
+function applyGatewayGroupReadToMessages(
+  old: MessageItemDto[] | undefined,
+  input: ApplyImGatewayReadCacheInput,
+  previousReaderReadSeq: number,
+) {
+  if (!old) return old;
+  return applyGroupReadReceiptToMessages({
+    identity: input.identity,
+    messages: old,
+    previousReaderReadSeq,
+    readSeq: input.readSeq,
+  });
+}
+
 function updateImConversationList(
   old: ConversationListResponse | undefined,
   input: ApplyImGatewayMessageCacheInput,
@@ -264,6 +297,42 @@ function updateImConversationReadReceiptItem(
     };
   }
   return item;
+}
+
+function shouldApplyDirectPeerRead(input: ApplyImGatewayReadCacheInput) {
+  return (
+    strictImConversationType(input.conversationType) === "direct" &&
+    input.peerReadSeq > input.previousPeerReadSeq
+  );
+}
+
+function shouldApplyGroupReaderRead(input: ApplyImGatewayReadCacheInput) {
+  return (
+    strictImConversationType(input.conversationType) === "group" &&
+    !input.readerIsCurrentUser &&
+    Boolean(input.readerKey) &&
+    input.readSeq > previousGroupReaderReadSeq(input)
+  );
+}
+
+function previousGroupReaderReadSeq(input: ApplyImGatewayReadCacheInput) {
+  return groupReaderReadSeqByConversation.get(groupReaderReadSeqKey(input)) ?? 0;
+}
+
+function rememberGroupReaderReadSeq(input: ApplyImGatewayReadCacheInput) {
+  const key = groupReaderReadSeqKey(input);
+  groupReaderReadSeqByConversation.set(
+    key,
+    Math.max(previousGroupReaderReadSeq(input), Math.floor(input.readSeq)),
+  );
+}
+
+function groupReaderReadSeqKey(input: ApplyImGatewayReadCacheInput) {
+  return [
+    input.scopeKey || "global",
+    input.conversationId,
+    input.readerKey || "unknown",
+  ].join(":");
 }
 
 function gatewayConversation(

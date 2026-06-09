@@ -526,6 +526,18 @@ describe("settings catalog", () => {
       join(process.cwd(), "src/renderer/messages/components/MessageCenterConversationStage.tsx"),
       "utf8",
     );
+    const messageCenterSource = readFileSync(
+      join(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
+      "utf8",
+    );
+    const conversationBackgroundSource = readFileSync(
+      join(process.cwd(), "src/renderer/messages/components/ConversationChatBackgroundDialog.tsx"),
+      "utf8",
+    );
+    const conversationBackgroundModelSource = readFileSync(
+      join(process.cwd(), "src/renderer/messages/models/conversationChatBackgroundModel.ts"),
+      "utf8",
+    );
     const listSource = readFileSync(
       join(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
       "utf8",
@@ -544,7 +556,12 @@ describe("settings catalog", () => {
     expect(backgroundSectionSource).toContain("--swatch-background");
     expect(backgroundSectionSource).toContain('accept="image/png,image/jpeg,image/webp,image/gif"');
     expect(backgroundSectionSource).toContain("ImagePlus");
-    expect(stageSource).toContain("chatBackgroundPreset={pcSettings.chatBackgroundPreset}");
+    expect(messageCenterSource).toContain("effectiveConversationChatBackground");
+    expect(messageCenterSource).toContain("ConversationChatBackgroundDialog");
+    expect(stageSource).toContain("chatBackgroundPreset={chatBackgroundPreset}");
+    expect(conversationBackgroundSource).toContain("messages.conversationBackground.title");
+    expect(conversationBackgroundSource).toContain("accept=\"image/png,image/jpeg,image/webp,image/gif\"");
+    expect(conversationBackgroundModelSource).toContain("conversationChatBackgroundStorageKey");
     expect(listSource).toContain("chatBackgroundStyleVariables");
     expect(serviceStageSource).toContain("chatBackgroundStyleVariables");
     expect(serviceStageSource).toContain("style={chatBackgroundStyleVariables(chatBackgroundPreset)");

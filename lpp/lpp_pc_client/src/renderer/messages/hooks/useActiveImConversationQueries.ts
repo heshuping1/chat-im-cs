@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import type { MessageItemDto } from "../../data/api/types";
 import type { ConversationListItem } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
-import { reuseStableMessageItems } from "../../data/message/message-domain";
+import { mergeStableMessagePage } from "../../data/message/message-domain";
 import {
   getImMessageStore,
   imMessageConversationKey,
@@ -98,7 +98,7 @@ export function useActiveImConversationQueries({
     staleTime: 5 * 60_000,
     structuralSharing: (previous, next) => {
       if (!isMessageItemList(next)) return next;
-      return reuseStableMessageItems(
+      return mergeStableMessagePage(
         isMessageItemList(previous) ? previous : undefined,
         next,
       );

@@ -60,7 +60,13 @@ describe("media materialization", () => {
       [
         mediaMessage(
           "image",
-          { image: { fileName: "first.png", signedUrl: "/media/media-1?sig=first" } },
+          {
+            image: {
+              fileName: "first.png",
+              mediaId: "media-1",
+              signedUrl: "/media/media-1?sig=first",
+            },
+          },
           "first",
         ),
         mediaMessage(
@@ -68,6 +74,7 @@ describe("media materialization", () => {
           {
             video: {
               fileName: "second.mp4",
+              mediaId: "media-1",
               signedUrl: "https://cdn.example/media/media-1?sig=second",
             },
           },
@@ -75,7 +82,13 @@ describe("media materialization", () => {
         ),
         mediaMessage(
           "file",
-          { file: { fileName: "third.zip", signedUrl: "/media/media-1?sig=third" } },
+          {
+            file: {
+              fileName: "third.zip",
+              mediaId: "media-1",
+              signedUrl: "/media/media-1?sig=third",
+            },
+          },
           "third",
         ),
       ],
@@ -97,6 +110,11 @@ describe("media materialization", () => {
       "image",
       "video",
       "file",
+    ]);
+    expect(candidates.map((candidate) => candidate.url)).toEqual([
+      "https://api.example.test/media/media-1",
+      "https://api.example.test/media/media-1",
+      "https://api.example.test/media/media-1",
     ]);
   });
 
@@ -121,6 +139,7 @@ describe("media materialization", () => {
       message: mediaMessage("image", {
         image: {
           fileName: "photo.png",
+          mediaId: "media-1",
           signedUrl: "/media/media-1?sig=one",
         },
       }),
@@ -133,7 +152,7 @@ describe("media materialization", () => {
       conversationId: "direct-1",
       fileName: "photo.png",
       kind: "image",
-      url: "https://api.example.test/media/media-1?sig=one",
+      url: "https://api.example.test/media/media-1",
     });
     expect(getPrefetchedImageFileUrl("image:media:media-1")).toBe(
       "file:///cache/images/media-1.png",
@@ -175,6 +194,7 @@ describe("media materialization", () => {
       message: mediaMessage("image", {
         image: {
           fileName: "photo.png",
+          mediaId: "media-1",
           signedUrl: "/media/media-1?sig=cached",
         },
       }, "image-cached"),
@@ -258,6 +278,7 @@ describe("media materialization", () => {
       message: mediaMessage("video", {
         video: {
           fileName: "clip.mp4",
+          mediaId: "media-1",
           signedUrl: "/media/media-1?sig=video",
         },
       }),
@@ -270,6 +291,7 @@ describe("media materialization", () => {
       message: mediaMessage("file", {
         file: {
           fileName: "archive.zip",
+          mediaId: "media-1",
           signedUrl: "/media/media-1?sig=file",
         },
       }),
@@ -282,7 +304,7 @@ describe("media materialization", () => {
       conversationId: "direct-1",
       fileName: "clip.mp4",
       kind: "video",
-      url: "https://api.example.test/media/media-1?sig=video",
+      url: "https://api.example.test/media/media-1",
     });
     expect(window.desktopApi?.cacheMediaFile).toHaveBeenNthCalledWith(2, {
       accountId: "staff-1",
@@ -291,7 +313,7 @@ describe("media materialization", () => {
       conversationId: "direct-1",
       fileName: "archive.zip",
       kind: "file",
-      url: "https://api.example.test/media/media-1?sig=file",
+      url: "https://api.example.test/media/media-1",
     });
     expect(getMaterializedMediaFileUrl("video:media:media-1")).toBe(
       "file:///cache/images/media-1.png",
@@ -310,6 +332,7 @@ describe("media materialization", () => {
       message: mediaMessage("video", {
         video: {
           fileName: "clip.mp4",
+          mediaId: "media-1",
           signedUrl: "/media/media-1?sig=one",
         },
       }),
@@ -322,6 +345,7 @@ describe("media materialization", () => {
       message: mediaMessage("video", {
         video: {
           fileName: "clip.mp4",
+          mediaId: "media-1",
           signedUrl: "/media/media-1?sig=two",
         },
       }, "video-2"),

@@ -246,6 +246,7 @@ export function mergeReadEvent(
 
   const readerIds = readReceiptReaderIds(payload);
   const readerIsCurrentUser = readReceiptReaderIsCurrentUser(readerIds, identity);
+  const readerKey = readReceiptReaderKey(readerIds, event.readerIdentity);
   const clientObservedAt = new Date().toISOString();
   recordMessageReminderDiagnostic({
     event: "im.read.received",
@@ -301,7 +302,10 @@ export function mergeReadEvent(
   const workspaceScope = workspaceScopeFromSession(getAuthSessionSnapshot());
   applyImGatewayReadCache(queryClient, {
     conversationId: event.conversationId,
+    conversationType: event.conversationType,
     readerIsCurrentUser,
+    readerKey,
+    readSeq: event.readSeq,
     myReadSeq: nextState.myReadSeq,
     peerReadSeq,
     previousPeerReadSeq,
@@ -327,6 +331,20 @@ function readReceiptTime(payload: Record<string, unknown>) {
       "createdAt",
       "created_at",
     ) || undefined
+  );
+}
+
+function readReceiptReaderKey(
+  readerIds: Array<string | null | undefined>,
+  readerIdentity?: CurrentUserIdentity | null,
+) {
+  return (
+    readerIds.find((value) => typeof value === "string" && value.trim())?.trim() ||
+    readerIdentity?.userId?.trim() ||
+    readerIdentity?.platformUserId?.trim() ||
+    readerIdentity?.lppId?.trim() ||
+    readerIdentity?.displayName?.trim() ||
+    undefined
   );
 }
 

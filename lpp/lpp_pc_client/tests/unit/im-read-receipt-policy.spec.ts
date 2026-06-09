@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeDirectReadStatusFastTrackIntervalMs,
+  activeDirectReadStatusFastTrackWindowMs,
   activeDirectReadStatusRefetchInBackground,
   activeDirectReadStatusRefetchIntervalMs,
   activeDirectReadStatusStaleMs,
@@ -18,6 +20,8 @@ describe("im read receipt policy", () => {
     expect(activeDirectReadStatusRefetchIntervalMs()).toBe(30_000);
     expect(activeDirectReadStatusRefetchInBackground()).toBe(false);
     expect(activeDirectReadStatusStaleMs()).toBe(10_000);
+    expect(activeDirectReadStatusFastTrackIntervalMs()).toBe(1_000);
+    expect(activeDirectReadStatusFastTrackWindowMs()).toBe(15_000);
   });
 
   it("does not enable direct read-status polling for group or inactive conversations", () => {

@@ -511,6 +511,10 @@ function useTransientScrollbars() {
       const target =
         event.target instanceof Element ? event.target : document.scrollingElement;
       if (!target) return;
+      if (target instanceof HTMLElement && target.dataset.programmaticScroll === 'true') {
+        target.classList.remove('is-scrolling');
+        return;
+      }
       target.classList.add('is-scrolling');
       const previousTimer = timers.get(target);
       if (previousTimer) window.clearTimeout(previousTimer);

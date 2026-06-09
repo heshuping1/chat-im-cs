@@ -102,6 +102,9 @@ export function ImagePart({
     item?.localOpenUrl ||
     item?.remoteSourceUrl ||
     (src && !isTransientImageUrl(src) ? src : undefined);
+  const imageDownloadSrc =
+    item?.remoteSourceUrl ||
+    (src && !isTransientImageUrl(src) ? src : undefined);
   const fileName = item?.fileName;
   const localImage = isInstantLocalImageSource(src);
   const cacheKey = item?.imageCacheKey ?? imageMediaCacheKey(media, src);
@@ -210,7 +213,7 @@ export function ImagePart({
     let disposed = false;
     setBrokenImageSrc(null);
     if (
-      !src ||
+      !imageDownloadSrc ||
       localImage ||
       !canCacheMediaFile ||
       (cacheKey && getPrefetchedImageFileUrl(cacheKey))
@@ -218,7 +221,7 @@ export function ImagePart({
       return undefined;
     }
     void cacheCurrentMessageImageFile({
-      url: src,
+      url: imageDownloadSrc,
       fileName: fileName || "image.png",
       kind: "image",
       authToken,
@@ -248,7 +251,7 @@ export function ImagePart({
     mediaCacheContext?.conversationId,
     cacheKey,
     hasNextImageSource,
-    src,
+    imageDownloadSrc,
     advanceToNextImageSource,
   ]);
 

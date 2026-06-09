@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,6 +19,11 @@ import { isInstantLocalImageSource } from "../../src/renderer/media/runtime/useC
 import { imageDisplayReady } from "../../src/renderer/media/runtime/useCachedImageMediaUrl";
 
 describe("image media runtime", () => {
+  const mediaCache = readFileSync(
+    resolve(process.cwd(), "src/renderer/lib/mediaCache.ts"),
+    "utf8",
+  );
+
   it("treats native local image urls as immediately displayable", () => {
     expect(isInstantLocalImageSource("blob:lpp-local-image")).toBe(true);
     expect(isInstantLocalImageSource("data:image/png;base64,AA==")).toBe(true);
@@ -39,6 +46,11 @@ describe("image media runtime", () => {
         "https://cdn.example/media/019e-image-id?sig=second#view",
       ),
     ).toBe("image:media:019e-image-id");
+  });
+
+  it("does not let one failed signed image url block fallback urls for the same media", () => {
+    expect(mediaCache).toContain("entry?.failedAt && entry.url === url");
+    expect(mediaCache).not.toContain("entry?.failedAt && now - entry.failedAt < mediaRetryIntervalMs");
   });
 
   it("prefers explicit media identity fields over signed urls", () => {

@@ -13,6 +13,8 @@ export interface ApiClientOptions {
   adminToken?: string;
   tenantId?: string;
   platformUserId?: string;
+  lppId?: string;
+  displayName?: string;
   spaceType?: number;
   userId?: string;
   membershipRole?: number;

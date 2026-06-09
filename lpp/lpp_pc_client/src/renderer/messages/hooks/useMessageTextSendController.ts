@@ -17,6 +17,7 @@ import {
 import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
 import type { SendOutboxStatus } from "../../data/send/send-outbox";
 import { currentIsoTimestamp, formatError } from "../../lib/format";
+import { logChatScrollTrace } from "../../lib/chatScrollTrace";
 import {
   appendLocalMessage,
   invalidateMessages,
@@ -49,7 +50,6 @@ export function useMessageTextSendController({
   groupMembers,
   queryClient,
   replyTarget,
-  scrollMessagesToBottom,
   session,
   setLocalOutgoingMessagesByConversation,
   setReplyTarget,
@@ -61,7 +61,6 @@ export function useMessageTextSendController({
   groupMembers: GroupMemberDto[];
   queryClient: QueryClient;
   replyTarget: ReplyTarget;
-  scrollMessagesToBottom: (behavior?: ScrollBehavior) => void;
   session: AuthSession | null;
   setLocalOutgoingMessagesByConversation: Dispatch<
     SetStateAction<Record<string, MessageItemDto[]>>
@@ -182,7 +181,6 @@ export function useMessageTextSendController({
           );
           void runtime.deleteOutboxRecord(localMessageId);
           void invalidateMessages(queryClient, session);
-          scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
           const reason = formatError(error);
@@ -237,7 +235,6 @@ export function useMessageTextSendController({
       enqueueOutgoingTask,
       groupMembers,
       queryClient,
-      scrollMessagesToBottom,
       session,
       setLocalOutgoingMessagesByConversation,
     ],
@@ -272,7 +269,7 @@ export function useMessageTextSendController({
       const body = withReplyBody({ text: content }, reply);
       const initialStatus = initialChatSendStatusForKind("text");
       const sendStartedAt = createdAt;
-      const localMessage = appendLocalMessage(
+      appendLocalMessage(
         queryClient,
         session,
         conversation,
@@ -283,7 +280,7 @@ export function useMessageTextSendController({
           conversationId: conversation.conversationId,
           serverTime: currentIsoTimestamp(),
         },
-        { status: initialStatus, localSendStartedAt: sendStartedAt },
+        { clientMsgId, status: initialStatus, localSendStartedAt: sendStartedAt },
       );
       runtime.log({
         phase: "local_echo",
@@ -309,16 +306,17 @@ export function useMessageTextSendController({
         stage: "send.local_echo.written",
         traceId: clientMsgId,
       });
-      setLocalOutgoingMessagesByConversation((current) =>
-        upsertLocalOutgoingMessage(
-          current,
+      logChatScrollTrace({
+        context: {
+          clientMsgId,
+          conversationId: conversation.conversationId,
           conversationType,
-          conversation.conversationId,
-          localMessage,
-        ),
-      );
+          localMessageId,
+          messageKind: "text",
+        },
+        event: "text-send.local-echo-written",
+      });
       setReplyTarget(null);
-      scrollMessagesToBottom("smooth");
       void runtime.upsertOutboxRecord({
         body,
         clientMsgId,
@@ -403,18 +401,20 @@ export function useMessageTextSendController({
             stage: "send.server_ack.observed",
             traceId: clientMsgId,
           });
-          setLocalOutgoingMessagesByConversation((current) =>
-            replaceLocalOutgoingMessage(
-              current,
+          logChatScrollTrace({
+            context: {
+              clientMsgId,
+              conversationId: conversation.conversationId,
+              conversationSeq: sentMessage.conversationSeq,
               conversationType,
-              conversation.conversationId,
               localMessageId,
-              sentMessage,
-            ),
-          );
+              messageId: sentMessage.messageId,
+              messageKind: "text",
+            },
+            event: "text-send.server-ack-observed",
+          });
           void runtime.deleteOutboxRecord(localMessageId);
           void invalidateMessages(queryClient, session);
-          scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
           const reason = formatError(error);
@@ -446,6 +446,17 @@ export function useMessageTextSendController({
             stage: "send.http.failed",
             traceId: clientMsgId,
           });
+          logChatScrollTrace({
+            context: {
+              clientMsgId,
+              conversationId: conversation.conversationId,
+              conversationType,
+              localMessageId,
+              messageKind: "text",
+              reason,
+            },
+            event: "text-send.failed",
+          });
           markLocalMessageFailed(
             queryClient,
             session,
@@ -453,16 +464,6 @@ export function useMessageTextSendController({
             localMessageId,
             reason,
             failedAt,
-          );
-          setLocalOutgoingMessagesByConversation((current) =>
-            markLocalOutgoingMessageFailed(
-              current,
-              conversationType,
-              conversation.conversationId,
-              localMessageId,
-              reason,
-              failedAt,
-            ),
           );
           void runtime.patchOutboxRecord(localMessageId, {
             localFailedAt: failedAt,
@@ -481,7 +482,6 @@ export function useMessageTextSendController({
       groupMembers,
       queryClient,
       replyTarget,
-      scrollMessagesToBottom,
       session,
       setLocalOutgoingMessagesByConversation,
       setReplyTarget,
@@ -520,7 +520,7 @@ export function useMessageTextSendController({
           conversationId: conversation.conversationId,
           serverTime: currentIsoTimestamp(),
         },
-        { status: initialStatus, localSendStartedAt: sendStartedAt },
+        { clientMsgId, status: initialStatus, localSendStartedAt: sendStartedAt },
       );
       runtime.log({
         phase: "local_echo",
@@ -543,7 +543,6 @@ export function useMessageTextSendController({
         ),
       );
       setReplyTarget(null);
-      scrollMessagesToBottom("smooth");
       void runtime.upsertOutboxRecord({
         body,
         clientMsgId,
@@ -598,7 +597,6 @@ export function useMessageTextSendController({
           );
           void runtime.deleteOutboxRecord(localMessageId);
           void invalidateMessages(queryClient, session);
-          scrollMessagesToBottom("smooth");
         } catch (error) {
           const failedAt = Date.now();
           const reason = formatError(error);
@@ -652,7 +650,6 @@ export function useMessageTextSendController({
       enqueueOutgoingTask,
       queryClient,
       replyTarget,
-      scrollMessagesToBottom,
       session,
       setLocalOutgoingMessagesByConversation,
       setReplyTarget,

@@ -349,26 +349,26 @@ function materializationSourceUrl(
     return resolveMediaUrl(
       media,
       assetBaseUrl,
-      "signedUrl",
-      "downloadUrl",
-      "thumbnailUrl",
-      "thumbUrl",
-      "previewUrl",
       "url",
       "fileUrl",
       "uri",
       "path",
+      "downloadUrl",
+      "signedUrl",
+      "thumbnailUrl",
+      "thumbUrl",
+      "previewUrl",
     );
   }
   return resolveMediaUrl(
     media,
     assetBaseUrl,
-    "signedUrl",
-    "downloadUrl",
     "url",
     "fileUrl",
     "uri",
     "path",
+    "downloadUrl",
+    "signedUrl",
   );
 }
 

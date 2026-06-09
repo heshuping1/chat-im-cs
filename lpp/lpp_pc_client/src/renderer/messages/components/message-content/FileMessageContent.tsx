@@ -3,6 +3,7 @@ import type { MouseEvent } from "react";
 import { appProductName } from "../../../app/appMetadata";
 import { FileMessageCard } from "../../../media/components/FileMessageCard";
 import type { ImMediaItem } from "../../../media/domain/mediaMessage";
+import { mediaStableCacheIdentity } from "../../../data/im-message-normalize";
 import {
   getMaterializedMediaFileUrl,
   mediaMaterializationCacheKey,
@@ -74,6 +75,7 @@ export function FileMessageContent({
           fileName,
           kind: "file",
           authToken,
+          cacheIdentity: mediaStableCacheIdentity(media, item?.remoteSourceUrl || href),
           accountId: mediaCacheContext?.accountId,
           conversationId: mediaCacheContext?.conversationId,
         });

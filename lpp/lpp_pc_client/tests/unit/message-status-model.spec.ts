@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { MessageItemDto } from "../../src/renderer/data/api/types";
 import {
   chatSendStatusFailedRevealDelayMs,
-  chatTextSendingIndicatorDelayMs,
   deriveChatMessageStatus,
   nextChatMessageStatusRefreshDelay,
 } from "../../src/renderer/data/message/message-status-model";
@@ -59,52 +58,31 @@ describe("message status model", () => {
     ).toBe("未读");
   });
 
-  it("delays the text sending slot until confirmation is slow", () => {
-    expect(
-      deriveChatMessageStatus({
-        conversationType: "direct",
-        message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
-        mine: true,
-        nowMs: 1_010,
-      }),
-    ).toMatchObject({
-      receiptState: "unread",
-      sendStatusSlot: "none",
-      sendState: "sending",
-      showFailureMarker: false,
-      showSendingIndicator: false,
-      statusLabel: "未读",
-    });
-
-    expect(
-      deriveChatMessageStatus({
-        conversationType: "direct",
-        message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
-        mine: true,
-        nowMs: 1_000 + chatTextSendingIndicatorDelayMs,
-      }),
-    ).toMatchObject({
-      receiptState: "unread",
-      sendStatusSlot: "sending",
-      sendState: "sending",
-      showFailureMarker: false,
-      showSendingIndicator: true,
-      statusLabel: "未读",
-    });
+  it("keeps text sending optimistic without an external sending slot", () => {
+    for (const nowMs of [1_000, 1_700, 4_000]) {
+      expect(
+        deriveChatMessageStatus({
+          conversationType: "direct",
+          message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
+          mine: true,
+          nowMs,
+        }),
+      ).toMatchObject({
+        receiptState: "unread",
+        sendStatusSlot: "none",
+        sendState: "sending",
+        showFailureMarker: false,
+        showSendingIndicator: false,
+        statusLabel: "未读",
+      });
+    }
   });
 
-  it("schedules a refresh when a text sending indicator is not visible yet", () => {
+  it("does not schedule text sending indicator refreshes", () => {
     expect(
       nextChatMessageStatusRefreshDelay({
         message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
         nowMs: 1_200,
-      }),
-    ).toBe(chatTextSendingIndicatorDelayMs - 200 + 16);
-
-    expect(
-      nextChatMessageStatusRefreshDelay({
-        message: message({ localSendStartedAt: 1_000, status: "sending" } as Partial<MessageItemDto>),
-        nowMs: 1_000 + chatTextSendingIndicatorDelayMs,
       }),
     ).toBeUndefined();
   });
@@ -187,18 +165,44 @@ describe("message status model", () => {
     expect(
       deriveChatMessageStatus({
         conversationType: "group",
+        groupReadReceiptTotal: 3,
         message: message({ conversationSeq: 9, readCount: 3 }),
         mine: true,
       }),
-    ).toMatchObject({ receiptState: "group_partial", statusLabel: "已读 3 人" });
+    ).toMatchObject({
+      groupReadReceipt: { readCount: 3, totalCount: 3, ratio: 1 },
+      groupReadReceiptClickable: true,
+      receiptState: "group_all",
+      statusLabel: undefined,
+    });
 
     expect(
       deriveChatMessageStatus({
         conversationType: "group",
+        groupReadReceiptTotal: 3,
+        message: message({ conversationSeq: 9, readCount: 1 }),
+        mine: true,
+      }),
+    ).toMatchObject({
+      groupReadReceipt: { readCount: 1, totalCount: 3, ratio: 1 / 3 },
+      groupReadReceiptClickable: true,
+      receiptState: "group_partial",
+      statusLabel: undefined,
+    });
+
+    expect(
+      deriveChatMessageStatus({
+        conversationType: "group",
+        groupReadReceiptTotal: 3,
         message: message({ conversationSeq: 9, readCount: 0 }),
         mine: true,
       }),
-    ).toMatchObject({ receiptState: "group_unread", statusLabel: "未读" });
+    ).toMatchObject({
+      groupReadReceipt: { readCount: 0, totalCount: 3, ratio: 0 },
+      groupReadReceiptClickable: true,
+      receiptState: "group_unread",
+      statusLabel: undefined,
+    });
 
     expect(
       deriveChatMessageStatus({
@@ -206,12 +210,28 @@ describe("message status model", () => {
         message: message({ conversationSeq: 9, unreadCount: 2 } as Partial<MessageItemDto>),
         mine: true,
       }),
-    ).toMatchObject({ receiptState: "group_unknown", statusLabel: undefined });
+    ).toMatchObject({
+      groupReadReceipt: { readCount: 0 },
+      groupReadReceiptClickable: true,
+      receiptState: "group_unread",
+      statusLabel: undefined,
+    });
   });
 
   it("hides group read receipts for unsent, failed, recalled and seq-less messages", () => {
+    expect(
+      deriveChatMessageStatus({
+        conversationType: "group",
+        message: message({ conversationSeq: 9, readCount: 3, status: "sending" }),
+        mine: true,
+      }),
+    ).toMatchObject({
+      groupReadReceiptClickable: false,
+      sendStatusSlot: "none",
+      statusLabel: undefined,
+    });
+
     for (const item of [
-      message({ conversationSeq: 9, readCount: 3, status: "sending" }),
       message({ conversationSeq: 9, readCount: 3, status: "failed" }),
       message({ conversationSeq: 9, isRecalled: true, readCount: 3, status: "recalled" }),
       message({ readCount: 3 }),
@@ -222,7 +242,10 @@ describe("message status model", () => {
           message: item,
           mine: true,
         }),
-      ).toMatchObject({ statusLabel: undefined });
+      ).toMatchObject({
+        groupReadReceiptClickable: false,
+        statusLabel: undefined,
+      });
     }
   });
 

@@ -5,7 +5,9 @@ import type {
   MessageItemDto,
 } from "../../src/renderer/data/api-client";
 import {
+  appendLocalMessage,
   applyConversationReadToCache,
+  discardLocalFailedOutgoingMessage,
   invalidateMessages,
   localMediaPreviewKeys,
   markLocalOutgoingMessageFailed,
@@ -14,9 +16,12 @@ import {
   removeMessageFromCache,
   replaceLocalMessageInCache,
   replaceLocalOutgoingMessage,
+  syncGroupReadReceiptSnapshotToCache,
+  removeLocalOutgoingMessage,
   upsertLocalOutgoingMessage,
   withLocalMediaPreviews,
 } from "../../src/renderer/messages/models/messageCacheMutationModel";
+import { chatMessageRenderKey } from "../../src/renderer/messages/models/messageRenderKey";
 import type { ConversationListResponse } from "../../src/renderer/data/api-client";
 import type { AuthSession } from "../../src/renderer/data/auth/auth-session";
 import {
@@ -25,8 +30,70 @@ import {
   imMessageScopeKey,
 } from "../../src/renderer/data/message-store/im-message-store";
 import { pcQueryKeys } from "../../src/renderer/data/query-keys";
+import {
+  createMemorySendOutboxStorage,
+  sendOutboxScopeKey,
+} from "../../src/renderer/data/send/send-outbox";
 
 describe("messageCacheMutationModel", () => {
+  it("keeps a stable render key from local echo through server confirmation", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-1",
+      spaceType: 1,
+      tenantId: "personal-tenant",
+      tenantToken: "personal-token",
+      userId: "personal-user",
+    } as AuthSession;
+    const conversation = {
+      conversationId: "c-stable-key",
+      conversationType: "direct",
+      title: "Peer",
+    } as ConversationListItem;
+    const clientMsgId = "pc-local-text-stable";
+    const localMessage = appendLocalMessage(
+      queryClient,
+      session,
+      conversation,
+      "text",
+      { text: "stable" },
+      {
+        conversationId: conversation.conversationId,
+        messageId: clientMsgId,
+        serverTime: "2026-06-07T08:20:15.011Z",
+      },
+      { clientMsgId, status: "sending" },
+    );
+
+    const confirmedMessage = replaceLocalMessageInCache(
+      queryClient,
+      session,
+      conversation,
+      clientMsgId,
+      "text",
+      { text: "stable" },
+      {
+        conversationId: conversation.conversationId,
+        conversationSeq: 12,
+        messageId: "server-stable-key",
+        serverTime: "2026-06-07T08:20:16.011Z",
+      },
+    );
+
+    expect(localMessage).toMatchObject({ clientMsgId, messageId: clientMsgId });
+    expect(confirmedMessage).toMatchObject({
+      clientMsgId,
+      messageId: "server-stable-key",
+    });
+    expect(chatMessageRenderKey(confirmedMessage)).toBe(chatMessageRenderKey(localMessage));
+    expect(
+      queryClient.getQueryData<MessageItemDto[]>(
+        pcQueryKeys.imMessagesForSession(session, "direct", conversation.conversationId),
+      )?.[0],
+    ).toMatchObject({ clientMsgId, messageId: "server-stable-key" });
+  });
+
   it("invalidates message and conversation queries only inside the current workspace scope", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const session = {
@@ -57,6 +124,51 @@ describe("messageCacheMutationModel", () => {
     expect(currentScope).not.toBe(otherScope);
   });
 
+  it("syncs group read receipt snapshots into the scoped message cache", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      displayName: "Me",
+      platformUserId: "platform-user-1",
+      spaceType: 1,
+      tenantId: "tenant-1",
+      tenantToken: "tenant-token-1",
+      userId: "u-self",
+    } as AuthSession;
+    const conversation = {
+      conversationId: "group-1",
+      conversationType: "group",
+      title: "Group",
+    } as ConversationListItem;
+    const queryKey = pcQueryKeys.imMessagesForSession(session, "group", "group-1");
+    queryClient.setQueryData<MessageItemDto[]>(queryKey, [
+      {
+        conversationId: "group-1",
+        conversationSeq: 8,
+        direction: "out",
+        isMine: true,
+        messageId: "m-target",
+        messageType: "text",
+        readCount: 0,
+        senderUserId: "u-self",
+        sentAt: "2026-06-09T09:00:00.000Z",
+        status: "sent",
+      } as MessageItemDto,
+    ]);
+
+    syncGroupReadReceiptSnapshotToCache(queryClient, {
+      conversation,
+      messageId: "m-target",
+      messageSeq: 8,
+      readCount: 2,
+      session,
+    });
+
+    expect(queryClient.getQueryData<MessageItemDto[]>(queryKey)).toMatchObject([
+      { messageId: "m-target", readCount: 2 },
+    ]);
+  });
+
   it("upserts and replaces local outgoing messages by conversation key", () => {
     const first = { messageId: "local-1", sentAt: "2026-01-01T00:00:00.000Z" } as MessageItemDto;
     const sent = { messageId: "server-1", sentAt: "2026-01-01T00:00:01.000Z" } as MessageItemDto;
@@ -80,6 +192,130 @@ describe("messageCacheMutationModel", () => {
       { messageId: "local-1" },
       { messageId: "local-2", status: "failed", localError: "network" },
     ]);
+  });
+
+  it("removes local outgoing messages by conversation key", () => {
+    const current = {
+      "group:g1": [
+        { messageId: "local-1" },
+        { messageId: "local-2" },
+      ] as MessageItemDto[],
+    };
+
+    expect(removeLocalOutgoingMessage(current, "group", "g1", "local-1")["group:g1"])
+      .toEqual([{ messageId: "local-2" }]);
+  });
+
+  it("discards failed local outgoing messages from cache, store, outbox and upload tasks", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-discard",
+      spaceType: 1,
+      tenantId: "tenant-discard",
+      tenantToken: "token-discard",
+      userId: "user-discard",
+    } as AuthSession;
+    const message = {
+      body: { text: "@所有人" },
+      conversationId: "g-discard",
+      direction: "out",
+      isMine: true,
+      messageId: "pc-local-text-discard",
+      messageType: "text",
+      preview: "@所有人",
+      sentAt: "2026-06-07T00:00:00.000Z",
+      status: "failed",
+    } as MessageItemDto;
+    const storage = createMemorySendOutboxStorage();
+    await storage.upsertRecord({
+      body: { text: "@所有人" },
+      channel: "im",
+      clientMsgId: "pc-local-text-discard",
+      createdAt: Date.parse("2026-06-07T00:00:00.000Z"),
+      localMessageId: "pc-local-text-discard",
+      localTaskId: "task-discard",
+      messageType: "text",
+      scopeKey: sendOutboxScopeKey(session),
+      status: "failed",
+      targetId: "g-discard",
+      targetType: "group",
+      updatedAt: Date.parse("2026-06-07T00:00:01.000Z"),
+    });
+    const scopeKey = imMessageScopeKey(session);
+    const store = getImMessageStore();
+    await store.clearScope(scopeKey);
+    await store.upsertMessages(scopeKey, "group", "g-discard", [message]);
+    queryClient.setQueryData<MessageItemDto[]>(
+      pcQueryKeys.imMessagesForSession(session, "group", "g-discard"),
+      [message],
+    );
+    let outgoing = {
+      "group:g-discard": [message],
+    } as Record<string, MessageItemDto[]>;
+    const controller = new AbortController();
+    const deletedTasks: string[] = [];
+
+    const result = await discardLocalFailedOutgoingMessage({
+      conversationId: "g-discard",
+      conversationType: "group",
+      mediaUploadTasks: {
+        deleteTask: (localTaskId) => deletedTasks.push(localTaskId),
+        getTask: () => ({ controller }),
+      },
+      message,
+      queryClient,
+      session,
+      setLocalOutgoingMessagesByConversation: (updater) => {
+        outgoing = typeof updater === "function" ? updater(outgoing) : updater;
+      },
+      storage,
+    });
+
+    expect(result).toEqual({ discarded: true, localMessageId: "pc-local-text-discard" });
+    expect(await storage.listRecords({ scopeKey: sendOutboxScopeKey(session) })).toEqual([]);
+    expect(
+      await store.listMessages(imMessageConversationKey(scopeKey, "group", "g-discard"), { limit: 50 }),
+    ).toEqual([]);
+    expect(queryClient.getQueryData<MessageItemDto[]>(
+      pcQueryKeys.imMessagesForSession(session, "group", "g-discard"),
+    )).toEqual([]);
+    expect(outgoing["group:g-discard"]).toEqual([]);
+    expect(controller.signal.aborted).toBe(true);
+    expect(deletedTasks).toEqual(["task-discard"]);
+  });
+
+  it("does not discard server-usable sent messages as local failures", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const session = {
+      apiBaseUrl: "https://api.example.test",
+      platformUserId: "platform-user-sent",
+      spaceType: 1,
+      tenantId: "tenant-sent",
+      tenantToken: "token-sent",
+      userId: "user-sent",
+    } as AuthSession;
+    const message = {
+      conversationId: "c-sent",
+      messageId: "server-message-1",
+      messageType: "text",
+      preview: "sent",
+      status: "sent",
+    } as MessageItemDto;
+    let outgoing = {} as Record<string, MessageItemDto[]>;
+
+    await expect(discardLocalFailedOutgoingMessage({
+      conversationId: "c-sent",
+      conversationType: "direct",
+      message,
+      queryClient,
+      session,
+      setLocalOutgoingMessagesByConversation: (updater) => {
+        outgoing = typeof updater === "function" ? updater(outgoing) : updater;
+      },
+      storage: createMemorySendOutboxStorage(),
+    })).resolves.toEqual({ discarded: false });
+    expect(outgoing).toEqual({});
   });
 
   it("patches local video media body without dropping the failed message", () => {

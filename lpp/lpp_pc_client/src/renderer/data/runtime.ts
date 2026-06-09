@@ -18,6 +18,8 @@ export function createApiClient(session: AuthSession) {
     platformToken: session.platformToken,
     tenantId: session.tenantId,
     platformUserId: session.platformUserId,
+    lppId: session.lppId,
+    displayName: session.displayName,
     spaceType: session.spaceType,
     userId: session.userId,
     membershipRole: session.membershipRole,

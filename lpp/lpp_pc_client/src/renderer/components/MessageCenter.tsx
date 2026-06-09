@@ -54,6 +54,8 @@ import { useWechatBottomFollow } from "../lib/useWechatBottomFollow";
 import { useMessageDetailSync } from "../lib/useMessageDetailSync";
 import { MessageConversationSidebar } from "../messages/components/MessageConversationSidebar";
 import { MessageCenterConversationStage } from "../messages/components/MessageCenterConversationStage";
+import { ConversationChatBackgroundDialog } from "../messages/components/ConversationChatBackgroundDialog";
+import type { ContactPickerItem } from "../messages/components/MessageStartDialogs";
 import { useActiveImConversationQueries } from "../messages/hooks/useActiveImConversationQueries";
 import { useGroupAvatarSnapshots } from "../messages/hooks/useGroupAvatarSnapshots";
 import { useMediaUploadTaskRegistry } from "../messages/hooks/useMediaUploadTaskRegistry";
@@ -101,6 +103,7 @@ import type { ReplyTarget } from "../messages/models/messageComposerModel";
 import {
   canAddGroupMemberFriend,
   canMentionAllGroupMembers,
+  canViewGroupMemberList,
 } from "../messages/models/groupManagementModel";
 import {
   normalizeContactCard,
@@ -118,6 +121,7 @@ import {
   type UnreadJumpState,
 } from "../messages/models/messageDisplayModel";
 import type { HistoryFilterKey } from "../messages/models/messageListModel";
+import { chatMessageRenderKey } from "../messages/models/messageRenderKey";
 import {
   useMessageCenterCommandModel,
   type MessageCenterCommandModel,
@@ -138,6 +142,13 @@ import { ContactAddFriendDialog } from "./ContactAddFriendDialog";
 import { CustomerServiceKnowledgePanel } from "../customer-service/components/CustomerServiceKnowledgeDrawer";
 import { CustomerServiceQuickReplyPanel } from "../customer-service/components/CustomerServiceQuickReplyDrawer";
 import type { MessageComposerHandle } from "./MessageComposer";
+import type { ChatBackgroundSetting } from "../settings/models/chatBackgroundModel";
+import {
+  clearConversationChatBackground,
+  effectiveConversationChatBackground,
+  readConversationChatBackground,
+  writeConversationChatBackground,
+} from "../messages/models/conversationChatBackgroundModel";
 
 type MessageMenuState = {
   message: MessageItemDto;
@@ -253,6 +264,12 @@ export function MessageCenter() {
   const [profileStandaloneOpen, setProfileStandaloneOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [composerDialog, setComposerDialog] = useState<"direct" | "group" | "qr" | "card" | null>(null);
+  const [groupLockedContacts, setGroupLockedContacts] = useState<ContactPickerItem[]>([]);
+  const [conversationBackgroundDialogOpen, setConversationBackgroundDialogOpen] = useState(false);
+  const [conversationChatBackground, setConversationChatBackground] =
+    useState<ChatBackgroundSetting | undefined>(() =>
+      readConversationChatBackground(activeConversationId),
+    );
   const [addFriendDialogOpen, setAddFriendDialogOpen] = useState(false);
   const [unreadJump, setUnreadJump] = useState<UnreadJumpState | null>(null);
   const [messageAnnotations, setMessageAnnotations] = useState<
@@ -267,9 +284,12 @@ export function MessageCenter() {
   const [localHiddenConversationIds, setLocalHiddenConversationIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [localMutedConversationIds, setLocalMutedConversationIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [localMutedConversationOverrides, setLocalMutedConversationOverrides] = useState<
+    Map<string, boolean>
+  >(() => new Map());
+  const [localPinnedConversationOverrides, setLocalPinnedConversationOverrides] = useState<
+    Map<string, boolean>
+  >(() => new Map());
   const chatPanelRef = useRef<HTMLElement | null>(null);
   const composerRef = useRef<MessageComposerHandle | null>(null);
   const localImagePreviewByMessageIdRef = useRef(new Map<string, string>());
@@ -334,7 +354,8 @@ export function MessageCenter() {
     imReadStateByConversation,
     keyword,
     localHiddenConversationIds,
-    localMutedConversationIds,
+    localMutedConversationOverrides,
+    localPinnedConversationOverrides,
     locallyReadConversationReads,
     messageFilter,
     session,
@@ -430,6 +451,12 @@ export function MessageCenter() {
       role: groupManagement.role,
       settings: groupManagement.settings ?? groupManagement.detail?.settings,
     });
+  const canViewCurrentGroupMemberList =
+    activeConversationType !== "group" ||
+    canViewGroupMemberList({
+      role: groupManagement.role,
+      settings: groupManagement.settings ?? groupManagement.detail?.settings,
+    });
   const notifyComposerBlocked = useCallback(() => {
     if (!composerDisabledNotice) return;
     setNotice(composerDisabledNotice);
@@ -450,6 +477,18 @@ export function MessageCenter() {
     inviteQrsQuery,
     tenantMembersQuery,
   } = useMessageContactPickerData(session, composerDialog);
+  const openCreateGroupFromActiveConversation = useCallback(() => {
+    if (activeConversation?.conversationType !== "direct" || !activeConversation.peerUserId) {
+      setGroupLockedContacts([]);
+      setComposerDialog("group");
+      return;
+    }
+    setGroupLockedContacts([
+      contactPickerItems.find((item) => item.id === activeConversation.peerUserId) ??
+        contactPickerItemFromDirectConversation(activeConversation),
+    ]);
+    setComposerDialog("group");
+  }, [activeConversation, contactPickerItems]);
   const addFriendController = useContactAddFriendController({
     onDirectChatCreated: () => setAddFriendDialogOpen(false),
     setNotice,
@@ -466,7 +505,7 @@ export function MessageCenter() {
   });
   const handleGroupMemberProfileOpen = useCallback(
     (target: HTMLElement, member: GroupMemberDto, options?: { canAddFriend?: boolean }) => {
-      if (!member.userId) return;
+      if (!member.userId) return false;
       setAvatarProfilePopover(null);
       setConversationMenu(null);
       setMessageMenu(null);
@@ -485,6 +524,7 @@ export function MessageCenter() {
         allowFriendRequest: options?.canAddFriend ?? canAddCurrentGroupMemberFriend,
         ...resolveGroupMemberContactCardPosition(rect),
       });
+      return true;
     },
     [activeConversation?.title, canAddCurrentGroupMemberFriend],
   );
@@ -501,32 +541,14 @@ export function MessageCenter() {
     setComposerDialog,
     setNotice,
   });
-  const {
-    deleteMutation,
-    batchDeleteMutation,
-    favoriteMutation,
-    forwardMutation,
-    recallMutation,
-    translateMutation,
-    voiceToTextMutation,
-  } = useMessageActionMutations({
-    activeConversation,
-    conversations,
-    queryClient,
-    session,
-    setForwardTargetMessages,
-    setMessageAnnotations,
-    setMultiSelectMode,
-    setNotice,
-    setSelectedMessageIds,
-  });
-  const { runConversationAction } = useMessageConversationActions({
+  const { conversationActionPending, runConversationAction } = useMessageConversationActions({
     activeConversationId,
     queryClient,
     session,
     setActiveConversation,
     setLocalHiddenConversationIds,
-    setLocalMutedConversationIds,
+    setLocalMutedConversationOverrides,
+    setLocalPinnedConversationOverrides,
     setNotice,
   });
 
@@ -545,6 +567,40 @@ export function MessageCenter() {
     session,
     serverMessages: hotServerMessages,
     unreadIdentity,
+  });
+  useEffect(() => {
+    setConversationChatBackground(readConversationChatBackground(activeConversation?.conversationId));
+    setConversationBackgroundDialogOpen(false);
+  }, [activeConversation?.conversationId]);
+  useEffect(() => {
+    if (!composerDialog) setGroupLockedContacts([]);
+  }, [composerDialog]);
+  const activeConversationChatBackground = effectiveConversationChatBackground(
+    conversationChatBackground,
+    pcSettings.chatBackgroundPreset,
+  );
+  const {
+    deleteMutation,
+    batchDeleteMutation,
+    favoriteMutation,
+    forwardMutation,
+    recallMutation,
+    translateMutation,
+    voiceToTextMutation,
+  } = useMessageActionMutations({
+    activeConversation,
+    activeConversationType,
+    conversations,
+    mediaUploadTasks,
+    messages,
+    queryClient,
+    session,
+    setForwardTargetMessages,
+    setLocalOutgoingMessagesByConversation,
+    setMessageAnnotations,
+    setMultiSelectMode,
+    setNotice,
+    setSelectedMessageIds,
   });
   const autoTranslateConversationKind =
     activeConversationType === "group" ? "im-group" : "im-direct";
@@ -739,9 +795,7 @@ export function MessageCenter() {
   } = useWechatBottomFollow({
     conversationKey: activeConversation?.conversationId,
     isMineMessage: (message: MessageItemDto) => isMineMessage(message, session),
-    messageKey: (message: MessageItemDto) =>
-      message.messageId ||
-      `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`,
+    messageKey: chatMessageRenderKey,
     messages,
   });
   const {
@@ -756,7 +810,6 @@ export function MessageCenter() {
     groupMembers: groupMembersQuery.data ?? [],
     queryClient,
     replyTarget,
-    scrollMessagesToBottom,
     session,
     setLocalOutgoingMessagesByConversation,
     setReplyTarget,
@@ -769,7 +822,6 @@ export function MessageCenter() {
       mediaUploadTasks,
       queryClient,
       replyTarget,
-      scrollMessagesToBottom,
       session,
       setLocalOutgoingMessagesByConversation,
       setReplyTarget,
@@ -834,7 +886,14 @@ export function MessageCenter() {
     activeConversation,
     activeConversationType,
     directReadStatus: directReadStatusQuery.data,
+    directReadStatusRefetch: directReadStatusQuery.refetch,
     markImPeerReadReceipt,
+    messages,
+    peerReadSeq:
+      activeConversationReadState?.peerReadSeq ??
+      activeConversation?.peerReadSeq ??
+      imPeerReadReceipts[activeConversation?.conversationId ?? ""]?.readSeq ??
+      0,
     queryClient,
     session,
     unreadIdentity,
@@ -1184,6 +1243,7 @@ export function MessageCenter() {
         contactCardRelation={contactProfileController.contactCardRelation}
         chatPanelRef={chatPanelRef}
         composerRef={composerRef}
+        chatBackgroundPreset={activeConversationChatBackground}
         canOpenAiAssistant={false}
         canOpenKnowledgeBase={isModuleVisibleForAccess("knowledgeBase", workspaceAccess)}
         composerDialog={composerDialog}
@@ -1191,6 +1251,7 @@ export function MessageCenter() {
         composerDisabledReason={composerDisabledNotice}
         composerHeight={composerHeight}
         contactPickerItems={contactPickerItems}
+        groupLockedContacts={groupLockedContacts}
         conversationMenu={conversationMenu}
         conversations={conversations}
         createDirectPending={createDirectChatMutation.isPending}
@@ -1206,6 +1267,7 @@ export function MessageCenter() {
         groupManagement={activeConversationIsGroup ? groupManagement : undefined}
         groupMemberMap={groupMemberMap}
         groupMembers={groupMembersQuery.data ?? []}
+        canOpenGroupReadReceiptMemberProfile={canViewCurrentGroupMemberList}
         handleAvatarClick={handleAvatarClick}
         handleContactCardClick={handleContactCardClick}
         handleConversationMenuAction={handleConversationMenuAction}
@@ -1246,18 +1308,18 @@ export function MessageCenter() {
           if (relation?.status !== "incomingPending") return;
           contactProfileController.acceptContactRequest(relation.requestId);
         }}
-        onContactCardBlock={() => {
+        onContactCardBlock={async () => {
           if (!contactCardProfile?.userId) return;
-          if (!confirmMessageDanger("block-user", t)) {
+          if (!(await confirmMessageDanger("block-user", t))) {
             return;
           }
           contactProfileController.blockUser(contactCardProfile.userId);
         }}
         onContactCardClose={() => setContactCardProfile(null)}
-        onContactCardDeleteFriend={() => {
+        onContactCardDeleteFriend={async () => {
           const relation = contactProfileController.contactCardRelation;
           if (relation?.status !== "friend") return;
-          if (!confirmMessageDanger("delete-friend", t)) return;
+          if (!(await confirmMessageDanger("delete-friend", t))) return;
           contactProfileController.deleteFriend(relation.friendUserId);
         }}
         onContactCardReject={() => {
@@ -1271,14 +1333,17 @@ export function MessageCenter() {
           setContactCardProfile(null);
           createDirectChatMutation.mutate(contactCardProfile.userId);
         }}
-        onCloseComposerDialog={() => setComposerDialog(null)}
+        onCloseComposerDialog={() => {
+          setComposerDialog(null);
+          setGroupLockedContacts([]);
+        }}
         onCloseForward={() => setForwardTargetMessages([])}
         onCloseResend={() => setResendConfirmMessage(null)}
         onCreateDirectChat={(userId) => createDirectChatMutation.mutate(userId)}
         onCreateGroupChat={(payload) => createGroupChatMutation.mutate(payload)}
         onCreateInviteQr={() => createInviteQrMutation.mutate()}
-        onOpenCreateGroup={() => setComposerDialog("group")}
-        onOpenChatBackgroundSettings={() => setActiveModule("settings")}
+        onOpenCreateGroup={openCreateGroupFromActiveConversation}
+        onOpenChatBackgroundSettings={() => setConversationBackgroundDialogOpen(true)}
         onSubmitConversationComplaint={submitConversationComplaint}
         onUpdateCustomerRemark={contactProfileController.updateCustomerRemark}
         onUpdateCustomerTags={contactProfileController.updateCustomerTags}
@@ -1320,7 +1385,9 @@ export function MessageCenter() {
         pcSettings={pcSettings}
         pendingNewMessageCount={pendingNewMessageCount}
         profilePaneWidth={profilePaneWidth}
-        profileActionPending={contactProfileController.profileActionPending}
+        profileActionPending={
+          contactProfileController.profileActionPending || conversationActionPending
+        }
         profileData={contactProfileController.profileQuery.data}
         profileError={contactProfileController.profileQuery.error}
         profileExtra={contactProfileController.profileExtraQuery.data}
@@ -1412,6 +1479,23 @@ export function MessageCenter() {
         </aside>
       )}
 
+      {conversationBackgroundDialogOpen && activeConversation && (
+        <ConversationChatBackgroundDialog
+          conversationTitle={activeConversation.title}
+          globalBackground={pcSettings.chatBackgroundPreset}
+          value={conversationChatBackground}
+          onChange={(value) => {
+            writeConversationChatBackground(activeConversation.conversationId, value);
+            setConversationChatBackground(value);
+          }}
+          onClear={() => {
+            clearConversationChatBackground(activeConversation.conversationId);
+            setConversationChatBackground(undefined);
+          }}
+          onClose={() => setConversationBackgroundDialogOpen(false)}
+        />
+      )}
+
       {addFriendDialogOpen && (
         <ContactAddFriendDialog
           actionPending={
@@ -1497,6 +1581,26 @@ function resolveGroupMemberContactCardPosition(anchor: DOMRect) {
       GROUP_MEMBER_CONTACT_CARD_PADDING,
       viewportHeight - GROUP_MEMBER_CONTACT_CARD_SIZE.height - GROUP_MEMBER_CONTACT_CARD_PADDING,
     ),
+  };
+}
+
+function contactPickerItemFromDirectConversation(
+  conversation: ConversationListItem,
+): ContactPickerItem {
+  return {
+    avatarUrl: conversation.avatarUrl,
+    id: conversation.peerUserId ?? conversation.conversationId,
+    name: conversation.peerDisplayName || conversation.title,
+    source: "friend",
+    subtitle:
+      conversation.peerLppId ||
+      conversation.peerLppNo ||
+      conversation.peerLppNumber ||
+      String(conversation.peerUserNo ?? "") ||
+      conversation.peerPhoneMasked ||
+      conversation.peerEmailMasked ||
+      conversation.peerUserId ||
+      conversation.conversationId,
   };
 }
 

@@ -24,10 +24,16 @@ import {
   imMessageScopeKey,
 } from "../../data/message-store/im-message-store";
 import { pcQueryKeys } from "../../data/query-keys";
+import { syncGroupReadReceiptSnapshot } from "../../data/read-receipts";
 import { isQueryInWorkspaceScope, workspaceScopeKeyFromSession } from "../../data/workspace-scope";
 import { currentIsoTimestamp, timestampFromDateValue } from "../../lib/format";
 import { getImConversationType } from "./messageConversationTypeModel";
 import { messageActionPreview } from "./messageListModel";
+import { createChatSendRuntime } from "../../data/send/chat-send-runtime";
+import {
+  sendOutboxTargetKey,
+  type SendOutboxStorage,
+} from "../../data/send/send-outbox";
 
 export type ImConversationType = "direct" | "group";
 export type LocalUploadStatus =
@@ -83,6 +89,8 @@ export function appendLocalMessage(
     localError?: string;
     localSendStartedAt?: number;
     uploadProgress?: number;
+    clientMsgId?: string;
+    clientMessageId?: string;
     localTaskId?: string;
   } = {},
 ) {
@@ -112,6 +120,8 @@ export function appendLocalMessage(
     senderUserId: session?.userId || session?.platformUserId,
     sentAt,
     status: options.status ?? "sent",
+    ...(options.clientMsgId ? { clientMsgId: options.clientMsgId } : {}),
+    ...(options.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
     ...(options.localError ? { localError: options.localError } : {}),
     ...(typeof options.localSendStartedAt === "number"
       ? { localSendStartedAt: options.localSendStartedAt }
@@ -191,7 +201,7 @@ export function replaceLocalMessageInCache(
   );
   const messageId = result.messageId || localMessageId;
   const sentAt = result.serverTime || currentIsoTimestamp();
-  const next = normalizeMessageItem({
+  let confirmedMessage = normalizeMessageItem({
     messageId,
     body,
     conversationId: result.conversationId || conversation.conversationId,
@@ -210,6 +220,13 @@ export function replaceLocalMessageInCache(
     status: "sent",
   });
   queryClient.setQueryData<MessageItemDto[]>(queryKey, (old = []) => {
+    const localMessage = old.find((message) => message.messageId === localMessageId);
+    const localIdentity = stableLocalMessageIdentity(localMessage);
+    const next = normalizeMessageItem({
+      ...confirmedMessage,
+      ...localIdentity,
+    });
+    confirmedMessage = next;
     return reduceMessageCoreEvent(
       { messages: old },
       {
@@ -241,7 +258,7 @@ export function replaceLocalMessageInCache(
                       conversationType:
                         getImConversationType(conversation) === "group" ? "group" : "direct",
                       localMessageId,
-                      message: next,
+                      message: confirmedMessage,
                     },
                   ).state.conversation ?? item
                 : item,
@@ -265,8 +282,8 @@ export function replaceLocalMessageInCache(
       senderUserId: session?.userId || session?.platformUserId,
     },
   });
-  writeSuccessfulMessageToLocalStore(session, conversation, next);
-  return next;
+  writeSuccessfulMessageToLocalStore(session, conversation, confirmedMessage);
+  return confirmedMessage;
 }
 
 export function withLocalMediaPreviews(
@@ -493,6 +510,97 @@ export function markLocalOutgoingMessageFailed(
   return { ...current, [key]: next };
 }
 
+export function removeLocalOutgoingMessage(
+  current: Record<string, MessageItemDto[]>,
+  conversationType: ImConversationType,
+  conversationId: string,
+  localMessageId: string,
+) {
+  const key = imConversationKey(conversationType, conversationId);
+  const existing = current[key] ?? [];
+  const next = existing.filter((item) => item.messageId !== localMessageId);
+  return { ...current, [key]: next };
+}
+
+export type LocalFailedOutgoingDiscardResult =
+  | { discarded: false }
+  | { discarded: true; localMessageId: string };
+
+export interface LocalFailedOutgoingTaskRegistry {
+  deleteTask(localTaskId: string): void;
+  getTask?(localTaskId: string): { controller?: AbortController } | undefined;
+}
+
+export async function discardLocalFailedOutgoingMessage({
+  conversationId,
+  conversationType,
+  mediaUploadTasks,
+  message,
+  queryClient,
+  session,
+  setLocalOutgoingMessagesByConversation,
+  storage,
+}: {
+  conversationId: string;
+  conversationType: ImConversationType;
+  mediaUploadTasks?: LocalFailedOutgoingTaskRegistry;
+  message: MessageItemDto;
+  queryClient: QueryClient;
+  session: AuthSession | null;
+  setLocalOutgoingMessagesByConversation: Dispatch<
+    SetStateAction<Record<string, MessageItemDto[]>>
+  >;
+  storage?: SendOutboxStorage;
+}): Promise<LocalFailedOutgoingDiscardResult> {
+  if (!isFailedLocalOutgoingStatus(message.status)) return { discarded: false };
+
+  const runtime = createChatSendRuntime({
+    channel: "im",
+    session,
+    ...(storage ? { storage } : {}),
+  });
+  const targetKey = sendOutboxTargetKey("im", conversationType, conversationId);
+  const outboxRecord = await findOutboxRecordForMessage(
+    runtime.storage,
+    runtime.scopeKey,
+    targetKey,
+    message,
+  );
+  const localMessageId = outboxRecord?.localMessageId || localMessageIdFromMessage(message);
+  if (!localMessageId) return { discarded: false };
+  if (!outboxRecord && !hasLocalOutgoingIdentity(message)) return { discarded: false };
+
+  const localTaskId = localTaskIdFromMessage(message) || outboxRecord?.localTaskId;
+  const scopeKey = imMessageScopeKey(session);
+  await Promise.all([
+    runtime.deleteOutboxRecord(localMessageId),
+    getImMessageStore().deleteMessage(scopeKey, conversationType, conversationId, localMessageId),
+  ]);
+
+  if (localTaskId) {
+    mediaUploadTasks?.getTask?.(localTaskId)?.controller?.abort();
+    mediaUploadTasks?.deleteTask(localTaskId);
+  }
+
+  removeMessageFromCacheOnly(queryClient, localMessageId, session);
+  if (localMessageId !== message.messageId) {
+    removeMessageFromCacheOnly(queryClient, message.messageId, session);
+  }
+  setLocalOutgoingMessagesByConversation((current) => {
+    const withoutLocalId = removeLocalOutgoingMessage(
+      current,
+      conversationType,
+      conversationId,
+      localMessageId,
+    );
+    return localMessageId === message.messageId
+      ? withoutLocalId
+      : removeLocalOutgoingMessage(withoutLocalId, conversationType, conversationId, message.messageId);
+  });
+
+  return { discarded: true, localMessageId };
+}
+
 export function appendForwardedMessagesToCache(
   queryClient: QueryClient,
   session: AuthSession | null,
@@ -527,6 +635,43 @@ export function appendForwardedMessagesToCache(
     );
     return [...old, ...forwarded];
   });
+}
+
+export function syncGroupReadReceiptSnapshotToCache(
+  queryClient: QueryClient,
+  {
+    conversation,
+    messageId,
+    messageSeq,
+    readCount,
+    session,
+  }: {
+    conversation: ConversationListItem;
+    messageId: string;
+    messageSeq: number;
+    readCount: number;
+    session?: AuthSession | null;
+  },
+) {
+  const conversationType = getImConversationType(conversation);
+  if (conversationType !== "group") return;
+  const queryKey = pcQueryKeys.imMessagesForSession(
+    session,
+    conversationType,
+    conversation.conversationId,
+  );
+  queryClient.setQueryData<MessageItemDto[]>(queryKey, (old) =>
+    old
+      ? syncGroupReadReceiptSnapshot({
+          conversationType,
+          identity: session ?? null,
+          messageId,
+          messageSeq,
+          messages: old,
+          readCount,
+        })
+      : old,
+  );
 }
 
 export function markMessageRecalledInCache(
@@ -565,9 +710,25 @@ export function removeMessageFromCache(
   messageId: string,
   session?: AuthSession | null,
 ) {
-  const affected = messageSnapshotsForMutation(queryClient, messageId);
+  const affected = removeMessageFromCacheOnly(queryClient, messageId, session);
+  writeMessageMutationToLocalStore(session, affected, {
+    type: "message.deleted",
+    messageId,
+  });
+}
+
+export function removeMessageFromCacheOnly(
+  queryClient: QueryClient,
+  messageId: string,
+  session?: AuthSession | null,
+) {
+  const affected = messageSnapshotsForMutation(queryClient, messageId, session);
   queryClient.setQueriesData<MessageItemDto[]>(
-    { queryKey: ["pc-im-messages"] },
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-messages" &&
+        (!session || isQueryInWorkspaceScope(query, workspaceScopeKeyFromSession(session))),
+    },
     (old) =>
       old
         ? reduceMessageCoreEvent(
@@ -584,11 +745,8 @@ export function removeMessageFromCache(
   patchConversationAfterMessageMutation(queryClient, affected, {
     type: "message.deleted",
     messageId,
-  });
-  writeMessageMutationToLocalStore(session, affected, {
-    type: "message.deleted",
-    messageId,
-  });
+  }, session);
+  return affected;
 }
 
 export function markMessageFavoriteInCache(
@@ -724,9 +882,78 @@ function outgoingMessageCoreEvent({
   };
 }
 
-function messageSnapshotsForMutation(queryClient: QueryClient, messageId: string) {
+async function findOutboxRecordForMessage(
+  storage: SendOutboxStorage,
+  scopeKey: string,
+  targetKey: string,
+  message: MessageItemDto,
+) {
+  const records = await storage.listRecords({ scopeKey, targetKey });
+  const messageId = message.messageId.trim();
+  const clientMsgId = clientMessageIdFromMessage(message);
+  const localTaskId = localTaskIdFromMessage(message);
+  return records.find((record) =>
+    record.localMessageId === messageId ||
+    record.clientMsgId === messageId ||
+    (clientMsgId ? record.clientMsgId === clientMsgId || record.localMessageId === clientMsgId : false) ||
+    (localTaskId ? record.localTaskId === localTaskId : false),
+  );
+}
+
+function isFailedLocalOutgoingStatus(status: unknown) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  return normalized === "failed" || normalized === "canceled";
+}
+
+function hasLocalOutgoingIdentity(message: MessageItemDto) {
+  return Boolean(
+    localMessageIdFromMessage(message) ||
+      clientMessageIdFromMessage(message) ||
+      localTaskIdFromMessage(message),
+  );
+}
+
+function stableLocalMessageIdentity(message?: MessageItemDto) {
+  if (!message) return {};
+  const record = message as unknown as Record<string, unknown>;
+  const clientMsgId = stringRecordValue(record.clientMsgId);
+  const clientMessageId = stringRecordValue(record.clientMessageId);
+  const localTaskId = stringRecordValue(record.localTaskId);
+  return {
+    ...(clientMsgId ? { clientMsgId } : {}),
+    ...(clientMessageId ? { clientMessageId } : {}),
+    ...(localTaskId ? { localTaskId } : {}),
+  };
+}
+
+function localMessageIdFromMessage(message: MessageItemDto) {
+  const id = message.messageId.trim();
+  return id.startsWith("pc-local-") ? id : "";
+}
+
+function clientMessageIdFromMessage(message: MessageItemDto) {
+  const record = message as unknown as Record<string, unknown>;
+  return stringRecordValue(record.clientMsgId) || stringRecordValue(record.clientMessageId);
+}
+
+function localTaskIdFromMessage(message: MessageItemDto) {
+  const record = message as unknown as Record<string, unknown>;
+  return stringRecordValue(record.localTaskId);
+}
+
+function stringRecordValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function messageSnapshotsForMutation(
+  queryClient: QueryClient,
+  messageId: string,
+  session?: AuthSession | null,
+) {
   const snapshots = queryClient.getQueriesData<MessageItemDto[]>({
-    queryKey: ["pc-im-messages"],
+    predicate: (query) =>
+      query.queryKey[0] === "pc-im-messages" &&
+      (!session || isQueryInWorkspaceScope(query, workspaceScopeKeyFromSession(session))),
   });
   for (const [, messages] of snapshots) {
     const target = messages?.find((message) => message.messageId === messageId);
@@ -755,10 +982,15 @@ function patchConversationAfterMessageMutation(
     messages: MessageItemDto[];
   },
   mutation: { type: "message.recalled" | "message.deleted"; messageId: string },
+  session?: AuthSession | null,
 ) {
   if (!affected.conversationId) return;
   queryClient.setQueriesData<{ items: ConversationListItem[] }>(
-    { queryKey: ["pc-im-conversations"] },
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-im-conversations" &&
+        (!session || isQueryInWorkspaceScope(query, workspaceScopeKeyFromSession(session))),
+    },
     (old) =>
       old
         ? {

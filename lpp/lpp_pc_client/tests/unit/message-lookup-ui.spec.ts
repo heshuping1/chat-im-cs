@@ -15,8 +15,16 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
     "utf8",
   );
+  const historyLookupDialog = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/MessageHistoryLookupDialog.tsx"),
+    "utf8",
+  );
   const messageListModel = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/models/messageListModel.ts"),
+    "utf8",
+  );
+  const messageCacheMutationModel = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/models/messageCacheMutationModel.ts"),
     "utf8",
   );
   const messageCenter = readFileSync(
@@ -57,6 +65,10 @@ describe("message lookup UI", () => {
   );
   const sharedComposerSurface = readFileSync(
     resolve(process.cwd(), "src/renderer/components/ChatComposerSurface.tsx"),
+    "utf8",
+  );
+  const directReadReceiptSync = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/hooks/useDirectReadReceiptSync.ts"),
     "utf8",
   );
   const chatMessageBubble = readFileSync(
@@ -103,6 +115,10 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/styles/messages/context-menu.css"),
     "utf8",
   );
+  const scrollbarBridgeCss = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/shared/scrollbar-theme-bridge.css"),
+    "utf8",
+  );
 
   it("uses one WeChat-style lookup entry instead of separate search and history buttons", () => {
     expect(header).toContain("onToggleLookup");
@@ -134,57 +150,166 @@ describe("message lookup UI", () => {
     expect(stage).toContain("onToggleProfile={toggleProfileFromRail}");
   });
 
-  it("renders one unified lookup panel with search, type filters and a close action", () => {
-    expect(listPanel).toContain("const lookupOpen = messageSearchOpen || historyOpen");
-    expect(listPanel).toContain("chat-lookup-panel");
-    expect(listPanel).toContain('t("messages.listPanel.closeSearch")');
-    expect(listPanel).toContain("lookupScope.limitedToLoadedRange");
-    expect(listPanel).toContain("t(lookupScope.labelKey)");
+  it("renders chat history lookup as a modal outside the message list", () => {
+    expect(stage).toContain("MessageHistoryLookupDialog");
+    expect(stage).toContain("(historyOpen || messageSearchOpen)");
+    expect(historyLookupDialog).toContain("message-history-lookup-dialog chat-lookup-panel");
+    expect(historyLookupDialog).toContain('t("messages.listPanel.wechatHistoryTitle"');
+    expect(historyLookupDialog).toContain('t("messages.listPanel.closeSearch")');
+    expect(historyLookupDialog).toContain("lookupScope.limitedToLoadedRange");
+    expect(historyLookupDialog).toContain("t(lookupScope.labelKey)");
+    expect(historyLookupDialog).toContain("lookupResultMessages.map");
+    expect(historyLookupDialog).toContain('window.addEventListener("keydown", onKeyDown, true)');
+    expect(historyLookupDialog).toContain("if (lookupImagePreview)");
+    expect(historyLookupDialog).not.toContain("scrollbarMetrics.visible");
+    expect(historyLookupDialog).not.toContain("updateLookupScrollbar");
+    expect(historyLookupDialog).not.toContain("messages.slice(0, 8)");
+    expect(historyLookupDialog).not.toContain("messages.slice(-6)");
     expect(messageListModel).toContain("createMessageLookupScope");
     expect(messageCenter).toContain("messagesHydrationSource");
     expect(listPanel).toContain("emptyText");
+    expect(listPanel).toContain("const windowingEnabled = !unreadJump");
+    expect(listPanel).not.toContain("const lookupOpen = messageSearchOpen || historyOpen");
+    expect(listPanel).not.toContain("chat-lookup-panel");
     expect(listPanel).not.toContain("chat-inline-panel");
+    expect(messageCenterCss).toContain(".message-history-lookup-backdrop");
+    expect(messageCenterCss).toContain(".message-history-lookup-dialog");
+    expect(messageCenterCss).toContain("overflow-y: scroll !important");
+    expect(messageCenterCss).toContain("scrollbar-gutter: stable !important");
+    expect(messageCenterCss).toContain("scrollbar-width: thin !important");
+    expect(messageCenterCss).toContain("width: 6px !important");
+    expect(messageCenterCss).toContain(".message-history-lookup-dialog .chat-history-results.is-scrolling");
+    expect(messageCenterCss).toContain(".message-history-lookup-results-shell");
+    expect(messageCenterCss).not.toContain(".message-history-lookup-scrollbar");
+    expect(messageCenterCss).toContain(".message-history-lookup-backdrop .message-image-preview");
+    expect(messageCenterCss).toContain("z-index: 240");
+  });
+
+  it("keeps popup scrollbars from shifting dialog content", () => {
+    [
+      ".app-shell .message-history-lookup-dialog .chat-history-results",
+      ".app-shell .pc-forward-targets",
+      ".app-shell .message-contact-targets",
+      ".app-shell .pc-group-read-receipt-body",
+      ".app-shell .group-invite-dialog-list",
+      ".app-shell .group-invite-selected-area",
+      ".app-shell .pc-avatar-profile-popover.contact-card-profile-dialog",
+      ".app-shell .contacts-add-layout",
+      ".app-shell .contacts-add-results",
+      ".app-shell .account-popover",
+      ".app-shell .space-radar-list",
+      ".app-shell .cs-knowledge-result-list",
+      ".app-shell .cs-knowledge-preview p",
+      ".app-shell .cs-quick-reply-filter-rail",
+      ".app-shell .cs-quick-reply-list",
+      ".app-shell .cs-quick-reply-preview p",
+      ".app-shell .cs-ai-preview p",
+      ".app-shell .cs-ai-suggestion-list",
+    ].forEach((selector) => {
+      expect(scrollbarBridgeCss).toContain(selector);
+    });
+
+    expect(scrollbarBridgeCss).toContain("overflow-y: scroll !important");
+    expect(scrollbarBridgeCss).toContain("scrollbar-gutter: stable !important");
+    expect(scrollbarBridgeCss).toContain("scrollbar-width: thin !important");
+    expect(scrollbarBridgeCss).toContain("scrollbar-color: transparent transparent !important");
+    expect(scrollbarBridgeCss).toContain("width: 6px !important");
+    expect(scrollbarBridgeCss).toContain(
+      ".app-shell .message-history-lookup-dialog .chat-history-results.is-scrolling",
+    );
+    expect(scrollbarBridgeCss).toContain(
+      ".app-shell .pc-forward-targets.is-scrolling::-webkit-scrollbar-thumb",
+    );
+    expect(scrollbarBridgeCss).toContain("background: rgba(156, 163, 175, 0.42) !important");
   });
 
   it("previews image and video chat history as a thumbnail grid", () => {
-    expect(listPanel).toContain("chatMediaItemsFromMessage");
-    expect(listPanel).toContain("showMediaLookupPreview");
-    expect(listPanel).toContain("groupLookupMediaPreviewItems");
-    expect(listPanel).toContain("lookupMediaPreviewItemsFromMessage");
-    expect(listPanel).toContain("chat-history-media-results");
-    expect(listPanel).toContain("chat-history-media-grid");
-    expect(listPanel).toContain("chat-history-media-tile");
-    expect(listPanel).toContain("LookupMediaThumbnail");
-    expect(listPanel).toContain("useCachedImageMediaUrl");
-    expect(listPanel).toContain("previewUrls");
-    expect(listPanel).toContain("hasNextPreview");
-    expect(listPanel).toContain('item.kind === "video"');
-    expect(listPanel).toContain("? item.posterUrl");
-    expect(listPanel).toContain("openLookupMediaPreview(item)");
-    expect(listPanel).toContain("setLookupImagePreview({ fileName: item.fileName, src: openUrl })");
-    expect(listPanel).toContain("openMessageVideoPlayer(item.message, openUrl, authToken, cacheContext)");
-    expect(listPanel).toContain("openMessageMediaFile(item.message, openUrl, authToken, cacheContext)");
-    expect(listPanel).toContain("chat-lookup-image-preview");
-    expect(listPanel).toContain("openUrl: item.localOpenUrl || item.remoteSourceUrl || item.sourceUrl");
-    expect(listPanel).not.toContain('key: "video"');
+    expect(historyLookupDialog).toContain("chatMediaItemsFromMessage");
+    expect(historyLookupDialog).toContain("showMediaLookupPreview");
+    expect(historyLookupDialog).toContain("groupLookupMediaPreviewItems");
+    expect(historyLookupDialog).toContain("lookupMediaPreviewItemsFromMessage");
+    expect(historyLookupDialog).toContain("chat-history-media-results");
+    expect(historyLookupDialog).toContain("chat-history-media-grid");
+    expect(historyLookupDialog).toContain("chat-history-media-tile");
+    expect(historyLookupDialog).toContain("showLookupOverview");
+    expect(historyLookupDialog).toContain("chat-history-overview");
+    expect(historyLookupDialog).toContain("chat-history-overview-categories");
+    expect(historyLookupDialog).toContain("lookupOverviewMediaGroups");
+    expect(historyLookupDialog).toContain("LookupMediaThumbnail");
+    expect(historyLookupDialog).toContain("LookupVideoThumbnail");
+    expect(historyLookupDialog).toContain("useVideoPosterSource");
+    expect(historyLookupDialog).toContain("mediaMaterializationCacheKey");
+    expect(historyLookupDialog).toContain("getMaterializedMediaDisplayUrl");
+    expect(historyLookupDialog).toContain("subscribeMaterializedMediaDisplayUrl");
+    expect(historyLookupDialog).toContain("mediaStableCacheIdentity");
+    expect(historyLookupDialog).toContain("LookupImagePreviewViewer");
+    expect(historyLookupDialog).toContain("useCachedImageMediaUrl");
+    expect(historyLookupDialog).toContain("ImagePreviewViewer");
+    expect(historyLookupDialog).toContain("previewUrls");
+    expect(historyLookupDialog).toContain("compactUniqueMediaUrls");
+    expect(historyLookupDialog).toContain("...(item.imageSourceUrls ?? [])");
+    expect(historyLookupDialog).toContain("item.localPreviewUrl");
+    expect(historyLookupDialog).toContain("item.localOpenUrl");
+    expect(historyLookupDialog).toContain("item.remoteSourceUrl");
+    expect(historyLookupDialog).toContain("hasNextPreview");
+    expect(historyLookupDialog).toContain('item.kind === "video"');
+    expect(historyLookupDialog).toContain("? item.posterUrl");
+    expect(historyLookupDialog).toContain("openLookupMediaPreview(item)");
+    expect(historyLookupDialog).toContain("cacheKey: item.previewCacheKey");
+    expect(historyLookupDialog).toContain("useCachedImageMediaUrl(preview.src, authToken, preview.cacheKey)");
+    expect(historyLookupDialog).toContain("src={displaySrc || preview.src}");
+    expect(historyLookupDialog).toContain("videoPreviewUrl");
+    expect(historyLookupDialog).toContain("media: item.media");
+    expect(historyLookupDialog).toContain("sourceUrl: item.sourceUrl");
+    expect(historyLookupDialog).toContain("remoteSourceUrl: item.remoteSourceUrl");
+    expect(historyLookupDialog).toContain("localOpenUrl: item.localOpenUrl");
+    expect(historyLookupDialog).toContain("posterUrl: item.kind === \"video\" ? item.posterUrl : undefined");
+    expect(historyLookupDialog).toContain("const src = displaySrc || previewUrl || \"\"");
+    expect(historyLookupDialog).toContain("displaySrc: videoDisplaySrc");
+    expect(historyLookupDialog).toContain("explicitPoster");
+    expect(historyLookupDialog).toContain("mediaCacheContext: { accountId, conversationId }");
+    expect(historyLookupDialog).toContain("chat-history-video-frame");
+    expect(historyLookupDialog).toContain("chat-history-video-poster");
+    expect(historyLookupDialog).toContain("chat-history-video-placeholder");
+    expect(historyLookupDialog).toContain("chat-history-video-play");
+    expect(historyLookupDialog).not.toContain("<video");
+    expect(historyLookupDialog).not.toContain('preload="metadata"');
+    expect(historyLookupDialog).toContain("openMessageVideoPlayer(item.message, openUrl, authToken, cacheContext)");
+    expect(historyLookupDialog).toContain("openMessageMediaFile(item.message, openUrl, authToken, cacheContext)");
+    expect(historyLookupDialog).not.toContain("chat-lookup-image-preview");
+    expect(historyLookupDialog).toContain("item.localOpenUrl ||");
+    expect(historyLookupDialog).toContain("compactUniqueMediaUrls(item.imageSourceUrls ?? [])[0]");
+    expect(historyLookupDialog).not.toContain('key: "video"');
+    expect(listPanel).not.toContain("chatMediaItemsFromMessage");
     expect(messageListModel).toContain('filter === "image"');
     expect(messageListModel).toContain("Boolean(body.image || body.video)");
     expect(messageListModel).not.toContain('"video",\n  "link"');
     expect(zhCnMessages).toContain("image: '图片与视频'");
     expect(messageCenterCss).toContain(".chat-history-media-grid");
-    expect(messageCenterCss).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
+    expect(messageCenterCss).toContain("padding: 0 18px 18px;");
+    expect(messageCenterCss).toContain("grid-template-columns: repeat(auto-fill, minmax(118px, 148px));");
+    expect(messageCenterCss).toContain("grid-template-columns: repeat(auto-fill, minmax(220px, 280px));");
     expect(messageCenterCss).toContain(".chat-history-media-tile img");
+    expect(messageCenterCss).toContain(".chat-history-video-frame");
+    expect(messageCenterCss).toContain(".chat-history-video-frame::before");
+    expect(messageCenterCss).toContain(".chat-history-video-poster");
+    expect(messageCenterCss).toContain(".chat-history-video-placeholder");
+    expect(messageCenterCss).toContain(".chat-history-video-play");
     expect(messageCenterCss).toContain(".chat-history-media-video");
+    expect(messageCenterCss).toContain("max-height: min(560px, calc(100vh - 290px));");
   });
 
   it("previews favorite images and videos from real media fields", () => {
     expect(accountUtilityPages).toContain("favoriteMediaPreviewFromItem");
     expect(accountUtilityPages).toContain("chatMediaItemsFromMessage({ assetBaseUrl, message })");
     expect(accountUtilityPages).toContain("favorite-media-preview");
-    expect(accountUtilityPages).toContain("setImagePreview({ fileName: preview.fileName, src: openUrl })");
+    expect(accountUtilityPages).toContain("FavoriteImagePreviewViewer");
+    expect(accountUtilityPages).toContain("useCachedImageMediaUrl(preview.src, authToken, preview.cacheKey)");
+    expect(accountUtilityPages).toContain("ImagePreviewViewer");
+    expect(accountUtilityPages).toContain("cacheKey: preview.cacheKey");
+    expect(accountUtilityPages).toContain('cacheKey: mediaItem.kind === "image" ? mediaItem.imageCacheKey : undefined');
     expect(accountUtilityPages).toContain("openMessageVideoPlayer(preview.message, openUrl, authToken, cacheContext)");
     expect(accountUtilityPages).toContain("openMessageMediaFile(preview.message, openUrl, authToken, cacheContext)");
-    expect(accountUtilityPages).toContain("message-image-preview favorite-image-preview");
     expect(accountUtilityPages).toContain('"imageUrl"');
     expect(accountUtilityPages).toContain('"videoUrl"');
     expect(accountUtilityPages).toContain('"thumbnailUrl"');
@@ -209,7 +334,8 @@ describe("message lookup UI", () => {
     expect(contactProfileController).not.toContain("pcQueryKeys.customerServiceThreadProfile");
     expect(contactProfileController).toContain("pcQueryKeys.friendProfileExtra");
     expect(contactProfileController).toContain("activeFriend");
-    expect(contactProfileController).toContain("getFriendProfileExtra(activeFriendUserId)");
+    expect(contactProfileController).toContain("enabled: false");
+    expect(contactProfileController).not.toContain("getFriendProfileExtra(activeFriendUserId)");
     expect(contactProfileController).toContain("updateFriendProfileMutation");
     expect(contactProfileController).toContain('queryClient.invalidateQueries({ queryKey: ["pc-friends"] })');
     expect(contactProfileController).toContain("pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken)");
@@ -221,7 +347,7 @@ describe("message lookup UI", () => {
     expect(messageCenter).toContain("useMessageInteractionHandlers({");
     expect(messageCenter).toContain("profile: contactProfileController.profileQuery.data");
     expect(messageCenter).toContain("profileExtra: contactProfileController.profileExtraQuery.data");
-    expect(contactProfileController).toContain("getFriendProfileExtra(activeFriendUserId)");
+    expect(contactProfileController).not.toContain("getFriendProfileExtra(activeFriendUserId)");
     expect(stage).toContain("handleAvatarClick");
   });
 
@@ -316,29 +442,102 @@ describe("message lookup UI", () => {
 
   it("marks direct read receipts with a green check without changing unread receipts", () => {
     expect(chatMessageBubble).toContain('model.status.receipt === "read"');
-    expect(chatMessageBubble).toContain("pc-chat-receipt-icon");
-    expect(chatMessageBubble).toContain('const receiptClassName = `pc-chat-receipt${readReceipt ? " read" : ""}');
-    expect(chatMessageBubble).toContain('<span className={receiptClassName}>{receiptContent}</span>');
-    expect(messageCenterCss).toContain(".pc-chat-receipt.read");
-    expect(messageCenterCss).toContain("color: #10b981");
+    expect(chatMessageBubble).toContain('model.status.receipt === "group_all"');
+    expect(chatMessageBubble).toContain("DirectReadReceiptIcon");
+    expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt-icon");
+    expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt-ring");
+    expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt-check");
+    expect(chatMessageBubble).not.toContain('from "lucide-react"');
+    expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt");
+    expect(chatMessageBubble).toContain("pc-chat-bubble-shell");
+    expect(messageCenterCss).toContain(".pc-chat-direct-read-receipt");
+    expect(messageCenterCss).toContain("color: #13bfa6");
+    expect(messageCenterCss).toContain("left: var(--pc-chat-receipt-left, -18px)");
+    expect(messageCenterCss).toContain("bottom: var(--pc-chat-receipt-bottom, 0px)");
+    expect(messageCenterCss).toContain("--pc-chat-receipt-bottom: 4px");
+    expect(messageCenterCss).toContain(".pc-chat-bubble-shell:has(.message-file-card)");
+    expect(messageCenterCss).not.toContain("pc-chat-direct-read-receipt {\n  border:");
+    expect(messageCenterCss).not.toContain("pc-chat-direct-read-receipt {\n  box-shadow:");
+  });
+
+  it("fast-tracks direct read receipt polling only while own sent messages are pending", () => {
+    expect(directReadReceiptSync).toContain("latestPendingDirectReadReceiptSeq");
+    expect(directReadReceiptSync).toContain("pendingDirectReadSeq");
+    expect(directReadReceiptSync).toContain("directReadStatusRefetch");
+    expect(directReadReceiptSync).toContain("activeDirectReadStatusFastTrackIntervalMs");
+    expect(directReadReceiptSync).toContain("activeDirectReadStatusFastTrackWindowMs");
   });
 
   it("opens group read receipts as a message-anchored popover", () => {
     expect(chatMessageBubble).toContain("onGroupReadReceiptClick");
-    expect(chatMessageBubble).toContain("pc-chat-group-receipt-button");
+    expect(chatMessageBubble).toContain("{ ...viewModel, actions: computedModel.actions }");
+    expect(chatMessageBubble).not.toContain("status: computedModel.status");
+    expect(chatMessageBubble).toContain("pc-chat-group-read-pie-button");
+    expect(chatMessageBubble).toContain("GroupReadPieIcon");
+    expect(chatMessageBubble).toContain("groupReadPiePath");
+    expect(chatMessageBubble).toContain("model.status.groupReadReceipt");
+    expect(chatMessageBubble).toContain('model.status.receipt !== "group_all"');
     expect(chatMessageBubble).toContain("model.status.groupReadReceiptClickable");
+    expect(chatMessageBubble).toContain("groupReadVisualRatio");
+    expect(chatMessageBubble).toContain('groupReadCount > 0 ? "read" : "unread"');
     expect(listPanel).toContain("GroupReadReceiptPopover");
+    expect(listPanel).toContain("pendingGroupReadReceiptSnapshotTargets");
+    expect(listPanel).toContain("groupReadReceiptAutoSyncTargets");
+    expect(listPanel).toContain("useQueries");
+    expect(listPanel).toContain("activeGroupReadReceiptAutoSyncIntervalMs");
     expect(listPanel).toContain("groupReadReceiptQuery");
+    expect(listPanel).toContain("useQueryClient");
+    expect(listPanel).toContain("syncGroupReadReceiptSnapshotToCache");
+    expect(listPanel).toContain("readCount: groupReadReceiptQuery.data.readCount");
+    expect(messageCacheMutationModel).toContain("pcQueryKeys.imMessagesForSession");
+    expect(messageCacheMutationModel).toContain("syncGroupReadReceiptSnapshot");
+    expect(listPanel).toContain("conversation.memberCount");
+    expect(listPanel).toContain("readableGroupReadReceiptMemberCount");
+    expect(listPanel).toContain("fallbackMemberCount: conversation.memberCount");
     expect(listPanel).toContain("setActiveGroupReadReceipt");
     expect(listPanel).toContain("onGroupReadReceiptClick");
     expect(groupReadReceiptPopover).toContain('role="dialog"');
     expect(groupReadReceiptPopover).toContain('aria-modal="false"');
     expect(groupReadReceiptPopover).toContain("readMembers");
     expect(groupReadReceiptPopover).toContain("unreadMembers");
+    expect(messageCenter).toContain("canViewCurrentGroupMemberList");
+    expect(messageCenter).toContain("canViewGroupMemberList");
+    expect(stage).toContain("canOpenGroupReadReceiptMemberProfile");
+    expect(stage).toContain("onOpenGroupMemberProfile={onOpenGroupMemberProfile}");
+    expect(listPanel).toContain("groupReadReceiptMemberProfileTarget");
+    expect(listPanel).toContain("groupReadReceiptMemberProfileFor");
+    expect(listPanel).toContain("canOpenGroupReadReceiptMemberProfileRow");
+    expect(listPanel).toContain("openGroupReadReceiptMemberProfile");
+    expect(listPanel).toContain("onOpenGroupMemberProfile?.(target, member)");
+    expect(listPanel).not.toContain("if (opened) setActiveGroupReadReceipt(null)");
+    expect(listPanel).toContain("loading={groupReadReceiptQuery.isLoading && !groupReadReceiptQuery.data}");
+    expect(listPanel).not.toContain("loading={groupReadReceiptQuery.isLoading || groupReadReceiptQuery.isFetching}");
+    expect(groupReadReceiptPopover).toContain("canOpenMemberProfile");
+    expect(groupReadReceiptPopover).toContain("onOpenMemberProfile");
+    expect(groupReadReceiptPopover).toContain("canOpenProfile && onOpenProfile");
+    expect(groupReadReceiptPopover).toContain("pc-group-read-receipt-member clickable");
+    expect(groupReadReceiptPopover).toContain("event.stopPropagation()");
+    expect(groupReadReceiptPopover).toContain("isContactCardProfileTarget(target)");
+    expect(groupReadReceiptPopover).toContain('target.closest(".contact-card-profile-dialog")');
     expect(groupReadReceiptPopover).toContain("onRetry");
     expect(groupReadReceiptPopover).toContain("Escape");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-icon");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-empty");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-track");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-fill");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-button.read");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-button.unread");
+    expect(messageCenterCss).toContain("color: #13bfa6");
+    expect(messageCenterCss).toContain("fill: #ffffff");
+    expect(messageCenterCss).toContain("stroke: currentColor");
+    expect(chatMessageBubble).toContain('height="13"');
+    expect(chatMessageBubble).toContain('width="13"');
+    expect(messageCenterCss).toContain(".pc-group-read-receipt-member.clickable");
+    expect(messageCenterCss).not.toContain("conic-gradient");
     expect(messageCenterCss).toContain(".pc-group-read-receipt-popover");
     expect(messageCenterCss).toContain(".pc-group-read-receipt-tabs");
+    expect(contextMenuCss).toContain("z-index: 190");
+    expect(contextMenuCss).toContain("z-index: 260");
   });
 
   it("surfaces incoming friend requests across navigation, message plus and reminders", () => {
