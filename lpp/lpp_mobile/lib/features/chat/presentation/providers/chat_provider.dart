@@ -392,7 +392,8 @@ class ChatNotifier
       try {
         final repository = _repo;
         if (repository is! DirectReadStatusReader) return;
-        final status = await repository.getDirectReadStatus(conversationId);
+        final reader = repository as DirectReadStatusReader;
+        final status = await reader.getDirectReadStatus(conversationId);
         final readSeq = status.peerLastReadSeq;
         if (readSeq <= 0) return;
         final myUserId = ref.read(currentSpaceProvider)?.userId ?? '';
