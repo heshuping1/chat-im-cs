@@ -90,6 +90,14 @@ abstract class ChatLocalDataSource {
   /// 标记消息为已撤回（Gateway 推送 msg.recalled 时调用）
   Future<void> markMessageRecalled(
       String spaceId, String conversationId, String messageId);
+
+  /// 按对端已读游标更新当前用户自己发送的消息。
+  Future<void> markOwnMessagesReadByPeer(
+    String spaceId,
+    String conversationId, {
+    required String currentUserId,
+    required int readSeq,
+  });
 }
 
 List<Message> sortMessagesForTimeline(Iterable<Message> messages) {
@@ -123,10 +131,15 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
         mentions                TEXT,
         status                  TEXT NOT NULL DEFAULT 'sent',
         translation             TEXT,
+        read_count              INTEGER NOT NULL DEFAULT 0,
+        is_read_by_peer         INTEGER NOT NULL DEFAULT 0,
         failure_reason          TEXT,
         is_self                 INTEGER NOT NULL DEFAULT 0
       )
     ''');
+    await _ensureColumn(db, table, 'read_count', 'INTEGER NOT NULL DEFAULT 0');
+    await _ensureColumn(
+        db, table, 'is_read_by_peer', 'INTEGER NOT NULL DEFAULT 0');
     await _ensureColumn(db, table, 'failure_reason', 'TEXT');
     await _ensureColumn(db, table, 'is_self', 'INTEGER NOT NULL DEFAULT 0');
     await db.execute('''
@@ -159,6 +172,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
           : null,
       'status': m.status.wireName,
       'translation': m.translation,
+      'read_count': m.readCount,
+      'is_read_by_peer': m.isReadByPeer ? 1 : 0,
       'failure_reason': m.failureReason,
       'is_self': m.isSelf ? 1 : 0,
     };
@@ -196,6 +211,8 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
       mentions: mentions,
       status: status,
       translation: row['translation'] as String?,
+      readCount: row['read_count'] as int? ?? 0,
+      isReadByPeer: (row['is_read_by_peer'] as int? ?? 0) == 1,
       failureReason: row['failure_reason'] as String?,
       isSelf: (row['is_self'] as int? ?? 0) == 1,
     );
@@ -706,6 +723,44 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     );
     await const ChatLocalSearchIndex()
         .deleteMessage(spaceId, conversationId, messageId);
+  }
+
+  @override
+  Future<void> markOwnMessagesReadByPeer(
+    String spaceId,
+    String conversationId, {
+    required String currentUserId,
+    required int readSeq,
+  }) async {
+    if (currentUserId.trim().isEmpty || readSeq <= 0) return;
+    final db = await AppDatabase.of(spaceId);
+    await _ensureMessageTable(db, conversationId);
+    final table = _messageTable(conversationId);
+    await db.update(
+      table,
+      {
+        'is_read_by_peer': 1,
+        'status': MessageStatus.read.wireName,
+      },
+      where: '''
+        conversation_seq > 0
+        AND conversation_seq <= ?
+        AND is_recalled = 0
+        AND (
+          is_self = 1
+          OR lower(sender_user_id) = lower(?)
+        )
+        AND status NOT IN (?, ?, ?, ?)
+      ''',
+      whereArgs: [
+        readSeq,
+        currentUserId,
+        MessageStatus.failed.wireName,
+        MessageStatus.rejected.wireName,
+        MessageStatus.recalled.wireName,
+        MessageStatus.deletedLocal.wireName,
+      ],
+    );
   }
 
   // ── 旧方法委托（保持接口兼容）────────────────────────────────────────────

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/space/space_context.dart';
+import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/pending_message_queue.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
@@ -12,7 +13,9 @@ import 'package:lpp_mobile/features/chat/data/repositories/chat_repository_impl.
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/group_entities.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/read_receipt.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_read_receipt_service.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_send_policy.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/send_message_usecase.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_prefetch_controller.dart';
@@ -41,11 +44,16 @@ class ChatNotifier
   late ChatRepository _repo;
   bool _hasMore = true;
   bool _isLoadingMore = false;
+  Timer? _directReadStatusFastTrackTimer;
 
   @override
   Future<List<Message>> build((String, String, bool) arg) async {
     // keepAlive：退出聊天页不销毁，保持消息缓存（微信做法）
     ref.keepAlive();
+    ref.onDispose(() {
+      _directReadStatusFastTrackTimer?.cancel();
+      _directReadStatusFastTrackTimer = null;
+    });
     final (spaceId, _, _) = arg;
     _repo = ref.watch(_chatRepositoryProvider(spaceId));
     return _loadInitial();
@@ -69,6 +77,10 @@ class ChatNotifier
 
         // 2. 后台增量同步：只拉比本地更新的消息
         _syncInBackground(conversationId, isGroup);
+        if (!isGroup) {
+          _syncDirectPeerReadStatusInBackground(conversationId);
+          _startDirectReadStatusFastTrack(conversationId);
+        }
 
         return cached;
       }
@@ -82,7 +94,12 @@ class ChatNotifier
       ref.read(mediaPrefetchControllerProvider(spaceId)).prefetchMessages(
             messages,
           );
-      return _mergeMessages(state.valueOrNull, messages);
+      final merged = _mergeMessages(state.valueOrNull, messages);
+      if (!isGroup) {
+        _syncDirectPeerReadStatusInBackground(conversationId);
+        _startDirectReadStatusFastTrack(conversationId);
+      }
+      return merged;
     } catch (e) {
       // 网络失败时返回空列表，不显示错误页
       _hasMore = false;
@@ -121,6 +138,10 @@ class ChatNotifier
             return map.values.toList()
               ..sort((a, b) => a.conversationSeq.compareTo(b.conversationSeq));
           });
+          if (!isGroup) {
+            _syncDirectPeerReadStatusInBackground(conversationId);
+            _startDirectReadStatusFastTrack(conversationId);
+          }
         }
       } catch (_) {
         // 后台同步失败静默处理，本地缓存继续展示
@@ -218,7 +239,7 @@ class ChatNotifier
 
   /// 乐观插入消息（发送中状态）
   void optimisticInsert(Message message) {
-    final (spaceId, conversationId, argIsGroup) = arg;
+    final (spaceId, conversationId, _) = arg;
     state = state.whenData((list) => [...list, message]);
     _persistMessage(spaceId, conversationId, message);
   }
@@ -245,6 +266,10 @@ class ChatNotifier
             message: updated,
             isSelf: true,
           );
+          if (!argIsGroup) {
+            _syncDirectPeerReadStatusInBackground(conversationId);
+            _startDirectReadStatusFastTrack(conversationId);
+          }
         }
       } catch (_) {}
     });
@@ -338,18 +363,87 @@ class ChatNotifier
   }
 
   /// 对端已读回执：将 seq <= readSeq 且自己发送的消息标记为已读
-  void updatePeerReadSeq(String peerUserId, int readSeq) {
+  void updatePeerReadSeq(String _peerUserId, int readSeq) {
     final myUserId = ref.read(currentSpaceProvider)?.userId ?? '';
-    state = state.whenData((list) => list.map((m) {
-          // 只标记自己发的、seq <= readSeq 的消息
-          if (m.senderUserId == myUserId &&
-              m.conversationSeq > 0 &&
-              m.conversationSeq <= readSeq &&
-              !m.isReadByPeer) {
-            return m.copyWith(isReadByPeer: true);
-          }
-          return m;
-        }).toList());
+    const receiptService = MessageReadReceiptService();
+    state = state.whenData(
+      (list) => receiptService.applyDirectPeerReadSeq(
+        list,
+        currentUserId: myUserId,
+        readSeq: readSeq,
+      ),
+    );
+    final (spaceId, conversationId, argIsGroup) = arg;
+    if (argIsGroup || myUserId.isEmpty || readSeq <= 0) return;
+    Future.microtask(() async {
+      try {
+        await ChatLocalDataSourceImpl().markOwnMessagesReadByPeer(
+          spaceId,
+          conversationId,
+          currentUserId: myUserId,
+          readSeq: readSeq,
+        );
+      } catch (_) {}
+    });
+  }
+
+  void _syncDirectPeerReadStatusInBackground(String conversationId) {
+    Future.microtask(() async {
+      try {
+        final repository = _repo;
+        if (repository is! DirectReadStatusReader) return;
+        final status = await repository.getDirectReadStatus(conversationId);
+        final readSeq = status.peerLastReadSeq;
+        if (readSeq <= 0) return;
+        final myUserId = ref.read(currentSpaceProvider)?.userId ?? '';
+        if (myUserId.isEmpty) return;
+        const receiptService = MessageReadReceiptService();
+        state = state.whenData(
+          (list) => receiptService.applyDirectPeerReadSeq(
+            list,
+            currentUserId: myUserId,
+            readSeq: readSeq,
+          ),
+        );
+        await ChatLocalDataSourceImpl().markOwnMessagesReadByPeer(
+          arg.$1,
+          conversationId,
+          currentUserId: myUserId,
+          readSeq: readSeq,
+        );
+      } catch (_) {
+        // read-status 是回执增强能力，失败时保留 Gateway/历史快照状态。
+      }
+    });
+  }
+
+  void _startDirectReadStatusFastTrack(String conversationId) {
+    final myUserId = ref.read(currentSpaceProvider)?.userId ?? '';
+    if (myUserId.isEmpty || !_hasPendingDirectReadReceipt(myUserId)) return;
+    if (_directReadStatusFastTrackTimer?.isActive == true) return;
+
+    final startedAt = DateTime.now();
+    _directReadStatusFastTrackTimer =
+        Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (DateTime.now().difference(startedAt) > const Duration(seconds: 30) ||
+          !_hasPendingDirectReadReceipt(myUserId)) {
+        timer.cancel();
+        if (_directReadStatusFastTrackTimer == timer) {
+          _directReadStatusFastTrackTimer = null;
+        }
+        return;
+      }
+      _syncDirectPeerReadStatusInBackground(conversationId);
+    });
+  }
+
+  bool _hasPendingDirectReadReceipt(String myUserId) {
+    final messages = state.valueOrNull;
+    if (messages == null || messages.isEmpty) return false;
+    return const MessageReadReceiptService().hasPendingDirectPeerReadReceipt(
+      messages,
+      currentUserId: myUserId,
+    );
   }
 
   bool get hasMore => _hasMore;

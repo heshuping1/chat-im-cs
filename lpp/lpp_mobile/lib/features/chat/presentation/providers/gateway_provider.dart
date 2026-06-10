@@ -355,10 +355,29 @@ void _handleMessageRead(
     return;
   }
 
-  // 对端已读回执：更新对应会话里自己发的消息的已读状态
+  final conversationType =
+      _resolveConversationType(ref, spaceId, event.conversationId);
+  if (conversationType != ConversationType.direct) {
+    return;
+  }
+
+  // 对端已读回执：只更新私聊里自己发的消息；群聊人数以服务端详情接口为准。
   _updateChatIfKnown(ref, spaceId, event.conversationId, (notifier) {
     notifier.updatePeerReadSeq(event.userId, event.readSeq);
   });
+  final selfUserId = currentUserId;
+  if (selfUserId != null && selfUserId.isNotEmpty && event.readSeq > 0) {
+    unawaited(Future<void>.microtask(() async {
+      try {
+        await ChatLocalDataSourceImpl().markOwnMessagesReadByPeer(
+          spaceId,
+          event.conversationId,
+          currentUserId: selfUserId,
+          readSeq: event.readSeq,
+        );
+      } catch (_) {}
+    }));
+  }
 }
 
 // ---------------------------------------------------------------------------

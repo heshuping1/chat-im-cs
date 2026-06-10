@@ -7,6 +7,7 @@ import 'package:lpp_mobile/features/chat/data/models/conversation_model.dart';
 import 'package:lpp_mobile/features/chat/data/models/message_model.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation_page.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/read_receipt.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 
 MessageType _messageTypeFromString(String raw) {
@@ -155,6 +156,9 @@ abstract class ChatRemoteDataSource {
 
   /// POST /api/client/v1/direct-chats/{chatId}/read
   Future<void> markDirectChatRead(String chatId, int readSeq);
+
+  /// GET /api/client/v1/direct-chats/{chatId}/read-status
+  Future<PeerReadStatus> getDirectReadStatus(String chatId);
 
   /// POST /api/client/v1/groups/{groupId}/read
   Future<void> markGroupRead(String groupId, int readSeq);
@@ -519,6 +523,24 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   }
 
   @override
+  Future<PeerReadStatus> getDirectReadStatus(String chatId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/api/client/v1/direct-chats/$chatId/read-status',
+      );
+      final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+      return PeerReadStatus(
+        peerLastReadSeq: _intValue(data['peerLastReadSeq']),
+        peerLastReadAt: DateTime.tryParse(
+          data['peerLastReadAt']?.toString() ?? '',
+        ),
+      );
+    } on DioException catch (e) {
+      throw ErrorHandler.fromDioException(e);
+    }
+  }
+
+  @override
   Future<void> markGroupRead(String groupId, int readSeq) async {
     try {
       await _dio.post<Map<String, dynamic>>(
@@ -528,6 +550,12 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     } on DioException catch (e) {
       throw ErrorHandler.fromDioException(e);
     }
+  }
+
+  static int _intValue(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   static String _messageTypeToString(MessageType type) {

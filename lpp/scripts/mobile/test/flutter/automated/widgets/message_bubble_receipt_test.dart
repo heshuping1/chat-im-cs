@@ -24,7 +24,7 @@ void main() {
     expect(find.byIcon(Icons.done_all), findsNothing);
   });
 
-  testWidgets('direct self messages use two ticks after peer reads', (
+  testWidgets('direct self messages use PC-style read receipt after peer reads', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -38,7 +38,8 @@ void main() {
     );
 
     expect(find.byIcon(Icons.done), findsNothing);
-    expect(find.byIcon(Icons.done_all), findsOneWidget);
+    expect(find.byIcon(Icons.done_all), findsNothing);
+    expect(_directReadReceiptMark(), findsOneWidget);
   });
 
   testWidgets('group self messages show read count receipt entry', (
@@ -60,6 +61,7 @@ void main() {
 
     expect(find.byIcon(Icons.done), findsNothing);
     expect(find.byIcon(Icons.done_all), findsNothing);
+    expect(_groupReadReceiptMark(), findsOneWidget);
     expect(find.text('已读 3 人'), findsOneWidget);
     expect(find.textContaining('未读'), findsNothing);
 
@@ -641,6 +643,26 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+Finder _directReadReceiptMark() {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is CustomPaint &&
+        widget.painter.runtimeType.toString().contains(
+              'DirectReadReceiptPainter',
+            ),
+  );
+}
+
+Finder _groupReadReceiptMark() {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is CustomPaint &&
+        widget.painter.runtimeType.toString().contains(
+              'GroupReadReceiptPainter',
+            ),
+  );
 }
 
 Widget _wrap(Widget child) {

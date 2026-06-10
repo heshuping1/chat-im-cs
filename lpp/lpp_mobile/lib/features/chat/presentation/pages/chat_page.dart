@@ -28,6 +28,7 @@ import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_read_receipt_service.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_send_failure.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/customer_service_chat_controller.dart';
@@ -4548,10 +4549,12 @@ class _MessageList extends ConsumerWidget {
                             })()
                           : null,
                       groupId: isGroup ? conversationId : null,
-                      onGroupReadReceiptTap: isGroup &&
-                              isSelf &&
-                              message.status.isServerUsable &&
-                              message.conversationSeq > 0
+                      onGroupReadReceiptTap: const MessageReadReceiptService()
+                              .canShowGroupReadReceipt(
+                            message,
+                            isSelf: isSelf,
+                            isGroup: isGroup,
+                          )
                           ? () => context.push(
                                 '/group-read-receipts/'
                                 '${Uri.encodeComponent(conversationId)}/'

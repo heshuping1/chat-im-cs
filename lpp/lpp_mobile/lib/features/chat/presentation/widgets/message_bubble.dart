@@ -18,6 +18,7 @@ import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/audio_player_service.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_read_receipt_service.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/image_viewer_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/message_media_preview_model.dart';
@@ -349,16 +350,16 @@ class _StatusIndicator extends StatelessWidget {
       case MessageStatus.sent:
       case MessageStatus.delivered:
         if (!showReadReceipt) return const SizedBox.shrink();
-        return Icon(
-          isReadByPeer ? Icons.done_all : Icons.done,
-          size: 16,
-          color: isReadByPeer
-              ? const Color(0xFF4FC3F7)
-              : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-        );
+        return isReadByPeer
+            ? const _DirectReadReceiptMark()
+            : Icon(
+                Icons.done,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              );
       case MessageStatus.read:
         if (!showReadReceipt) return const SizedBox.shrink();
-        return const Icon(Icons.done_all, size: 16, color: Color(0xFF4FC3F7));
+        return const _DirectReadReceiptMark();
       case MessageStatus.failed:
       case MessageStatus.rejected:
         return GestureDetector(
@@ -400,12 +401,12 @@ bool _shouldShowGroupReadReceipt(
   required VoidCallback? onTap,
 }) {
   return showGroupReadReceipt &&
-      isSelf &&
-      groupId != null &&
       onTap != null &&
-      message.status.isServerUsable &&
-      message.conversationSeq > 0 &&
-      !message.isRecalled;
+      const MessageReadReceiptService().canShowGroupReadReceipt(
+        message,
+        isSelf: isSelf,
+        isGroup: groupId != null,
+      );
 }
 
 class _GroupReadReceiptEntry extends StatelessWidget {
@@ -424,21 +425,131 @@ class _GroupReadReceiptEntry extends StatelessWidget {
         readCount > 0 ? l10n.chatReadCount(readCount) : l10n.chatUnread;
     return Padding(
       padding: const EdgeInsets.only(top: 3, right: 2),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Text(
-          text,
-          key: const ValueKey('message-group-read-receipt-entry'),
-          style: TextStyle(
-            fontSize: 11,
-            color: Theme.of(context).colorScheme.onSurface.withValues(
-                  alpha: 0.55,
+      child: Semantics(
+        button: true,
+        label: text,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            key: const ValueKey('message-group-read-receipt-entry'),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _GroupReadReceiptMark(ratio: readCount > 0 ? 0.42 : 0),
+                const SizedBox(width: 3),
+                Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(
+                          alpha: 0.58,
+                        ),
+                  ),
                 ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _DirectReadReceiptMark extends StatelessWidget {
+  const _DirectReadReceiptMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 16,
+      height: 16,
+      child: CustomPaint(painter: _DirectReadReceiptPainter()),
+    );
+  }
+}
+
+class _GroupReadReceiptMark extends StatelessWidget {
+  final double ratio;
+
+  const _GroupReadReceiptMark({required this.ratio});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 14,
+      height: 14,
+      child: CustomPaint(
+        painter: _GroupReadReceiptPainter(ratio: ratio),
+      ),
+    );
+  }
+}
+
+class _DirectReadReceiptPainter extends CustomPainter {
+  const _DirectReadReceiptPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.shortestSide / 14;
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.35 * scale
+      ..strokeCap = StrokeCap.round
+      ..color = _C.green;
+    canvas.drawCircle(size.center(Offset.zero), 5.45 * scale, ring);
+
+    final check = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.45 * scale
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..color = _C.green;
+    final path = Path()
+      ..moveTo(4.45 * scale, 7.05 * scale)
+      ..lineTo(6.12 * scale, 8.68 * scale)
+      ..lineTo(9.58 * scale, 5.28 * scale);
+    canvas.drawPath(path, check);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _GroupReadReceiptPainter extends CustomPainter {
+  final double ratio;
+
+  const _GroupReadReceiptPainter({required this.ratio});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.shortestSide / 14;
+    final center = size.center(Offset.zero);
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.25 * scale
+      ..color = _C.green;
+    canvas.drawCircle(center, 5.35 * scale, ring);
+
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1 * scale
+      ..color = _C.green.withValues(alpha: 0.18);
+    canvas.drawCircle(center, 3.25 * scale, track);
+
+    final clamped = ratio.clamp(0.0, 1.0).toDouble();
+    if (clamped <= 0) return;
+    final fill = Paint()
+      ..style = PaintingStyle.fill
+      ..color = _C.green.withValues(alpha: 0.82);
+    final rect = Rect.fromCircle(center: center, radius: 3.25 * scale);
+    canvas.drawArc(rect, -math.pi / 2, clamped * math.pi * 2, true, fill);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GroupReadReceiptPainter oldDelegate) {
+    return oldDelegate.ratio != ratio;
   }
 }
 // Recalled Bubble

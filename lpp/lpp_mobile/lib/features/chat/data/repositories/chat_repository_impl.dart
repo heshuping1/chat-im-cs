@@ -3,11 +3,12 @@ import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation_page.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/read_receipt.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/filter_conversations.dart';
 
-class ChatRepositoryImpl implements ChatRepository {
+class ChatRepositoryImpl implements ChatRepository, DirectReadStatusReader {
   final ChatRemoteDataSource _remote;
   final ChatLocalDataSource _local;
   final String spaceId;
@@ -410,5 +411,10 @@ class ChatRepositoryImpl implements ChatRepository {
     } else {
       await _remote.markDirectChatRead(conversationId, readSeq);
     }
+  }
+
+  @override
+  Future<PeerReadStatus> getDirectReadStatus(String conversationId) {
+    return _remote.getDirectReadStatus(conversationId);
   }
 }

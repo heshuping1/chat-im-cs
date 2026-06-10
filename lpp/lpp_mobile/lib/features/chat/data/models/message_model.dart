@@ -5,6 +5,12 @@ class MessageModel {
   static Message fromJson(Map<String, dynamic> json) {
     final isRecalled = json['isRecalled'] as bool? ?? false;
     final direction = _stringValue(json['direction']);
+    final isSelf = _boolValue(json['isSelf']) ||
+        _boolValue(json['isMine']) ||
+        const {'out', 'outgoing', 'sent', 'self'}.contains(direction);
+    final status = isRecalled
+        ? MessageStatus.recalled
+        : parseMessageStatus(json['status'] as String?);
     return Message(
       messageId: json['messageId'] as String,
       clientMsgId: json['clientMsgId'] as String?,
@@ -30,14 +36,15 @@ class MessageModel {
       mentions: (json['mentions'] as List<dynamic>?)
           ?.map((e) => Mention.fromJson(e as Map<String, dynamic>))
           .toList(),
-      status: isRecalled
-          ? MessageStatus.recalled
-          : parseMessageStatus(json['status'] as String?),
-      readCount: json['readCount'] as int? ?? 0,
+      status: status,
+      readCount: _intValue(json['readCount'] ?? json['read_count']),
+      isReadByPeer: _boolValue(json['isReadByPeer']) ||
+          _boolValue(json['readByPeer']) ||
+          _boolValue(json['isRead']) ||
+          json['readAt'] != null ||
+          (isSelf && status == MessageStatus.read),
       failureReason: json['failureReason'] as String?,
-      isSelf: _boolValue(json['isSelf']) ||
-          _boolValue(json['isMine']) ||
-          const {'out', 'outgoing', 'sent', 'self'}.contains(direction),
+      isSelf: isSelf,
     );
   }
 
@@ -87,6 +94,7 @@ class MessageModel {
       'mentions': m.mentions?.map((e) => e.toJson()).toList(),
       'status': m.status.wireName,
       'readCount': m.readCount,
+      'isReadByPeer': m.isReadByPeer,
       'isSelf': m.isSelf,
       if (m.failureReason != null) 'failureReason': m.failureReason,
     };
@@ -111,6 +119,12 @@ class MessageModel {
 
   static bool _boolValue(Object? value) {
     return value == true || value == 'true' || value == 1 || value == '1';
+  }
+
+  static int _intValue(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   static MessageType _parseType(String raw) {
