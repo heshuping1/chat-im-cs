@@ -34,7 +34,7 @@ class _C {
   static const selfBgDark = Color(0xFF3D7A4F); // 微信暗色深绿
   static const otherBgLight = Color(0xFFFFFFFF);
   static const otherBgDark = Color(0xFF2C2C2C); // 微信暗色对方气泡
-  static const green = Color(0xFF07C160);
+  static const green = Color(0xFF13BFA6);
   static const textSecondary = Color(0xFF666666);
 
   static Color selfBg(BuildContext context) {
@@ -117,6 +117,16 @@ class MessageBubble extends ConsumerWidget {
       return _EventBubble(message: message);
     }
 
+    final showGroupReceipt = _shouldShowGroupReadReceipt(
+      message,
+      isSelf: isSelf,
+      groupId: groupId,
+      showGroupReadReceipt: showGroupReadReceipt,
+      onTap: onGroupReadReceiptTap,
+    );
+    final showStatusSlot =
+        showGroupReceipt || _shouldShowExternalStatusIndicator(message, groupId);
+
     return Padding(
       padding: EdgeInsets.only(
         left: isSelf ? 56 : 6,
@@ -186,16 +196,22 @@ class MessageBubble extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (isSelf) ...[
-                      _StatusIndicator(
-                        status: message.status,
-                        isReadByPeer: message.isReadByPeer,
-                        showReadReceipt: groupId == null,
-                        showSendingProgress: !_suppressesExternalSendProgress(
-                          message,
+                    if (isSelf && showStatusSlot) ...[
+                      if (showGroupReceipt)
+                        _GroupReadReceiptEntry(
+                          readCount: message.readCount,
+                          onTap: onGroupReadReceiptTap!,
+                        )
+                      else
+                        _StatusIndicator(
+                          status: message.status,
+                          isReadByPeer: message.isReadByPeer,
+                          showReadReceipt: groupId == null,
+                          showSendingProgress: !_suppressesExternalSendProgress(
+                            message,
+                          ),
+                          onFailedTap: onFailedTap,
                         ),
-                        onFailedTap: onFailedTap,
-                      ),
                       const SizedBox(width: 4),
                     ],
                     Flexible(
@@ -210,17 +226,6 @@ class MessageBubble extends ConsumerWidget {
                     ),
                   ],
                 ),
-                if (_shouldShowGroupReadReceipt(
-                  message,
-                  isSelf: isSelf,
-                  groupId: groupId,
-                  showGroupReadReceipt: showGroupReadReceipt,
-                  onTap: onGroupReadReceiptTap,
-                ))
-                  _GroupReadReceiptEntry(
-                    readCount: message.readCount,
-                    onTap: onGroupReadReceiptTap!,
-                  ),
                 // 时间戳（相邻消息时间差 < 5 分钟时隐藏）
                 if (showTimestamp)
                   Padding(
@@ -352,11 +357,7 @@ class _StatusIndicator extends StatelessWidget {
         if (!showReadReceipt) return const SizedBox.shrink();
         return isReadByPeer
             ? const _DirectReadReceiptMark()
-            : Icon(
-                Icons.done,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              );
+            : const SizedBox.shrink();
       case MessageStatus.read:
         if (!showReadReceipt) return const SizedBox.shrink();
         return const _DirectReadReceiptMark();
@@ -374,6 +375,24 @@ class _StatusIndicator extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+
+bool _shouldShowExternalStatusIndicator(Message message, String? groupId) {
+  switch (message.status) {
+    case MessageStatus.sending:
+      return !_suppressesExternalSendProgress(message);
+    case MessageStatus.sent:
+    case MessageStatus.delivered:
+      return groupId == null && message.isReadByPeer;
+    case MessageStatus.read:
+      return groupId == null;
+    case MessageStatus.failed:
+    case MessageStatus.rejected:
+      return true;
+    case MessageStatus.recalled:
+    case MessageStatus.deletedLocal:
+      return false;
+  }
+}
 
 bool _suppressesExternalSendProgress(Message message) {
   if (message.type == MessageType.text ||
@@ -423,34 +442,18 @@ class _GroupReadReceiptEntry extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final text =
         readCount > 0 ? l10n.chatReadCount(readCount) : l10n.chatUnread;
-    return Padding(
-      padding: const EdgeInsets.only(top: 3, right: 2),
-      child: Semantics(
-        button: true,
-        label: text,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: Container(
-            key: const ValueKey('message-group-read-receipt-entry'),
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _GroupReadReceiptMark(ratio: readCount > 0 ? 0.42 : 0),
-                const SizedBox(width: 3),
-                Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(
-                          alpha: 0.58,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return Semantics(
+      button: true,
+      label: text,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          key: const ValueKey('message-group-read-receipt-entry'),
+          width: 16,
+          height: 16,
+          alignment: Alignment.center,
+          child: const _GroupReadReceiptMark(),
         ),
       ),
     );
@@ -463,25 +466,23 @@ class _DirectReadReceiptMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
-      width: 16,
-      height: 16,
+      width: 14,
+      height: 14,
       child: CustomPaint(painter: _DirectReadReceiptPainter()),
     );
   }
 }
 
 class _GroupReadReceiptMark extends StatelessWidget {
-  final double ratio;
-
-  const _GroupReadReceiptMark({required this.ratio});
+  const _GroupReadReceiptMark();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return const SizedBox(
       width: 14,
       height: 14,
       child: CustomPaint(
-        painter: _GroupReadReceiptPainter(ratio: ratio),
+        painter: _GroupReadReceiptPainter(ratio: 0.42),
       ),
     );
   }
@@ -493,16 +494,22 @@ class _DirectReadReceiptPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final scale = size.shortestSide / 14;
+    final center = size.center(Offset.zero);
+    final ringFill = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.white;
+    canvas.drawCircle(center, 5.45 * scale, ringFill);
+
     final ring = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.35 * scale
+      ..strokeWidth = 1.7 * scale
       ..strokeCap = StrokeCap.round
       ..color = _C.green;
-    canvas.drawCircle(size.center(Offset.zero), 5.45 * scale, ring);
+    canvas.drawCircle(center, 5.45 * scale, ring);
 
     final check = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.45 * scale
+      ..strokeWidth = 1.75 * scale
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..color = _C.green;
@@ -526,23 +533,27 @@ class _GroupReadReceiptPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final scale = size.shortestSide / 14;
     final center = size.center(Offset.zero);
+    final ringFill = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.white;
+    canvas.drawCircle(center, 5.35 * scale, ringFill);
+
     final ring = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.25 * scale
+      ..strokeWidth = 1.45 * scale
       ..color = _C.green;
     canvas.drawCircle(center, 5.35 * scale, ring);
 
     final track = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1 * scale
-      ..color = _C.green.withValues(alpha: 0.18);
+      ..style = PaintingStyle.fill
+      ..color = Colors.white;
     canvas.drawCircle(center, 3.25 * scale, track);
 
     final clamped = ratio.clamp(0.0, 1.0).toDouble();
     if (clamped <= 0) return;
     final fill = Paint()
       ..style = PaintingStyle.fill
-      ..color = _C.green.withValues(alpha: 0.82);
+      ..color = _C.green;
     final rect = Rect.fromCircle(center: center, radius: 3.25 * scale);
     canvas.drawArc(rect, -math.pi / 2, clamped * math.pi * 2, true, fill);
   }

@@ -63,6 +63,12 @@ void main() {
       readCount: 2,
     );
     final peerSent = message(id: 'group-peer', seq: 9, senderUserId: 'peer');
+    final unknownSeq = message(
+      id: 'group-unknown',
+      seq: 0,
+      senderUserId: 'me',
+      isSelf: true,
+    );
 
     expect(
       service.canShowGroupReadReceipt(
@@ -85,6 +91,14 @@ void main() {
         ownSent,
         isSelf: true,
         isGroup: false,
+      ),
+      isFalse,
+    );
+    expect(
+      service.canShowGroupReadReceipt(
+        unknownSeq,
+        isSelf: true,
+        isGroup: true,
       ),
       isFalse,
     );

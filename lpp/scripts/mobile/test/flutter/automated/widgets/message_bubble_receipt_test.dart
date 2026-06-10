@@ -7,7 +7,7 @@ import 'package:lpp_mobile/features/chat/presentation/widgets/message_bubble.dar
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
 void main() {
-  testWidgets('direct self messages use one tick before peer reads', (
+  testWidgets('direct self messages hide receipt before peer reads', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -20,8 +20,9 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.done), findsOneWidget);
+    expect(find.byIcon(Icons.done), findsNothing);
     expect(find.byIcon(Icons.done_all), findsNothing);
+    expect(_directReadReceiptMark(), findsNothing);
   });
 
   testWidgets('direct self messages use PC-style read receipt after peer reads', (
@@ -42,7 +43,7 @@ void main() {
     expect(_directReadReceiptMark(), findsOneWidget);
   });
 
-  testWidgets('group self messages show read count receipt entry', (
+  testWidgets('group self messages show PC-style pie receipt entry', (
     tester,
   ) async {
     var tapped = false;
@@ -62,16 +63,18 @@ void main() {
     expect(find.byIcon(Icons.done), findsNothing);
     expect(find.byIcon(Icons.done_all), findsNothing);
     expect(_groupReadReceiptMark(), findsOneWidget);
-    expect(find.text('已读 3 人'), findsOneWidget);
+    expect(find.textContaining('已读'), findsNothing);
     expect(find.textContaining('未读'), findsNothing);
 
-    await tester.tap(find.text('已读 3 人'));
+    await tester.tap(
+      find.byKey(const ValueKey('message-group-read-receipt-entry')),
+    );
     await tester.pump();
 
     expect(tapped, isTrue);
   });
 
-  testWidgets('group self messages show unread receipt entry when count is zero', (
+  testWidgets('group self messages show pie receipt entry when count is zero', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -86,8 +89,31 @@ void main() {
       ),
     );
 
-    expect(find.text('未读'), findsOneWidget);
+    expect(_groupReadReceiptMark(), findsOneWidget);
+    expect(find.text('未读'), findsNothing);
     expect(find.textContaining('已读'), findsNothing);
+  });
+
+  testWidgets('group read receipt entry is hidden when message seq is unknown', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        MessageBubble(
+          message: _message(readCount: 3, conversationSeq: 0),
+          isSelf: true,
+          groupId: 'group-1',
+          showTimestamp: false,
+          onGroupReadReceiptTap: () {},
+        ),
+      ),
+    );
+
+    expect(_groupReadReceiptMark(), findsNothing);
+    expect(
+      find.byKey(const ValueKey('message-group-read-receipt-entry')),
+      findsNothing,
+    );
   });
 
   testWidgets('group read receipt entry is hidden for peer and unsent messages', (
@@ -685,11 +711,12 @@ Message _message({
   MessageLocalUploadState? localUploadState,
   List<Mention>? mentions,
   bool isRecalled = false,
+  int conversationSeq = 1,
 }) {
   return Message(
     messageId: 'msg-1',
     conversationId: 'chat-1',
-    conversationSeq: 1,
+    conversationSeq: conversationSeq,
     senderUserId: 'me',
     type: type,
     body: body,
