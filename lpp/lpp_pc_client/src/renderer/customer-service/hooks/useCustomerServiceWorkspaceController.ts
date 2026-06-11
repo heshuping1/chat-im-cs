@@ -12,6 +12,7 @@ import {
 } from "../../data/customer-service/cs-cache-adapter";
 import {
   canReadCustomerServiceHistory,
+  canSuperviseCustomerServiceClose,
   canUseCustomerServiceStaffEndpoints,
 } from "../../data/customer-service/cs-role-capabilities";
 import {
@@ -63,6 +64,7 @@ export function useCustomerServiceWorkspaceController({
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
   const canReadHistory = canReadCustomerServiceHistory(session);
+  const canSuperviseClose = canSuperviseCustomerServiceClose(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -232,7 +234,13 @@ export function useCustomerServiceWorkspaceController({
   const threadActionMutation = useMutation({
     mutationFn: async (action: CustomerServiceThreadAction) => {
       if (!client || !selectedThread) throw new Error("Select a customer service conversation.");
-      if (!canUseStaffEndpoints) throw new Error("Only customer service staff can perform this action.");
+      if (action === "close") {
+        if (!canUseStaffEndpoints && !canSuperviseClose) {
+          throw new Error("Only customer service staff, administrators, or owners can close this conversation.");
+        }
+      } else if (!canUseStaffEndpoints) {
+        throw new Error("Only customer service staff can perform this action.");
+      }
       return executeCustomerServiceThreadAction({ action, client, thread: selectedThread });
     },
     onSuccess: async (result, action) => {

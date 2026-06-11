@@ -199,9 +199,11 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerContextPanel).toContain("getCustomerServiceHistoryThreads({");
     expect(customerContextPanel).not.toContain("getStaffServiceHistory({");
     expect(threadList).toContain("queued && canUseStaffEndpoints");
-    expect(workspaceController).toContain("if (!canUseStaffEndpoints)");
+    expect(workspaceController).toContain("canSuperviseCustomerServiceClose");
+    expect(workspaceController).toContain('if (action === "close")');
+    expect(workspaceController).toContain("!canUseStaffEndpoints && !canSuperviseClose");
     expect(chatWorkspace).toContain("canUseStaffActions={canUseStaffEndpoints}");
-    expect(chatWorkspace).toContain("canClose={canUseStaffEndpoints && closePermission.enabled}");
+    expect(chatWorkspace).toContain("canClose={canCloseThread}");
     expect(threadActionButton).toContain("if (!canUseStaffActions) return null;");
   });
 
@@ -423,7 +425,10 @@ describe("customer-service history and lookup surfaces", () => {
     expect(workspaceHeader).toContain('t("common.close")');
     expect(workspaceHeader).toContain('t("messages.chatHeader.searchMessages")');
     expect(workspaceHeader).toContain("onCloseThread");
-    expect(chatWorkspace).toContain("canClose={canUseStaffEndpoints && closePermission.enabled}");
+    expect(chatWorkspace).toContain("const canCloseThread = useMemo");
+    expect(chatWorkspace).toContain("canSuperviseCustomerServiceClose");
+    expect(chatWorkspace).toContain("canClose={canCloseThread}");
+    expect(chatWorkspace).toContain('onCloseThread={() => handleThreadAction("close")}');
     expect(chatWorkspace).toContain("const canTransferThread = useMemo");
     expect(chatWorkspace).toContain("canSuperviseCustomerServiceTransfer");
     expect(chatWorkspace).toContain("!createCustomerServiceThreadState(status || selectedThread.status).readOnly");
@@ -432,7 +437,6 @@ describe("customer-service history and lookup surfaces", () => {
     expect(chatWorkspace).toContain("currentStaffName={currentTransferStaffName}");
     expect(transferDialog).toContain("currentStaffName");
     expect(transferDialog).toContain('t("customerService.transfer.currentStaff")');
-    expect(chatWorkspace).toContain("onCloseThread={confirmCloseThread}");
     expect(threadActionButton).not.toContain('onAction("close")');
   });
 

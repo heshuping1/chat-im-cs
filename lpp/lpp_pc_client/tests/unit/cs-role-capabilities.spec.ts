@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canControlCustomerServiceReception,
   canReadCustomerServiceHistory,
+  canSuperviseCustomerServiceClose,
   canSuperviseCustomerServiceTransfer,
   canUseCustomerServiceManagementReadonly,
   canUseCustomerServiceStaffEndpoints,
@@ -16,6 +17,8 @@ describe("customer service role capabilities", () => {
     expect(canControlCustomerServiceReception({ membershipRole: 3 })).toBe(false);
     expect(canReadCustomerServiceHistory({ membershipRole: 4 })).toBe(true);
     expect(canReadCustomerServiceHistory({ membershipRole: 3 })).toBe(true);
+    expect(canSuperviseCustomerServiceClose({ membershipRole: 4 })).toBe(true);
+    expect(canSuperviseCustomerServiceClose({ membershipRole: 3 })).toBe(true);
     expect(canSuperviseCustomerServiceTransfer({ membershipRole: 4 })).toBe(true);
     expect(canSuperviseCustomerServiceTransfer({ membershipRole: 3 })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 4 })).toBe(true);
@@ -26,6 +29,7 @@ describe("customer service role capabilities", () => {
     expect(canUseCustomerServiceStaffEndpoints({ membershipRole: 2 })).toBe(true);
     expect(canControlCustomerServiceReception({ membershipRole: 2 })).toBe(true);
     expect(canReadCustomerServiceHistory({ membershipRole: 2 })).toBe(true);
+    expect(canSuperviseCustomerServiceClose({ membershipRole: 2 })).toBe(false);
     expect(canSuperviseCustomerServiceTransfer({ membershipRole: 2 })).toBe(false);
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 2 })).toBe(false);
   });
@@ -45,6 +49,8 @@ describe("customer service role capabilities", () => {
     expect(canControlCustomerServiceReception({ roleLabel: "owner" })).toBe(false);
     expect(canReadCustomerServiceHistory({ roleLabel: "admin" })).toBe(true);
     expect(canReadCustomerServiceHistory({ roleLabel: "owner" })).toBe(true);
+    expect(canSuperviseCustomerServiceClose({ roleLabel: "admin" })).toBe(true);
+    expect(canSuperviseCustomerServiceClose({ roleLabel: "owner" })).toBe(true);
     expect(canSuperviseCustomerServiceTransfer({ roleLabel: "admin" })).toBe(true);
     expect(canSuperviseCustomerServiceTransfer({ roleLabel: "owner" })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ roleLabel: "admin" })).toBe(true);

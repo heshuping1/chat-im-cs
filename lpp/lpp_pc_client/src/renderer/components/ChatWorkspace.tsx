@@ -59,7 +59,10 @@ import {
 import {
   extractActionResultText,
 } from "../messages/models/messageComposerModel";
-import { canSuperviseCustomerServiceTransfer } from "../data/customer-service/cs-role-capabilities";
+import {
+  canSuperviseCustomerServiceClose,
+  canSuperviseCustomerServiceTransfer,
+} from "../data/customer-service/cs-role-capabilities";
 import {
   messageDangerConfirmationDescriptor,
   requestMessageDangerConfirmation,
@@ -318,6 +321,12 @@ export function ChatWorkspace({
       }),
     [selectedThread, threadState],
   );
+  const canCloseThread = useMemo(() => {
+    if (closePermission.enabled) return true;
+    if (!selectedThread) return false;
+    if (!canSuperviseCustomerServiceClose(session)) return false;
+    return !createCustomerServiceThreadState(status || selectedThread.status).readOnly;
+  }, [closePermission.enabled, selectedThread, session, status]);
   const transferTargets = useMemo(
     () =>
       createCustomerServiceTransferTargetOptions(transferTargetsQuery.data ?? [], [
@@ -575,7 +584,12 @@ export function ChatWorkspace({
 
   const handleThreadAction = useCallback(
     (action: CustomerServiceThreadAction) => {
-      if (!canUseStaffEndpoints) {
+      if (action === "close") {
+        if (!canCloseThread) {
+          setNotice(t("customerService.transfer.unavailable"));
+          return;
+        }
+      } else if (!canUseStaffEndpoints) {
         setNotice(t("customerService.transfer.unavailable"));
         return;
       }
@@ -596,7 +610,7 @@ export function ChatWorkspace({
         threadId: selectedThread.threadId,
       });
     },
-    [canUseStaffEndpoints, displayMessages, selectedThread, threadActionMutation, translatedTitle, t],
+    [canCloseThread, canUseStaffEndpoints, displayMessages, selectedThread, threadActionMutation, translatedTitle, t],
   );
 
   const confirmCloseThread = useCallback(() => {
@@ -692,14 +706,14 @@ export function ChatWorkspace({
         autoTranslateEffective={autoTranslateEffective}
         autoTranslateMode={autoTranslateConversationMode}
         unreadCount={selectedThread.unreadCount}
-        canClose={canUseStaffEndpoints && closePermission.enabled}
+        canClose={canCloseThread}
         canTransfer={canTransferThread}
         onCycleAutoTranslateMode={() =>
           setAutoTranslateConversationMode(
             nextAutoTranslateConversationMode(autoTranslateConversationMode),
           )
         }
-        onCloseThread={confirmCloseThread}
+        onCloseThread={() => handleThreadAction("close")}
         onOpenLookup={() => setLookupOpen(true)}
         onOpenTransfer={openTransferDialog}
         onOpenCustomerContext={onOpenCustomerContext}
