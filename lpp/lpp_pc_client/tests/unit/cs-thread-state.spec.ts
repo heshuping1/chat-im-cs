@@ -49,6 +49,37 @@ describe("customer service thread state", () => {
     });
   });
 
+  it("keeps timeout-closed conversations in history until explicitly reopened", () => {
+    expect(createCustomerServiceThreadState("closed_timeout")).toMatchObject({
+      kind: "closed",
+      normalizedStatus: "closed_timeout",
+      readOnly: true,
+      replyGate: "readonly",
+      terminal: true,
+    });
+    expect(createCustomerServiceThreadState("7")).toMatchObject({
+      kind: "closed",
+      readOnly: true,
+      replyGate: "readonly",
+    });
+  });
+
+  it("keeps transferred-away conversations readonly for the previous agent", () => {
+    expect(createCustomerServiceThreadState("transferred")).toMatchObject({
+      kind: "closed",
+      normalizedStatus: "transferred",
+      readOnly: true,
+      replyGate: "readonly",
+      terminal: true,
+    });
+    expect(createCustomerServiceThreadState("assigned-away")).toMatchObject({
+      kind: "closed",
+      normalizedStatus: "assigned_away",
+      readOnly: true,
+      replyGate: "readonly",
+    });
+  });
+
   it("keeps unknown active statuses open to preserve legacy behavior", () => {
     expect(createCustomerServiceThreadState("serving")).toMatchObject({
       kind: "serving",

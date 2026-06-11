@@ -25,6 +25,19 @@ describe("customer context panel empty state", () => {
     expect(source).toContain('t("customerService.contextPanel.selectFirst")');
     expect(source).toContain("{selectedThread ? (");
     expect(source).toContain("<UserRound size={18}");
+    expect(source).toContain("<PcAvatar");
+    expect(source).toContain("Sparkles");
     expect(source).not.toContain('src="/customer-info-entry.svg"');
+    expect(source).not.toContain('src="/ai-draft-entry.svg"');
+  });
+
+  it("renders session notes only for temp-session customer-service threads", () => {
+    expect(source).toContain("CustomerServiceSessionNotesPanel");
+    expect(source).toContain(
+      'normalizeCustomerServiceThreadType(selectedThread.threadType) === "temp_session"',
+    );
+    expect(source).toContain(
+      "<CustomerServiceSessionNotesPanel sessionId={selectedThread.threadId} />",
+    );
   });
 });

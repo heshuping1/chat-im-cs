@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   GatewayEventKind,
+  GatewayCustomerServiceTypingPreviewEvent,
   GatewayIgnoredEvent,
   GatewayImMessageReceivedEvent,
   GatewayImReadReceivedEvent,
@@ -54,9 +55,21 @@ describe("gateway event types", () => {
       diagnostics: ["gateway.im.missing_conversation_id"],
     } satisfies GatewayInvalidEvent;
 
+    const typingEvent = {
+      kind: "cs.typing.preview",
+      eventName: "temp_session.typing",
+      receivedAt: 1_700_000_000_004,
+      rawPayload: { sessionId: "thread-1" },
+      threadId: "thread-1",
+      threadType: "temp_session",
+      isTyping: true,
+      previewText: "draft",
+    } satisfies GatewayCustomerServiceTypingPreviewEvent;
+
     const events: GatewayTypedEvent[] = [
       messageEvent,
       readEvent,
+      typingEvent,
       ignoredEvent,
       invalidEvent,
     ];
@@ -65,12 +78,14 @@ describe("gateway event types", () => {
     expect(kinds).toEqual([
       "im.message.received",
       "im.read.received",
+      "cs.typing.preview",
       "ignored",
       "invalid",
     ]);
     expect(events.map((event) => eventKindLabel(event))).toEqual([
       "message",
       "read",
+      "typing",
       "ignored",
       "invalid",
     ]);
@@ -83,6 +98,12 @@ function eventKindLabel(event: GatewayTypedEvent) {
       return "message";
     case "im.read.received":
       return "read";
+    case "cs.message.received":
+      return "customer-service-message";
+    case "cs.thread.changed":
+      return "customer-service-thread";
+    case "cs.typing.preview":
+      return "typing";
     case "ignored":
       return "ignored";
     case "invalid":

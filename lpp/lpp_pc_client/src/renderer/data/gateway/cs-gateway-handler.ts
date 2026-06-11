@@ -13,12 +13,14 @@ import {
 import type {
   GatewayCustomerServiceMessageReceivedEvent,
   GatewayCustomerServiceThreadChangedEvent,
+  GatewayCustomerServiceTypingPreviewEvent,
   GatewayRawEventInput,
 } from "./gateway-event-types";
 
 export interface CustomerServiceGatewayHandlerCallbacks {
   onMessageReceived: (event: GatewayCustomerServiceMessageReceivedEvent) => void;
   onThreadChanged: (event: GatewayCustomerServiceThreadChangedEvent) => void;
+  onTypingPreview?: (event: GatewayCustomerServiceTypingPreviewEvent) => void;
   onHandlerError?: (error: GatewayDispatchError) => void;
 }
 
@@ -28,6 +30,7 @@ export function createCustomerServiceGatewayDispatchHandlers(
   return {
     onCustomerServiceMessageReceived: callbacks.onMessageReceived,
     onCustomerServiceThreadChanged: callbacks.onThreadChanged,
+    onCustomerServiceTypingPreview: callbacks.onTypingPreview,
     onHandlerError: callbacks.onHandlerError,
   };
 }
@@ -53,7 +56,9 @@ export function handleFirstStageCustomerServiceGatewayEvent(
 
   if (
     dispatchResult.handled &&
-    (gatewayEvent.kind === "cs.message.received" || gatewayEvent.kind === "cs.thread.changed")
+    (gatewayEvent.kind === "cs.message.received" ||
+      gatewayEvent.kind === "cs.thread.changed" ||
+      gatewayEvent.kind === "cs.typing.preview")
   ) {
     logGatewayDiagnostic(diagnosticFromHandledGatewayEvent(gatewayEvent));
   }

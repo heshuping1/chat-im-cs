@@ -14,7 +14,8 @@ export type HistoryFilterKey =
   | "voice"
   | "video"
   | "link"
-  | "favorite";
+  | "favorite"
+  | "date";
 
 export interface MessageLookupScope {
   source: ImMessageHydrationSource;
@@ -114,6 +115,7 @@ export function historyMessageMatches(message: MessageItemDto, filter: HistoryFi
   }
   if (filter === "video") return type.includes("video") || Boolean(body.video);
   if (filter === "link") return messageContainsLink(message);
+  if (filter === "date") return Boolean(message.sentAt);
   if (filter === "favorite") {
     const record = message as unknown as Record<string, unknown>;
     return Boolean(record.favoriteId || record.isFavorite || record.favoritedAt);
@@ -176,10 +178,8 @@ function mediaFileNameFromBody(value: unknown) {
 
 const historyFilterKeys: HistoryFilterKey[] = [
   "all",
-  "text",
   "image",
   "file",
-  "voice",
   "link",
-  "favorite",
+  "date",
 ];

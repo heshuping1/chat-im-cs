@@ -88,10 +88,45 @@ async function fetchMediaBlob(url: string, token?: string | null) {
       }
     : undefined;
   const response = await fetch(url, { cache: "no-store", headers });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const blob = await response.blob();
+  const errorMessage = await mediaBlobErrorMessage(blob, response.headers.get("content-type") || "");
+  if (!response.ok || errorMessage) {
+    throw new Error(errorMessage || `HTTP ${response.status}`);
+  }
   if (!blob.size) throw new Error("Empty media");
   return blob;
+}
+
+async function mediaBlobErrorMessage(blob: Blob, contentType: string) {
+  const lowerContentType = `${contentType} ${blob.type}`.toLowerCase();
+  const looksText =
+    lowerContentType.includes("json") ||
+    lowerContentType.includes("html") ||
+    lowerContentType.includes("text/");
+  if (!looksText) return undefined;
+
+  const text = (await blob.text().catch(() => "")).trim();
+  const preview = text.slice(0, 2048);
+  if (!preview) return undefined;
+  if (
+    lowerContentType.includes("html") ||
+    /^<!doctype\s+html/i.test(preview) ||
+    /^<html[\s>]/i.test(preview)
+  ) {
+    return "MEDIA_DOWNLOAD_HTML_ERROR";
+  }
+  if (preview.toLowerCase().includes("media signature has expired")) {
+    return "MEDIA_SIGNATURE_EXPIRED";
+  }
+  if (!lowerContentType.includes("json") && !/^[{[]/.test(preview)) return undefined;
+  try {
+    const payload = JSON.parse(preview) as { code?: string; message?: string } | null;
+    if (!payload || typeof payload !== "object") return undefined;
+    if (payload.code === "OK" || payload.code === "SUCCESS") return undefined;
+    return payload.message || payload.code;
+  } catch {
+    return "MEDIA_DOWNLOAD_JSON_ERROR";
+  }
 }
 
 async function getMediaEntry(key: string) {

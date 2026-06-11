@@ -406,6 +406,14 @@ describe("contacts page closure", () => {
     ),
     "utf8",
   );
+  const contactsCss = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/contacts/contacts.css"),
+    "utf8",
+  );
+  const scrollbarBridgeCss = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/shared/scrollbar-theme-bridge.css"),
+    "utf8",
+  );
 
   it("uses list entries instead of horizontal contact tabs", () => {
     expect(contactsPage).toContain("contacts-entry-list");
@@ -442,6 +450,16 @@ describe("contacts page closure", () => {
     expect(contactsController).toContain("requestListError");
     expect(contactsController).not.toContain(
       "membersQuery.error ||\n    conversationsQuery.error ||\n    departmentsQuery.error ||\n    requestsQuery.error",
+    );
+  });
+
+  it("keeps the contact list scrollbar from changing name layout", () => {
+    expect(contactsCss).toMatch(
+      /\.contacts-page\.contacts-b-layout \.contacts-list\s*\{[^}]*overflow-y:\s*scroll !important;[^}]*scrollbar-gutter:\s*stable !important;[^}]*scrollbar-width:\s*thin !important;/s,
+    );
+    expect(scrollbarBridgeCss).toContain(".app-shell .contacts-page.contacts-b-layout .contacts-list");
+    expect(scrollbarBridgeCss).toContain(
+      ".app-shell .contacts-page.contacts-b-layout .contacts-list.is-scrolling::-webkit-scrollbar-thumb",
     );
   });
 });

@@ -20,29 +20,41 @@ import type {
 } from "./types";
 
 interface RawFriendDto extends Omit<FriendDto, "greenBubbleNo"> {
+  avatar?: string | null;
+  avatar_url?: string | null;
   greenBubbleId?: string | null;
   green_bubble_id?: string | null;
   greenBubbleNo?: string | null;
   green_bubble_no?: string | null;
+  headImageUrl?: string | null;
+  head_image_url?: string | null;
   lppId?: string | null;
   lpp_id?: string | null;
   lppNo?: string | null;
   lpp_no?: string | null;
   lppNumber?: string | null;
   lpp_number?: string | null;
+  profileImageUrl?: string | null;
+  profile_image_url?: string | null;
 }
 
 interface RawTenantMemberDto extends Omit<TenantMemberDto, "greenBubbleNo"> {
+  avatar?: string | null;
+  avatar_url?: string | null;
   greenBubbleId?: string | null;
   green_bubble_id?: string | null;
   greenBubbleNo?: string | null;
   green_bubble_no?: string | null;
+  headImageUrl?: string | null;
+  head_image_url?: string | null;
   lppId?: string | null;
   lpp_id?: string | null;
   lppNo?: string | null;
   lpp_no?: string | null;
   lppNumber?: string | null;
   lpp_number?: string | null;
+  profileImageUrl?: string | null;
+  profile_image_url?: string | null;
 }
 
 interface RawTenantMemberProfileDto extends UserProfileDto {
@@ -364,7 +376,7 @@ export class ContactsApiClient extends ProfileApiClient {
 
 export function normalizeFriendDto(friend: RawFriendDto): FriendDto {
   return {
-    avatarUrl: friend.avatarUrl,
+    avatarUrl: publicAvatarUrl(friend),
     createdAt: friend.createdAt,
     displayName: friend.displayName,
     friendUserId: friend.friendUserId,
@@ -377,7 +389,7 @@ export function normalizeFriendDto(friend: RawFriendDto): FriendDto {
 
 export function normalizeTenantMemberDto(member: RawTenantMemberDto): TenantMemberDto {
   return {
-    avatarUrl: member.avatarUrl,
+    avatarUrl: publicAvatarUrl(member),
     displayName: member.displayName,
     greenBubbleNo: publicGreenBubbleNo(member),
     joinedAt: member.joinedAt,
@@ -411,6 +423,21 @@ function publicGreenBubbleNo(source: object) {
       "lpp_no",
       "lppNumber",
       "lpp_number",
+    ) || null
+  );
+}
+
+function publicAvatarUrl(source: object) {
+  return (
+    stringField(
+      source,
+      "avatarUrl",
+      "avatar_url",
+      "avatar",
+      "headImageUrl",
+      "head_image_url",
+      "profileImageUrl",
+      "profile_image_url",
     ) || null
   );
 }

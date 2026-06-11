@@ -12,7 +12,7 @@ export const realtimeSyncPolicy = {
   customerService: {
     receptionFallbackPollMs: 30_000,
     receptionRefetchInBackground: true,
-    workbenchThreadsFallbackPollMs: 10_000,
+    workbenchThreadsFallbackPollMs: 3_000,
     workbenchThreadsRefetchInBackground: true,
   },
   spaces: {

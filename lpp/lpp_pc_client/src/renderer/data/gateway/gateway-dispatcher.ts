@@ -2,6 +2,7 @@ import type {
   GatewayHandledEvent,
   GatewayCustomerServiceMessageReceivedEvent,
   GatewayCustomerServiceThreadChangedEvent,
+  GatewayCustomerServiceTypingPreviewEvent,
   GatewayImMessageReceivedEvent,
   GatewayImReadReceivedEvent,
   GatewayTypedEvent,
@@ -10,6 +11,7 @@ import type {
 export interface GatewayDispatchHandlers {
   onCustomerServiceMessageReceived?: (event: GatewayCustomerServiceMessageReceivedEvent) => void;
   onCustomerServiceThreadChanged?: (event: GatewayCustomerServiceThreadChangedEvent) => void;
+  onCustomerServiceTypingPreview?: (event: GatewayCustomerServiceTypingPreviewEvent) => void;
   onImMessageReceived?: (event: GatewayImMessageReceivedEvent) => void;
   onImReadReceived?: (event: GatewayImReadReceivedEvent) => void;
   onInvalidEvent?: (event: Extract<GatewayTypedEvent, { kind: "invalid" }>) => void;
@@ -56,6 +58,11 @@ export function dispatchGatewayEvent(
     if (event.kind === "cs.message.received") {
       handlers.onCustomerServiceMessageReceived?.(event);
       return { handled: Boolean(handlers.onCustomerServiceMessageReceived), kind: event.kind };
+    }
+
+    if (event.kind === "cs.typing.preview") {
+      handlers.onCustomerServiceTypingPreview?.(event);
+      return { handled: Boolean(handlers.onCustomerServiceTypingPreview), kind: event.kind };
     }
 
     handlers.onCustomerServiceThreadChanged?.(event);

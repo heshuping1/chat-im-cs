@@ -136,10 +136,15 @@ export function useMessageListData({
     [localDatabaseSearchActive, messagesHydrationSource],
   );
   const visibleMessages = useMemo(
+    () => filterVisibleMessages(messages, ""),
+    [messages],
+  );
+  const lookupMessages = useMemo(
     () => {
+      const lookupOpen = historyOpen || messageSearchOpen;
       const searchSource = localDatabaseSearchActive ? localSearchQuery.data ?? [] : messages;
       return filterVisibleMessages(
-        filterMessagesByHistory(searchSource, historyOpen ? historyFilter : "all"),
+        filterMessagesByHistory(searchSource, lookupOpen ? historyFilter : "all"),
         localDatabaseSearchActive ? "" : messageSearchOpen ? messageSearchKeyword : "",
       );
     },
@@ -156,6 +161,7 @@ export function useMessageListData({
 
   return {
     historyCounts,
+    lookupMessages,
     lookupScope,
     messages,
     visibleMessages,

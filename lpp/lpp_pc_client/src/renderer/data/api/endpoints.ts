@@ -78,6 +78,7 @@ export const endpointPlan = {
   groupReadReceipts: "/api/client/v1/groups/{conversationId}/read-receipts",
   mediaUpload: "/api/client/v1/media/upload",
   messageRecall: "/api/client/v1/messages/{messageId}/recall",
+  messageRecallSilent: "/api/client/v1/messages/{messageId}/recall-silent",
   messageDelete: "/api/client/v1/messages/{messageId}/delete",
   messageForward: "/api/client/v1/messages/forward",
   messageBatchDelete: "/api/client/v1/messages/batch-delete",
@@ -96,12 +97,39 @@ export const endpointPlan = {
     "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/messages",
   customerServiceThreadAction:
     "/api/client/v1/customer-service/workbench/threads/{threadActionType}/{threadId}/{action}",
+  customerServiceImDirectTransfer:
+    "/api/client/v1/customer-service/im-direct/{threadId}/transfer",
+  customerServiceTempSessionTransfer:
+    "/api/client/v1/customer-service/temp-sessions/{sessionId}/transfer",
+  customerServiceTempSessionNotes:
+    "/api/client/v1/customer-service/temp-sessions/{sessionId}/notes",
+  customerServiceTempSessionNotePin:
+    "/api/client/v1/customer-service/temp-sessions/{sessionId}/notes/{noteId}/pin",
+  customerServiceTempSessionNote:
+    "/api/client/v1/customer-service/temp-sessions/{sessionId}/notes/{noteId}",
   adminCustomerServiceTempSessions:
     "/api/admin/v1/customer-service/temp-sessions",
   adminCustomerServiceTempSession:
     "/api/admin/v1/customer-service/temp-sessions/{sessionId}",
   adminCustomerServiceTempSessionStats:
     "/api/admin/v1/customer-service/temp-sessions/stats",
+  adminCustomerServiceCenterDashboard:
+    "/api/admin/v1/customer-service/center/dashboard",
+  adminCustomerServiceCenterThreads:
+    "/api/admin/v1/customer-service/center/threads",
+  adminCustomerServiceCenterThread:
+    "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}",
+  adminCustomerServiceCenterCustomersServiceHistory:
+    "/api/admin/v1/customer-service/center/customers/service-history",
+  adminCustomerServiceCenterStaffServiceHistory:
+    "/api/admin/v1/customer-service/center/staff/{staffUserId}/service-history",
+  adminCustomerServiceCenterStaffStatuses:
+    "/api/admin/v1/customer-service/center/staff-statuses",
+  adminCustomerServiceCenterSlaDashboard:
+    "/api/admin/v1/customer-service/center/sla/dashboard",
+  adminCustomerServiceCenterHistorySessions:
+    "/api/admin/v1/customer-service/center/history-sessions",
+  adminExportTasks: "/api/admin/v1/export-tasks",
   threadProfileCard:
     "/api/client/v1/customer-service/workbench/threads/{threadType}/{threadId}/profile-card",
   clientErrors: "/api/client/v1/client-errors",

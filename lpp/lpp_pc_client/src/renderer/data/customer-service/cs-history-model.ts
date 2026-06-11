@@ -31,10 +31,11 @@ export function staffServiceHistoryItemToThread(
         : item.lastMessageAt
           ? `Last active ${formatApiShortDateTime(item.lastMessageAt)}`
           : item.participation === "transferred"
-            ? "Transferred history conversation"
+        ? "Transferred history conversation"
             : "History conversation"),
     lastMessageAt: item.lastMessageAt ?? item.closedAt ?? item.acceptedAt ?? item.startedAt,
     unreadCount: item.unreadCount ?? 0,
+    historyItem: item as StaffServiceHistoryItem & Record<string, unknown>,
   };
 }
 

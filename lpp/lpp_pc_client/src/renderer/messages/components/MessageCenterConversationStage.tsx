@@ -125,6 +125,7 @@ export function MessageCenterConversationStage({
   jumpToLatest,
   loadingGroupMembers,
   lookupScope,
+  lookupMessages,
   messageAnnotations,
   messageCenterCommands,
   messageLayoutMode,
@@ -273,6 +274,7 @@ export function MessageCenterConversationStage({
   jumpToLatest: () => void;
   loadingGroupMembers: boolean;
   lookupScope: MessageLookupScope;
+  lookupMessages: MessageItemDto[];
   messageAnnotations: Record<string, string>;
   messageCenterCommands: MessageCenterCommandModel;
   messageLayoutMode: MessageLayoutMode;
@@ -563,12 +565,15 @@ export function MessageCenterConversationStage({
                 assetBaseUrl={session?.apiBaseUrl}
                 authToken={session?.tenantToken}
                 conversation={activeConversation}
+                currentUserAvatarUrl={session?.avatarUrl}
+                currentUserDisplayName={session?.displayName}
                 historyCounts={historyCounts}
                 historyFilter={historyFilter}
+                isMineMessage={(message) => isMineMessage(message, unreadIdentity ?? session)}
                 loadedMessages={messages}
                 lookupScope={lookupScope}
                 messageSearchKeyword={messageSearchKeyword}
-                messages={visibleMessages}
+                messages={lookupMessages}
                 onClearMessageSearch={() => setMessageSearchKeyword("")}
                 onClose={() => {
                   setHistoryOpen(false);

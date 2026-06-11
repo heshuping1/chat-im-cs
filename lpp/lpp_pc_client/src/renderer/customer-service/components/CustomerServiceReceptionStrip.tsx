@@ -3,6 +3,7 @@ import type { CustomerServiceThreadState } from "../../data/customer-service/cs-
 import { CustomerServiceThreadActionButton } from "./CustomerServiceThreadActionButton";
 
 export function CustomerServiceReceptionStrip({
+  canUseStaffActions,
   pending,
   readOnly,
   receptionText,
@@ -11,6 +12,7 @@ export function CustomerServiceReceptionStrip({
   threadState,
   onAction,
 }: {
+  canUseStaffActions?: boolean;
   pending: boolean;
   readOnly: boolean;
   receptionText: string;
@@ -26,6 +28,7 @@ export function CustomerServiceReceptionStrip({
       <span>{receptionText}</span>
       {!readOnly && (
         <CustomerServiceThreadActionButton
+          canUseStaffActions={canUseStaffActions}
           status={status}
           selectedStatus={selectedStatus}
           pending={pending}

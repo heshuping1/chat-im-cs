@@ -199,7 +199,6 @@ class MessageBubble extends ConsumerWidget {
                     if (isSelf && showStatusSlot) ...[
                       if (showGroupReceipt)
                         _GroupReadReceiptEntry(
-                          readCount: message.readCount,
                           onTap: onGroupReadReceiptTap!,
                         )
                       else
@@ -429,22 +428,17 @@ bool _shouldShowGroupReadReceipt(
 }
 
 class _GroupReadReceiptEntry extends StatelessWidget {
-  final int readCount;
   final VoidCallback onTap;
 
   const _GroupReadReceiptEntry({
-    required this.readCount,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final text =
-        readCount > 0 ? l10n.chatReadCount(readCount) : l10n.chatUnread;
     return Semantics(
       button: true,
-      label: text,
+      label: '已读详情',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,

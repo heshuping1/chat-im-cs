@@ -198,6 +198,28 @@ export const apiContractFixtures: ApiContractFixture[] = [
     },
   },
   {
+    name: "customer-service timeout-closed temp session remains resumable",
+    normalize: () =>
+      normalizeCustomerServiceThreadDto({
+        session_id: "cs-timeout-1",
+        thread_type: "temp_session",
+        thread_status: "closed_timeout",
+        visitorName: "Visitor C",
+        unread_count: "2",
+      }),
+    expected: {
+      status: "ok",
+      data: {
+        id: "cs-timeout-1",
+        type: "temp_session",
+        normalizedStatus: "closed_timeout",
+        isTerminal: false,
+        title: "Visitor C",
+        unreadCount: 2,
+      },
+    },
+  },
+  {
     name: "customer profile keeps display and risk fields",
     normalize: () =>
       normalizeCustomerProfileDto({

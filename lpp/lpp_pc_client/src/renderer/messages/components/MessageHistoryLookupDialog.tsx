@@ -1,23 +1,22 @@
 import {
-  Clock3,
+  CalendarDays,
   FileImage,
   FileText,
-  MessageSquarePlus,
+  Grid2X2,
   Play,
   Search,
-  Star,
-  TextCursorInput,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { PanelState } from "../../components/PanelState";
+import { PcAvatar } from "../../components/PcAvatar";
 import type { ConversationListItem, MediaResourceDto, MessageItemDto } from "../../data/api-client";
 import { mediaStableCacheIdentity } from "../../data/im-message-normalize";
 import { useI18n } from "../../i18n/useI18n";
 import { formatChatTime } from "../../lib/format";
 import { ImagePreviewViewer } from "../../media/components/ImageMessageFrame";
-import { chatMediaItemsFromMessage, type ChatMediaItem } from "../../media/domain/mediaMessage";
+import { chatMediaItemsFromMessage, messageMediaFileName, type ChatMediaItem } from "../../media/domain/mediaMessage";
 import { useCachedImageMediaUrl } from "../../media/runtime/useCachedImageMediaUrl";
 import {
   ensureMaterializedMediaDisplayUrl,
@@ -42,8 +41,11 @@ export interface MessageHistoryLookupDialogProps {
   assetBaseUrl?: string;
   authToken?: string;
   conversation: ConversationListItem;
+  currentUserAvatarUrl?: string | null;
+  currentUserDisplayName?: string | null;
   historyCounts: Record<HistoryFilterKey, number>;
   historyFilter: HistoryFilterKey;
+  isMineMessage?: (message: MessageItemDto) => boolean;
   loadedMessages: MessageItemDto[];
   lookupScope: MessageLookupScope;
   messageSearchKeyword: string;
@@ -58,15 +60,12 @@ export interface MessageHistoryLookupDialogProps {
 const historyFilterTabs: Array<{
   key: HistoryFilterKey;
   labelKey: string;
-  icon: typeof Clock3;
+  icon: typeof FileText;
 }> = [
-  { key: "all", labelKey: "messages.listPanel.filter.all", icon: Clock3 },
-  { key: "text", labelKey: "messages.listPanel.filter.text", icon: TextCursorInput },
-  { key: "image", labelKey: "messages.listPanel.filter.image", icon: FileImage },
   { key: "file", labelKey: "messages.listPanel.filter.file", icon: FileText },
-  { key: "voice", labelKey: "messages.listPanel.filter.voice", icon: MessageSquarePlus },
+  { key: "image", labelKey: "messages.listPanel.filter.image", icon: Grid2X2 },
   { key: "link", labelKey: "messages.listPanel.filter.link", icon: Search },
-  { key: "favorite", labelKey: "messages.listPanel.filter.favorite", icon: Star },
+  { key: "date", labelKey: "messages.listPanel.filter.date", icon: CalendarDays },
 ];
 
 export function MessageHistoryLookupDialog({
@@ -74,8 +73,11 @@ export function MessageHistoryLookupDialog({
   assetBaseUrl,
   authToken,
   conversation,
+  currentUserAvatarUrl,
+  currentUserDisplayName,
   historyCounts,
   historyFilter,
+  isMineMessage,
   loadedMessages,
   lookupScope,
   messageSearchKeyword,
@@ -92,9 +94,21 @@ export function MessageHistoryLookupDialog({
     fileName: string;
     src: string;
   } | null>(null);
-  const lookupKeywordActive = Boolean(messageSearchKeyword.trim());
-  const showLookupOverview = historyFilter === "all" && !lookupKeywordActive;
-  const showMediaLookupPreview = historyFilter === "image" || historyFilter === "video";
+  const [selectedDate, setSelectedDate] = useState<string | undefined>();
+  const [draftDate, setDraftDate] = useState(() => localDateInputValue(new Date()));
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [previousFilterBeforeDate, setPreviousFilterBeforeDate] =
+    useState<HistoryFilterKey>("all");
+  const showMediaLookupPreview = historyFilter === "image";
+  const showFileLookup = historyFilter === "file";
+  const showDateLookup = historyFilter === "date";
+  const lookupMessagesForDate = useMemo(
+    () =>
+      showDateLookup && selectedDate
+        ? messages.filter((message) => messageMatchesLocalDate(message.sentAt, selectedDate))
+        : messages,
+    [messages, selectedDate, showDateLookup],
+  );
   const lookupMediaGroups = useMemo(
     () =>
       showMediaLookupPreview
@@ -102,29 +116,40 @@ export function MessageHistoryLookupDialog({
             assetBaseUrl,
             filter: historyFilter,
             messages,
+            thisMonthLabel: t("messages.listPanel.thisMonth"),
+            thisWeekLabel: t("messages.listPanel.thisWeek"),
             todayLabel: t("messages.listPanel.today"),
           })
         : [],
     [assetBaseUrl, historyFilter, messages, showMediaLookupPreview, t],
   );
-  const lookupResultMessages = useMemo(() => messages.slice().reverse(), [messages]);
-  const lookupOverviewMessages = lookupResultMessages;
-  const lookupOverviewMediaGroups = useMemo(
-    () =>
-      showLookupOverview
-        ? groupLookupMediaPreviewItems({
-            assetBaseUrl,
-            filter: "image",
-            messages: messages.slice(-24),
-            todayLabel: t("messages.listPanel.today"),
-          }).map((group) => ({ ...group, items: group.items.slice(-6).reverse() }))
-        : [],
-    [assetBaseUrl, messages, showLookupOverview, t],
+  const lookupResultMessages = useMemo(
+    () => lookupMessagesForDate.slice().reverse(),
+    [lookupMessagesForDate],
   );
-  const lookupOverviewHasMedia = lookupOverviewMediaGroups.some((group) => group.items.length > 0);
-  const lookupOverviewCategoryKeys = historyFilterTabs
-    .map((tab) => tab.key)
-    .filter((key) => key !== "all" && (historyCounts[key] ?? 0) > 0);
+  const lookupFileItems = useMemo(
+    () =>
+      showFileLookup
+        ? fileLookupItemsFromMessages({ assetBaseUrl, messages }).slice().reverse()
+        : [],
+    [assetBaseUrl, messages, showFileLookup],
+  );
+  const activeFilterTab = historyFilter === "date" && !selectedDate ? "date" : historyFilter;
+  const activeFilterChip =
+    historyFilter === "image" || historyFilter === "file"
+      ? historyFilterTabs.find((tab) => tab.key === historyFilter)
+      : undefined;
+  const searchPlaceholder =
+    historyFilter === "image"
+      ? t("messages.listPanel.searchPlaceholderMedia")
+      : historyFilter === "file"
+        ? t("messages.listPanel.searchPlaceholderFile")
+        : t("messages.listPanel.searchPlaceholder");
+  const resultCount = showMediaLookupPreview
+    ? lookupMediaGroups.reduce((count, group) => count + group.items.length, 0)
+    : showFileLookup
+      ? lookupFileItems.length
+      : lookupResultMessages.length;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -135,11 +160,23 @@ export function MessageHistoryLookupDialog({
         setLookupImagePreview(null);
         return;
       }
+      if (datePickerOpen) {
+        setDatePickerOpen(false);
+        if (!selectedDate) onHistoryFilterChange(previousFilterBeforeDate);
+        return;
+      }
       onClose();
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [lookupImagePreview, onClose]);
+  }, [
+    datePickerOpen,
+    lookupImagePreview,
+    onClose,
+    onHistoryFilterChange,
+    previousFilterBeforeDate,
+    selectedDate,
+  ]);
 
   const openLookupMediaPreview = (item: LookupMediaPreviewItem) => {
     const openUrl = item.openUrl || item.previewUrl;
@@ -170,6 +207,36 @@ export function MessageHistoryLookupDialog({
     onScrollToMessage(messageId);
   };
 
+  const clearFilterChip = () => {
+    setDatePickerOpen(false);
+    setSelectedDate(undefined);
+    onHistoryFilterChange("all");
+  };
+
+  const selectHistoryFilter = (filter: HistoryFilterKey) => {
+    if (filter === "date") {
+      setPreviousFilterBeforeDate(historyFilter === "date" ? previousFilterBeforeDate : historyFilter);
+      setDraftDate(selectedDate || localDateInputValue(new Date()));
+      setDatePickerOpen(true);
+      onHistoryFilterChange("date");
+      return;
+    }
+    setDatePickerOpen(false);
+    setSelectedDate(undefined);
+    onHistoryFilterChange(filter);
+  };
+
+  const cancelDatePicker = () => {
+    setDatePickerOpen(false);
+    if (!selectedDate) onHistoryFilterChange(previousFilterBeforeDate);
+  };
+
+  const confirmDatePicker = () => {
+    setSelectedDate(draftDate);
+    setDatePickerOpen(false);
+    onHistoryFilterChange("date");
+  };
+
   return (
     <div className="message-history-lookup-backdrop" role="presentation">
       <section
@@ -191,10 +258,21 @@ export function MessageHistoryLookupDialog({
         <div className="chat-lookup-head">
           <label className="chat-inline-search">
             <Search size={15} />
+            {activeFilterChip && (
+              <button
+                className="chat-history-filter-chip"
+                type="button"
+                aria-label={t("messages.listPanel.clearSearch")}
+                onClick={clearFilterChip}
+              >
+                {t(activeFilterChip.labelKey)}
+                <X size={13} />
+              </button>
+            )}
             <input
               value={messageSearchKeyword}
               onChange={(event) => onMessageSearchKeywordChange(event.target.value)}
-              placeholder={t("messages.listPanel.searchPlaceholder")}
+              placeholder={searchPlaceholder}
               autoFocus
             />
             {messageSearchKeyword && (
@@ -214,15 +292,14 @@ export function MessageHistoryLookupDialog({
             const count = historyCounts[tab.key] ?? 0;
             return (
               <button
-                className={historyFilter === tab.key ? "selected" : ""}
+                className={activeFilterTab === tab.key ? "selected" : ""}
                 type="button"
                 key={tab.key}
-                onClick={() => onHistoryFilterChange(tab.key)}
-                disabled={tab.key !== "all" && count === 0}
+                onClick={() => selectHistoryFilter(tab.key)}
+                disabled={tab.key !== "date" && count === 0}
               >
                 <Icon size={14} />
                 {t(tab.labelKey)}
-                <em>{count}</em>
               </button>
             );
           })}
@@ -230,7 +307,7 @@ export function MessageHistoryLookupDialog({
         <div className="chat-lookup-summary">
           <span>
             {messageSearchKeyword
-              ? t("messages.listPanel.matchCount", { count: messages.length })
+              ? t("messages.listPanel.matchCount", { count: resultCount })
               : t("messages.listPanel.loadedCount", { count: loadedMessages.length })}
             {loadedMessages[0]?.sentAt
               ? ` · ${t("messages.listPanel.earliest", { time: formatChatTime(loadedMessages[0].sentAt) })}`
@@ -244,101 +321,18 @@ export function MessageHistoryLookupDialog({
           </span>
         </div>
         <div className="message-history-lookup-results-shell">
-        {showLookupOverview && (
+          {datePickerOpen && (
+            <LookupDatePicker
+              value={draftDate}
+              onCancel={cancelDatePicker}
+              onChange={setDraftDate}
+              onConfirm={confirmDatePicker}
+            />
+          )}
           <div
-            className="chat-history-results chat-history-overview"
-            aria-label={t("messages.listPanel.resultsAria")}
-          >
-            {lookupOverviewCategoryKeys.length > 0 && (
-              <section className="chat-history-overview-section">
-                <h3>{t("messages.listPanel.overviewCategories")}</h3>
-                <div className="chat-history-overview-categories">
-                  {lookupOverviewCategoryKeys.map((key) => {
-                    const tab = historyFilterTabs.find((item) => item.key === key);
-                    if (!tab) return null;
-                    const Icon = tab.icon;
-                    return (
-                      <button
-                        className="chat-history-overview-category"
-                        type="button"
-                        key={key}
-                        onClick={() => onHistoryFilterChange(key)}
-                      >
-                        <span>
-                          <Icon size={15} />
-                          {t(tab.labelKey)}
-                        </span>
-                        <em>{historyCounts[key] ?? 0}</em>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-            {lookupOverviewHasMedia && (
-              <section className="chat-history-overview-section">
-                <header>
-                  <h3>{t("messages.listPanel.overviewMedia")}</h3>
-                  <button type="button" onClick={() => onHistoryFilterChange("image")}>
-                    {t("messages.listPanel.viewMore")}
-                  </button>
-                </header>
-                <div className="chat-history-media-results chat-history-media-results-overview">
-                  {lookupOverviewMediaGroups.map((group) => (
-                    <section className="chat-history-media-group" key={group.label}>
-                      <h3>{group.label}</h3>
-                      <div className="chat-history-media-grid">
-                        {group.items.map((item) => (
-                          <button
-                            className="chat-history-media-tile"
-                            type="button"
-                            key={`${item.message.messageId}-${item.index}`}
-                            title={item.fileName}
-                            onClick={() => openLookupMediaPreview(item)}
-                          >
-                            <LookupMediaThumbnail
-                              accountId={accountId}
-                              authToken={authToken}
-                              conversationId={conversation.conversationId}
-                              item={item}
-                            />
-                            {item.kind === "video" && (
-                              <em className="chat-history-media-video">
-                                <Play size={12} />
-                                {formatLookupMediaDuration(item.durationSeconds)}
-                              </em>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              </section>
-            )}
-            {lookupOverviewMessages.length > 0 && (
-              <section className="chat-history-overview-section">
-                <h3>{t("messages.listPanel.overviewRecent")}</h3>
-                <div className="chat-history-overview-list">
-                  {lookupOverviewMessages.map((message) => (
-                    <button
-                      type="button"
-                      key={message.messageId}
-                      onClick={() => selectMessage(message.messageId)}
-                    >
-                      <span>{formatChatTime(message.sentAt)}</span>
-                      <strong>{messageActionPreview(message)}</strong>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-            {messages.length === 0 && <PanelState text={t("messages.listPanel.noMatches")} />}
-          </div>
-        )}
-        {!showLookupOverview && (
-          <div
-            className="chat-history-results"
+            className={`chat-history-results ${
+              showMediaLookupPreview ? "chat-history-results-media" : ""
+            }`}
             aria-label={t("messages.listPanel.resultsAria")}
           >
             {showMediaLookupPreview ? (
@@ -373,21 +367,32 @@ export function MessageHistoryLookupDialog({
                   </section>
                 ))}
               </div>
+            ) : showFileLookup ? (
+              lookupFileItems.map((item) => (
+                <LookupFileResultRow
+                  currentUserDisplayName={currentUserDisplayName}
+                  isMine={isMineMessage?.(item.message) ?? false}
+                  item={item}
+                  key={`${item.message.messageId}-${item.index}`}
+                  unknownSizeText={t("messages.listPanel.fileSizeUnknown")}
+                  onSelect={() => selectMessage(item.message.messageId)}
+                />
+              ))
             ) : (
               lookupResultMessages.map((message) => (
-                <button
-                  type="button"
+                <LookupMessageResultRow
+                  conversation={conversation}
+                  currentUserAvatarUrl={currentUserAvatarUrl}
+                  currentUserDisplayName={currentUserDisplayName}
+                  isMine={isMineMessage?.(message) ?? false}
                   key={message.messageId}
-                  onClick={() => selectMessage(message.messageId)}
-                >
-                  <span>{formatChatTime(message.sentAt)}</span>
-                  <strong>{messageActionPreview(message)}</strong>
-                </button>
+                  message={message}
+                  onSelect={() => selectMessage(message.messageId)}
+                />
               ))
             )}
-            {messages.length === 0 && <PanelState text={t("messages.listPanel.noMatches")} />}
+            {resultCount === 0 && <PanelState text={t("messages.listPanel.noMatches")} />}
           </div>
-        )}
         </div>
       </section>
       {lookupImagePreview && (
@@ -398,6 +403,173 @@ export function MessageHistoryLookupDialog({
         />
       )}
     </div>
+  );
+}
+
+function LookupMessageResultRow({
+  conversation,
+  currentUserAvatarUrl,
+  currentUserDisplayName,
+  isMine,
+  message,
+  onSelect,
+}: {
+  conversation: ConversationListItem;
+  currentUserAvatarUrl?: string | null;
+  currentUserDisplayName?: string | null;
+  isMine: boolean;
+  message: MessageItemDto;
+  onSelect: () => void;
+}) {
+  const senderName = isMine
+    ? currentUserDisplayName || message.senderDisplayName || "我"
+    : message.senderDisplayName || conversation.title;
+  const avatarUrl = isMine
+    ? currentUserAvatarUrl || message.senderAvatarUrl || message.avatarUrl
+    : message.senderAvatarUrl || message.avatarUrl || conversation.avatarUrl;
+  return (
+    <button
+      className="chat-history-message-row"
+      type="button"
+      onClick={onSelect}
+    >
+      <PcAvatar
+        avatarUrl={avatarUrl}
+        className="chat-history-row-avatar"
+        name={senderName}
+      />
+      <span className="chat-history-message-main">
+        <span className="chat-history-message-sender">{senderName}</span>
+        <strong>{messageActionPreview(message)}</strong>
+      </span>
+      <time>{formatLookupFullDateTime(message.sentAt)}</time>
+    </button>
+  );
+}
+
+type LookupFileItem = {
+  fileName: string;
+  index: number;
+  media?: MediaResourceDto;
+  message: MessageItemDto;
+  sizeBytes?: number;
+};
+
+function LookupFileResultRow({
+  currentUserDisplayName,
+  isMine,
+  item,
+  onSelect,
+  unknownSizeText,
+}: {
+  currentUserDisplayName?: string | null;
+  isMine: boolean;
+  item: LookupFileItem;
+  onSelect: () => void;
+  unknownSizeText: string;
+}) {
+  const senderName = isMine
+    ? currentUserDisplayName || item.message.senderDisplayName || "我"
+    : item.message.senderDisplayName || "";
+  return (
+    <button
+      className="chat-history-file-row"
+      type="button"
+      onClick={onSelect}
+    >
+      <span className="chat-history-file-icon" aria-hidden="true">
+        <FileText size={21} />
+      </span>
+      <span className="chat-history-file-main">
+        <strong>{item.fileName}</strong>
+        <span>{senderName}</span>
+      </span>
+      <span className="chat-history-file-meta">
+        <time>{formatLookupShortDate(item.message.sentAt)}</time>
+        <span>{formatLookupFileSize(item.sizeBytes, unknownSizeText)}</span>
+      </span>
+    </button>
+  );
+}
+
+function LookupDatePicker({
+  onCancel,
+  onChange,
+  onConfirm,
+  value,
+}: {
+  onCancel: () => void;
+  onChange: (value: string) => void;
+  onConfirm: () => void;
+  value: string;
+}) {
+  const { t } = useI18n();
+  const parsed = parseLocalDateValue(value) ?? new Date();
+  const year = parsed.getFullYear();
+  const month = parsed.getMonth();
+  const selectedDay = parsed.getDate();
+  const days = calendarDaysForMonth(year, month);
+  const years = Array.from({ length: 9 }, (_, index) => year - 4 + index);
+  const setDatePart = (nextYear: number, nextMonth: number, nextDay: number) => {
+    const maxDay = new Date(nextYear, nextMonth + 1, 0).getDate();
+    onChange(localDateInputValue(new Date(nextYear, nextMonth, Math.min(nextDay, maxDay))));
+  };
+
+  return (
+    <section className="chat-history-date-picker" aria-label={t("messages.listPanel.selectSendDate")}>
+      <h3>{t("messages.listPanel.selectSendDate")}</h3>
+      <div className="chat-history-date-controls">
+        <select
+          value={year}
+          onChange={(event) => setDatePart(Number(event.target.value), month, selectedDay)}
+        >
+          {years.map((item) => (
+            <option value={item} key={item}>
+              {item}年
+            </option>
+          ))}
+        </select>
+        <select
+          value={month}
+          onChange={(event) => setDatePart(year, Number(event.target.value), selectedDay)}
+        >
+          {Array.from({ length: 12 }, (_, index) => (
+            <option value={index} key={index}>
+              {index + 1}月
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="chat-history-calendar-weekdays" aria-hidden="true">
+        {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
+          <span key={day}>{day}</span>
+        ))}
+      </div>
+      <div className="chat-history-calendar-days">
+        {days.map((day, index) =>
+          day ? (
+            <button
+              className={day === selectedDay ? "selected" : ""}
+              type="button"
+              key={`${year}-${month}-${day}`}
+              onClick={() => setDatePart(year, month, day)}
+            >
+              {day}
+            </button>
+          ) : (
+            <span key={`empty-${index}`} />
+          ),
+        )}
+      </div>
+      <footer>
+        <button type="button" onClick={onCancel}>
+          {t("messages.listPanel.cancel")}
+        </button>
+        <button className="primary" type="button" onClick={onConfirm}>
+          {t("messages.listPanel.confirm")}
+        </button>
+      </footer>
+    </section>
   );
 }
 
@@ -446,17 +618,25 @@ function groupLookupMediaPreviewItems({
   assetBaseUrl,
   filter,
   messages,
+  thisMonthLabel,
+  thisWeekLabel,
   todayLabel,
 }: {
   assetBaseUrl?: string;
   filter: HistoryFilterKey;
   messages: MessageItemDto[];
+  thisMonthLabel: string;
+  thisWeekLabel: string;
   todayLabel: string;
 }) {
   const groups = new Map<string, LookupMediaPreviewItem[]>();
   messages.forEach((message) => {
     lookupMediaPreviewItemsFromMessage({ assetBaseUrl, filter, message }).forEach((item) => {
-      const label = lookupMediaDateLabel(message.sentAt, todayLabel);
+      const label = lookupMediaDateLabel(message.sentAt, {
+        thisMonthLabel,
+        thisWeekLabel,
+        todayLabel,
+      });
       const items = groups.get(label) ?? [];
       items.push(item);
       groups.set(label, items);
@@ -524,6 +704,26 @@ function lookupMediaPreviewItemsFromMessage({
           ? item.localPreviewUrl || item.localOpenUrl || item.sourceUrl || item.remoteSourceUrl
           : undefined,
     }));
+}
+
+function fileLookupItemsFromMessages({
+  assetBaseUrl,
+  messages,
+}: {
+  assetBaseUrl?: string;
+  messages: MessageItemDto[];
+}): LookupFileItem[] {
+  return messages.flatMap((message) =>
+    chatMediaItemsFromMessage({ assetBaseUrl, message })
+      .filter((item) => item.kind === "file")
+      .map((item, index) => ({
+        fileName: item.fileName || messageMediaFileName(message),
+        index,
+        media: item.media,
+        message,
+        sizeBytes: item.media?.sizeBytes,
+      })),
+  );
 }
 
 function compactUniqueMediaUrls(urls: Array<string | undefined>) {
@@ -783,8 +983,15 @@ function LookupVideoThumbnail({
   );
 }
 
-function lookupMediaDateLabel(sentAt: string | undefined, todayLabel: string) {
-  if (!sentAt) return todayLabel;
+function lookupMediaDateLabel(
+  sentAt: string | undefined,
+  labels: {
+    thisMonthLabel: string;
+    thisWeekLabel: string;
+    todayLabel: string;
+  },
+) {
+  if (!sentAt) return labels.todayLabel;
   const date = new Date(sentAt);
   if (Number.isNaN(date.getTime())) return formatChatTime(sentAt);
   const now = new Date();
@@ -793,9 +1000,13 @@ function lookupMediaDateLabel(sentAt: string | undefined, todayLabel: string) {
     date.getMonth() === now.getMonth() &&
     date.getDate() === now.getDate()
   ) {
-    return todayLabel;
+    return labels.todayLabel;
   }
-  return date.toLocaleDateString();
+  if (isSameLocalWeek(date, now)) return labels.thisWeekLabel;
+  if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()) {
+    return labels.thisMonthLabel;
+  }
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
 }
 
 function formatLookupMediaDuration(durationSeconds?: number) {
@@ -804,4 +1015,64 @@ function formatLookupMediaDuration(durationSeconds?: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatLookupFullDateTime(value: string | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatChatTime(value);
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(
+    date.getHours(),
+  ).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatLookupShortDate(value: string | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return formatChatTime(value);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function formatLookupFileSize(size: number | undefined, unknownSizeText: string) {
+  if (!size || size <= 0) return unknownSizeText;
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function localDateInputValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function parseLocalDateValue(value: string | undefined) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
+  if (!match) return undefined;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function messageMatchesLocalDate(sentAt: string | undefined, selectedDate: string) {
+  const date = sentAt ? new Date(sentAt) : undefined;
+  if (!date || Number.isNaN(date.getTime())) return false;
+  return localDateInputValue(date) === selectedDate;
+}
+
+function calendarDaysForMonth(year: number, month: number) {
+  const firstDay = new Date(year, month, 1);
+  const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return [
+    ...Array.from({ length: leadingEmptyDays }, () => 0),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+  ];
+}
+
+function isSameLocalWeek(left: Date, right: Date) {
+  const startOfWeek = (date: Date) => {
+    const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    return start;
+  };
+  return startOfWeek(left).getTime() === startOfWeek(right).getTime();
 }

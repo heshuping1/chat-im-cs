@@ -58,6 +58,41 @@ describe("IM local message store", () => {
     expect(await store.listMessages(conversationKey, { limit: 50 })).toEqual([message("m1", 1)]);
   });
 
+  it("preserves self message sender metadata for local history lookup", async () => {
+    const store = createMemoryImMessageStore();
+    const scopeKey = imMessageScopeKey(session);
+    const conversationKey = imMessageConversationKey(scopeKey, "direct", "c1");
+    const selfMessage: MessageItemDto = {
+      ...message("m-self", 1),
+      avatarUrl: "https://cdn.example.test/me-fallback.png",
+      body: { text: "我发送的聊天记录" },
+      direction: "out",
+      isSelf: true,
+      preview: "我发送的聊天记录",
+      senderAvatarUrl: "https://cdn.example.test/me.png",
+      senderDisplayName: "当前账号",
+      senderPlatformUserId: "platform-user-1",
+      senderUserId: "user-1",
+    };
+
+    await store.upsertMessages(scopeKey, "direct", "c1", [selfMessage]);
+
+    expect(await store.listMessages(conversationKey, { limit: 50 })).toMatchObject([
+      {
+        direction: "out",
+        isSelf: true,
+        messageId: "m-self",
+        senderAvatarUrl: "https://cdn.example.test/me.png",
+        senderDisplayName: "当前账号",
+        senderPlatformUserId: "platform-user-1",
+        senderUserId: "user-1",
+      },
+    ]);
+    expect(await store.searchMessages(scopeKey, "direct", "c1", "当前账号", 20)).toMatchObject([
+      { messageId: "m-self", senderDisplayName: "当前账号" },
+    ]);
+  });
+
   it("can use desktop LocalDataService as the IM message store backend", async () => {
     let records: LocalDataMessage[] = [];
     const desktopApi = {
@@ -102,10 +137,37 @@ describe("IM local message store", () => {
     const scopeKey = imMessageScopeKey(session);
     const conversationKey = imMessageConversationKey(scopeKey, "direct", "c1");
 
-    await store.upsertMessages(scopeKey, "direct", "c1", [message("m1", 1)]);
+    await store.upsertMessages(scopeKey, "direct", "c1", [
+      {
+        ...message("m1", 1),
+        direction: "out",
+        isSelf: true,
+        senderAvatarUrl: "https://cdn.example.test/me.png",
+        senderDisplayName: "当前账号",
+        senderPlatformUserId: "platform-user-1",
+        senderUserId: "user-1",
+      },
+    ]);
 
     expect(await store.listMessages(conversationKey, { limit: 50 })).toMatchObject([
-      { messageId: "m1", conversationId: "c1" },
+      {
+        conversationId: "c1",
+        direction: "out",
+        isSelf: true,
+        messageId: "m1",
+        senderAvatarUrl: "https://cdn.example.test/me.png",
+        senderDisplayName: "当前账号",
+        senderPlatformUserId: "platform-user-1",
+        senderUserId: "user-1",
+      },
+    ]);
+    expect(records).toMatchObject([
+      {
+        direction: "out",
+        isSelf: true,
+        senderDisplayName: "当前账号",
+        senderPlatformUserId: "platform-user-1",
+      },
     ]);
     expect(
       await store.searchMessages(scopeKey, "direct", "c1", "m1", 20),

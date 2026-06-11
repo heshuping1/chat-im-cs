@@ -1,6 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 
-import type { ConversationListItem, GroupMemberDto } from "../../data/api-client";
+import type {
+  ConversationListItem,
+  FriendDto,
+  GroupMemberDto,
+  TenantMemberDto,
+} from "../../data/api-client";
 import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import { useI18n } from "../../i18n/useI18n";
 import { startHorizontalPaneResize } from "../../lib/paneResize";
@@ -27,6 +32,7 @@ export function MessageConversationSidebar({
   draftsByConversation,
   emptyText,
   errorText,
+  friends,
   friendRequestCount,
   groupAvatarSnapshotFor,
   groupCreateAccess,
@@ -35,6 +41,7 @@ export function MessageConversationSidebar({
   listPaneWidth,
   loading,
   plusMenuOpen,
+  tenantMembers,
   unreadCount,
   unreadIdentity,
   userAvatarRegistry,
@@ -59,6 +66,7 @@ export function MessageConversationSidebar({
   draftsByConversation: Record<string, string | undefined>;
   emptyText: string;
   errorText?: string | null;
+  friends: FriendDto[];
   friendRequestCount: number;
   groupAvatarSnapshotFor: (conversation?: ConversationListItem) => string | undefined;
   groupCreateAccess: GroupCreateAccess;
@@ -67,6 +75,7 @@ export function MessageConversationSidebar({
   listPaneWidth: number;
   loading: boolean;
   plusMenuOpen: boolean;
+  tenantMembers: TenantMemberDto[];
   unreadCount: number;
   unreadIdentity: CurrentUserIdentity;
   userAvatarRegistry: UserAvatarRegistry;
@@ -98,11 +107,13 @@ export function MessageConversationSidebar({
         draftsByConversation={draftsByConversation}
         emptyText={emptyText}
         errorText={errorText}
+        friends={friends}
         friendRequestCount={friendRequestCount}
         groupCreateAccess={groupCreateAccess}
         keyword={keyword}
         loading={loading}
         plusMenuOpen={plusMenuOpen}
+        tenantMembers={tenantMembers}
         unreadCount={unreadCount}
         onConversationClick={onConversationClick}
         onConversationContextMenu={onConversationContextMenu}

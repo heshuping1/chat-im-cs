@@ -11,7 +11,7 @@ const root = process.cwd();
 
 describe("customer service realtime config", () => {
   it("uses shared push-first fallback intervals for workbench threads", () => {
-    expect(customerServiceRealtimePollIntervalMs).toBe(10_000);
+    expect(customerServiceRealtimePollIntervalMs).toBe(3_000);
     expect(customerServiceReceptionPollIntervalMs).toBe(30_000);
 
     const sidebarSource = readSource("src/renderer/components/Sidebar.tsx");

@@ -23,6 +23,7 @@ import type {
 import {
   customerServiceThreadEventKinds,
   isCustomerServiceMessageEventName,
+  isCustomerServiceTypingEventName,
 } from "./gateway-event-registry";
 
 type GatewayEnvelope = Pick<GatewayTypedEvent, "eventName" | "receivedAt" | "traceId" | "rawPayload">;
@@ -36,6 +37,13 @@ export function adaptCustomerServiceGatewayEvent(input: GatewayRawEventInput): G
     traceId: input.traceId ?? createGatewayTraceId(input.eventName, receivedAt),
     rawPayload: payload,
   };
+
+  if (
+    isCustomerServiceTypingEventName(input.eventName) ||
+    (input.eventName === "msg.typing" && isCustomerServiceGatewayPayload(payload, input.scopeKey))
+  ) {
+    return adaptCustomerServiceTypingPreviewEvent(envelope, input.scopeKey);
+  }
 
   if (
     isCustomerServiceMessageEventName(input.eventName) ||
@@ -103,6 +111,41 @@ function adaptCustomerServiceThreadChangedEvent(
       changeKind === "queue_created" ||
       changeKind === "thread_created" ||
       changeKind === "thread_queued",
+  };
+}
+
+function adaptCustomerServiceTypingPreviewEvent(
+  envelope: GatewayEnvelope,
+  scopeKey?: string,
+): GatewayTypedEvent {
+  const payload = envelope.rawPayload;
+  const threadId = customerServiceStandardThreadId(payload, scopeKey);
+  if (!threadId) {
+    return invalid(envelope, "missing_thread_id", ["gateway.cs.typing.missing_thread_id"]);
+  }
+  const typing = asRecord(payload.typing);
+  const message = customerServiceMessageRecord(payload);
+  return {
+    ...envelope,
+    kind: "cs.typing.preview",
+    threadId,
+    threadType: customerServiceThreadType(payload),
+    isTyping:
+      booleanField(payload, "isTyping", "typing") ??
+      booleanField(typing, "isTyping", "typing") ??
+      true,
+    previewText:
+      stringField(payload, "content", "text", "preview", "draft", "inputText", "typingText") ||
+      stringField(typing, "content", "text", "preview", "draft", "inputText", "typingText") ||
+      stringField(message, "content", "text", "preview", "draft", "inputText", "typingText"),
+    senderRole:
+      stringField(payload, "senderRole", "senderType", "authorType", "fromType", "role") ||
+      stringField(typing, "senderRole", "senderType", "authorType", "fromType", "role") ||
+      stringField(message, "senderRole", "senderType", "authorType", "fromType", "role"),
+    senderUserId:
+      stringField(payload, "senderUserId", "userId", "senderId") ||
+      stringField(typing, "senderUserId", "userId", "senderId") ||
+      stringField(message, "senderUserId", "userId", "senderId"),
   };
 }
 

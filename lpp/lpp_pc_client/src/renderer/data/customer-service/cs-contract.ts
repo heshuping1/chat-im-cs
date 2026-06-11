@@ -74,10 +74,16 @@ export interface CustomerProfileEntity {
 
 const terminalStatuses = new Set([
   "closed",
+  "closed_timeout",
+  "closed_by_timeout",
+  "timeout_closed",
   "closed_by_visitor",
   "closed_by_staff",
-  "closed_timeout",
   "closed_system",
+  "transferred",
+  "transferred_out",
+  "assigned_away",
+  "handoff",
   "archived",
   "ended",
   "finished",

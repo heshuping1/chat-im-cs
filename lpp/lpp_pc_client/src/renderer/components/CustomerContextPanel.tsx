@@ -1,7 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { DragEvent, ReactNode } from "react";
-import { GripVertical, LibraryBig, MessageSquareText, Pin, PinOff, UserRound } from "lucide-react";
+import {
+  GripVertical,
+  LibraryBig,
+  MessageSquareText,
+  Pin,
+  PinOff,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 
 import {
   isTerminalCustomerServiceThreadStatus,
@@ -15,10 +23,12 @@ import { createApiClient } from "../data/runtime";
 import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import { useActiveThreadId } from "../data/workspace-ui/workspace-ui-store";
 import { useI18n } from "../i18n/useI18n";
+import { CustomerServiceSessionNotesPanel } from "../customer-service/components/CustomerServiceSessionNotesPanel";
 import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
+import { PcAvatar } from "./PcAvatar";
 
-const customerInfoEntryIcon = "/customer-info-entry.svg";
 type Translate = ReturnType<typeof useI18n>["t"];
+const staffServiceHistoryPageSize = 50;
 
 export function useCustomerContextPanelModel() {
   const session = useAuthSession();
@@ -32,12 +42,22 @@ export function useCustomerContextPanelModel() {
     enabled: Boolean(client),
     queryFn: async () => client!.getWorkbenchThreads(),
   });
-  const historyQuery = useQuery({
+  const historyQuery = useInfiniteQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
     enabled: Boolean(client && canUseStaffEndpoints),
-    queryFn: async () =>
-      client!.getStaffServiceHistory({ threadType: "temp_session", limit: 50 }),
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) =>
+      client!.getStaffServiceHistory({
+        cursor: pageParam,
+        limit: staffServiceHistoryPageSize,
+        threadType: "temp_session",
+      }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   });
+  const historyItems = useMemo(
+    () => historyQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [historyQuery.data],
+  );
 
   const selectedThread = useMemo(() => {
     if (!selectedThreadId) return undefined;
@@ -50,13 +70,13 @@ export function useCustomerContextPanelModel() {
     ]
       .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
       .filter((thread) => !isTerminalCustomerServiceThreadStatus(thread.status));
-    const historyThreads = (historyQuery.data?.items ?? [])
+    const historyThreads = historyItems
       .map(staffServiceHistoryItemToThread)
       .filter((thread) => thread.threadType === "temp_session");
     return [...currentThreads, ...historyThreads].find(
       (thread) => thread.threadId === normalizedSelectedThreadId,
     );
-  }, [historyQuery.data, selectedThreadId, threadsQuery.data]);
+  }, [historyItems, selectedThreadId, threadsQuery.data]);
 
   const profileQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreadProfile(
@@ -161,6 +181,11 @@ export function CustomerContextPanel({
       onDragOver={onDragOverContextPane}
       onDrop={(event) => onDropContextPane?.(event, "customer")}
       profile={profileForPanel}
+      profileActions={
+        normalizeCustomerServiceThreadType(selectedThread.threadType) === "temp_session"
+          ? <CustomerServiceSessionNotesPanel sessionId={selectedThread.threadId} />
+          : undefined
+      }
       title={t("customerService.contextPanel.title")}
     />
   );
@@ -179,6 +204,10 @@ export function CustomerContextRail({
 }) {
   const { t } = useI18n();
   const { selectedThread } = useCustomerContextPanelModel();
+  const customerAvatarName =
+    selectedThread?.title || t("customerService.threadList.unknownCustomer");
+  const customerAvatarUrl =
+    selectedThread?.customerAvatarUrl || selectedThread?.avatarUrl || undefined;
   const customerTooltip = selectedThread
     ? customerPaneCollapsed
       ? t("customerService.contextPanel.expandCustomer")
@@ -197,11 +226,10 @@ export function CustomerContextRail({
         onClick={onToggleCustomerPane}
       >
         {selectedThread ? (
-          <img
-            className="service-customer-rail-avatar-image"
-            src={customerInfoEntryIcon}
-            alt=""
-            aria-hidden="true"
+          <PcAvatar
+            avatarUrl={customerAvatarUrl}
+            className="e-avatar service-customer-rail-avatar-image"
+            name={customerAvatarName}
           />
         ) : (
           <UserRound size={18} aria-hidden="true" />
@@ -224,12 +252,7 @@ export function CustomerContextRail({
           label={t("customerService.contextPanel.aiDraft")}
           onClick={() => onToggleAssistantPane("aiDraft")}
         >
-          <img
-            className="context-rail-tool-image ai-draft"
-            src="/ai-draft-entry.svg"
-            alt=""
-            aria-hidden="true"
-          />
+          <Sparkles size={18} aria-hidden="true" />
         </CustomerContextRailButton>
         <CustomerContextRailButton
           active={activeAssistantPane === "knowledge"}

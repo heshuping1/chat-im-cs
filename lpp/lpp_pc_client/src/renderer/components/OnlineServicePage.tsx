@@ -164,7 +164,7 @@ export function isServiceAssistantPaneVisible(
 
 function clampServicePaneWidth(pane: ServiceResizablePane, width: number) {
   const [min, max] =
-    pane === "list" ? [260, 420] : pane === "assistant" ? [320, 420] : [300, 440];
+    pane === "list" ? [260, 420] : pane === "assistant" ? [320, 960] : [300, 440];
   return Math.min(max, Math.max(min, Math.round(width)));
 }
 

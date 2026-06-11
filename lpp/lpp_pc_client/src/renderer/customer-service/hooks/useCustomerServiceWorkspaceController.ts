@@ -1,12 +1,14 @@
 import { useEffect, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { createApiClient } from "../../data/runtime";
 import { useAuthSession } from "../../data/auth/auth-store";
 import { pcQueryKeys } from "../../data/query-keys";
 import {
   invalidateCustomerServiceQueries,
+  markCustomerServiceThreadClaimed,
   markCustomerServiceThreadClosed,
+  markCustomerServiceThreadTransferred,
 } from "../../data/customer-service/cs-cache-adapter";
 import { canUseCustomerServiceStaffEndpoints } from "../../data/customer-service/cs-role-capabilities";
 import {
@@ -27,10 +29,18 @@ import {
 } from "../../data/customer-service/cs-workspace-view-model";
 import {
   executeCustomerServiceThreadAction,
+  executeCustomerServiceThreadTransfer,
   type CustomerServiceThreadAction,
+  type CustomerServiceThreadTransferPayload,
 } from "../../data/customer-service/cs-action-service";
+import {
+  isCustomerServiceTypingPreviewExpired,
+  type CustomerServiceTypingPreview,
+} from "../../data/customer-service/cs-typing-preview";
 import { formatError } from "../../lib/format";
 import { useMessageDetailSync } from "../../lib/useMessageDetailSync";
+
+const staffServiceHistoryPageSize = 50;
 
 export function useCustomerServiceWorkspaceController({
   selectedThreadId,
@@ -57,33 +67,51 @@ export function useCustomerServiceWorkspaceController({
     refetchInterval: customerServiceRealtimePollIntervalMs,
     refetchIntervalInBackground: customerServiceRealtimeRefetchInBackground,
   });
-  const historyQuery = useQuery({
+  const historyQuery = useInfiniteQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
     enabled: Boolean(client && canUseStaffEndpoints),
-    queryFn: async () =>
-      client!.getStaffServiceHistory({ threadType: "temp_session", limit: 50 }),
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) =>
+      client!.getStaffServiceHistory({
+        cursor: pageParam,
+        limit: staffServiceHistoryPageSize,
+        threadType: "temp_session",
+      }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   });
+  const historyItems = useMemo(
+    () => historyQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [historyQuery.data],
+  );
 
   const selectedThread = useMemo(() => {
     return selectCustomerServiceThread({
-      historyItems: historyQuery.data?.items ?? [],
+      historyItems,
       selectedThreadId,
       threads: threadsQuery.data,
     });
-  }, [historyQuery.data, selectedThreadId, threadsQuery.data]);
+  }, [historyItems, selectedThreadId, threadsQuery.data]);
   const selectableThreads = useMemo(
     () =>
       listCustomerServiceSelectableThreads({
-        historyItems: historyQuery.data?.items ?? [],
+        historyItems,
         threads: threadsQuery.data,
       }),
-    [historyQuery.data?.items, threadsQuery.data],
+    [historyItems, threadsQuery.data],
   );
 
   const threadType = selectedThread?.threadType ?? "temp_session";
   const threadId = selectedThread?.threadId ?? "";
+  const typingPreviewQueryKey = useMemo(
+    () => pcQueryKeys.customerServiceTypingPreview(...queryBaseKey, threadType, threadId),
+    [session?.apiBaseUrl, session?.tenantToken, threadId, threadType],
+  );
   const selectedThreadIsLive = useMemo(
-    () => (selectedThread ? !createCustomerServiceThreadState(selectedThread.status).readOnly : false),
+    () =>
+      selectedThread
+        ? selectedThread.accessMode !== "management_readonly" &&
+          !createCustomerServiceThreadState(selectedThread.status).readOnly
+        : false,
     [selectedThread],
   );
 
@@ -131,6 +159,20 @@ export function useCustomerServiceWorkspaceController({
     queryFn: async () => listLocalCustomerServiceThreadSnapshots(session),
     staleTime: 30_000,
   });
+  const transferTargetsQuery = useQuery({
+    queryKey: pcQueryKeys.tenantMembers(...queryBaseKey),
+    enabled: Boolean(client && selectedThread),
+    queryFn: async () => client!.getTenantMembers(),
+    staleTime: 60_000,
+  });
+  const typingPreviewQuery = useQuery<CustomerServiceTypingPreview | null>({
+    queryKey: typingPreviewQueryKey,
+    enabled: false,
+    queryFn: async () => null,
+    initialData: null,
+    staleTime: Infinity,
+    gcTime: 30_000,
+  });
 
   useEffect(() => {
     if (!session || !threadsQuery.data) return;
@@ -149,6 +191,18 @@ export function useCustomerServiceWorkspaceController({
       thread: selectedThread,
     });
   }, [profileQuery.data, selectedThread, session]);
+  useEffect(() => {
+    const preview = typingPreviewQuery.data;
+    if (!preview) return undefined;
+    if (isCustomerServiceTypingPreviewExpired(preview)) {
+      queryClient.setQueryData(typingPreviewQueryKey, null);
+      return undefined;
+    }
+    const timeout = window.setTimeout(() => {
+      queryClient.setQueryData(typingPreviewQueryKey, null);
+    }, Math.max(0, preview.expiresAt - Date.now()));
+    return () => window.clearTimeout(timeout);
+  }, [queryClient, typingPreviewQuery.data, typingPreviewQueryKey]);
 
   const detail = detailQuery.data;
   const localSelectedThread = localThreadsQuery.data?.find(
@@ -174,13 +228,34 @@ export function useCustomerServiceWorkspaceController({
   const threadActionMutation = useMutation({
     mutationFn: async (action: CustomerServiceThreadAction) => {
       if (!client || !selectedThread) throw new Error("Select a customer service conversation.");
+      if (!canUseStaffEndpoints) throw new Error("Only customer service staff can perform this action.");
       return executeCustomerServiceThreadAction({ action, client, thread: selectedThread });
     },
     onSuccess: async (result, action) => {
-      if (action === "close" && selectedThread) {
-        markCustomerServiceThreadClosed(queryClient, selectedThread, result);
+      if (selectedThread) {
+        if (action === "close") markCustomerServiceThreadClosed(queryClient, selectedThread, result);
+        if (action === "claim" || action === "takeover") {
+          markCustomerServiceThreadClaimed(queryClient, selectedThread, result);
+        }
       }
       setNotice(actionSuccessText(action));
+      await invalidateCustomerServiceQueries(queryClient);
+    },
+    onError: (error) => {
+      setNotice(formatError(error));
+      void invalidateCustomerServiceQueries(queryClient);
+    },
+  });
+  const transferThreadMutation = useMutation({
+    mutationFn: async (payload: CustomerServiceThreadTransferPayload) => {
+      if (!client || !selectedThread) throw new Error("Select a customer service conversation.");
+      return executeCustomerServiceThreadTransfer({ client, payload, thread: selectedThread });
+    },
+    onSuccess: async (result) => {
+      if (selectedThread) {
+        markCustomerServiceThreadTransferred(queryClient, selectedThread, result);
+      }
+      setNotice("Conversation transferred.");
       await invalidateCustomerServiceQueries(queryClient);
     },
     onError: (error) => {
@@ -197,7 +272,11 @@ export function useCustomerServiceWorkspaceController({
     selectedThread,
     selectableThreads,
     session,
+    canUseStaffEndpoints,
     threadActionMutation,
+    typingPreview: typingPreviewQuery.data ?? null,
+    transferTargetsQuery,
+    transferThreadMutation,
     workspaceViewModel,
   };
 }

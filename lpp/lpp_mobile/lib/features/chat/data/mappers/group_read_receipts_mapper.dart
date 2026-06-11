@@ -2,15 +2,19 @@ class GroupReadReceiptMember {
   final String userId;
   final String displayName;
   final String? avatarUrl;
+  final String? lppId;
   final int lastReadSeq;
   final bool hasRead;
+  final String? platformUserId;
 
   const GroupReadReceiptMember({
     required this.userId,
     required this.displayName,
     this.avatarUrl,
+    this.lppId,
     required this.lastReadSeq,
     required this.hasRead,
+    this.platformUserId,
   });
 }
 
@@ -34,8 +38,23 @@ class GroupReadReceipts {
       members.where((member) => !member.hasRead).toList(growable: false);
 }
 
+class GroupReadReceiptIdentity {
+  final String? displayName;
+  final String? lppId;
+  final String? platformUserId;
+  final String? userId;
+
+  const GroupReadReceiptIdentity({
+    this.displayName,
+    this.lppId,
+    this.platformUserId,
+    this.userId,
+  });
+}
+
 GroupReadReceipts parseGroupReadReceiptsPayload(
   Object? payload, {
+  GroupReadReceiptIdentity? currentUser,
   required int messageSeq,
 }) {
   if (payload is List) {
@@ -47,7 +66,11 @@ GroupReadReceipts parseGroupReadReceiptsPayload(
               preferHasRead: true,
             ))
         .toList(growable: false);
-    return _receiptsFromMembers(members, totalMembers: members.length);
+    return _receiptsFromMembers(
+      members,
+      totalMembers: members.length,
+      currentUser: currentUser,
+    );
   }
 
   if (payload is Map) {
@@ -73,6 +96,7 @@ GroupReadReceipts parseGroupReadReceiptsPayload(
       totalMembers: _intValue(json['totalMembers']) ?? members.length,
       fallbackReadCount: _intValue(json['readCount']),
       fallbackUnreadCount: _intValue(json['unreadCount']),
+      currentUser: currentUser,
     );
   }
 
@@ -89,16 +113,35 @@ GroupReadReceipts _receiptsFromMembers(
   required int totalMembers,
   int? fallbackReadCount,
   int? fallbackUnreadCount,
+  GroupReadReceiptIdentity? currentUser,
 }) {
-  final readCount = members.isEmpty
-      ? fallbackReadCount ?? 0
-      : members.where((member) => member.hasRead).length;
-  final unreadCount = members.isEmpty
-      ? fallbackUnreadCount ?? 0
-      : members.length - readCount;
+  final selfMember = _currentReceiptMember(members, currentUser);
+  final receiptMembers = selfMember == null
+      ? members
+      : members
+          .where((member) => !_isCurrentReceiptMember(member, currentUser))
+          .toList(growable: false);
+  final readMembers =
+      receiptMembers.where((member) => member.hasRead).toList(growable: false);
+  final readableTotal = selfMember == null
+      ? totalMembers
+      : totalMembers > 0
+          ? totalMembers - 1
+          : 0;
+  final readableFallbackReadCount = selfMember?.hasRead == true
+      ? _decrementCount(fallbackReadCount)
+      : fallbackReadCount ?? 0;
+  final readableFallbackUnreadCount = selfMember != null && !selfMember.hasRead
+      ? _decrementCount(fallbackUnreadCount)
+      : fallbackUnreadCount ?? 0;
+  final readCount =
+      receiptMembers.isEmpty ? readableFallbackReadCount : readMembers.length;
+  final unreadCount = receiptMembers.isEmpty
+      ? readableFallbackUnreadCount
+      : receiptMembers.length - readCount;
   return GroupReadReceipts(
-    members: members,
-    totalMembers: totalMembers,
+    members: receiptMembers,
+    totalMembers: readableTotal,
     readCount: readCount,
     unreadCount: unreadCount,
   );
@@ -113,19 +156,47 @@ GroupReadReceiptMember _memberFromJson(
   final hasRead = preferHasRead && json.containsKey('hasRead')
       ? json['hasRead'] == true
       : lastReadSeq >= messageSeq && messageSeq > 0;
-  final displayName = _firstText(json, const [
+  final user = _mapValue(json, const ['user', 'member', 'profile', 'reader']);
+  final displayName = _firstTextFrom(json, user, const [
         'displayName',
+        'display_name',
         'name',
         'nickname',
         'userName',
+        'user_name',
       ]) ??
       '用户';
   return GroupReadReceiptMember(
-    userId: _firstText(json, const ['userId', 'id']) ?? '',
+    userId: _firstTextFrom(json, user, const [
+          'userId',
+          'user_id',
+          'memberUserId',
+          'member_user_id',
+          'targetUserId',
+          'target_user_id',
+          'readerUserId',
+          'reader_user_id',
+          'id',
+        ]) ??
+        '',
     displayName: displayName,
-    avatarUrl: _firstText(json, const ['avatarUrl', 'avatar']),
+    avatarUrl:
+        _firstTextFrom(json, user, const ['avatarUrl', 'avatar_url', 'avatar']),
+    lppId: _firstTextFrom(json, user, const [
+      'lppId',
+      'lpp_id',
+      'lppNo',
+      'lpp_no',
+    ]),
     lastReadSeq: lastReadSeq,
     hasRead: hasRead,
+    platformUserId: _firstTextFrom(json, user, const [
+      'platformUserId',
+      'platform_user_id',
+      'platformId',
+      'readerPlatformUserId',
+      'reader_platform_user_id',
+    ]),
   );
 }
 
@@ -145,8 +216,71 @@ String? _firstText(Map<String, dynamic> json, List<String> keys) {
   return null;
 }
 
+String? _firstTextFrom(
+  Map<String, dynamic> primary,
+  Map<String, dynamic>? secondary,
+  List<String> keys,
+) {
+  return _firstText(primary, keys) ??
+      (secondary == null ? null : _firstText(secondary, keys));
+}
+
+Map<String, dynamic>? _mapValue(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final value = json[key];
+    if (value is Map) return Map<String, dynamic>.from(value);
+  }
+  return null;
+}
+
 int? _intValue(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse(value?.toString() ?? '');
+}
+
+GroupReadReceiptMember? _currentReceiptMember(
+  List<GroupReadReceiptMember> members,
+  GroupReadReceiptIdentity? currentUser,
+) {
+  for (final member in members) {
+    if (_isCurrentReceiptMember(member, currentUser)) return member;
+  }
+  return null;
+}
+
+bool _isCurrentReceiptMember(
+  GroupReadReceiptMember member,
+  GroupReadReceiptIdentity? currentUser,
+) {
+  final currentIds = _compactIdentityValues([
+    currentUser?.userId,
+    currentUser?.platformUserId,
+    currentUser?.lppId,
+  ]);
+  final memberIds = _compactIdentityValues([
+    member.userId,
+    member.platformUserId,
+    member.lppId,
+  ]);
+  if (currentIds.isNotEmpty &&
+      memberIds.any((id) => currentIds.contains(id))) {
+    return true;
+  }
+  final currentName = _normalizeText(currentUser?.displayName);
+  return currentName.isNotEmpty &&
+      currentName == _normalizeText(member.displayName);
+}
+
+List<String> _compactIdentityValues(List<String?> values) {
+  return values.map(_normalizeText).where((value) => value.isNotEmpty).toList();
+}
+
+String _normalizeText(String? value) {
+  return value?.trim().toLowerCase() ?? '';
+}
+
+int _decrementCount(int? value) {
+  final count = value ?? 0;
+  return count > 0 ? count - 1 : 0;
 }

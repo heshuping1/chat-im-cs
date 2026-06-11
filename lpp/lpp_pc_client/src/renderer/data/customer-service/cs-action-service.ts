@@ -2,6 +2,11 @@ import type { CustomerServiceThread, CustomerServiceThreadType } from "../api/ty
 
 export type CustomerServiceThreadAction = "claim" | "takeover" | "close";
 
+export interface CustomerServiceThreadTransferPayload {
+  reason?: string;
+  toStaffUserId: string;
+}
+
 export interface CustomerServiceThreadActionClient {
   claimCustomerServiceThread: (
     threadType: CustomerServiceThreadType,
@@ -15,6 +20,11 @@ export interface CustomerServiceThreadActionClient {
     threadType: CustomerServiceThreadType,
     threadId: string,
   ) => Promise<{ status?: string; closed?: boolean }>;
+  transferCustomerServiceThread: (
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+    payload: CustomerServiceThreadTransferPayload,
+  ) => Promise<{ status?: string; transferred?: boolean }>;
 }
 
 export interface ExecuteCustomerServiceThreadActionInput {
@@ -35,4 +45,16 @@ export async function executeCustomerServiceThreadAction({
     return client.takeoverCustomerServiceThread(thread.threadType, thread.threadId);
   }
   return client.closeCustomerServiceThread(thread.threadType, thread.threadId);
+}
+
+export async function executeCustomerServiceThreadTransfer({
+  client,
+  payload,
+  thread,
+}: {
+  client: CustomerServiceThreadActionClient;
+  payload: CustomerServiceThreadTransferPayload;
+  thread: Pick<CustomerServiceThread, "threadId" | "threadType">;
+}) {
+  return client.transferCustomerServiceThread(thread.threadType, thread.threadId, payload);
 }

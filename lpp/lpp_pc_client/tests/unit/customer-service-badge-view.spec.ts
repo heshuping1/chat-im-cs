@@ -70,7 +70,9 @@ describe("customer service badge view", () => {
       threadDataLoaded: true,
     });
 
-    expect(view.activeTempSessions.map((item) => item.threadId)).toEqual(["temp-active"]);
+    expect(view.activeTempSessions.map((item) => item.threadId)).toEqual([
+      "temp-active",
+    ]);
     expect(view.queuedTempSessions.map((item) => item.threadId)).toEqual(["temp-queue"]);
     expect(view.activeServiceUnreadCount).toBe(2);
     expect(view.taskbarServiceUnreadCount).toBe(2);

@@ -1,13 +1,18 @@
 import { Plus, Search } from "lucide-react";
 import type { MouseEvent } from "react";
 
-import type { ConversationListItem } from "../../data/api-client";
+import type {
+  ConversationListItem,
+  FriendDto,
+  TenantMemberDto,
+} from "../../data/api-client";
 import { PanelState } from "../../components/PanelState";
 import { useI18n } from "../../i18n/useI18n";
 import { formatBadgeCount } from "../../lib/format";
 import { MessagePlusMenu, type MessagePlusAction } from "./MessageStartDialogs";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
+import { conversationListIdentityView } from "../models/conversationListIdentityModel";
 import { ConversationRow } from "./ConversationListParts";
 
 export type MessageConversationFilterKey = "all" | "unread" | "friends" | "groups";
@@ -20,12 +25,14 @@ export interface MessageConversationListPanelProps {
   draftsByConversation: Record<string, string | undefined>;
   emptyText: string;
   errorText?: string | null;
+  friends: FriendDto[];
   friendRequestCount: number;
   groupCreateAccess: GroupCreateAccess;
   keyword: string;
   loading: boolean;
   plusMenuOpen: boolean;
   unreadCount: number;
+  tenantMembers: TenantMemberDto[];
   onConversationClick: (conversation: ConversationListItem) => void;
   onConversationContextMenu: (
     event: MouseEvent<HTMLElement>,
@@ -61,11 +68,13 @@ export function MessageConversationListPanel({
   draftsByConversation,
   emptyText,
   errorText,
+  friends,
   friendRequestCount,
   groupCreateAccess,
   keyword,
   loading,
   plusMenuOpen,
+  tenantMembers,
   unreadCount,
   onConversationClick,
   onConversationContextMenu,
@@ -143,20 +152,29 @@ export function MessageConversationListPanel({
       <div className="e-conversation-list" aria-label={t("messages.conversationList.listAria")}>
         {loading && <PanelState text={t("messages.conversationList.loading")} />}
         {!loading &&
-          conversations.map((item) => (
-            <ConversationRow
-              active={item.conversationId === activeConversationId}
-              avatarUrl={resolveConversationAvatar(item)}
-              conversation={item}
-              draft={draftsByConversation[item.conversationId]}
-              groupAvatar={resolveConversationGroupAvatar(item)}
-              isGroup={resolveConversationIsGroup(item)}
-              key={item.conversationId}
-              onClick={() => onConversationClick(item)}
-              onContextMenu={(event) => onConversationContextMenu(event, item)}
-              unread={resolveConversationUnread(item)}
-            />
-          ))}
+          conversations.map((item) => {
+            const isGroup = resolveConversationIsGroup(item);
+            return (
+              <ConversationRow
+                active={item.conversationId === activeConversationId}
+                avatarUrl={resolveConversationAvatar(item)}
+                conversation={item}
+                draft={draftsByConversation[item.conversationId]}
+                groupAvatar={resolveConversationGroupAvatar(item)}
+                identity={conversationListIdentityView({
+                  conversation: item,
+                  friends,
+                  isGroup,
+                  tenantMembers,
+                })}
+                isGroup={isGroup}
+                key={item.conversationId}
+                onClick={() => onConversationClick(item)}
+                onContextMenu={(event) => onConversationContextMenu(event, item)}
+                unread={resolveConversationUnread(item)}
+              />
+            );
+          })}
         {!loading && conversations.length === 0 && (
           <PanelState className="e-panel-state" text={emptyText} tone={false} />
         )}

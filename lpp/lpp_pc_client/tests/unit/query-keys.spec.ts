@@ -25,4 +25,32 @@ describe("pc query keys", () => {
       "tenant-token",
     ]);
   });
+
+  it("scopes customer-service export tasks by api base url and tenant token", () => {
+    expect(
+      pcQueryKeys.customerServiceExportTasks(
+        "https://api.example.test",
+        "tenant-token",
+      ),
+    ).toEqual([
+      "pc-cs-export-tasks",
+      "https://api.example.test",
+      "tenant-token",
+    ]);
+  });
+
+  it("scopes customer-service temp-session notes by api base url, tenant token, and session id", () => {
+    expect(
+      pcQueryKeys.customerServiceTempSessionNotes(
+        "https://api.example.test",
+        "tenant-token",
+        "session-1",
+      ),
+    ).toEqual([
+      "pc-cs-temp-session-notes",
+      "https://api.example.test",
+      "tenant-token",
+      "session-1",
+    ]);
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type {
   CustomerProfileCard,
@@ -11,8 +11,16 @@ import {
   createCustomerServiceWorkspaceViewModel,
   selectCustomerServiceThread,
 } from "../../src/renderer/data/customer-service/cs-workspace-view-model";
+import {
+  rememberSilentCustomerServiceRecall,
+  resetSilentCustomerServiceRecallForTest,
+} from "../../src/renderer/data/customer-service/cs-silent-recall";
 
 describe("customer service workspace view model", () => {
+  afterEach(() => {
+    resetSilentCustomerServiceRecallForTest();
+  });
+
   it("does not select a thread without an explicit selected id", () => {
     const live = thread({ threadId: "live", status: "serving" });
     const closed = thread({ threadId: "closed", status: "closed_by_staff" });
@@ -83,6 +91,38 @@ describe("customer service workspace view model", () => {
     expect(vm.messages).toHaveLength(1);
   });
 
+  it("keeps recalled customer-service messages invisible in the agent workspace", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      detail: {
+        messages: [
+          message({ messageId: "m1", preview: "visible" }),
+          message({ isRecalled: true, messageId: "m2", preview: "hidden" }),
+          message({ messageId: "m3", preview: "hidden", status: "recalled" }),
+        ],
+        status: "serving",
+      },
+      selectedThread: thread({ status: "serving" }),
+    });
+
+    expect(vm.messages.map((item) => item.messageId)).toEqual(["m1"]);
+  });
+
+  it("keeps silently recalled customer-service messages invisible even if detail reloads them", () => {
+    rememberSilentCustomerServiceRecall(thread(), "m2");
+    const vm = createCustomerServiceWorkspaceViewModel({
+      detail: {
+        messages: [
+          message({ messageId: "m1", preview: "visible" }),
+          message({ messageId: "m2", preview: "must not render" }),
+        ],
+        status: "serving",
+      },
+      selectedThread: thread({ status: "serving" }),
+    });
+
+    expect(vm.messages.map((item) => item.messageId)).toEqual(["m1"]);
+  });
+
   it("centralizes no-thread, loading, error and empty states", () => {
     expect(createCustomerServiceNoThreadState()).toMatchObject({
       kind: "empty",
@@ -146,6 +186,72 @@ describe("customer service workspace view model", () => {
       key: "customerService.workspace.reception.ended",
       params: { status: "customerService.threadList.historyStatus.closedByStaff" },
     });
+  });
+
+  it("keeps timeout-closed threads read-only in history until explicitly reopened", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      selectedThread: thread({ status: "closed_timeout", unreadCount: 2 }),
+    });
+
+    expect(vm.canReply).toBe(false);
+    expect(vm.closedUnreadNoticeText).toEqual({
+      key: "customerService.workspace.closedUnreadNotice",
+      params: { count: 2 },
+    });
+    expect(vm.composerDisabledText).toEqual({
+      key: "customerService.workspace.composerDisabled.readonly",
+    });
+    expect(vm.modeLabel).toEqual({ key: "customerService.workspace.mode.history" });
+    expect(vm.readOnly).toBe(true);
+    expect(vm.replyGate).toBe("readonly");
+    expect(vm.selectedThreadIsLive).toBe(false);
+  });
+
+  it("disables replies after the thread is transferred away from the current agent", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      selectedThread: thread({
+        accessMode: "management_readonly",
+        status: "transferred",
+        unreadCount: 0,
+      }),
+    });
+
+    expect(vm.canReply).toBe(false);
+    expect(vm.composerDisabledText).toEqual({
+      key: "customerService.workspace.composerDisabled.readonly",
+    });
+    expect(vm.modeLabel).toEqual({ key: "customerService.workspace.mode.history" });
+    expect(vm.readOnly).toBe(true);
+    expect(vm.receptionText).toEqual({
+      key: "customerService.workspace.reception.ended",
+      params: { status: "customerService.threadList.historyStatus.transferred" },
+    });
+    expect(vm.replyGate).toBe("readonly");
+    expect(vm.selectedThreadIsLive).toBe(false);
+  });
+
+  it("treats management readonly live threads as non-replyable viewing mode", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      formatSourceLabel: () => "网页",
+      selectedThread: thread({
+        accessMode: "management_readonly",
+        status: "serving",
+      }),
+    });
+
+    expect(vm.canReply).toBe(false);
+    expect(vm.composerDisabledText).toEqual({
+      key: "customerService.workspace.composerDisabled.managementReadonly",
+    });
+    expect(vm.modeLabel).toEqual({ key: "customerService.workspace.mode.viewing" });
+    expect(vm.readOnly).toBe(true);
+    expect(vm.receptionText).toEqual({
+      key: "customerService.workspace.reception.viewing",
+      params: { source: "网页", status: "customerService.status.serving" },
+    });
+    expect(vm.replyGate).toBe("readonly");
+    expect(vm.selectedThreadIsLive).toBe(false);
+    expect(vm.threadState.label).toBe("查看中");
   });
 });
 

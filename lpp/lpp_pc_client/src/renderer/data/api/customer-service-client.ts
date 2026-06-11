@@ -1,17 +1,30 @@
 import { endpointPlan } from "./endpoints";
 import { MessagesApiClient } from "./messages-client";
+import { ApiError, deriveAdminApiBaseUrl } from "./base";
 import type {
   AiSuggestionDto,
+  CustomerServiceExportType,
+  CustomerServiceMonitorDashboardDto,
+  CustomerServiceMonitorThreadsResponse,
+  CustomerServiceReadStatusDto,
+  CustomerServiceSlaDashboardDto,
+  CustomerServiceStaffStatusDto,
   CustomerProfileCard,
+  CreateCustomerServiceSessionNoteRequest,
+  CustomerServiceSessionNoteDto,
   CustomerServiceThread,
   CustomerServiceThreadType,
   CustomerServiceThreadsResponse,
+  ExportTaskDownloadResult,
+  ExportTaskDto,
   MediaResourceDto,
   MessageItemDto,
   StaffReceptionStatusDto,
   StaffServiceHistoryResponse,
   TempSessionStatsDto,
+  WorkbenchSummary,
 } from "./types";
+import { getAppInstanceHeaders } from "../app-instance/app-instance";
 import { logApiContractDiagnostic } from "../api-contract/contract-diagnostics";
 import {
   normalizeAiSuggestion,
@@ -23,6 +36,7 @@ import {
   normalizeCustomerProfileDto,
   normalizeCustomerServiceThreadDto,
 } from "../customer-service/cs-contract";
+import { staffServiceHistoryItemToThread } from "../customer-service/cs-history-model";
 import { normalizeStaffServiceHistoryResponse } from "../customer-service/cs-history-response";
 import {
   applyCustomerServiceThreadOverlay,
@@ -38,9 +52,6 @@ import {
 
 export class CustomerServiceApiClient extends MessagesApiClient {
   getWorkbenchThreads() {
-    if (this.shouldUseAdminConversationManagement()) {
-      return this.getManagedCustomerServiceThreads();
-    }
     return this.request<CustomerServiceThreadsResponse>(
       endpointPlan.customerServiceThreads,
     ).then((response) =>
@@ -70,14 +81,108 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     );
   }
 
-  async getTempSessionStats() {
+  async getTempSessionStats(params: { from?: string; to?: string } = {}) {
     const adminToken = await this.issueAdminToken();
     this.options.adminToken = adminToken;
+    const search = new URLSearchParams();
+    appendOptionalSearchParams(search, params, ["from", "to"]);
+    const query = search.toString();
     return this.request<TempSessionStatsDto>(
-      endpointPlan.adminCustomerServiceTempSessionStats,
+      `${endpointPlan.adminCustomerServiceTempSessionStats}${query ? `?${query}` : ""}`,
       {},
       true,
     );
+  }
+
+  async getCustomerServiceMonitorDashboard() {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<CustomerServiceMonitorDashboardDto>(
+      endpointPlan.adminCustomerServiceCenterDashboard,
+      {},
+      true,
+    );
+  }
+
+  async getCustomerServiceMonitorStaffStatuses() {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<CustomerServiceStaffStatusDto[]>(
+      endpointPlan.adminCustomerServiceCenterStaffStatuses,
+      {},
+      true,
+    );
+  }
+
+  async getCustomerServiceMonitorSlaDashboard() {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<CustomerServiceSlaDashboardDto>(
+      endpointPlan.adminCustomerServiceCenterSlaDashboard,
+      {},
+      true,
+    );
+  }
+
+  async getCustomerServiceMonitorThreads(params: {
+    assignedStaffUserId?: string;
+    keyword?: string;
+    pageSize?: number;
+    slaRisk?: string;
+    status?: string;
+    threadType?: CustomerServiceThreadType;
+  } = {}): Promise<CustomerServiceMonitorThreadsResponse> {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    const fetchStatus = async (status?: string) => {
+      const search = new URLSearchParams({
+        page: "1",
+        pageSize: String(params.pageSize ?? 50),
+      });
+      appendOptionalSearchParams(search, params, [
+        "assignedStaffUserId",
+        "keyword",
+        "slaRisk",
+      ]);
+      if (status) search.set("status", status);
+      appendOptionalSearchParams(search, params, ["threadType"]);
+      const response = await this.request<AdminConversationManagementResponse>(
+        `${endpointPlan.adminCustomerServiceCenterThreads}?${search.toString()}`,
+        {},
+        true,
+      );
+      return normalizeCustomerServiceThreadsResponse(
+        normalizeAdminCenterThreadsResponse(response),
+        customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
+      );
+    };
+    const normalized = await fetchStatus(params.status);
+    return {
+      items: [...normalized.queueItems, ...normalized.activeItems],
+      nextCursor: null,
+      summary: normalized.summary,
+    };
+  }
+
+  async getCustomerServiceMonitorThreadDetail(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<CustomerServiceThreadDetailResponse>(
+      endpointPlan.adminCustomerServiceCenterThread
+        .replace("{threadType}", threadType)
+        .replace("{threadId}", threadId),
+      {},
+      true,
+    ).then((detail) => ({
+      ...normalizeWorkbenchThreadDetail(detail, {
+        fallbackThreadId: threadId,
+        fallbackThreadType: threadType,
+      }),
+      accessMode: "management_readonly" as const,
+    }));
   }
 
   private shouldUseAdminConversationManagement() {
@@ -115,12 +220,53 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     status?: string | number;
     limit?: number;
     cursor?: string | null;
+    from?: string;
+    to?: string;
+    customerId?: string;
+    customerUserId?: string;
+    visitorUserId?: string;
+    keyword?: string;
+    assignedStaffUserId?: string;
+    staffUserId?: string;
+    locale?: string;
+    conversationId?: string;
+    senderUserId?: string;
+    sourcePlatform?: string;
+    sourceChannel?: string;
+    country?: string;
+    region?: string;
+    rating?: string | number;
+    minRating?: string | number;
+    maxRating?: string | number;
+    minRiskLevel?: string | number;
+    slaRisk?: string;
   } = {}) {
     const search = new URLSearchParams();
     if (params.threadType) search.set("threadType", params.threadType);
     if (params.status !== undefined) search.set("status", String(params.status));
     if (params.limit !== undefined) search.set("limit", String(params.limit));
     if (params.cursor) search.set("cursor", params.cursor);
+    appendOptionalSearchParams(search, params, [
+      "from",
+      "to",
+      "customerId",
+      "customerUserId",
+      "visitorUserId",
+      "keyword",
+      "assignedStaffUserId",
+      "staffUserId",
+      "locale",
+      "conversationId",
+      "senderUserId",
+      "sourcePlatform",
+      "sourceChannel",
+      "country",
+      "region",
+      "minRating",
+      "maxRating",
+      "minRiskLevel",
+      "slaRisk",
+    ]);
     const query = search.toString();
     return this.request<StaffServiceHistoryResponse>(
       `${endpointPlan.staffServiceHistory}${query ? `?${query}` : ""}`,
@@ -130,6 +276,228 @@ export class CustomerServiceApiClient extends MessagesApiClient {
         customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
       ),
     );
+  }
+
+  async getCustomerServiceHistoryThreads(params: {
+    threadType?: CustomerServiceThreadType;
+    status?: string | number;
+    limit?: number;
+    cursor?: string | null;
+    from?: string;
+    to?: string;
+    customerId?: string;
+    customerUserId?: string;
+    visitorUserId?: string;
+    keyword?: string;
+    assignedStaffUserId?: string;
+    staffUserId?: string;
+    locale?: string;
+    conversationId?: string;
+    senderUserId?: string;
+    sourcePlatform?: string;
+    sourceChannel?: string;
+    country?: string;
+    region?: string;
+    rating?: string | number;
+    minRating?: string | number;
+    maxRating?: string | number;
+    minRiskLevel?: string | number;
+    slaRisk?: string;
+  } = {}) {
+    if (!this.shouldUseAdminConversationManagement()) {
+      const history = await this.getStaffServiceHistory(params);
+      return {
+        items: history.items.map(staffServiceHistoryItemToThread),
+        nextCursor: history.nextCursor,
+        summary: history.summary,
+      };
+    }
+
+    const adminHistory = await this.getAdminCustomerServiceHistory(params);
+    if (adminHistory) return adminHistory;
+
+    return {
+      items: [],
+      nextCursor: null,
+    };
+  }
+
+  private async getAdminCustomerServiceHistory(params: {
+    threadType?: CustomerServiceThreadType;
+    status?: string | number;
+    limit?: number;
+    cursor?: string | null;
+    from?: string;
+    to?: string;
+    customerId?: string;
+    customerUserId?: string;
+    visitorUserId?: string;
+    keyword?: string;
+    assignedStaffUserId?: string;
+    staffUserId?: string;
+    locale?: string;
+    conversationId?: string;
+    senderUserId?: string;
+    sourcePlatform?: string;
+    sourceChannel?: string;
+    country?: string;
+    region?: string;
+    rating?: string | number;
+    minRating?: string | number;
+    maxRating?: string | number;
+    minRiskLevel?: string | number;
+    slaRisk?: string;
+  }) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    const search = new URLSearchParams();
+    if (params.threadType) search.set("threadType", params.threadType);
+    if (params.status !== undefined) search.set("status", String(params.status));
+    if (params.limit !== undefined) search.set("limit", String(params.limit));
+    if (params.cursor) search.set("cursor", params.cursor);
+    if (params.cursor) search.set("includeSummary", "false");
+    appendOptionalSearchParams(search, params, [
+      "from",
+      "to",
+      "customerId",
+      "customerUserId",
+      "visitorUserId",
+      "keyword",
+      "locale",
+      "staffUserId",
+      "sourcePlatform",
+      "sourceChannel",
+      "country",
+      "region",
+      "minRating",
+      "maxRating",
+      "minRiskLevel",
+    ]);
+    const query = search.toString();
+    const response = await this.request<StaffServiceHistoryResponse>(
+      `${endpointPlan.adminCustomerServiceCenterHistorySessions}${query ? `?${query}` : ""}`,
+      {},
+      true,
+    );
+    const history = normalizeStaffServiceHistoryResponse(
+      response,
+      customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
+    );
+    return {
+      items: history.items.map(staffServiceHistoryItemToThread),
+      nextCursor: history.nextCursor,
+      summary: history.summary,
+    };
+  }
+
+  private async getAdminCustomerServiceRealtimeThreads(
+    params: {
+      threadType?: CustomerServiceThreadType;
+      status?: string | number;
+      limit?: number;
+      keyword?: string;
+      assignedStaffUserId?: string;
+      locale?: string;
+    },
+    status: "queued" | "active",
+  ) {
+    const search = new URLSearchParams({
+      page: "1",
+      pageSize: String(params.limit ?? 50),
+      status,
+    });
+    if (params.threadType) search.set("threadType", params.threadType);
+    appendOptionalSearchParams(search, params, [
+      "keyword",
+      "assignedStaffUserId",
+      "locale",
+    ]);
+    const response = await this.request<AdminConversationManagementResponse>(
+      `${endpointPlan.adminCustomerServiceCenterThreads}?${search.toString()}`,
+      {},
+      true,
+    );
+    const normalized = normalizeCustomerServiceThreadsResponse(
+      normalizeAdminCenterThreadsResponse(response),
+      customerServiceIndexScopeKey(apiClientIndexScopeInput(this.options)),
+    );
+    return {
+      items: [...normalized.queueItems, ...normalized.activeItems],
+      nextCursor: null,
+      summary: normalized.summary,
+    };
+  }
+
+  async createCustomerServiceExportTask(params: {
+    exportType: CustomerServiceExportType;
+    filters: Record<string, unknown>;
+  }) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<ExportTaskDto>(
+      endpointPlan.adminExportTasks,
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      },
+      true,
+    );
+  }
+
+  async getCustomerServiceExportTasks(params: {
+    exportType?: CustomerServiceExportType;
+  } = {}) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    const response = await this.request<ExportTaskDto[] | { items?: ExportTaskDto[] }>(
+      endpointPlan.adminExportTasks,
+      {},
+      true,
+    );
+    const items = Array.isArray(response) ? response : response.items ?? [];
+    return params.exportType
+      ? items.filter((item) => item.exportType === params.exportType)
+      : items;
+  }
+
+  async downloadCustomerServiceExportTask(taskId: string): Promise<ExportTaskDownloadResult> {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    const path = `${endpointPlan.adminExportTasks}/${encodeURIComponent(taskId)}/download`;
+    const headers = new Headers();
+    headers.set("X-Client-Trace-Id", this.options.traceId);
+    Object.entries(await getAppInstanceHeaders()).forEach(([key, value]) => {
+      headers.set(key, value);
+    });
+    if (this.options.tenantId) {
+      headers.set("X-Tenant-Id", this.options.tenantId);
+    }
+    headers.set("Authorization", `Bearer ${adminToken}`);
+    const baseUrl =
+      this.options.adminBaseUrl?.trim() || deriveAdminApiBaseUrl(this.options.baseUrl);
+    const response = await fetch(`${baseUrl}${path}`, {
+      credentials: "omit",
+      headers,
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as {
+        code?: string;
+        message?: string;
+        requestId?: string;
+      } | null;
+      throw new ApiError(
+        payload?.message ?? `HTTP ${response.status} ${path}`,
+        payload?.code,
+        payload?.requestId,
+        response.status,
+      );
+    }
+    return {
+      blob: await response.blob(),
+      fileName:
+        exportFileNameFromDisposition(response.headers.get("content-disposition")) ||
+        `customer-service-export-${taskId}.csv`,
+    };
   }
 
   getReceptionStatus() {
@@ -175,9 +543,6 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     threadType: CustomerServiceThreadType,
     threadId: string,
   ) {
-    if (this.shouldUseAdminConversationManagement()) {
-      return this.getManagedTempSessionDetail(threadId);
-    }
     return this.request<CustomerServiceThreadDetailResponse>(
       endpointPlan.customerServiceThreadDetail
         .replace("{threadType}", threadRoutePathType(threadType))
@@ -188,16 +553,6 @@ export class CustomerServiceApiClient extends MessagesApiClient {
         fallbackThreadType: threadType,
       }),
     );
-  }
-
-  private async getManagedTempSessionDetail(sessionId: string) {
-    const adminToken = await this.issueAdminToken();
-    this.options.adminToken = adminToken;
-    return this.request<AdminTempSessionDetailResponse>(
-      endpointPlan.adminCustomerServiceTempSession.replace("{sessionId}", sessionId),
-      {},
-      true,
-    ).then((detail) => normalizeAdminTempSessionDetail(detail, sessionId));
   }
 
   private sendWorkbenchMessage(
@@ -276,6 +631,93 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     return this.customerServiceThreadAction(threadType, threadId, "close");
   }
 
+  recallCustomerServiceMessage(messageId: string) {
+    return this.request<{ messageId?: string; silent?: boolean }>(
+      endpointPlan.messageRecallSilent.replace("{messageId}", messageId),
+      { method: "POST" },
+    );
+  }
+
+  transferCustomerServiceThread(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+    payload: { reason?: string; toStaffUserId: string },
+  ) {
+    const reason = payload.reason?.trim();
+    return this.request<{
+      status?: string;
+      threadId?: string;
+      transferred?: boolean;
+      transferredAt?: string;
+    }>(
+      transferEndpoint(threadType).replace(
+        threadType === "temp_session" ? "{sessionId}" : "{threadId}",
+        encodeURIComponent(threadId),
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          toStaffUserId: payload.toStaffUserId,
+          ...(reason ? { reason } : {}),
+        }),
+      },
+    );
+  }
+
+  getTempSessionNotes(sessionId: string) {
+    return this.request<unknown>(
+      endpointPlan.customerServiceTempSessionNotes.replace(
+        "{sessionId}",
+        encodeURIComponent(sessionId),
+      ),
+    ).then(normalizeCustomerServiceSessionNotes);
+  }
+
+  createTempSessionNote(
+    sessionId: string,
+    payload: CreateCustomerServiceSessionNoteRequest,
+  ) {
+    const content = normalizeSessionNoteContent(payload.content);
+    return this.request<unknown>(
+      endpointPlan.customerServiceTempSessionNotes.replace(
+        "{sessionId}",
+        encodeURIComponent(sessionId),
+      ),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          content,
+          isPinned: Boolean(payload.isPinned),
+        }),
+      },
+    ).then(normalizeCustomerServiceSessionNote);
+  }
+
+  setTempSessionNotePinned(
+    sessionId: string,
+    noteId: string,
+    pinned: boolean,
+  ) {
+    return this.request<unknown>(
+      endpointPlan.customerServiceTempSessionNotePin
+        .replace("{sessionId}", encodeURIComponent(sessionId))
+        .replace("{noteId}", encodeURIComponent(noteId)),
+      {
+        method: "PUT",
+        body: JSON.stringify({ pinned }),
+      },
+    ).then(normalizeCustomerServiceSessionNote);
+  }
+
+  deleteTempSessionNote(sessionId: string, noteId: string) {
+    return this.request<void>(
+      endpointPlan.customerServiceTempSessionNote
+        .replace("{sessionId}", encodeURIComponent(sessionId))
+        .replace("{noteId}", encodeURIComponent(noteId)),
+      { method: "DELETE" },
+    );
+  }
+
   generateAiSuggestion(
     threadType: CustomerServiceThreadType,
     threadId: string,
@@ -345,6 +787,8 @@ function emptyAiSuggestion(suggestionId = ""): AiSuggestionDto {
 
 type NestedThreadPayload = {
   messages?: MessageItemDto[];
+  notes?: unknown;
+  readStatus?: unknown;
   lastMessagePreview?: string | null;
   lastMessageAt?: string | null;
   updatedAt?: string | null;
@@ -383,6 +827,8 @@ type CustomerServiceThreadDetailResponse = NestedThreadPayload & {
   temp_session?: NestedThreadPayload | null;
   directChat?: NestedThreadPayload | null;
   direct_chat?: NestedThreadPayload | null;
+  notes?: unknown;
+  readStatus?: unknown;
 };
 
 type AdminTokenIssueResponse = {
@@ -401,12 +847,6 @@ type AdminConversationManagementResponse =
     };
 
 type AdminTempSessionsResponse = AdminConversationManagementResponse;
-
-type AdminTempSessionDetailResponse = {
-  session?: Record<string, unknown>;
-  visitor?: Record<string, unknown>;
-  messages?: MessageItemDto[];
-};
 
 const adminTokenCache = new Map<string, string>();
 
@@ -524,36 +964,21 @@ function normalizeAdminTempSessionsResponse(
   };
 }
 
-function normalizeAdminTempSessionDetail(
-  detail: AdminTempSessionDetailResponse,
-  fallbackSessionId: string,
-) {
-  const session = asRecord(detail.session) ?? {};
-  const visitor = asRecord(detail.visitor) ?? {};
-  const thread = adminTempSessionItemToCustomerServiceThread({
-    ...session,
-    visitorName:
-      readString(session.visitorName) ||
-      readString(visitor.displayName) ||
-      readString(visitor.visitorName),
-  }) ?? {
-    accessMode: "management_readonly" as const,
-    conversationId: fallbackSessionId,
-    status: "closed_timeout",
-    threadId: fallbackSessionId,
-    threadType: "temp_session" as const,
-    title: "Visitor",
-  };
-  const rawMessages = readMessages(detail.messages) ?? [];
-  const messages = normalizeCustomerServiceMessagesFromContract(rawMessages, {
-    conversationId: thread.conversationId,
-    threadId: thread.threadId,
-    threadType: thread.threadType,
-  });
+function normalizeAdminCenterThreadsResponse(
+  response: AdminConversationManagementResponse,
+): CustomerServiceThreadsResponse {
+  const allItems = readAdminConversationItems(response)
+    .map(adminCenterThreadItemToCustomerServiceThread)
+    .filter((item): item is CustomerServiceThread => Boolean(item));
+  const queueItems = allItems.filter((item) => isQueuedThreadStatus(item.status));
+  const activeItems = allItems.filter((item) => !isQueuedThreadStatus(item.status));
   return {
-    ...detail,
-    ...thread,
-    messages,
+    activeItems,
+    queueItems,
+    summary: readAdminThreadSummary(response, {
+      activeItems,
+      queueItems,
+    }),
   };
 }
 
@@ -589,6 +1014,98 @@ function adminTempSessionItemToCustomerServiceThread(
   };
 }
 
+function adminCenterThreadItemToCustomerServiceThread(
+  value: unknown,
+): CustomerServiceThread | null {
+  const item = asRecord(value);
+  if (!item) return null;
+  const threadType = normalizeResponseThreadType(
+    readString(item.threadType) ||
+      readString(item.thread_type) ||
+      readString(item.type),
+  );
+  const threadId =
+    readString(item.threadId) ||
+    readString(item.thread_id) ||
+    readString(item.sessionId) ||
+    readString(item.session_id) ||
+    readString(item.id);
+  const conversationId =
+    readString(item.conversationId) ||
+    readString(item.conversation_id) ||
+    threadId;
+  if (!threadId || !conversationId) return null;
+  return {
+    accessMode: "management_readonly",
+    assignedAt: readString(item.assignedAt) || readString(item.acceptedAt) || null,
+    avatarUrl: readString(item.avatarUrl) ?? null,
+    conversationId,
+    customerAvatarUrl:
+      readString(item.customerAvatarUrl) ||
+      readString(item.visitorAvatarUrl) ||
+      null,
+    lastMessageAt:
+      readString(item.lastMessageAt) ||
+      readString(item.updatedAt) ||
+      readString(item.last_message_at) ||
+      null,
+    lastMessagePreview:
+      readString(item.lastMessagePreview) ||
+      readString(item.preview) ||
+      readString(item.lastMessage),
+    priority: readString(item.priority) || readString(item.riskLevel),
+    source: readString(item.source) || readString(item.sourcePlatform),
+    sourceChannel:
+      readString(item.sourceChannel) ||
+      readString(item.channel) ||
+      readString(item.entryChannel),
+    status: readString(item.status) || "active",
+    threadId,
+    threadType,
+    title:
+      readString(item.title) ||
+      readString(item.customerName) ||
+      readString(item.customerDisplayName) ||
+      readString(item.visitorName) ||
+      readString(item.displayName) ||
+      "Visitor",
+    unreadCount: readNumber(item.unreadCount),
+    updatedAt: readString(item.updatedAt) || readString(item.createdAt) || null,
+  };
+}
+
+function readAdminThreadSummary(
+  response: AdminConversationManagementResponse,
+  fallback: {
+    activeItems: CustomerServiceThread[];
+    queueItems: CustomerServiceThread[];
+  },
+): WorkbenchSummary {
+  const record = asRecord(response);
+  const summary = asRecord(record?.summary);
+  const allItems = [...fallback.queueItems, ...fallback.activeItems];
+  return {
+    activeCount:
+      readNumber(summary?.activeCount) ??
+      fallback.activeItems.filter((item) => !isClosedThreadStatus(item.status)).length,
+    allCount: readNumber(summary?.allCount) ?? allItems.length,
+    queuedCount: readNumber(summary?.queuedCount) ?? fallback.queueItems.length,
+    vipCount:
+      readNumber(summary?.vipCount) ??
+      allItems.filter((item) => item.isVip || item.priority === "vip").length,
+  };
+}
+
+function isQueuedThreadStatus(status?: string | null) {
+  const normalized = normalizeResponseWireType(status);
+  return normalized === "queued" || normalized === "queueing" || normalized === "waiting";
+}
+
+function isClosedThreadStatus(status?: string | null) {
+  const normalized = normalizeResponseWireType(status);
+  return normalized.startsWith("closed") || normalized === "ended" || normalized === "archived";
+}
+
 function readAdminConversationItems(response: AdminConversationManagementResponse) {
   if (Array.isArray(response)) return response;
   const record = asRecord(response);
@@ -603,6 +1120,17 @@ function readAdminConversationItems(response: AdminConversationManagementRespons
     ];
   }
   return [];
+}
+
+function readResponseCursor(response: unknown) {
+  const record = asRecord(response);
+  if (!record) return null;
+  return (
+    readString(record.nextCursor) ||
+    readString(record.next_cursor) ||
+    readString(record.cursor) ||
+    null
+  );
 }
 
 function normalizeCustomerServiceThreadFromContract(
@@ -641,6 +1169,137 @@ function normalizeCustomerProfileFromContract(
   return result.data ? customerProfileEntityToDto(result.data, profile) : profile;
 }
 
+function normalizeCustomerServiceSessionNotes(
+  payload: unknown,
+): CustomerServiceSessionNoteDto[] {
+  const record = asRecord(payload);
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(record?.items)
+      ? record.items
+      : Array.isArray(record?.notes)
+        ? record.notes
+        : Array.isArray(record?.data)
+          ? record.data
+          : [];
+  return items
+    .map(normalizeCustomerServiceSessionNoteRecord)
+    .filter((note): note is CustomerServiceSessionNoteDto => Boolean(note))
+    .sort(compareCustomerServiceSessionNotes);
+}
+
+function normalizeCustomerServiceSessionNote(
+  payload: unknown,
+): CustomerServiceSessionNoteDto {
+  const record = asRecord(payload);
+  const note =
+    normalizeCustomerServiceSessionNoteRecord(payload) ??
+    normalizeCustomerServiceSessionNoteRecord(record?.note) ??
+    normalizeCustomerServiceSessionNoteRecord(record?.data);
+  if (!note) {
+    throw new Error("Customer service session note response is missing noteId or content.");
+  }
+  return note;
+}
+
+function normalizeCustomerServiceSessionNoteRecord(
+  payload: unknown,
+): CustomerServiceSessionNoteDto | null {
+  const record = asRecord(payload);
+  if (!record) return null;
+  const noteId =
+    readString(record.noteId) ||
+    readString(record.note_id) ||
+    readString(record.id);
+  const content = readString(record.content);
+  if (!noteId || !content) return null;
+  return {
+    noteId,
+    staffDisplayName:
+      readString(record.staffDisplayName) ||
+      readString(record.staff_display_name) ||
+      readString(record.createdByDisplayName) ||
+      readString(record.creatorDisplayName) ||
+      "",
+    content,
+    isPinned:
+      readBoolean(record.isPinned) ??
+      readBoolean(record.is_pinned) ??
+      readBoolean(record.pinned) ??
+      false,
+    createdAt:
+      readString(record.createdAt) ||
+      readString(record.created_at) ||
+      null,
+  };
+}
+
+function normalizeCustomerServiceReadStatus(
+  payload: unknown,
+): CustomerServiceReadStatusDto | null {
+  const record = asRecord(payload);
+  if (!record) return null;
+  const rawMembers = Array.isArray(record.members) ? record.members : [];
+  const members: CustomerServiceReadStatusDto["members"] = rawMembers
+    .flatMap((item) => {
+      const member = asRecord(item);
+      const userId =
+        readString(member?.userId) ||
+        readString(member?.user_id) ||
+        readString(member?.memberUserId) ||
+        readString(member?.member_user_id);
+      if (!userId) return [];
+      return [{
+        userId,
+        lastReadSeq:
+          readNumber(member?.lastReadSeq) ??
+          readNumber(member?.last_read_seq) ??
+          0,
+        lastReadAt:
+          readString(member?.lastReadAt) ||
+          readString(member?.last_read_at) ||
+          null,
+      }];
+    });
+  if (members.length === 0) return null;
+  return {
+    sessionId:
+      readString(record.sessionId) ||
+      readString(record.session_id),
+    conversationId:
+      readString(record.conversationId) ||
+      readString(record.conversation_id),
+    visitorUserId:
+      readString(record.visitorUserId) ||
+      readString(record.visitor_user_id),
+    members,
+  };
+}
+
+function normalizeSessionNoteContent(content: string) {
+  const normalized = content.trim();
+  if (!normalized) {
+    throw new Error("Customer service session note content is required.");
+  }
+  if (normalized.length > 2000) {
+    throw new Error("Customer service session note content cannot exceed 2000 characters.");
+  }
+  return normalized;
+}
+
+function compareCustomerServiceSessionNotes(
+  left: CustomerServiceSessionNoteDto,
+  right: CustomerServiceSessionNoteDto,
+) {
+  if (Boolean(left.isPinned) !== Boolean(right.isPinned)) {
+    return left.isPinned ? -1 : 1;
+  }
+  const rightTime = Date.parse(right.createdAt ?? "");
+  const leftTime = Date.parse(left.createdAt ?? "");
+  return (Number.isFinite(rightTime) ? rightTime : 0) -
+    (Number.isFinite(leftTime) ? leftTime : 0);
+}
+
 function normalizeWorkbenchThreadDetail(
   detail: CustomerServiceThreadDetailResponse,
   options: {
@@ -651,17 +1310,23 @@ function normalizeWorkbenchThreadDetail(
   const tempSession = asRecord(detail.tempSession ?? detail.temp_session);
   const directChat = asRecord(detail.directChat ?? detail.direct_chat);
   const nested = asNestedPayload(tempSession) ?? asNestedPayload(directChat);
+  const sourceRecord = nested ?? {};
   const threadType = normalizeResponseThreadType(detail.threadType || options.fallbackThreadType);
   const threadId = detail.threadId || options.fallbackThreadId;
   const conversationId = detail.conversationId || detail.threadId || options.fallbackThreadId;
   const rawMessages = readMessages(detail.messages) ?? readMessages(nested?.messages) ?? [];
+  const notes = normalizeCustomerServiceSessionNotes(
+    detail.notes ?? nested?.notes,
+  );
+  const readStatus = normalizeCustomerServiceReadStatus(
+    detail.readStatus ?? sourceRecord.readStatus,
+  );
   const messages = normalizeCustomerServiceMessagesFromContract(rawMessages, {
     conversationId,
     threadId,
     threadType,
   });
   const latest = latestMessage(messages);
-  const sourceRecord = nested ?? {};
 
   const normalizedDetail = {
     ...detail,
@@ -717,6 +1382,8 @@ function normalizeWorkbenchThreadDetail(
       readString(detail.updatedAt) ||
       readString(sourceRecord.updatedAt),
     messages,
+    notes,
+    readStatus,
   };
   const result = normalizeCustomerServiceThreadDto(normalizedDetail);
   logApiContractDiagnostic({
@@ -780,12 +1447,45 @@ function threadRoutePathType(threadType: CustomerServiceThreadType) {
   return threadType === "temp_session" ? "temp-session" : "direct-customer";
 }
 
+function normalizeCustomerServiceHistoryStatusParam(
+  status?: string | number,
+): "queued" | "active" | null {
+  const normalized = String(status ?? "").trim().toLowerCase().replace(/-/g, "_");
+  if (normalized === "queued" || normalized === "queue") return "queued";
+  if (normalized === "active" || normalized === "open" || normalized === "serving") {
+    return "active";
+  }
+  return null;
+}
+
+function hasAdminCustomerServiceHistoryScope(params: {
+  conversationId?: string;
+  customerId?: string;
+  customerUserId?: string;
+  senderUserId?: string;
+  visitorUserId?: string;
+}) {
+  return [
+    params.conversationId,
+    params.customerId,
+    params.customerUserId,
+    params.senderUserId,
+    params.visitorUserId,
+  ].some((value) => String(value ?? "").trim());
+}
+
 function aiSuggestionPathType(threadType: CustomerServiceThreadType) {
   return threadType === "temp_session" ? "temp_session" : "im_direct";
 }
 
 function threadActionPathType(threadType: CustomerServiceThreadType) {
   return threadRoutePathType(threadType);
+}
+
+function transferEndpoint(threadType: CustomerServiceThreadType) {
+  return threadType === "temp_session"
+    ? endpointPlan.customerServiceTempSessionTransfer
+    : endpointPlan.customerServiceImDirectTransfer;
 }
 
 function normalizeResponseThreadType(value?: string | null): CustomerServiceThreadType {
@@ -908,6 +1608,43 @@ function readNumber(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function readBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1") return true;
+  if (normalized === "false" || normalized === "0") return false;
+  return undefined;
+}
+
+function appendOptionalSearchParams<T extends Record<string, unknown>>(
+  search: URLSearchParams,
+  params: T,
+  keys: Array<keyof T & string>,
+) {
+  keys.forEach((key) => {
+    const value = params[key];
+    if (value === undefined || value === null) return;
+    const text = String(value).trim();
+    if (!text) return;
+    search.set(key, text);
+  });
+}
+
+function exportFileNameFromDisposition(value: string | null) {
+  if (!value) return undefined;
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(value);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1].replace(/^"|"$/g, ""));
+    } catch {
+      return utf8Match[1].replace(/^"|"$/g, "");
+    }
+  }
+  const fallbackMatch = /filename="?([^";]+)"?/i.exec(value);
+  return fallbackMatch?.[1]?.trim() || undefined;
 }
 
 function adminTokenCacheKey(input: {

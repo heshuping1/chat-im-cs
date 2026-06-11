@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { AiReplySuggestionDrawer } from "./AiReplySuggestionDrawer";
 import { channelLabel as formatChannelLabel } from "./ChannelBadge";
 import { PanelState } from "./PanelState";
 import {
+  type CustomerServiceThread,
+  type ConversationListItem,
   type MessageItemDto,
   type KnowledgeInsertPayload,
 } from "../data/api-client";
 import type { CustomerServiceThreadAction } from "../data/customer-service/cs-action-service";
+import { getCustomerServiceActionPermission } from "../data/customer-service/cs-action-permissions";
+import { createCustomerServiceThreadState } from "../data/customer-service/cs-thread-state";
+import {
+  invalidateCustomerServiceQueries,
+  removeCustomerServiceMessage,
+} from "../data/customer-service/cs-cache-adapter";
+import { createCustomerServiceTransferTargetOptions } from "../data/customer-service/cs-transfer-targets";
 import { usePcSettings } from "../data/settings/settings-store";
 import {
   useDismissRealtimeRemindersForTarget,
@@ -22,6 +32,7 @@ import {
   useSetServiceAssistantPane,
 } from "../data/workspace-ui/workspace-ui-store";
 import { resolveCustomerServiceThreadReadVisibility } from "../data/customer-service/customer-service-read-visibility";
+import { applyCustomerServiceReadStatusToMessages } from "../data/customer-service/cs-message-read-status";
 import type { CurrentUserIdentity } from "../data/message-display";
 import {
   createCustomerServiceNoThreadState,
@@ -48,10 +59,23 @@ import {
 import {
   extractActionResultText,
 } from "../messages/models/messageComposerModel";
+import {
+  messageDangerConfirmationDescriptor,
+  requestMessageDangerConfirmation,
+} from "../messages/runtime/messageConfirm";
 import { ChatToastNotice, isNoticeErrorText } from "../messages/components/ChatToastNotice";
+import { MessageHistoryLookupDialog } from "../messages/components/MessageHistoryLookupDialog";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
 import {
+  createMessageLookupScope,
+  filterMessagesByHistory,
+  filterVisibleMessages,
+  getHistoryFilterCounts,
+  type HistoryFilterKey,
+} from "../messages/models/messageListModel";
+import {
   isServiceAiDraftableMessage,
+  isServiceSilentRecallableMessage,
   type ServiceMessageContextAction,
 } from "../customer-service/components/ServiceMessageContextMenu";
 import { ChatComposerSurface } from "./ChatComposerSurface";
@@ -61,6 +85,7 @@ import {
   readCustomerServiceAssistantInsertText,
 } from "../customer-service/runtime/customer-service-assistant-events";
 import { CustomerServiceWorkspaceHeader } from "../customer-service/components/CustomerServiceWorkspaceHeader";
+import { CustomerServiceTransferDialog } from "../customer-service/components/CustomerServiceTransferDialog";
 import { CustomerServiceReceptionStrip } from "../customer-service/components/CustomerServiceReceptionStrip";
 import { CustomerServiceMessageStage } from "../customer-service/components/CustomerServiceMessageStage";
 import { useAutoTranslateConversationPreference } from "../translation/hooks/useAutoTranslateConversationPreference";
@@ -120,6 +145,13 @@ export function ChatWorkspace({
   const [aiDraftDrawer, setAiDraftDrawer] = useState<AiDraftDrawerState>(null);
   const [closeConfirmation, setCloseConfirmation] =
     useState<CloseConfirmationState>(null);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferReason, setTransferReason] = useState("");
+  const [selectedTransferTargetId, setSelectedTransferTargetId] = useState("");
+  const [lookupOpen, setLookupOpen] = useState(false);
+  const [lookupHistoryFilter, setLookupHistoryFilter] =
+    useState<HistoryFilterKey>("all");
+  const [lookupKeyword, setLookupKeyword] = useState("");
   const composerRef = useRef<MessageComposerHandle | null>(null);
   const serviceAssistantPane = useServiceAssistantPane();
   const setServiceAssistantPane = useSetServiceAssistantPane();
@@ -129,12 +161,16 @@ export function ChatWorkspace({
   const dismissRealtimeRemindersForTarget = useDismissRealtimeRemindersForTarget();
   const {
     client,
+    canUseStaffEndpoints,
     detail,
     detailLoading,
     queryClient,
     selectedThread,
     session,
     threadActionMutation,
+    typingPreview,
+    transferTargetsQuery,
+    transferThreadMutation,
     workspaceViewModel,
   } = useCustomerServiceWorkspaceController({
     formatSourceLabel: formatChannelLabel,
@@ -157,6 +193,25 @@ export function ChatWorkspace({
     threadState,
     title,
   } = workspaceViewModel;
+  const recallServiceMessageMutation = useMutation({
+    mutationFn: async (payload: {
+      messageId: string;
+      thread: CustomerServiceThread;
+    }) => {
+      if (!client || !session) {
+        throw new Error(t("messages.actionMutations.loginRequired"));
+      }
+      await client.recallCustomerServiceMessage(payload.messageId);
+      return payload;
+    },
+    onSuccess: async ({ messageId, thread }) => {
+      removeCustomerServiceMessage(queryClient, thread, messageId);
+      await invalidateCustomerServiceQueries(queryClient);
+    },
+    onError: (error) => {
+      setNotice(t("messages.actionMutations.recallFailed", { error: formatError(error) }));
+    },
+  });
   const translatedIdentity = useMemo(
     () => ({
       ...identity,
@@ -181,6 +236,10 @@ export function ChatWorkspace({
   const translatedModeLabel = formatCustomerServiceWorkspaceText(modeLabel, t);
   const translatedReceptionText = formatCustomerServiceWorkspaceText(receptionText, t);
   const translatedTitle = translateCustomerServiceValue(title, t);
+  const displayMessages = useMemo(
+    () => applyCustomerServiceReadStatusToMessages(detail, messages),
+    [detail, messages],
+  );
   const readVisibility = resolveCustomerServiceThreadReadVisibility({
     activeModule,
     activeThreadId: selectedThreadId,
@@ -194,7 +253,7 @@ export function ChatWorkspace({
     activeThreadOpenSource,
     detail,
     dismissRealtimeRemindersForTarget,
-    messages,
+    messages: displayMessages,
     queryClient,
     readVisibility,
     selectedThread,
@@ -214,12 +273,76 @@ export function ChatWorkspace({
     messageKey: (message: MessageItemDto) =>
       message.messageId ||
       `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`,
-    messages,
+    messages: displayMessages,
   });
+  const lookupCounts = useMemo(() => getHistoryFilterCounts(displayMessages), [displayMessages]);
+  const lookupMessages = useMemo(
+    () =>
+      filterVisibleMessages(
+        filterMessagesByHistory(displayMessages, lookupHistoryFilter),
+        lookupKeyword,
+      ),
+    [displayMessages, lookupHistoryFilter, lookupKeyword],
+  );
+  const lookupConversation = useMemo<ConversationListItem | null>(() => {
+    if (!selectedThread) return null;
+    return {
+      avatarUrl: selectedThread.avatarUrl || selectedThread.customerAvatarUrl || null,
+      conversationId: selectedThread.conversationId || selectedThread.threadId,
+      conversationType: selectedThread.threadType,
+      title: translatedTitle || selectedThread.title,
+      unreadCount: selectedThread.unreadCount,
+    };
+  }, [selectedThread, translatedTitle]);
+  const lookupScope = useMemo(() => createMessageLookupScope("hot"), []);
+  const transferPermission = useMemo(
+    () =>
+      getCustomerServiceActionPermission("transfer", {
+        hasThread: Boolean(selectedThread),
+        state: threadState,
+      }),
+    [selectedThread, threadState],
+  );
+  const canTransferThread = useMemo(() => {
+    if (transferPermission.enabled) return true;
+    if (!selectedThread) return false;
+    const detailAccessMode = (detail as { accessMode?: string } | undefined)?.accessMode;
+    const selectedThreadAccessMode = (selectedThread as { accessMode?: string }).accessMode;
+    const managementReadonly =
+      detailAccessMode === "management_readonly" ||
+      selectedThreadAccessMode === "management_readonly";
+    if (!managementReadonly) return false;
+    return !createCustomerServiceThreadState(status || selectedThread.status).readOnly;
+  }, [detail, selectedThread, status, transferPermission.enabled]);
+  const closePermission = useMemo(
+    () =>
+      getCustomerServiceActionPermission("close", {
+        hasThread: Boolean(selectedThread),
+        state: threadState,
+      }),
+    [selectedThread, threadState],
+  );
+  const transferTargets = useMemo(
+    () =>
+      createCustomerServiceTransferTargetOptions(transferTargetsQuery.data ?? [], [
+        session?.userId,
+        session?.platformUserId,
+      ]),
+    [session?.platformUserId, session?.userId, transferTargetsQuery.data],
+  );
+  const currentTransferStaffName = useMemo(
+    () =>
+      currentCustomerServiceStaffName(
+        detail,
+        selectedThread,
+        t("customerService.transfer.unassignedStaff"),
+      ),
+    [detail, selectedThread, t],
+  );
   useCustomerServiceIncomingNotifications({
     detailLoaded: Boolean(detail),
     isMineMessage,
-    messages,
+    messages: displayMessages,
     pcSettings,
     pushRealtimeReminder,
     readOnly,
@@ -252,7 +375,7 @@ export function ChatWorkspace({
     conversationKey: autoTranslateConversationModeKey,
     enabled: autoTranslateEffective,
     isMineMessage: autoTranslateIsMineMessage,
-    messages,
+    messages: displayMessages,
     session,
     setAnnotations: setMessageAnnotations,
     targetLanguage: autoTranslateTargetLanguage(pcSettings.language),
@@ -269,6 +392,12 @@ export function ChatWorkspace({
 
   useEffect(() => {
     setCloseConfirmation(null);
+    setTransferDialogOpen(false);
+    setTransferReason("");
+    setSelectedTransferTargetId("");
+    setLookupOpen(false);
+    setLookupHistoryFilter("all");
+    setLookupKeyword("");
   }, [selectedThreadId]);
 
   useWindowDismiss(Boolean(messageMenu), () => setMessageMenu(null));
@@ -317,11 +446,13 @@ export function ChatWorkspace({
 
   const openServiceMessageMenu = useCallback(
     (event: MouseEvent<HTMLElement>, message: MessageItemDto) => {
+      const mine = isMineMessage(message, session);
       const canAiDraftMessage =
         canReply &&
-        !isMineMessage(message, session) &&
+        !mine &&
         isServiceAiDraftableMessage(message);
-      if (!hasOpenableMessageMedia(message) && !canAiDraftMessage) return;
+      const canSilentRecallMessage = isServiceSilentRecallableMessage(message, mine);
+      if (!hasOpenableMessageMedia(message) && !canAiDraftMessage && !canSilentRecallMessage) return;
       event.preventDefault();
       event.stopPropagation();
       setMessageMenu({
@@ -340,6 +471,23 @@ export function ChatWorkspace({
       setNotice(null);
       if (action === "ai_reply") {
         setAiDraftDrawer({ customerMessageId: message.messageId });
+        return;
+      }
+      if (action === "recall") {
+        if (!selectedThread) {
+          setNotice(t("customerService.workspace.selectThread"));
+          return;
+        }
+        const descriptor = messageDangerConfirmationDescriptor("recall-message");
+        const confirmed = await requestMessageDangerConfirmation({
+          action: "recall-message",
+          message: t(descriptor.key, descriptor.params),
+        });
+        if (!confirmed) return;
+        recallServiceMessageMutation.mutate({
+          messageId: message.messageId,
+          thread: selectedThread,
+        });
         return;
       }
       const url = resolveMessageMediaUrl(message, session?.apiBaseUrl);
@@ -412,7 +560,7 @@ export function ChatWorkspace({
         setNotice(t("customerService.workspace.actionFailed", { action: prefix, error: formatError(error) }));
       }
     },
-    [selectedThread?.conversationId, selectedThread?.threadId, session, t],
+    [recallServiceMessageMutation, selectedThread, session, t],
   );
 
   const {
@@ -431,6 +579,10 @@ export function ChatWorkspace({
 
   const handleThreadAction = useCallback(
     (action: CustomerServiceThreadAction) => {
+      if (!canUseStaffEndpoints) {
+        setNotice(t("customerService.transfer.unavailable"));
+        return;
+      }
       if (!shouldConfirmCustomerServiceCloseAction(action)) {
         threadActionMutation.mutate(action);
         return;
@@ -443,12 +595,12 @@ export function ChatWorkspace({
         model: createCustomerServiceCloseConfirmation({
           customerTitle:
             translatedTitle || selectedThread.title || t("customerService.workspace.currentCustomer"),
-          pendingMessageCount: countPendingCustomerServiceCloseMessages(messages),
+          pendingMessageCount: countPendingCustomerServiceCloseMessages(displayMessages),
         }),
         threadId: selectedThread.threadId,
       });
     },
-    [messages, selectedThread, threadActionMutation, translatedTitle, t],
+    [canUseStaffEndpoints, displayMessages, selectedThread, threadActionMutation, translatedTitle, t],
   );
 
   const confirmCloseThread = useCallback(() => {
@@ -460,6 +612,61 @@ export function ChatWorkspace({
     setCloseConfirmation(null);
     threadActionMutation.mutate("close");
   }, [closeConfirmation, selectedThread?.threadId, threadActionMutation, t]);
+
+  const openTransferDialog = useCallback(() => {
+    if (!selectedThread || !canTransferThread) {
+      setNotice(t("customerService.transfer.unavailable"));
+      return;
+    }
+    setTransferDialogOpen(true);
+  }, [canTransferThread, selectedThread, t]);
+
+  const confirmTransferThread = useCallback(async () => {
+    if (!selectedThread) {
+      setNotice(t("customerService.workspace.selectThread"));
+      return;
+    }
+    if (!selectedTransferTargetId) {
+      setNotice(t("customerService.transfer.selectTarget"));
+      return;
+    }
+    try {
+      await transferThreadMutation.mutateAsync({
+        reason: transferReason,
+        toStaffUserId: selectedTransferTargetId,
+      });
+      setTransferDialogOpen(false);
+      setTransferReason("");
+      setSelectedTransferTargetId("");
+    } catch {
+      // The mutation owns user-facing error formatting and query invalidation.
+    }
+  }, [
+    selectedThread,
+    selectedTransferTargetId,
+    setNotice,
+    t,
+    transferReason,
+    transferThreadMutation,
+  ]);
+
+  const scrollToServiceMessage = useCallback(
+    (messageId: string) => {
+      const stage = messageStageRef.current;
+      if (!stage) return;
+      const target = stage.querySelector<HTMLElement>(
+        `[data-message-id="${escapeCssAttributeValue(messageId)}"]`,
+      );
+      if (!target) {
+        setNotice(t("customerService.workspace.lookupLoadedRangeOnly"));
+        return;
+      }
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.add("cs-lookup-message-hit");
+      window.setTimeout(() => target.classList.remove("cs-lookup-message-hit"), 1600);
+    },
+    [messageStageRef, t],
+  );
 
   if (!selectedThread) {
     const noThreadState = createCustomerServiceNoThreadState();
@@ -489,15 +696,21 @@ export function ChatWorkspace({
         autoTranslateEffective={autoTranslateEffective}
         autoTranslateMode={autoTranslateConversationMode}
         unreadCount={selectedThread.unreadCount}
+        canClose={canUseStaffEndpoints && closePermission.enabled}
+        canTransfer={canTransferThread}
         onCycleAutoTranslateMode={() =>
           setAutoTranslateConversationMode(
             nextAutoTranslateConversationMode(autoTranslateConversationMode),
           )
         }
+        onCloseThread={confirmCloseThread}
+        onOpenLookup={() => setLookupOpen(true)}
+        onOpenTransfer={openTransferDialog}
         onOpenCustomerContext={onOpenCustomerContext}
       />
 
       <CustomerServiceReceptionStrip
+        canUseStaffActions={canUseStaffEndpoints}
         pending={threadActionMutation.isPending}
         readOnly={readOnly}
         receptionText={translatedReceptionText}
@@ -566,6 +779,51 @@ export function ChatWorkspace({
         <div className="composer-disabled-note">{translatedClosedUnreadNoticeText}</div>
       )}
 
+      {transferDialogOpen && (
+        <CustomerServiceTransferDialog
+          currentStaffName={currentTransferStaffName}
+          disabled={transferThreadMutation.isPending}
+          errorText={transferTargetsQuery.error ? formatError(transferTargetsQuery.error) : null}
+          loading={transferTargetsQuery.isLoading || transferTargetsQuery.isFetching}
+          reason={transferReason}
+          selectedTargetId={selectedTransferTargetId}
+          targets={transferTargets}
+          threadTitle={translatedTitle || selectedThread.title}
+          onCancel={() => setTransferDialogOpen(false)}
+          onConfirm={() => void confirmTransferThread()}
+          onReasonChange={setTransferReason}
+          onTargetChange={setSelectedTransferTargetId}
+        />
+      )}
+
+      {lookupOpen && lookupConversation && (
+        <MessageHistoryLookupDialog
+          accountId={
+            session?.userId ||
+            session?.platformUserId ||
+            session?.lppId ||
+            session?.tenantId
+          }
+          assetBaseUrl={session?.apiBaseUrl}
+          authToken={session?.tenantToken}
+          conversation={lookupConversation}
+          currentUserAvatarUrl={session?.avatarUrl}
+          currentUserDisplayName={session?.displayName}
+          historyCounts={lookupCounts}
+          historyFilter={lookupHistoryFilter}
+          isMineMessage={(message) => isMineMessage(message, session)}
+          loadedMessages={displayMessages}
+          lookupScope={lookupScope}
+          messageSearchKeyword={lookupKeyword}
+          messages={lookupMessages}
+          onClearMessageSearch={() => setLookupKeyword("")}
+          onClose={() => setLookupOpen(false)}
+          onHistoryFilterChange={setLookupHistoryFilter}
+          onMessageSearchKeywordChange={setLookupKeyword}
+          onScrollToMessage={scrollToServiceMessage}
+        />
+      )}
+
       <CustomerServiceMessageStage
         accountId={
           session?.userId ||
@@ -580,12 +838,15 @@ export function ChatWorkspace({
         jumpToLatest={jumpToLatest}
         messageAnnotations={messageAnnotations}
         messageMenu={messageMenu}
-        messages={messages}
+        messages={displayMessages}
         messageStageState={translatedMessageStageState}
+        mineAvatarUrl={session?.avatarUrl}
         pendingNewMessageCount={pendingNewMessageCount}
+        peerAvatarUrl={selectedThread.customerAvatarUrl || selectedThread.avatarUrl}
         selectedThread={selectedThread}
         stageRef={messageStageRef}
         title={translatedTitle}
+        typingPreview={typingPreview}
         onContextMenu={openServiceMessageMenu}
         onMenuAction={(action, message) =>
           void handleServiceMessageMenuAction(action, message)
@@ -684,6 +945,34 @@ function isMineMessage(message: MessageItemDto, identity?: CurrentUserIdentity |
   return isMineCustomerServiceMessage(message, identity);
 }
 
+function currentCustomerServiceStaffName(
+  detail: unknown,
+  thread: CustomerServiceThread | null | undefined,
+  unassignedLabel: string,
+) {
+  const detailRecord = detail as Record<string, unknown> | undefined;
+  const threadRecord = thread as (CustomerServiceThread & Record<string, unknown>) | undefined;
+  return (
+    readOptionalString(detailRecord?.assignedStaffDisplayName) ||
+    readOptionalString(detailRecord?.assignedStaffName) ||
+    readOptionalString(detailRecord?.staffDisplayName) ||
+    readOptionalString(detailRecord?.staffName) ||
+    readOptionalString(threadRecord?.assignedStaffDisplayName) ||
+    readOptionalString(threadRecord?.assignedStaffName) ||
+    readOptionalString(threadRecord?.staffDisplayName) ||
+    readOptionalString(threadRecord?.staffName) ||
+    readOptionalString(detailRecord?.assignedStaffUserId) ||
+    readOptionalString(detailRecord?.staffUserId) ||
+    readOptionalString(threadRecord?.assignedStaffUserId) ||
+    readOptionalString(threadRecord?.staffUserId) ||
+    unassignedLabel
+  );
+}
+
+function readOptionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
 type ChatWorkspaceTranslate = (
   key: string,
   params?: Record<string, string | number>,
@@ -728,4 +1017,8 @@ function formatCustomerServiceCloseConfirmText(
       )
     : undefined;
   return t(descriptor.key, params);
+}
+
+function escapeCssAttributeValue(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }

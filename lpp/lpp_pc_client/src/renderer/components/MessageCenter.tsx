@@ -552,7 +552,13 @@ export function MessageCenter() {
     setNotice,
   });
 
-  const { historyCounts, lookupScope, messages, visibleMessages } = useMessageListData({
+  const {
+    historyCounts,
+    lookupMessages,
+    lookupScope,
+    messages,
+    visibleMessages,
+  } = useMessageListData({
     activeConversation,
     activeConversationKey,
     activeConversationType,
@@ -1193,6 +1199,7 @@ export function MessageCenter() {
         }}
         emptyText={conversationList.emptyText}
         errorText={errorText}
+        friends={friendsQuery.data ?? []}
         friendRequestCount={addFriendController.pendingIncomingRequestCount}
         groupAvatarSnapshotFor={groupAvatarSnapshotFor}
         groupCreateAccess={groupCreateAccess}
@@ -1201,6 +1208,7 @@ export function MessageCenter() {
         listPaneWidth={listPaneWidth}
         loading={conversationList.loading}
         plusMenuOpen={plusMenuOpen}
+        tenantMembers={tenantMembersQuery.data ?? []}
         unreadCount={counts.unread}
         unreadIdentity={unreadIdentity as CurrentUserIdentity}
         activeConversationVisibility={activeConversationVisibility}
@@ -1428,6 +1436,7 @@ export function MessageCenter() {
         userAvatarRegistry={userAvatarRegistry}
         visibleMessages={visibleMessages}
         lookupScope={lookupScope}
+        lookupMessages={lookupMessages}
       />
 
       {assistantPane && activeConversation && (

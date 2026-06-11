@@ -36,6 +36,14 @@ export function customerServiceHistoryStatusKey(status: string | number) {
   if (normalized === "8" || normalized === "closed_system") {
     return "customerService.threadList.historyStatus.closedSystem";
   }
+  if (
+    normalized === "transferred" ||
+    normalized === "transferred_out" ||
+    normalized === "assigned_away" ||
+    normalized === "handoff"
+  ) {
+    return "customerService.threadList.historyStatus.transferred";
+  }
   if (normalized === "9" || normalized === "archived") {
     return "customerService.threadList.historyStatus.archived";
   }

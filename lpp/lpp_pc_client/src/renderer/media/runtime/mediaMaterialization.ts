@@ -59,6 +59,7 @@ const materializedMediaDisplayUrls = new Map<string, string>();
 const pendingMediaMaterializations = new Map<string, Promise<void>>();
 const pendingMediaDisplayUrls = new Map<string, Promise<string | undefined>>();
 const failedMediaMaterializations = new Map<string, number>();
+const failedMediaDisplayUrls = new Map<string, { failedAt: number; url: string }>();
 const mediaMaterializationSubscribers = new Map<string, Set<(fileUrl: string) => void>>();
 const mediaDisplaySubscribers = new Map<string, Set<(displayUrl: string) => void>>();
 
@@ -152,6 +153,13 @@ export function ensureMaterializedMediaDisplayUrl({
     registerMaterializedMediaDisplayUrl(cacheKey, fileUrl);
     return Promise.resolve(fileUrl);
   }
+  const failedDisplay = failedMediaDisplayUrls.get(cacheKey);
+  if (
+    failedDisplay?.url === fileUrl &&
+    Date.now() - failedDisplay.failedAt < mediaMaterializationRetryMs
+  ) {
+    return Promise.resolve(undefined);
+  }
   const pending = pendingMediaDisplayUrls.get(cacheKey);
   if (pending) return pending;
   if (!window.desktopApi?.readMediaFileAsDataUrl) return Promise.resolve(undefined);
@@ -170,6 +178,14 @@ export function ensureMaterializedMediaDisplayUrl({
       if (!displayUrl?.startsWith("data:")) return undefined;
       registerMaterializedMediaDisplayUrl(cacheKey, displayUrl);
       return displayUrl;
+    })
+    .catch((error) => {
+      failedMediaDisplayUrls.set(cacheKey, { failedAt: Date.now(), url: fileUrl });
+      if (isRecoverableMediaAccessError(error)) {
+        materializedMediaDisplayUrls.delete(cacheKey);
+        forgetMaterializedMediaFileUrl(cacheKey, fileUrl);
+      }
+      return undefined;
     })
     .finally(() => {
       pendingMediaDisplayUrls.delete(cacheKey);
@@ -463,6 +479,7 @@ async function materializeMediaCandidate({
 export function registerMaterializedMediaFileUrl(cacheKey: string, fileUrl: string) {
   if (!fileUrl) return;
   failedMediaMaterializations.delete(cacheKey);
+  failedMediaDisplayUrls.delete(cacheKey);
   materializedMediaFileUrls.set(cacheKey, fileUrl);
   if (window.desktopApi?.localDataUpsertMedia) {
     mediaMaterializationSubscribers.get(cacheKey)?.forEach((callback) => callback(fileUrl));
@@ -588,6 +605,31 @@ function defaultMaterializedMediaFileName(kind: MaterializedMediaKind) {
   if (kind === "image") return "image.png";
   if (kind === "video") return "video.mp4";
   return "file";
+}
+
+function isRecoverableMediaAccessError(error: unknown) {
+  const message = errorMessageText(error).toLowerCase();
+  return (
+    message.includes("signature has expired") ||
+    message.includes("auth_required") ||
+    message.includes("html") ||
+    message.includes("json") ||
+    message.includes("login") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden") ||
+    message.includes("401") ||
+    message.includes("403")
+  );
+}
+
+function errorMessageText(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "";
+  }
 }
 
 function mediaMaterializationIdentity(

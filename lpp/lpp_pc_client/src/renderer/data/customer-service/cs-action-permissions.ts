@@ -46,7 +46,7 @@ export function getCustomerServiceActionPermission(
     return permission(action, input.state.readOnly, input.state.readOnly, input.state.readOnly ? "ok" : "unsupported");
   }
 
-  if (action === "transfer" || action === "rate") {
+  if (action === "rate") {
     return permission(action, false, false, "unsupported");
   }
 
@@ -67,6 +67,11 @@ export function getCustomerServiceActionPermission(
   if (action === "close") {
     const visible = input.state.replyGate === "open";
     return permission(action, visible, visible, visible ? "ok" : "unsupported");
+  }
+
+  if (action === "transfer") {
+    const transferable = input.state.replyGate === "open";
+    return permission(action, transferable, transferable, transferable ? "ok" : "unsupported");
   }
 
   if (input.state.replyGate === "claim") {

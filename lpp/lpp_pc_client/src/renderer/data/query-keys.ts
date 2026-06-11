@@ -51,6 +51,24 @@ export const pcQueryKeys = {
     ["pc-cs-reception-status", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   customerServiceTempSessionStats: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-cs-temp-session-stats", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  customerServiceExportTasks: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-cs-export-tasks", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  customerServiceMonitorDashboard: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-cs-monitor-dashboard", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  customerServiceMonitorStaffStatuses: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-cs-monitor-staff-statuses", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  customerServiceMonitorSlaDashboard: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-cs-monitor-sla-dashboard", ...sessionKey(apiBaseUrl, tenantToken)] as const,
+  customerServiceMonitorThreads: (
+    apiBaseUrl?: string,
+    tenantToken?: string,
+    filters?: unknown,
+  ) =>
+    [
+      "pc-cs-monitor-threads",
+      ...sessionKey(apiBaseUrl, tenantToken),
+      filters ?? "",
+    ] as const,
   customerServiceThreadDetail: (
     apiBaseUrl?: string,
     tenantToken?: string,
@@ -75,10 +93,34 @@ export const pcQueryKeys = {
       threadType ?? "",
       threadId ?? "",
     ] as const,
+  customerServiceTempSessionNotes: (
+    apiBaseUrl?: string,
+    tenantToken?: string,
+    sessionId?: string,
+  ) =>
+    [
+      "pc-cs-temp-session-notes",
+      ...sessionKey(apiBaseUrl, tenantToken),
+      sessionId ?? "",
+    ] as const,
+  customerServiceTypingPreview: (
+    apiBaseUrl?: string,
+    tenantToken?: string,
+    threadType?: string,
+    threadId?: string,
+  ) =>
+    [
+      "pc-cs-typing-preview",
+      ...sessionKey(apiBaseUrl, tenantToken),
+      threadType ?? "",
+      threadId ?? "",
+    ] as const,
   friendProfileExtra: (apiBaseUrl?: string, tenantToken?: string, friendUserId?: string) =>
     ["pc-friend-profile-extra", ...sessionKey(apiBaseUrl, tenantToken), friendUserId ?? ""] as const,
   tenantMemberProfile: (apiBaseUrl?: string, tenantToken?: string, userId?: string) =>
     ["pc-tenant-member-profile", ...sessionKey(apiBaseUrl, tenantToken), userId ?? ""] as const,
+  tenantMembers: (apiBaseUrl?: string, tenantToken?: string) =>
+    ["pc-tenant-members", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountProfile: (apiBaseUrl?: string, tenantToken?: string) =>
     ["pc-account-profile", ...sessionKey(apiBaseUrl, tenantToken)] as const,
   accountTenant: (apiBaseUrl?: string, tenantToken?: string) =>

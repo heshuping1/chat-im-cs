@@ -1,6 +1,6 @@
 # ZTChat 开发者接入文档
 
-版本:3.0 | 更新日期:2026-05-22
+版本:3.1 | 更新日期:2026-06-10
 
 欢迎接入 ZTChat 即时通讯平台。本文档面向 APP / Web 客户端开发者,以及第三方系统集成方。
 
@@ -42,6 +42,17 @@
 |---|---|
 | [friend-invite-qr.html](./friend-invite-qr.html) | "扫码加好友"客户端 SDK 示例页 |
 | [payloads/](./payloads/) | 真实响应示例（辅助参考，不承担字段定义职责） |
+
+专题文档(按日期,新能力上线时的专项接入说明;对应内容已回填进上方主文档,专题文档保留完整背景与示例):
+
+| 文档 | 说明 |
+|---|---|
+| [customer-service-suite-2026-06-10.md](./customer-service-suite-2026-06-10.md) | 在线客服八项能力:历史/转接/监控/统计、🆕 正在输入预览、🆕 已读时间、🆕 静默撤回、超时后续聊 |
+| [customer-service-config-notes-resume-2026-06-10.md](./customer-service-config-notes-resume-2026-06-10.md) | 🆕 管理端配置开场白/自动发话/快捷回复、🆕 客服会话备注、🆕 复访续聊 `resumeRecentSession` |
+| [group-invite-qr-and-at-all-2026-06-06.md](./group-invite-qr-and-at-all-2026-06-06.md) | 群二维码进群 + @所有人服务端校验 |
+| [permissions-reference-2026-06-06.md](./permissions-reference-2026-06-06.md) | 权限码速查 |
+| [tenant-join-invite-permissions-2026-05-31.md](./tenant-join-invite-permissions-2026-05-31.md) | 入租/邀请权限说明 |
+| [web-video-thumbnail-2026-05-28.md](./web-video-thumbnail-2026-05-28.md) | Web 视频封面上传/绑定 |
 
 ## 字段字典、枚举与接口速查索引
 

@@ -47,17 +47,28 @@ describe("message list model", () => {
     const messages = [
       message({ messageId: "text", body: { text: "hello" }, messageType: "text" }),
       message({ messageId: "image", body: { image: { url: "/image.png" } }, messageType: "image" }),
+      message({ messageId: "file", body: { file: { fileName: "contract.pdf" } }, messageType: "file" }),
       message({ messageId: "link", body: { text: "https://example.com" }, messageType: "text" }),
     ];
 
     expect(getHistoryFilterCounts(messages)).toMatchObject({
-      all: 3,
+      all: 4,
+      date: 4,
+      file: 1,
       image: 1,
       link: 1,
-      text: 2,
     });
+    expect(getHistoryFilterCounts(messages)).not.toHaveProperty("text");
+    expect(getHistoryFilterCounts(messages)).not.toHaveProperty("voice");
+    expect(getHistoryFilterCounts(messages)).not.toHaveProperty("favorite");
     expect(filterMessagesByHistory(messages, "image").map((item) => item.messageId)).toEqual([
       "image",
+    ]);
+    expect(filterMessagesByHistory(messages, "date").map((item) => item.messageId)).toEqual([
+      "text",
+      "image",
+      "file",
+      "link",
     ]);
   });
 
@@ -96,6 +107,7 @@ describe("message list model", () => {
       .toEqual(["video-ready"]);
     expect(getHistoryFilterCounts([pendingVideo, readyVideo])).toMatchObject({
       all: 1,
+      date: 1,
       image: 1,
     });
     expect(getHistoryFilterCounts([pendingVideo, readyVideo])).not.toHaveProperty("video");

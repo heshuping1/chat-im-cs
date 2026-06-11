@@ -31,6 +31,10 @@ describe("message lookup UI", () => {
     resolve(process.cwd(), "src/renderer/components/MessageCenter.tsx"),
     "utf8",
   );
+  const messageListData = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/hooks/useMessageListData.ts"),
+    "utf8",
+  );
   const contactProfileController = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/hooks/useMessageContactProfileController.ts"),
     "utf8",
@@ -49,6 +53,14 @@ describe("message lookup UI", () => {
   );
   const conversationListPanel = readFileSync(
     resolve(process.cwd(), "src/renderer/messages/components/MessageConversationListPanel.tsx"),
+    "utf8",
+  );
+  const conversationListParts = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/components/ConversationListParts.tsx"),
+    "utf8",
+  );
+  const conversationListIdentityModel = readFileSync(
+    resolve(process.cwd(), "src/renderer/messages/models/conversationListIdentityModel.ts"),
     "utf8",
   );
   const conversationSidebar = readFileSync(
@@ -159,6 +171,11 @@ describe("message lookup UI", () => {
     expect(historyLookupDialog).toContain("lookupScope.limitedToLoadedRange");
     expect(historyLookupDialog).toContain("t(lookupScope.labelKey)");
     expect(historyLookupDialog).toContain("lookupResultMessages.map");
+    expect(historyLookupDialog).toContain("isMineMessage?.(message)");
+    expect(historyLookupDialog).toContain("currentUserDisplayName || message.senderDisplayName || \"我\"");
+    expect(stage).toContain("isMineMessage={(message) => isMineMessage(message, unreadIdentity ?? session)}");
+    expect(stage).toContain("currentUserDisplayName={session?.displayName}");
+    expect(stage).toContain("currentUserAvatarUrl={session?.avatarUrl}");
     expect(historyLookupDialog).toContain('window.addEventListener("keydown", onKeyDown, true)');
     expect(historyLookupDialog).toContain("if (lookupImagePreview)");
     expect(historyLookupDialog).not.toContain("scrollbarMetrics.visible");
@@ -183,6 +200,18 @@ describe("message lookup UI", () => {
     expect(messageCenterCss).not.toContain(".message-history-lookup-scrollbar");
     expect(messageCenterCss).toContain(".message-history-lookup-backdrop .message-image-preview");
     expect(messageCenterCss).toContain("z-index: 240");
+  });
+
+  it("keeps chat history filters scoped to the lookup dialog", () => {
+    expect(messageListData).toContain("const visibleMessages = useMemo(");
+    expect(messageListData).toContain('filterVisibleMessages(messages, "")');
+    expect(messageListData).toContain("const lookupMessages = useMemo(");
+    expect(messageListData).toContain("filterMessagesByHistory(searchSource, lookupOpen ? historyFilter : \"all\")");
+    expect(messageListData).toContain("lookupMessages,");
+    expect(messageCenter).toContain("lookupMessages");
+    expect(stage).toContain("lookupMessages: MessageItemDto[]");
+    expect(stage).toContain("messages={visibleMessages}");
+    expect(stage).toContain("messages={lookupMessages}");
   });
 
   it("keeps popup scrollbars from shifting dialog content", () => {
@@ -231,10 +260,12 @@ describe("message lookup UI", () => {
     expect(historyLookupDialog).toContain("chat-history-media-results");
     expect(historyLookupDialog).toContain("chat-history-media-grid");
     expect(historyLookupDialog).toContain("chat-history-media-tile");
-    expect(historyLookupDialog).toContain("showLookupOverview");
-    expect(historyLookupDialog).toContain("chat-history-overview");
-    expect(historyLookupDialog).toContain("chat-history-overview-categories");
-    expect(historyLookupDialog).toContain("lookupOverviewMediaGroups");
+    expect(historyLookupDialog).not.toContain("chat-history-overview-categories");
+    expect(historyLookupDialog).not.toContain("overviewCategories");
+    expect(historyLookupDialog).toContain("showFileLookup");
+    expect(historyLookupDialog).toContain("showDateLookup");
+    expect(historyLookupDialog).toContain("LookupFileResultRow");
+    expect(historyLookupDialog).toContain("LookupDatePicker");
     expect(historyLookupDialog).toContain("LookupMediaThumbnail");
     expect(historyLookupDialog).toContain("LookupVideoThumbnail");
     expect(historyLookupDialog).toContain("useVideoPosterSource");
@@ -409,6 +440,8 @@ describe("message lookup UI", () => {
     expect(zhCnMessages).toContain("expandGroupInfo: '展开群聊信息'");
     expect(messageContextRail).toContain("MessageSquareText");
     expect(messageContextRail).toContain("{showAiTools &&");
+    expect(messageContextRail).toContain("Sparkles");
+    expect(messageContextRail).not.toContain('src="/ai-draft-entry.svg"');
     expect(messageContextRail).toContain("LibraryBig");
     expect(messageContextRail).toContain('activeAssistantPane === "quickReply"');
     expect(messageContextRail).toContain('activeAssistantPane === "knowledge"');
@@ -553,5 +586,21 @@ describe("message lookup UI", () => {
     expect(reminderCenter).toContain('item.targetModule === "contacts"');
     expect(reminderCenter).toContain('setContactFilter("requests")');
     expect(reminderCenter).toContain('t("reminder.action.handleRequest")');
+  });
+
+  it("keeps IM conversation identity lightweight and confined to the title row", () => {
+    expect(conversationListIdentityModel).toContain('identityText: "客户"');
+    expect(conversationListIdentityModel).toContain('identityText: "内部"');
+    expect(conversationListIdentityModel).toContain('kind: "internal"');
+    expect(conversationListIdentityModel).not.toContain('sourceText: "@企业"');
+    expect(conversationListIdentityModel).not.toContain("用户");
+    expect(conversationListParts).toContain("e-conversation-title-line");
+    expect(conversationListParts).toContain("e-conversation-title-text");
+    expect(conversationListParts).toContain("e-conversation-identity");
+    expect(conversationListParts).toContain("e-conversation-source");
+    expect(conversationListParts).toContain("conversation.lastMessage?.preview");
+    expect(conversationListParts).toContain("<time>{formatChatTime(conversation.lastMessage?.sentAt)}</time>");
+    expect(conversationListParts).toContain("<BellOff className=\"e-muted-icon\" size={15} />");
+    expect(conversationListParts).not.toContain("identityMark");
   });
 });

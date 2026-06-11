@@ -237,6 +237,17 @@ function contextFromHandledEvent(event: GatewayHandledEvent): GatewayDiagnosticC
     };
   }
 
+  if (event.kind === "cs.typing.preview") {
+    return {
+      eventName: event.eventName,
+      threadId: event.threadId,
+      threadType: event.threadType,
+      isTyping: event.isTyping,
+      senderRole: event.senderRole,
+      senderUserId: event.senderUserId,
+    };
+  }
+
   return {
     eventName: event.eventName,
     changeKind: event.changeKind,

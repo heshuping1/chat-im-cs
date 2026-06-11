@@ -1,4 +1,3 @@
-import { Mic } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, SyntheticEvent } from "react";
 
@@ -405,11 +404,15 @@ function videoPosterDisplayCacheIdentity(
 export function VoicePart({
   assetBaseUrl,
   authToken,
+  messageId,
   media,
+  unread = false,
 }: {
   assetBaseUrl?: string;
   authToken?: string;
+  messageId?: string;
   media?: MediaResourceDto;
+  unread?: boolean;
 }) {
   const { t } = useI18n();
   const src = resolveMediaUrl(
@@ -426,21 +429,76 @@ export function VoicePart({
     src,
     authToken,
   );
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [showUnreadDot, setShowUnreadDot] = useState(
+    () => unread && !hasPlayedVoiceMessage(messageId),
+  );
+  const canPlay = Boolean(displaySrc && !failed);
+  const durationText = formatVoiceDuration(media?.durationSeconds, t);
+  const durationSeconds = Math.max(1, Math.min(60, Math.round(media?.durationSeconds ?? 1)));
+  const voiceCardWidth = Math.min(178, 72 + durationSeconds * 2);
+  const voiceCardStyle = {
+    "--voice-card-width": `${voiceCardWidth}px`,
+  } as CSSProperties;
+
+  const togglePlayback = () => {
+    if (!canPlay) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+      return;
+    }
+    void audio.play().catch(loadAuthenticatedMedia);
+  };
+
+  useEffect(() => {
+    setShowUnreadDot(unread && !hasPlayedVoiceMessage(messageId));
+  }, [messageId, unread]);
+
+  const markPlayed = () => {
+    markVoiceMessagePlayed(messageId);
+    setShowUnreadDot(false);
+  };
 
   return (
-    <div className="message-audio-card">
-      <Mic size={20} />
-      <div>
-        <strong>{t("messages.mediaContent.voiceMessage")}</strong>
-        <em>{formatDuration(media?.durationSeconds, t)}</em>
-      </div>
+    <div className="message-audio-wrap">
+      <button
+        aria-label={`${t("messages.mediaContent.voicePlayer")} ${durationText}`}
+        className={[
+          "message-audio-card wechat-voice-card",
+          playing ? "is-playing" : "",
+          canPlay ? "" : "is-unavailable",
+        ].filter(Boolean).join(" ")}
+        disabled={!canPlay}
+        style={voiceCardStyle}
+        title={canPlay ? t("messages.mediaContent.voicePlayer") : t("messages.mediaContent.noAudio")}
+        type="button"
+        onClick={togglePlayback}
+      >
+        <span className="message-audio-wave" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+        <strong>{durationText}</strong>
+      </button>
+      {showUnreadDot && <span className="message-audio-unread-dot" aria-hidden="true" />}
       {displaySrc && !failed ? (
         <audio
+          ref={audioRef}
           aria-label={t("messages.mediaContent.voicePlayer")}
-          controls
+          className="message-audio-native"
           preload="metadata"
           src={displaySrc}
+          onEnded={() => setPlaying(false)}
           onError={loadAuthenticatedMedia}
+          onPause={() => setPlaying(false)}
+          onPlay={() => {
+            setPlaying(true);
+            markPlayed();
+          }}
         />
       ) : (
         <span className="message-media-unavailable">{t("messages.mediaContent.noAudio")}</span>
@@ -851,11 +909,21 @@ function logVideoOpenDiagnostic(
   });
 }
 
-function formatDuration(value: number | null | undefined, t: ReturnType<typeof useI18n>["t"]) {
+function formatVoiceDuration(value: number | null | undefined, t: ReturnType<typeof useI18n>["t"]) {
   if (!value || value <= 0) return t("messages.mediaContent.unknownDuration");
   const seconds = Math.round(value);
-  if (seconds < 60) return t("messages.mediaContent.durationSeconds", { seconds });
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  if (seconds < 60) return `${seconds}"`;
+  return `${Math.floor(seconds / 60)}'${String(seconds % 60).padStart(2, "0")}"`;
+}
+
+const playedVoiceMessageIds = new Set<string>();
+
+function hasPlayedVoiceMessage(messageId: string | undefined) {
+  return Boolean(messageId && playedVoiceMessageIds.has(messageId));
+}
+
+function markVoiceMessagePlayed(messageId: string | undefined) {
+  if (messageId) playedVoiceMessageIds.add(messageId);
 }
 
 function formatVideoDuration(value: number | null | undefined, t: ReturnType<typeof useI18n>["t"]) {

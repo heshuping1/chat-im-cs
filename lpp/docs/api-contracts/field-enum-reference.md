@@ -1,6 +1,6 @@
 # 字段与枚举补遗总表
 
-> 文档校对快照:2026-05-22
+> 文档校对快照:2026-05-22(2026-06-10 增量校对:客服域 —— 输入预览/已读时间/静默撤回/转接/复访续聊/自动话术配置/会话备注/报表导出)
 
 本文档用于补齐 `3rddocs` 里此前分散、遗漏或没有统一索引的字段与枚举说明。
 
@@ -460,7 +460,7 @@
 | `senderUserId` | GUID | 发送者用户 ID |
 | `messageType` | string | 消息类型：`text`、`markdown`、`image`、`video`、`voice`、`file`、`contact_card`、`call_log`、`location`、`event` |
 | `body` | `MessageBodyDto` | 消息正文 |
-| `isRecalled` | bool | 是否已撤回 |
+| `isRecalled` | bool | 是否已撤回。🆕 2026-06-10:服务端撤回状态实为三态(0=未撤回/1=普通撤回/2=客服静默撤回);**静默撤回(2)的消息整行不出现在历史/同步结果里**(任何端都看不到、无占位),本字段只会以"普通撤回"形态出现;实时移除靠 `msg.recalled` 帧的 `silent=true` |
 | `sentAt` | datetime | 服务端发送时间 |
 | `replyToMessageId` | GUID? | 回复目标消息 ID |
 | `forwardFromMessageId` | GUID? | 转发来源消息 ID |
@@ -999,6 +999,22 @@
 - `direct_customer` 的 `threadId` 是稳定客服线程标识，`conversationId` 才是实际直聊 `chatId`
 - `temp_session` 的 `threadId` 与会话线程主键一致，但也仍建议统一按 `threadType + threadId` 使用
 
+### 7.9.3 自动话术规则类型 `TempSessionAutoReply.ruleType` 🆕 2026-06-10
+
+管理端 `/customer-service/temp-sessions/auto-replies` CRUD 使用:
+
+| 值 | 含义 | 触发时机 |
+|---|---|---|
+| `0` | 开场白 | 访客进线创建会话时自动发送 |
+| `1` | 关键词自动回复 | 访客消息包含 `keywordPattern`(大小写不敏感)时以系统消息自动发话;`keywordPattern` 必填 |
+| `2` | 排队提示 | 会话进入排队时发送 |
+
+匹配优先级:同 `ruleType` 下 locale 精确命中 > `*`,再按 `sortOrder` 取第一条;`category`/`skillGroupId` 为空表示不限定。
+
+### 7.9.4 已读时间字段 `lastReadAt` / `readAt` / `peerLastReadAt` 🆕 2026-06-10
+
+出现在单聊 `read-status`、群 `read-receipts`、temp 会话 `read-status` 与 `msg.read` 实时帧:只在对应用户**标记已读**时推进(不被置顶/免打扰等无关写入刷新);`null` = 该用户从未上报过已读(历史老数据),客户端应按"未知"渲染而非 1970。
+
 ### 7.10 用户状态 `status`
 
 | 值 | 名称 | 说明 |
@@ -1227,6 +1243,8 @@
 | `7` | `closed_timeout` | 超时关闭 |
 | `8` | `closed_system` | 系统关闭 |
 | `9` | `archived` | 已归档 |
+
+> **service-history 的 `status` 过滤**（`/api/client/v1/customer-service/staff/service-history` 与管理端 `center/staff/{staffUserId}/service-history`，2026-06-10 起）：推荐用语义值——`open`(temp=0..4 / im_direct=1,2)、`queued`(temp=1 / im_direct=1)、`active`(temp=2,3,4 / im_direct=2)、`closed`(temp=5,6,7,8,9 / im_direct=3)。也兼容直接传单个数字（原样套两渠道；注意两渠道数字含义不同——`3` 在 temp_session 是协助中、在 im_direct 是已关闭，所以跨渠道过滤请优先用语义值）。非法值返回 400 `CUSTOMER_SERVICE_HISTORY_STATUS_INVALID`。
 
 ### 9.2 AI 服务状态 `TempSessionAiServiceStatus`
 

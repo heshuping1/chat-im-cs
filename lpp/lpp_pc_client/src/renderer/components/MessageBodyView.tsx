@@ -35,6 +35,7 @@ export function MessageBodyView({
   authToken,
   mediaCacheContext,
   message,
+  mine = false,
   onContactClick,
   onUploadAction,
 }: {
@@ -42,6 +43,7 @@ export function MessageBodyView({
   authToken?: string;
   mediaCacheContext?: MediaCacheContext;
   message: MessageItemDto;
+  mine?: boolean;
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
   onUploadAction?: UploadActionHandler;
 }) {
@@ -65,6 +67,7 @@ export function MessageBodyView({
           mediaCacheContext={mediaCacheContext}
           key={`${part.type}-${index}`}
           message={message}
+          mine={mine}
           part={part}
           fallback={message.preview}
           onContactClick={onContactClick}
@@ -92,6 +95,7 @@ function MessagePartView({
   authToken,
   mediaCacheContext,
   message,
+  mine,
   part,
   fallback,
   onContactClick,
@@ -101,6 +105,7 @@ function MessagePartView({
   authToken?: string;
   mediaCacheContext?: MediaCacheContext;
   message: MessageItemDto;
+  mine: boolean;
   part: NormalizedMessagePart;
   fallback?: string;
   onContactClick?: (event: MouseEvent<HTMLElement>, value: Record<string, unknown>) => void;
@@ -139,7 +144,9 @@ function MessagePartView({
       <VoicePart
         assetBaseUrl={assetBaseUrl}
         authToken={authToken}
+        messageId={message.messageId}
         media={part.media}
+        unread={!mine}
       />
     );
   }

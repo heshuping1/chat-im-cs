@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -278,5 +280,76 @@ describe("online service responsive layout", () => {
         snapshot: fullLayout,
       }),
     ).toBe(fullLayout.serviceListPaneWidth);
+  });
+
+  it("lets the service assistant pane expand until the chat reaches its minimum width", () => {
+    const roomyShellWidth =
+      serviceLayoutMetrics.sidebarExpanded +
+      fullLayout.serviceListPaneWidth +
+      serviceLayoutMetrics.resizer +
+      serviceLayoutMetrics.chatMin +
+      serviceLayoutMetrics.resizer +
+      780 +
+      serviceLayoutMetrics.resizer +
+      fullLayout.serviceProfilePaneWidth +
+      serviceLayoutMetrics.customerRail;
+
+    expect(
+      calculateServiceResizeWidth({
+        mode: "full",
+        pane: "assistant",
+        requestedWidth: 700,
+        shellWidth: roomyShellWidth,
+        snapshot: fullLayout,
+      }),
+    ).toBe(700);
+
+    expect(
+      calculateServiceResizeWidth({
+        mode: "full",
+        pane: "assistant",
+        requestedWidth: 960,
+        shellWidth: roomyShellWidth,
+        snapshot: fullLayout,
+      }),
+    ).toBe(780);
+  });
+
+  it("keeps online service pane resizers easy to grab", () => {
+    const css = readFileSync(
+      new URL(
+        "../../src/renderer/styles/customer-service/customer-service.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(css).toContain(".h-flagship-grid .service-assistant-resizer");
+    expect(css).toContain("margin-inline: -5px !important;");
+    expect(css).toContain("padding-inline: 5px !important;");
+    expect(css).toContain("z-index: 8;");
+  });
+
+  it("keeps online service message rows aligned to the chat edges", () => {
+    const stage = readFileSync(
+      new URL(
+        "../../src/renderer/customer-service/components/CustomerServiceMessageStage.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const css = readFileSync(
+      new URL(
+        "../../src/renderer/styles/customer-service/customer-service.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(stage).toContain("className={`cs-message-row ${mine ? \"mine\" : \"other\"}`}");
+    expect(css).toContain(".h-message-stage .cs-message-row.mine");
+    expect(css).toContain("justify-content: flex-end;");
+    expect(css).toContain(".h-message-stage .cs-message-row.other");
+    expect(css).toContain("justify-content: flex-start;");
   });
 });

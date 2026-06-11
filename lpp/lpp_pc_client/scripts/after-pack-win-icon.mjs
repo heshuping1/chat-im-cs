@@ -1,0 +1,71 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const root = resolve(dirname(__filename), "..");
+
+export default async function afterPack(context) {
+  if (context.electronPlatformName !== "win32") return;
+
+  const exePath = join(context.appOutDir, "lppchat.exe");
+  const iconPath = join(root, "assets", "app-icon-green-bubble.ico");
+  if (!existsSync(exePath)) {
+    throw new Error(`Cannot patch Windows icon, exe not found: ${exePath}`);
+  }
+  if (!existsSync(iconPath)) {
+    throw new Error(`Cannot patch Windows icon, ico not found: ${iconPath}`);
+  }
+
+  const rcedit = findRcedit();
+  if (!rcedit) {
+    throw new Error("Cannot patch Windows icon, rcedit-x64.exe was not found.");
+  }
+
+  execFileSync(rcedit, [exePath, "--set-icon", iconPath], { stdio: "inherit" });
+}
+
+function findRcedit() {
+  const candidates = [
+    process.env.RCEDIT_PATH,
+    ...findFiles(join(process.env.LOCALAPPDATA || "", "electron-builder", "Cache", "winCodeSign"), "rcedit-x64.exe"),
+    join(root, "node_modules", "rcedit", "bin", "rcedit-x64.exe"),
+    join(root, "node_modules", "electron-winstaller", "vendor", "rcedit.exe"),
+  ].filter(Boolean);
+
+  return candidates.find((candidate) => existsSync(candidate)) || null;
+}
+
+function findFiles(startDir, fileName) {
+  if (!startDir || !existsSync(startDir)) return [];
+
+  const matches = [];
+  const stack = [startDir];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    let entries = [];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry);
+      let stat;
+      try {
+        stat = statSync(fullPath);
+      } catch {
+        continue;
+      }
+
+      if (stat.isDirectory()) {
+        stack.push(fullPath);
+      } else if (entry.toLowerCase() === fileName.toLowerCase()) {
+        matches.push(fullPath);
+      }
+    }
+  }
+  return matches;
+}

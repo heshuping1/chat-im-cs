@@ -338,6 +338,71 @@
   padding: 24px;
 }
 
+.h-message-stage .cs-message-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+}
+
+.h-message-stage .cs-message-row.mine {
+  justify-content: flex-end;
+}
+
+.h-message-stage .cs-message-row.other {
+  justify-content: flex-start;
+}
+
+.h-message-stage .cs-message-row > .pc-chat-message {
+  max-width: min(640px, calc(100% - 24px));
+}
+
+.h-message-stage [data-message-id].cs-lookup-message-hit {
+  border-radius: 14px;
+  animation: csLookupMessageHit 1.6s ease;
+}
+
+.cs-typing-preview {
+  display: grid;
+  width: min(520px, 78%);
+  align-self: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  background: rgba(236, 253, 245, 0.94);
+  color: #065f46;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.cs-typing-preview span {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.cs-typing-preview p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #1f2937;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+@keyframes csLookupMessageHit {
+  0% {
+    background: rgba(16, 185, 129, 0.22);
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.14);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
 .h-flagship-grid .h-service-message {
   gap: 6px !important;
   max-width: 78%;
@@ -2052,6 +2117,193 @@
   white-space: nowrap;
 }
 
+.cs-session-notes-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.cs-session-notes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cs-session-notes-head h3 {
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.cs-session-notes-head > button,
+.cs-session-note-editor button,
+.cs-session-note-item footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 24px;
+  border: 1px solid rgba(207, 219, 234, 0.94);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #28415f;
+  font-size: 11px;
+  font-weight: 860;
+  white-space: nowrap;
+}
+
+.cs-session-notes-head > button {
+  flex: 0 0 auto;
+  padding: 0 8px;
+}
+
+.cs-session-note-editor {
+  display: grid;
+  gap: 7px;
+}
+
+.cs-session-note-editor textarea {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  border: 1px solid rgba(207, 219, 234, 0.94);
+  border-radius: 8px;
+  background: #fff;
+  color: #102033;
+  font-size: 12px;
+  line-height: 1.55;
+  outline: 0;
+  padding: 8px;
+}
+
+.cs-session-note-editor textarea:focus {
+  border-color: rgba(16, 185, 129, 0.42);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.cs-session-note-editor footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.cs-session-note-editor label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 5px;
+  color: #52667f;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.cs-session-note-editor footer > span {
+  color: #7a8da6;
+  font-size: 10px;
+  font-weight: 780;
+}
+
+.cs-session-note-editor button {
+  padding: 0 9px;
+  border-color: rgba(16, 185, 129, 0.28);
+  color: #087a60;
+}
+
+.cs-session-notes-notice {
+  overflow: hidden;
+  margin: 0;
+  color: #087a60;
+  font-size: 10px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-session-note-list {
+  display: grid;
+  gap: 7px;
+}
+
+.cs-session-note-item {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(226, 234, 243, 0.92);
+  border-radius: 8px;
+  background: rgba(248, 251, 255, 0.9);
+}
+
+.cs-session-note-item[data-pinned="true"] {
+  border-color: rgba(16, 185, 129, 0.26);
+  background: rgba(237, 252, 247, 0.9);
+}
+
+.cs-session-note-item header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cs-session-note-item header strong,
+.cs-session-note-item header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-session-note-item header strong {
+  min-width: 0;
+  color: #14243a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.cs-session-note-item header span {
+  flex: 0 0 auto;
+  color: #7a8da6;
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.cs-session-note-item p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: #28415f;
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.cs-session-note-item footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.cs-session-note-item footer button {
+  min-height: 22px;
+  padding: 0 7px;
+  color: #52667f;
+}
+
+.cs-session-note-item footer button.danger {
+  border-color: rgba(239, 68, 68, 0.22);
+  color: #b4232f;
+}
+
+.cs-session-notes-head > button:disabled,
+.cs-session-note-editor button:disabled,
+.cs-session-note-item footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .customer-360-compact .customer-360-language-flow {
   grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr);
   gap: 8px;
@@ -3394,6 +3646,11 @@
 .h-flagship-grid .service-list-resizer,
 .h-flagship-grid .service-assistant-resizer,
 .h-flagship-grid .service-profile-resizer {
+  position: relative;
+  z-index: 8;
+  box-sizing: content-box !important;
+  margin-inline: -5px !important;
+  padding-inline: 5px !important;
   background:
     linear-gradient(180deg, transparent, rgba(216, 226, 237, 0.68), transparent) center /
       1px 100% no-repeat !important;
@@ -3603,6 +3860,46 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
   padding: 10px 16px;
 }
 
+.h-flagship-grid .h-chat-head-actions {
+  display: flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.h-flagship-grid .h-chat-head-actions button {
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: 48px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 12px !important;
+  border: 1px solid rgba(216, 226, 237, 0.95) !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  color: #344256 !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+.h-flagship-grid .h-chat-head-actions button:hover:not(:disabled),
+.h-flagship-grid .h-chat-head-actions button.active {
+  border-color: rgba(16, 185, 129, 0.36) !important;
+  background: #ecfdf5 !important;
+  color: var(--e2-green-dark) !important;
+}
+
+.h-flagship-grid .h-chat-head-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .h-flagship-grid .h-customer-title {
   gap: 10px;
 }
@@ -3766,6 +4063,204 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
 }
 
 .cs-close-confirm-dialog footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.cs-transfer-backdrop {
+  z-index: 76;
+  background: rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(5px);
+}
+
+.cs-transfer-dialog {
+  display: grid;
+  width: min(520px, calc(100vw - 48px));
+  max-height: min(720px, calc(100vh - 48px));
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid rgba(34, 197, 94, 0.24);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 26px 72px rgba(15, 23, 42, 0.24);
+}
+
+.cs-transfer-dialog header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.cs-transfer-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.cs-transfer-dialog h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.cs-transfer-dialog p {
+  margin: 0;
+  color: #607086;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cs-transfer-dialog header p {
+  margin-top: 6px;
+}
+
+.cs-transfer-current-staff {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.cs-transfer-current-staff strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #0f172a;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-transfer-search {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #dce6f2;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.cs-transfer-search input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+}
+
+.cs-transfer-target-list {
+  display: grid;
+  max-height: 236px;
+  gap: 8px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.cs-transfer-target-list > button {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 54px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #172033;
+  text-align: left;
+}
+
+.cs-transfer-target-list > button.selected {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: #f0fdf4;
+}
+
+.cs-transfer-target-list strong,
+.cs-transfer-target-list em {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-transfer-target-list em {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.cs-transfer-empty {
+  padding: 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.cs-transfer-empty.error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.cs-transfer-reason {
+  display: grid;
+  gap: 8px;
+  color: #344256;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.cs-transfer-reason textarea {
+  min-height: 76px;
+  resize: vertical;
+  border: 1px solid #dce6f2;
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: 0;
+  color: #172033;
+  font: inherit;
+  font-weight: 500;
+}
+
+.cs-transfer-dialog footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.cs-transfer-dialog footer button {
+  height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: #eef2f7;
+  color: #273449;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.cs-transfer-dialog footer button.primary {
+  background: #16a34a;
+  color: #fff;
+}
+
+.cs-transfer-dialog footer button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }

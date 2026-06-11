@@ -9,6 +9,7 @@
 .app-shell .group-invite-dialog-list,
 .app-shell .group-invite-selected-area,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog,
+.app-shell .contacts-page.contacts-b-layout .contacts-list,
 .app-shell .contacts-add-layout,
 .app-shell .contacts-add-results,
 .app-shell .account-popover,
@@ -36,6 +37,7 @@
 .app-shell .group-invite-dialog-list::-webkit-scrollbar,
 .app-shell .group-invite-selected-area::-webkit-scrollbar,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog::-webkit-scrollbar,
+.app-shell .contacts-page.contacts-b-layout .contacts-list::-webkit-scrollbar,
 .app-shell .contacts-add-layout::-webkit-scrollbar,
 .app-shell .contacts-add-results::-webkit-scrollbar,
 .app-shell .account-popover::-webkit-scrollbar,
@@ -57,6 +59,7 @@
 .app-shell .group-invite-dialog-list:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .group-invite-selected-area:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .contacts-page.contacts-b-layout .contacts-list:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .contacts-add-layout:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .contacts-add-results:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .account-popover:not(.is-scrolling)::-webkit-scrollbar,
@@ -78,6 +81,7 @@
 .app-shell .group-invite-dialog-list.is-scrolling::-webkit-scrollbar,
 .app-shell .group-invite-selected-area.is-scrolling::-webkit-scrollbar,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog.is-scrolling::-webkit-scrollbar,
+.app-shell .contacts-page.contacts-b-layout .contacts-list.is-scrolling::-webkit-scrollbar,
 .app-shell .contacts-add-layout.is-scrolling::-webkit-scrollbar,
 .app-shell .contacts-add-results.is-scrolling::-webkit-scrollbar,
 .app-shell .account-popover.is-scrolling::-webkit-scrollbar,
@@ -103,6 +107,7 @@
 .app-shell .group-invite-dialog-list::-webkit-scrollbar-thumb,
 .app-shell .group-invite-selected-area::-webkit-scrollbar-thumb,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog::-webkit-scrollbar-thumb,
+.app-shell .contacts-page.contacts-b-layout .contacts-list::-webkit-scrollbar-thumb,
 .app-shell .contacts-add-layout::-webkit-scrollbar-thumb,
 .app-shell .contacts-add-results::-webkit-scrollbar-thumb,
 .app-shell .account-popover::-webkit-scrollbar-thumb,
@@ -130,6 +135,7 @@
 .app-shell .group-invite-dialog-list.is-scrolling,
 .app-shell .group-invite-selected-area.is-scrolling,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog.is-scrolling,
+.app-shell .contacts-page.contacts-b-layout .contacts-list.is-scrolling,
 .app-shell .contacts-add-layout.is-scrolling,
 .app-shell .contacts-add-results.is-scrolling,
 .app-shell .account-popover.is-scrolling,
@@ -154,6 +160,7 @@
 .app-shell .group-invite-dialog-list.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .group-invite-selected-area.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog.is-scrolling::-webkit-scrollbar-thumb,
+.app-shell .contacts-page.contacts-b-layout .contacts-list.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .contacts-add-layout.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .contacts-add-results.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .account-popover.is-scrolling::-webkit-scrollbar-thumb,
@@ -181,6 +188,7 @@
 .app-shell .group-invite-dialog-list.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .group-invite-selected-area.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog.is-scrolling::-webkit-scrollbar-thumb:hover,
+.app-shell .contacts-page.contacts-b-layout .contacts-list.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .contacts-add-layout.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .contacts-add-results.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .account-popover.is-scrolling::-webkit-scrollbar-thumb:hover,
@@ -205,6 +213,7 @@
 .app-shell .group-invite-dialog-list::-webkit-scrollbar-track,
 .app-shell .group-invite-selected-area::-webkit-scrollbar-track,
 .app-shell .pc-avatar-profile-popover.contact-card-profile-dialog::-webkit-scrollbar-track,
+.app-shell .contacts-page.contacts-b-layout .contacts-list::-webkit-scrollbar-track,
 .app-shell .contacts-add-layout::-webkit-scrollbar-track,
 .app-shell .contacts-add-results::-webkit-scrollbar-track,
 .app-shell .account-popover::-webkit-scrollbar-track,
@@ -249,4 +258,32 @@
 
 .app-shell.is-boundary-strong :where(.e-conversation-panel, .e-chat-panel, .h-context-panel, .page-main, .settings-page, .contacts-page) {
   border-color: var(--pc-border) !important;
+}
+
+.app-shell .cs-history-field-table-scroll {
+  overflow: scroll !important;
+  scrollbar-color: rgba(100, 116, 139, 0.48) transparent !important;
+  scrollbar-gutter: stable both-edges !important;
+  scrollbar-width: thin !important;
+}
+
+.app-shell .cs-history-field-table-scroll::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.app-shell .cs-history-field-table-scroll::-webkit-scrollbar-thumb {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(100, 116, 139, 0.48) !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .cs-history-field-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.62) !important;
+}
+
+.app-shell .cs-history-field-table-scroll::-webkit-scrollbar-track,
+.app-shell .cs-history-field-table-scroll::-webkit-scrollbar-corner {
+  background: transparent !important;
 }

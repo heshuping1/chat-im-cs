@@ -6,17 +6,21 @@ import type { CustomerServiceThreadAction } from "../../data/customer-service/cs
 import { useI18n } from "../../i18n/useI18n";
 
 export function CustomerServiceThreadActionButton({
+  canUseStaffActions = true,
   onAction,
   pending,
   selectedStatus,
   status,
 }: {
+  canUseStaffActions?: boolean;
   onAction: (action: CustomerServiceThreadAction) => void;
   pending: boolean;
   selectedStatus?: string;
   status?: string;
 }) {
   const { t } = useI18n();
+  if (!canUseStaffActions) return null;
+
   const threadState = createCustomerServiceThreadState(status);
   const selectedThreadState = createCustomerServiceThreadState(selectedStatus);
   const hasThread = Boolean(status || selectedStatus);
@@ -52,20 +56,5 @@ export function CustomerServiceThreadActionButton({
       </button>
     );
   }
-  const closePermission = getCustomerServiceActionPermission("close", {
-    hasThread,
-    selectedState: selectedThreadState,
-    state: threadState,
-  });
-  if (!closePermission.visible) return null;
-  return (
-    <button
-      className="danger"
-      type="button"
-      disabled={pending || !closePermission.enabled}
-      onClick={() => onAction("close")}
-    >
-      {t("customerService.action.closeThread")}
-    </button>
-  );
+  return null;
 }

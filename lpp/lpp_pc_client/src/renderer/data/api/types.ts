@@ -773,6 +773,19 @@ export interface MessageItemDto {
   direction?: string;
 }
 
+export interface CustomerServiceReadStatusMemberDto {
+  userId: string;
+  lastReadSeq?: number | null;
+  lastReadAt?: string | null;
+}
+
+export interface CustomerServiceReadStatusDto {
+  sessionId?: string;
+  conversationId?: string;
+  visitorUserId?: string;
+  members: CustomerServiceReadStatusMemberDto[];
+}
+
 export interface WorkbenchSummary {
   allCount: number;
   queuedCount: number;
@@ -835,12 +848,27 @@ export interface CustomerServiceThread {
   assignedAt?: string | null;
   unreadCount?: number;
   accessMode?: "workbench" | "management_readonly";
+  readStatus?: CustomerServiceReadStatusDto | null;
+  historyItem?: StaffServiceHistoryItem & Record<string, unknown>;
 }
 
 export interface CustomerServiceThreadsResponse {
   queueItems: CustomerServiceThread[];
   activeItems: CustomerServiceThread[];
   summary?: WorkbenchSummary;
+}
+
+export interface CustomerServiceSessionNoteDto {
+  noteId: string;
+  staffDisplayName: string;
+  content: string;
+  isPinned?: boolean;
+  createdAt?: string | null;
+}
+
+export interface CreateCustomerServiceSessionNoteRequest {
+  content: string;
+  isPinned?: boolean;
 }
 
 export interface TempSessionAcquisitionDto {
@@ -907,6 +935,96 @@ export interface TempSessionStatsDto {
   staffPerformance?: TempStaffPerformanceDto[];
 }
 
+export type CustomerServiceExportType = "cs_sessions" | "cs_staff_daily_stats";
+
+export interface ExportTaskDto {
+  taskId?: string;
+  id?: string;
+  tenantId?: string;
+  exportType?: CustomerServiceExportType | string;
+  status?: "pending" | "processing" | "completed" | "failed" | string;
+  fileName?: string | null;
+  downloadUrl?: string | null;
+  recordCount?: number | null;
+  createdAt?: string | null;
+  completedAt?: string | null;
+  errorMessage?: string | null;
+  message?: string | null;
+}
+
+export interface ExportTaskDownloadResult {
+  blob: Blob;
+  fileName: string;
+}
+
+export interface CustomerServiceMonitorDashboardDto {
+  queuedCount?: number;
+  activeCount?: number;
+  assistingCount?: number;
+  aiServingCount?: number;
+  humanServingCount?: number;
+  onlineStaffCount?: number;
+  busyStaffCount?: number;
+  awayStaffCount?: number;
+  breakStaffCount?: number;
+  todaySessions?: number;
+  todayServed?: number;
+  todayAbandoned?: number;
+  avgWaitSeconds?: number;
+  avgDurationSeconds?: number;
+  avgRating?: number;
+}
+
+export interface CustomerServiceStaffStatusDto {
+  staffUserId: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  serviceStatus?: string | number | null;
+  status?: string | number | null;
+  activeSessionCount?: number | null;
+  reservedSessionCount?: number | null;
+  maxConcurrentSessions?: number | null;
+  queueAcceptEnabled?: boolean | null;
+  lastHeartbeatAt?: string | null;
+  lastOnlineAt?: string | null;
+  lastAssignedAt?: string | null;
+  lastIp?: string | null;
+  deviceIp?: string | null;
+}
+
+export interface CustomerServiceSlaRiskItemDto {
+  threadType?: CustomerServiceThreadType | string;
+  threadId?: string;
+  conversationId?: string;
+  title?: string;
+  customerName?: string;
+  visitorName?: string;
+  assignedStaffUserId?: string | null;
+  assignedStaffName?: string | null;
+  riskLevel?: string | number | null;
+  riskReason?: string | null;
+  reason?: string | null;
+  deadlineAt?: string | null;
+  lastMessageAt?: string | null;
+  waitSeconds?: number | null;
+  overdueSeconds?: number | null;
+}
+
+export interface CustomerServiceSlaDashboardDto {
+  warningCount?: number;
+  breachedCount?: number;
+  riskCount?: number;
+  items?: CustomerServiceSlaRiskItemDto[];
+  warningItems?: CustomerServiceSlaRiskItemDto[];
+  breachedItems?: CustomerServiceSlaRiskItemDto[];
+}
+
+export interface CustomerServiceMonitorThreadsResponse {
+  items: CustomerServiceThread[];
+  summary?: WorkbenchSummary;
+  nextCursor?: string | null;
+}
+
 export interface StaffServiceHistoryItem {
   threadType: CustomerServiceThreadType | "direct" | string;
   threadId: string;
@@ -933,8 +1051,25 @@ export interface StaffServiceHistoryItem {
   customerAvatarUrl?: string | null;
   lastMessagePreview?: string;
   unreadCount?: number;
+  createdAt?: string | null;
   startedAt?: string | null;
   acceptedAt?: string | null;
+  queueEnteredAt?: string | null;
+  firstResponseSeconds?: number | null;
+  durationSeconds?: number | null;
+  transferCount?: number | null;
+  rating?: number | null;
+  statusCode?: string | number;
+  staffDisplayName?: string | null;
+  customerUserId?: string | null;
+  visitorUserId?: string | null;
+  customerId?: string | null;
+  customerDisplayName?: string | null;
+  sourcePlatform?: string | null;
+  country?: string | null;
+  region?: string | null;
+  locale?: string | null;
+  category?: string | null;
   firstResponseAt?: string | null;
   closedAt?: string | null;
   lastMessageAt?: string | null;
@@ -943,9 +1078,21 @@ export interface StaffServiceHistoryItem {
   participation?: "current_owner" | "transferred" | string;
 }
 
+export interface CustomerServiceHistorySummary {
+  totalSessions?: number;
+  avgFirstResponseSeconds?: number | null;
+  avgDurationSeconds?: number | null;
+  avgRating?: number | null;
+  ratingCount?: number;
+  sampledSessions?: number;
+  channelDistribution?: TempDistributionPointDto[];
+  sourcePlatformDistribution?: TempDistributionPointDto[];
+}
+
 export interface StaffServiceHistoryResponse {
   items: StaffServiceHistoryItem[];
   nextCursor?: string | null;
+  summary?: CustomerServiceHistorySummary | null;
 }
 
 export interface StaffReceptionStatusDto {

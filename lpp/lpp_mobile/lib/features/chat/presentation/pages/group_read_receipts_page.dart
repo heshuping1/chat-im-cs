@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
+import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/data/mappers/group_read_receipts_mapper.dart';
 
@@ -14,12 +15,14 @@ final _readReceiptsProvider = FutureProvider.autoDispose
         (String groupId, String messageId, int messageSeq)>(
   (ref, args) async {
     final dio = ref.read(dioProvider);
+    final currentUserId = ref.watch(currentSpaceProvider)?.userId;
     final resp = await dio.get<Map<String, dynamic>>(
       '/api/client/v1/groups/${args.$1}/read-receipts',
       queryParameters: {'messageId': args.$2},
     );
     return parseGroupReadReceiptsPayload(
       resp.data?['data'],
+      currentUser: GroupReadReceiptIdentity(userId: currentUserId),
       messageSeq: args.$3,
     );
   },

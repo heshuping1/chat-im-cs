@@ -3,12 +3,15 @@ export interface CustomerServiceCacheDiagnosticRecord {
   event:
     | "cache.invalidate"
     | "cache.message.merge"
+    | "cache.message.remove"
     | "cache.local_message.append"
     | "cache.local_message.patch"
     | "cache.local_message.remove"
     | "cache.thread.merge_detail"
     | "cache.thread.read"
-    | "cache.thread.closed";
+    | "cache.thread.claimed"
+    | "cache.thread.closed"
+    | "cache.thread.transferred";
   phase: "cache";
   result: "ok" | "ignored";
   timestamp: number;

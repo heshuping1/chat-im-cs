@@ -57,5 +57,44 @@ void main() {
       expect(receipts.readMembers.single.displayName, 'Alice');
       expect(receipts.unreadMembers.single.displayName, '用户');
     });
+
+    test('excludes current sender from members and counts', () {
+      final receipts = parseGroupReadReceiptsPayload(
+        {
+          'members': [
+            {
+              'userId': 'self-user',
+              'displayName': 'Me',
+              'lastReadSeq': 8,
+            },
+            {
+              'userId': 'u-2',
+              'displayName': 'Bob',
+              'lastReadSeq': 2,
+            },
+            {
+              'user': {
+                'readerUserId': 'u-3',
+                'platformUserId': 'platform-3',
+                'displayName': 'Carol',
+              },
+              'lastReadSeq': 0,
+            },
+          ],
+          'totalMembers': 3,
+          'readCount': 1,
+          'unreadCount': 2,
+        },
+        currentUser: const GroupReadReceiptIdentity(userId: 'self-user'),
+        messageSeq: 5,
+      );
+
+      expect(receipts.totalMembers, 2);
+      expect(receipts.readCount, 0);
+      expect(receipts.unreadCount, 2);
+      expect(receipts.members.map((m) => m.userId), ['u-2', 'u-3']);
+      expect(receipts.readMembers, isEmpty);
+      expect(receipts.unreadMembers.map((m) => m.userId), ['u-2', 'u-3']);
+    });
   });
 }

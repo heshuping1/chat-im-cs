@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   mergeImGatewayMessage: vi.fn(),
   mergeReadEvent: vi.fn(),
   notifyCustomerServiceQueue: vi.fn(),
+  removeCustomerServiceMessageByThreadId: vi.fn(),
   spaceReminderScopeKey: vi.fn(
     (apiBaseUrl?: string, platformToken?: string) =>
       `scope:${apiBaseUrl ?? ""}:${platformToken ?? ""}`,
@@ -24,6 +25,10 @@ vi.mock("../../src/renderer/data/gateway/gateway-cs-side-effects", () => ({
 vi.mock("../../src/renderer/data/gateway/gateway-im-side-effects", () => ({
   mergeImGatewayMessage: mocks.mergeImGatewayMessage,
   mergeReadEvent: mocks.mergeReadEvent,
+}));
+
+vi.mock("../../src/renderer/data/customer-service/cs-cache-adapter", () => ({
+  removeCustomerServiceMessageByThreadId: mocks.removeCustomerServiceMessageByThreadId,
 }));
 
 vi.mock("../../src/renderer/data/spaces/space-reminder-ledger", () => ({
@@ -173,6 +178,52 @@ describe("createGatewayEventRouter", () => {
     expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({
       queryKey: ["pc-im-conversations"],
     });
+  });
+
+  it("routes customer typing events to preview cache without merging messages", async () => {
+    const { createGatewayEventRouter } = await import(
+      "../../src/renderer/data/gateway/gateway-event-router"
+    );
+    const queryClient = {
+      clear: vi.fn(),
+      invalidateQueries: vi.fn(),
+      setQueryData: vi.fn(),
+    };
+    const router = createGatewayEventRouter({
+      clearAuthSession: vi.fn(),
+      queryClient: queryClient as never,
+      session: {
+        apiBaseUrl: "https://api.example.test",
+        tenantToken: "tenant-token",
+      } as never,
+      setCustomerServiceStatus: vi.fn(),
+    });
+
+    router.handleEvent("temp_session.typing", [
+      {
+        sessionId: "temp-session-typing-1",
+        isTyping: true,
+        content: "typing draft",
+        senderRole: "visitor",
+      },
+    ]);
+
+    expect(queryClient.setQueryData).toHaveBeenCalledWith(
+      [
+        "pc-cs-typing-preview",
+        "https://api.example.test",
+        "tenant-token",
+        "temp_session",
+        "temp-session-typing-1",
+      ],
+      expect.objectContaining({
+        previewText: "typing draft",
+        threadId: "temp-session-typing-1",
+        threadType: "temp_session",
+      }),
+    );
+    expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
+    expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
   });
 
   it("routes unmarked msg.new payloads through the customer-service conversation index", async () => {
@@ -331,6 +382,45 @@ describe("createGatewayEventRouter", () => {
     });
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["pc-cs-workbench-threads"],
+    });
+  });
+
+  it("routes silent recalled customer-service messages away from ordinary IM recall", async () => {
+    const { createGatewayEventRouter } = await import(
+      "../../src/renderer/data/gateway/gateway-event-router"
+    );
+    const queryClient = {
+      clear: vi.fn(),
+      invalidateQueries: vi.fn(),
+    };
+    const router = createGatewayEventRouter({
+      clearAuthSession: vi.fn(),
+      queryClient: queryClient as never,
+      session: {} as never,
+      setCustomerServiceStatus: vi.fn(),
+    });
+
+    router.handleEvent("msg.recalled", [
+      {
+        data: {
+          conversationId: "thread-1",
+          conversationType: "temp_session",
+          messageId: "message-1",
+          silent: true,
+        },
+      },
+    ]);
+
+    expect(mocks.removeCustomerServiceMessageByThreadId).toHaveBeenCalledWith(
+      queryClient,
+      "thread-1",
+      "message-1",
+    );
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["pc-cs-workbench-threads"],
+    });
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalledWith({
+      queryKey: ["pc-im-conversations"],
     });
   });
 

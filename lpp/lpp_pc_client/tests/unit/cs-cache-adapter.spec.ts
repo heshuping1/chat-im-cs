@@ -8,11 +8,14 @@ import type {
 import {
   appendCustomerServiceLocalMessage,
   applyCustomerServiceGatewayMessageCache,
+  markCustomerServiceThreadClaimed,
   markCustomerServiceThreadClosed,
   markCustomerServiceThreadReadInCache,
+  markCustomerServiceThreadTransferred,
   mergeLoadedCustomerServiceThreadDetail,
   mergeSentCustomerServiceMessage,
   patchCustomerServiceLocalMessage,
+  removeCustomerServiceMessage,
   removeCustomerServiceLocalMessage,
 } from "../../src/renderer/data/customer-service/cs-cache-adapter";
 import {
@@ -21,11 +24,13 @@ import {
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
 import { shouldRecordCustomerServiceImListCompatDiagnostic } from "../../src/renderer/data/customer-service/cs-compatibility-bridge";
+import { resetSilentCustomerServiceRecallForTest } from "../../src/renderer/data/customer-service/cs-silent-recall";
 
 describe("customer service cache adapter", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     resetCustomerServiceConversationIndexForTest();
+    resetSilentCustomerServiceRecallForTest();
   });
 
   it("merges sent messages into detail and thread preview caches", () => {
@@ -274,6 +279,56 @@ describe("customer service cache adapter", () => {
     });
   });
 
+  it("moves a claimed queued thread into the active list immediately", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient, { unreadCount: 2 });
+
+    markCustomerServiceThreadClaimed(queryClient, thread({ unreadCount: 2 }), {
+      status: "serving",
+    });
+
+    expect(workbenchCache(queryClient).queueItems).toHaveLength(0);
+    expect(workbenchCache(queryClient).activeItems[0]).toMatchObject({
+      status: "serving",
+      threadId: "thread-1",
+      unreadCount: 2,
+    });
+    expect(queryClient.getQueryData<{ status?: string }>(detailKey())).toMatchObject({
+      status: "serving",
+    });
+  });
+
+  it("marks a transferred-away thread as readonly history for the current agent", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient, { status: "serving", unreadCount: 3 });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "thread-1",
+      lastMessagePreview: "visitor before transfer",
+      overlayUnreadCount: 3,
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    markCustomerServiceThreadTransferred(queryClient, thread({ status: "serving", unreadCount: 3 }), {
+      status: "serving",
+      transferred: true,
+      transferredAt: "2026-06-10T12:00:00.000Z",
+    });
+
+    expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({
+      accessMode: "management_readonly",
+      status: "transferred",
+      unreadCount: 0,
+      updatedAt: "2026-06-10T12:00:00.000Z",
+    });
+    expect(queryClient.getQueryData<{ status?: string }>(detailKey())).toMatchObject({
+      status: "transferred",
+    });
+    expect(getCustomerServiceThreadIndex("thread-1")).toMatchObject({
+      overlayUnreadCount: 0,
+    });
+  });
+
   it("keeps closed unread in the customer-service overlay index for history refetches", () => {
     const queryClient = createQueryClient();
     seedCaches(queryClient);
@@ -405,6 +460,45 @@ describe("customer service cache adapter", () => {
 
     removeCustomerServiceLocalMessage(queryClient, thread(), "local-1");
     expect(detailMessages(queryClient)).toEqual([]);
+  });
+
+  it("removes recalled customer-service messages from the agent detail cache", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    queryClient.setQueryData(detailKey(), {
+      messages: [
+        message({ messageId: "m1", preview: "keep" }),
+        message({ messageId: "m2", preview: "remove me" }),
+      ],
+    });
+
+    removeCustomerServiceMessage(queryClient, thread(), "m2");
+
+    expect(detailMessages(queryClient).map((item) => item.messageId)).toEqual(["m1"]);
+  });
+
+  it("keeps silently recalled customer-service messages removed after gateway replay", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    queryClient.setQueryData(detailKey(), {
+      messages: [
+        message({ messageId: "m1", preview: "keep" }),
+        message({ messageId: "m2", preview: "remove me" }),
+      ],
+    });
+
+    removeCustomerServiceMessage(queryClient, thread(), "m2");
+    applyCustomerServiceGatewayMessageCache(queryClient, {
+      message: message({ messageId: "m2", preview: "replayed recall trace" }),
+      read: false,
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    expect(detailMessages(queryClient).map((item) => item.messageId)).toEqual(["m1"]);
+    expect(workbenchCache(queryClient).queueItems[0]).not.toMatchObject({
+      lastMessagePreview: "replayed recall trace",
+    });
   });
 
   it("merges loaded detail, marks read, closes threads and records diagnostics", () => {

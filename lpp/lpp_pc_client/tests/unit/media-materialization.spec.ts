@@ -269,6 +269,30 @@ describe("media materialization", () => {
     expect(displayUrl).toBe("data:image/png;base64,aW1hZ2U=");
   });
 
+  it("throttles expired signed media display urls instead of repeatedly reading them", async () => {
+    vi.mocked(window.desktopApi?.readMediaFileAsDataUrl).mockRejectedValueOnce(
+      new Error("MEDIA_SIGNATURE_EXPIRED"),
+    );
+
+    const payload = {
+      accountId: "staff-1",
+      authToken: "tenant-token",
+      cacheIdentity: "video-poster:expired-media",
+      cacheKey: "video-poster:expired-media",
+      conversationId: "direct-1",
+      fileName: "expired-poster.jpg",
+      fileUrl: "https://cdn.example.test/media/expired-poster.jpg?sig=expired",
+      kind: "image" as const,
+      preferDesktopRead: true,
+    };
+
+    await expect(ensureMaterializedMediaDisplayUrl(payload)).resolves.toBeUndefined();
+    await expect(ensureMaterializedMediaDisplayUrl(payload)).resolves.toBeUndefined();
+
+    expect(window.desktopApi?.readMediaFileAsDataUrl).toHaveBeenCalledTimes(1);
+    expect(getMaterializedMediaDisplayUrl("video-poster:expired-media")).toBeUndefined();
+  });
+
   it("materializes received video and file messages before UI render", async () => {
     await materializeReceivedMediaMessage({
       accountId: "staff-1",

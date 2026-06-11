@@ -161,6 +161,16 @@ describe("message status model", () => {
     ).toMatchObject({ receiptState: "unread", statusLabel: "未读" });
   });
 
+  it("treats direct readCount snapshots as read receipts", () => {
+    expect(
+      deriveChatMessageStatus({
+        conversationType: "temp_session",
+        message: message({ readCount: 1 }),
+        mine: true,
+      }),
+    ).toMatchObject({ receiptState: "read" });
+  });
+
   it("shows group read receipts only from server readCount", () => {
     expect(
       deriveChatMessageStatus({

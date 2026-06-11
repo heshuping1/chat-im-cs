@@ -1,6 +1,6 @@
 # 管理后台 API 文档
 
-> 文档校对快照：2026-05-22
+> 文档校对快照：2026-05-22(2026-06-10 增量校对:客服域 —— 输入预览/已读时间/静默撤回/转接/复访续聊/自动话术配置/会话备注/报表导出)
 
 Base URL：`/api/admin/v1`
 
@@ -417,7 +417,7 @@ POST /api/platform/v1/auth/admin-token
 
 其中 `GET .../center/customers/service-history` 按客户身份聚合其跨频道（临时会话 + 直聊客服）历史，查询参数（`customerUserId` / `visitorUserId` / `customerId` 择一，加 `limit` / `cursor`）与响应字段与客户端同名接口一致，详见 [client-api.md §12.11A1](./client-api.md)。
 
-`GET .../center/staff/{staffUserId}/service-history` 按**接待人**聚合：返回指定客服"曾参与"的跨频道历史会话（当前归属是他 **或** 转接历史里他是 from/to，已转交出去的也会出现）。查询参数 `threadType`(`temp_session`/`im_direct`)、`status`、`limit`、`cursor`；响应 `{ items, nextCursor }`，每项在客户端 §12.11A1 字段基础上额外带 `participation`(`current_owner`/`transferred`)。权限：`customer_service.center.view` 或 `customer_service.temp_session.view`。客户端（客服本人自查）同名接口见 [client-api.md §12.11A1b](./client-api.md)。
+`GET .../center/staff/{staffUserId}/service-history` 按**接待人**聚合：返回指定客服"曾参与"的跨频道历史会话（当前归属是他 **或** 转接历史里他是 from/to，已转交出去的也会出现）。查询参数 `threadType`(`temp_session`/`im_direct`)、`status`(语义值 `open`/`queued`/`active`/`closed` 按渠道映射，亦兼容单个数字状态码原样套两渠道；非法值返回 400 `CUSTOMER_SERVICE_HISTORY_STATUS_INVALID`)、`limit`、`cursor`；响应 `{ items, nextCursor }`，每项在客户端 §12.11A1 字段基础上额外带 `participation`(`current_owner`/`transferred`)。权限：`customer_service.center.view` 或 `customer_service.temp_session.view`。客户端（客服本人自查）同名接口见 [client-api.md §12.11A1b](./client-api.md)。
 
 第二层是临时会话域专属能力，主入口仍然是：
 
@@ -1817,6 +1817,7 @@ AI 信息字段（`TempSessionAiInfoDto`）：
 | `GET /customer-service/temp-sessions/dashboard` | 临时会话域看板 | `TempSessionDashboardDto`(下方) |
 | `GET /customer-service/temp-sessions/staff-statuses` | 当前租户全部客服状态 | `TempStaffStatusDto[]` |
 | `GET /customer-service/temp-sessions/auto-replies` | 自动回复规则列表 | `TempSessionAutoReplyDto[]` |
+| 🆕 `POST/PUT/DELETE /customer-service/temp-sessions/auto-replies[/{ruleId}]` | 2026-06-10 自动话术 CRUD(开场白/关键词自动回复/排队提示),见下方 §3.2B.32A | `TempSessionAutoReplyDto` |
 | `GET /customer-service/temp-sessions/quick-replies` | 快捷回复列表(兼容入口;新接入用 `/customer-service/quick-replies`) | `CustomerServiceQuickReplyDto[]` |
 | `GET /customer-service/temp-sessions/skill-groups` | 技能组列表 | `TempSessionSkillGroupDto[]` |
 | `GET /customer-service/temp-sessions/blacklist` | 黑名单列表 | `TempSessionBlacklistEntry[]` |
@@ -1824,6 +1825,30 @@ AI 信息字段（`TempSessionAiInfoDto`）：
 | `GET /customer-service/temp-sessions/config` | 当前生效配置 | `TempSessionConfigModel`(同 §3.2B.22 写入字段,API key 字段脱敏) |
 
 权限要求(任一):`customer_service.temp_session.view`、`customer_service.center.view`(部分配置类需要 `customer_service.temp_config.manage`)
+
+#### 3.2B.32A 自动话术 CRUD 🆕 2026-06-10
+
+此前 auto-replies 只有 GET,开场白/排队提示永远是系统默认文案。现补齐写端点(权限:`customer_service.temp_session.manage`;详见 [customer-service-config-notes-resume-2026-06-10.md](./customer-service-config-notes-resume-2026-06-10.md) §1.1):
+
+| 端点 | 方法 | 说明 |
+|---|---|---|
+| `/customer-service/temp-sessions/auto-replies` | POST | 新建规则 |
+| `/customer-service/temp-sessions/auto-replies/{ruleId}` | PUT | 更新规则 |
+| `/customer-service/temp-sessions/auto-replies/{ruleId}` | DELETE | 删除规则(幂等) |
+
+请求体(POST/PUT 同构):
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `ruleType` | short | 是 | **0=开场白**(进线欢迎语)/**1=关键词自动回复**/**2=排队提示**;其他值 400 `AUTO_REPLY_RULE_TYPE_INVALID` |
+| `content` | string | 是 | 文案,≤2000 字符 |
+| `locale` | string? | 否 | 空 = `*` 全语言;同型多规则按 locale 精确命中优先、再按 `sortOrder` |
+| `keywordPattern` | string? | type=1 必填 | 包含匹配,大小写不敏感;缺失 400 `AUTO_REPLY_KEYWORD_REQUIRED` |
+| `category` / `skillGroupId` | string?/GUID? | 否 | 限定分类/技能组;空 = 不限定 |
+| `sortOrder` | int | 否 | 默认 0 |
+| `isEnabled` | bool | 否 | 默认 true;停用不删数据 |
+
+即改即生效(新进线会话立刻使用新文案);写操作进审计日志(`temp_session.auto_reply_created/updated/deleted`)。
 
 `TempSessionDashboardDto` 字段:
 
@@ -3407,8 +3432,8 @@ Query 参数:
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `exportType` | string | 是 | 导出类型（如 `users`、`messages`、`audit_logs`） |
-| `filters` | object? | 否 | 筛选条件（键值对，按 `exportType` 不同而异） |
+| `exportType` | string | 是 | 导出类型:`users`、`messages`、`audit_logs`、`online_users`、`tenants`;🆕 2026-06-10 新增 `cs_sessions`(跨渠道客服会话明细:渠道/客户/坐席/状态/来源/地区/首响秒数/时长/转接数/消息数/满意度评分)与 `cs_staff_daily_stats`(坐席×渠道日统计直出) |
+| `filters` | object? | 否 | 筛选条件（键值对，按 `exportType` 不同而异）;`cs_sessions`/`cs_staff_daily_stats` 支持 `from`/`to`(ISO 日期,UTC 解释;前者按创建时间,后者按统计日) |
 
 响应 `data`：
 

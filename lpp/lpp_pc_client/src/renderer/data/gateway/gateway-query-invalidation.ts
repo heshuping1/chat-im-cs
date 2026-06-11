@@ -53,6 +53,10 @@ export function invalidateCustomerServiceGatewayQueries(
   void queryClient.invalidateQueries({ queryKey: ["pc-cs-workbench-threads"] });
   void queryClient.invalidateQueries({ queryKey: ["pc-cs-staff-service-history"] });
   void queryClient.invalidateQueries({ queryKey: ["pc-cs-reception-status"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-cs-monitor-dashboard"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-cs-monitor-staff-statuses"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-cs-monitor-sla-dashboard"] });
+  void queryClient.invalidateQueries({ queryKey: ["pc-cs-monitor-threads"] });
   if (threadId) {
     void queryClient.invalidateQueries({
       predicate: (query) =>

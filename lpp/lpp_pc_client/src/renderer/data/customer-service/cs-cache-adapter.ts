@@ -24,6 +24,10 @@ import {
   type CustomerServiceCacheMessageKind,
 } from "./cs-cache-message-model";
 import { logCustomerServiceCacheDiagnostic } from "./cs-cache-diagnostics";
+import {
+  isSilentCustomerServiceRecalledMessage,
+  rememberSilentCustomerServiceRecall,
+} from "./cs-silent-recall";
 
 export {
   customerServiceMessageFromSendResult,
@@ -48,6 +52,7 @@ export async function invalidateCustomerServiceQueries(queryClient: QueryClient)
     queryClient.invalidateQueries({ queryKey: ["pc-cs-thread-detail"] }),
     queryClient.invalidateQueries({ queryKey: ["pc-cs-workbench-threads"] }),
     queryClient.invalidateQueries({ queryKey: ["pc-cs-staff-service-history"] }),
+    queryClient.invalidateQueries({ queryKey: ["pc-cs-temp-session-notes"] }),
   ]);
   logCustomerServiceCacheDiagnostic({
     event: "cache.invalidate",
@@ -57,6 +62,7 @@ export async function invalidateCustomerServiceQueries(queryClient: QueryClient)
         "pc-cs-thread-detail",
         "pc-cs-workbench-threads",
         "pc-cs-staff-service-history",
+        "pc-cs-temp-session-notes",
       ],
     },
   });
@@ -241,6 +247,35 @@ export function removeCustomerServiceLocalMessage(
   });
 }
 
+export function removeCustomerServiceMessage(
+  queryClient: QueryClient,
+  thread: CustomerServiceThread,
+  messageId: string,
+) {
+  rememberSilentCustomerServiceRecall(thread, messageId);
+  removeCustomerServiceMessageByThreadId(queryClient, thread.threadId, messageId);
+  logCustomerServiceCacheDiagnostic({
+    event: "cache.message.remove",
+    result: "ok",
+    context: {
+      messageId,
+      threadId: thread.threadId,
+      threadType: thread.threadType,
+    },
+  });
+}
+
+export function removeCustomerServiceMessageByThreadId(
+  queryClient: QueryClient,
+  threadId: string,
+  messageId: string,
+) {
+  rememberSilentCustomerServiceRecall(threadId, messageId);
+  updateCustomerServiceDetailMessages(queryClient, threadId, (messages) =>
+    messages.filter((message) => message.messageId !== messageId),
+  );
+}
+
 export function mergeLoadedCustomerServiceThreadDetail(
   queryClient: QueryClient,
   thread: CustomerServiceThread,
@@ -259,7 +294,10 @@ export function mergeLoadedCustomerServiceThreadDetail(
     messages?: MessageItemDto[];
   },
 ) {
-  const latest = latestCustomerServiceMessage(detail.messages ?? []);
+  const visibleMessages = (detail.messages ?? []).filter((message) =>
+    isVisibleCustomerServiceMessage(message, thread),
+  );
+  const latest = latestCustomerServiceMessage(visibleMessages);
   const lastMessagePreview =
     detail.lastMessagePreview ||
     previewFromCustomerServiceMessage(latest) ||
@@ -318,6 +356,20 @@ export function mergeLoadedCustomerServiceThreadDetail(
   });
 }
 
+function isVisibleCustomerServiceMessage(
+  message: MessageItemDto,
+  thread?: Pick<CustomerServiceThread, "conversationId" | "threadId">,
+) {
+  const status = String((message as { status?: unknown }).status ?? "")
+    .trim()
+    .toLowerCase();
+  return (
+    !message.isRecalled &&
+    status !== "recalled" &&
+    !isSilentCustomerServiceRecalledMessage(thread, message)
+  );
+}
+
 export function markCustomerServiceThreadReadInCache(
   queryClient: QueryClient,
   threadId: string,
@@ -371,6 +423,59 @@ export function markCustomerServiceThreadReadInCache(
     event: "cache.thread.read",
     result: "ok",
     context: { conversationId, threadId },
+  });
+}
+
+export function markCustomerServiceThreadClaimed(
+  queryClient: QueryClient,
+  thread: CustomerServiceThread,
+  result: { status?: string },
+) {
+  const status = result.status || "serving";
+  queryClient.setQueriesData<CustomerServiceThreadsCache>(
+    { queryKey: ["pc-cs-workbench-threads"] },
+    (old) => {
+      if (!old) return old;
+      let claimedThread: CustomerServiceThread | null = null;
+      const updateThread = (item: CustomerServiceThread) => {
+        if (!isCustomerServiceThreadMatch(item, thread.threadId)) return item;
+        claimedThread = {
+          ...item,
+          status,
+          updatedAt: new Date().toISOString(),
+        };
+        return claimedThread;
+      };
+      const queueItems = old.queueItems.filter((item) => {
+        const updated = updateThread(item);
+        return updated === item;
+      });
+      const activeItems = old.activeItems.some((item) =>
+        isCustomerServiceThreadMatch(item, thread.threadId),
+      )
+        ? old.activeItems.map(updateThread)
+        : claimedThread
+          ? [claimedThread, ...old.activeItems]
+          : old.activeItems;
+      return claimedThread ? { ...old, queueItems, activeItems } : old;
+    },
+  );
+  queryClient.setQueriesData<{ status?: string; messages?: MessageItemDto[] }>(
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-cs-thread-detail" &&
+        query.queryKey.includes(thread.threadId),
+    },
+    (old) => (old ? { ...old, status } : old),
+  );
+  logCustomerServiceCacheDiagnostic({
+    event: "cache.thread.claimed",
+    result: "ok",
+    context: {
+      status,
+      threadId: thread.threadId,
+      threadType: thread.threadType,
+    },
   });
 }
 
@@ -442,6 +547,82 @@ export function markCustomerServiceThreadClosed(
   });
 }
 
+export function markCustomerServiceThreadTransferred(
+  queryClient: QueryClient,
+  thread: CustomerServiceThread,
+  result: { status?: string; transferred?: boolean; transferredAt?: string },
+) {
+  const status = transferredAwayStatus(result.status);
+  const transferredAt = result.transferredAt || new Date().toISOString();
+  queryClient.setQueriesData<CustomerServiceThreadsCache>(
+    { queryKey: ["pc-cs-workbench-threads"] },
+    (old) => {
+      if (!old) return old;
+      let changed = false;
+      const transferListItem = (item: CustomerServiceThread) => {
+        if (!isCustomerServiceThreadMatch(item, thread.threadId)) return item;
+        changed = true;
+        return {
+          ...item,
+          accessMode: "management_readonly" as const,
+          status,
+          unreadCount: 0,
+          updatedAt: transferredAt,
+        };
+      };
+      const queueItems = old.queueItems.map(transferListItem);
+      const activeItems = old.activeItems.map(transferListItem);
+      return changed ? { ...old, queueItems, activeItems } : old;
+    },
+  );
+  queryClient.setQueriesData<{ status?: string; messages?: MessageItemDto[] }>(
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-cs-thread-detail" &&
+        query.queryKey.includes(thread.threadId),
+    },
+    (old) => (old ? { ...old, status } : old),
+  );
+  clearCustomerServiceConversationUnread(thread.threadId);
+  if (thread.conversationId && thread.conversationId !== thread.threadId) {
+    clearCustomerServiceConversationUnread(thread.conversationId);
+  }
+  rememberCustomerServiceConversationIndex({
+    conversationId: thread.conversationId || thread.threadId,
+    lastMessageAt: transferredAt,
+    lastMessageId: readNonEmptyString(
+      (thread as unknown as Record<string, unknown>).lastMessageId,
+    ),
+    lastMessagePreview: thread.lastMessagePreview,
+    overlayUnreadCount: 0,
+    threadId: thread.threadId,
+    threadType: thread.threadType,
+  });
+  logCustomerServiceCacheDiagnostic({
+    event: "cache.thread.transferred",
+    result: "ok",
+    context: {
+      status,
+      threadId: thread.threadId,
+      threadType: thread.threadType,
+      transferredAt,
+    },
+  });
+}
+
+function transferredAwayStatus(status?: string) {
+  const normalized = String(status ?? "").trim().toLowerCase().replace(/-/g, "_");
+  if (
+    normalized === "transferred" ||
+    normalized === "transferred_out" ||
+    normalized === "assigned_away" ||
+    normalized === "handoff"
+  ) {
+    return normalized;
+  }
+  return "transferred";
+}
+
 function readNonEmptyString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
@@ -458,6 +639,15 @@ export function applyCustomerServiceGatewayMessageCache(
     threadType: CustomerServiceThread["threadType"];
   },
 ) {
+  const thread = {
+    conversationId: params.conversationId || params.message.conversationId || params.threadId,
+    status: "",
+    threadId: params.threadId,
+    threadType: params.threadType,
+    title: "",
+  };
+  if (isSilentCustomerServiceRecalledMessage(thread, params.message)) return;
+
   const overlayDecision = rememberCustomerServiceConversationMessageOverlay({
     conversationId: params.conversationId || params.message.conversationId,
     message: params.message,
@@ -472,13 +662,6 @@ export function applyCustomerServiceGatewayMessageCache(
     params.conversationId || params.message.conversationId || params.threadId,
     params.scopeKey,
   );
-  const thread = {
-    conversationId: params.threadId,
-    status: "",
-    threadId: params.threadId,
-    threadType: params.threadType,
-    title: "",
-  };
   appendCustomerServiceMessageToDetail(queryClient, thread, params.message);
   updateCustomerServiceThreadPreviewInList(queryClient, {
     incrementUnread: !params.selfMessage && !overlayDecision.sameMessage,

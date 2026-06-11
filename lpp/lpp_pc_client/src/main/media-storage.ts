@@ -363,11 +363,13 @@ function safeDiagnosticText(value: string) {
 function mediaErrorMessage(bytes: Uint8Array, contentType: string) {
   const preview = new TextDecoder().decode(bytes.slice(0, Math.min(bytes.byteLength, 2048))).trim();
   const lowerContentType = contentType.toLowerCase();
+  const lowerPreview = preview.toLowerCase();
   const looksJson = lowerContentType.includes('json') || preview.startsWith('{') || preview.startsWith('[');
   const looksHtml =
-    lowerContentType.includes('text/html') ||
+    lowerContentType.includes('html') ||
     /^<!doctype\s+html/i.test(preview) ||
     /^<html[\s>]/i.test(preview);
+  if (lowerPreview.includes('media signature has expired')) return 'MEDIA_SIGNATURE_EXPIRED';
   if (looksHtml) return '下载到的媒体文件是 HTML 错误页，请重新登录或稍后重试';
   if (!looksJson) return undefined;
   try {
@@ -376,6 +378,10 @@ function mediaErrorMessage(bytes: Uint8Array, contentType: string) {
       message?: string;
     } | null;
     if (!payload || typeof payload !== 'object') return undefined;
+    const payloadMessage = typeof payload.message === 'string' ? payload.message.trim() : '';
+    if (payloadMessage.toLowerCase().includes('media signature has expired')) {
+      return 'MEDIA_SIGNATURE_EXPIRED';
+    }
     if (payload.code === 'AUTH_REQUIRED') return '文件下载需要登录认证，请重新登录后再试';
     if (payload.code && payload.code !== 'OK' && payload.code !== 'SUCCESS') {
       return payload.message || payload.code;

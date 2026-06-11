@@ -192,6 +192,7 @@ function createWindow() {
     title: appTitle,
     icon: appIconPath,
     backgroundColor: '#f5f7fb',
+    autoHideMenuBar: app.isPackaged,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.cjs'),
       contextIsolation: true,
@@ -589,6 +590,9 @@ app.whenReady().then(() => {
   });
   if (process.platform === 'darwin' && !app.isPackaged) {
     app.dock?.setIcon(devDockIconPath);
+  }
+  if (app.isPackaged) {
+    Menu.setApplicationMenu(null);
   }
   createWindow();
   void updateManager.scheduleInitialAutoCheck();

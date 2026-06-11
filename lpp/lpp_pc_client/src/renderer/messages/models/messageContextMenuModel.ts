@@ -92,7 +92,7 @@ export function getMessageContextActionAvailability(
     reveal_in_folder: state.hasMedia && videoReadyForFileActions,
     save_media_as: state.hasMedia && videoReadyForFileActions,
     translate: state.isText,
-    voice_to_text: state.serverUsable && state.isVoice,
+    voice_to_text: false,
   };
 }
 

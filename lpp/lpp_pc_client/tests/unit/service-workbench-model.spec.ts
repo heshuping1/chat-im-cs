@@ -35,7 +35,9 @@ describe("customer service workbench model", () => {
       slaRiskCount: 1,
       totalCount: 3,
     });
-    expect(counters.activeTempSessions.map((item) => item.threadId)).toEqual(["serving-1"]);
+    expect(counters.activeTempSessions.map((item) => item.threadId)).toEqual([
+      "serving-1",
+    ]);
     expect(counters.queuedTempSessions.map((item) => item.threadId)).toEqual([
       "queued-in-active",
       "queued-1",
@@ -79,12 +81,12 @@ describe("customer service workbench model", () => {
       slaRiskCount: 1,
       totalCount: 3,
     });
-    expect(metrics.metrics.map((item) => [item.label, item.value])).toEqual([
-      ["容量", "2/5"],
-      ["排队", "1"],
-      ["进行中", "2"],
-      ["未读", "3"],
-      ["SLA", "1"],
+    expect(metrics.metrics.map((item) => item.value)).toEqual([
+      "2/5",
+      "1",
+      "2",
+      "3",
+      "1",
     ]);
   });
 

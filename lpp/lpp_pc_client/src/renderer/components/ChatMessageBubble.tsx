@@ -102,12 +102,14 @@ export function ChatMessageBubble({
     model.status.groupReadReceiptClickable &&
     Boolean(onGroupReadReceiptClick);
   const groupReadVisualRatio = 0.42;
+  const directReadReceiptLabel = model.status.readReceiptText;
   const groupReadLabel = groupReadReceiptLabel(model.status.groupReadReceipt);
   const statusReceipt = directReadReceipt ? (
     <span
-      aria-label="已读"
+      aria-label={directReadReceiptLabel || "已读"}
       className="pc-chat-bubble-receipt pc-chat-direct-read-receipt"
       role="img"
+      title={directReadReceiptLabel}
     >
       <DirectReadReceiptIcon />
     </span>
@@ -126,6 +128,11 @@ export function ChatMessageBubble({
   ) : null;
   const inlineStatusText = model.status.statusText ? (
     <span className="pc-chat-inline-status">{model.status.statusText}</span>
+  ) : null;
+  const readReceiptText = model.status.readReceiptText ? (
+    <span className="pc-chat-inline-status pc-chat-inline-read-receipt">
+      {model.status.readReceiptText}
+    </span>
   ) : null;
   const sendStatusSlot = mine && model.status.sendStatusSlot !== "none" ? (
     <MessageSendStatusSlot
@@ -178,6 +185,7 @@ export function ChatMessageBubble({
                 authToken={authToken}
                 mediaCacheContext={mediaCacheContext}
                 message={message}
+                mine={mine}
                 onContactClick={onContactClick}
                 onUploadAction={onUploadAction}
               />
@@ -190,12 +198,12 @@ export function ChatMessageBubble({
         )}
         <time className="pc-chat-time">
           <span>{model.status.timeText}</span>
-          {inlineStatusText && (
+          {(inlineStatusText || readReceiptText) && (
             <>
               <span className="pc-chat-time-separator" aria-hidden="true">
                 ·
               </span>
-              {inlineStatusText}
+              {readReceiptText || inlineStatusText}
             </>
           )}
         </time>

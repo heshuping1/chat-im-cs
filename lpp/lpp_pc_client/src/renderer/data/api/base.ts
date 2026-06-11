@@ -264,6 +264,9 @@ export class ApiBaseClient {
     Object.entries(await getAppInstanceHeaders()).forEach(([key, value]) => {
       headers.set(key, value);
     });
+    if (this.options.tenantId) {
+      headers.set("X-Tenant-Id", this.options.tenantId);
+    }
     if (token) {
       headers.set("Authorization", `Bearer ${token}`);
     }

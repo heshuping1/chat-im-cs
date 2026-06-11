@@ -47,6 +47,7 @@ export interface ChatMessageViewModel {
     sendStatusSlot: ChatMessageSendStatusSlot;
     showFailureMarker: boolean;
     showSendingIndicator: boolean;
+    readReceiptText?: string;
     statusText?: string;
     timeText: string;
   };
@@ -71,6 +72,7 @@ export interface CreateChatMessageViewModelInput {
   mineAvatarUrl?: string | null;
   timeText: string;
   statusText?: string;
+  readReceiptText?: string;
   conversationType?: string;
   translationText?: string;
   contextMenuEnabled?: boolean;
@@ -129,6 +131,10 @@ export function createChatMessageViewModel(
       sendStatusSlot: status.sendStatusSlot,
       showFailureMarker: status.showFailureMarker,
       showSendingIndicator: status.showSendingIndicator,
+      readReceiptText:
+        input.mine && status.receiptState === "read"
+          ? input.readReceiptText || status.statusLabel
+          : undefined,
       statusText: visibleStatusText(input.statusText ?? status.statusLabel, status.receiptState),
       timeText: input.timeText,
     },

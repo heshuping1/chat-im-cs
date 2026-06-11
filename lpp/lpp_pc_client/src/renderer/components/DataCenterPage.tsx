@@ -1,142 +1,152 @@
 import {
   Activity,
-  ChartNoAxesCombined,
-  Gauge,
-  LineChart,
-  RefreshCw,
-  UsersRound,
+  BarChart3,
+  Headphones,
+  History,
+  MessageCircleMore,
+  Repeat2,
+  Settings2,
+  Tags,
+  TicketCheck,
+  TrendingUp,
+  Users,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
 import type { PcDataCenterView } from "../data/workspace-access";
-import { useI18n } from "../i18n/useI18n";
-
-type DataCard = {
-  titleKey: string;
-  descriptionKey: string;
-  icon: LucideIcon;
-};
-
-const defaultDataCards: DataCard[] = [
-  {
-    titleKey: "dataCenter.cards.serviceEfficiency.title",
-    descriptionKey: "dataCenter.cards.serviceEfficiency.description",
-    icon: Gauge,
-  },
-  {
-    titleKey: "dataCenter.cards.customerGrowth.title",
-    descriptionKey: "dataCenter.cards.customerGrowth.description",
-    icon: UsersRound,
-  },
-  {
-    titleKey: "dataCenter.cards.serviceTrend.title",
-    descriptionKey: "dataCenter.cards.serviceTrend.description",
-    icon: LineChart,
-  },
-  {
-    titleKey: "dataCenter.cards.realtimeStatus.title",
-    descriptionKey: "dataCenter.cards.realtimeStatus.description",
-    icon: Activity,
-  },
-];
-
-const selfServiceDataCards: DataCard[] = [
-  {
-    titleKey: "dataCenter.cards.myServiceEfficiency.title",
-    descriptionKey: "dataCenter.cards.myServiceEfficiency.description",
-    icon: Gauge,
-  },
-  {
-    titleKey: "dataCenter.cards.myCustomerFollowUp.title",
-    descriptionKey: "dataCenter.cards.myCustomerFollowUp.description",
-    icon: UsersRound,
-  },
-  {
-    titleKey: "dataCenter.cards.myServiceTrend.title",
-    descriptionKey: "dataCenter.cards.myServiceTrend.description",
-    icon: LineChart,
-  },
-  {
-    titleKey: "dataCenter.cards.myRealtimeStatus.title",
-    descriptionKey: "dataCenter.cards.myRealtimeStatus.description",
-    icon: Activity,
-  },
-];
+import {
+  dataCenterDomains,
+  firstAvailableDataCenterDomain,
+  reportsForDataCenterDomain,
+} from "./data-center/dataCenterReportRegistry";
+import type {
+  DataCenterDomainId,
+  DataCenterReportDefinition,
+  DataCenterReportId,
+} from "./data-center/dataCenterReportTypes";
+import { PanelState } from "./PanelState";
 
 export function DataCenterPage({
   dataCenterView = "team-admin",
 }: {
   dataCenterView?: PcDataCenterView;
 }) {
-  const { t } = useI18n();
-  const dataCards = dataCardsForView(dataCenterView);
-  const pageTitle =
-    dataCenterView === "self-service"
-      ? t("dataCenter.title.selfService")
-      : dataCenterView === "enterprise-owner"
-        ? t("dataCenter.title.enterpriseOwner")
-        : t("dataCenter.title.default");
-  const pageDescription =
-    dataCenterView === "self-service"
-      ? t("dataCenter.description.selfService")
-      : t("dataCenter.description.default");
+  const initialDomain =
+    firstAvailableDataCenterDomain(dataCenterView)?.domainId ?? "customer-service";
+  const [selectedDomainId, setSelectedDomainId] =
+    useState<DataCenterDomainId>(initialDomain);
+  const [selectedReportId, setSelectedReportId] =
+    useState<DataCenterReportId>("cs-history");
+
+  const domainsWithReports = useMemo(
+    () =>
+      dataCenterDomains.map((domain) => ({
+        ...domain,
+        reports: reportsForDataCenterDomain(domain.domainId, dataCenterView),
+      })),
+    [dataCenterView],
+  );
+  const selectedDomain =
+    domainsWithReports.find((domain) => domain.domainId === selectedDomainId) ??
+    domainsWithReports.find((domain) => domain.reports.length > 0);
+  const reports = selectedDomain?.reports ?? [];
+  const activeReport =
+    reports.find((report) => report.reportId === selectedReportId) ?? reports[0];
+
+  useEffect(() => {
+    if (selectedDomain?.domainId && selectedDomain.domainId !== selectedDomainId) {
+      setSelectedDomainId(selectedDomain.domainId);
+      return;
+    }
+    if (activeReport?.reportId && activeReport.reportId !== selectedReportId) {
+      setSelectedReportId(activeReport.reportId);
+    }
+  }, [activeReport?.reportId, selectedDomain?.domainId, selectedDomainId, selectedReportId]);
+
+  const ActiveReportComponent = activeReport?.component;
+
   return (
-    <main className="module-page skeleton-page data-center-page">
-      <header className="skeleton-hero">
-        <div>
-          <span className="eyebrow">DATA CENTER</span>
-          <h1>{pageTitle}</h1>
-          <p>{pageDescription}</p>
-        </div>
-        <button className="skeleton-primary-action" type="button" disabled>
-          <RefreshCw size={16} />
-          {t("dataCenter.refreshMetrics")}
-        </button>
-      </header>
-
-      <section className="skeleton-metric-strip">
-        <div>
-          <span>{t("dataCenter.metrics.todayConversations")}</span>
-          <strong>--</strong>
-        </div>
-        <div>
-          <span>{t("dataCenter.metrics.slaRisk")}</span>
-          <strong>--</strong>
-        </div>
-        <div>
-          <span>{t("dataCenter.metrics.customerSatisfaction")}</span>
-          <strong>--</strong>
-        </div>
-        <div>
-          <span>{t("dataCenter.metrics.pendingTickets")}</span>
-          <strong>--</strong>
-        </div>
-      </section>
-
-      <section className="skeleton-lane-grid four">
-        {dataCards.map((card) => {
-          const Icon = card.icon;
+    <main className="module-page data-center-page data-center-shell">
+      <nav className="data-center-domain-nav" aria-label="数据中心业务域">
+        {domainsWithReports.map((domain) => {
+          const Icon = domainIcon(domain.domainId);
+          const disabled = domain.reports.length === 0;
           return (
-            <article className="skeleton-lane-card" key={card.titleKey}>
-              <span className="skeleton-lane-icon">
-                <Icon size={18} />
-              </span>
-              <strong>{t(card.titleKey)}</strong>
-              <p>{t(card.descriptionKey)}</p>
-              <em>{t("common.noData")}</em>
-            </article>
+            <button
+              key={domain.domainId}
+              type="button"
+              className={domain.domainId === selectedDomain?.domainId ? "active" : ""}
+              disabled={disabled}
+              onClick={() => {
+                setSelectedDomainId(domain.domainId);
+                setSelectedReportId(domain.reports[0]?.reportId ?? "cs-history");
+              }}
+            >
+              <Icon size={16} />
+              <span>{domain.title}</span>
+              <small>{domain.description}</small>
+            </button>
           );
         })}
-      </section>
+      </nav>
 
-      <section className="skeleton-empty-panel wide">
-        <ChartNoAxesCombined size={30} />
-        <h2>{t("dataCenter.emptyTitle")}</h2>
-        <p>{t("dataCenter.emptyText")}</p>
+      {reports.length > 0 && (
+        <section className="data-center-report-cluster">
+          <nav
+            className="data-center-report-tabs"
+            aria-label={`${selectedDomain?.title ?? "数据中心"}二级页签`}
+          >
+            {reports.map((report) => {
+              const ReportIcon = reportIcon(report.reportId);
+              return (
+                <button
+                  key={report.reportId}
+                  type="button"
+                  className={report.reportId === activeReport?.reportId ? "active" : ""}
+                  aria-current={report.reportId === activeReport?.reportId ? "page" : undefined}
+                  onClick={() => setSelectedReportId(report.reportId)}
+                >
+                  <ReportIcon size={15} />
+                  {report.title}
+                </button>
+              );
+            })}
+          </nav>
+        </section>
+      )}
+
+      <section className="data-center-report-surface">
+        {ActiveReportComponent && activeReport ? (
+          <ActiveReportComponent dataCenterView={dataCenterView} report={activeReport} />
+        ) : (
+          <PanelState text="当前角色暂无可查看的数据报表。" />
+        )}
       </section>
     </main>
   );
 }
 
-function dataCardsForView(dataCenterView: PcDataCenterView) {
-  return dataCenterView === "self-service" ? selfServiceDataCards : defaultDataCards;
+function domainIcon(domainId: DataCenterDomainId) {
+  const icons = {
+    "customer-service": Headphones,
+    customers: Users,
+    operations: Settings2,
+    tickets: TicketCheck,
+  } satisfies Record<DataCenterDomainId, typeof BarChart3>;
+  return icons[domainId] ?? BarChart3;
 }
+
+function reportIcon(reportId: DataCenterReportId) {
+  const icons = {
+    "cs-history": History,
+    "cs-conversation-stats": MessageCircleMore,
+    "customer-growth": TrendingUp,
+    "customer-retention": Repeat2,
+    "ticket-efficiency": Activity,
+    "ticket-category": Tags,
+    "operations-system": Settings2,
+  } satisfies Record<DataCenterReportId, typeof BarChart3>;
+  return icons[reportId] ?? BarChart3;
+}
+
+export type { DataCenterReportDefinition };

@@ -32,7 +32,7 @@ class TestCustomerServiceApiClient extends CustomerServiceApiClient {
 }
 
 class RecordingCustomerServiceApiClient extends CustomerServiceApiClient {
-  readonly requests: Array<{ path: string; admin: boolean }> = [];
+  readonly requests: Array<{ path: string; admin: boolean; body?: unknown }> = [];
   readonly platformRequests: Array<{ path: string; body?: unknown }> = [];
 
   constructor(options: {
@@ -61,7 +61,11 @@ class RecordingCustomerServiceApiClient extends CustomerServiceApiClient {
     _init: RequestInit = {},
     admin = false,
   ) {
-    this.requests.push({ path, admin });
+    this.requests.push({
+      path,
+      admin,
+      ...(_init.body ? { body: JSON.parse(String(_init.body)) } : {}),
+    });
     return this.response as T;
   }
 
@@ -99,19 +103,28 @@ describe("CustomerServiceApiClient", () => {
     delete (globalThis as { window?: unknown }).window;
   });
 
-  it("queries customer service conversations with an admin token for owner workspaces", async () => {
+  it("keeps live workbench conversations on the client token for owner workspaces", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,
       tenantId: "tenant-1",
-      response: [
+      response: {
+        activeItems: [
         {
           conversationId: "conversation-1",
           lastMessageAt: "2026-06-02T12:00:00.000Z",
-          sessionId: "session-1",
+          threadId: "session-1",
+          threadType: "temp_session",
           status: "closed_timeout",
           visitorName: "访客 A",
         },
-      ],
+        ],
+        queueItems: [],
+        summary: {
+          activeCount: 0,
+          allCount: 1,
+          queuedCount: 0,
+        },
+      },
     });
 
     await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
@@ -127,29 +140,25 @@ describe("CustomerServiceApiClient", () => {
       queueItems: [],
       summary: {
         activeCount: 0,
-        allCount: 0,
+        allCount: 1,
         queuedCount: 0,
       },
     });
-    expect(client.platformRequests).toEqual([
-      {
-        body: { tenantId: "tenant-1" },
-        path: "/api/platform/v1/auth/admin-token",
-      },
-    ]);
+    expect(client.platformRequests).toEqual([]);
     expect(client.requests).toEqual([
       {
-        admin: true,
-        path: "/api/admin/v1/customer-service/temp-sessions?page=1&pageSize=50",
+        admin: false,
+        path: "/api/client/v1/customer-service/workbench/threads",
       },
     ]);
   });
 
-  it("loads owner readonly temp-session detail with the admin token", async () => {
+  it("loads owner temp-session detail through the workbench client endpoint", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,
       tenantId: "tenant-1",
       response: {
+        conversationId: "conversation-1",
         messages: [
           {
             body: { text: "hello" },
@@ -160,30 +169,54 @@ describe("CustomerServiceApiClient", () => {
             sentAt: "2026-06-02T12:00:00.000Z",
           },
         ],
-        session: {
-          conversationId: "conversation-1",
-          lastMessageAt: "2026-06-02T12:00:00.000Z",
-          sessionId: "session-1",
-          status: "closed_timeout",
-          visitorName: "访客 A",
+        status: "closed_timeout",
+        tempSession: {
+          readStatus: {
+            conversationId: "conversation-1",
+            members: [
+              { userId: "staff-1", lastReadSeq: 0, lastReadAt: null },
+              {
+                userId: "visitor-1",
+                lastReadSeq: 1,
+                lastReadAt: "2026-06-02T12:01:00.000Z",
+              },
+            ],
+            sessionId: "session-1",
+            visitorUserId: "visitor-1",
+          },
         },
+        threadId: "session-1",
+        threadType: "temp_session",
+        title: "访客 A",
       },
     });
 
     await expect(
       client.getWorkbenchThreadDetail("temp_session", "session-1"),
     ).resolves.toMatchObject({
-      accessMode: "management_readonly",
       conversationId: "conversation-1",
       messages: [{ messageId: "message-1" }],
+      readStatus: {
+        conversationId: "conversation-1",
+        members: [
+          { userId: "staff-1", lastReadSeq: 0, lastReadAt: null },
+          {
+            userId: "visitor-1",
+            lastReadSeq: 1,
+            lastReadAt: "2026-06-02T12:01:00.000Z",
+          },
+        ],
+        sessionId: "session-1",
+        visitorUserId: "visitor-1",
+      },
       status: "closed_timeout",
       threadId: "session-1",
       title: "访客 A",
     });
     expect(client.requests).toEqual([
       {
-        admin: true,
-        path: "/api/admin/v1/customer-service/temp-sessions/session-1",
+        admin: false,
+        path: "/api/client/v1/customer-service/workbench/threads/temp-session/session-1",
       },
     ]);
   });
@@ -198,13 +231,432 @@ describe("CustomerServiceApiClient", () => {
       },
     });
 
-    await expect(client.getTempSessionStats()).resolves.toMatchObject({
+    await expect(client.getTempSessionStats({ from: "2026-06-01", to: "2026-06-10" })).resolves.toMatchObject({
       totalSessions: 1,
     });
     expect(client.requests).toEqual([
       {
         admin: true,
-        path: "/api/admin/v1/customer-service/temp-sessions/stats",
+        path: "/api/admin/v1/customer-service/temp-sessions/stats?from=2026-06-01&to=2026-06-10",
+      },
+    ]);
+  });
+
+  it("loads temp-session notes through the client token API and keeps pinned notes first", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      response: {
+        items: [
+          {
+            content: "普通备注",
+            createdAt: "2026-06-02T12:00:00.000Z",
+            isPinned: false,
+            noteId: "note-2",
+            staffDisplayName: "Agent B",
+          },
+          {
+            content: "置顶备注",
+            createdAt: "2026-06-01T12:00:00.000Z",
+            isPinned: true,
+            noteId: "note-1",
+            staffDisplayName: "Agent A",
+          },
+        ],
+      },
+    });
+
+    await expect(client.getTempSessionNotes("session-1")).resolves.toMatchObject([
+      {
+        content: "置顶备注",
+        isPinned: true,
+        noteId: "note-1",
+      },
+      {
+        content: "普通备注",
+        isPinned: false,
+        noteId: "note-2",
+      },
+    ]);
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        path: "/api/client/v1/customer-service/temp-sessions/session-1/notes",
+      },
+    ]);
+  });
+
+  it("creates a temp-session note with trimmed content", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      response: {
+        content: "VIP 客户，关注退款时效",
+        createdAt: "2026-06-02T12:00:00.000Z",
+        isPinned: false,
+        noteId: "note-1",
+        staffDisplayName: "Agent A",
+      },
+    });
+
+    await expect(
+      client.createTempSessionNote("session-1", {
+        content: "  VIP 客户，关注退款时效  ",
+        isPinned: false,
+      }),
+    ).resolves.toMatchObject({
+      content: "VIP 客户，关注退款时效",
+      noteId: "note-1",
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        body: {
+          content: "VIP 客户，关注退款时效",
+          isPinned: false,
+        },
+        path: "/api/client/v1/customer-service/temp-sessions/session-1/notes",
+      },
+    ]);
+  });
+
+  it("rejects temp-session note content longer than 2000 characters before posting", () => {
+    const client = new RecordingCustomerServiceApiClient();
+
+    expect(() =>
+      client.createTempSessionNote("session-1", {
+        content: "x".repeat(2001),
+        isPinned: false,
+      }),
+    ).toThrow("2000");
+    expect(client.requests).toEqual([]);
+  });
+
+  it("updates temp-session note pin state through the client token API", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      response: {
+        content: "置顶备注",
+        createdAt: "2026-06-02T12:00:00.000Z",
+        isPinned: true,
+        noteId: "note-1",
+        staffDisplayName: "Agent A",
+      },
+    });
+
+    await expect(
+      client.setTempSessionNotePinned("session-1", "note-1", true),
+    ).resolves.toMatchObject({
+      isPinned: true,
+      noteId: "note-1",
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        body: { pinned: true },
+        path: "/api/client/v1/customer-service/temp-sessions/session-1/notes/note-1/pin",
+      },
+    ]);
+  });
+
+  it("deletes a temp-session note through the client token API", async () => {
+    const client = new RecordingCustomerServiceApiClient();
+
+    await client.deleteTempSessionNote("session-1", "note-1");
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        path: "/api/client/v1/customer-service/temp-sessions/session-1/notes/note-1",
+      },
+    ]);
+  });
+
+  it("loads live monitor threads from the admin service center", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        items: [
+          {
+            conversationId: "conversation-queued",
+            lastMessagePreview: "waiting",
+            status: "queued",
+            threadId: "thread-queued",
+            threadType: "temp_session",
+            title: "Visitor Q",
+          },
+          {
+            conversationId: "conversation-active",
+            lastMessagePreview: "active",
+            status: "active",
+            threadId: "thread-active",
+            threadType: "im_direct",
+            title: "Customer A",
+          },
+        ],
+        summary: {
+          activeCount: 1,
+          allCount: 2,
+          queuedCount: 1,
+          vipCount: 0,
+        },
+      },
+    });
+
+    await expect(
+      client.getCustomerServiceMonitorThreads({
+        assignedStaffUserId: "staff-1",
+        status: "active",
+        threadType: "im_direct",
+      }),
+    ).resolves.toMatchObject({
+      items: [
+        {
+          status: "queued",
+          threadId: "thread-queued",
+          threadType: "temp_session",
+        },
+        {
+          status: "active",
+          threadId: "thread-active",
+          threadType: "im_direct",
+        },
+      ],
+      summary: {
+        activeCount: 1,
+        allCount: 2,
+        queuedCount: 1,
+      },
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/threads?page=1&pageSize=50&assignedStaffUserId=staff-1&status=active&threadType=im_direct",
+      },
+    ]);
+  });
+
+  it("loads monitor threads without forcing a default status or thread type", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        items: [
+          {
+            conversationId: "conversation-active",
+            lastMessagePreview: "active",
+            status: "active",
+            threadId: "thread-active",
+            threadType: "im_direct",
+            title: "Active customer",
+          },
+          {
+            conversationId: "conversation-queued",
+            lastMessagePreview: "queued",
+            status: "queued",
+            threadId: "thread-queued",
+            threadType: "temp_session",
+            title: "Queued customer",
+          },
+        ],
+      },
+    });
+
+    await expect(
+      client.getCustomerServiceMonitorThreads(),
+    ).resolves.toMatchObject({
+      items: [
+        {
+          status: "queued",
+          threadId: "thread-queued",
+        },
+        {
+          status: "active",
+          threadId: "thread-active",
+          threadType: "im_direct",
+        },
+      ],
+      summary: {
+        activeCount: 1,
+        allCount: 2,
+        queuedCount: 1,
+      },
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/threads?page=1&pageSize=50",
+      },
+    ]);
+  });
+
+  it("loads owner closed history from admin unified history sessions instead of realtime center threads", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        items: [
+          {
+            status: "closed",
+            threadId: "history-1",
+            threadType: "im_direct",
+            title: "History customer",
+          },
+        ],
+      },
+    });
+
+    await expect(
+      client.getCustomerServiceHistoryThreads({
+        keyword: "refund",
+        limit: 50,
+        staffUserId: "staff-1",
+        status: "closed",
+        threadType: "im_direct",
+      }),
+    ).resolves.toMatchObject({
+      items: [
+        {
+          status: "closed",
+          threadId: "history-1",
+          threadType: "im_direct",
+        },
+      ],
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/history-sessions?threadType=im_direct&status=closed&limit=50&keyword=refund&staffUserId=staff-1",
+      },
+    ]);
+  });
+
+  it("loads owner all history from admin unified history sessions without a customer or staff scope", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-history-all",
+      response: {
+        items: [
+          {
+            conversationId: "conversation-1",
+            sourceChannel: "temp-chat-widget",
+            status: "closed_timeout",
+            threadId: "session-1",
+            threadType: "temp_session",
+            visitorName: "Visitor A",
+          },
+        ],
+        nextCursor: "cursor-2",
+        summary: {
+          totalSessions: 216,
+          avgFirstResponseSeconds: 59,
+          sourcePlatformDistribution: [{ label: "Web", value: 216 }],
+        },
+      },
+    });
+
+    await expect(
+      client.getCustomerServiceHistoryThreads({
+        limit: 50,
+      }),
+    ).resolves.toMatchObject({
+      items: [
+        {
+          conversationId: "conversation-1",
+          sourceChannel: "temp-chat-widget",
+          status: "closed_timeout",
+          threadId: "session-1",
+          threadType: "temp_session",
+          title: "Visitor A",
+        },
+      ],
+      nextCursor: "cursor-2",
+      summary: {
+        totalSessions: 216,
+      },
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/history-sessions?limit=50",
+      },
+    ]);
+    expect(client.platformRequests).toEqual(
+      client.platformRequests.length
+        ? [
+            {
+              body: { tenantId: "tenant-history-all" },
+              path: "/api/platform/v1/auth/admin-token",
+            },
+          ]
+        : [],
+    );
+  });
+
+  it("creates customer-service server export tasks with the admin export API", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: { taskId: "export-1", status: "pending" },
+    });
+
+    await expect(
+      client.createCustomerServiceExportTask({
+        exportType: "cs_sessions",
+        filters: { from: "2026-06-01", to: "2026-06-10" },
+      }),
+    ).resolves.toMatchObject({ taskId: "export-1" });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        body: {
+          exportType: "cs_sessions",
+          filters: { from: "2026-06-01", to: "2026-06-10" },
+        },
+        path: "/api/admin/v1/export-tasks",
+      },
+    ]);
+  });
+
+  it("lists customer-service export tasks with the admin export API", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: [
+        {
+          exportType: "cs_sessions",
+          status: "completed",
+          taskId: "export-sessions",
+        },
+        {
+          exportType: "cs_staff_daily_stats",
+          status: "completed",
+          taskId: "export-staff",
+        },
+      ],
+    });
+
+    await expect(
+      client.getCustomerServiceExportTasks({ exportType: "cs_staff_daily_stats" }),
+    ).resolves.toEqual([
+      {
+        exportType: "cs_staff_daily_stats",
+        status: "completed",
+        taskId: "export-staff",
+      },
+    ]);
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/export-tasks",
+      },
+    ]);
+  });
+
+  it("uses the silent recall endpoint for customer service message recall", async () => {
+    const client = new RecordingCustomerServiceApiClient();
+
+    await client.recallCustomerServiceMessage("message-1");
+
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        path: "/api/client/v1/messages/message-1/recall-silent",
       },
     ]);
   });

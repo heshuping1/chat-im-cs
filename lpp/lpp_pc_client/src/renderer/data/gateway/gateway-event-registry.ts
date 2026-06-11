@@ -56,6 +56,12 @@ export const customerServiceLifecycleEventNames = [
   "customer_service.sla.breached",
 ] as const;
 
+export const customerServiceTypingEventNames = [
+  "temp_session.typing",
+  "customer_service.typing",
+  "customer_service.thread.typing",
+] as const;
+
 export const tenantJoinRequestEventNames = [
   "tenant.join_request.reviewed",
   "tenant.join_request.approved",
@@ -66,10 +72,12 @@ export const gatewayEvents = [
   ...imMessageEventNames,
   ...imReadEventNames,
   "msg.recalled",
+  "msg.typing",
   "space.notice",
   ...customerServiceQueueEventNames,
   ...customerServiceMessageEventNames,
   ...customerServiceLifecycleEventNames,
+  ...customerServiceTypingEventNames,
   "friend.request.created",
   "friend.request.accepted",
   "friend.request.rejected",
@@ -116,6 +124,9 @@ const customerServiceQueueEventNameSet = new Set<string>(
 const customerServiceLifecycleEventNameSet = new Set<string>(
   customerServiceLifecycleEventNames,
 );
+const customerServiceTypingEventNameSet = new Set<string>(
+  customerServiceTypingEventNames,
+);
 const tenantJoinRequestEventNameSet = new Set<string>(tenantJoinRequestEventNames);
 
 export function isImMessageEventName(eventName: string) {
@@ -140,6 +151,10 @@ export function isCustomerServiceQueueEventName(eventName: string) {
 
 export function isCustomerServiceLifecycleEventName(eventName: string) {
   return customerServiceLifecycleEventNameSet.has(eventName);
+}
+
+export function isCustomerServiceTypingEventName(eventName: string) {
+  return customerServiceTypingEventNameSet.has(eventName);
 }
 
 export function isTenantJoinRequestEventName(eventName: string) {

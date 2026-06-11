@@ -18,6 +18,48 @@ describe("customer service role capabilities", () => {
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 2 })).toBe(false);
   });
 
+  it("accepts string and label based customer service roles for staff actions", () => {
+    expect(canUseCustomerServiceStaffEndpoints({ membershipRole: "2" })).toBe(true);
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "客服" })).toBe(true);
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "customer_service" })).toBe(true);
+    expect(canUseCustomerServiceManagementReadonly({ membershipRole: "2" })).toBe(false);
+    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "客服" })).toBe(false);
+  });
+
+  it("keeps label based owner and admin accounts on readonly management access", () => {
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "管理员" })).toBe(false);
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "owner" })).toBe(false);
+    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "管理员" })).toBe(true);
+    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "owner" })).toBe(true);
+  });
+
+  it("does not block token or tenant-account sessions when role metadata is incomplete", () => {
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "已配置 Token" })).toBe(true);
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "tenant-account" })).toBe(true);
+    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "已配置 Token" })).toBe(false);
+  });
+
+  it("falls back to the current tenant membership role", () => {
+    expect(
+      canUseCustomerServiceStaffEndpoints({
+        tenantId: "tenant-1",
+        tenants: [{ tenantId: "tenant-1", membershipRole: 2 }],
+      }),
+    ).toBe(true);
+    expect(
+      canUseCustomerServiceStaffEndpoints({
+        tenantId: "tenant-1",
+        tenants: [{ tenantId: "tenant-1", membershipRole: 3 }],
+      }),
+    ).toBe(false);
+    expect(
+      canUseCustomerServiceManagementReadonly({
+        tenantId: "tenant-1",
+        tenants: [{ tenantId: "tenant-1", membershipRole: 3 }],
+      }),
+    ).toBe(true);
+  });
+
   it("does not treat unknown high role numbers as management roles", () => {
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 5 })).toBe(false);
   });

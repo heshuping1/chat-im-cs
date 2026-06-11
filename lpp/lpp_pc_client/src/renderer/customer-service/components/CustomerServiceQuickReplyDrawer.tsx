@@ -250,6 +250,7 @@ export function CustomerServiceQuickReplyPanel({
                   key={reply.quickReplyId}
                   active={selectedReply?.quickReplyId === reply.quickReplyId}
                   reply={reply}
+                  onInsert={() => insertReply(reply)}
                   onSelect={() => setSelectedId(reply.quickReplyId)}
                 />
               ))}
@@ -362,10 +363,12 @@ export function createQuickReplyPickerViewModel({
 
 function QuickReplyCard({
   active,
+  onInsert,
   onSelect,
   reply,
 }: {
   active: boolean;
+  onInsert: () => void;
   onSelect: () => void;
   reply: CustomerServiceQuickReplyDto;
 }) {
@@ -377,6 +380,7 @@ function QuickReplyCard({
       type="button"
       aria-pressed={active}
       onClick={onSelect}
+      onDoubleClick={onInsert}
     >
       <span className="cs-quick-reply-marker" aria-hidden="true">
         {active ? <Check size={13} /> : <Tags size={13} />}

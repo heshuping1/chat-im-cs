@@ -6,6 +6,7 @@ import type { ConversationListItem } from "../../data/api-client";
 import { useI18n } from "../../i18n/useI18n";
 import { formatBadgeCount, formatChatTime } from "../../lib/format";
 import { renderWechatEmojiText } from "../../lib/wechatEmoji";
+import type { ConversationListIdentityView } from "../models/conversationListIdentityModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 
 export function ConversationAvatar({
@@ -62,6 +63,7 @@ export function ConversationRow({
   conversation,
   draft,
   groupAvatar,
+  identity,
   isGroup,
   onClick,
   onContextMenu,
@@ -72,6 +74,7 @@ export function ConversationRow({
   conversation: ConversationListItem;
   draft?: string;
   groupAvatar?: GroupConversationAvatar;
+  identity?: ConversationListIdentityView;
   isGroup: boolean;
   onClick: () => void;
   onContextMenu: (event: MouseEvent<HTMLElement>) => void;
@@ -79,6 +82,7 @@ export function ConversationRow({
 }) {
   const { t } = useI18n();
   const draftText = draft?.trim();
+  const title = conversation.title || t("messages.conversationRow.unnamed");
 
   return (
     <button
@@ -96,7 +100,19 @@ export function ConversationRow({
         unread={unread}
       />
       <span className="e-conversation-copy">
-        <strong>{conversation.title || t("messages.conversationRow.unnamed")}</strong>
+        <strong className="e-conversation-title-line">
+          <span className="e-conversation-title-text">{title}</span>
+          {identity?.identityText && (
+            <span className={`e-conversation-identity ${identity.kind}`}>
+              · {identity.identityText}
+            </span>
+          )}
+          {identity?.sourceText && (
+            <span className={`e-conversation-source ${identity.kind}`}>
+              {identity.sourceText}
+            </span>
+          )}
+        </strong>
         {draftText ? (
           <small className="e-conversation-draft">
             <span className="e-draft-prefix">{t("messages.conversationRow.draftPrefix")}</span>

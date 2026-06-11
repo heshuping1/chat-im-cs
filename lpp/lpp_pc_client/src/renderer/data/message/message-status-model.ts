@@ -210,9 +210,11 @@ function groupReceiptStatus(
 function isDirectRead(message: MessageItemDto) {
   const record = message as unknown as Record<string, unknown>;
   const status = String(message.status ?? "").trim().toLowerCase();
+  const readCount = numberFieldAllowZero(record, "readCount", "read_count");
   return Boolean(
     message.isRead ||
       message.readAt ||
+      (readCount !== undefined && readCount > 0) ||
       status === "read" ||
       status === "seen" ||
       record.deliveryStatus === "read",

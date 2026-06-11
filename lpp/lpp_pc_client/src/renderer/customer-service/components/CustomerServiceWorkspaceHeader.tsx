@@ -1,4 +1,4 @@
-import { Languages, Mail, ShieldAlert } from "lucide-react";
+import { ArrowRightLeft, Languages, Mail, Search, ShieldAlert, XCircle } from "lucide-react";
 import { ChannelBadge } from "../../components/ChannelBadge";
 import { PcAvatar } from "../../components/PcAvatar";
 import type { CustomerServiceIdentityViewModel } from "../../data/customer-service/cs-identity-view-model";
@@ -16,8 +16,13 @@ export function CustomerServiceWorkspaceHeader({
   title,
   autoTranslateEffective,
   autoTranslateMode,
+  canClose,
+  canTransfer,
   unreadCount = 0,
   onCycleAutoTranslateMode,
+  onCloseThread,
+  onOpenLookup,
+  onOpenTransfer,
   onOpenCustomerContext,
 }: {
   identity: CustomerServiceIdentityViewModel;
@@ -29,8 +34,13 @@ export function CustomerServiceWorkspaceHeader({
   title: string;
   autoTranslateEffective: boolean;
   autoTranslateMode: AutoTranslateConversationMode;
+  canClose?: boolean;
   unreadCount?: number;
+  canTransfer?: boolean;
   onCycleAutoTranslateMode: () => void;
+  onCloseThread?: () => void;
+  onOpenLookup: () => void;
+  onOpenTransfer?: () => void;
   onOpenCustomerContext?: () => void;
 }) {
   const { t } = useI18n();
@@ -57,21 +67,6 @@ export function CustomerServiceWorkspaceHeader({
             <ChannelBadge source={source} compact />
             <span>{identity.isVip ? t("customerService.header.vipCustomer") : t("customerService.header.normalCustomer")}</span>
             <span>{modeLabel}</span>
-            <button
-              className={`chat-meta-action ${autoTranslateEffective ? "active" : ""}`}
-              type="button"
-              aria-label={t("customerService.header.autoTranslateNamed", {
-                state: autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective, t),
-              })}
-              title={t("customerService.header.autoTranslateNamed", {
-                state: autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective, t),
-              })}
-              aria-pressed={autoTranslateEffective}
-              onClick={onCycleAutoTranslateMode}
-            >
-              <Languages size={12} />
-              {t("composer.translate")}
-            </button>
             <span className={`reply-gate-${replyGate}`}>
               {replyGateLabel(replyGate, readOnly, t)}
             </span>
@@ -89,6 +84,52 @@ export function CustomerServiceWorkspaceHeader({
             )}
           </div>
         </div>
+      </div>
+      <div className="h-chat-head-actions" aria-label={t("customerService.header.actionsAria")}>
+        <button
+          className={autoTranslateEffective ? "active" : ""}
+          type="button"
+          aria-label={t("customerService.header.autoTranslateNamed", {
+            state: autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective, t),
+          })}
+          title={t("customerService.header.autoTranslateNamed", {
+            state: autoTranslateModeLabel(autoTranslateMode, autoTranslateEffective, t),
+          })}
+          aria-pressed={autoTranslateEffective}
+          onClick={onCycleAutoTranslateMode}
+        >
+          <Languages size={14} />
+          {t("composer.translate")}
+        </button>
+        <button
+          type="button"
+          disabled={!canTransfer || !onOpenTransfer}
+          aria-label={t("customerService.transfer.open")}
+          title={t("customerService.transfer.open")}
+          onClick={onOpenTransfer}
+        >
+          <ArrowRightLeft size={14} />
+          {t("customerService.transfer.openShort")}
+        </button>
+        <button
+          type="button"
+          disabled={!canClose || !onCloseThread}
+          aria-label={t("customerService.action.closeThread")}
+          title={t("customerService.action.closeThread")}
+          onClick={onCloseThread}
+        >
+          <XCircle size={14} />
+          {t("common.close")}
+        </button>
+        <button
+          type="button"
+          aria-label={t("messages.chatHeader.searchMessages")}
+          title={t("messages.chatHeader.searchMessages")}
+          onClick={onOpenLookup}
+        >
+          <Search size={14} />
+          {t("messages.chatHeader.searchMessages")}
+        </button>
       </div>
     </header>
   );

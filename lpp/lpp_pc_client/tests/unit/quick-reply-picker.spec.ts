@@ -1,9 +1,24 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { CustomerServiceQuickReplyDto } from "../../src/renderer/data/api/types";
 import { createQuickReplyPickerViewModel } from "../../src/renderer/customer-service/components/CustomerServiceQuickReplyDrawer";
 
 describe("quick reply picker view model", () => {
+  const pickerSource = readFileSync(
+    resolve(
+      process.cwd(),
+      "src/renderer/customer-service/components/CustomerServiceQuickReplyDrawer.tsx",
+    ),
+    "utf8",
+  );
+
+  it("inserts a quick reply directly from a list item double click", () => {
+    expect(pickerSource).toContain("onInsert={() => insertReply(reply)}");
+    expect(pickerSource).toContain("onDoubleClick={onInsert}");
+  });
+
   it("derives scoped all replies, categories and selected reply", () => {
     const vm = createQuickReplyPickerViewModel({
       filter: "all",

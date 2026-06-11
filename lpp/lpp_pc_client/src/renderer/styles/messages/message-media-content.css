@@ -633,7 +633,6 @@ button.message-image-frame {
   font-size: 20px;
 }
 
-.message-audio-card,
 .message-video-card,
 .message-contact-card {
   display: grid;
@@ -644,27 +643,125 @@ button.message-image-frame {
   color: #1f2937;
 }
 
+.message-audio-wrap {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .message-audio-card {
-  grid-template-columns: auto minmax(76px, 1fr);
-  gap: 8px 10px;
-  min-width: 250px;
-  padding: 9px 10px;
+  display: inline-flex;
+  width: var(--voice-card-width, 82px);
+  min-width: 82px;
+  max-width: min(178px, 46vw);
+  min-height: 36px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 0 12px 0 11px;
+  border: 0;
+  border-radius: 5px;
+  background: #eeeeee;
+  color: #111827;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
-.message-audio-card > div {
-  display: grid;
-  min-width: 0;
+.message-audio-card:hover:not(:disabled) {
+  background: #e8e8e8;
+}
+
+.message-audio-card:active:not(:disabled),
+.message-audio-card.is-playing {
+  background: #e2e2e2;
+}
+
+.message-audio-card:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.message-audio-wave {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
   gap: 2px;
+  color: currentColor;
 }
 
-.message-audio-card audio {
-  grid-column: 1 / -1;
-  width: 100%;
-  height: 32px;
+.message-audio-wave span {
+  display: block;
+  width: 2px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
-.message-audio-card strong,
-.message-audio-card em,
+.message-audio-wave span:nth-child(1) {
+  height: 7px;
+}
+
+.message-audio-wave span:nth-child(2) {
+  height: 12px;
+}
+
+.message-audio-wave span:nth-child(3) {
+  height: 17px;
+}
+
+.message-audio-card.is-playing .message-audio-wave span:nth-child(1) {
+  animation: voice-wave-pulse 820ms ease-in-out infinite;
+}
+
+.message-audio-card.is-playing .message-audio-wave span:nth-child(2) {
+  animation: voice-wave-pulse 820ms ease-in-out 120ms infinite;
+}
+
+.message-audio-card.is-playing .message-audio-wave span:nth-child(3) {
+  animation: voice-wave-pulse 820ms ease-in-out 240ms infinite;
+}
+
+.message-audio-card strong {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 520;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-audio-native {
+  display: none;
+}
+
+.message-audio-unread-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #ff3b30;
+}
+
+@keyframes voice-wave-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.72);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 .message-video-card small,
 .message-contact-card strong,
 .message-contact-card em {
@@ -673,7 +770,6 @@ button.message-image-frame {
   white-space: nowrap;
 }
 
-.message-audio-card em,
 .message-video-card small,
 .message-contact-card em,
 .message-media-unavailable {

@@ -12,6 +12,7 @@ describe("createCustomerServiceGatewayDispatchHandlers", () => {
     const handlers = createCustomerServiceGatewayDispatchHandlers({
       onMessageReceived: (event) => handled.push(`message:${event.threadId}`),
       onThreadChanged: (event) => handled.push(`thread:${event.changeKind}`),
+      onTypingPreview: (event) => handled.push(`typing:${event.threadId}`),
     });
 
     dispatchGatewayEvent(
@@ -38,8 +39,21 @@ describe("createCustomerServiceGatewayDispatchHandlers", () => {
       },
       handlers,
     );
+    dispatchGatewayEvent(
+      {
+        kind: "cs.typing.preview",
+        eventName: "temp_session.typing",
+        receivedAt: 3,
+        rawPayload: {},
+        threadId: "thread-1",
+        threadType: "temp_session",
+        isTyping: true,
+        previewText: "draft",
+      },
+      handlers,
+    );
 
-    expect(handled).toEqual(["message:thread-1", "thread:queue_created"]);
+    expect(handled).toEqual(["message:thread-1", "thread:queue_created", "typing:thread-1"]);
   });
 
   it("adapts and dispatches first-stage customer service gateway events", () => {
@@ -66,6 +80,31 @@ describe("createCustomerServiceGatewayDispatchHandlers", () => {
 
     expect(result).toBe(true);
     expect(handled).toEqual(["thread-1"]);
+  });
+
+  it("adapts and dispatches customer typing preview events", () => {
+    const handled: string[] = [];
+    const result = handleFirstStageCustomerServiceGatewayEvent(
+      {
+        eventName: "temp_session.typing",
+        receivedAt: 1,
+        args: [
+          {
+            sessionId: "thread-typing-1",
+            content: "typing draft",
+            senderRole: "visitor",
+          },
+        ],
+      },
+      {
+        onMessageReceived: (event) => handled.push(`message:${event.threadId}`),
+        onThreadChanged: (event) => handled.push(`thread:${event.changeKind}`),
+        onTypingPreview: (event) => handled.push(`typing:${event.previewText}`),
+      },
+    );
+
+    expect(result).toBe(true);
+    expect(handled).toEqual(["typing:typing draft"]);
   });
 
   it("claims msg.new events when the nested message belongs to a temp session", () => {

@@ -212,4 +212,20 @@ describe("workspace ui store selectors", () => {
       useWorkspaceStore.setState({ profilePaneWidth: previousWidth });
     }
   });
+
+  it("allows the online service assistant pane to expand like an IM side pane", () => {
+    const previousWidth = useWorkspaceStore.getState().serviceAssistantPaneWidth;
+    try {
+      useWorkspaceStore.getState().setServiceAssistantPaneWidth(700);
+      expect(useWorkspaceStore.getState().serviceAssistantPaneWidth).toBe(700);
+
+      useWorkspaceStore.getState().setServiceAssistantPaneWidth(1200);
+      expect(useWorkspaceStore.getState().serviceAssistantPaneWidth).toBe(960);
+
+      useWorkspaceStore.getState().setServiceAssistantPaneWidth(120);
+      expect(useWorkspaceStore.getState().serviceAssistantPaneWidth).toBe(320);
+    } finally {
+      useWorkspaceStore.setState({ serviceAssistantPaneWidth: previousWidth });
+    }
+  });
 });

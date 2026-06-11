@@ -1,6 +1,6 @@
 # 客户端 API 字段与枚举速查
 
-> 文档校对快照：2026-05-22
+> 文档校对快照：2026-05-22(2026-06-10 增量校对:客服域 —— 输入预览/已读时间/静默撤回/转接/复访续聊/自动话术配置/会话备注/报表导出)
 
 版本基于当前 `/api/platform/v1`、`/api/client/v1`、`/api/widget/v1` 对外契约整理，目标是让第三方客户端不用翻源码也能确认字段和值域。
 
@@ -241,10 +241,10 @@ Base URL：`/api/client/v1`
 | `/direct-chats/{chatId}/messages` | POST | `SendDirectMessageRequest` | `messageId` `conversationId` `conversationSeq` `serverTime` | `messageType=text/markdown/image/video/voice/file/contact_card/call_log/location/event` |
 | `/direct-chats/{chatId}/messages` | GET | `beforeSeq?` `limit?` | `MessageItemDto[]` | `limit` 实际范围 `1..200` |
 | `/direct-chats/{chatId}/read` | POST | `readSeq` | `chatId` `readSeq` | 标记到某个会话内序号 |
-| `/direct-chats/{chatId}/read-status` | GET | 无 | `PeerReadStatusDto` | 查询对端已读位置 |
+| `/direct-chats/{chatId}/read-status` | GET | 无 | `PeerReadStatusDto` | 查询对端已读位置;🆕 2026-06-10 `peerLastReadAt` 为真实已读时间(只在对端标记已读时推进),从未上报为 `null` |
 | `/direct-chats/{chatId}/pin` | PUT | `pinned` | `chatId` | 会话个人设置 |
 | `/direct-chats/{chatId}/mute` | PUT | `muted` | `chatId` | 会话个人设置 |
-| `/direct-chats/{chatId}/typing` | POST | 无 | `chatId` `userId` | 当前是占位接口，不做实时转发 |
+| `/direct-chats/{chatId}/typing` | POST | `preview?`(可省略 body) | `chatId` `userId` | 🆕 2026-06-10 正在输入预览:对端收 `msg.typing` 帧(含未发送内容,截断 500 字);`preview=null`/空 body = 停止输入 |
 | `/direct-chats/{chatId}/files` | GET | `mediaKind?` `limit?` | `ChatFileDto[]` | `mediaKind=image/video/voice/file` |
 | `/direct-chats/{chatId}/draft` | PUT | `draftText` | `chatId` | 保存草稿 |
 | `/direct-chats/{chatId}/draft` | DELETE | 无 | `chatId` | 删除草稿 |
@@ -255,7 +255,7 @@ Base URL：`/api/client/v1`
 | `/groups/{groupId}/messages` | POST | `SendGroupMessageRequest` | `messageId` `conversationId` `conversationSeq` `serverTime` | 群消息支持 `mentions[]` |
 | `/groups/{groupId}/messages` | GET | `beforeSeq?` `limit?` | `MessageItemDto[]` | `limit` 实际范围 `1..200` |
 | `/groups/{groupId}/read` | POST | `readSeq` | `groupId` `readSeq` | 标记群已读 |
-| `/groups/{groupId}/read-receipts` | GET | 无 | `GroupReadReceiptsDto` | 包含已读成员列表和统计 |
+| `/groups/{groupId}/read-receipts` | GET | 无 | `GroupReadReceiptsDto` | 包含已读成员列表和统计;🆕 2026-06-10 成员行新增 `lastReadAt` |
 | `/groups/{groupId}/typing` | POST | 无 | `groupId` `userId` | 当前是占位接口 |
 | `/groups/{groupId}/members` | GET | 无 | `GroupMemberDto[]` | `role=owner/admin/member` |
 | `/groups/{groupId}/members` | POST | `userIds[]` | `groupId` `addedCount` | 返回新增成员数 |
@@ -281,7 +281,8 @@ Base URL：`/api/client/v1`
 | `/groups/{groupId}/draft` | PUT | `draftText` | `groupId` | 保存草稿 |
 | `/groups/{groupId}/draft` | DELETE | 无 | `groupId` | 删除草稿 |
 | `/groups/{groupId}/files` | GET | `mediaKind?` `limit?` | `ChatFileDto[]` | `mediaKind=image/video/voice/file` |
-| `/messages/{messageId}/recall` | POST | 无 | `messageId` | 撤回消息 |
+| `/messages/{messageId}/recall` | POST | 无 | `messageId` | 撤回消息(对端显示"[消息已撤回]"占位) |
+| `/messages/{messageId}/recall-silent` | POST | 无 | `messageId` `silent` | 🆕 2026-06-10 客服静默撤回:仅限客服会话(否则 400 `SILENT_RECALL_NOT_ALLOWED`);所有端整行消失无占位,`msg.recalled` 帧 `silent=true` |
 | `/messages/{messageId}/delete` | POST | 无 | `messageId` | 仅自己删除 |
 | `/messages/forward` | POST | `sourceMessageId` `targetConversationId` `clientMsgId` | `messageId` `conversationId` `conversationSeq` `serverTime` | 分别表示新消息 ID、目标会话 ID、目标会话内顺序号、服务端时间 |
 
@@ -371,7 +372,7 @@ Base URL：`/api/widget/v1`
 | 端点 | 方法 | 请求字段 / 查询参数 | 响应 `data` | 关键枚举 / 说明 |
 |---|---|---|---|---|
 | `/{tenantCode}/config` | GET | 路径参数：`tenantCode` | Widget 配置 | 无需鉴权 |
-| `/{tenantCode}/sessions` | POST | `WidgetCreateSessionInput` | `sessionId` `conversationId` `visitorId` `visitorUserId` `visitorToken` `status` `queuePosition?` `estimatedWaitSeconds?` `locale` `ai?` `welcomeMessages[]` | 无需鉴权；创建访客临时会话；`welcomeMessages[]` 每项形如 `{ type: string, content: string }` |
+| `/{tenantCode}/sessions` | POST | `WidgetCreateSessionInput` | `sessionId` `conversationId` `visitorId` `visitorUserId` `visitorToken` `status` `queuePosition?` `estimatedWaitSeconds?` `locale` `ai?` `welcomeMessages[]` | 无需鉴权；创建访客临时会话；`welcomeMessages[]` 每项形如 `{ type: string, content: string }`;🆕 2026-06-10 入参新增 `resumeRecentSession?`(true=复访续聊:进行中会话直接复用,已关闭的自动重开同一会话保留历史;前提是稳定传 `customerId` 或 `fingerprint`) |
 | `/sessions/{sessionId}` | GET | 路径参数：`sessionId` | 会话状态 | 需要 `visitorToken` |
 | `/sessions/{sessionId}/messages` | GET | 路径参数：`sessionId` | 消息列表 | 需要 `visitorToken` |
 | `/media/upload` | POST | `multipart/form-data`，文件字段名 `file` | `MediaUploadResponse` | 需要 `visitorToken`；Widget 富媒体上传专用入口 |
@@ -380,7 +381,9 @@ Base URL：`/api/widget/v1`
 | `/sessions/{sessionId}/close` | POST | 无 | `sessionId` `visitorToken` | 访客关闭会话，并返回新的访客 Token |
 | `/sessions/{sessionId}/handoff` | POST | `reason?` | `sessionId` `requested=true` | 请求转人工 |
 | `/sessions/{sessionId}/rate` | POST | `rating` `tags?` `comment?` | `sessionId` `rating` | 会话评价 |
-| `/sessions/{sessionId}/reopen` | POST | 无 | `sessionId` `visitorToken` | 重新打开已关闭的会话，并返回新的访客 Token |
+| `/sessions/{sessionId}/reopen` | POST | 无 | `sessionId` `visitorToken` | 重新打开已关闭的会话，并返回新的访客 Token;🆕 2026-06-10 与 `rate` 同级豁免 token 版本校验(超时/客服关闭后持旧 token 仍可重开续聊) |
+| `/sessions/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 访客正在输入预览;客服端收 `temp_session.typing` 帧 |
+| `/sessions/{sessionId}/read` | POST | `readSeq` | `sessionId` `readSeq` | 🆕 2026-06-10 访客已读上报;推进已读位置与已读时间,客服端收 `msg.read` 帧(含 `readAt`) |
 
 补充：
 
@@ -401,7 +404,7 @@ Base URL：`/api/client/v1/customer-service`
 | `/quick-replies` | GET | `scope?=all/temp_session/direct_customer` | `CustomerServiceQuickReplyDto[]` | 任意已登录用户可访问；仅返回 `enabled=true` 的话术 |
 | `/im-direct/contact-brand` | POST | `serviceAccountId` `locale?` `category?` `sourceUrl?` `priority` | `ImCustomerServiceThreadDto` | 任意已登录用户可访问；返回（或复用）客服线程 |
 | `/im-direct/outbound` | POST | `customerUserId` `reason?` `skillGroupId?` `priority` | `ImCustomerServiceThreadDto` | 仅客服（`userType=2` 且 `membershipRole≥2`）可访问 |
-| `/im-direct/{threadId}/transfer` | POST | `toStaffUserId` `reason?` | `ImCustomerServiceThreadDto` | 转接活跃 IM 客服线程到另一个坐席；仅客服可访问 |
+| `/im-direct/{threadId}/transfer` | POST | `toStaffUserId` `reason?` | `ImCustomerServiceThreadDto` | 转接活跃 IM 客服线程到另一个坐席；仅客服可访问;🆕 2026-06-10 转接后向新坐席与客户定向推送 `customer_service.thread.transferred` 帧 |
 | `/im-direct/{threadId}/close` | POST | 无 | `{ closed: true }` | 关闭线程；仅客服可访问 |
 | `/threads/{threadId}/rating` | POST | `rating`(short) `comment?` `tags?` | `ThreadRatingDto`（含 `threadId`/`rating`/`comment`/`tags`/`ratedAt`） | 客户对线程评分；触发 `im_customer_service.rated` webhook 主题 |
 
@@ -463,7 +466,7 @@ Base URL：`/api/client/v1/customer-service`
 | `/quick-replies` | GET | `scope?=all/temp_session/direct_customer` | `CustomerServiceQuickReplyDto[]` | 仅返回启用话术；`scope=all` 话术会在所有场景返回 |
 | `/quick-replies/sync` | GET | `updatedSince?` | `{ items[], updatedSince, serverTime }`，`items` 额外带 `deletedAt`（墓碑） | 增量同步；首次留空取全量，之后传上次 `serverTime`；`deletedAt!=null` 删除本地缓存 |
 | `/customers/service-history` | GET | `customerUserId?` `visitorUserId?` `customerId?` `limit?` `cursor?`（前三者择一） | `{ items[], nextCursor }`，`items` 含 `threadType`(`temp_session`/`direct`) `threadId` `staffUserId?` `status` `startedAt?` `firstResponseAt?` `closedAt?` `riskLevel` 等 | 按客户身份聚合跨频道服务历史；管理端同名见 [admin-api.md](./admin-api.md) |
-| `/staff/service-history` | GET | `threadType?`(`temp_session`/`im_direct`) `status?` `limit?` `cursor?` | `{ items[], nextCursor }`，`items` 字段同上并额外带 `participation`(`current_owner`/`transferred`) | 按**接待人**聚合"我接待过的历史会话"——`staffUserId` 恒为当前登录客服(不可查他人)；曾参与即算(当前归属或转接历史 from/to)；按 `lastMessageAt` 倒序；管理端按任意客服查见 [admin-api.md](./admin-api.md) |
+| `/staff/service-history` | GET | `threadType?`(`temp_session`/`im_direct`) `status?`(`open`/`queued`/`active`/`closed` 或数字状态码) `limit?` `cursor?` | `{ items[], nextCursor }`，`items` 字段同上并额外带 `participation`(`current_owner`/`transferred`) | 按**接待人**聚合"我接待过的历史会话"——`staffUserId` 恒为当前登录客服(不可查他人)；曾参与即算(当前归属或转接历史 from/to)；按 `lastMessageAt` 倒序；管理端按任意客服查见 [admin-api.md](./admin-api.md) |
 
 ### 2.9B 客服自助接待状态（Reception）
 
@@ -634,6 +637,13 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `/{sessionId}/takeover` | POST | 无 | `TempSessionDetailDto` | 接管访客会话 |
 | `/{sessionId}/messages` | POST | `clientMsgId` `messageType` `body` | `TempSessionMessageDto` | 发送访客会话消息 |
 | `/{sessionId}/close` | POST | 无 | `sessionId` | 关闭访客会话 |
+| `/{sessionId}/transfer` | POST | `toStaffUserId` `reason?` | `TempSessionDetailDto` | 🆕 2026-06-10 坐席间转接;仅当前接待坐席可调,目标须为客服角色;服务端自动给访客落礼貌系统消息,被转接坐席收 `temp_session.transferred` 帧 |
+| `/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 坐席正在输入预览;访客端收 `temp_session.typing` 帧 |
+| `/{sessionId}/read-status` | GET | 无 | `sessionId` `conversationId` `visitorUserId` `members[]{userId,lastReadSeq,lastReadAt}` | 🆕 2026-06-10 会话全员已读位置/时间 |
+| `/{sessionId}/notes` | GET | 无 | `TempSessionNoteDto[]` | 🆕 2026-06-10 会话备注列表(置顶在前);备注访客不可见,主管/质检可见 |
+| `/{sessionId}/notes` | POST | `content`(≤2000 字) `isPinned?` | `TempSessionNoteDto` | 🆕 新建备注;`{noteId,staffDisplayName,content,isPinned,createdAt}` |
+| `/{sessionId}/notes/{noteId}/pin` | PUT | `pinned` | `sessionId` `noteId` `pinned` | 🆕 置顶/取消置顶 |
+| `/{sessionId}/notes/{noteId}` | DELETE | 无 | `sessionId` `noteId` | 🆕 删除备注 |
 
 ## 3. 匿名响应与简单布尔响应
 
@@ -884,7 +894,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `MentionDto` | `userId` `offset` `length` |
 | `MessageItemDto` | `messageId` `conversationId` `conversationSeq` `senderUserId` `messageType` `body` `isRecalled` `sentAt` `replyToMessageId?` `forwardFromMessageId?` `mentions?` `clientMsgId?` `appId?` |
 | `GroupReadReceiptsDto` | `members[]` `totalMembers` `readCount` `unreadCount` |
-| `ReadReceiptUserDto` | `userId` `displayName` `avatarUrl?` `lastReadSeq` |
+| `ReadReceiptUserDto` | `userId` `displayName` `avatarUrl?` `lastReadSeq` `lastReadAt?`(🆕 2026-06-10,`null`=从未上报已读) |
 | `SyncResponse` | `conversations[]` `nextSinceSeq?` |
 | `SyncConversationItem` | `conversationId` `messages[]` `lastReadSeq` |
 
@@ -1062,8 +1072,12 @@ Hub 路径：`/ws/client`（标准客户端）、`/ws/widget`（访客 Widget）
 | `msg.new` | 会话成员 | `tenantId` `conversationId` `messageId` `conversationSeq` `senderUserId` `messageType` `body` `sentAt` `conversationType` `sourceType` | 新消息推送；`sourceType`(widget/im)+`conversationType`(direct/group/temp_session) 2026-06-03 新增，便于直接分流在线客服与 IM：`sourceType==="widget"` 即在线客服（详见 client-api.md §10.1 与 [字段枚举 §7.16.1](field-enum-reference.md)） |
 | `space.notice` | 平台级连接 | `noticeType` `spaceType` `tenantId` `requiresSwitch` `targetUnreadConversationCount` `targetUnreadMessageCount` `unreadSpaceCount` `totalUnreadConversationCount` `totalUnreadMessageCount` | 跨空间新消息全局提醒；`noticeType` 当前固定 `"message"`；`spaceType=1` 为个人空间、`2` 为企业空间；`tenantId` 在企业空间下为目标租户 ID，个人空间为 `null` |
 | `presence.changed` | 好友/同租户成员 | `userId` `isOnline` `customStatus?` | 在线状态变更；只包含这 3 个字段 |
-| `msg.read` | 会话其他成员 | `tenantId` `conversationId` `userId` `readSeq` | 已读回执推送 |
-| `msg.recalled` | 会话所有成员 | `tenantId` `messageId` `conversationId` `conversationSeq` `operatorUserId` | 消息撤回推送 |
+| `msg.read` | 会话其他成员 | `tenantId` `conversationId` `userId` `readSeq` `readAt?`(🆕) | 已读回执推送;`readAt` 为对方上报已读的服务器时间(2026-06-10 新增) |
+| `msg.recalled` | 会话所有成员 | `tenantId` `messageId` `conversationId` `conversationSeq` `operatorUserId` `silent`(🆕) | 消息撤回推送;`silent=true`(2026-06-10)时直接移除气泡、不渲染任何撤回提示 |
+| `msg.typing` | 会话其他成员 | `conversationId` `senderUserId` `preview?` `isTyping` `at` | 🆕 2026-06-10 IM 单聊正在输入预览(瞬时帧,不落库);widget 渠道对应帧为 `temp_session.typing` |
+| `temp_session.typing` | 租户客服 + 访客 Widget | `sessionId` `conversationId` `senderUserId` `senderType` `preview?` `isTyping` `at` | 🆕 2026-06-10 临时会话正在输入预览(双向;`senderType=visitor/staff`) |
+| `temp_session.transferred` | 租户客服 + 访客 Widget | `sessionId` `fromStaffUserId` `toStaffUserId` `reason?` | 🆕 2026-06-10 临时会话坐席间转接 |
+| `customer_service.thread.transferred` | 新坐席与客户(定向) | `threadId` `conversationId` `customerUserId` `fromStaffUserId` `toStaffUserId` `reason?` `transferredAt` `recipientRole` | 🆕 2026-06-10 IM 客服直聊转接通知;`recipientRole=staff/customer` |
 | `group.settings.updated` | 群在群成员 | `conversationId` `operatorUserId` `title` `avatarUrl?` `muteMode` `settings` `updatedAt` | 群设置/全员禁言/群名群头像变更推送（2026-06-06 新增）；完整快照，收到后可直接覆盖或重拉群详情；纯 `/ws/client` 多端同步信号，不进 push/webhook（详见 client-api.md §10.10.3） |
 | `auth.force_logout` | 目标连接 | `platformUserId?` `deviceId?` `reason` `revokedAt` `deactivateRequestedAt?` `cooldownEndsAt?` | 强制登出；`reason=device_revoked/account_deactivated/device_claimed_by_other_user` |
 | `temp_session.assigned` | 租户客服 + 访客 Widget | `tenantId` `sessionId` `staffUserId` | 临时会话分配客服 |
@@ -1078,7 +1092,7 @@ Hub 路径：`/ws/client`（标准客户端）、`/ws/widget`（访客 Widget）
 
 上行方法与 `/ws/client` 相同（`HeartbeatAsync`）。
 
-可接收的下行事件：`msg.new`、`msg.read`、`msg.recalled`、`temp_session.assigned`、`temp_session.closed`、`temp_session.rated`。
+可接收的下行事件：`msg.new`、`msg.read`(🆕 含 `readAt`)、`msg.recalled`(🆕 含 `silent`)、`temp_session.assigned`、`temp_session.closed`、`temp_session.rated`、`temp_session.typing`(🆕)、`temp_session.transferred`(🆕)。
 
 ## 7. 核心概念边界速查
 

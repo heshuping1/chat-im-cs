@@ -8,6 +8,7 @@ import {
   isCustomerServiceLifecycleEventName,
   isCustomerServiceMessageEventName,
   isCustomerServiceQueueEventName,
+  isCustomerServiceTypingEventName,
   isForceLogoutEventName,
   isImMessageEventName,
   isTenantJoinRequestEventName,
@@ -42,6 +43,8 @@ import {
   applySpaceNoticeReminder,
   spaceReminderScopeKey,
 } from "../spaces/space-reminder-ledger";
+import { applyCustomerServiceTypingPreviewCache } from "../customer-service/cs-typing-preview-cache";
+import { removeCustomerServiceMessageByThreadId } from "../customer-service/cs-cache-adapter";
 
 export function createGatewayEventRouter(options: {
   clearAuthSession: () => void;
@@ -114,6 +117,17 @@ export function createGatewayEventRouter(options: {
             });
           }
         },
+        onTypingPreview: (event) => {
+          applyCustomerServiceTypingPreviewCache(queryClient, session, {
+            isTyping: event.isTyping,
+            previewText: event.previewText,
+            receivedAt: event.receivedAt,
+            senderRole: event.senderRole,
+            senderUserId: event.senderUserId,
+            threadId: event.threadId,
+            threadType: event.threadType,
+          });
+        },
         onHandlerError: () => undefined,
       },
     );
@@ -125,7 +139,9 @@ export function createGatewayEventRouter(options: {
     if (
       isImMessageEventName(eventName) ||
       isCustomerServiceMessageEventName(eventName) ||
-      isCustomerServiceQueueEventName(eventName)
+      isCustomerServiceQueueEventName(eventName) ||
+      isCustomerServiceTypingEventName(eventName) ||
+      eventName === "msg.typing"
     ) {
       recordCsRoutingDiagnostic({
         event: eventName,
@@ -180,6 +196,11 @@ export function createGatewayEventRouter(options: {
           session.platformToken,
         ),
       });
+      return;
+    }
+
+    if (eventName === "msg.recalled" && isSilentCustomerServiceRecallPayload(payload, scopeKey)) {
+      routeSilentCustomerServiceRecall(payload);
       return;
     }
 
@@ -344,6 +365,10 @@ export function createGatewayEventRouter(options: {
         });
         return;
       }
+      if (eventName === "msg.recalled" && isSilentCustomerServiceRecallPayload(payload, scopeKey)) {
+        routeSilentCustomerServiceRecall(payload);
+        return;
+      }
       invalidateIm(stringField(payload, "conversationId", "chatId"));
       if (eventName === "space.notice") {
         applySpaceNoticeReminder(
@@ -424,6 +449,25 @@ export function createGatewayEventRouter(options: {
     }
   };
 
+  const routeSilentCustomerServiceRecall = (payload: Record<string, unknown>) => {
+    const threadId =
+      customerServiceThreadId(payload, scopeKey) ||
+      stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "conversationId", "chatId");
+    const messageId = stringField(payload, "messageId", "message_id", "id");
+    if (threadId && messageId) {
+      removeCustomerServiceMessageByThreadId(queryClient, threadId, messageId);
+    }
+    invalidateCustomerService(threadId);
+    recordGatewayReminderDiagnostic({
+      eventName: "msg.recalled",
+      payload,
+      phase: "routed",
+      route: "customer-service-silent-recall",
+      scopeKey,
+      source: "gateway-router",
+    });
+  };
+
   const pushDevImMessage = (payload: unknown) => {
     const record = asRecord(payload);
     if (handleFirstStageGatewayEvent("msg.new", [record])) return;
@@ -442,4 +486,14 @@ export function createGatewayEventRouter(options: {
     invalidateIm,
     pushDevImMessage,
   };
+}
+
+function isSilentCustomerServiceRecallPayload(
+  payload: Record<string, unknown>,
+  scopeKey?: string,
+) {
+  return (
+    booleanField(payload, "silent", "isSilent", "is_silent") === true &&
+    isCustomerServiceGatewayPayload(payload, scopeKey)
+  );
 }

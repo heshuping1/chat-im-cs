@@ -7,7 +7,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   isTerminalCustomerServiceThreadStatus,
   normalizeCustomerServiceThreadType,
@@ -20,6 +20,7 @@ import {
   isQueuedCustomerServiceThread,
 } from "../data/customer-service-display";
 import { createCustomerServiceIdentityViewModel } from "../data/customer-service/cs-identity-view-model";
+import { markCustomerServiceThreadClaimed } from "../data/customer-service/cs-cache-adapter";
 import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
 import { chatConversationEntityFromCustomerServiceThread } from "../data/conversation/conversation-domain";
 import { pcQueryKeys } from "../data/query-keys";
@@ -50,6 +51,7 @@ import { PcAvatar } from "./PcAvatar";
 
 type ThreadMode = ServiceThreadListMode;
 type ThreadListEmptyAction = "clearSearch" | "viewAll" | "viewQueued";
+const staffServiceHistoryPageSize = 50;
 
 interface ThreadListEmptyStateView {
   action?: ThreadListEmptyAction;
@@ -81,21 +83,30 @@ export function ThreadList() {
     enabled: Boolean(client),
     queryFn: async () => client!.getWorkbenchThreads(),
   });
-  const historyQuery = useQuery({
+  const historyQuery = useInfiniteQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
     enabled: Boolean(client && canUseStaffEndpoints),
-    queryFn: async () =>
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) =>
       client!.getStaffServiceHistory({
+        cursor: pageParam,
+        limit: staffServiceHistoryPageSize,
         threadType: "temp_session",
-        limit: 50,
       }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
   });
+  const historyItems = useMemo(
+    () => historyQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [historyQuery.data],
+  );
   const claimThreadMutation = useMutation({
     mutationFn: async (thread: CustomerServiceThread) => {
       if (!client) throw new Error("Customer service API is not ready");
+      if (!canUseStaffEndpoints) throw new Error("Only customer service staff can claim conversations.");
       return client.claimCustomerServiceThread(thread.threadType, thread.threadId);
     },
-    onSuccess: (_result, thread) => {
+    onSuccess: (result, thread) => {
+      markCustomerServiceThreadClaimed(queryClient, thread, result);
       openCustomerServiceThread(thread.threadId, "claim");
       void queryClient.invalidateQueries({
         queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -131,13 +142,13 @@ export function ThreadList() {
       ]
         .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
         .filter(isCustomerServiceHistoryThread);
-      const staffHistoryThreads = (historyQuery.data?.items ?? [])
+      const staffHistoryThreads = historyItems
         .map(staffServiceHistoryItemToThread)
         .filter((thread) => thread.threadType === "temp_session")
         .filter((thread) => isTerminalCustomerServiceThreadStatus(thread.status));
       return dedupeThreadList([...readonlyHistoryThreads, ...staffHistoryThreads]);
     },
-    [historyQuery.data, threadsQuery.data],
+    [historyItems, threadsQuery.data],
   );
   const currentCounts = useMemo(
     () => createServiceThreadListCounts(currentThreads, isRiskyCustomerServiceThread),
@@ -184,6 +195,7 @@ export function ThreadList() {
     [expandedThreadCount, visibleThreads],
   );
 
+  const canLoadMoreHistory = mode === "history" && Boolean(historyQuery.hasNextPage);
   const listLoading = threadsQuery.isLoading || historyQuery.isLoading;
   const listError = threadsQuery.error || historyQuery.error;
   const emptyState = useMemo(
@@ -236,7 +248,11 @@ export function ThreadList() {
           type="button"
           onClick={() => setMode("history")}
         >
-          {t("customerService.threadList.history")} <em>{historyTabBadge.threadCount}</em>
+          {t("customerService.threadList.history")}{" "}
+          <em>
+            {historyTabBadge.threadCount}
+            {historyQuery.hasNextPage ? "+" : ""}
+          </em>
           {historyTabBadge.unreadCount > 0 && (
             <span className="h-switch-tabs-unread">
               {formatBadgeCount(historyTabBadge.unreadCount)}
@@ -354,7 +370,7 @@ export function ThreadList() {
                   <p>{entity.lastMessage?.preview || (mode === "history" ? t("customerService.threadList.historyThread") : t("customerService.threadList.noMessage"))}</p>
                 </span>
                 <span className="h-thread-sla">
-                  {queued ? (
+                  {queued && canUseStaffEndpoints ? (
                     <button
                       className="h-thread-claim"
                       type="button"
@@ -385,15 +401,28 @@ export function ThreadList() {
               </article>
             );
           })}
-        {!listLoading && !listError && threadRenderWindow.windowed && (
+        {!listLoading && !listError && (threadRenderWindow.windowed || canLoadMoreHistory) && (
           <button
             className="h-thread-more"
+            disabled={historyQuery.isFetchingNextPage}
             type="button"
-            onClick={() =>
-              setExpandedThreadCount((count) => count + threadRenderWindowExpandStep)
-            }
+            onClick={() => {
+              if (threadRenderWindow.windowed) {
+                setExpandedThreadCount((count) => count + threadRenderWindowExpandStep);
+                return;
+              }
+              if (canLoadMoreHistory) {
+                void historyQuery.fetchNextPage();
+              }
+            }}
           >
-            {t("customerService.threadList.showMore", { count: threadRenderWindow.hiddenAfterCount })}
+            {threadRenderWindow.windowed
+              ? t("customerService.threadList.showMore", {
+                  count: threadRenderWindow.hiddenAfterCount,
+                })
+              : historyQuery.isFetchingNextPage
+                ? t("customerService.threadList.loadingMore")
+                : t("customerService.threadList.loadMore")}
           </button>
         )}
       </div>
@@ -402,10 +431,7 @@ export function ThreadList() {
 }
 
 function isCustomerServiceHistoryThread(thread: CustomerServiceThread) {
-  return (
-    thread.accessMode === "management_readonly" ||
-    isTerminalCustomerServiceThreadStatus(thread.status)
-  );
+  return isTerminalCustomerServiceThreadStatus(thread.status);
 }
 
 function dedupeThreadList(threads: CustomerServiceThread[]) {

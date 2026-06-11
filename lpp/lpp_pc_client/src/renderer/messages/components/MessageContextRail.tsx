@@ -1,4 +1,10 @@
-import { LibraryBig, MessageSquareText, UserRound, UsersRound } from "lucide-react";
+import {
+  LibraryBig,
+  MessageSquareText,
+  Sparkles,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { ConversationListItem } from "../../data/api-client";
@@ -58,12 +64,7 @@ export function MessageContextRail({
             label={t("messages.contextRail.aiDraft")}
             onClick={() => onToggleAssistantPane("aiDraft")}
           >
-            <img
-              className="context-rail-tool-image ai-draft"
-              src="/ai-draft-entry.svg"
-              alt=""
-              aria-hidden="true"
-            />
+            <Sparkles size={18} aria-hidden="true" />
           </MessageContextRailButton>
         )}
         <MessageContextRailButton

@@ -7,6 +7,7 @@ export type GatewayEventKind =
   | "im.read.received"
   | "cs.message.received"
   | "cs.thread.changed"
+  | "cs.typing.preview"
   | "ignored"
   | "invalid";
 
@@ -89,6 +90,16 @@ export interface GatewayCustomerServiceThreadChangedEvent extends GatewayEventEn
   shouldNotifyQueue?: boolean;
 }
 
+export interface GatewayCustomerServiceTypingPreviewEvent extends GatewayEventEnvelope {
+  kind: "cs.typing.preview";
+  threadId: string;
+  threadType: CustomerServiceThreadType;
+  isTyping: boolean;
+  previewText: string;
+  senderRole?: string;
+  senderUserId?: string;
+}
+
 export interface GatewayIgnoredEvent extends GatewayEventEnvelope {
   kind: "ignored";
   reason: GatewayIgnoredReason;
@@ -105,7 +116,8 @@ export type GatewayHandledEvent =
   | GatewayImMessageReceivedEvent
   | GatewayImReadReceivedEvent
   | GatewayCustomerServiceMessageReceivedEvent
-  | GatewayCustomerServiceThreadChangedEvent;
+  | GatewayCustomerServiceThreadChangedEvent
+  | GatewayCustomerServiceTypingPreviewEvent;
 
 export type GatewayTypedEvent =
   | GatewayHandledEvent

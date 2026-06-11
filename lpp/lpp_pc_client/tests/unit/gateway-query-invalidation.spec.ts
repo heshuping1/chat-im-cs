@@ -58,6 +58,12 @@ describe("gateway query invalidation", () => {
       queryKey: ["pc-cs-workbench-threads"],
     });
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["pc-cs-monitor-threads"],
+    });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["pc-cs-monitor-dashboard"],
+    });
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["pc-cs-thread-detail"],
     });
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith({

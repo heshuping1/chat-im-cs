@@ -568,8 +568,11 @@
 .contacts-page.contacts-b-layout .contacts-list {
   display: block !important;
   min-height: 0 !important;
-  overflow: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: scroll !important;
   padding: 0 0 10px !important;
+  scrollbar-gutter: stable !important;
+  scrollbar-width: thin !important;
 }
 
 .contacts-page.contacts-b-layout .contacts-row,

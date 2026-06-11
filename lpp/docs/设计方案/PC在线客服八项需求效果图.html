@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PC在线客服八项需求效果图 - 现有布局增量版</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --bg: #f5f9fc;
+        --panel: #ffffff;
+        --line: #dce7f1;
+        --line-soft: #e9f0f6;
+        --text: #0f172a;
+        --muted: #64748b;
+        --primary: #10b981;
+        --primary-strong: #047857;
+        --blue: #2563eb;
+        --amber: #f59e0b;
+        --danger: #dc2626;
+        --shadow: 0 16px 42px rgba(30, 45, 66, 0.12);
+      }
+
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #dfe9f2; color: var(--text); }
+      .deck { display: grid; gap: 28px; padding: 28px; }
+      .artboard {
+        width: 1920px;
+        height: 982px;
+        overflow: hidden;
+        border: 1px solid #cfdce8;
+        background: var(--bg);
+        box-shadow: 0 18px 60px rgba(22, 34, 49, 0.18);
+      }
+
+      .app {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        grid-template-columns: 156px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        padding: 18px 10px 14px;
+        border-right: 1px solid var(--line);
+        background: linear-gradient(180deg, #ffffff, #f8fbfd);
+      }
+
+      .brand {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr);
+        gap: 9px;
+        align-items: center;
+        margin: 2px 6px 26px;
+      }
+
+      .logo, .avatar, .mini-avatar {
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 950;
+      }
+
+      .logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #00b889, #12caa2);
+      }
+
+      .brand strong, .profile strong {
+        display: block;
+        overflow: hidden;
+        font-size: 13px;
+        font-weight: 950;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span, .profile span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .nav { display: grid; gap: 5px; }
+      .nav-item {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+        min-height: 39px;
+        padding: 0 8px;
+        border-radius: 10px;
+        color: #52647a;
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .nav-item.active {
+        border: 1px solid #b8f0db;
+        background: #eafff6;
+        color: #047857;
+      }
+
+      .nav-icon {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border-radius: 8px;
+        background: #eef4f8;
+        color: #60758c;
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .active .nav-icon { background: #c8f8e5; color: #047857; }
+      .sidebar-bottom { margin-top: auto; display: grid; gap: 8px; }
+
+      .profile {
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        padding: 8px 6px;
+        border-radius: 12px;
+      }
+
+      .profile .small-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #f59e0b, #f97316);
+      }
+
+      .main {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: 88px minmax(0, 1fr);
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: 235px repeat(5, minmax(0, 1fr)) 190px;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255,255,255,0.92);
+      }
+
+      .service-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .badge-square {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 10px;
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: 12px;
+        font-weight: 950;
+      }
+
+      .service-title h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 950;
+      }
+
+      .service-title p {
+        margin: 3px 0 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 760;
+      }
+
+      .metric {
+        min-height: 50px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+      }
+
+      .metric span {
+        display: block;
+        color: #475569;
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 24px;
+        font-weight: 950;
+      }
+
+      .metric strong.green { color: #059669; }
+      .status-pill {
+        display: flex;
+        min-height: 36px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid #cbddeb;
+        border-radius: 10px;
+        background: #fff;
+        color: #1f2937;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--amber);
+      }
+
+      .body {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-columns: 340px minmax(0, 1fr) 420px 56px;
+      }
+
+      .data-body {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 16px;
+        padding: 18px;
+        background: #f4f8fb;
+      }
+
+      .history-main, .history-detail {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+      }
+
+      .history-main {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .history-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 18px 20px 12px;
+      }
+
+      .history-head h2 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 950;
+      }
+
+      .history-head p {
+        margin: 5px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 780;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        padding: 0 20px 14px;
+      }
+
+      .summary-card {
+        min-height: 78px;
+        padding: 12px;
+        border: 1px solid var(--line-soft);
+        border-radius: 12px;
+        background: linear-gradient(180deg, #ffffff, #f8fbfd);
+      }
+
+      .summary-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .summary-card strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 25px;
+        font-weight: 950;
+      }
+
+      .summary-card small {
+        display: block;
+        margin-top: 4px;
+        color: #059669;
+        font-size: 10px;
+        font-weight: 850;
+      }
+
+      .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+        padding: 14px 20px;
+        border-top: 1px solid var(--line-soft);
+        border-bottom: 1px solid var(--line-soft);
+        background: #fbfdff;
+      }
+
+      .history-table-wrap {
+        min-height: 0;
+        overflow: hidden;
+        padding: 14px 20px 20px;
+      }
+
+      .history-detail {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .sessions, .chat, .right-panel, .toolrail {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .sessions {
+        border-right: 1px solid var(--line);
+        background: #f8fbfd;
+      }
+
+      .session-head {
+        padding: 28px 16px 12px;
+      }
+
+      .session-head h2 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 950;
+      }
+
+      .session-head p {
+        margin: 5px 0 14px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 760;
+      }
+
+      .input {
+        display: flex;
+        min-height: 38px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .tab {
+        display: inline-flex;
+        min-height: 34px;
+        align-items: center;
+        gap: 8px;
+        padding: 0 11px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .tab.active {
+        border-color: #10b981;
+        background: #eafff6;
+        color: #047857;
+      }
+
+      .count {
+        min-width: 22px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #475569;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 950;
+      }
+
+      .tab.active .count { background: #10b981; color: #fff; }
+      .session-list { display: grid; gap: 8px; padding: 4px 16px 18px; }
+      .session-card {
+        display: grid;
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .session-card.active {
+        border-color: #34d399;
+        background: #f0fdf7;
+      }
+
+      .avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, #5b6cff, #7c5cff);
+      }
+
+      .avatar.green { background: linear-gradient(135deg, #10b981, #05a77a); }
+      .avatar.amber { background: linear-gradient(135deg, #f59e0b, #f97316); }
+      .avatar.blue { background: linear-gradient(135deg, #3b82f6, #6366f1); }
+
+      .session-card strong {
+        display: block;
+        overflow: hidden;
+        font-size: 13px;
+        font-weight: 950;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .session-card small {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 760;
+      }
+
+      .chip {
+        display: inline-flex;
+        height: 24px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 8px;
+        border: 1px solid #d7e5f1;
+        border-radius: 999px;
+        background: #fff;
+        color: #42546b;
+        font-size: 11px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .chip.green { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
+      .chip.blue { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+      .chip.amber { border-color: #fde68a; background: #fffbeb; color: #b45309; }
+      .chip.red { border-color: #fecaca; background: #fff1f2; color: #be123c; }
+
+      .chat {
+        display: grid;
+        grid-template-rows: 70px 36px minmax(0, 1fr) 64px;
+        background: #f8fbfd;
+      }
+
+      .chat-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .visitor {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .visitor-avatar {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #5b6cff, #7c5cff);
+        color: #fff;
+        font-weight: 950;
+      }
+
+      .visitor h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 950;
+      }
+
+      .visitor-tags {
+        display: flex;
+        gap: 6px;
+        margin-top: 5px;
+      }
+
+      .btn {
+        display: inline-flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: #344458;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .btn.primary {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #fff;
+      }
+
+      .btn.danger {
+        border-color: #fecaca;
+        background: #fff1f2;
+        color: #be123c;
+      }
+
+      .actions { display: flex; gap: 8px; align-items: center; }
+
+      .status-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line-soft);
+        background: #f7fbff;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .messages {
+        position: relative;
+        overflow: hidden;
+        padding: 20px;
+        background: linear-gradient(180deg, #f9fcff, #ffffff);
+      }
+
+      .bubble-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .bubble-row.me { justify-content: flex-end; }
+      .mini-avatar {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        border-radius: 10px;
+        background: #10b981;
+        font-size: 12px;
+      }
+
+      .mini-avatar.customer { background: #64748b; }
+      .bubble {
+        max-width: 460px;
+        padding: 10px 12px;
+        border: 1px solid #d7e5f1;
+        border-radius: 9px;
+        background: #fff;
+        font-size: 13px;
+        font-weight: 760;
+        line-height: 1.55;
+      }
+
+      .bubble.me {
+        border-color: #a7f3d0;
+        background: #dcfce7;
+      }
+
+      .meta {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 850;
+      }
+
+      .composer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        border-top: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .composer .input { flex: 1; min-height: 44px; }
+      .right-panel {
+        border-left: 1px solid var(--line);
+        background: #f8fbfd;
+      }
+
+      .panel-head {
+        display: flex;
+        min-height: 50px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        background: #fff;
+      }
+
+      .panel-head strong {
+        font-size: 14px;
+        font-weight: 950;
+      }
+
+      .panel-head span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .panel-body {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .section {
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .section h4 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 950;
+      }
+
+      .kv {
+        display: grid;
+        gap: 8px;
+      }
+
+      .kv div {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 780;
+      }
+
+      .kv b { color: #111827; font-weight: 950; }
+      .toolrail {
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 8px;
+        border-left: 1px solid var(--line);
+        background: #f8fbfd;
+      }
+
+      .tool {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        color: #64748b;
+        font-weight: 950;
+      }
+
+      .tool.active {
+        border-color: #10b981;
+        background: #10b981;
+        color: #fff;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        font-weight: 780;
+      }
+
+      .table th, .table td {
+        padding: 9px 8px;
+        border-bottom: 1px solid var(--line-soft);
+        text-align: left;
+      }
+
+      .table th {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 950;
+      }
+
+      .bar {
+        display: grid;
+        grid-template-columns: 70px minmax(0, 1fr) 44px;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 10px;
+        color: #42546b;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .track {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #edf4f9;
+      }
+
+      .fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #10b981, #22c55e);
+      }
+
+      .fill.blue { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+      .fill.amber { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+      .fill.red { background: linear-gradient(90deg, #ef4444, #fb7185); }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(15, 23, 42, 0.24);
+      }
+
+      .modal {
+        width: 520px;
+        overflow: hidden;
+        border: 1px solid #c8d8e6;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+
+      .modal-head {
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .modal-head h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 950;
+      }
+
+      .modal-head p {
+        margin: 5px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .modal-body {
+        display: grid;
+        gap: 10px;
+        padding: 14px 18px;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 14px 18px;
+        border-top: 1px solid var(--line-soft);
+        background: #fbfdff;
+      }
+
+      .notice {
+        padding: 10px 12px;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 12px;
+        font-weight: 820;
+        line-height: 1.5;
+      }
+
+      .typing {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 12px;
+        padding: 10px 12px;
+        border: 1px solid #99f6e4;
+        border-radius: 10px;
+        background: #ecfdf5;
+        color: #047857;
+        font-size: 12px;
+        font-weight: 850;
+        box-shadow: 0 10px 26px rgba(16, 185, 129, 0.12);
+      }
+
+      .popover {
+        position: absolute;
+        right: 72px;
+        top: 148px;
+        width: 246px;
+        padding: 12px;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+
+      .split-chat {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        height: 100%;
+      }
+
+      .mini-window {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .mini-window .messages { height: 100%; padding: 16px; }
+      .widget {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+      }
+
+      .widget-head {
+        padding: 14px;
+        background: linear-gradient(135deg, #10b981, #16c7a4);
+        color: #fff;
+      }
+
+      .widget-head strong { display: block; font-size: 15px; font-weight: 950; }
+      .widget-head span { display: block; margin-top: 4px; font-size: 12px; font-weight: 760; opacity: .9; }
+      .widget-body { display: grid; gap: 10px; padding: 14px; }
+      .watermark {
+        position: absolute;
+        right: 14px;
+        bottom: 10px;
+        color: #94a3b8;
+        font-size: 10px;
+        font-weight: 800;
+      }
+
+      .artboard { position: relative; }
+      .body.monitor .chat { grid-template-rows: 70px 36px minmax(0, 1fr) 0; }
+      .body.monitor .composer { display: none; }
+    </style>
+  </head>
+  <body>
+    <main class="deck">
+      <section class="artboard" id="req1">
+        <div class="app">
+          <aside class="sidebar">
+            <div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>专业版 · v1.0.0</span></div></div>
+            <nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item"><span class="nav-icon">S</span>在线客服</div><div class="nav-item"><span class="nav-icon">C</span>通讯录</div><div class="nav-item active"><span class="nav-icon">D</span>数据中心</div><div class="nav-item"><span class="nav-icon">W</span>工作台</div></nav>
+            <div class="sidebar-bottom"><div class="profile"><div class="small-avatar"></div><div><strong>mouse客服</strong><span>在线</span></div></div></div>
+          </aside>
+          <section class="main">
+            <header class="topbar">
+              <div class="service-title"><div class="badge-square">数据</div><div><h1>数据中心 · 在线客服</h1><p>历史对话：统计与搜寻同页</p></div></div>
+              <div class="metric"><span>历史对话</span><strong class="green">1,284</strong></div><div class="metric"><span>平均处理</span><strong>08:42</strong></div><div class="metric"><span>满意度</span><strong>4.8</strong></div><div class="metric"><span>SLA风险</span><strong>12</strong></div><div class="metric"><span>导出任务</span><strong>3</strong></div>
+              <div class="status-pill"><span class="dot"></span>近 30 天 已更新</div>
+            </header>
+            <div class="data-body">
+              <section class="history-main">
+                <div class="history-head">
+                  <div><h2>历史对话</h2><p>统计、筛选搜寻、历史列表和导出在同一页面完成。</p></div>
+                  <div class="actions"><button class="btn">清空筛选</button><button class="btn primary">按当前条件导出</button></div>
+                </div>
+                <div class="summary-grid">
+                  <div class="summary-card"><span>对话总量</span><strong>1,284</strong><small>较上期 +12%</small></div>
+                  <div class="summary-card"><span>平均首响</span><strong>00:38</strong><small>达标 96%</small></div>
+                  <div class="summary-card"><span>平均处理时长</span><strong>08:42</strong><small>近 30 天</small></div>
+                  <div class="summary-card"><span>满意度评分</span><strong>4.8</strong><small>评价 612 条</small></div>
+                  <div class="summary-card"><span>来源 / 地区</span><strong>Web 76%</strong><small>HK 42% · SG 21%</small></div>
+                </div>
+                <div class="filter-grid">
+                  <div class="input">时间 06/01 - 06/10</div>
+                  <div class="input">客户ID customerId</div>
+                  <div class="input">访客ID visitorUserId</div>
+                  <div class="input">关键字 退款 / 订单</div>
+                  <div class="input">渠道 temp_session</div>
+                  <div class="input">状态 closed</div>
+                  <div class="input">客服 Sofia</div>
+                  <div class="input">曾参与客服 Ken</div>
+                  <div class="input">来源 Web Widget</div>
+                  <div class="input">地区 HK</div>
+                  <div class="input">满意度 4-5</div>
+                  <div class="input">SLA 风险 否</div>
+                </div>
+                <div class="history-table-wrap">
+                  <table class="table"><thead><tr><th>结束时间</th><th>客户</th><th>渠道</th><th>客服</th><th>关键内容</th><th>处理时长</th><th>满意度</th><th>操作</th></tr></thead><tbody><tr><td>06/10 12:09</td><td>访客 8A21</td><td>Web</td><td>Sofia / Ken</td><td>退款进度，订单号 81231</td><td>08:42</td><td>5</td><td>查看完整对话</td></tr><tr><td>06/10 10:42</td><td>注册客户 Lin</td><td>APP</td><td>Mia</td><td>KYC 认证审核进度</td><td>06:18</td><td>4</td><td>查看完整对话</td></tr><tr><td>06/09 20:11</td><td>访客 2F19</td><td>Web</td><td>Sofia</td><td>入金不到账，已转接支付支持</td><td>13:05</td><td>5</td><td>查看完整对话</td></tr><tr><td>06/09 17:52</td><td>访客 6D73</td><td>WhatsApp</td><td>Ken</td><td>账户登录异常</td><td>04:26</td><td>未评价</td><td>查看完整对话</td></tr><tr><td>06/08 20:13</td><td>注册客户 Ada</td><td>APP</td><td>Mia</td><td>身份资料补充说明</td><td>09:11</td><td>5</td><td>查看完整对话</td></tr></tbody></table>
+                </div>
+              </section>
+              <aside class="history-detail">
+                <div class="panel-head"><strong>完整对话预览</strong><span>只读</span></div>
+                <div class="panel-body">
+                  <div class="section"><h4>访客 8A21 · 退款进度</h4><div class="kv"><div>会话ID <b>temp-81231</b></div><div>状态 <b>closed_by_staff</b></div><div>来源 <b>Web Widget / HK</b></div><div>参与客服 <b>Sofia、Ken</b></div></div></div>
+                  <div class="section"><h4>对话时间线</h4><div class="kv"><div>12:01 客户 <b>我想查询退款进度</b></div><div>12:02 Sofia <b>我先帮您确认订单状态</b></div><div>12:04 系统 <b>转接至二线支付支持</b></div><div>12:08 客户 <b>问题解决，感谢</b></div><div>12:09 系统 <b>客服关闭会话</b></div></div></div>
+                  <div class="section"><h4>统计联动</h4><div class="bar"><span>Web</span><div class="track"><div class="fill" style="width:76%"></div></div><b>76%</b></div><div class="bar"><span>HK</span><div class="track"><div class="fill blue" style="width:42%"></div></div><b>42%</b></div><div class="bar"><span>满意</span><div class="track"><div class="fill amber" style="width:88%"></div></div><b>88%</b></div></div>
+                </div>
+              </aside>
+            </div>
+          </section>
+        </div>
+        <div class="watermark">REQ-001 数据中心：历史对话统计与搜寻同页</div>
+      </section>
+
+      <section class="artboard" id="req2">
+        <div class="app">
+          <aside class="sidebar"><div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>专业版 · v1.0.0</span></div></div><nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item active"><span class="nav-icon">S</span>在线客服</div><div class="nav-item"><span class="nav-icon">D</span>数据中心</div><div class="nav-item"><span class="nav-icon">W</span>工作台</div></nav></aside>
+          <section class="main"><header class="topbar"><div class="service-title"><div class="badge-square">企微</div><div><h1>在线客服接待平台</h1><p>会话 1 · 手动接入 · 容量 1/10</p></div></div><div class="metric"><span>客服</span><strong class="green">1/10</strong></div><div class="metric"><span>排队</span><strong>0</strong></div><div class="metric"><span>进行中</span><strong>1</strong></div><div class="metric"><span>未读</span><strong>1</strong></div><div class="metric"><span>SLA</span><strong>0</strong></div><div class="status-pill"><span class="dot"></span>在线 手动接入 1/10</div></header><div class="body"><aside class="sessions"><div class="session-head"><h2>会话池</h2><p>当前 1 · 排队 0 · 历史 50</p><div class="input">搜索客户、渠道、会话内容</div><div class="tabs"><span class="tab active">当前 <span class="count">1</span></span><span class="tab">历史 <span class="count">50</span></span></div></div><div class="session-list"><div class="session-card active"><div class="avatar">访</div><div><strong>访客 81231</strong><small>支付问题 · 网页 · 需升级</small></div><span class="chip amber">转接</span></div></div></aside><section class="chat"><div class="chat-head"><div class="visitor"><div class="visitor-avatar">访</div><div><h3>访客 81231</h3><div class="visitor-tags"><span class="chip green">在线客服</span><span class="chip">网页</span><span class="chip amber">支付问题</span></div></div></div><div class="actions"><button class="btn primary">转接</button><button class="btn">关闭</button></div></div><div class="status-strip">人工接待中 · 当前客服 Sofia · SLA 剩余 04:12</div><div class="messages"><div class="bubble-row"><div class="mini-avatar customer">访</div><div class="bubble">这个问题需要支付部门确认吗？<span class="meta">12:06</span></div></div><div class="bubble-row me"><div class="bubble me">我帮您转接到支付支持同事，他会接着处理当前问题。<span class="meta">12:07 · 已读</span></div><div class="mini-avatar">我</div></div><div class="notice">客户侧系统提示由服务端产生：您的会话已转接至支付支持，将继续为您服务，请稍候。</div></div><div class="composer"><button class="btn">快捷话术</button><div class="input">转接前补充：订单 81231，疑似支付回调延迟。</div><button class="btn primary">发送</button></div></section><aside class="right-panel"><div class="panel-head"><strong>客户上下文</strong><span>服务协作</span></div><div class="panel-body"><div class="section"><h4>当前处理</h4><div class="kv"><div>来源 <b>网页 Widget</b></div><div>当前客服 <b>Sofia</b></div><div>SLA <b>04:12</b></div></div></div><div class="section"><h4>转接后时间线</h4><div class="kv"><div>目标客服 <b>Ken 支付支持</b></div><div>内部备注 <b>可审计</b></div><div>客户可见 <b>礼貌提示</b></div></div></div></div></aside><aside class="toolrail"><div class="tool active">访</div><div class="tool">话</div><div class="tool">AI</div><div class="tool">图</div></aside></div></section>
+        </div>
+        <div class="overlay"><div class="modal"><div class="modal-head"><h3>转接给另一位客服</h3><p>保持当前页面布局，只在会话上方弹出转接确认。</p></div><div class="modal-body"><div class="session-card active"><div class="avatar green">K</div><div><strong>Ken · 支付支持</strong><small>在线 · 当前接待 3/10 · 中文/粤语</small></div><span class="chip green">推荐</span></div><div class="input">转接备注：订单 81231，疑似支付回调延迟，请继续核查。</div></div><div class="modal-actions"><button class="btn">取消</button><button class="btn primary">确认转接</button></div></div></div>
+        <div class="watermark">REQ-002 现有布局增量：转接弹窗</div>
+      </section>
+
+      <section class="artboard" id="req3">
+        <div class="app"><aside class="sidebar"><div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>Owner</span></div></div><nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item active"><span class="nav-icon">S</span>在线客服</div><div class="nav-item"><span class="nav-icon">D</span>数据中心</div><div class="nav-item"><span class="nav-icon">W</span>工作台</div></nav></aside><section class="main"><header class="topbar"><div class="service-title"><div class="badge-square">监控</div><div><h1>在线客服接待平台</h1><p>管理员/所有者监控视角 · 不改变坐席布局</p></div></div><div class="metric"><span>客服</span><strong class="green">12</strong></div><div class="metric"><span>排队</span><strong>6</strong></div><div class="metric"><span>进行中</span><strong>24</strong></div><div class="metric"><span>未读</span><strong>8</strong></div><div class="metric"><span>SLA</span><strong>4</strong></div><div class="status-pill"><span class="dot"></span>管理员/所有者</div></header><div class="body monitor"><aside class="sessions"><div class="session-head"><h2>会话池</h2><p>全量监控 · 进行中 24 · SLA 4</p><div class="input">按客服、状态、渠道、SLA 搜索</div><div class="tabs"><span class="tab active">监控 <span class="count">24</span></span><span class="tab">排队 <span class="count">6</span></span></div></div><div class="session-list"><div class="session-card active"><div class="avatar">访</div><div><strong>Sofia 接待中</strong><small>访客 81231 · 剩余 02:18</small></div><span class="chip amber">风险</span></div><div class="session-card"><div class="avatar blue">客</div><div><strong>Ken 接待中</strong><small>注册客户 Lin · APP</small></div><span class="chip">正常</span></div></div></aside><section class="chat"><div class="chat-head"><div class="visitor"><div class="visitor-avatar">监</div><div><h3>实时监控并排查看</h3><div class="visitor-tags"><span class="chip green">管理员</span><span class="chip green">所有者</span><span class="chip">只读</span></div></div></div><div class="actions"><button class="btn">改派</button><button class="btn danger">强制关闭</button></div></div><div class="status-strip">默认只读 · 若启用插话必须显示“管理员介入”并写审计</div><div class="messages"><div class="split-chat"><div class="mini-window"><div class="panel-head"><strong>访客 81231</strong><span>Sofia</span></div><div class="messages"><div class="bubble-row"><div class="mini-avatar customer">访</div><div class="bubble">我已经等了很久，麻烦帮忙看一下。</div></div><div class="bubble-row me"><div class="bubble me">Sofia：正在核查订单流水。</div><div class="mini-avatar">S</div></div></div></div><div class="mini-window"><div class="panel-head"><strong>注册客户 Lin</strong><span>Ken</span></div><div class="messages"><div class="bubble-row"><div class="mini-avatar customer">客</div><div class="bubble">KYC 审核多久完成？</div></div><div class="bubble-row me"><div class="bubble me">Ken：我为您查看审核状态。</div><div class="mini-avatar">K</div></div></div></div></div></div><div class="composer"></div></section><aside class="right-panel"><div class="panel-head"><strong>监控动作</strong><span>审计开启</span></div><div class="panel-body"><div class="section"><h4>客服状态墙</h4><div class="kv"><div>Sofia <b>在线 8/10</b></div><div>Ken <b>在线 3/10</b></div><div>Mia <b>忙碌 9/10</b></div></div></div><div class="section"><button class="btn" style="width:100%;margin-bottom:8px">改派给空闲客服</button><button class="btn" style="width:100%;margin-bottom:8px">冻结会话</button><button class="btn danger" style="width:100%">强制关闭</button></div></div></aside><aside class="toolrail"><div class="tool active">监</div><div class="tool">话</div><div class="tool">AI</div><div class="tool">图</div></aside></div></section></div>
+        <div class="watermark">REQ-003 现有布局增量：管理员/所有者监控</div>
+      </section>
+
+      <section class="artboard" id="req4">
+        <div class="app"><aside class="sidebar"><div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>Owner</span></div></div><nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item"><span class="nav-icon">S</span>在线客服</div><div class="nav-item active"><span class="nav-icon">D</span>数据中心</div><div class="nav-item"><span class="nav-icon">W</span>工作台</div></nav></aside><section class="main"><header class="topbar"><div class="service-title"><div class="badge-square">统计</div><div><h1>数据中心 · 在线客服</h1><p>统计对话嵌入历史对话页，不进入接待布局</p></div></div><div class="metric"><span>对话量</span><strong class="green">8,240</strong></div><div class="metric"><span>首响</span><strong>00:38</strong></div><div class="metric"><span>处理</span><strong>07:16</strong></div><div class="metric"><span>满意度</span><strong>4.86</strong></div><div class="metric"><span>转接率</span><strong>8.2%</strong></div><div class="status-pill"><span class="dot"></span>近 30 天</div></header><div class="data-body"><section class="history-main"><div class="history-head"><div><h2>历史对话 · 统计</h2><p>同一套筛选条件同时驱动统计摘要、趋势、来源地区分布和历史列表。</p></div><div class="actions"><button class="btn">保存视图</button><button class="btn primary">导出统计报表</button></div></div><div class="summary-grid"><div class="summary-card"><span>每日/每周/月对话量</span><strong>8,240</strong><small>日均 274</small></div><div class="summary-card"><span>各客服接待数量</span><strong>Sofia 1,420</strong><small>Ken 1,086 · Mia 974</small></div><div class="summary-card"><span>平均首次回复</span><strong>00:38</strong><small>SLA 达标 96%</small></div><div class="summary-card"><span>平均处理时长</span><strong>07:16</strong><small>较上期 -11%</small></div><div class="summary-card"><span>满意度评分</span><strong>4.86</strong><small>评价 3,126 条</small></div></div><div class="filter-grid"><div class="input">时间 近 30 天</div><div class="input">渠道 全部</div><div class="input">客服 全部</div><div class="input">来源 Web / APP</div><div class="input">地区 HK / SG</div><div class="input">状态 已结束</div></div><div class="history-table-wrap"><table class="table"><thead><tr><th>统计维度</th><th>对话量</th><th>平均首响</th><th>平均处理</th><th>满意度</th><th>SLA 风险</th><th>占比</th></tr></thead><tbody><tr><td>Web Widget</td><td>6,262</td><td>00:35</td><td>06:58</td><td>4.88</td><td>42</td><td>76%</td></tr><tr><td>APP 客户服务</td><td>1,484</td><td>00:41</td><td>07:44</td><td>4.82</td><td>18</td><td>18%</td></tr><tr><td>WhatsApp</td><td>494</td><td>00:55</td><td>09:21</td><td>4.74</td><td>9</td><td>6%</td></tr><tr><td>Sofia</td><td>1,420</td><td>00:31</td><td>06:42</td><td>4.91</td><td>7</td><td>17%</td></tr><tr><td>Ken</td><td>1,086</td><td>00:36</td><td>07:10</td><td>4.84</td><td>11</td><td>13%</td></tr></tbody></table></div></section><aside class="history-detail"><div class="panel-head"><strong>来源与地区分布</strong><span>同页统计</span></div><div class="panel-body"><div class="section"><h4>来源渠道</h4><div class="bar"><span>网页</span><div class="track"><div class="fill" style="width:76%"></div></div><b>76%</b></div><div class="bar"><span>APP</span><div class="track"><div class="fill blue" style="width:54%"></div></div><b>54%</b></div><div class="bar"><span>WhatsApp</span><div class="track"><div class="fill amber" style="width:32%"></div></div><b>32%</b></div></div><div class="section"><h4>地区分布</h4><div class="bar"><span>HK</span><div class="track"><div class="fill" style="width:42%"></div></div><b>42%</b></div><div class="bar"><span>SG</span><div class="track"><div class="fill blue" style="width:21%"></div></div><b>21%</b></div><div class="bar"><span>MY</span><div class="track"><div class="fill amber" style="width:16%"></div></div><b>16%</b></div></div><div class="section"><h4>导出</h4><button class="btn primary" style="width:100%;margin-bottom:8px">导出 cs_sessions</button><button class="btn" style="width:100%">导出 cs_staff_daily_stats</button></div></div></aside></div></section></div>
+        <div class="watermark">REQ-004 数据中心：统计对话在历史对话页内</div>
+      </section>
+
+      <section class="artboard" id="req5">
+        <div class="app"><aside class="sidebar"><div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>客服</span></div></div><nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item active"><span class="nav-icon">S</span>在线客服</div><div class="nav-item"><span class="nav-icon">D</span>数据中心</div></nav></aside><section class="main"><header class="topbar"><div class="service-title"><div class="badge-square">企微</div><div><h1>在线客服接待平台</h1><p>客户输入预览只加在聊天输入区上方</p></div></div><div class="metric"><span>客服</span><strong class="green">1/10</strong></div><div class="metric"><span>排队</span><strong>0</strong></div><div class="metric"><span>进行中</span><strong>1</strong></div><div class="metric"><span>未读</span><strong>1</strong></div><div class="metric"><span>SLA</span><strong>0</strong></div><div class="status-pill"><span class="dot"></span>在线 手动接入</div></header><div class="body"><aside class="sessions"><div class="session-head"><h2>会话池</h2><p>当前 1 · 输入中 1</p><div class="input">搜索客户、渠道、会话内容</div><div class="tabs"><span class="tab active">当前 <span class="count">1</span></span><span class="tab">历史 <span class="count">50</span></span></div></div><div class="session-list"><div class="session-card active"><div class="avatar">访</div><div><strong>访客 81231</strong><small>正在输入：我想问一下退款...</small></div><span class="chip green">输入中</span></div></div></aside><section class="chat"><div class="chat-head"><div class="visitor"><div class="visitor-avatar">访</div><div><h3>访客 81231</h3><div class="visitor-tags"><span class="chip">网页</span><span class="chip green">输入中</span></div></div></div><div class="actions"><button class="btn">转接</button><button class="btn">关闭</button></div></div><div class="status-strip">输入预览为瞬时信号 · 不落库 · 不进历史 · 不进搜索</div><div class="messages"><div class="bubble-row"><div class="mini-avatar customer">访</div><div class="bubble">您好，我想咨询退款流程。</div></div><div class="bubble-row me"><div class="bubble me">好的，我先确认一下您的订单状态。<span class="meta">已读 12:03</span></div><div class="mini-avatar">我</div></div><div class="typing">客户正在输入：我想问一下退款大概多久到账？订单号是 81231，之前已经提交了申请...</div></div><div class="composer"><button class="btn">快捷话术</button><div class="input">已提前准备回复...</div><button class="btn primary">发送</button></div></section><aside class="right-panel"><div class="panel-head"><strong>快捷话术</strong><span>不改变布局</span></div><div class="panel-body"><div class="section"><h4>隐私规则</h4><div class="kv"><div>落库 <b>否</b></div><div>搜索 <b>否</b></div><div>TTL <b>5 秒</b></div><div>最大长度 <b>500 字</b></div></div></div></div></aside><aside class="toolrail"><div class="tool active">访</div><div class="tool">话</div><div class="tool">AI</div><div class="tool">图</div></aside></div></section></div>
+        <div class="watermark">REQ-005 现有布局增量：客户输入预览</div>
+      </section>
+
+      <section class="artboard" id="req6">
+        <div class="app"><aside class="sidebar"><div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>客服</span></div></div><nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item active"><span class="nav-icon">S</span>在线客服</div></nav></aside><section class="main"><header class="topbar"><div class="service-title"><div class="badge-square">企微</div><div><h1>在线客服接待平台</h1><p>已读状态只加在客服消息气泡下方</p></div></div><div class="metric"><span>客服</span><strong class="green">1/10</strong></div><div class="metric"><span>排队</span><strong>0</strong></div><div class="metric"><span>进行中</span><strong>1</strong></div><div class="metric"><span>未读</span><strong>0</strong></div><div class="metric"><span>SLA</span><strong>0</strong></div><div class="status-pill"><span class="dot"></span>在线 手动接入</div></header><div class="body"><aside class="sessions"><div class="session-head"><h2>会话池</h2><p>当前 1 · 已读同步</p><div class="input">搜索客户、渠道、会话内容</div><div class="tabs"><span class="tab active">当前 <span class="count">1</span></span><span class="tab">历史 <span class="count">50</span></span></div></div><div class="session-list"><div class="session-card active"><div class="avatar">访</div><div><strong>访客 81231</strong><small>客户已读到 Seq 42</small></div><span class="chip green">已读</span></div></div></aside><section class="chat"><div class="chat-head"><div class="visitor"><div class="visitor-avatar">访</div><div><h3>访客 81231</h3><div class="visitor-tags"><span class="chip">网页</span><span class="chip green">已读状态</span></div></div></div><div class="actions"><button class="btn">刷新已读</button></div></div><div class="status-strip">lastReadSeq=42 · lastReadAt=12:04:18 · null 显示未知，不显示 1970</div><div class="messages"><div class="bubble-row me"><div class="bubble me">您好，退款预计 1-3 个工作日到账。<span class="meta">Seq 40 · 已读 12:03:22</span></div><div class="mini-avatar">我</div></div><div class="bubble-row me"><div class="bubble me">我已经为您提交支付侧加急。<span class="meta">Seq 42 · 已读 12:04:18</span></div><div class="mini-avatar">我</div></div><div class="bubble-row me"><div class="bubble me">后续有结果我会在这里同步。<span class="meta">Seq 43 · 未读</span></div><div class="mini-avatar">我</div></div><div class="popover"><div class="kv"><div>lastReadSeq <b>42</b></div><div>lastReadAt <b>12:04:18</b></div><div>Seq 43 <b>未读</b></div></div></div></div><div class="composer"><button class="btn">快捷话术</button><div class="input">继续输入回复...</div><button class="btn primary">发送</button></div></section><aside class="right-panel"><div class="panel-head"><strong>客户资料</strong><span>原右栏保留</span></div><div class="panel-body"><div class="section"><h4>已读规则</h4><div class="kv"><div>判断 <b>seq <= lastReadSeq</b></div><div>时间 <b>lastReadAt</b></div><div>未知 <b>null</b></div></div></div></div></aside><aside class="toolrail"><div class="tool active">访</div><div class="tool">话</div><div class="tool">AI</div></aside></div></section></div>
+        <div class="watermark">REQ-006 现有布局增量：已读时间</div>
+      </section>
+
+      <section class="artboard" id="req7">
+        <div class="app"><aside class="sidebar"><div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>客服</span></div></div><nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item active"><span class="nav-icon">S</span>在线客服</div></nav></aside><section class="main"><header class="topbar"><div class="service-title"><div class="badge-square">企微</div><div><h1>在线客服接待平台</h1><p>静默撤回是消息菜单能力，不改工作台布局</p></div></div><div class="metric"><span>客服</span><strong class="green">1/10</strong></div><div class="metric"><span>排队</span><strong>0</strong></div><div class="metric"><span>进行中</span><strong>1</strong></div><div class="metric"><span>未读</span><strong>0</strong></div><div class="metric"><span>SLA</span><strong>0</strong></div><div class="status-pill"><span class="dot"></span>在线 手动接入</div></header><div class="body"><aside class="sessions"><div class="session-head"><h2>会话池</h2><p>当前 1</p><div class="input">搜索客户、渠道、会话内容</div><div class="tabs"><span class="tab active">当前 <span class="count">1</span></span><span class="tab">历史 <span class="count">50</span></span></div></div><div class="session-list"><div class="session-card active"><div class="avatar">访</div><div><strong>访客 81231</strong><small>选中客服消息 Seq 42</small></div><span class="chip amber">可撤回</span></div></div></aside><section class="chat"><div class="chat-head"><div class="visitor"><div class="visitor-avatar">访</div><div><h3>访客 81231</h3><div class="visitor-tags"><span class="chip">网页</span><span class="chip red">静默撤回</span></div></div></div><div class="actions"><button class="btn">普通撤回</button><button class="btn danger">静默撤回</button></div></div><div class="status-strip">只允许客服会话使用 · 普通 IM 私聊和群聊不支持</div><div class="messages"><div class="bubble-row me"><div class="bubble me">这条是正确回复。<span class="meta">Seq 41 · 已读</span></div><div class="mini-avatar">我</div></div><div class="bubble-row me"><div class="bubble me" style="outline:2px solid #fb7185">这条消息误发，需要从客户侧完全移除。<span class="meta">Seq 42 · 右键菜单打开</span></div><div class="mini-avatar">我</div></div><div class="notice" style="position:absolute;left:20px;right:20px;bottom:16px">客户侧结果：该气泡从历史、同步和实时消息流中移除，不显示任何撤回提示。</div></div><div class="composer"><button class="btn">快捷话术</button><div class="input">撤回后继续专业回复...</div><button class="btn primary">发送</button></div></section><aside class="right-panel"><div class="panel-head"><strong>审计与权限</strong><span>silent=true</span></div><div class="panel-body"><div class="section"><div class="kv"><div>客服会话 <b>允许</b></div><div>普通私聊 <b>禁止</b></div><div>普通群聊 <b>禁止</b></div><div>管理审计 <b>保留</b></div></div></div></div></aside><aside class="toolrail"><div class="tool active">访</div><div class="tool">话</div><div class="tool">AI</div></aside></div></section></div><div class="overlay"><div class="modal"><div class="modal-head"><h3>确认静默撤回？</h3><p>客户侧不会看到该消息，也不会看到撤回提示；管理审计仍可追溯。</p></div><div class="modal-body"><div class="notice">该能力只用于在线客服会话，普通 IM 私聊和群聊不支持。</div></div><div class="modal-actions"><button class="btn">取消</button><button class="btn danger">确认撤回</button></div></div></div>
+        <div class="watermark">REQ-007 现有布局增量：静默撤回</div>
+      </section>
+
+      <section class="artboard" id="req8">
+        <div class="app"><aside class="sidebar"><div class="brand"><div class="logo">L</div><div><strong>LPP</strong><span>客服</span></div></div><nav class="nav"><div class="nav-item"><span class="nav-icon">M</span>消息</div><div class="nav-item active"><span class="nav-icon">S</span>在线客服</div></nav></aside><section class="main"><header class="topbar"><div class="service-title"><div class="badge-square">企微</div><div><h1>在线客服接待平台</h1><p>PC 不主动 reopen，只响应 Widget 重开后的状态</p></div></div><div class="metric"><span>客服</span><strong class="green">1/10</strong></div><div class="metric"><span>排队</span><strong>1</strong></div><div class="metric"><span>进行中</span><strong>0</strong></div><div class="metric"><span>未读</span><strong>0</strong></div><div class="metric"><span>SLA</span><strong>0</strong></div><div class="status-pill"><span class="dot"></span>手动接入</div></header><div class="body"><aside class="sessions"><div class="session-head"><h2>会话池</h2><p>重开后仍回到原会话池</p><div class="input">搜索客户、渠道、会话内容</div><div class="tabs"><span class="tab active">当前 <span class="count">1</span></span><span class="tab">历史 <span class="count">50</span></span></div></div><div class="session-list"><div class="session-card active"><div class="avatar green">访</div><div><strong>访客 8A21</strong><small>由 closed_timeout 重开 · 排队中</small></div><span class="chip green">reopened</span></div><div class="session-card"><div class="avatar">访</div><div><strong>访客 72CC</strong><small>已关闭 · 只读历史</small></div><span class="chip">历史</span></div></div></aside><section class="chat"><div class="chat-head"><div class="visitor"><div class="visitor-avatar">访</div><div><h3>访客 8A21</h3><div class="visitor-tags"><span class="chip green">reopened</span><span class="chip">排队中</span><span class="chip">历史连续</span></div></div></div><div class="actions"><button class="btn primary">接入</button></div></div><div class="status-strip">History retained · reopened 事件已写入时间线 · 输入区按排队状态禁用</div><div class="messages"><div style="display:grid;grid-template-columns:360px minmax(0,1fr);gap:14px;height:100%"><div class="widget"><div class="widget-head"><strong>Widget 在线客服</strong><span>会话已因超时关闭</span></div><div class="widget-body"><div class="notice">您可以继续上一次对话，历史消息会保留。</div><div class="bubble">上次问题：退款到账时间</div><button class="btn primary" style="width:100%">继续对话</button><button class="btn" style="width:100%">服务评价</button><div class="kv"><div>resumeRecentSession <b>true</b></div><div>visitorToken <b>已替换</b></div><div>历史消息 <b>保留</b></div></div></div></div><div class="section"><h4>PC 侧时间线</h4><div class="kv"><div>11:30 超时关闭 <b>closed_timeout</b></div><div>12:05 Widget 继续 <b>新 token</b></div><div>12:05 写入事件 <b>reopened</b></div><div>12:06 PC 刷新 <b>回到队列</b></div></div></div></div></div><div class="composer"><div class="input">排队中，接入后可回复</div></div></section><aside class="right-panel"><div class="panel-head"><strong>识别条件</strong><span>复访续聊</span></div><div class="panel-body"><div class="section"><div class="kv"><div>customerId <b>优先</b></div><div>fingerprint <b>匿名访客</b></div><div>visitorMobile <b>可选</b></div><div>visitorEmail <b>可选</b></div></div></div><div class="notice">超过业务定义的最近期限时，前端可选择不带 resumeRecentSession，进入新会话。</div></div></aside><aside class="toolrail"><div class="tool active">访</div><div class="tool">话</div><div class="tool">AI</div></aside></div></section></div>
+        <div class="watermark">REQ-008 现有布局增量：继续对话</div>
+      </section>
+    </main>
+  </body>
+</html>

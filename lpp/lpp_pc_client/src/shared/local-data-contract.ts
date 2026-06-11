@@ -25,11 +25,23 @@ export interface LocalDataMessageInput {
   conversationSeq?: number | null;
   conversationType: LocalConversationType | string;
   isRead?: boolean | null;
+  isSelf?: boolean | null;
+  isMine?: boolean | null;
+  direction?: string | null;
   messageId: string;
   messageType?: string | null;
   preview?: string | null;
   scopeKey: string;
+  senderAvatarUrl?: string | null;
+  senderDisplayName?: string | null;
+  senderId?: string | null;
+  senderLppId?: string | null;
+  senderPlatformUserId?: string | null;
   senderUserId?: string | null;
+  fromUserId?: string | null;
+  platformUserId?: string | null;
+  lppId?: string | null;
+  avatarUrl?: string | null;
   sentAt?: string | null;
   status?: LocalMessageStatus | string | null;
 }
@@ -43,11 +55,23 @@ export interface LocalDataMessage {
   conversationType: LocalConversationType;
   id: string;
   isRead: boolean;
+  isSelf?: boolean;
+  isMine?: boolean;
+  direction?: string;
   messageId: string;
   messageType: string;
   preview: string;
   scopeKey: string;
+  senderAvatarUrl?: string;
+  senderDisplayName?: string;
+  senderId?: string;
+  senderLppId?: string;
+  senderPlatformUserId?: string;
   senderUserId?: string;
+  fromUserId?: string;
+  platformUserId?: string;
+  lppId?: string;
+  avatarUrl?: string;
   sentAt?: string;
   status: LocalMessageStatus;
   updatedAt: number;
@@ -298,13 +322,41 @@ export function normalizeLocalDataMessage(input: LocalDataMessageInput): LocalDa
     conversationType,
     id: localDataMessageKey(input.scopeKey, conversationType, input.conversationId, messageId),
     isRead: Boolean(input.isRead),
+    ...(typeof input.isSelf === "boolean" ? { isSelf: input.isSelf } : {}),
+    ...(typeof input.isMine === "boolean" ? { isMine: input.isMine } : {}),
+    ...(normalizeOptional(input.direction) ? { direction: normalizeOptional(input.direction) } : {}),
     messageId,
     messageType: normalizeOptional(input.messageType) ?? "text",
     preview: normalizeOptional(input.preview) ?? "",
     scopeKey: normalizeKeyPart(input.scopeKey, "unknown-scope"),
+    ...(normalizeOptional(input.senderAvatarUrl)
+      ? { senderAvatarUrl: normalizeOptional(input.senderAvatarUrl) }
+      : {}),
+    ...(normalizeOptional(input.senderDisplayName)
+      ? { senderDisplayName: normalizeOptional(input.senderDisplayName) }
+      : {}),
+    ...(normalizeOptional(input.senderId)
+      ? { senderId: normalizeOptional(input.senderId) }
+      : {}),
+    ...(normalizeOptional(input.senderLppId)
+      ? { senderLppId: normalizeOptional(input.senderLppId) }
+      : {}),
+    ...(normalizeOptional(input.senderPlatformUserId)
+      ? { senderPlatformUserId: normalizeOptional(input.senderPlatformUserId) }
+      : {}),
     ...(normalizeOptional(input.senderUserId)
       ? { senderUserId: normalizeOptional(input.senderUserId) }
       : {}),
+    ...(normalizeOptional(input.fromUserId)
+      ? { fromUserId: normalizeOptional(input.fromUserId) }
+      : {}),
+    ...(normalizeOptional(input.platformUserId)
+      ? { platformUserId: normalizeOptional(input.platformUserId) }
+      : {}),
+    ...(normalizeOptional(input.lppId)
+      ? { lppId: normalizeOptional(input.lppId) }
+      : {}),
+    ...(normalizeOptional(input.avatarUrl) ? { avatarUrl: normalizeOptional(input.avatarUrl) } : {}),
     ...(normalizeOptional(input.sentAt) ? { sentAt: normalizeOptional(input.sentAt) } : {}),
     status: normalizeMessageStatus(input.status),
     updatedAt: Date.now(),
@@ -444,6 +496,11 @@ function searchableText(message: LocalDataMessage) {
     message.messageId,
     message.clientMsgId,
     message.messageType,
+    message.senderDisplayName,
+    message.senderUserId,
+    message.senderId,
+    message.senderPlatformUserId,
+    message.senderLppId,
     JSON.stringify(message.bodyJson),
   ]
     .filter(Boolean)

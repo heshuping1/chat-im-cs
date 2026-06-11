@@ -99,4 +99,29 @@ describe("customer service message contract", () => {
       status: "sent",
     });
   });
+
+  it("normalizes customer read receipt aliases", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-read-1",
+        conversationId: "cs-conv-read",
+        conversationSeq: 12,
+        messageType: "text",
+        body: { text: "receipt" },
+        customerReadAt: "2026-06-11T09:20:00.000Z",
+        readByCustomer: true,
+      },
+      {
+        threadId: "thread-read",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(result.status).toBe("ok");
+    expect(customerServiceMessageEntityToDto(result.data!)).toMatchObject({
+      messageId: "cs-read-1",
+      readAt: "2026-06-11T09:20:00.000Z",
+      isRead: true,
+    });
+  });
 });

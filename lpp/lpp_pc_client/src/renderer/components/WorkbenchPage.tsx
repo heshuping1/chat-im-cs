@@ -1,29 +1,23 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   BarChart3,
-  Bell,
   BookOpenText,
-  Building2,
   CheckCircle2,
-  ChevronRight,
-  ClipboardList,
   Headphones,
   LockKeyhole,
   Megaphone,
   MessageSquareText,
-  Radio,
-  ShieldCheck,
   Sparkles,
   TriangleAlert,
-  UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { normalizeKnowledgeBasesResponse } from "../data/api/knowledge-normalizers";
 import { createApiClient } from "../data/runtime";
+import { CustomerServiceMonitorPanel } from "../customer-service/components/CustomerServiceMonitorPanel";
 import {
   canViewTeamServicePerformance,
   createServicePerformanceModel,
@@ -48,14 +42,7 @@ const shortcutIcons: Record<string, LucideIcon> = {
   "wb-cs-notices": Megaphone,
   "wb-cs-quick-replies": BookOpenText,
   "wb-cs-performance": BarChart3,
-  "wb-admin-customers": UsersRound,
   "wb-admin-service-center": Headphones,
-  "wb-admin-groups": ShieldCheck,
-  "wb-owner-broadcast": Radio,
-};
-
-const shortcutRoutes: Partial<Record<string, ModuleKey>> = {
-  "wb-cs-quick-replies": "knowledgeBase",
 };
 
 export function WorkbenchPage() {
@@ -64,7 +51,9 @@ export function WorkbenchPage() {
   const authSession = useAuthSession();
   const setActiveModule = useSetActiveModule();
   const currentWorkspaceRole = roleFromSession(authSession);
-  const [selectedShortcutId, setSelectedShortcutId] = useState("wb-cs-notices");
+  const [selectedShortcutId, setSelectedShortcutId] = useState(() =>
+    defaultWorkbenchShortcutId(currentWorkspaceRole),
+  );
   const [notice, setNotice] = useState<string | null>(null);
 
   const client = useMemo(
@@ -84,13 +73,12 @@ export function WorkbenchPage() {
     visibleItems.find((item) => item.id === selectedShortcutId) ??
     visibleItems[0];
 
-  const grouped = visibleItems.reduce<Record<string, WorkbenchShortcut[]>>(
-    (result, item) => {
-      result[item.groupKey] = [...(result[item.groupKey] ?? []), item];
-      return result;
-    },
-    {},
-  );
+  useEffect(() => {
+    const nextDefault = defaultWorkbenchShortcutId(currentWorkspaceRole);
+    setSelectedShortcutId((current) =>
+      visibleItems.some((item) => item.id === current) ? current : nextDefault,
+    );
+  }, [currentWorkspaceRole, visibleItems]);
 
   const announcementsQuery = useQuery({
     queryKey: pcQueryKeys.workbenchAnnouncements(...queryBaseKey),
@@ -127,10 +115,6 @@ export function WorkbenchPage() {
     onError: (error) => setNotice(t("workbench.notice.readFailed", { error: formatError(error) })),
   });
 
-  const roleLabel = t(`workbench.role.${currentWorkspaceRole}`);
-  const summary = threadsQuery.data?.summary;
-  const announcementCount = announcementsQuery.data?.length;
-  const receptionStatus = receptionQuery.data?.serviceStatus;
   const knowledgeBases = normalizeKnowledgeBasesResponse(knowledgeBasesQuery.data);
   const canViewTeamPerformance = canViewTeamServicePerformance(authSession);
   const performanceQuery = useQuery({
@@ -147,106 +131,33 @@ export function WorkbenchPage() {
     [performanceQuery.data, t],
   );
 
-  function handleShortcutAction(item: WorkbenchShortcut) {
-    setSelectedShortcutId(item.id);
-    setNotice(null);
-    if (item.state === "no_permission") return;
-    const target = shortcutRoutes[item.id];
-    if (target) {
-      setActiveModule(target);
-    }
-  }
-
   return (
     <main className="module-page workbench-page">
-      <header className="workbench-hero">
-        <div>
-          <span className="eyebrow">ROLE WORKBENCH</span>
-          <h1>{t("workbench.heroTitle", { role: roleLabel })}</h1>
-          <p>
-            {t("workbench.heroSubtitle", {
-              role: roleLabel,
-              tenant: authSession?.tenantName ?? t("workbench.currentEnterprise"),
-            })}
-          </p>
-        </div>
-        <div className="role-card" aria-label={t("workbench.currentRole")}>
-          <UsersRound size={20} />
-          <span>{t("workbench.currentRole")}</span>
-          <strong>{roleLabel}</strong>
-        </div>
-      </header>
-
       {notice && (
         <p className="workbench-notice" role="status">
           {notice}
         </p>
       )}
 
-      <section className="workbench-summary" aria-label={t("workbench.summaryAria")}>
-        <MetricCard
-          icon={Megaphone}
-          label={t("workbench.summary.announcements")}
-          value={formatMetric(announcementCount)}
-          hint={announcementsQuery.isError ? t("workbench.announcementLoadFailed") : t("workbench.summary.announcementsHint")}
-        />
-        <MetricCard
-          icon={BookOpenText}
-          label={t("workbench.summary.quickReplies")}
-          value={t("workbench.entry")}
-          hint={t("workbench.summary.quickRepliesHint")}
-        />
-        <MetricCard
-          icon={Headphones}
-          label={t("workbench.summary.receptionStatus")}
-          value={workbenchReceptionStatusLabel(receptionStatus, t)}
-          hint={t("workbench.summary.receptionStatusHint")}
-        />
-        <MetricCard
-          icon={BarChart3}
-          label={t("workbench.summary.currentConversations")}
-          value={formatMetric(summary?.allCount)}
-          hint={
-            threadsQuery.isError
-              ? t("workbench.performanceLoadFailed")
-              : t("workbench.summary.threadHint", {
-                  active: formatMetric(summary?.activeCount),
-                  queue: formatMetric(summary?.queuedCount),
-                })
-          }
-        />
-      </section>
-
       <section className="workbench-main-grid">
-        <div className="workbench-left">
-          {Object.entries(grouped).map(([group, items]) => {
-            const groupKey = group as WorkbenchShortcut["groupKey"];
-            const Icon = workbenchGroupIcon(groupKey);
-            return (
-              <section className="workbench-section" key={group}>
-                <h2>
-                  <Icon size={17} />
-                  {workbenchGroupLabel(groupKey, t)}
-                </h2>
-                <div className="workbench-grid">
-                  {items.map((item) => (
-                    <ShortcutCard
-                      item={item}
-                      key={item.id}
-                      selected={item.id === selectedShortcut?.id}
-                      onClick={() => {
-                        setSelectedShortcutId(item.id);
-                        setNotice(null);
-                      }}
-                      onAction={() => handleShortcutAction(item)}
-                      t={t}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+        <nav
+          aria-label={t("workbench.capabilityNavAria")}
+          className="workbench-tabs"
+          role="tablist"
+        >
+          {visibleItems.map((item) => (
+            <WorkbenchTab
+              item={item}
+              key={item.id}
+              selected={item.id === selectedShortcut?.id}
+              onClick={() => {
+                setSelectedShortcutId(item.id);
+                setNotice(null);
+              }}
+              t={t}
+            />
+          ))}
+        </nav>
 
         <aside className="workbench-detail" aria-label={t("workbench.detailAria")}>
           {selectedShortcut ? (
@@ -267,6 +178,7 @@ export function WorkbenchPage() {
               }
               onOpenModule={setActiveModule}
               canViewTeamPerformance={canViewTeamPerformance}
+              client={client}
               performanceError={
                 performanceQuery.isError ? formatError(performanceQuery.error) : ""
               }
@@ -274,6 +186,8 @@ export function WorkbenchPage() {
               performanceModel={performanceModel}
               retryPerformance={() => void performanceQuery.refetch()}
               reception={receptionQuery.data}
+              sessionBaseUrl={authSession?.apiBaseUrl}
+              sessionTenantToken={authSession?.tenantToken}
               threads={threadsQuery.data}
               threadsError={
                 threadsQuery.isError ? formatError(threadsQuery.error) : ""
@@ -295,37 +209,16 @@ export function WorkbenchPage() {
 
 type WorkbenchTranslate = (key: string, params?: Record<string, string | number>) => string;
 
-function workbenchGroupIcon(group: WorkbenchShortcut["groupKey"]) {
-  switch (group) {
-    case "customerService":
-      return MessageSquareText;
-    case "admin":
-      return ShieldCheck;
-    case "owner":
-      return Building2;
-    default:
-      return MessageSquareText;
-  }
-}
-
-function workbenchGroupLabel(group: WorkbenchShortcut["groupKey"], t: WorkbenchTranslate) {
-  return t(`workbench.group.${group}`);
+function defaultWorkbenchShortcutId(role: ReturnType<typeof roleFromSession>) {
+  return role === "admin" || role === "owner" ? "wb-admin-service-center" : "wb-cs-notices";
 }
 
 function workbenchStateLabel(state: WorkbenchShortcut["state"], t: WorkbenchTranslate) {
   return t(`workbench.state.${state}.label`);
 }
 
-function workbenchStateHint(state: WorkbenchShortcut["state"], t: WorkbenchTranslate) {
-  return t(`workbench.state.${state}.hint`);
-}
-
 function workbenchShortcutTitle(item: WorkbenchShortcut, t: WorkbenchTranslate) {
   return t(item.titleKey);
-}
-
-function workbenchShortcutDescription(item: WorkbenchShortcut, t: WorkbenchTranslate) {
-  return t(item.descriptionKey);
 }
 
 function workbenchReceptionStatusLabel(value: unknown, t: WorkbenchTranslate) {
@@ -338,73 +231,33 @@ function workbenchReceptionStatusLabel(value: unknown, t: WorkbenchTranslate) {
   return t("sidebar.service.status.offline");
 }
 
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <div className="workbench-metric-card">
-      <Icon size={18} />
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{hint}</small>
-    </div>
-  );
-}
-
-function ShortcutCard({
+function WorkbenchTab({
   item,
   selected,
   onClick,
-  onAction,
   t,
 }: {
   item: WorkbenchShortcut;
   selected: boolean;
   onClick: () => void;
-  onAction: () => void;
   t: WorkbenchTranslate;
 }) {
   const Icon = shortcutIcons[item.id] ?? MessageSquareText;
   const disabled = item.state === "no_permission";
   return (
-    <article
-      className={`workbench-card ${item.state} ${selected ? "active" : ""}`}
+    <button
+      aria-selected={selected}
+      className={`workbench-tab ${item.state} ${selected ? "active" : ""}`}
+      disabled={disabled}
       onClick={onClick}
+      role="tab"
+      type="button"
     >
-      <div className="workbench-card-head">
-        <span className="workbench-card-icon">
-          <Icon size={18} />
-        </span>
-        <span className="card-state">
-          {item.state === "no_permission" && <LockKeyhole size={13} />}
-          {workbenchStateLabel(item.state, t)}
-        </span>
-      </div>
+      <span className="workbench-tab-icon">
+        <Icon size={16} />
+      </span>
       <strong>{workbenchShortcutTitle(item, t)}</strong>
-      <p>{workbenchShortcutDescription(item, t)}</p>
-      <footer>
-        <em>{item.metric ?? workbenchStateHint(item.state, t)}</em>
-        <button
-          aria-label={t("workbench.openShortcut", { title: workbenchShortcutTitle(item, t) })}
-          disabled={disabled}
-          onClick={(event) => {
-            event.stopPropagation();
-            onAction();
-          }}
-          type="button"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </footer>
-    </article>
+    </button>
   );
 }
 
@@ -412,6 +265,7 @@ function WorkbenchDetail({
   announcements,
   announcementsError,
   canViewTeamPerformance,
+  client,
   item,
   markRead,
   knowledgeBases,
@@ -422,6 +276,8 @@ function WorkbenchDetail({
   performanceModel,
   retryPerformance,
   reception,
+  sessionBaseUrl,
+  sessionTenantToken,
   t,
   threads,
   threadsError,
@@ -429,6 +285,7 @@ function WorkbenchDetail({
   announcements: EnterpriseAnnouncementDto[];
   announcementsError: string;
   canViewTeamPerformance: boolean;
+  client: ReturnType<typeof createApiClient> | null;
   item: WorkbenchShortcut;
   markRead: (id: string) => void;
   knowledgeBases: KnowledgeBaseDto[];
@@ -439,6 +296,8 @@ function WorkbenchDetail({
   performanceModel: ServicePerformanceModel;
   retryPerformance: () => void;
   reception?: StaffReceptionStatusDto;
+  sessionBaseUrl?: string;
+  sessionTenantToken?: string;
   t: WorkbenchTranslate;
   threads?: CustomerServiceThreadsResponse;
   threadsError: string;
@@ -446,7 +305,6 @@ function WorkbenchDetail({
   if (item.id === "wb-cs-notices") {
     return (
       <>
-        <DetailHeader icon={Megaphone} item={item} t={t} />
         {announcementsError ? (
           <EmptyBlock
             icon={TriangleAlert}
@@ -488,7 +346,6 @@ function WorkbenchDetail({
   if (item.id === "wb-cs-quick-replies") {
     return (
       <>
-        <DetailHeader icon={BookOpenText} item={item} t={t} />
         {knowledgeError ? (
           <EmptyBlock icon={TriangleAlert} title={t("workbench.knowledgeLoadFailed")} text={knowledgeError} />
         ) : knowledgeBases.length ? (
@@ -537,7 +394,6 @@ function WorkbenchDetail({
     if (canViewTeamPerformance) {
       return (
         <>
-          <DetailHeader icon={BarChart3} item={item} t={t} />
           <TeamPerformancePanel
             error={performanceError}
             loading={performanceLoading}
@@ -550,7 +406,6 @@ function WorkbenchDetail({
     }
     return (
       <>
-        <DetailHeader icon={BarChart3} item={item} t={t} />
         {threadsError ? (
           <EmptyBlock icon={TriangleAlert} title={t("workbench.performanceLoadFailed")} text={threadsError} />
         ) : (
@@ -581,9 +436,22 @@ function WorkbenchDetail({
     );
   }
 
+  if (item.id === "wb-admin-service-center") {
+    return (
+      <>
+        <CustomerServiceMonitorPanel
+          apiBaseUrl={sessionBaseUrl}
+          client={client}
+          onOpenOnlineService={() => onOpenModule("onlineService")}
+          t={t}
+          tenantToken={sessionTenantToken}
+        />
+      </>
+    );
+  }
+
   return (
     <>
-      <DetailHeader icon={shortcutIcons[item.id] ?? ClipboardList} item={item} t={t} />
       <EmptyBlock
         icon={CheckCircle2}
         title={t("workbench.entryReservedTitle")}
@@ -727,29 +595,6 @@ function TeamPerformancePanel({
   );
 }
 
-function DetailHeader({
-  icon: Icon,
-  item,
-  t,
-}: {
-  icon: LucideIcon;
-  item: WorkbenchShortcut;
-  t: WorkbenchTranslate;
-}) {
-  return (
-    <header className="workbench-detail-head">
-      <div>
-        <span>
-          <Icon size={17} />
-          {workbenchGroupLabel(item.groupKey, t)}
-        </span>
-        <h2>{workbenchShortcutTitle(item, t)}</h2>
-      </div>
-      <em>{workbenchStateLabel(item.state, t)}</em>
-    </header>
-  );
-}
-
 function EmptyBlock({
   icon: Icon,
   title,
@@ -777,6 +622,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatMetric(value?: number | null) {
-  return typeof value === "number" ? String(value) : "--";
+function formatMetric(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+  return value.toLocaleString();
 }

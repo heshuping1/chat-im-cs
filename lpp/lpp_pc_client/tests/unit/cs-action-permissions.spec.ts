@@ -39,6 +39,29 @@ describe("customer service action permissions", () => {
     ).toMatchObject({ enabled: true, visible: true, reason: "ok" });
   });
 
+  it("keeps timeout-closed conversations read-only until explicitly reopened", () => {
+    const state = createCustomerServiceThreadState("closed_timeout");
+
+    expect(
+      getCustomerServiceActionPermission("send_text", { hasThread: true, state }),
+    ).toMatchObject({ enabled: false, visible: false, reason: "readonly" });
+    expect(
+      getCustomerServiceActionPermission("close", { hasThread: true, state }),
+    ).toMatchObject({ enabled: false, visible: false, reason: "readonly" });
+  });
+
+  it("allows transfer only for open serving threads", () => {
+    const serving = createCustomerServiceThreadState("serving");
+    const queued = createCustomerServiceThreadState("queued");
+
+    expect(
+      getCustomerServiceActionPermission("transfer", { hasThread: true, state: serving }),
+    ).toMatchObject({ enabled: true, visible: true, reason: "ok" });
+    expect(
+      getCustomerServiceActionPermission("transfer", { hasThread: true, state: queued }),
+    ).toMatchObject({ enabled: false, visible: false, reason: "unsupported" });
+  });
+
   it("hides active actions for readonly threads and unsupported actions", () => {
     const state = createCustomerServiceThreadState("closed_by_staff");
 
@@ -47,6 +70,6 @@ describe("customer service action permissions", () => {
     ).toMatchObject({ enabled: false, visible: false, reason: "readonly" });
     expect(
       getCustomerServiceActionPermission("transfer", { hasThread: true, state }),
-    ).toMatchObject({ enabled: false, visible: false, reason: "unsupported" });
+    ).toMatchObject({ enabled: false, visible: false, reason: "readonly" });
   });
 });

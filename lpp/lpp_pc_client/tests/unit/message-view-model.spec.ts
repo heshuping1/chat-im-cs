@@ -92,6 +92,69 @@ describe("message view model", () => {
     ).toMatchObject({
       status: {
         receipt: "read",
+        readReceiptText: expect.any(String),
+        statusText: undefined,
+      },
+    });
+  });
+
+  it("exposes direct readCount snapshots as visible read receipt text", () => {
+    const message = {
+      body: { text: "hello" },
+      direction: "out",
+      isMine: true,
+      messageId: "m-direct-read-count",
+      messageType: "text",
+      readCount: 1,
+      sentAt: "2026-05-29T12:00:00.000Z",
+      status: "sent",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Customer",
+        conversationType: "temp_session",
+        message,
+        mine: true,
+        senderFallback: "Customer",
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      status: {
+        receipt: "read",
+        readReceiptText: expect.any(String),
+        statusText: undefined,
+      },
+    });
+  });
+
+  it("exposes customer-service read time text when supplied", () => {
+    const message = {
+      body: { text: "hello" },
+      direction: "out",
+      isMine: true,
+      isRead: true,
+      messageId: "m-cs-read",
+      messageType: "text",
+      readAt: "2026-06-11T09:20:00.000Z",
+      sentAt: "2026-06-11T09:18:00.000Z",
+      status: "sent",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Customer",
+        conversationType: "temp_session",
+        message,
+        mine: true,
+        readReceiptText: "客户已读 17:20",
+        senderFallback: "Customer",
+        timeText: "17:18",
+      }),
+    ).toMatchObject({
+      status: {
+        receipt: "read",
+        readReceiptText: "客户已读 17:20",
         statusText: undefined,
       },
     });

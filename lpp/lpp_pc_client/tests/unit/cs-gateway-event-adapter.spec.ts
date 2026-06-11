@@ -107,6 +107,51 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.threadStatus).toBe("closed_by_visitor");
   });
 
+  it("adapts temp-session typing events as customer preview state", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "temp_session.typing",
+      receivedAt: 12,
+      args: [
+        {
+          sessionId: "temp-session-typing-1",
+          isTyping: true,
+          content: "I need help with my order",
+          senderRole: "visitor",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.typing.preview");
+    if (event.kind !== "cs.typing.preview") return;
+    expect(event.threadId).toBe("temp-session-typing-1");
+    expect(event.threadType).toBe("temp_session");
+    expect(event.isTyping).toBe(true);
+    expect(event.previewText).toBe("I need help with my order");
+    expect(event.senderRole).toBe("visitor");
+  });
+
+  it("adapts direct-customer msg.typing events as online-service direct preview state", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "msg.typing",
+      receivedAt: 13,
+      args: [
+        {
+          conversationId: "thread-direct-typing",
+          conversationType: "direct_customer",
+          content: "direct draft",
+          isTyping: "true",
+          senderType: "customer",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.typing.preview");
+    if (event.kind !== "cs.typing.preview") return;
+    expect(event.threadId).toBe("thread-direct-typing");
+    expect(event.threadType).toBe("im_direct");
+    expect(event.previewText).toBe("direct draft");
+  });
+
   it("returns invalid for customer service messages without a thread id", () => {
     const event = adaptCustomerServiceGatewayEvent({
       eventName: "customer_service.message",

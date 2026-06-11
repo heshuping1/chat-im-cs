@@ -142,7 +142,7 @@ function readStoredServiceLayout(): StoredServiceLayout {
         typeof parsed.assistantPaneWidth === 'number'
           ? parsed.assistantPaneWidth === legacyServiceLayoutDefaults.assistantPaneWidth
             ? serviceLayoutDefaults.assistantPaneWidth
-            : clampPaneWidth(parsed.assistantPaneWidth, 320, 420)
+            : clampPaneWidth(parsed.assistantPaneWidth, 320, 960)
           : undefined,
       customerPaneCollapsed:
         typeof parsed.customerPaneUserCollapsed === 'boolean'
@@ -549,7 +549,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }),
   setServiceAssistantPaneWidth: (width) =>
     set(() => {
-      const serviceAssistantPaneWidth = clampPaneWidth(width, 320, 420);
+      const serviceAssistantPaneWidth = clampPaneWidth(width, 320, 960);
       persistServiceLayoutPatch({ assistantPaneWidth: serviceAssistantPaneWidth });
       return { serviceAssistantPaneWidth };
     }),

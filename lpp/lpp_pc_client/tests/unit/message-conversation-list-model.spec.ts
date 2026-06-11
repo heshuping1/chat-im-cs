@@ -11,7 +11,12 @@ import {
   filterMessageConversations,
   sortMessageConversations,
 } from "../../src/renderer/messages/models/messageConversationListModel";
-import type { ConversationListItem } from "../../src/renderer/data/api/types";
+import { conversationListIdentityView } from "../../src/renderer/messages/models/conversationListIdentityModel";
+import type {
+  ConversationListItem,
+  FriendDto,
+  TenantMemberDto,
+} from "../../src/renderer/data/api/types";
 
 describe("message conversation list model", () => {
   beforeEach(() => {
@@ -110,6 +115,78 @@ describe("message conversation list model", () => {
 
     expect(isVisibleImConversationInScope(directShapedCustomerService, "scope-a")).toBe(false);
     expect(isVisibleImConversationInScope(directShapedCustomerService, "scope-b")).toBe(true);
+  });
+
+  it("adds lightweight customer identity and real source to direct conversations", () => {
+    const item = conversation({
+      conversationId: "customer",
+      peerUserId: "customer-1",
+      peerUserType: 1,
+      sourceChannel: "web",
+    } as Partial<ConversationListItem>);
+
+    expect(
+      conversationListIdentityView({
+        conversation: item,
+        friends: [],
+        isGroup: false,
+        tenantMembers: [],
+      }),
+    ).toEqual({
+      identityText: "客户",
+      kind: "customer",
+      sourceText: "@网页",
+    });
+  });
+
+  it("marks tenant members as internal without exposing concrete employee roles", () => {
+    const item = conversation({
+      conversationId: "staff",
+      peerUserId: "staff-1",
+    });
+    const tenantMembers: TenantMemberDto[] = [
+      { displayName: "客服一", membershipRole: 2, userId: "staff-1" },
+    ];
+
+    expect(
+      conversationListIdentityView({
+        conversation: item,
+        friends: [],
+        isGroup: false,
+        tenantMembers,
+      }),
+    ).toEqual({
+      identityText: "内部",
+      kind: "internal",
+      sourceText: "",
+    });
+  });
+
+  it("does not label ordinary friends as users and does not label groups", () => {
+    const friend: FriendDto = {
+      displayName: "Alice",
+      friendUserId: "friend-1",
+      userType: 2,
+    };
+    const direct = conversation({ peerUserId: "friend-1" });
+    const group = conversation({ conversationType: "group" });
+
+    expect(
+      conversationListIdentityView({
+        conversation: direct,
+        friends: [friend],
+        isGroup: false,
+        tenantMembers: [],
+      }),
+    ).toEqual({ identityText: "", kind: "none", sourceText: "" });
+    expect(
+      conversationListIdentityView({
+        conversation: group,
+        friends: [],
+        isGroup: true,
+        tenantMembers: [{ displayName: "Member", userId: "friend-1" }],
+      }),
+    ).toEqual({ identityText: "", kind: "none", sourceText: "" });
   });
 });
 

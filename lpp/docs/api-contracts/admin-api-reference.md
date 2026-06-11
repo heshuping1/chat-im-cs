@@ -1,6 +1,6 @@
 # 管理后台 API 字段与接口速查
 
-> 文档校对快照：2026-05-22
+> 文档校对快照：2026-05-22(2026-06-10 增量校对:客服域 —— 输入预览/已读时间/静默撤回/转接/复访续聊/自动话术配置/会话备注/报表导出)
 
 适用范围：
 
@@ -469,6 +469,9 @@ Base URL：`/api/admin/v1/customer-service/temp-sessions`
 | 端点 | 方法 | 请求字段 / 查询参数 | 响应 `data` |
 |---|---|---|---|
 | `/auto-replies` | GET | 无 | 自动回复规则列表 |
+| `/auto-replies` | POST 🆕 | `ruleType(0=开场白/1=关键词/2=排队提示)` `content`(≤2000) `locale?` `keywordPattern?(type1 必填)` `category?` `skillGroupId?` `sortOrder?` `isEnabled?` | `TempSessionAutoReplyDto`(2026-06-10;权限 `customer_service.temp_session.manage`) |
+| `/auto-replies/{ruleId}` | PUT 🆕 | 同 POST | `TempSessionAutoReplyDto` |
+| `/auto-replies/{ruleId}` | DELETE 🆕 | 无 | `{ ruleId }`(幂等) |
 | `/quick-replies` | GET | 无 | 快捷回复列表（兼容旧入口；新配置请使用 `/api/admin/v1/customer-service/quick-replies`） |
 | `/skill-groups` | GET | 无 | 技能组列表 |
 
@@ -1530,8 +1533,8 @@ Base URL：`/api/admin/v1/platform`
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `exportType` | string | 导出类型 |
-| `filters` | object? | 自定义筛选条件键值对 |
+| `exportType` | string | 导出类型:`users` `messages` `audit_logs` `online_users` `tenants`;🆕 2026-06-10 `cs_sessions`(跨渠道客服会话明细 CSV)/`cs_staff_daily_stats`(坐席×渠道日统计 CSV) |
+| `filters` | object? | 自定义筛选条件键值对;`cs_*` 类型支持 `from`/`to`(ISO 日期,按 UTC 解释) |
 
 `SilenceAlertRequest`：
 
