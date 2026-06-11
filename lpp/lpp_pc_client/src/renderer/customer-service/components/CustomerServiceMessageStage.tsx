@@ -5,6 +5,7 @@ import type { CustomerServiceThread } from "../../data/api-client";
 import type { MessageItemDto } from "../../data/api-client";
 import type { CustomerServiceTypingPreview } from "../../data/customer-service/cs-typing-preview";
 import { useI18n } from "../../i18n/useI18n";
+import { formatChatMessageTime } from "../../lib/format";
 import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
 import {
   ServiceMessageContextMenu,
@@ -104,36 +105,44 @@ export function CustomerServiceMessageStage({
           {messageStageState?.kind !== "loading" &&
             messageStageState?.kind !== "error" &&
             messages.map((message) => {
-              const mine = isMineMessage(message);
+              const system = isSystemServiceMessage(message);
+              const mine = !system && isMineMessage(message);
               return (
                 <div
                   key={message.messageId}
-                  className={`cs-message-row ${mine ? "mine" : "other"}`}
+                  className={`cs-message-row ${system ? "system" : mine ? "mine" : "other"}`}
                   data-message-id={message.messageId}
                   data-message-render-key={
                     message.messageId ||
                     `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`
                   }
                 >
-                  <ServiceMessageBubble
-                    message={message}
-                    mine={mine}
-                    translationText={message.messageId ? messageAnnotations[message.messageId] : undefined}
-                    assetBaseUrl={assetBaseUrl}
-                    authToken={authToken}
-                    mediaCacheContext={{
-                      accountId,
-                      conversationId: selectedThread.threadId || selectedThread.conversationId,
-                    }}
-                    mineAvatarUrl={mineAvatarUrl}
-                    conversationFallbackName={title || t("customerService.messageStage.customerFallback")}
-                    senderFallback={title}
-                    onContextMenu={onContextMenu}
-                    onAvatarClick={onAvatarClick}
-                    onUploadAction={onUploadAction}
-                    senderAvatarUrl={!mine ? message.senderAvatarUrl || message.avatarUrl || peerAvatarUrl : undefined}
-                    threadType={selectedThread.threadType}
-                  />
+                  {system ? (
+                    <div className="cs-system-message" role="status">
+                      <span>{serviceSystemMessageText(message)}</span>
+                      {message.sentAt && <time>{formatChatMessageTime(message.sentAt)}</time>}
+                    </div>
+                  ) : (
+                    <ServiceMessageBubble
+                      message={message}
+                      mine={mine}
+                      translationText={message.messageId ? messageAnnotations[message.messageId] : undefined}
+                      assetBaseUrl={assetBaseUrl}
+                      authToken={authToken}
+                      mediaCacheContext={{
+                        accountId,
+                        conversationId: selectedThread.threadId || selectedThread.conversationId,
+                      }}
+                      mineAvatarUrl={mineAvatarUrl}
+                      conversationFallbackName={title || t("customerService.messageStage.customerFallback")}
+                      senderFallback={title}
+                      onContextMenu={onContextMenu}
+                      onAvatarClick={onAvatarClick}
+                      onUploadAction={onUploadAction}
+                      senderAvatarUrl={!mine ? message.senderAvatarUrl || message.avatarUrl || peerAvatarUrl : undefined}
+                      threadType={selectedThread.threadType}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -162,4 +171,32 @@ export function CustomerServiceMessageStage({
       )}
     </>
   );
+}
+
+function isSystemServiceMessage(message: MessageItemDto) {
+  const type = String(message.messageType ?? "").trim().toLowerCase();
+  const direction = String(message.direction ?? "").trim().toLowerCase();
+  return (
+    direction === "system" ||
+    type === "event" ||
+    type === "system" ||
+    type === "notice"
+  );
+}
+
+function serviceSystemMessageText(message: MessageItemDto) {
+  const body = message.body ?? {};
+  return (
+    message.preview ||
+    stringField(body, "text", "eventText", "notice", "message", "content") ||
+    "[消息]"
+  );
+}
+
+function stringField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return undefined;
 }

@@ -3832,7 +3832,7 @@ class _LocationPickerPageState extends State<_LocationPickerPage> {
         'addressdetails': '1',
       });
       final response = await http.get(uri, headers: const {
-        'User-Agent': 'LPPMobile/1.0 location-picker',
+        'User-Agent': 'StartLinkMobile/1.0 location-picker',
       }).timeout(const Duration(seconds: 6));
       if (response.statusCode != 200) return;
 

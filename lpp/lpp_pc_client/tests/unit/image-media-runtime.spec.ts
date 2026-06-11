@@ -98,10 +98,23 @@ describe("image media runtime", () => {
   });
 
   it("registers lazily cached desktop image files for the next chat entry", () => {
-    const fileUrl = "file:///Users/me/Library/Application%20Support/lppchat/LPP%20Files/a.png";
+    const fileUrl = "file:///Users/me/Library/Application%20Support/startlink/StartLink%20Files/a.png";
+    const previousWindow = globalThis.window;
 
-    registerPrefetchedImageFileUrl("image:media:lazy-photo", fileUrl);
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {},
+    });
 
-    expect(getPrefetchedImageFileUrl("image:media:lazy-photo")).toBe(fileUrl);
+    try {
+      registerPrefetchedImageFileUrl("image:media:lazy-photo", fileUrl);
+
+      expect(getPrefetchedImageFileUrl("image:media:lazy-photo")).toBe(fileUrl);
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: previousWindow,
+      });
+    }
   });
 });

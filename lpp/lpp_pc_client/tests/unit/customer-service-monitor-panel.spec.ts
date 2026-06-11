@@ -48,14 +48,14 @@ describe("customer service monitor wall", () => {
   });
 
   it("renders readonly monitor read status from detail snapshots", () => {
-    expect(source).toContain("createMonitorReadSnapshot");
-    expect(source).toContain("readDetailReadStatus");
-    expect(source).toContain("applyMonitorReadStatusToMessages");
-    expect(source).toContain("lastReadSeq >= seq");
-    expect(source).toContain("visitorUserId");
-    expect(source).toContain("monitorReadStatusChip({");
-    expect(source).toContain("readerLabel");
-    expect(source).toContain('className: read ? "read" : "unread"');
+    expect(source).toContain("applyCustomerServiceReadStatusToMessages");
+    expect(source).toContain("monitorThreadDetailData(thread, detailQuery?.data, t)");
+    expect(source).toContain("getCustomerServiceMonitorThreadDetail");
+    expect(source).not.toContain("getWorkbenchThreadDetail(thread.threadType, thread.threadId)");
+    expect(source).toContain('isMonitorHistoryThread(thread) ? "monitor-history" : "monitor"');
+    expect(source).not.toContain("createMonitorReadSnapshot");
+    expect(source).not.toContain("readDetailReadStatus");
+    expect(source).not.toContain("monitorReadStatusChip");
     expect(styles).toContain(".cs-monitor-chat-chips span.read");
     expect(styles).toContain(".cs-monitor-chat-chips span.unread");
     expect(styles).toContain(".cs-monitor-chat-chips span.unknown");
@@ -78,6 +78,7 @@ describe("customer service monitor wall", () => {
   it("shows participant avatars and lightweight read-only profile entry points", () => {
     expect(source).toContain("PcAvatar");
     expect(source).toContain("createCustomerServiceIdentityViewModel");
+    expect(source).toContain("monitorThreadForProfile(thread, detailData)");
     expect(source).toContain("cs-monitor-avatar-button customer");
     expect(source).toContain("cs-monitor-avatar-button staff");
     expect(source).toContain("cs-monitor-avatar-pair");
@@ -97,17 +98,29 @@ describe("customer service monitor wall", () => {
   it("falls back to staff identity from readonly message snapshots", () => {
     expect(source).toContain("createCustomerServiceStaffProfileViewModel");
     expect(source).toContain("threadStaffProfile(thread, staffItems, messages)");
+    expect(source).toContain("monitorThreadForProfile");
     expect(source).not.toContain("latestStaffMessageProfile");
     expect(source).not.toContain("cs-monitor-status-dot");
     expect(styles).not.toContain("cs-monitor-status-dot");
-    expect(source).toContain('className={`cs-monitor-thread-avatars ${unassigned ? "single" : ""}`}');
+    expect(source).toContain('className="cs-monitor-thread-avatars"');
+    expect(source).not.toContain('cs-monitor-thread-avatars ${unassigned ? "single" : ""}');
     expect(source).toContain("{!unassigned && (");
   });
 
   it("keeps manager actions to transfer and open without exposing intervention copy", () => {
     expect(source).toContain("CustomerServiceTransferDialog");
-    expect(source).toContain("transferCustomerServiceThread");
-    expect(source).toContain('t("customerService.transfer.open")');
+    expect(source).toContain("assignCustomerServiceThread");
+    expect(source).toContain("forceCloseCustomerServiceThread");
+    expect(source).toContain("freezeCustomerServiceThread");
+    expect(source).toContain("unfreezeCustomerServiceThread");
+    expect(source).toContain("MonitorManagementAction");
+    expect(source).toContain('onManagementAction("force-close")');
+    expect(source).toContain('frozen ? "unfreeze" : "freeze"');
+    expect(source).toContain("isMonitorThreadFrozen");
+    expect(source).toContain("monitorManagementConfirmText");
+    expect(styles).toContain(".cs-monitor-window-actions button.danger");
+    expect(styles).toContain(".cs-monitor-window-actions button.warning");
+    expect(source).toContain("改派客服");
     expect(source).toContain("monitorTransferTargets");
     expect(source).toContain("monitorTransferCurrentStaffName");
     expect(source).toContain("transferThreadMessages");
@@ -117,37 +130,110 @@ describe("customer service monitor wall", () => {
     expect(source).not.toContain('t("workbench.monitor.assistThread")');
   });
 
-  it("does not hard-scope realtime monitor results to one thread type", () => {
-    expect(source).not.toContain('threadType: "temp_session"');
+  it("scopes realtime monitor results to online customer-service sessions", () => {
+    expect(source).toContain('threadType: "temp_session"');
+    expect(source).toContain("isOnlineServiceMonitorThread");
+    expect(source).toContain("realtimeThreads.filter(isOnlineServiceMonitorThread)");
+    expect(source).toContain("historyThreads.filter(isOnlineServiceMonitorThread)");
+    expect(source).toContain('thread.threadType === "temp_session"');
     expect(source).not.toContain("rawThreads.filter");
     expect(source).not.toContain("allTempSessionThreads");
     expect(source).not.toContain('<option value="im_direct">IM Direct</option>');
   });
 
-  it("filters the monitor thread pool locally with searchable multi-select staff", () => {
+  it("filters the monitor thread pool locally with single-select staff", () => {
     expect(source).toContain("filterMonitorThreads");
     expect(source).toContain("visiblePoolThreads");
     expect(source).toContain("allMonitorThreads");
+    expect(source).toContain("monitorThreadsForFilter");
+    expect(source).toContain("sortMonitorThreadsByStatusAndRecent");
+    expect(source).toContain("monitorThreadStatusRank");
+    expect(source).toContain("monitorQueryParams(filters)");
+    expect(source).toContain("monitorHistoryQueryParams(filters)");
+    expect(source).toContain("monitorSelectedStaffUserIds(filters)");
+    expect(source).toContain("loadMonitorThreadItems");
+    expect(source).toContain("loadMonitorHistoryThreadItems");
+    expect(source).toContain("assignedStaffUserId: staffUserId");
+    expect(source).toContain("staffUserId");
+    expect(source).toContain("keyword ? { keyword }");
+    expect(source).toContain("slaRisk ? { slaRisk }");
+    expect(source).toContain('value={filters.slaRisk}');
+    expect(source).toContain('onFilterChange({ ...filters, slaRisk: event.target.value })');
+    expect(source).toContain('client.getCustomerServiceMonitorThreads(params)');
+    expect(source).toContain('client.getCustomerServiceHistoryThreads(params)');
+    expect(source).not.toContain("singleSelectedStaffUserId");
+    expect(source).toContain("monitorHistoryLimit = 100");
+    expect(source).toContain("getCustomerServiceHistoryThreads");
+    expect(source).toContain('status: "closed"');
+    expect(source).toContain("dedupeMonitorThreads([...realtimeServiceThreads, ...historyServiceThreads])");
+    expect(source).toContain('if (status === "closed") return sortMonitorThreadsByRecent(historyServiceThreads)');
+    expect(source).toContain('<option value="closed">{t("customerService.status.closed")}</option>');
     expect(source).toContain("assignedStaffUserIds");
-    expect(source).toContain("MonitorStaffMultiSelect");
-    expect(source).toContain("selectedNames.length");
+    expect(source).toContain("MonitorStaffSelect");
+    expect(source).toContain('className={`cs-monitor-staff-select ${selectedStaffUserId ? "active" : ""}`}');
+    expect(source).toContain("assignedStaffUserIds: staffUserId ? [staffUserId] : []");
+    expect(source).toContain('t("common.query")');
+    expect(source).not.toContain("MonitorStaffMultiSelect");
+    expect(source).not.toContain("selectedNames.length");
     expect(source).toContain("monitorThreadSearchText");
-    expect(source).toContain("visibleThreads={visiblePoolThreads.length}");
     expect(source).toContain("pruneWatchedThreadKeys(current, allThreadKeys, layoutMode)");
+    expect(styles).toContain(".cs-monitor-staff-select");
+    expect(styles).toContain(".cs-monitor-staff-select.active");
+    expect(styles).toContain("grid-template-columns: 90px minmax(150px, 220px) 110px minmax(220px, 1fr)");
   });
 
   it("shows two avatars in the thread pool and supports dragging sessions onto the wall", () => {
     expect(source).toContain("cs-monitor-thread-avatars");
     expect(source).toContain("cs-monitor-thread-avatar staff");
     expect(source).toContain("cs-monitor-thread-avatar customer");
+    expect(source).not.toContain("cs-monitor-thread-avatars.single");
+    expect(styles).not.toContain("margin-left: -8px");
+    expect(styles).toContain("width: 58px !important");
+    expect(styles).toContain("grid-template-columns: 58px minmax(0, 1fr) auto");
     expect(source).toContain("monitorThreadDragMime");
     expect(source).toContain("draggable");
     expect(source).toContain("onDragStart");
     expect(source).toContain("onDropThreadToSlot");
     expect(source).toContain("dropWatchedThreadKeyAtIndex");
     expect(source).toContain("readMonitorThreadDragData");
+    expect(source).toContain("manualWallSelection");
+    expect(source).toContain("setManualWallSelection(true)");
+    expect(source).toContain("if (manualWallSelection) return;");
     expect(styles).toContain(".cs-monitor-thread-avatars");
-    expect(styles).toContain(".cs-monitor-staff-filter-menu");
+    expect(styles).toContain(".cs-monitor-staff-select");
+  });
+
+  it("uses the focused monitor window for direct replacement before showing replace mode", () => {
+    expect(source).toContain("selectWatchedThreadKey(");
+    expect(source).toContain("nextSelection.replaced");
+    expect(source).toContain("setRecentlyReplacedThreadKey(nextSelection.focusedThreadKey)");
+    expect(source).toContain("recentlyReplaced={threadKey(thread) === recentlyReplacedThreadKey}");
+    expect(source).toContain('replacementThreadKey || allThreadKeys.includes(replacementThreadKey)');
+    expect(source).toContain("focusedEmptySlotIndex");
+    expect(source).toContain("dropWatchedThreadKeyAtIndex(current, key, focusedEmptySlotIndex, layoutMode)");
+    expect(source).toContain("onClick={() => onFocusEmptySlot(index)}");
+    expect(styles).toContain(".cs-monitor-window.recently-replaced");
+    expect(styles).toContain(".cs-monitor-empty-slot.focused");
+    expect(styles).toContain("@keyframes cs-monitor-replaced-pulse");
+  });
+
+  it("uses color-only monitor pool status and history snapshots for closed sessions", () => {
+    expect(source).not.toContain("<small>{threadStatusLabel(thread.status, t)}</small>");
+    expect(source).toContain("threadStatusClass(thread.status)");
+    expect(styles).toContain(".cs-monitor-thread-list article.closed > button:first-child");
+    expect(styles).toContain(".cs-monitor-thread-list article.queued > button:first-child");
+    expect(styles).toContain(".cs-monitor-thread-list article.active > button:first-child");
+    expect(source).toContain("isMonitorHistoryThread(thread)");
+    expect(source).toContain("!isMonitorHistoryThread(thread)");
+    expect(source).toContain("monitorThreadDetailData(thread, detailQuery?.data, t)");
+    expect(source).toContain("readHistorySnapshotMessages");
+    expect(source).toContain("readHistorySnapshotMessages(t, detailRecord, record, historyRecord)");
+    expect(source).toContain("appendHistoryClosedNoticeMessage");
+    expect(source).toContain("historyClosedNoticeMessage");
+    expect(source).toContain("messageType: \"event\"");
+    expect(source).toContain("monitorThreadPreview(thread, t)");
+    expect(source).toContain("历史会话暂无消息快照。");
+    expect(source).not.toContain("onOpenTransfer(); }} title={t(\"customerService.transfer.open\")} type=\"button\">\n            <ArrowRightLeft");
   });
 
   it("defaults the monitor wall to the two-column one-row layout", () => {
@@ -166,6 +252,9 @@ describe("customer service monitor wall", () => {
 
   it("keeps the monitor session pool compact", () => {
     expect(styles).toContain("grid-template-columns: 200px minmax(0, 1fr)");
+    expect(styles).toContain(".cs-monitor-thread-list,\n.cs-monitor-wall-grid,\n.cs-monitor-window .h-message-stage");
+    expect(styles).toContain("scrollbar-gutter: stable !important");
+    expect(styles).toContain("overflow-y: scroll !important");
   });
 
   it("supports a single-window monitor layout", () => {
@@ -181,6 +270,9 @@ describe("customer service monitor wall", () => {
 
   it("only adapts the shared message stage inside the monitor grid", () => {
     expect(styles).toContain(".cs-monitor-window .h-message-stage");
+    expect(styles).toContain("--chat-stage-padding: 10px");
+    expect(styles).toContain("--chat-edge-gap: 10px");
+    expect(styles).toContain("--chat-message-gap: 6px");
     expect(styles).toContain(".cs-monitor-window .h-message-stage .cs-message-row");
     expect(styles).toContain("container-type: inline-size");
     expect(styles).toContain("@container (max-width: 430px)");

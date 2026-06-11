@@ -862,7 +862,7 @@ export function Sidebar() {
             <img alt="" src={appIconSrc} />
           </span>
           <span className="sidebar-brand-copy">
-            <strong>LPP</strong>
+            <strong>{appProductName}</strong>
             <em>{productVersionLabel}</em>
           </span>
         </button>
@@ -1160,7 +1160,7 @@ export function Sidebar() {
               </div>
             )}
           </div>
-          {workspaceAccess.canReadServiceWorkbench && (
+          {workspaceAccess.canReadServiceWorkbench && canControlReception && (
             <div className="sidebar-status-row-wrap">
               <button
                 className={`sidebar-status-row sidebar-service-status-row ${serviceStatusTone}`}

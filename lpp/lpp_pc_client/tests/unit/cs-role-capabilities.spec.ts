@@ -57,8 +57,8 @@ describe("customer service role capabilities", () => {
     expect(canUseCustomerServiceManagementReadonly({ roleLabel: "owner" })).toBe(true);
   });
 
-  it("does not block configured token sessions when role metadata is incomplete", () => {
-    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "tenant-account" })).toBe(true);
+  it("keeps incomplete role metadata away from personal reception controls", () => {
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "tenant-account" })).toBe(false);
     expect(canReadCustomerServiceHistory({ roleLabel: "tenant-account" })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ roleLabel: "tenant-account" })).toBe(false);
   });
@@ -95,8 +95,8 @@ describe("customer service role capabilities", () => {
     expect(canReadCustomerServiceHistory({ membershipRole: 5 })).toBe(false);
   });
 
-  it("does not block configured token sessions without role metadata", () => {
-    expect(canUseCustomerServiceStaffEndpoints({})).toBe(true);
+  it("does not allow staff endpoints without role metadata", () => {
+    expect(canUseCustomerServiceStaffEndpoints({})).toBe(false);
     expect(canReadCustomerServiceHistory({})).toBe(true);
   });
 });

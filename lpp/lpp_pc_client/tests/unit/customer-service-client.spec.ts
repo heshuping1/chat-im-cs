@@ -10,6 +10,7 @@ import {
   rememberCustomerServiceStaffSentMessage,
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
+import { customerServiceDirectPeerReaderId } from "../../src/renderer/data/customer-service/cs-message-read-status";
 import { workspaceScopeKeyFromSession } from "../../src/renderer/data/workspace-scope";
 
 const testScopeKey = customerServiceIndexScopeKey({
@@ -217,6 +218,62 @@ describe("CustomerServiceApiClient", () => {
       {
         admin: false,
         path: "/api/client/v1/customer-service/workbench/threads/temp-session/session-1",
+      },
+    ]);
+  });
+
+  it("normalizes im-direct monitor detail customer read cursor from directChat fields", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        directChat: {
+          chatId: "direct-1",
+          customerLastReadAt: "2026-06-11T11:18:00.000Z",
+          customerLastReadSeq: 8,
+          messages: [
+            {
+              body: { text: "staff reply" },
+              conversationId: "direct-1",
+              conversationSeq: 8,
+              direction: "out",
+              messageId: "message-8",
+              messageType: "text",
+              sentAt: "2026-06-11T11:17:00.000Z",
+              senderRole: "staff",
+            },
+          ],
+        },
+        threadId: "thread-1",
+        threadType: "im_direct",
+        title: "Direct customer",
+      },
+    });
+
+    await expect(
+      client.getCustomerServiceMonitorThreadDetail("im_direct", "thread-1"),
+    ).resolves.toMatchObject({
+      accessMode: "management_readonly",
+      conversationId: "direct-1",
+      messages: [{ messageId: "message-8" }],
+      readStatus: {
+        conversationId: "direct-1",
+        members: [
+          {
+            userId: customerServiceDirectPeerReaderId,
+            lastReadSeq: 8,
+            lastReadAt: "2026-06-11T11:18:00.000Z",
+          },
+        ],
+        visitorUserId: customerServiceDirectPeerReaderId,
+      },
+      threadId: "thread-1",
+      threadType: "im_direct",
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/threads/im_direct/thread-1",
       },
     ]);
   });
@@ -443,6 +500,8 @@ describe("CustomerServiceApiClient", () => {
     await expect(
       client.getCustomerServiceMonitorThreads({
         assignedStaffUserId: "staff-1",
+        keyword: "refund",
+        slaRisk: "true",
         status: "active",
         threadType: "im_direct",
       }),
@@ -468,7 +527,7 @@ describe("CustomerServiceApiClient", () => {
     expect(client.requests).toEqual([
       {
         admin: true,
-        path: "/api/admin/v1/customer-service/center/threads?page=1&pageSize=50&assignedStaffUserId=staff-1&status=active&threadType=im_direct",
+        path: "/api/admin/v1/customer-service/center/threads?page=1&pageSize=50&assignedStaffUserId=staff-1&keyword=refund&slaRisk=true&status=active&threadType=im_direct",
       },
     ]);
   });
@@ -527,6 +586,71 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("normalizes monitor customer and staff avatar snake_case fields", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        items: [
+          {
+            avatar_url: "https://cdn.example/thread.png",
+            conversation_id: "conversation-active",
+            customer_avatar_url: "https://cdn.example/customer.png",
+            last_message_at: "2026-06-11T10:00:00Z",
+            staff_avatar_url: "https://cdn.example/staff-inline.png",
+            staff_user_id: "staff-1",
+            status: "active",
+            thread_id: "thread-active",
+            thread_type: "temp_session",
+            title: "Visitor A",
+          },
+        ],
+      },
+    });
+
+    await expect(client.getCustomerServiceMonitorThreads()).resolves.toMatchObject({
+      items: [
+        {
+          avatarUrl: "https://cdn.example/thread.png",
+          customerAvatarUrl: "https://cdn.example/customer.png",
+          staffAvatarUrl: "https://cdn.example/staff-inline.png",
+          staffUserId: "staff-1",
+          threadId: "thread-active",
+        },
+      ],
+    });
+  });
+
+  it("normalizes monitor staff status avatars from admin payloads", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        items: [
+          {
+            active_session_count: 2,
+            avatar_url: "https://cdn.example/staff.png",
+            display_name: "Agent A",
+            queue_accept_enabled: "true",
+            service_status: "online",
+            staff_user_id: "staff-1",
+          },
+        ],
+      },
+    });
+
+    await expect(client.getCustomerServiceMonitorStaffStatuses()).resolves.toEqual([
+      expect.objectContaining({
+        activeSessionCount: 2,
+        avatarUrl: "https://cdn.example/staff.png",
+        displayName: "Agent A",
+        queueAcceptEnabled: true,
+        serviceStatus: "online",
+        staffUserId: "staff-1",
+      }),
+    ]);
+  });
+
   it("force closes customer service threads through the admin center endpoint", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,
@@ -578,6 +702,38 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("freezes and unfreezes customer service threads through admin center endpoints", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-freeze-thread",
+      response: { frozen: true, status: "active" },
+    });
+
+    await expect(
+      client.freezeCustomerServiceThread("temp_session", "session-1"),
+    ).resolves.toMatchObject({ frozen: true });
+    await expect(
+      client.unfreezeCustomerServiceThread("temp_session", "session-1"),
+    ).resolves.toMatchObject({ frozen: true });
+
+    expect(client.platformRequests).toEqual([
+      {
+        body: { tenantId: "tenant-freeze-thread" },
+        path: "/api/platform/v1/auth/admin-token",
+      },
+    ]);
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/threads/temp_session/session-1/freeze",
+      },
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/threads/temp_session/session-1/unfreeze",
+      },
+    ]);
+  });
+
   it("loads owner closed history from admin unified history sessions instead of realtime center threads", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,
@@ -596,11 +752,19 @@ describe("CustomerServiceApiClient", () => {
 
     await expect(
       client.getCustomerServiceHistoryThreads({
+        assignedStaffUserId: "staff-assigned",
+        conversationId: "conversation-1",
+        customerId: "customer-1",
+        customerUserId: "customer-user-1",
         keyword: "refund",
         limit: 50,
+        rating: 5,
+        senderUserId: "sender-1",
+        slaRisk: "true",
         staffUserId: "staff-1",
         status: "closed",
         threadType: "im_direct",
+        visitorUserId: "visitor-1",
       }),
     ).resolves.toMatchObject({
       items: [
@@ -614,7 +778,7 @@ describe("CustomerServiceApiClient", () => {
     expect(client.requests).toEqual([
       {
         admin: true,
-        path: "/api/admin/v1/customer-service/center/history-sessions?threadType=im_direct&status=closed&limit=50&keyword=refund&staffUserId=staff-1",
+        path: "/api/admin/v1/customer-service/center/history-sessions?threadType=im_direct&status=closed&limit=50&customerId=customer-1&customerUserId=customer-user-1&visitorUserId=visitor-1&keyword=refund&assignedStaffUserId=staff-assigned&conversationId=conversation-1&senderUserId=sender-1&staffUserId=staff-1&rating=5&slaRisk=true",
       },
     ]);
   });

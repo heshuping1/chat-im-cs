@@ -24,6 +24,14 @@ export interface CustomerServiceThreadActionClient {
     threadType: CustomerServiceThreadType,
     threadId: string,
   ) => Promise<{ status?: string; closed?: boolean }>;
+  freezeCustomerServiceThread?: (
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) => Promise<{ status?: string; frozen?: boolean; isFrozen?: boolean }>;
+  unfreezeCustomerServiceThread?: (
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) => Promise<{ status?: string; frozen?: boolean; isFrozen?: boolean }>;
   transferCustomerServiceThread: (
     threadType: CustomerServiceThreadType,
     threadId: string,

@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
-const packagedExe = join(root, "release", "win-unpacked", "lppchat.exe");
-const installedExe = process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\lppchat\\lppchat.exe";
-const ico = join(root, "assets", "app-icon-green-bubble.ico");
+const packagedExe = join(root, "release", "win-unpacked", "startlink.exe");
+const installedExe = process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\startlink\\startlink.exe";
+const ico = join(root, "assets", "app-icon-startlink.ico");
 const syncScript = join(root, "scripts", "sync-app-icon.mjs");
 
 if (process.platform !== "win32") {
@@ -72,10 +72,10 @@ function updateShortcuts(targetExe) {
     "foreach ($root in $roots) {",
     "if (-not (Test-Path $root)) { continue }",
     "Get-ChildItem $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue |",
-    "Where-Object { $_.Name -match 'lppchat|LPP|客服|lpp' } |",
+    "Where-Object { $_.Name -match 'startlink|LPP|客服|lpp' } |",
     "ForEach-Object {",
     "$shortcut = $shell.CreateShortcut($_.FullName);",
-    "if ($shortcut.TargetPath -eq $target -or $_.Name -match 'lppchat|LPP|客服|lpp') {",
+    "if ($shortcut.TargetPath -eq $target -or $_.Name -match 'startlink|LPP|客服|lpp') {",
     "$shortcut.TargetPath = $target;",
     "$shortcut.WorkingDirectory = Split-Path $target;",
     "$shortcut.IconLocation = $target + ',0';",

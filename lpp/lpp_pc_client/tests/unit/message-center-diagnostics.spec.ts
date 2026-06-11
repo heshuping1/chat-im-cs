@@ -40,7 +40,7 @@ describe("message center diagnostics", () => {
         reason: "Failed to fetch file:///Users/eric/private/clip.mp4",
         context: {
           hasLocalCache: true,
-          localPath: "/Users/eric/Library/Application Support/lppchat/lppchat-files/u1/c1/video.mp4",
+          localPath: "/Users/eric/Library/Application Support/startlink/startlink-files/u1/c1/video.mp4",
           posterKind: "blob",
           sourceKind: "file",
         },

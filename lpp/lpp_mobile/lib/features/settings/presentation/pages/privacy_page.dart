@@ -31,12 +31,12 @@ class _PrivacyContent extends StatelessWidget {
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Title('绿泡泡隐私政策'),
+          _Title('星络隐私政策'),
           _UpdateDate('更新日期：2026年1月1日'),
           _UpdateDate('生效日期：2026年1月1日'),
           SizedBox(height: 16),
           _Body(
-            '绿泡泡科技有限公司（以下简称"我们"）深知个人信息对您的重要性，我们将按照法律法规要求，采取相应安全保护措施，尽力保护您的个人信息安全可控。',
+            '星络科技有限公司（以下简称"我们"）深知个人信息对您的重要性，我们将按照法律法规要求，采取相应安全保护措施，尽力保护您的个人信息安全可控。',
           ),
           SizedBox(height: 16),
           _Section('一、我们收集的信息'),
@@ -44,7 +44,7 @@ class _PrivacyContent extends StatelessWidget {
             '1.1 账号信息\n'
             '注册时您需提供手机号码或邮箱地址，以及您设置的昵称、头像等个人资料。\n\n'
             '1.2 通讯内容\n'
-            '您在使用绿泡泡时发送的消息、图片、语音、视频等内容，仅用于提供通讯服务，我们不会主动读取您的私信内容。\n\n'
+            '您在使用星络时发送的消息、图片、语音、视频等内容，仅用于提供通讯服务，我们不会主动读取您的私信内容。\n\n'
             '1.3 设备信息\n'
             '为保障服务安全，我们会收集设备型号、操作系统版本、设备标识符等信息。\n\n'
             '1.4 日志信息\n'
@@ -87,7 +87,7 @@ class _PrivacyContent extends StatelessWidget {
           SizedBox(height: 12),
           _Section('六、未成年人保护'),
           _Body(
-            '6.1 绿泡泡不向未满14周岁的未成年人提供服务。\n\n'
+            '6.1 星络不向未满14周岁的未成年人提供服务。\n\n'
             '6.2 如果我们发现在未获得可证实的父母同意的情况下收集了未成年人的个人信息，我们会尽快删除相关信息。',
           ),
           SizedBox(height: 12),
@@ -100,13 +100,13 @@ class _PrivacyContent extends StatelessWidget {
           _Section('八、联系我们'),
           _Body(
             '如您对本隐私政策有任何疑问或投诉，请联系：\n\n'
-            '公司名称：绿泡泡科技有限公司\n'
+            '公司名称：星络科技有限公司\n'
             '电子邮件：privacy@lpp.com\n'
             '客服电话：400-000-0000\n'
             '我们将在15个工作日内回复您的请求。',
           ),
           SizedBox(height: 24),
-          _Footer('© 2026 绿泡泡科技有限公司 保留所有权利'),
+          _Footer('© 2026 星络科技有限公司 保留所有权利'),
         ],
       ),
     );

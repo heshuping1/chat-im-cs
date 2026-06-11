@@ -651,7 +651,7 @@ POST /api/platform/v1/auth/admin-token
 |---|---|---|
 | `userId` | GUID | 客户用户 ID |
 | `displayName` | string | 昵称 |
-| `lppId` | string? | LPP 号 |
+| `lppId` | string? | 星络号 |
 | `mobileMasked` | string? | 手机号掩码 |
 | `avatarUrl` | string? | 头像 |
 | `status` | number | 用户状态(`1`=正常) |
@@ -4559,7 +4559,7 @@ Query 参数:
 | `userId` | GUID | 用户 ID |
 | `platformUserId` | GUID? | 平台用户 ID |
 | `loginName` | string | 登录名 |
-| `lppId` | string? | LPP ID |
+| `lppId` | string? | startlink ID |
 | `displayName` | string | 显示名 |
 | `avatarUrl` | string? | 头像 URL |
 | `mobile` | string? | 手机号 |
@@ -4629,7 +4629,7 @@ Query 参数:
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `lppId` | string? | 否 | LPP ID |
+| `lppId` | string? | 否 | startlink ID |
 | `password` | string | 是 | 初始密码 |
 | `displayName` | string | 是 | 显示名 |
 | `mobile` | string? | 否 | 手机号 |
@@ -4661,7 +4661,7 @@ Query 参数:
 |---|---|---|---|
 | `displayName` | string? | 否 | 显示名 |
 | `avatarUrl` | string? | 否 | 头像 URL |
-| `lppId` | string? | 否 | LPP ID |
+| `lppId` | string? | 否 | startlink ID |
 | `userType` | short? | 否 | 用户类型 |
 | `status` | short? | 否 | 用户状态 |
 | `membershipRole` | short? | 否 | 成员角色 |
@@ -4821,7 +4821,7 @@ Query 参数:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `platformUserId` | GUID | 平台用户 ID |
-| `lppId` | string? | LPP ID |
+| `lppId` | string? | startlink ID |
 | `displayName` | string | 显示名 |
 | `mobile` | string? | 手机号 |
 | `email` | string? | 邮箱 |
@@ -4865,7 +4865,7 @@ Query 参数:
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `lppId` | string? | 否 | LPP ID |
+| `lppId` | string? | 否 | startlink ID |
 | `status` | short? | 否 | 用户状态 |
 | `isPlatformAdmin` | bool? | 否 | 是否为平台管理员 |
 

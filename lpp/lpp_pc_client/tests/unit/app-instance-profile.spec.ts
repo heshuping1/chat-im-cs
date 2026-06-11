@@ -13,7 +13,7 @@ import {
 describe("app instance profile", () => {
   it("keeps the default single profile when no profile is configured", () => {
     expect(resolveAppInstanceProfileId({ argv: ["electron", "."], env: {} })).toBeNull();
-    expect(formatProfileWindowTitle("LPP", null)).toBe("LPP");
+    expect(formatProfileWindowTitle("StartLink", null)).toBe("StartLink");
   });
 
   it("reads and normalizes profile ids from CLI args before env", () => {
@@ -43,7 +43,7 @@ describe("app instance profile", () => {
 
   it("moves userData into a profile-specific directory", () => {
     const app = {
-      getPath: vi.fn(() => join("C:", "Users", "tester", "AppData", "lppchat")),
+      getPath: vi.fn(() => join("C:", "Users", "tester", "AppData", "startlink")),
       setPath: vi.fn(),
       setAppUserModelId: vi.fn(),
     };
@@ -54,17 +54,17 @@ describe("app instance profile", () => {
     });
 
     expect(profile).toEqual({
-      defaultUserDataPath: join("C:", "Users", "tester", "AppData", "lppchat"),
+      defaultUserDataPath: join("C:", "Users", "tester", "AppData", "startlink"),
       profileId: "agent-b",
       profileName: "agent-b",
-      userDataPath: join("C:", "Users", "tester", "AppData", "lppchat", "profiles", "agent-b"),
+      userDataPath: join("C:", "Users", "tester", "AppData", "startlink", "profiles", "agent-b"),
     });
     expect(app.setPath).toHaveBeenCalledWith("userData", profile.userDataPath);
   });
 
   it("keeps profile app user model ids under the product prefix", () => {
-    expect(appUserModelIdForProfile(null)).toBe("com.lppchat.desktop");
-    expect(appUserModelIdForProfile("agent-a")).toBe("com.lppchat.desktop.agent-a");
+    expect(appUserModelIdForProfile(null)).toBe("com.startlink.desktop");
+    expect(appUserModelIdForProfile("agent-a")).toBe("com.startlink.desktop.agent-a");
   });
 
   it("allocates the next explicit client profile id", () => {

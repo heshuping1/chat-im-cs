@@ -10,7 +10,7 @@ export async function createVideoPlayerDocument({
   html: string;
   userDataPath: string;
 }) {
-  const directory = join(userDataPath, 'lppchat-player');
+  const directory = join(userDataPath, 'startlink-player');
   await mkdir(directory, { recursive: true });
   const filePath = join(directory, `video-player-${Date.now()}-${randomUUID()}.html`);
   await writeFile(filePath, html, 'utf8');

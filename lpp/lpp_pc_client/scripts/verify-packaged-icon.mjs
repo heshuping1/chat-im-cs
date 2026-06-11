@@ -7,12 +7,12 @@ const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
 const targets = [
   {
-    exe: join(root, "release", "win-unpacked", "lppchat.exe"),
+    exe: join(root, "release", "win-unpacked", "startlink.exe"),
     outputPng: join(root, "tmp", "packaged-exe-icon.png"),
     required: true,
   },
   {
-    exe: process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\lppchat\\lppchat.exe",
+    exe: process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\startlink\\startlink.exe",
     outputPng: join(root, "tmp", "installed-exe-icon.png"),
     required: false,
   },

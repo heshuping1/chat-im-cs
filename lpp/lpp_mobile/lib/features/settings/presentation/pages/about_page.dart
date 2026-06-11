@@ -31,7 +31,7 @@ class AboutPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('绿泡泡',
+                const Text('星络',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -79,7 +79,7 @@ class AboutPage extends StatelessWidget {
           const Center(
             child: Column(
               children: [
-                Text('© 2026 绿泡泡科技有限公司',
+                Text('© 2026 星络科技有限公司',
                     style: TextStyle(fontSize: 12, color: Color(0xFFAEAEB2))),
                 SizedBox(height: 4),
                 Text('保留所有权利',

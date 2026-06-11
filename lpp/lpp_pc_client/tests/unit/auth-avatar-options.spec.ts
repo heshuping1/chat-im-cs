@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { registerAvatarOptions } from "../../src/renderer/data/auth/register-avatar-options";
 
 describe("register avatar options", () => {
-  it("offers AI beauty, cartoon and green bubble themed avatars", () => {
+  it("offers AI beauty, cartoon and startlink themed avatars", () => {
     expect(registerAvatarOptions).toHaveLength(18);
     expect(registerAvatarOptions.filter((item) => item.category === "ai_beauty")).toHaveLength(6);
     expect(registerAvatarOptions.filter((item) => item.category === "cartoon")).toHaveLength(6);
     expect(registerAvatarOptions.filter((item) => item.category === "green_bubble")).toHaveLength(6);
     expect(registerAvatarOptions.some((item) => item.label.includes("AI"))).toBe(true);
     expect(registerAvatarOptions.some((item) => item.label.includes("卡通"))).toBe(true);
-    expect(registerAvatarOptions.some((item) => item.label.includes("绿泡泡"))).toBe(true);
+    expect(registerAvatarOptions.some((item) => item.label.includes("星络"))).toBe(true);
   });
 
   it("keeps every preset as a local unique svg data url", () => {

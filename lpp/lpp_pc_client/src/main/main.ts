@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { readdir } from 'node:fs/promises';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import type {
@@ -95,9 +95,9 @@ const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const allowedExternalProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const appIconPath = app.isPackaged
   ? join(process.resourcesPath, 'app-icon.ico')
-  : join(__dirname, '../../assets/app-icon-green-bubble.ico');
-const devDockIconPath = join(__dirname, '../../assets/app-icon-green-bubble.png');
-const appDisplayName = 'lppchat';
+  : join(__dirname, '../../assets/app-icon-startlink.ico');
+const devDockIconPath = join(__dirname, '../../assets/app-icon-startlink.png');
+const appDisplayName = 'StartLink';
 const isSandboxedElectronAutomation = Boolean(process.env.LPP_PC_USER_DATA_ROOT);
 const screenshotRequestWindowHideDelayMs = 140;
 app.setName(appDisplayName);
@@ -113,13 +113,15 @@ app.setAppLogsPath(logsDir);
 const diagnosticsDir = join(app.getPath('userData'), 'diagnostics');
 configureDefaultMainAppLogging({ logsDir, isDev });
 setElectronRuntimeDiagnosticLogger(mainAppLogBackend);
+const localDataProfileId = appInstanceProfile.profileId ?? 'default';
+migrateLegacyLocalDataProfile(app.getPath('userData'), localDataProfileId);
 const localDataService = createLocalDataService({
   driver: new SqliteLocalDataDriver({
     dbPath: join(
       app.getPath('userData'),
-      'LPP Local Data',
+      'StartLink Local Data',
       'profiles',
-      appInstanceProfile.profileId ?? 'default',
+      localDataProfileId,
       'lpp-local-v1.sqlite',
     ),
     recordDiagnostic: (record) => {
@@ -135,6 +137,34 @@ const localDataService = createLocalDataService({
     },
   }),
 });
+
+function migrateLegacyLocalDataProfile(userDataPath: string, profileId: string) {
+  const legacyProfileDir = join(userDataPath, 'LPP Local Data', 'profiles', profileId);
+  const nextProfileDir = join(userDataPath, 'StartLink Local Data', 'profiles', profileId);
+  if (existsSync(nextProfileDir) || !existsSync(legacyProfileDir)) return;
+  try {
+    mkdirSync(dirname(nextProfileDir), { recursive: true });
+    cpSync(legacyProfileDir, nextProfileDir, { recursive: true });
+    recordDefaultMainAppLog({
+      module: 'local-data',
+      event: 'local_data.brand_directory_migrated',
+      phase: 'startup',
+      result: 'ok',
+      level: 'info',
+      context: { profileId },
+    });
+  } catch (error) {
+    recordDefaultMainAppLog({
+      module: 'local-data',
+      event: 'local_data.brand_directory_migrated',
+      phase: 'startup',
+      result: 'failed',
+      level: 'warn',
+      reason: error instanceof Error ? error.message : String(error),
+      context: { profileId },
+    });
+  }
+}
 const appTitle = formatProfileWindowTitle(
   appDisplayName,
   appInstanceProfile.profileId,
@@ -271,7 +301,7 @@ function updateTrayContextMenu() {
       { label: '显示主窗口', click: showMainWindow },
       { type: 'separator' },
       {
-        label: 'Quit lppchat',
+        label: 'Quit StartLink',
         click: () => {
           isQuitting = true;
           app.quit();

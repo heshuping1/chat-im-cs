@@ -16,7 +16,7 @@ export interface ProfileSource {
 const profileArgNames = new Set(['--profile', '--lpp-profile', '--pc-profile']);
 const profileEnvNames = ['LPP_PC_PROFILE', 'LPP_PC_INSTANCE_PROFILE'];
 const userDataRootEnvName = 'LPP_PC_USER_DATA_ROOT';
-export const appUserModelIdPrefix = 'com.lppchat.desktop';
+export const appUserModelIdPrefix = 'com.startlink.desktop';
 
 export function configureAppInstanceProfile(
   app: Pick<typeof ElectronApp, 'getPath' | 'setPath' | 'setAppUserModelId'>,

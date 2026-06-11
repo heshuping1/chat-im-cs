@@ -120,7 +120,7 @@ export function buildAvatarProfilePopover({
       avatarUrl: session?.avatarUrl,
       rows: compactProfileRows([
         ["昵称", title],
-        ["绿泡泡号", session?.lppId],
+        ["星络号", session?.lppId],
       ], { keepEmpty: true }),
     };
   }
@@ -214,12 +214,12 @@ export function buildAvatarProfilePopover({
       isGroup
         ? [
             ["昵称", displayName],
-            ["绿泡泡号", lppId],
+            ["星络号", lppId],
           ]
         : [
             ["昵称", displayName],
             ["备注", remark],
-            ["绿泡泡号", lppId],
+            ["星络号", lppId],
             ["渠道应用", applicationName],
             ["来源渠道", source],
           ],
@@ -272,7 +272,7 @@ export function buildContactCardProfilePopover({
     rows: compactProfileRows([
       ["个性签名", signature],
       ["昵称", title],
-      ["绿泡泡号", lppId],
+      ["星络号", lppId],
       ["来源", source],
     ], { keepEmpty: true }),
   };

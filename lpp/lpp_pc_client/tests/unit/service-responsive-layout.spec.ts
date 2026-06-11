@@ -346,11 +346,14 @@ describe("online service responsive layout", () => {
       "utf8",
     );
 
-    expect(stage).toContain("className={`cs-message-row ${mine ? \"mine\" : \"other\"}`}");
+    expect(stage).toContain("isSystemServiceMessage(message)");
+    expect(stage).toContain('className={`cs-message-row ${system ? "system" : mine ? "mine" : "other"}`}');
     expect(css).toContain(".h-message-stage .cs-message-row.mine");
     expect(css).toContain("justify-content: flex-end;");
     expect(css).toContain(".h-message-stage .cs-message-row.other");
     expect(css).toContain("justify-content: flex-start;");
+    expect(css).toContain(".h-message-stage .cs-message-row.system");
+    expect(css).toContain(".cs-system-message");
   });
 
   it("keeps customer typing preview below the scroller without overlaying messages", () => {

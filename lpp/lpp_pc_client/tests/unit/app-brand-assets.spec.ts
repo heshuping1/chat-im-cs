@@ -37,29 +37,29 @@ describe("app brand assets", () => {
 
   it("keeps one app icon source with Windows, macOS and web outputs", () => {
     expect(existsSync(resolve(root, "assets/brand/app-icon-source.png"))).toBe(true);
-    expect(existsSync(resolve(root, "assets/app-icon-green-bubble.png"))).toBe(true);
-    expect(existsSync(resolve(root, "assets/app-icon-green-bubble.ico"))).toBe(true);
-    expect(existsSync(resolve(root, "assets/app-icon-green-bubble.icns"))).toBe(true);
-    expect(existsSync(resolve(root, "public/app-icon-green-bubble.png"))).toBe(true);
+    expect(existsSync(resolve(root, "assets/app-icon-startlink.png"))).toBe(true);
+    expect(existsSync(resolve(root, "assets/app-icon-startlink.ico"))).toBe(true);
+    expect(existsSync(resolve(root, "assets/app-icon-startlink.icns"))).toBe(true);
+    expect(existsSync(resolve(root, "public/app-icon-startlink.png"))).toBe(true);
   });
 
   it("wires Electron builder icons for Windows installer and macOS app bundles", () => {
-    expect(packageJson.build?.icon).toBe("assets/app-icon-green-bubble.ico");
-    expect(packageJson.build?.win?.icon).toBe("assets/app-icon-green-bubble.ico");
-    expect(packageJson.build?.nsis?.installerIcon).toBe("assets/app-icon-green-bubble.ico");
-    expect(packageJson.build?.nsis?.uninstallerIcon).toBe("assets/app-icon-green-bubble.ico");
-    expect(packageJson.build?.mac?.icon).toBe("assets/app-icon-green-bubble.icns");
+    expect(packageJson.build?.icon).toBe("assets/app-icon-startlink.ico");
+    expect(packageJson.build?.win?.icon).toBe("assets/app-icon-startlink.ico");
+    expect(packageJson.build?.nsis?.installerIcon).toBe("assets/app-icon-startlink.ico");
+    expect(packageJson.build?.nsis?.uninstallerIcon).toBe("assets/app-icon-startlink.ico");
+    expect(packageJson.build?.mac?.icon).toBe("assets/app-icon-startlink.icns");
     expect(packageJson.build?.extraResources).toContainEqual({
-      from: "assets/app-icon-green-bubble.ico",
+      from: "assets/app-icon-startlink.ico",
       to: "app-icon.ico",
     });
   });
 
   it("exposes the app icon to browser tabs and macOS development dock", () => {
     expect(indexHtml).toContain('rel="icon"');
-    expect(indexHtml).toContain("%BASE_URL%app-icon-green-bubble.png");
+    expect(indexHtml).toContain("%BASE_URL%app-icon-startlink.png");
     expect(mainSource).toContain("app.dock?.setIcon");
-    expect(mainSource).toContain("app-icon-green-bubble.png");
+    expect(mainSource).toContain("app-icon-startlink.png");
   });
 
   it("provides scripts for syncing, starting and verifying packaged icons", () => {
@@ -74,41 +74,41 @@ describe("app brand assets", () => {
     expect(iconManual).toContain("win-unpacked");
     expect(iconManual).toContain("icon:fix-taskbar");
     expect(iconManual).toContain("icon:sync");
-    expect(iconManual).toContain("D:\\Program Files\\lppchat");
+    expect(iconManual).toContain("D:\\Program Files\\startlink");
     expect(iconManual).toContain("Windows 图标缓存");
   });
 
   it("keeps the sync scripts tied to the shared icon outputs and packaged exe patch", () => {
     expect(iconSyncSource).toContain("rcedit-x64.exe");
-    expect(iconSyncSource).toContain("app-icon-green-bubble.ico");
-    expect(iconSyncSource).toContain("public/app-icon-green-bubble.png");
-    expect(iconSyncSource).toContain("lppchat.exe");
+    expect(iconSyncSource).toContain("app-icon-startlink.ico");
+    expect(iconSyncSource).toContain("public/app-icon-startlink.png");
+    expect(iconSyncSource).toContain("startlink.exe");
     expect(iconVerifySource).toContain("packaged-exe-icon.png");
     expect(iconVerifySource).toContain("installed-exe-icon.png");
     expect(startPackagedSource).toContain("sync-app-icon.mjs");
     expect(fixTaskbarSource).toContain("ie4uinit.exe");
-    expect(fixTaskbarSource).toContain("D:\\\\Program Files\\\\lppchat");
+    expect(fixTaskbarSource).toContain("D:\\\\Program Files\\\\startlink");
     expect(fixTaskbarSource).toContain("rcedit-x64.exe");
   });
 
   it("uses the app icon in the PC sidebar brand instead of a letter fallback", () => {
     expect(appMetadataSource).toContain("import.meta.env.BASE_URL");
-    expect(appMetadataSource).toContain("app-icon-green-bubble.png");
+    expect(appMetadataSource).toContain("app-icon-startlink.png");
     expect(sidebarSource).toContain("appIconSrc");
-    expect(sidebarSource).not.toContain('src="/app-icon-green-bubble.png"');
+    expect(sidebarSource).not.toContain('src="/app-icon-startlink.png"');
     expect(sidebarSource).not.toContain('className="sidebar-brand-logo" aria-hidden="true">\n            L');
   });
 
   it("keeps a small-size visual acceptance board for the app icon", () => {
-    expect(readPngMetadata("assets/app-icon-green-bubble.png")).toEqual({
-      width: 1254,
-      height: 1254,
-      colorType: 6,
+    expect(readPngMetadata("assets/app-icon-startlink.png")).toEqual({
+      width: 1024,
+      height: 1024,
+      colorType: 2,
     });
-    expect(readPngMetadata("public/app-icon-green-bubble.png")).toEqual({
-      width: 1254,
-      height: 1254,
-      colorType: 6,
+    expect(readPngMetadata("public/app-icon-startlink.png")).toEqual({
+      width: 1024,
+      height: 1024,
+      colorType: 2,
     });
     expect(existsSync(resolve(root, "docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png"))).toBe(
       true,

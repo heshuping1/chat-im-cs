@@ -50,6 +50,7 @@ import {
   customerServiceMessageEntityToDto,
   normalizeCustomerServiceMessageDto,
 } from "../customer-service/cs-message-contract";
+import { customerServiceDirectPeerReaderId } from "../customer-service/cs-message-read-status";
 
 export class CustomerServiceApiClient extends MessagesApiClient {
   getWorkbenchThreads() {
@@ -108,11 +109,12 @@ export class CustomerServiceApiClient extends MessagesApiClient {
   async getCustomerServiceMonitorStaffStatuses() {
     const adminToken = await this.issueAdminToken();
     this.options.adminToken = adminToken;
-    return this.request<CustomerServiceStaffStatusDto[]>(
+    const response = await this.request<unknown>(
       endpointPlan.adminCustomerServiceCenterStaffStatuses,
       {},
       true,
     );
+    return normalizeCustomerServiceStaffStatuses(response);
   }
 
   async getCustomerServiceMonitorSlaDashboard() {
@@ -364,15 +366,20 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       "customerUserId",
       "visitorUserId",
       "keyword",
+      "assignedStaffUserId",
       "locale",
+      "conversationId",
+      "senderUserId",
       "staffUserId",
       "sourcePlatform",
       "sourceChannel",
       "country",
       "region",
+      "rating",
       "minRating",
       "maxRating",
       "minRiskLevel",
+      "slaRisk",
     ]);
     const query = search.toString();
     const response = await this.request<StaffServiceHistoryResponse>(
@@ -651,6 +658,45 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       closed?: boolean;
     }>(
       endpointPlan.adminCustomerServiceCenterThreadForceClose
+        .replace("{threadType}", threadType)
+        .replace("{threadId}", encodeURIComponent(threadId)),
+      { method: "POST" },
+      true,
+    );
+  }
+
+  async freezeCustomerServiceThread(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) {
+    return this.updateCustomerServiceThreadFreezeState(threadType, threadId, true);
+  }
+
+  async unfreezeCustomerServiceThread(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) {
+    return this.updateCustomerServiceThreadFreezeState(threadType, threadId, false);
+  }
+
+  private async updateCustomerServiceThreadFreezeState(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+    frozen: boolean,
+  ) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    const endpoint = frozen
+      ? endpointPlan.adminCustomerServiceCenterThreadFreeze
+      : endpointPlan.adminCustomerServiceCenterThreadUnfreeze;
+    return this.request<{
+      threadType?: CustomerServiceThreadType;
+      threadId?: string;
+      status?: string;
+      frozen?: boolean;
+      isFrozen?: boolean;
+    }>(
+      endpoint
         .replace("{threadType}", threadType)
         .replace("{threadId}", encodeURIComponent(threadId)),
       { method: "POST" },
@@ -1072,9 +1118,9 @@ function adminTempSessionItemToCustomerServiceThread(
       readString(item.serviceStaffUserId) ||
       readString(item.service_staff_user_id) ||
       null,
-    avatarUrl: readString(item.avatarUrl) ?? null,
+    avatarUrl: readThreadAvatarUrl(item) ?? null,
     conversationId,
-    customerAvatarUrl: readString(item.customerAvatarUrl) ?? null,
+    customerAvatarUrl: readCustomerAvatarUrl(item) ?? null,
     lastMessageAt: readString(item.lastMessageAt) || readString(item.updatedAt) || null,
     lastMessagePreview: readString(item.lastMessagePreview),
     priority: readString(item.priority),
@@ -1145,12 +1191,9 @@ function adminCenterThreadItemToCustomerServiceThread(
       readString(item.serviceStaffUserId) ||
       readString(item.service_staff_user_id) ||
       null,
-    avatarUrl: readString(item.avatarUrl) ?? null,
+    avatarUrl: readThreadAvatarUrl(item) ?? null,
     conversationId,
-    customerAvatarUrl:
-      readString(item.customerAvatarUrl) ||
-      readString(item.visitorAvatarUrl) ||
-      null,
+    customerAvatarUrl: readCustomerAvatarUrl(item) ?? null,
     lastMessageAt:
       readString(item.lastMessageAt) ||
       readString(item.updatedAt) ||
@@ -1167,7 +1210,7 @@ function adminCenterThreadItemToCustomerServiceThread(
       readString(item.channel) ||
       readString(item.entryChannel),
     status: readString(item.status) || "active",
-    staffAvatarUrl: readString(item.staffAvatarUrl) || readString(item.staff_avatar_url) || null,
+    staffAvatarUrl: readStaffAvatarUrl(item) || null,
     staffDisplayName: readString(item.staffDisplayName) || readString(item.staff_display_name) || null,
     staffName: readString(item.staffName) || readString(item.staff_name) || null,
     staffUserId: readString(item.staffUserId) || readString(item.staff_user_id) || null,
@@ -1182,6 +1225,85 @@ function adminCenterThreadItemToCustomerServiceThread(
       "Visitor",
     unreadCount: readNumber(item.unreadCount),
     updatedAt: readString(item.updatedAt) || readString(item.createdAt) || null,
+  };
+}
+
+function normalizeCustomerServiceStaffStatuses(
+  value: unknown,
+): CustomerServiceStaffStatusDto[] {
+  const record = asRecord(value);
+  const items = Array.isArray(value)
+    ? value
+    : Array.isArray(record?.items)
+      ? record.items
+      : [];
+  return items
+    .map(normalizeCustomerServiceStaffStatus)
+    .filter((item): item is CustomerServiceStaffStatusDto => Boolean(item));
+}
+
+function normalizeCustomerServiceStaffStatus(
+  value: unknown,
+): CustomerServiceStaffStatusDto | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const staffUserId =
+    readStringField(record, [
+      "staffUserId",
+      "staff_user_id",
+      "serviceStaffUserId",
+      "service_staff_user_id",
+      "userId",
+      "user_id",
+      "id",
+    ]) ?? "";
+  if (!staffUserId) return null;
+  return {
+    activeSessionCount:
+      readNumberField(record, ["activeSessionCount", "active_session_count"]) ?? null,
+    avatarUrl: readStaffAvatarUrl(record) ?? null,
+    deviceIp: readStringField(record, ["deviceIp", "device_ip"]) ?? null,
+    displayName:
+      readStringField(record, [
+        "displayName",
+        "display_name",
+        "staffDisplayName",
+        "staff_display_name",
+        "staffName",
+        "staff_name",
+        "name",
+      ]) ?? null,
+    lastAssignedAt:
+      readStringField(record, ["lastAssignedAt", "last_assigned_at"]) ?? null,
+    lastHeartbeatAt:
+      readStringField(record, ["lastHeartbeatAt", "last_heartbeat_at"]) ?? null,
+    lastIp: readStringField(record, ["lastIp", "last_ip"]) ?? null,
+    lastOnlineAt: readStringField(record, ["lastOnlineAt", "last_online_at"]) ?? null,
+    maxConcurrentSessions:
+      readNumberField(record, [
+        "maxConcurrentSessions",
+        "max_concurrent_sessions",
+      ]) ?? null,
+    queueAcceptEnabled:
+      readBoolean(record.queueAcceptEnabled) ??
+      readBoolean(record.queue_accept_enabled) ??
+      null,
+    reservedSessionCount:
+      readNumberField(record, [
+        "reservedSessionCount",
+        "reserved_session_count",
+      ]) ?? null,
+    serviceStatus:
+      readStatusValue(record.serviceStatus) ??
+      readStatusValue(record.service_status) ??
+      readStatusValue(record.status) ??
+      null,
+    staffUserId,
+    status:
+      readStatusValue(record.status) ??
+      readStatusValue(record.serviceStatus) ??
+      readStatusValue(record.service_status) ??
+      null,
   };
 }
 
@@ -1386,6 +1508,47 @@ function normalizeCustomerServiceReadStatus(
   };
 }
 
+function normalizeDirectChatCustomerReadStatus(input: {
+  conversationId: string;
+  detailRecord: Record<string, unknown>;
+  sourceRecord: Record<string, unknown>;
+  threadType: CustomerServiceThreadType;
+}): CustomerServiceReadStatusDto | null {
+  if (input.threadType !== "im_direct") return null;
+  const readSeq =
+    readNumberField(input.detailRecord, ["customerLastReadSeq", "customer_last_read_seq"]) ??
+    readNumberField(input.sourceRecord, ["customerLastReadSeq", "customer_last_read_seq"]);
+  const readAt =
+    readNullableStringField(input.detailRecord, [
+      "customerLastReadAt",
+      "customer_last_read_at",
+      "customerReadAt",
+      "customer_read_at",
+    ]) ??
+    readNullableStringField(input.sourceRecord, [
+      "customerLastReadAt",
+      "customer_last_read_at",
+      "customerReadAt",
+      "customer_read_at",
+    ]);
+  if (readSeq === undefined && readAt === undefined) return null;
+  const conversationId =
+    readStringField(input.detailRecord, ["conversationId", "conversation_id", "chatId", "chat_id"]) ||
+    readStringField(input.sourceRecord, ["conversationId", "conversation_id", "chatId", "chat_id"]) ||
+    input.conversationId;
+  return {
+    conversationId,
+    visitorUserId: customerServiceDirectPeerReaderId,
+    members: [
+      {
+        userId: customerServiceDirectPeerReaderId,
+        lastReadSeq: readSeq ?? 0,
+        lastReadAt: readAt ?? null,
+      },
+    ],
+  };
+}
+
 function normalizeSessionNoteContent(content: string) {
   const normalized = content.trim();
   if (!normalized) {
@@ -1425,14 +1588,27 @@ function normalizeWorkbenchThreadDetail(
   const sourceFieldRecord = sourceRecord as NestedThreadPayload & Record<string, unknown>;
   const threadType = normalizeResponseThreadType(detail.threadType || options.fallbackThreadType);
   const threadId = detail.threadId || options.fallbackThreadId;
-  const conversationId = detail.conversationId || detail.threadId || options.fallbackThreadId;
+  const conversationId =
+    readString(detailRecord.conversationId) ||
+    readString(detailRecord.conversation_id) ||
+    readString(sourceFieldRecord.conversationId) ||
+    readString(sourceFieldRecord.conversation_id) ||
+    readString(sourceFieldRecord.chatId) ||
+    readString(sourceFieldRecord.chat_id) ||
+    detail.threadId ||
+    options.fallbackThreadId;
   const rawMessages = readMessages(detail.messages) ?? readMessages(nested?.messages) ?? [];
   const notes = normalizeCustomerServiceSessionNotes(
     detail.notes ?? nested?.notes,
   );
-  const readStatus = normalizeCustomerServiceReadStatus(
-    detail.readStatus ?? sourceRecord.readStatus,
-  );
+  const readStatus =
+    normalizeCustomerServiceReadStatus(detail.readStatus ?? sourceRecord.readStatus) ??
+    normalizeDirectChatCustomerReadStatus({
+      conversationId,
+      detailRecord,
+      sourceRecord,
+      threadType,
+    });
   const messages = normalizeCustomerServiceMessagesFromContract(rawMessages, {
     conversationId,
     threadId,
@@ -1452,10 +1628,8 @@ function normalizeWorkbenchThreadDetail(
       readString(sourceRecord.visitorDisplayName) ||
       readString(sourceRecord.displayName),
     avatarUrl:
-      readString(detail.avatarUrl) ||
-      readString(sourceRecord.customerAvatarUrl) ||
-      readString(sourceRecord.visitorAvatarUrl) ||
-      readString(sourceRecord.avatarUrl) ||
+      readCustomerAvatarUrl(detailRecord) ||
+      readCustomerAvatarUrl(sourceRecord) ||
       null,
     assignedStaffAvatarUrl:
       readString(detailRecord.assignedStaffAvatarUrl) ||
@@ -1763,11 +1937,84 @@ function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function readStringField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = readString(record[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function readThreadAvatarUrl(record: Record<string, unknown>) {
+  return readStringField(record, [
+    "avatarUrl",
+    "avatar_url",
+    "customerAvatarUrl",
+    "customer_avatar_url",
+    "visitorAvatarUrl",
+    "visitor_avatar_url",
+    "profileAvatarUrl",
+    "profile_avatar_url",
+  ]);
+}
+
+function readCustomerAvatarUrl(record: Record<string, unknown>) {
+  return readStringField(record, [
+    "customerAvatarUrl",
+    "customer_avatar_url",
+    "visitorAvatarUrl",
+    "visitor_avatar_url",
+    "customerProfileAvatarUrl",
+    "customer_profile_avatar_url",
+    "profileAvatarUrl",
+    "profile_avatar_url",
+    "avatarUrl",
+    "avatar_url",
+  ]);
+}
+
+function readStaffAvatarUrl(record: Record<string, unknown>) {
+  return readStringField(record, [
+    "assignedStaffAvatarUrl",
+    "assigned_staff_avatar_url",
+    "staffAvatarUrl",
+    "staff_avatar_url",
+    "serviceStaffAvatarUrl",
+    "service_staff_avatar_url",
+    "avatarUrl",
+    "avatar_url",
+  ]);
+}
+
+function readStatusValue(value: unknown) {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return undefined;
+}
+
+function readNullableStringField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+    if (record[key] === null) return null;
+    const value = readString(record[key]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
 function readNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string" || !value.trim()) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function readNumberField(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = readNumber(record[key]);
+    if (value !== undefined) return value;
+  }
+  return undefined;
 }
 
 function readBoolean(value: unknown) {

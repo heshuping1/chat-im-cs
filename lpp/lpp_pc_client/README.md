@@ -1,4 +1,4 @@
-# lppchat
+# startlink
 
 这是 LPP 的 Windows 客服客户端工程骨架。
 

@@ -52,9 +52,9 @@ class MainActivity : FlutterActivity() {
         }
         val displayName = fileName.ifBlank { source.name }
         val relativePath = if (isVideo) {
-            Environment.DIRECTORY_MOVIES + "/LPP"
+            Environment.DIRECTORY_MOVIES + "/StartLink"
         } else {
-            Environment.DIRECTORY_PICTURES + "/LPP"
+            Environment.DIRECTORY_PICTURES + "/StartLink"
         }
 
         val values = ContentValues().apply {

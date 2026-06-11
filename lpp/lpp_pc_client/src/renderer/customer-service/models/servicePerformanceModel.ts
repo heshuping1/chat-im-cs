@@ -32,6 +32,15 @@ export interface ServicePerformanceStatsDto {
   avgDurationSeconds?: number;
   channelDistribution?: ServicePerformanceDistributionPoint[];
   staffPerformance?: ServicePerformanceStaffDto[];
+  staffStats?: ServicePerformanceStaffDto[];
+  staffDailyStats?: ServicePerformanceStaffDto[];
+  agentPerformance?: ServicePerformanceStaffDto[];
+  agentStats?: ServicePerformanceStaffDto[];
+  staff_performance?: ServicePerformanceStaffDto[];
+  staff_stats?: ServicePerformanceStaffDto[];
+  staff_daily_stats?: ServicePerformanceStaffDto[];
+  agent_performance?: ServicePerformanceStaffDto[];
+  agent_stats?: ServicePerformanceStaffDto[];
 }
 
 export interface ServicePerformanceKpi {
@@ -91,7 +100,7 @@ export function createServicePerformanceModel({
   stats,
   translate,
 }: CreateServicePerformanceModelInput): ServicePerformanceModel {
-  const staffPerformance = stats?.staffPerformance ?? [];
+  const staffPerformance = resolveServicePerformanceStaff(stats);
   return {
     isEmpty: !stats || staffPerformance.length === 0,
     kpis: [
@@ -136,6 +145,126 @@ export function createServicePerformanceModel({
   };
 }
 
+export function resolveServicePerformanceStaff(
+  stats?: ServicePerformanceStatsDto | null,
+): ServicePerformanceStaffDto[] {
+  const rows = firstArrayValue(stats, [
+    "staffPerformance",
+    "staffStats",
+    "staffDailyStats",
+    "agentPerformance",
+    "agentStats",
+    "staff_performance",
+    "staff_stats",
+    "staff_daily_stats",
+    "agent_performance",
+    "agent_stats",
+  ]);
+  return rows.map(normalizeServicePerformanceStaff).filter((staff) =>
+    Boolean(
+      staff.staffUserId ||
+        staff.displayName ||
+        safeNumber(staff.sessionsServed) > 0 ||
+        staff.byChannel?.length,
+    ),
+  );
+}
+
+function normalizeServicePerformanceStaff(input: unknown): ServicePerformanceStaffDto {
+  const record = asRecord(input);
+  return {
+    staffUserId: readString(record, [
+      "staffUserId",
+      "staff_user_id",
+      "staffId",
+      "staff_id",
+      "agentUserId",
+      "agent_user_id",
+      "userId",
+      "user_id",
+      "id",
+    ]),
+    displayName: readString(record, [
+      "displayName",
+      "display_name",
+      "staffName",
+      "staff_name",
+      "agentName",
+      "agent_name",
+      "nickname",
+      "name",
+    ]),
+    sessionsServed: readNumber(record, [
+      "sessionsServed",
+      "sessions_served",
+      "servedSessions",
+      "served_sessions",
+      "servedCount",
+      "served_count",
+      "sessionCount",
+      "session_count",
+    ]),
+    avgFirstResponseSeconds: readNumber(record, [
+      "avgFirstResponseSeconds",
+      "avg_first_response_seconds",
+      "firstResponseAvgSeconds",
+      "first_response_avg_seconds",
+    ]),
+    avgDurationSeconds: readNumber(record, [
+      "avgDurationSeconds",
+      "avg_duration_seconds",
+      "durationAvgSeconds",
+      "duration_avg_seconds",
+    ]),
+    avgRating: readNumber(record, ["avgRating", "avg_rating", "ratingAvg", "rating_avg"]),
+    excellentRate: readNumber(record, [
+      "excellentRate",
+      "excellent_rate",
+      "qualityPassRate",
+      "quality_pass_rate",
+    ]),
+    byChannel: firstArrayValue(record, ["byChannel", "by_channel", "channels", "channelStats"])
+      .map(normalizeServicePerformanceChannel)
+      .filter((channel) => Boolean(channel.channel)),
+  };
+}
+
+function normalizeServicePerformanceChannel(input: unknown): ServicePerformanceChannelDto {
+  const record = asRecord(input);
+  return {
+    channel: readString(record, ["channel", "sourceChannel", "source_channel", "sourcePlatform", "source_platform"]),
+    sessionsServed: readNumber(record, [
+      "sessionsServed",
+      "sessions_served",
+      "servedSessions",
+      "served_sessions",
+      "servedCount",
+      "served_count",
+      "sessionCount",
+      "session_count",
+    ]),
+    avgFirstResponseSeconds: readNumber(record, [
+      "avgFirstResponseSeconds",
+      "avg_first_response_seconds",
+      "firstResponseAvgSeconds",
+      "first_response_avg_seconds",
+    ]),
+    avgDurationSeconds: readNumber(record, [
+      "avgDurationSeconds",
+      "avg_duration_seconds",
+      "durationAvgSeconds",
+      "duration_avg_seconds",
+    ]),
+    avgRating: readNumber(record, ["avgRating", "avg_rating", "ratingAvg", "rating_avg"]),
+    excellentRate: readNumber(record, [
+      "excellentRate",
+      "excellent_rate",
+      "qualityPassRate",
+      "quality_pass_rate",
+    ]),
+  };
+}
+
 function createChannelBreakdown(
   breakdown: ServicePerformanceChannelDto[] | undefined,
 ): ServicePerformanceChannelBreakdown[] {
@@ -154,6 +283,43 @@ function createChannelBreakdown(
       excellentRate: formatPercent(item?.excellentRate),
     };
   });
+}
+
+function firstArrayValue(
+  input: Record<string, unknown> | ServicePerformanceStatsDto | null | undefined,
+  keys: string[],
+) {
+  const record = asRecord(input);
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+function readString(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function readNumber(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const numberValue = Number(value);
+      if (Number.isFinite(numberValue)) return numberValue;
+    }
+  }
+  return undefined;
+}
+
+function asRecord(input: unknown): Record<string, unknown> {
+  return input && typeof input === "object" ? (input as Record<string, unknown>) : {};
 }
 
 function formatInteger(value: unknown, emptyValue = "--") {

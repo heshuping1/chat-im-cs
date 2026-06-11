@@ -1,8 +1,8 @@
 {
-  "name": "lppchat",
+  "name": "startlink",
   "version": "1.0.0",
   "private": true,
-  "description": "LPP Windows customer service desktop client",
+  "description": "StartLink Windows customer service desktop client",
   "main": "dist/main/main.js",
   "type": "module",
   "scripts": {
@@ -97,11 +97,11 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.lppchat.desktop",
-    "productName": "lppchat",
-    "icon": "assets/app-icon-green-bubble.ico",
+    "appId": "com.startlink.desktop",
+    "productName": "StartLink",
+    "icon": "assets/app-icon-startlink.ico",
     "mac": {
-      "icon": "assets/app-icon-green-bubble.icns"
+      "icon": "assets/app-icon-startlink.icns"
     },
     "directories": {
       "output": "release"
@@ -113,25 +113,25 @@
     ],
     "extraResources": [
       {
-        "from": "assets/app-icon-green-bubble.ico",
+        "from": "assets/app-icon-startlink.ico",
         "to": "app-icon.ico"
       }
     ],
     "win": {
-      "icon": "assets/app-icon-green-bubble.ico",
+      "icon": "assets/app-icon-startlink.ico",
       "target": "nsis",
-      "artifactName": "lppchat-${version}-win-x64.${ext}",
+      "artifactName": "startlink-${version}-win-x64.${ext}",
       "signAndEditExecutable": false
     },
     "nsis": {
-      "installerIcon": "assets/app-icon-green-bubble.ico",
-      "uninstallerIcon": "assets/app-icon-green-bubble.ico",
+      "installerIcon": "assets/app-icon-startlink.ico",
+      "uninstallerIcon": "assets/app-icon-startlink.ico",
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "LPP 客服客户端",
+      "shortcutName": "星络",
       "include": "scripts/nsis/installer.nsh",
       "runAfterFinish": false,
       "deleteAppDataOnUninstall": false

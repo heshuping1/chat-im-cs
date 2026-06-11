@@ -7,8 +7,8 @@ const args = new Set(process.argv.slice(2));
 const releaseDir = join(process.cwd(), "release");
 const packageJson = JSON.parse(await readFile(join(process.cwd(), "package.json"), "utf8"));
 const version = String(packageJson.version);
-const fromVersion = valueAfter("--from-version=") || process.env.LPP_UPDATE_FROM_VERSION || "";
-const baseUrl = trimTrailingSlash(process.env.LPP_UPDATE_BASE_URL || "");
+const fromVersion = valueAfter("--from-version=") || process.env.startlink_UPDATE_FROM_VERSION || "";
+const baseUrl = trimTrailingSlash(process.env.startlink_UPDATE_BASE_URL || "");
 
 const entries = await readdir(releaseDir).catch(() => []);
 const installerName = findInstaller(entries);
@@ -24,7 +24,7 @@ const installerBlockmapName =
   entries.find((entry) => entry === `${installerName}.blockmap`) ??
   entries.find(
     (entry) =>
-      entry.toLowerCase().startsWith("lppchat-") && entry.toLowerCase().endsWith(".exe.blockmap"),
+      entry.toLowerCase().startsWith("startlink-") && entry.toLowerCase().endsWith(".exe.blockmap"),
   ) ??
   entries.find((entry) => entry.toLowerCase().endsWith(".exe.blockmap"));
 const blockmapInfo = installerBlockmapName ? await fileInfo(join(releaseDir, installerBlockmapName)) : undefined;
@@ -40,7 +40,7 @@ const fullPackage = {
 };
 
 const metadata = {
-  appId: "lppchat",
+  appId: "startlink",
   generatedAt: new Date().toISOString(),
   fullPackage,
   deltaPackage: buildDeltaPackage(installerBlockmapName),
@@ -54,7 +54,7 @@ console.log(JSON.stringify(metadata, null, 2));
 function buildDeltaPackage(blockmapName) {
   if (!args.has("--delta") && !fromVersion) return undefined;
   if (!fromVersion) {
-    throw new Error("Delta metadata requires --from-version=x.y.z or LPP_UPDATE_FROM_VERSION.");
+    throw new Error("Delta metadata requires --from-version=x.y.z or startlink_UPDATE_FROM_VERSION.");
   }
   if (!blockmapName) {
     throw new Error("No .blockmap artifact found. electron-builder must produce blockmap metadata first.");
@@ -73,11 +73,11 @@ function buildDeltaPackage(blockmapName) {
 }
 
 function findInstaller(entryNames) {
-  const expectedName = `lppchat-${version}-win-x64.exe`;
+  const expectedName = `startlink-${version}-win-x64.exe`;
   if (entryNames.includes(expectedName)) return expectedName;
   return (
     entryNames.find(
-      (entry) => entry.toLowerCase().startsWith("lppchat-") && extname(entry).toLowerCase() === ".exe",
+      (entry) => entry.toLowerCase().startsWith("startlink-") && extname(entry).toLowerCase() === ".exe",
     ) ??
     entryNames.find((entry) => extname(entry).toLowerCase() === ".exe" && !entry.includes("uninstaller"))
   );

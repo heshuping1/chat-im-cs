@@ -46,6 +46,7 @@ export function ServiceMessageBubble({
   const customerReadReceiptText = customerServiceReadReceiptText(
     customerServiceMessageReadReceiptState(message, mine, threadType),
     message.readAt,
+    t,
   );
   const messageViewModel = createChatMessageViewModel({
     conversationFallbackName,
@@ -85,10 +86,22 @@ export function ServiceMessageBubble({
 function customerServiceReadReceiptText(
   state: ReturnType<typeof customerServiceMessageReadReceiptState>,
   readAt?: string | null,
+  t?: (key: string, params?: Record<string, string | number>) => string,
 ) {
   if (!state) return undefined;
-  if (state === "unread") return "客户未读";
-  if (state === "unknown") return "客户已读时间未知";
+  if (state === "unread") {
+    return t?.("customerService.messageStage.customerUnread") ?? "Customer unread";
+  }
+  if (state === "unknown") {
+    return (
+      t?.("customerService.messageStage.customerReadTimeUnknown") ??
+      "Customer read time unknown"
+    );
+  }
   const timeText = formatChatMessageTime(readAt);
-  return timeText ? `客户已读 ${timeText}` : "客户已读时间未知";
+  return timeText
+    ? t?.("customerService.messageStage.customerReadAt", { time: timeText }) ??
+        `Customer read ${timeText}`
+    : t?.("customerService.messageStage.customerReadTimeUnknown") ??
+        "Customer read time unknown";
 }

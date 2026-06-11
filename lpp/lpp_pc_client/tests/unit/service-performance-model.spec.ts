@@ -89,4 +89,43 @@ describe("service performance model", () => {
     expect(model.staffRows).toEqual([]);
     expect(model.kpis.map((item) => item.value)).toEqual(["--", "--", "--", "--"]);
   });
+
+  it("normalizes common staff performance aliases from admin stats responses", () => {
+    const model = createServicePerformanceModel({
+      stats: {
+        totalSessions: 3,
+        staff_daily_stats: [
+          {
+            staff_user_id: "staff-2",
+            staff_name: "Bob",
+            sessions_served: "3",
+            avg_first_response_seconds: "45",
+            avg_duration_seconds: 180,
+            avg_rating: "4.6",
+            excellent_rate: "0.8",
+            by_channel: [
+              {
+                channel: "widget",
+                sessions_served: "3",
+                avg_first_response_seconds: 45,
+              },
+            ],
+          },
+        ],
+      } as never,
+      translate,
+    });
+
+    expect(model.isEmpty).toBe(false);
+    expect(model.staffRows[0]).toMatchObject({
+      avgDuration: "3m",
+      avgFirstResponse: "45s",
+      avgRating: "4.6",
+      displayName: "Bob",
+      excellentRate: "80%",
+      sessionsServed: "3",
+      staffUserId: "staff-2",
+    });
+    expect(model.staffRows[0].channelBreakdown[0].sessionsServed).toBe("3");
+  });
 });

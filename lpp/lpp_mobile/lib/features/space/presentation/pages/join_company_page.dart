@@ -368,7 +368,7 @@ class _JoinCompanyPageState extends ConsumerState<JoinCompanyPage> {
                   child: Text('🫧', style: TextStyle(fontSize: 48))),
             ),
             const SizedBox(height: 16),
-            const Text('绿泡泡',
+            const Text('星络',
                 style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,

@@ -1,4 +1,4 @@
-﻿import type { MessageDictionary } from './zh-CN';
+import type { MessageDictionary } from './zh-CN';
 
 import {
   spaceRadarFallback,
@@ -27,7 +27,7 @@ export const th: MessageDictionary = {
     forceUpdateInstalling: 'Installing',
     forceUpdateMessage: 'This version is below the minimum version allowed by the server. Update before continuing.',
     forceUpdateTitle: 'Client update required',
-    title: 'LPP',
+    title: 'StartLink',
   },
   aiDraft: {
     adoptFailed: 'นำไปใช้ไม่สำเร็จ: {error}',
@@ -89,12 +89,12 @@ export const th: MessageDictionary = {
       'cartoon-pink': 'อวาตาร์การ์ตูนพีช',
       'cartoon-lemon': 'อวาตาร์การ์ตูนเลมอน',
       'cartoon-gray': 'อวาตาร์การ์ตูนสีเทา',
-      'bubble-service': 'อวาตาร์บริการ LPP',
-      'bubble-headset': 'อวาตาร์หูฟัง LPP',
-      'bubble-chat': 'อวาตาร์แชต LPP',
-      'bubble-cute': 'อวาตาร์เป็นมิตร LPP',
-      'bubble-online': 'อวาตาร์ออนไลน์ LPP',
-      'bubble-brand': 'อวาตาร์แบรนด์ LPP',
+      'bubble-service': 'อวาตาร์บริการ StartLink',
+      'bubble-headset': 'อวาตาร์หูฟัง StartLink',
+      'bubble-chat': 'อวาตาร์แชต StartLink',
+      'bubble-cute': 'อวาตาร์เป็นมิตร StartLink',
+      'bubble-online': 'อวาตาร์ออนไลน์ StartLink',
+      'bubble-brand': 'อวาตาร์แบรนด์ StartLink',
     },
     validation: {
       displayNameRequired: 'Enter a nickname',
@@ -157,8 +157,8 @@ export const th: MessageDictionary = {
     enter: 'เข้า',
     entering: 'กำลังเข้า...',
     enterpriseSpace: 'Enterprise space',
-    identifier: 'LPP ID / อีเมล / มือถือ',
-    identifierPlaceholder: 'ป้อน LPP ID / อีเมล / มือถือ',
+    identifier: 'StartLink ID / อีเมล / มือถือ',
+    identifierPlaceholder: 'ป้อน StartLink ID / อีเมล / มือถือ',
     invitationHelp: 'บัญชีที่มีอยู่สามารถเข้าสู่ระบบแล้วเข้าร่วมองค์กรที่ได้รับเชิญได้ โดยไม่เปลี่ยนบทบาทในองค์กรที่เข้าร่วมแล้ว',
     invitation: {
       enterpriseInvitation: 'Enterprise invitation',
@@ -231,6 +231,7 @@ export const th: MessageDictionary = {
     edit: 'แก้ไข',
     expand: 'ขยาย',
     open: 'เปิด',
+    query: 'ค้นหา',
     retry: 'ลองอีกครั้ง',
     save: 'บันทึก',
     saveAs: 'บันทึกเป็น...',
@@ -398,6 +399,8 @@ export const th: MessageDictionary = {
       aria: 'แชทบริการลูกค้า',
       customerFallback: 'ลูกค้า',
       customerReadAt: 'ลูกค้าอ่านแล้ว {time}',
+      customerReadTimeUnknown: 'ไม่ทราบเวลาอ่านของลูกค้า',
+      customerUnread: 'ลูกค้ายังไม่อ่าน',
       read: 'อ่านแล้ว',
       newMessages: '↓ ข้อความใหม่ {count} รายการ',
       typingPreviewEmpty: 'The customer is typing...',
@@ -593,7 +596,7 @@ export const th: MessageDictionary = {
       remindersSuffix: ', การเตือน {count} รายการ',
     },
     brand: {
-      about: 'เกี่ยวกับ LPP',
+      about: 'เกี่ยวกับ StartLink',
       helpAboutUpdate: 'ช่วยเหลือ / เกี่ยวกับ / ตรวจสอบอัปเดต',
     },
     collapse: 'ย่อแถบด้านข้าง',
@@ -1571,12 +1574,12 @@ export const th: MessageDictionary = {
         terms: {
           title: 'Terms of Service',
           parts: [
-            'LPP Terms of Service',
+            'StartLink Terms of Service',
             'Updated: June 5, 2026',
             'Effective: June 5, 2026',
-            'Welcome to LPP. Please read and understand these terms before using this client and related services. Continued use means you agree to these terms.',
+            'Welcome to StartLink. Please read and understand these terms before using this client and related services. Continued use means you agree to these terms.',
             '1. Services',
-            'LPP provides instant messaging, customer service collaboration, file transfer, notifications, and related operation tools. We may adjust, interrupt, or terminate parts of the service for maintenance, upgrades, or security.',
+            'StartLink provides instant messaging, customer service collaboration, file transfer, notifications, and related operation tools. We may adjust, interrupt, or terminate parts of the service for maintenance, upgrades, or security.',
             '2. Account registration and use',
             'You must provide true, accurate, and complete registration information, keep your account and password secure, and must not sell, rent, transfer, or authorize others to use your account.',
             '3. User conduct',
@@ -1587,13 +1590,13 @@ export const th: MessageDictionary = {
             'For service interruption, data anomalies, or losses caused by force majeure, third parties, or causes outside our control, liability is limited to the extent permitted by law. You are responsible for content you publish through the service.',
             '6. Changes and contact',
             'We may update these terms for business or legal reasons. Material changes will be announced in the client or by other reasonable methods. Contact support@lpp.com with questions.',
-            '© 2026 LPP Technology Co., Ltd. All rights reserved',
+            '© 2026 StartLink Technology Co., Ltd. All rights reserved',
           ],
         },
         privacy: {
           title: 'Privacy Policy',
           parts: [
-            'LPP Privacy Policy',
+            'StartLink Privacy Policy',
             'Updated: June 5, 2026',
             'Effective: June 5, 2026',
             'We value personal information protection and take reasonable security measures under applicable laws and regulations.',
@@ -1609,7 +1612,7 @@ export const th: MessageDictionary = {
             'You may access, correct, delete personal information, close your account, withdraw authorization, or request explanations of personal information processing rules as permitted by law.',
             '6. Minors and policy updates',
             'This service is not intended for minors under 14. When this policy changes, we will notify you in the client or through other reasonable channels.',
-            '© 2026 LPP Technology Co., Ltd. All rights reserved',
+            '© 2026 StartLink Technology Co., Ltd. All rights reserved',
           ],
         },
       },

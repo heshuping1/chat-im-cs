@@ -1,4 +1,4 @@
-﻿import type { MessageDictionary } from './zh-CN';
+import type { MessageDictionary } from './zh-CN';
 
 export const zhTW: MessageDictionary = {
   app: {
@@ -16,7 +16,7 @@ export const zhTW: MessageDictionary = {
     forceUpdateInstalling: '安裝中',
     forceUpdateMessage: '目前版本已低於服務端允許範圍，需要完成更新後才能繼續使用。',
     forceUpdateTitle: '需要更新客戶端',
-    title: '綠泡泡',
+    title: '星絡',
   },
   aiDraft: {
     adoptFailed: '採納失敗：{error}',
@@ -78,12 +78,12 @@ export const zhTW: MessageDictionary = {
       'cartoon-pink': '卡通粉桃頭像',
       'cartoon-lemon': '卡通檸檬頭像',
       'cartoon-gray': '卡通灰調頭像',
-      'bubble-service': '綠泡泡客服頭像',
-      'bubble-headset': '綠泡泡耳麥頭像',
-      'bubble-chat': '綠泡泡會話頭像',
-      'bubble-cute': '綠泡泡親和頭像',
-      'bubble-online': '綠泡泡在線頭像',
-      'bubble-brand': '綠泡泡品牌頭像',
+      'bubble-service': '星絡客服頭像',
+      'bubble-headset': '星絡耳麥頭像',
+      'bubble-chat': '星絡會話頭像',
+      'bubble-cute': '星絡親和頭像',
+      'bubble-online': '星絡在線頭像',
+      'bubble-brand': '星絡品牌頭像',
     },
     validation: {
       displayNameRequired: '請輸入暱稱',
@@ -146,8 +146,8 @@ export const zhTW: MessageDictionary = {
     enter: '進入',
     entering: '進入中...',
     enterpriseSpace: '企業空間',
-    identifier: 'LPP 號 / 電子郵件 / 手機號',
-    identifierPlaceholder: '請輸入 LPP 號 / 電子郵件 / 手機號',
+    identifier: '星絡號 / 電子郵件 / 手機號',
+    identifierPlaceholder: '請輸入 星絡號 / 電子郵件 / 手機號',
     invitationHelp: '已有帳號可登入後加入被邀請的企業，不會修改已加入企業的角色。',
     invitation: {
       enterpriseInvitation: '企業邀請',
@@ -220,6 +220,7 @@ export const zhTW: MessageDictionary = {
     edit: '編輯',
     expand: '展開',
     open: '打開',
+    query: '查詢',
     retry: '重試',
     save: '儲存',
     saveAs: '另存為...',
@@ -387,6 +388,8 @@ export const zhTW: MessageDictionary = {
       aria: '線上客服聊天',
       customerFallback: '客',
       customerReadAt: '客戶已讀 {time}',
+      customerReadTimeUnknown: '客戶已讀時間未知',
+      customerUnread: '客戶未讀',
       read: '已讀',
       newMessages: '↓ {count} 條新訊息',
       typingPreviewEmpty: '客戶正在輸入...',
@@ -582,7 +585,7 @@ export const zhTW: MessageDictionary = {
       remindersSuffix: '，{count} 條提醒',
     },
     brand: {
-      about: '關於 LPP',
+      about: '關於星絡',
       helpAboutUpdate: '幫助 / 關於 / 檢查更新',
     },
     collapse: '收起側邊欄',
@@ -912,7 +915,7 @@ export const zhTW: MessageDictionary = {
       openStaffProfile: '查看客服資料',
       removeWindow: '移出',
       replaceMode: '選擇替換視窗',
-      replacePrompt: '選擇一個視窗替換為：{title}',
+      replacePrompt: '監控牆已滿，請選擇要替換的視窗：{title}',
       replaceThisWindow: '替換此視窗',
       resultCount: '{count} 條',
       selectThread: '選擇一條客服對話後查看即時詳情。',
@@ -1063,7 +1066,7 @@ export const zhTW: MessageDictionary = {
       usedUp: '已用完',
     },
     target: '定向對象',
-    targetPlaceholder: '手機號 / 郵箱 / LPP 號，可選',
+    targetPlaceholder: '手機號 / 郵箱 / 星絡號，可選',
     title: '邀請員工',
     usedCount: '已用 {used}/{max}',
     validEmpty: '有效期 --',
@@ -1072,8 +1075,8 @@ export const zhTW: MessageDictionary = {
   },
   privacySettings: {
     allowLppSearch: {
-      desc: '其他使用者可透過 LPP 號找到你。',
-      label: '允許透過 LPP 號搜尋',
+      desc: '其他使用者可透過 星絡號找到你。',
+      label: '允許透過 星絡號搜尋',
     },
     allowMobileSearch: {
       desc: '其他使用者可透過手機號找到你。',
@@ -1352,7 +1355,7 @@ export const zhTW: MessageDictionary = {
         submit: '確定禁言',
         title: '設定禁言',
       },
-      memberSearchPlaceholder: '暱稱 / LPP ID',
+      memberSearchPlaceholder: '暱稱 / 星絡號',
       moreActions: '更多操作',
       myGroupNickname: '我在本群的暱稱',
       noSignature: '暫無個性簽名',
@@ -1364,7 +1367,7 @@ export const zhTW: MessageDictionary = {
       quickActions: '快捷操作',
       profileRows: {
         groupNickname: '群暱稱',
-        lppId: 'LPP ID',
+        lppId: '星絡號',
         muted: '狀態',
         nickname: '暱稱',
         role: '群角色',
@@ -1968,7 +1971,7 @@ export const zhTW: MessageDictionary = {
     row: {
       profile: {
         label: '个人資料',
-        desc: '头像、昵称、LPP 号、手机号、邮箱和创建时间。',
+        desc: '頭像、暱稱、星絡號、手機號、信箱和建立時間。',
       },
       enterpriseIdentity: {
         label: '目前企業',
@@ -1984,19 +1987,19 @@ export const zhTW: MessageDictionary = {
       },
       logoutAccount: {
         label: '退出登入',
-        desc: '退出目前 lppchat 帳號。',
+        desc: '退出目前 StartLink 帳號。',
       },
       deactivateAccount: {
         label: '註銷帳戶',
         desc: '提交验证码后进入帳號註銷冷静期。',
       },
       allowMobileSearch: {
-        label: '允许透過手机号搜索',
-        desc: '其他用户可透過手机号找到你。',
+        label: '允许透過手機號搜尋',
+        desc: '其他用戶可透過手機號找到你。',
       },
       allowLppSearch: {
-        label: '允许透過 LPP 号搜索',
-        desc: '其他用户可透過 LPP 号找到你。',
+        label: '允许透過 星絡號搜尋',
+        desc: '其他用戶可透過 星絡號找到你。',
       },
       friendRequestVerification: {
         label: '加我为好友',
@@ -2191,12 +2194,12 @@ export const zhTW: MessageDictionary = {
         desc: '提交投诉、建议、问题回饋和缺陷线索。',
       },
       terms: {
-        label: '用户协议',
-        desc: '查看 LPP 用户服務协议。',
+        label: '用戶協議',
+        desc: '查看 星絡用戶服務協議。',
       },
       privacyPolicy: {
         label: '隱私政策',
-        desc: '查看 LPP 隱私政策和个人信息處理說明。',
+        desc: '查看 星絡隱私政策和个人信息處理說明。',
       },
       aboutClient: {
         label: '关于客戶端',
@@ -2293,7 +2296,7 @@ export const zhTW: MessageDictionary = {
       loading: '正在讀取個人資料...',
       loginExpiredAvatar: '登入狀態已失效，請重新登入後設定頭像。',
       loginName: '登入名',
-      lppId: 'LPP 號',
+      lppId: '星絡號',
       member: '成員',
       mobile: '手機號',
       reverted: '已還原資料編輯',
@@ -2461,7 +2464,7 @@ export const zhTW: MessageDictionary = {
       matchType: {
         email: '信箱',
         exact: '精準匹配',
-        lppId: '綠泡泡號',
+        lppId: '星絡號',
         mobile: '手機號',
       },
       myQr: '我的好友二維碼',
@@ -2480,12 +2483,12 @@ export const zhTW: MessageDictionary = {
       searchAdd: '搜尋添加',
       searchFailed: '搜尋失敗：{error}',
       searchLoading: '正在搜尋聯絡人...',
-      searchPlaceholder: '輸入綠泡泡號、手機號或信箱',
+      searchPlaceholder: '輸入星絡號、手機號或信箱',
       searching: '搜尋中',
       sendRequest: '發送申請',
       sendRequestTitle: '發送好友申請',
       sending: '發送中',
-      subtitle: '精準搜尋綠泡泡號、手機號或信箱',
+      subtitle: '精準搜尋星絡號、手機號或信箱',
       title: '添加聯絡人',
     },
     notice: {
@@ -2497,7 +2500,7 @@ export const zhTW: MessageDictionary = {
       createFriendQrFailedWithError: '生成二維碼失敗：{error}',
       deleteFriendFailed: '刪除好友失敗',
       deleteFriendFailedWithError: '刪除好友失敗：{error}',
-      enterSearchKeyword: '請輸入綠泡泡號、手機號或郵箱。',
+      enterSearchKeyword: '請輸入星絡號、手機號或郵箱。',
       friendDeleted: '已刪除好友',
       friendQrCreated: '好友二維碼已生成',
       friendRequestAccepted: '已通過好友申請',
@@ -2526,7 +2529,7 @@ export const zhTW: MessageDictionary = {
       established: '已建立',
       friendRelationship: '好友關係',
       friendTags: '好友標籤',
-      greenBubbleNo: '綠泡泡號',
+      greenBubbleNo: '星絡號',
       group: '通訊錄分組',
       groupInfo: '群聊資訊',
       groupTags: '群標籤',
@@ -2843,7 +2846,7 @@ export const zhTW: MessageDictionary = {
       lastMessageTime: '最後時間',
       latestFundTime: '最近資金變動',
       latestTouchChannel: '最近觸達渠道',
-      lppId: '綠泡泡號',
+      lppId: '星絡號',
       marketingConsent: '行銷同意',
       mobile: '手機',
       name: '姓名',
@@ -3233,12 +3236,12 @@ export const zhTW: MessageDictionary = {
         terms: {
           title: '用戶協議',
           parts: [
-            '綠泡泡用戶服務協議',
+            '星絡用戶服務協議',
             '更新日期：2026年6月5日',
             '生效日期：2026年6月5日',
-            '歡迎使用綠泡泡。使用本客戶端及相關服務前，請仔細閱讀並理解本協議。繼續使用即表示你同意遵守本協議。',
+            '歡迎使用星絡。使用本客戶端及相關服務前，請仔細閱讀並理解本協議。繼續使用即表示你同意遵守本協議。',
             '一、服務內容',
-            '綠泡泡提供即時通訊、客戶服務協作、文件傳輸、通知和相關營運工具。我們可能因維護、升級或安全原因調整、中斷或終止部分服務。',
+            '星絡提供即時通訊、客戶服務協作、文件傳輸、通知和相關營運工具。我們可能因維護、升級或安全原因調整、中斷或終止部分服務。',
             '二、帳號註冊與使用',
             '你應提供真實、準確、完整的註冊資訊，妥善保管帳號和密碼，不得出售、出租、轉讓或授權他人使用帳號。',
             '三、用戶行為規範',
@@ -3249,13 +3252,13 @@ export const zhTW: MessageDictionary = {
             '因不可抗力、第三方原因或非我們可控因素造成的服務中斷、資料異常或損失，我們將在法律允許範圍內承擔相應責任。你透過服務發布的內容由你自行負責。',
             '六、協議修改與聯絡',
             '我們可能根據業務和法律要求更新本協議。重大變更會透過客戶端公告或其他合理方式提示。疑問請聯絡 support@lpp.com。',
-            '© 2026 綠泡泡科技有限公司 保留所有權利',
+            '© 2026 星絡科技有限公司 保留所有權利',
           ],
         },
         privacy: {
           title: '隱私政策',
           parts: [
-            '綠泡泡隱私政策',
+            '星絡隱私政策',
             '更新日期：2026年6月5日',
             '生效日期：2026年6月5日',
             '我們重視個人資訊保護，並按照適用法律法規採取合理安全措施保護你的資訊。',
@@ -3271,7 +3274,7 @@ export const zhTW: MessageDictionary = {
             '你可以依法存取、更正、刪除個人資訊，註銷帳號，撤回授權或要求解釋個人資訊處理規則。',
             '六、未成年人保護與政策更新',
             '本服務不面向未滿 14 週歲的未成年人。政策更新時，我們會在客戶端或其他合理渠道提示。',
-            '© 2026 綠泡泡科技有限公司 保留所有權利',
+            '© 2026 星絡科技有限公司 保留所有權利',
           ],
         },
       },

@@ -801,7 +801,7 @@ function historyCustomerProfile(
   const name = tenantMember?.displayName || historyCustomerName(thread, raw);
   const details = historyProfileDetails([
     ["通讯录", tenantMember ? "已关联通讯录" : "未关联通讯录"],
-    ["绿泡泡号", tenantMember?.greenBubbleNo || firstHistoryText(raw.lppId, raw.lppNo, raw.lppNumber, raw.customerLppId, raw.customerLppNo, raw.greenBubbleId, raw.greenBubbleNo)],
+    ["星络号", tenantMember?.greenBubbleNo || firstHistoryText(raw.lppId, raw.lppNo, raw.lppNumber, raw.customerLppId, raw.customerLppNo, raw.greenBubbleId, raw.greenBubbleNo)],
     ["通讯录角色", tenantMemberRoleLabel(tenantMember?.membershipRole)],
     ["来源平台", raw.sourcePlatform],
     ["来源渠道", raw.sourceChannel],
@@ -824,7 +824,7 @@ function historyStaffProfile(
   const name = tenantMember?.displayName || historyStaffName(raw);
   const details = historyProfileDetails([
     ["通讯录", tenantMember ? "已关联通讯录" : "未关联通讯录"],
-    ["绿泡泡号", tenantMember?.greenBubbleNo || firstHistoryText(raw.staffLppId, raw.staffLppNo, raw.lppId, raw.lppNo)],
+    ["星络号", tenantMember?.greenBubbleNo || firstHistoryText(raw.staffLppId, raw.staffLppNo, raw.lppId, raw.lppNo)],
     ["通讯录角色", tenantMemberRoleLabel(tenantMember?.membershipRole)],
     ["参与关系", raw.participation],
   ]);

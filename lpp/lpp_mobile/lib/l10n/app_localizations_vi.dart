@@ -144,7 +144,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get navMe => 'Tôi';
 
   @override
-  String get authLoginTitle => 'Đăng nhập LPP';
+  String get authLoginTitle => 'Đăng nhập StartLink';
 
   @override
   String get authTabMobile => 'Số điện thoại';
@@ -153,7 +153,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get authTabEmail => 'Email';
 
   @override
-  String get authTabLoginName => 'LPP ID';
+  String get authTabLoginName => 'StartLink ID';
 
   @override
   String get authHintMobile => 'Nhập số điện thoại';
@@ -168,7 +168,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get authHintCode => 'Nhập mã xác minh';
 
   @override
-  String get authHintLoginName => 'Nhập LPP ID (lpp_xxxxxxxx)';
+  String get authHintLoginName => 'Nhập StartLink ID (lpp_xxxxxxxx)';
 
   @override
   String get authLoginButton => 'Đăng nhập / Đăng ký';
@@ -215,7 +215,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get authErrorEmptyPassword => 'Vui lòng nhập mật khẩu';
 
   @override
-  String get authErrorEmptyLoginName => 'Vui lòng nhập LPP ID';
+  String get authErrorEmptyLoginName => 'Vui lòng nhập StartLink ID';
 
   @override
   String get authErrorWrongCredentials => 'Tài khoản hoặc mật khẩu không đúng';
@@ -787,11 +787,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get myLeaveEnterpriseFailed => 'Rời thất bại, vui lòng thử lại';
 
   @override
-  String get myLppIdCopied => 'Đã sao chép LPP ID';
+  String get myLppIdCopied => 'Đã sao chép StartLink ID';
 
   @override
   String myLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override
@@ -854,7 +854,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get profileBasicSection => 'Thông tin cơ bản';
 
   @override
-  String get profileLppId => 'LPP ID';
+  String get profileLppId => 'StartLink ID';
 
   @override
   String get profileLppIdNotSet => 'Chưa đặt';
@@ -893,15 +893,15 @@ class AppLocalizationsVi extends AppLocalizations {
   String get profileSaveFailed => 'Lưu thất bại, vui lòng thử lại';
 
   @override
-  String get profileLppIdTitle => 'LPP ID';
+  String get profileLppIdTitle => 'StartLink ID';
 
   @override
   String get profileLppIdSetOnce =>
-      'LPP ID chỉ có thể thay đổi một lần. Vui lòng điền cẩn thận.';
+      'StartLink ID chỉ có thể thay đổi một lần. Vui lòng điền cẩn thận.';
 
   @override
   String get profileLppIdChangeFailed =>
-      'Thay đổi thất bại (LPP ID chỉ thay đổi được một lần)';
+      'Thay đổi thất bại (StartLink ID chỉ thay đổi được một lần)';
 
   @override
   String get profileChangePasswordOld => 'Mật khẩu hiện tại';
@@ -966,7 +966,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get settingsChatHistory => 'Lịch sử chat';
 
   @override
-  String get settingsAbout => 'Về LPP';
+  String get settingsAbout => 'Về StartLink';
 
   @override
   String get settingsLanguage => 'Ngôn ngữ';
@@ -1219,7 +1219,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get friendAddTitle => 'Thêm bạn bè';
 
   @override
-  String get friendSearchHint => 'SĐT / Email / LPP ID';
+  String get friendSearchHint => 'SĐT / Email / StartLink ID';
 
   @override
   String get friendRequestSent => 'Đã gửi lời mời kết bạn';
@@ -1267,7 +1267,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get friendSendMessage => 'Nhắn tin';
 
   @override
-  String get friendMatchTypeLppId => 'Khớp theo LPP ID';
+  String get friendMatchTypeLppId => 'Khớp theo StartLink ID';
 
   @override
   String get friendMatchTypeMobile => 'Khớp theo SĐT';
@@ -1322,7 +1322,7 @@ class AppLocalizationsVi extends AppLocalizations {
       'Người dùng này chỉ hiển thị hồ sơ cho bạn bè';
 
   @override
-  String get profilePageLppId => 'LPP ID';
+  String get profilePageLppId => 'StartLink ID';
 
   @override
   String get profilePageRemarkName => 'Biệt danh';
@@ -1340,7 +1340,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get searchTitle => 'Tìm kiếm';
 
   @override
-  String get searchHint => 'Tìm theo SĐT, email hoặc LPP ID';
+  String get searchHint => 'Tìm theo SĐT, email hoặc StartLink ID';
 
   @override
   String get searchNoResults => 'Không tìm thấy kết quả';
@@ -1555,7 +1555,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get spaceEnterEnterprise => 'Vào không gian doanh nghiệp';
 
   @override
-  String get aboutTitle => 'Về LPP';
+  String get aboutTitle => 'Về StartLink';
 
   @override
   String get aboutVersion => 'Phiên bản';
@@ -1784,7 +1784,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get privacySearchableByMobile => 'Cho phép tìm kiếm theo SĐT';
 
   @override
-  String get privacySearchableByLppId => 'Cho phép tìm kiếm theo LPP ID';
+  String get privacySearchableByLppId => 'Cho phép tìm kiếm theo StartLink ID';
 
   @override
   String get privacyAllowFriendRequest => 'Cho phép lời mời kết bạn';
@@ -2000,11 +2000,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get addFriendTitle => 'Thêm bạn bè';
 
   @override
-  String get addFriendSearchHint => 'SĐT / Email / LPP ID';
+  String get addFriendSearchHint => 'SĐT / Email / StartLink ID';
 
   @override
   String addFriendLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override

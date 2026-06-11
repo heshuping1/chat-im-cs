@@ -65,6 +65,55 @@ export function replaceWatchedThreadKey(
   return current.map((key) => (key === target ? replacement : key));
 }
 
+export function selectWatchedThreadKey(
+  watchedThreadKeys: string[],
+  threadKey: string,
+  focusedThreadKey: string,
+  layoutMode: MonitorLayoutMode,
+) {
+  const key = threadKey.trim();
+  const current = trimWatchedThreadKeys(watchedThreadKeys, layoutMode);
+  if (!key) {
+    return {
+      focusedThreadKey: focusedThreadKey.trim(),
+      replacementThreadKey: "",
+      replaced: false,
+      watchedThreadKeys: current,
+    };
+  }
+  if (current.includes(key)) {
+    return {
+      focusedThreadKey: key,
+      replacementThreadKey: "",
+      replaced: false,
+      watchedThreadKeys: current,
+    };
+  }
+  if (current.length < monitorLayoutCapacity(layoutMode)) {
+    return {
+      focusedThreadKey: key,
+      replacementThreadKey: "",
+      replaced: false,
+      watchedThreadKeys: addWatchedThreadKey(current, key, layoutMode),
+    };
+  }
+  const focused = focusedThreadKey.trim();
+  if (focused && current.includes(focused)) {
+    return {
+      focusedThreadKey: key,
+      replacementThreadKey: "",
+      replaced: true,
+      watchedThreadKeys: replaceWatchedThreadKey(current, focused, key, layoutMode),
+    };
+  }
+  return {
+    focusedThreadKey: "",
+    replacementThreadKey: key,
+    replaced: false,
+    watchedThreadKeys: current,
+  };
+}
+
 export function removeWatchedThreadKey(
   watchedThreadKeys: string[],
   threadKey: string,

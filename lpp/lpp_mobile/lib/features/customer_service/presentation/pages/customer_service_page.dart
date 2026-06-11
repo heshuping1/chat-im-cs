@@ -1712,7 +1712,7 @@ class _AdminAssignCustomerSheet extends StatelessWidget {
                     return _AdminAssignCustomerRow(
                       title: staff.displayName,
                       subtitle: staff.lppId?.isNotEmpty == true
-                          ? '绿泡泡号：${staff.lppId}'
+                          ? '星络号：${staff.lppId}'
                           : staff.loginName,
                       selected: customer.assignedStaffUserId == staff.userId,
                       onTap: () => onAssign(staff.userId),

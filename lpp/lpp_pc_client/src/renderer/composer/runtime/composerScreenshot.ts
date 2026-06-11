@@ -1,7 +1,7 @@
 export type ScreenshotShortcut = "Alt+A" | "Ctrl+Alt+A" | "Ctrl+Shift+A" | "None";
 
 const screenshotPermissionFallback =
-  "Screenshot failed. Allow lppchat to record the screen in system settings, then try again.";
+  "Screenshot failed. Allow StartLink to record the screen in system settings, then try again.";
 
 export function screenshotDataUrlToFile(dataUrl: string, fileName: string) {
   const [meta = "", data = ""] = dataUrl.split(",");

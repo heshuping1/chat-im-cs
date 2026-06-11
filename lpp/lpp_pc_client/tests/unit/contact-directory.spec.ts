@@ -96,7 +96,7 @@ describe("contact directory model", () => {
     ]);
   });
 
-  it("maps organization member green bubble numbers from the normalized contact model", () => {
+  it("maps organization member startlink numbers from the normalized contact model", () => {
     const contacts = mapContacts({
       conversations: [],
       currentUserId: "me",
@@ -143,7 +143,7 @@ describe("contact directory model", () => {
     });
   });
 
-  it("normalizes tenant member profile LPP fields at the contacts anti-corruption boundary", () => {
+  it("normalizes tenant member profile startlink fields at the contacts anti-corruption boundary", () => {
     expect(
       normalizeTenantMemberProfileDto({
         userId: "u1",
@@ -180,7 +180,7 @@ describe("contact directory model", () => {
     });
   });
 
-  it("shows public LPP numbers instead of internal user ids in contact details", () => {
+  it("shows public startlink numbers instead of internal user ids in contact details", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/renderer/components/ContactDetailViews.tsx"),
       "utf8",

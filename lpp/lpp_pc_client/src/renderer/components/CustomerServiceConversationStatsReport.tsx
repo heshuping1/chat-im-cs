@@ -12,6 +12,7 @@ import type {
 import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
+import { resolveServicePerformanceStaff } from "../customer-service/models/servicePerformanceModel";
 import { formatError } from "../lib/format";
 import { PanelState } from "./PanelState";
 import type {
@@ -230,11 +231,11 @@ export function CustomerServiceConversationStatsReport({
               <header>
                 <div>
                   <h2>坐席效率</h2>
-                  <p>staffPerformance，支持展开查看 byChannel。</p>
+                  <p>按客服聚合接待量、首响、处理时长和评分，支持按渠道展开。</p>
                 </div>
               </header>
               {model.staffRows.length === 0 ? (
-                <PanelState text="接口未返回 staffPerformance，暂无坐席效率统计。" />
+                <PanelState text="暂无坐席效率数据。请确认所选日期内有已接待会话，或通过下方导出任务下载坐席日报。" />
               ) : (
                 <div className="cs-stats-staff-table" role="table" aria-label="坐席效率">
                   <div className="cs-stats-staff-row heading" role="row">
@@ -494,27 +495,34 @@ function ConversationTrendChart({ items }: { items: TempDistributionPointDto[] }
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const rows = items.length ? items : [{ label: "当前统计", value: 0 }];
   const values = rows.map((item) => safeNumber(item.value));
-  const max = Math.max(...values, 1);
+  const rawMax = Math.max(...values, 0);
+  const max = Math.max(Math.ceil(rawMax * 1.18), 1);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  const average = rows.length ? total / rows.length : 0;
   const chart = {
-    bottom: 174,
-    height: 210,
-    left: 32,
-    right: 22,
-    top: 10,
-    width: 760,
+    bottom: 220,
+    height: 252,
+    left: 44,
+    right: 34,
+    top: 20,
+    width: 1280,
   };
   const plotWidth = chart.width - chart.left - chart.right;
   const plotHeight = chart.bottom - chart.top;
   const step = rows.length > 1 ? plotWidth / (rows.length - 1) : 0;
   const barWidth = Math.max(6, Math.min(20, plotWidth / Math.max(rows.length * 2.2, 1)));
-  const labelStride = Math.max(1, Math.ceil(rows.length / 8));
+  const labelStride = Math.max(1, Math.ceil(rows.length / 10));
+  const valueToY = (value: number) => chart.top + (1 - value / max) * plotHeight;
+  const tickValues = [max, Math.round(max / 2), 0];
   const points = rows.map((item, index) => {
     const value = safeNumber(item.value);
     const x = rows.length > 1 ? chart.left + step * index : chart.left + plotWidth / 2;
-    const y = chart.top + (1 - value / max) * plotHeight;
+    const y = valueToY(value);
     return {
       barHeight: Math.max(value > 0 ? 3 : 0, chart.bottom - y),
       index,
+      isPeak: rawMax > 0 && value === rawMax,
+      isZero: value === 0,
       label: item.label || "--",
       showLabel: index === 0 || index === rows.length - 1 || index % labelStride === 0,
       value,
@@ -537,6 +545,7 @@ function ConversationTrendChart({ items }: { items: TempDistributionPointDto[] }
     ? Math.max(chart.top + 4, activePoint.y - tooltipHeight - 12)
     : 0;
   const hitWidth = rows.length > 1 ? Math.max(16, step) : plotWidth;
+  const averageY = valueToY(average);
 
   return (
     <div className="cs-stats-trend-chart" onMouseLeave={() => setHoveredIndex(null)}>
@@ -552,20 +561,37 @@ function ConversationTrendChart({ items }: { items: TempDistributionPointDto[] }
             <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        <line
-          className="cs-stats-trend-grid"
-          x1={chart.left}
-          x2={chart.width - chart.right}
-          y1={chart.top}
-          y2={chart.top}
-        />
-        <line
-          className="cs-stats-trend-grid"
-          x1={chart.left}
-          x2={chart.width - chart.right}
-          y1={(chart.top + chart.bottom) / 2}
-          y2={(chart.top + chart.bottom) / 2}
-        />
+        {tickValues.map((tickValue) => {
+          const y = valueToY(tickValue);
+          return (
+            <g key={`tick-${tickValue}`}>
+              <line
+                className={tickValue === 0 ? "cs-stats-trend-axis" : "cs-stats-trend-grid"}
+                x1={chart.left}
+                x2={chart.width - chart.right}
+                y1={y}
+                y2={y}
+              />
+              <text
+                className="cs-stats-trend-y-label"
+                textAnchor="end"
+                x={chart.left - 10}
+                y={y + 3}
+              >
+                {numberLabel(tickValue)}
+              </text>
+            </g>
+          );
+        })}
+        {rawMax > 0 && (
+          <line
+            className="cs-stats-trend-average"
+            x1={chart.left}
+            x2={chart.width - chart.right}
+            y1={averageY}
+            y2={averageY}
+          />
+        )}
         <line
           className="cs-stats-trend-axis"
           x1={chart.left}
@@ -590,11 +616,15 @@ function ConversationTrendChart({ items }: { items: TempDistributionPointDto[] }
         {points.length > 1 && <polyline className="cs-stats-trend-line" points={linePoints} />}
         {points.map((point) => (
           <circle
-            className="cs-stats-trend-point"
+            className={[
+              "cs-stats-trend-point",
+              point.isZero ? "zero" : "",
+              point.isPeak ? "peak" : "",
+            ].filter(Boolean).join(" ")}
             cx={point.x}
             cy={point.y}
             key={`point-${point.label}`}
-            r="3.5"
+            r={point.isPeak ? 4.8 : point.isZero ? 2.4 : 3.6}
           >
             <title>{`${point.label}：${numberLabel(point.value)}`}</title>
           </circle>
@@ -807,7 +837,7 @@ function createConversationStatsModel(stats?: TempSessionStatsDto, rangeFilter?:
         value: ratingLabel(stats?.avgRating),
       },
     ],
-    staffRows: [...(stats?.staffPerformance ?? [])]
+    staffRows: [...resolveServicePerformanceStaff(stats)]
       .sort((left, right) => safeNumber(right.sessionsServed) - safeNumber(left.sessionsServed))
       .map((staff) => ({
         avgDuration: durationLabel(staff.avgDurationSeconds),

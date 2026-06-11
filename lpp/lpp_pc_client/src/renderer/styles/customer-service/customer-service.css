@@ -334,8 +334,13 @@
 }
 
 .h-flagship-grid .h-message-stage {
-  gap: 18px;
-  padding: 24px;
+  --chat-avatar-size: 34px;
+  --chat-edge-gap: 12px;
+  --chat-message-gap: 6px;
+  --chat-stage-padding: clamp(10px, 1.55vw, 18px);
+  --chat-stage-row-gap: 14px;
+  gap: var(--chat-stage-row-gap);
+  padding: var(--chat-stage-padding);
 }
 
 .cs-message-stage-shell {
@@ -372,8 +377,41 @@
   justify-content: flex-start;
 }
 
+.h-message-stage .cs-message-row.system {
+  justify-content: center;
+  padding: 2px var(--chat-edge-gap, 12px);
+}
+
+.cs-system-message {
+  display: inline-flex;
+  max-width: min(520px, 100%);
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.82);
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.cs-system-message span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-system-message time {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 750;
+}
+
 .h-message-stage .cs-message-row > .pc-chat-message {
-  max-width: min(640px, calc(100% - 24px));
+  max-width: min(640px, calc(100% - (var(--chat-edge-gap, 12px) * 2)));
 }
 
 .h-message-stage [data-message-id].cs-lookup-message-hit {
@@ -862,8 +900,13 @@
 }
 
 .h-flagship-grid .h-message-stage {
-  gap: 14px !important;
-  padding: 18px !important;
+  --chat-avatar-size: 34px !important;
+  --chat-edge-gap: 12px !important;
+  --chat-message-gap: 6px !important;
+  --chat-stage-padding: clamp(10px, 1.55vw, 18px) !important;
+  --chat-stage-row-gap: 14px !important;
+  gap: var(--chat-stage-row-gap) !important;
+  padding: var(--chat-stage-padding) !important;
 }
 
 .h-flagship-grid .cs-typing-preview-dock {

@@ -180,7 +180,7 @@
   "@navMe": {
     "description": "Bottom nav: Me"
   },
-  "authLoginTitle": "登录绿泡泡",
+  "authLoginTitle": "登录星络",
   "@authLoginTitle": {
     "description": "Login page title"
   },
@@ -192,7 +192,7 @@
   "@authTabEmail": {
     "description": "Login tab: email"
   },
-  "authTabLoginName": "绿泡泡号",
+  "authTabLoginName": "星络号",
   "@authTabLoginName": {
     "description": "Login tab: lpp id"
   },
@@ -212,7 +212,7 @@
   "@authHintCode": {
     "description": "Code hint"
   },
-  "authHintLoginName": "请输入绿泡泡号（lpp_xxxxxxxx）",
+  "authHintLoginName": "请输入星络号（lpp_xxxxxxxx）",
   "@authHintLoginName": {
     "description": "Login name hint"
   },
@@ -277,7 +277,7 @@
   "@authErrorEmptyPassword": {
     "description": "Empty password error"
   },
-  "authErrorEmptyLoginName": "请输入绿泡泡号",
+  "authErrorEmptyLoginName": "请输入星络号",
   "@authErrorEmptyLoginName": {
     "description": "Empty login name error"
   },
@@ -1053,13 +1053,13 @@
   "@myLeaveEnterpriseFailed": {
     "description": "Leave enterprise failed"
   },
-  "myLppIdCopied": "绿泡泡号已复制",
+  "myLppIdCopied": "星络号已复制",
   "@myLppIdCopied": {
-    "description": "LPP ID copied"
+    "description": "StartLink ID copied"
   },
-  "myLppIdLabel": "绿泡泡号：{lppId}",
+  "myLppIdLabel": "星络号：{lppId}",
   "@myLppIdLabel": {
-    "description": "LPP ID label",
+    "description": "StartLink ID label",
     "placeholders": {
       "lppId": {
         "type": "String"
@@ -1147,13 +1147,13 @@
   "@profileBasicSection": {
     "description": "Basic info section"
   },
-  "profileLppId": "绿泡泡号",
+  "profileLppId": "星络号",
   "@profileLppId": {
-    "description": "LPP ID field"
+    "description": "StartLink ID field"
   },
   "profileLppIdNotSet": "未设置",
   "@profileLppIdNotSet": {
-    "description": "LPP ID not set"
+    "description": "StartLink ID not set"
   },
   "profileMobile": "手机号",
   "@profileMobile": {
@@ -1199,17 +1199,17 @@
   "@profileSaveFailed": {
     "description": "Save failed"
   },
-  "profileLppIdTitle": "绿泡泡号",
+  "profileLppIdTitle": "星络号",
   "@profileLppIdTitle": {
-    "description": "LPP ID page title"
+    "description": "StartLink ID page title"
   },
-  "profileLppIdSetOnce": "绿泡泡号设置后只能修改一次，请谨慎填写",
+  "profileLppIdSetOnce": "星络号设置后只能修改一次，请谨慎填写",
   "@profileLppIdSetOnce": {
-    "description": "LPP ID set once warning"
+    "description": "StartLink ID set once warning"
   },
-  "profileLppIdChangeFailed": "修改失败（绿泡泡号只能修改一次）",
+  "profileLppIdChangeFailed": "修改失败（星络号只能修改一次）",
   "@profileLppIdChangeFailed": {
-    "description": "LPP ID change failed"
+    "description": "StartLink ID change failed"
   },
   "profileChangePasswordOld": "旧密码",
   "@profileChangePasswordOld": {
@@ -1291,7 +1291,7 @@
   "@settingsChatHistory": {
     "description": "Chat history"
   },
-  "settingsAbout": "关于绿泡泡",
+  "settingsAbout": "关于星络",
   "@settingsAbout": {
     "description": "About"
   },
@@ -1631,7 +1631,7 @@
   "@friendAddTitle": {
     "description": "Add friend title"
   },
-  "friendSearchHint": "手机号 / 邮箱 / 绿泡泡号",
+  "friendSearchHint": "手机号 / 邮箱 / 星络号",
   "@friendSearchHint": {
     "description": "Friend search hint"
   },
@@ -1695,7 +1695,7 @@
   "@friendSendMessage": {
     "description": "Send message"
   },
-  "friendMatchTypeLppId": "绿泡泡号匹配",
+  "friendMatchTypeLppId": "星络号匹配",
   "@friendMatchTypeLppId": {
     "description": "Match by lpp id"
   },
@@ -1767,9 +1767,9 @@
   "@profilePageFriendsOnly": {
     "description": "Profile friends only"
   },
-  "profilePageLppId": "绿泡泡号",
+  "profilePageLppId": "星络号",
   "@profilePageLppId": {
-    "description": "LPP ID"
+    "description": "StartLink ID"
   },
   "profilePageRemarkName": "备注",
   "@profilePageRemarkName": {
@@ -1791,7 +1791,7 @@
   "@searchTitle": {
     "description": "Search title"
   },
-  "searchHint": "输入完整手机号、邮箱或绿泡泡号搜索",
+  "searchHint": "输入完整手机号、邮箱或星络号搜索",
   "@searchHint": {
     "description": "Search hint"
   },
@@ -2075,7 +2075,7 @@
   "@spaceEnterEnterprise": {
     "description": "Enter enterprise space"
   },
-  "aboutTitle": "关于绿泡泡",
+  "aboutTitle": "关于星络",
   "@aboutTitle": {
     "description": "About title"
   },
@@ -2375,7 +2375,7 @@
   "@privacySearchableByMobile": {
     "description": "Searchable by mobile"
   },
-  "privacySearchableByLppId": "允许通过绿泡泡号搜索",
+  "privacySearchableByLppId": "允许通过星络号搜索",
   "@privacySearchableByLppId": {
     "description": "Searchable by lpp id"
   },
@@ -2663,13 +2663,13 @@
   "@addFriendTitle": {
     "description": "Add friend page title"
   },
-  "addFriendSearchHint": "手机号 / 邮箱 / 绿泡泡号",
+  "addFriendSearchHint": "手机号 / 邮箱 / 星络号",
   "@addFriendSearchHint": {
     "description": "Add friend search hint"
   },
-  "addFriendLppIdLabel": "绿泡泡号：{lppId}",
+  "addFriendLppIdLabel": "星络号：{lppId}",
   "@addFriendLppIdLabel": {
-    "description": "LPP ID label in search result",
+    "description": "StartLink ID label in search result",
     "placeholders": {
       "lppId": {
         "type": "String"

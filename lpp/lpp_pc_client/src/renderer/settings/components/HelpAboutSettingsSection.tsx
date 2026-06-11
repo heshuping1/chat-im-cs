@@ -230,7 +230,7 @@ export function HelpAboutSettingsSection({
           <strong>{t("settings.helpAbout.version.title")}</strong>
           <span>{version}</span>
         </header>
-        <InfoRow {...settingRowProps("aboutClient")} desc={`lppchat ${version}`} />
+        <InfoRow {...settingRowProps("aboutClient")} desc={`StartLink ${version}`} />
         <SwitchRow
           {...settingRowProps("autoCheckUpdates")}
           checked={updateState.preferences.autoCheck}

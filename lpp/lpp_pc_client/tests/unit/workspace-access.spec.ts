@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ModuleKey } from "../../src/renderer/data/types";
 import { roleFromSession } from "../../src/renderer/data/static-config";
+import { canControlCustomerServiceReception } from "../../src/renderer/data/customer-service/cs-role-capabilities";
 import {
   derivePcWorkspaceAccess,
   normalizeActiveModuleForAccess,
@@ -97,6 +98,15 @@ describe("pc workspace access model", () => {
         tenantToken: "token",
       }).dataCenterView,
     ).toBe("enterprise-owner");
+  });
+
+  it("limits personal reception controls to customer service staff", () => {
+    expect(canControlCustomerServiceReception({ membershipRole: 2 })).toBe(true);
+    expect(canControlCustomerServiceReception({ membershipRole: 3 })).toBe(false);
+    expect(canControlCustomerServiceReception({ membershipRole: 4 })).toBe(false);
+    expect(canControlCustomerServiceReception({ roleLabel: "customer service" })).toBe(true);
+    expect(canControlCustomerServiceReception({ roleLabel: "admin" })).toBe(false);
+    expect(canControlCustomerServiceReception({})).toBe(false);
   });
 
   it("derives workbench role from membership role before stale role labels", () => {
@@ -294,7 +304,8 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).toContain("onMutate");
     expect(onlineServicePageSource).toContain("confirmedQueueAcceptEnabled");
     expect(onlineServicePageSource).toContain("canControlCustomerServiceReception");
-    expect(onlineServicePageSource).toContain("disabled={!client || !canControlReception}");
+    expect(onlineServicePageSource).toContain("{canControlReception && (");
+    expect(onlineServicePageSource).toContain("disabled={!client}");
     expect(onlineServicePageSource).toContain("onMutate");
     expect(sidebarSource).toContain('t("sidebar.service.syncFailed"');
     expect(sidebarSource).not.toContain("serviceAutoSidebarCollapsed");

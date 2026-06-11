@@ -143,7 +143,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       ref.watch(gatewayProvider);
     }
     return MaterialApp.router(
-      title: '绿泡泡',
+      title: '星络',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,

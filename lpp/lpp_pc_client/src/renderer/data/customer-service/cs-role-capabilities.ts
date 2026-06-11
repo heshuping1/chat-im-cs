@@ -9,7 +9,7 @@ export function canUseCustomerServiceStaffEndpoints(input?: {
   const roleLabel = normalizeRoleLabel(input?.roleLabel);
   if (roleLabel && isManagementRoleLabel(roleLabel)) return false;
   if (roleLabel && isCustomerServiceRoleLabel(roleLabel)) return true;
-  return true;
+  return false;
 }
 
 export function canControlCustomerServiceReception(input?: {

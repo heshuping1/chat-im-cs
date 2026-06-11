@@ -251,7 +251,7 @@ function avatarLabel(preset: AvatarPreset) {
       ? "AI"
       : preset.category === "cartoon"
         ? "卡通"
-        : "绿泡泡";
+        : "星络";
   return `${categoryLabel} ${preset.id}`;
 }
 

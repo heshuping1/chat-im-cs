@@ -145,7 +145,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navMe => 'Me';
 
   @override
-  String get authLoginTitle => 'Sign in to LPP';
+  String get authLoginTitle => 'Sign in to StartLink';
 
   @override
   String get authTabMobile => 'Phone';
@@ -154,7 +154,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authTabEmail => 'Email';
 
   @override
-  String get authTabLoginName => 'LPP ID';
+  String get authTabLoginName => 'StartLink ID';
 
   @override
   String get authHintMobile => 'Enter phone number';
@@ -169,7 +169,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authHintCode => 'Enter verification code';
 
   @override
-  String get authHintLoginName => 'Enter LPP ID (lpp_xxxxxxxx)';
+  String get authHintLoginName => 'Enter StartLink ID (lpp_xxxxxxxx)';
 
   @override
   String get authLoginButton => 'Sign In / Register';
@@ -216,7 +216,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authErrorEmptyPassword => 'Please enter password';
 
   @override
-  String get authErrorEmptyLoginName => 'Please enter LPP ID';
+  String get authErrorEmptyLoginName => 'Please enter StartLink ID';
 
   @override
   String get authErrorWrongCredentials => 'Incorrect account or password';
@@ -791,11 +791,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get myLeaveEnterpriseFailed => 'Failed to leave, please try again';
 
   @override
-  String get myLppIdCopied => 'LPP ID copied';
+  String get myLppIdCopied => 'StartLink ID copied';
 
   @override
   String myLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override
@@ -858,7 +858,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileBasicSection => 'Basic Info';
 
   @override
-  String get profileLppId => 'LPP ID';
+  String get profileLppId => 'StartLink ID';
 
   @override
   String get profileLppIdNotSet => 'Not set';
@@ -897,15 +897,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileSaveFailed => 'Failed to save, please try again';
 
   @override
-  String get profileLppIdTitle => 'LPP ID';
+  String get profileLppIdTitle => 'StartLink ID';
 
   @override
   String get profileLppIdSetOnce =>
-      'LPP ID can only be changed once. Please choose carefully.';
+      'StartLink ID can only be changed once. Please choose carefully.';
 
   @override
   String get profileLppIdChangeFailed =>
-      'Change failed (LPP ID can only be changed once)';
+      'Change failed (StartLink ID can only be changed once)';
 
   @override
   String get profileChangePasswordOld => 'Current Password';
@@ -970,7 +970,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsChatHistory => 'Chat History';
 
   @override
-  String get settingsAbout => 'About LPP';
+  String get settingsAbout => 'About StartLink';
 
   @override
   String get settingsLanguage => 'Language';
@@ -1224,7 +1224,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get friendAddTitle => 'Add Contact';
 
   @override
-  String get friendSearchHint => 'Phone / Email / LPP ID';
+  String get friendSearchHint => 'Phone / Email / StartLink ID';
 
   @override
   String get friendRequestSent => 'Friend request sent';
@@ -1272,7 +1272,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get friendSendMessage => 'Message';
 
   @override
-  String get friendMatchTypeLppId => 'Matched by LPP ID';
+  String get friendMatchTypeLppId => 'Matched by StartLink ID';
 
   @override
   String get friendMatchTypeMobile => 'Matched by phone';
@@ -1327,7 +1327,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'This user only shows profile to friends';
 
   @override
-  String get profilePageLppId => 'LPP ID';
+  String get profilePageLppId => 'StartLink ID';
 
   @override
   String get profilePageRemarkName => 'Nickname';
@@ -1345,7 +1345,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchTitle => 'Search';
 
   @override
-  String get searchHint => 'Search by phone, email or LPP ID';
+  String get searchHint => 'Search by phone, email or StartLink ID';
 
   @override
   String get searchNoResults => 'No results found';
@@ -1560,7 +1560,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get spaceEnterEnterprise => 'Enter Enterprise Space';
 
   @override
-  String get aboutTitle => 'About LPP';
+  String get aboutTitle => 'About StartLink';
 
   @override
   String get aboutVersion => 'Version';
@@ -1789,7 +1789,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privacySearchableByMobile => 'Allow search by phone number';
 
   @override
-  String get privacySearchableByLppId => 'Allow search by LPP ID';
+  String get privacySearchableByLppId => 'Allow search by StartLink ID';
 
   @override
   String get privacyAllowFriendRequest => 'Allow friend requests';
@@ -2005,11 +2005,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addFriendTitle => 'Add Contact';
 
   @override
-  String get addFriendSearchHint => 'Phone / Email / LPP ID';
+  String get addFriendSearchHint => 'Phone / Email / StartLink ID';
 
   @override
   String addFriendLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override

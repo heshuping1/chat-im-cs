@@ -9,6 +9,7 @@ export function staffServiceHistoryItemToThread(
   item: StaffServiceHistoryItem,
 ): CustomerServiceThread {
   const threadType = normalizeHistoryThreadType(item.threadType);
+  const record = item as StaffServiceHistoryItem & Record<string, unknown>;
   return {
     threadType,
     threadId: item.threadId,
@@ -24,6 +25,59 @@ export function staffServiceHistoryItemToThread(
     provider: item.provider,
     avatarUrl: item.avatarUrl || item.customerAvatarUrl,
     customerAvatarUrl: item.customerAvatarUrl,
+    assignedStaffAvatarUrl: readHistoryStaffField(record, [
+      "assignedStaffAvatarUrl",
+      "assigned_staff_avatar_url",
+      "staffAvatarUrl",
+      "staff_avatar_url",
+      "serviceStaffAvatarUrl",
+      "service_staff_avatar_url",
+    ], ["avatarUrl", "avatar", "profileAvatarUrl"]),
+    assignedStaffDisplayName: readHistoryStaffField(record, [
+      "assignedStaffDisplayName",
+      "assigned_staff_display_name",
+      "staffDisplayName",
+      "staff_display_name",
+      "displayName",
+    ], ["displayName", "name", "nickname"]),
+    assignedStaffName: readHistoryStaffField(record, [
+      "assignedStaffName",
+      "assigned_staff_name",
+      "staffName",
+      "staff_name",
+    ], ["name", "displayName", "nickname"]),
+    assignedStaffUserId: readHistoryStaffField(record, [
+      "assignedStaffUserId",
+      "assigned_staff_user_id",
+      "staffUserId",
+      "staff_user_id",
+      "serviceStaffUserId",
+      "service_staff_user_id",
+    ], ["staffUserId", "userId", "id"]),
+    serviceStaffAvatarUrl: readHistoryStaffField(record, [
+      "serviceStaffAvatarUrl",
+      "service_staff_avatar_url",
+    ], ["avatarUrl", "avatar", "profileAvatarUrl"]),
+    serviceStaffUserId: readHistoryStaffField(record, [
+      "serviceStaffUserId",
+      "service_staff_user_id",
+    ], ["staffUserId", "userId", "id"]),
+    staffAvatarUrl: readHistoryStaffField(record, [
+      "staffAvatarUrl",
+      "staff_avatar_url",
+    ], ["avatarUrl", "avatar", "profileAvatarUrl"]),
+    staffDisplayName: readHistoryStaffField(record, [
+      "staffDisplayName",
+      "staff_display_name",
+    ], ["displayName", "name", "nickname"]),
+    staffName: readHistoryStaffField(record, [
+      "staffName",
+      "staff_name",
+    ], ["name", "displayName", "nickname"]),
+    staffUserId: readHistoryStaffField(record, [
+      "staffUserId",
+      "staff_user_id",
+    ], ["staffUserId", "userId", "id"]),
     lastMessagePreview:
       item.lastMessagePreview ??
       (item.closedAt
@@ -67,6 +121,44 @@ function readStringField(source: unknown, key: string) {
   if (!source || typeof source !== "object") return undefined;
   const value = (source as Record<string, unknown>)[key];
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function readHistoryStaffField(
+  source: Record<string, unknown>,
+  directKeys: string[],
+  nestedKeys: string[],
+) {
+  const direct = readFirstStringField(source, directKeys);
+  if (direct) return direct;
+  return readNestedStaffStringField(source, nestedKeys);
+}
+
+function readFirstStringField(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = readStringField(source, key);
+    if (value) return value;
+  }
+  return null;
+}
+
+function readNestedStaffStringField(
+  source: Record<string, unknown>,
+  keys: string[],
+) {
+  const staffRecords = [
+    source.assignedStaff,
+    source.assigned_staff,
+    source.staff,
+    source.serviceStaff,
+    source.service_staff,
+  ].filter((value): value is Record<string, unknown> =>
+    Boolean(value && typeof value === "object" && !Array.isArray(value)),
+  );
+  for (const staffRecord of staffRecords) {
+    const value = readFirstStringField(staffRecord, keys);
+    if (value) return value;
+  }
+  return null;
 }
 
 function formatApiShortDateTime(value: string) {

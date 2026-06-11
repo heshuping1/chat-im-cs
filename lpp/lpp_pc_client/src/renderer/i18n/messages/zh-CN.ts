@@ -1,4 +1,4 @@
-﻿export const zhCN = {
+export const zhCN = {
   app: {
     errorMessage: '界面渲染出现异常。请先重试界面，若仍失败再重新加载客户端。',
     errorReference: '错误编号：{referenceCode}',
@@ -14,7 +14,7 @@
     forceUpdateInstalling: '安装中',
     forceUpdateMessage: '当前版本已低于服务端允许范围，需要完成更新后才能继续使用。',
     forceUpdateTitle: '需要更新客户端',
-    title: '绿泡泡',
+    title: '星络',
   },
   aiDraft: {
     adoptFailed: '采纳失败：{error}',
@@ -76,12 +76,12 @@
       'cartoon-pink': '卡通粉桃头像',
       'cartoon-lemon': '卡通柠檬头像',
       'cartoon-gray': '卡通灰调头像',
-      'bubble-service': '绿泡泡客服头像',
-      'bubble-headset': '绿泡泡耳麦头像',
-      'bubble-chat': '绿泡泡会话头像',
-      'bubble-cute': '绿泡泡亲和头像',
-      'bubble-online': '绿泡泡在线头像',
-      'bubble-brand': '绿泡泡品牌头像',
+      'bubble-service': '星络客服头像',
+      'bubble-headset': '星络耳麦头像',
+      'bubble-chat': '星络会话头像',
+      'bubble-cute': '星络亲和头像',
+      'bubble-online': '星络在线头像',
+      'bubble-brand': '星络品牌头像',
     },
     validation: {
       displayNameRequired: '请输入昵称',
@@ -144,8 +144,8 @@
     enter: '进入',
     entering: '进入中...',
     enterpriseSpace: '企业空间',
-    identifier: 'LPP 号 / 邮箱 / 手机号',
-    identifierPlaceholder: '请输入 LPP 号 / 邮箱 / 手机号',
+    identifier: '星络号 / 邮箱 / 手机号',
+    identifierPlaceholder: '请输入 星络号 / 邮箱 / 手机号',
     invitationHelp: '已有账号可登录后加入被邀请的企业，不会修改已加入企业的角色。',
     invitation: {
       enterpriseInvitation: '企业邀请',
@@ -218,6 +218,7 @@
     edit: '编辑',
     expand: '展开',
     open: '打开',
+    query: '查询',
     retry: '重试',
     save: '保存',
     saveAs: '另存为...',
@@ -385,6 +386,8 @@
       aria: '在线客服聊天',
       customerFallback: '客',
       customerReadAt: '客户已读 {time}',
+      customerReadTimeUnknown: '客户已读时间未知',
+      customerUnread: '客户未读',
       read: '已读',
       newMessages: '↓ {count} 条新消息',
       typingPreviewEmpty: '客户正在输入...',
@@ -580,7 +583,7 @@
       remindersSuffix: '，{count} 条提醒',
     },
     brand: {
-      about: '关于 LPP',
+      about: '关于星络',
       helpAboutUpdate: '帮助 / 关于 / 检查更新',
     },
     collapse: '收起侧边栏',
@@ -910,7 +913,7 @@
       openStaffProfile: '查看客服资料',
       removeWindow: '移出',
       replaceMode: '选择替换窗口',
-      replacePrompt: '选择一个窗口替换为：{title}',
+      replacePrompt: '监控墙已满，请选择要替换的窗口：{title}',
       replaceThisWindow: '替换此窗口',
       resultCount: '{count} 条',
       selectThread: '选择一条客服对话后查看实时详情。',
@@ -1061,7 +1064,7 @@
       usedUp: '已用完',
     },
     target: '定向对象',
-    targetPlaceholder: '手机号 / 邮箱 / LPP 号，可选',
+    targetPlaceholder: '手机号 / 邮箱 / 星络号，可选',
     title: '邀请员工',
     usedCount: '已用 {used}/{max}',
     validEmpty: '有效期 --',
@@ -1070,8 +1073,8 @@
   },
   privacySettings: {
     allowLppSearch: {
-      desc: '其他用户可通过 LPP 号找到你。',
-      label: '允许通过 LPP 号搜索',
+      desc: '其他用户可通过 星络号找到你。',
+      label: '允许通过 星络号搜索',
     },
     allowMobileSearch: {
       desc: '其他用户可通过手机号找到你。',
@@ -1350,7 +1353,7 @@
         submit: '确定禁言',
         title: '设置禁言',
       },
-      memberSearchPlaceholder: '昵称 / LPP ID',
+      memberSearchPlaceholder: '昵称 / 星络号',
       moreActions: '更多操作',
       myGroupNickname: '我在本群的昵称',
       noSignature: '暂无个性签名',
@@ -1362,7 +1365,7 @@
       quickActions: '快捷操作',
       profileRows: {
         groupNickname: '群昵称',
-        lppId: 'LPP ID',
+        lppId: '星络号',
         muted: '状态',
         nickname: '昵称',
         role: '群角色',
@@ -1966,7 +1969,7 @@
     row: {
       profile: {
         label: '个人资料',
-        desc: '头像、昵称、LPP 号、手机号、邮箱和创建时间。',
+        desc: '头像、昵称、星络号、手机号、邮箱和创建时间。',
       },
       enterpriseIdentity: {
         label: '当前企业',
@@ -1982,7 +1985,7 @@
       },
       logoutAccount: {
         label: '退出登录',
-        desc: '退出当前 lppchat 账号。',
+        desc: '退出当前 StartLink 账号。',
       },
       deactivateAccount: {
         label: '注销账户',
@@ -1993,8 +1996,8 @@
         desc: '其他用户可通过手机号找到你。',
       },
       allowLppSearch: {
-        label: '允许通过 LPP 号搜索',
-        desc: '其他用户可通过 LPP 号找到你。',
+        label: '允许通过 星络号搜索',
+        desc: '其他用户可通过 星络号找到你。',
       },
       friendRequestVerification: {
         label: '加我为好友',
@@ -2190,11 +2193,11 @@
       },
       terms: {
         label: '用户协议',
-        desc: '查看 LPP 用户服务协议。',
+        desc: '查看 星络用户服务协议。',
       },
       privacyPolicy: {
         label: '隐私政策',
-        desc: '查看 LPP 隐私政策和个人信息处理说明。',
+        desc: '查看 星络隐私政策和个人信息处理说明。',
       },
       aboutClient: {
         label: '关于客户端',
@@ -2291,7 +2294,7 @@
       loading: '正在读取个人资料...',
       loginExpiredAvatar: '登录状态已失效，请重新登录后设置头像。',
       loginName: '登录名',
-      lppId: 'LPP 号',
+      lppId: '星络号',
       member: '成员',
       mobile: '手机号',
       reverted: '已还原资料编辑',
@@ -2459,7 +2462,7 @@
       matchType: {
         email: '邮箱',
         exact: '精准匹配',
-        lppId: '绿泡泡号',
+        lppId: '星络号',
         mobile: '手机号',
       },
       myQr: '我的好友二维码',
@@ -2478,12 +2481,12 @@
       searchAdd: '搜索添加',
       searchFailed: '搜索失败：{error}',
       searchLoading: '正在搜索联系人...',
-      searchPlaceholder: '输入绿泡泡号、手机号或邮箱',
+      searchPlaceholder: '输入星络号、手机号或邮箱',
       searching: '搜索中',
       sendRequest: '发送申请',
       sendRequestTitle: '发送好友申请',
       sending: '发送中',
-      subtitle: '精准搜索绿泡泡号、手机号或邮箱',
+      subtitle: '精准搜索星络号、手机号或邮箱',
       title: '添加联系人',
     },
     notice: {
@@ -2495,7 +2498,7 @@
       createFriendQrFailedWithError: '生成二维码失败：{error}',
       deleteFriendFailed: '删除好友失败',
       deleteFriendFailedWithError: '删除好友失败：{error}',
-      enterSearchKeyword: '请输入绿泡泡号、手机号或邮箱。',
+      enterSearchKeyword: '请输入星络号、手机号或邮箱。',
       friendDeleted: '已删除好友',
       friendQrCreated: '好友二维码已生成',
       friendRequestAccepted: '已通过好友申请',
@@ -2524,7 +2527,7 @@
       established: '已建立',
       friendRelationship: '好友关系',
       friendTags: '好友标签',
-      greenBubbleNo: '绿泡泡号',
+      greenBubbleNo: '星络号',
       group: '通讯录分组',
       groupInfo: '群聊信息',
       groupTags: '群标签',
@@ -2841,7 +2844,7 @@
       lastMessageTime: '最后时间',
       latestFundTime: '最近资金变动',
       latestTouchChannel: '最近触达渠道',
-      lppId: '绿泡泡号',
+      lppId: '星络号',
       marketingConsent: '营销同意',
       mobile: '手机',
       name: '姓名',
@@ -3231,12 +3234,12 @@
         terms: {
           title: '用户协议',
           parts: [
-            '绿泡泡用户服务协议',
+            '星络用户服务协议',
             '更新日期：2026年6月5日',
             '生效日期：2026年6月5日',
-            '欢迎使用绿泡泡。使用本客户端及相关服务前，请仔细阅读并理解本协议。继续使用即表示你同意遵守本协议。',
+            '欢迎使用星络。使用本客户端及相关服务前，请仔细阅读并理解本协议。继续使用即表示你同意遵守本协议。',
             '一、服务内容',
-            '绿泡泡提供即时通讯、客户服务协作、文件传输、通知和相关运营工具。我们可能因维护、升级或安全原因调整、中断或终止部分服务。',
+            '星络提供即时通讯、客户服务协作、文件传输、通知和相关运营工具。我们可能因维护、升级或安全原因调整、中断或终止部分服务。',
             '二、账号注册与使用',
             '你应提供真实、准确、完整的注册信息，妥善保管账号和密码，不得出售、出租、转让或授权他人使用账号。',
             '三、用户行为规范',
@@ -3247,13 +3250,13 @@
             '因不可抗力、第三方原因或非我们可控因素造成的服务中断、数据异常或损失，我们将在法律允许范围内承担相应责任。你通过服务发布的内容由你自行负责。',
             '六、协议修改与联系',
             '我们可能根据业务和法律要求更新本协议。重大变更会通过客户端公告或其他合理方式提示。疑问请联系 support@lpp.com。',
-            '© 2026 绿泡泡科技有限公司 保留所有权利',
+            '© 2026 星络科技有限公司 保留所有权利',
           ],
         },
         privacy: {
           title: '隐私政策',
           parts: [
-            '绿泡泡隐私政策',
+            '星络隐私政策',
             '更新日期：2026年6月5日',
             '生效日期：2026年6月5日',
             '我们重视个人信息保护，并按照适用法律法规采取合理安全措施保护你的信息。',
@@ -3269,7 +3272,7 @@
             '你可以依法访问、更正、删除个人信息，注销账号，撤回授权或要求解释个人信息处理规则。',
             '六、未成年人保护与政策更新',
             '本服务不面向未满 14 周岁的未成年人。政策更新时，我们会在客户端或其他合理渠道提示。',
-            '© 2026 绿泡泡科技有限公司 保留所有权利',
+            '© 2026 星络科技有限公司 保留所有权利',
           ],
         },
       },

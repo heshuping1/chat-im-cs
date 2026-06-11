@@ -303,7 +303,7 @@
 | `membershipRole` | short | 租户角色：`0=member`、`1=technical`、`2=customer_service`、`3=admin`、`4=owner` |
 | `joinMethod` | short | 入租方式：`0=self`、`1=invite`、`2=approval` |
 | `joinedAt` | datetime? | 入租时间 |
-| `lppId` | string? | **2026-06-04 新增**。对应平台账号的全局唯一 `lpp_id`（绿泡泡号）；未设置时为 `null` |
+| `lppId` | string? | **2026-06-04 新增**。对应平台账号的全局唯一 `lpp_id`（星络号）；未设置时为 `null` |
 
 ### 3.14 `DepartmentDto`
 
@@ -534,7 +534,7 @@
 | `signature` | string? | 个性签名 |
 | `lppId` | string? | LPP 标识 |
 | `userType` | short | 用户类型：`1=customer`、`2=staff`、`3=visitor` |
-| `matchType` | string | 匹配来源类型，例如按名称或 LPP ID 命中 |
+| `matchType` | string | 匹配来源类型，例如按名称或 startlink ID 命中 |
 
 ### 4.14 `DirectChatCreatedDto`
 
@@ -715,7 +715,7 @@
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `searchableByMobile` | bool | 是否允许通过手机号搜索到自己 |
-| `searchableByLppId` | bool | 是否允许通过 LPP ID 搜索到自己 |
+| `searchableByLppId` | bool | 是否允许通过 startlink ID 搜索到自己 |
 | `allowFriendRequest` | string | 好友申请策略：`everyone` / `friends_of_friends` / `nobody` |
 | `profileVisibility` | string | 资料可见性：`everyone` / `friends` / `nobody` |
 
@@ -1048,7 +1048,7 @@
 | `auto` | 自动识别账号类型 |
 | `email` | 按邮箱登录 |
 | `mobile` | 按手机号登录 |
-| `lpp_id` | 按 LPP ID 登录 |
+| `lpp_id` | 按 startlink ID 登录 |
 
 ### 7.14 验证码通道 `channel`
 

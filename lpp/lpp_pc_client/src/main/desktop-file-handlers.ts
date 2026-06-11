@@ -197,7 +197,7 @@ export function registerDesktopFileHandlers({
       defaultPath: payload.defaultName,
       filters: [
         payload.kind === 'backup'
-          ? { name: 'LPP Chat Backup', extensions: ['lpp-chat-backup'] }
+          ? { name: 'StartLink Chat Backup', extensions: ['lpp-chat-backup'] }
           : { name: 'JSON', extensions: ['json'] },
       ],
     });
@@ -212,13 +212,13 @@ export function registerDesktopFileHandlers({
 
   register('openChatArchiveFile', async (): Promise<ChatArchiveFileResult | null> => {
     const result = await dialog.showOpenDialog({
-      filters: [{ name: 'LPP Chat Backup', extensions: ['lpp-chat-backup'] }],
+      filters: [{ name: 'StartLink Chat Backup', extensions: ['lpp-chat-backup'] }],
       properties: ['openFile'],
     });
     if (result.canceled || !result.filePaths[0]) return null;
     const filePath = result.filePaths[0];
     if (!filePath.toLowerCase().endsWith('.lpp-chat-backup')) {
-      throw new Error('只能打开 LPP 聊天备份文件');
+      throw new Error('只能打开 StartLink 聊天备份文件');
     }
     const encrypted = await readFile(filePath, 'utf8');
     return {

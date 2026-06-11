@@ -223,7 +223,7 @@ describe("desktop api validation", () => {
           conversationId: "c1",
           fileName: "photo.png",
           kind: "image",
-          url: "file:///Users/eric/Library/Application%20Support/lppchat/LPP%20Files/photo.png",
+          url: "file:///Users/eric/Library/Application%20Support/startlink/StartLink%20Files/photo.png",
         },
       ]),
     ).toEqual([
@@ -234,7 +234,7 @@ describe("desktop api validation", () => {
         conversationId: "c1",
         fileName: "photo.png",
         kind: "image",
-        url: "file:///Users/eric/Library/Application%20Support/lppchat/LPP%20Files/photo.png",
+        url: "file:///Users/eric/Library/Application%20Support/startlink/StartLink%20Files/photo.png",
       },
     ]);
     expect(() =>

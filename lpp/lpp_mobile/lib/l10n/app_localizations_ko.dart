@@ -144,7 +144,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get navMe => '마이페이지';
 
   @override
-  String get authLoginTitle => 'LPP 로그인';
+  String get authLoginTitle => 'StartLink 로그인';
 
   @override
   String get authTabMobile => '전화번호';
@@ -153,7 +153,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get authTabEmail => '이메일';
 
   @override
-  String get authTabLoginName => 'LPP ID';
+  String get authTabLoginName => 'StartLink ID';
 
   @override
   String get authHintMobile => '전화번호를 입력해 주십시오';
@@ -168,7 +168,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get authHintCode => '인증 코드를 입력해 주십시오';
 
   @override
-  String get authHintLoginName => 'LPP ID를 입력해 주십시오 (lpp_xxxxxxxx)';
+  String get authHintLoginName => 'StartLink ID를 입력해 주십시오 (lpp_xxxxxxxx)';
 
   @override
   String get authLoginButton => '로그인 / 회원가입';
@@ -215,7 +215,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get authErrorEmptyPassword => '비밀번호를 입력해 주십시오';
 
   @override
-  String get authErrorEmptyLoginName => 'LPP ID를 입력해 주십시오';
+  String get authErrorEmptyLoginName => 'StartLink ID를 입력해 주십시오';
 
   @override
   String get authErrorWrongCredentials => '계정 또는 비밀번호가 올바르지 않습니다';
@@ -781,11 +781,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get myLeaveEnterpriseFailed => '탈퇴에 실패했습니다. 다시 시도해 주십시오';
 
   @override
-  String get myLppIdCopied => 'LPP ID가 복사되었습니다';
+  String get myLppIdCopied => 'StartLink ID가 복사되었습니다';
 
   @override
   String myLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override
@@ -848,7 +848,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get profileBasicSection => '기본 정보';
 
   @override
-  String get profileLppId => 'LPP ID';
+  String get profileLppId => 'StartLink ID';
 
   @override
   String get profileLppIdNotSet => '미설정';
@@ -887,13 +887,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get profileSaveFailed => '저장에 실패했습니다. 다시 시도해 주십시오';
 
   @override
-  String get profileLppIdTitle => 'LPP ID';
+  String get profileLppIdTitle => 'StartLink ID';
 
   @override
-  String get profileLppIdSetOnce => 'LPP ID는 한 번만 변경할 수 있습니다. 신중하게 입력해 주십시오.';
+  String get profileLppIdSetOnce => 'StartLink ID는 한 번만 변경할 수 있습니다. 신중하게 입력해 주십시오.';
 
   @override
-  String get profileLppIdChangeFailed => '변경에 실패했습니다 (LPP ID는 한 번만 변경 가능)';
+  String get profileLppIdChangeFailed => '변경에 실패했습니다 (StartLink ID는 한 번만 변경 가능)';
 
   @override
   String get profileChangePasswordOld => '현재 비밀번호';
@@ -956,7 +956,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsChatHistory => '채팅 기록';
 
   @override
-  String get settingsAbout => 'LPP 정보';
+  String get settingsAbout => 'StartLink 정보';
 
   @override
   String get settingsLanguage => '언어';
@@ -1205,7 +1205,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get friendAddTitle => '친구 추가';
 
   @override
-  String get friendSearchHint => '전화번호 / 이메일 / LPP ID';
+  String get friendSearchHint => '전화번호 / 이메일 / StartLink ID';
 
   @override
   String get friendRequestSent => '친구 신청을 보냈습니다';
@@ -1253,7 +1253,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get friendSendMessage => '메시지 보내기';
 
   @override
-  String get friendMatchTypeLppId => 'LPP ID로 일치';
+  String get friendMatchTypeLppId => 'StartLink ID로 일치';
 
   @override
   String get friendMatchTypeMobile => '전화번호로 일치';
@@ -1307,7 +1307,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get profilePageFriendsOnly => '이 사용자는 친구에게만 프로필을 공개합니다';
 
   @override
-  String get profilePageLppId => 'LPP ID';
+  String get profilePageLppId => 'StartLink ID';
 
   @override
   String get profilePageRemarkName => '별명';
@@ -1325,7 +1325,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchTitle => '검색';
 
   @override
-  String get searchHint => '전화번호, 이메일 또는 LPP ID로 검색';
+  String get searchHint => '전화번호, 이메일 또는 StartLink ID로 검색';
 
   @override
   String get searchNoResults => '결과를 찾을 수 없습니다';
@@ -1539,7 +1539,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get spaceEnterEnterprise => '기업 공간 입장';
 
   @override
-  String get aboutTitle => 'LPP 정보';
+  String get aboutTitle => 'StartLink 정보';
 
   @override
   String get aboutVersion => '버전';
@@ -1765,7 +1765,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get privacySearchableByMobile => '전화번호로 검색 허용';
 
   @override
-  String get privacySearchableByLppId => 'LPP ID로 검색 허용';
+  String get privacySearchableByLppId => 'StartLink ID로 검색 허용';
 
   @override
   String get privacyAllowFriendRequest => '친구 신청 허용';
@@ -1981,11 +1981,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get addFriendTitle => '친구 추가';
 
   @override
-  String get addFriendSearchHint => '전화번호 / 이메일 / LPP ID';
+  String get addFriendSearchHint => '전화번호 / 이메일 / StartLink ID';
 
   @override
   String addFriendLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override

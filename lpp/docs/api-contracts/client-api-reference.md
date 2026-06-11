@@ -186,7 +186,7 @@ Base URL：`/api/client/v1`
 | `/tenant/info` | GET | 无 | `TenantDetailDto` | `status=0(pending_approval)`、`1(active)`、`2(suspended)`、`9(deleted)` |
 | `/tenant/info` | PUT | `UpdateTenantInfoRequest` | `updated=true` | 仅更新传入字段；支持维护 `tenantDescription` |
 | `/tenant/leave` | POST | 无 | `left=true` `tenantId` | 最后一个所有者不能直接退出 |
-| `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户。**2026-06-04 起**每个成员附带 `lppId`（绿泡泡号），供通讯录展示 |
+| `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户。**2026-06-04 起**每个成员附带 `lppId`（星络号），供通讯录展示 |
 | `/tenant/members/{userId}` | DELETE | 路径参数：`userId` | `userId` | 当前实现返回被移除用户 ID |
 | `/tenant/members/{userId}/role` | PUT | `membershipRole` | `userId` | 仅所有者可修改角色 |
 | `/tenant/invitations` | POST | `maxUses` `expireHours` `targetIdentifier?` `targetMembershipRole?` | `InvitationDto` | **客服/管理员/所有者**可调用(2026-05-31 起放宽,原为仅管理员/所有者);`inviteType=0(public)`、`1(targeted)`；`status=0(revoked)`、`1(active)`、`3(exhausted)`；权限不足返回 `403 TENANT_PERMISSION_DENIED`。**2026-06-03 起** `targetMembershipRole?`(1=技术/2=客服/3=管理员,省略=普通成员)→接受后直接落地为员工角色;只能签发<自己的角色,否则 `403 INVITATION_ROLE_TOO_HIGH`;请求 `4(Owner)` 返回 `400 INVITATION_ROLE_INVALID` |
@@ -699,7 +699,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `membershipRole` | short | 角色：`0=member`、`1=technical`、`2=customer_service`、`3=admin`、`4=owner` |
 | `joinMethod` | short | 加入方式：`0=self`、`1=invite`、`2=approval` |
 | `joinedAt` | DateTimeOffset? | 入租时间 |
-| `lppId` | string? | **2026-06-04 新增**。成员对应平台账号的全局唯一 `lpp_id`（绿泡泡号）；未设置时为 `null`。用于在通讯录展示成员的绿泡泡号 |
+| `lppId` | string? | **2026-06-04 新增**。成员对应平台账号的全局唯一 `lpp_id`（星络号）；未设置时为 `null`。用于在通讯录展示成员的星络号 |
 
 ### 4.3 `InvitationDto`
 

@@ -719,14 +719,16 @@ export function OnlineServicePage() {
         } as CSSProperties
       }
     >
-      <ServiceCommandBar
-        disabled={!client || !canControlReception}
-        layoutMode={serviceLayoutMode}
-        metrics={commandMetrics}
-        onSetQueueMode={(mode) => queueAcceptMutation.mutate(mode)}
-        onSetStatus={(status) => receptionStatusMutation.mutate(status)}
-        pending={receptionStatusMutation.isPending || queueAcceptMutation.isPending}
-      />
+      {canControlReception && (
+        <ServiceCommandBar
+          disabled={!client}
+          layoutMode={serviceLayoutMode}
+          metrics={commandMetrics}
+          onSetQueueMode={(mode) => queueAcceptMutation.mutate(mode)}
+          onSetStatus={(status) => receptionStatusMutation.mutate(status)}
+          pending={receptionStatusMutation.isPending || queueAcceptMutation.isPending}
+        />
+      )}
 
       <div className="h-flagship-grid">
         {effectiveServiceListPaneHidden ? null : effectiveServiceListPaneCollapsed ? (

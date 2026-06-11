@@ -171,7 +171,7 @@ function mediaDirectory(payload: CacheMediaFilePayload) {
     payload.kind === 'image' ? 'Images' : payload.kind === 'video' ? 'Videos' : 'Files';
   return join(
     app.getPath('userData'),
-    'LPP Files',
+    'StartLink Files',
     safePathSegment(payload.accountId || 'default-account'),
     safePathSegment(payload.conversationId || 'default-conversation'),
     mediaKindDirectory,

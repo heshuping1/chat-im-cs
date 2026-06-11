@@ -349,12 +349,17 @@
   --chat-stage-background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.38), rgba(226, 232, 240, 0.12));
   --chat-stage-background-size: auto;
   --chat-stage-background-wash: rgba(255, 255, 255, 0.38);
+  --chat-avatar-size: 34px;
+  --chat-edge-gap: 12px;
+  --chat-message-gap: 6px;
+  --chat-stage-padding: clamp(10px, 1.55vw, 18px);
+  --chat-stage-row-gap: 14px;
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--chat-stage-row-gap);
   overflow: auto;
-  padding: 18px;
+  padding: var(--chat-stage-padding);
   background:
     linear-gradient(180deg, var(--chat-stage-background-wash), rgba(255, 255, 255, 0) 170px),
     var(--chat-stage-background-image),

@@ -217,7 +217,7 @@ export function registerUpdateManager({
     );
     if (!apiBaseUrl) throw new Error('缺少更新服务地址，请先登录或配置 LPP_UPDATE_API_BASE_URL');
     const url = new URL('/api/client-updates/latest', apiBaseUrl);
-    url.searchParams.set('appId', 'lppchat');
+    url.searchParams.set('appId', 'startlink');
     url.searchParams.set('platform', 'windows');
     url.searchParams.set('arch', process.arch === 'ia32' ? 'ia32' : 'x64');
     url.searchParams.set('currentVersion', app.getVersion());

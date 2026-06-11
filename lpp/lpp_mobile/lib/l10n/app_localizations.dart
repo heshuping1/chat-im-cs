@@ -378,7 +378,7 @@ abstract class AppLocalizations {
   /// Login page title
   ///
   /// In zh, this message translates to:
-  /// **'登录绿泡泡'**
+  /// **'登录星络'**
   String get authLoginTitle;
 
   /// Login tab: mobile
@@ -396,7 +396,7 @@ abstract class AppLocalizations {
   /// Login tab: lpp id
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号'**
+  /// **'星络号'**
   String get authTabLoginName;
 
   /// Mobile hint
@@ -426,7 +426,7 @@ abstract class AppLocalizations {
   /// Login name hint
   ///
   /// In zh, this message translates to:
-  /// **'请输入绿泡泡号（lpp_xxxxxxxx）'**
+  /// **'请输入星络号（lpp_xxxxxxxx）'**
   String get authHintLoginName;
 
   /// Login button
@@ -516,7 +516,7 @@ abstract class AppLocalizations {
   /// Empty login name error
   ///
   /// In zh, this message translates to:
-  /// **'请输入绿泡泡号'**
+  /// **'请输入星络号'**
   String get authErrorEmptyLoginName;
 
   /// Wrong credentials
@@ -1587,16 +1587,16 @@ abstract class AppLocalizations {
   /// **'退出失败，请重试'**
   String get myLeaveEnterpriseFailed;
 
-  /// LPP ID copied
+  /// StartLink ID copied
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号已复制'**
+  /// **'星络号已复制'**
   String get myLppIdCopied;
 
-  /// LPP ID label
+  /// StartLink ID label
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号：{lppId}'**
+  /// **'星络号：{lppId}'**
   String myLppIdLabel(String lppId);
 
   /// Friend count
@@ -1713,13 +1713,13 @@ abstract class AppLocalizations {
   /// **'基本信息'**
   String get profileBasicSection;
 
-  /// LPP ID field
+  /// StartLink ID field
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号'**
+  /// **'星络号'**
   String get profileLppId;
 
-  /// LPP ID not set
+  /// StartLink ID not set
   ///
   /// In zh, this message translates to:
   /// **'未设置'**
@@ -1791,22 +1791,22 @@ abstract class AppLocalizations {
   /// **'保存失败，请重试'**
   String get profileSaveFailed;
 
-  /// LPP ID page title
+  /// StartLink ID page title
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号'**
+  /// **'星络号'**
   String get profileLppIdTitle;
 
-  /// LPP ID set once warning
+  /// StartLink ID set once warning
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号设置后只能修改一次，请谨慎填写'**
+  /// **'星络号设置后只能修改一次，请谨慎填写'**
   String get profileLppIdSetOnce;
 
-  /// LPP ID change failed
+  /// StartLink ID change failed
   ///
   /// In zh, this message translates to:
-  /// **'修改失败（绿泡泡号只能修改一次）'**
+  /// **'修改失败（星络号只能修改一次）'**
   String get profileLppIdChangeFailed;
 
   /// Old password
@@ -1932,7 +1932,7 @@ abstract class AppLocalizations {
   /// About
   ///
   /// In zh, this message translates to:
-  /// **'关于绿泡泡'**
+  /// **'关于星络'**
   String get settingsAbout;
 
   /// Language
@@ -2412,7 +2412,7 @@ abstract class AppLocalizations {
   /// Friend search hint
   ///
   /// In zh, this message translates to:
-  /// **'手机号 / 邮箱 / 绿泡泡号'**
+  /// **'手机号 / 邮箱 / 星络号'**
   String get friendSearchHint;
 
   /// Friend request sent
@@ -2508,7 +2508,7 @@ abstract class AppLocalizations {
   /// Match by lpp id
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号匹配'**
+  /// **'星络号匹配'**
   String get friendMatchTypeLppId;
 
   /// Match by mobile
@@ -2613,10 +2613,10 @@ abstract class AppLocalizations {
   /// **'该用户仅对好友展示资料'**
   String get profilePageFriendsOnly;
 
-  /// LPP ID
+  /// StartLink ID
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号'**
+  /// **'星络号'**
   String get profilePageLppId;
 
   /// Remark name
@@ -2652,7 +2652,7 @@ abstract class AppLocalizations {
   /// Search hint
   ///
   /// In zh, this message translates to:
-  /// **'输入完整手机号、邮箱或绿泡泡号搜索'**
+  /// **'输入完整手机号、邮箱或星络号搜索'**
   String get searchHint;
 
   /// No search results
@@ -3078,7 +3078,7 @@ abstract class AppLocalizations {
   /// About title
   ///
   /// In zh, this message translates to:
-  /// **'关于绿泡泡'**
+  /// **'关于星络'**
   String get aboutTitle;
 
   /// Version
@@ -3528,7 +3528,7 @@ abstract class AppLocalizations {
   /// Searchable by lpp id
   ///
   /// In zh, this message translates to:
-  /// **'允许通过绿泡泡号搜索'**
+  /// **'允许通过星络号搜索'**
   String get privacySearchableByLppId;
 
   /// Allow friend request
@@ -3960,13 +3960,13 @@ abstract class AppLocalizations {
   /// Add friend search hint
   ///
   /// In zh, this message translates to:
-  /// **'手机号 / 邮箱 / 绿泡泡号'**
+  /// **'手机号 / 邮箱 / 星络号'**
   String get addFriendSearchHint;
 
-  /// LPP ID label in search result
+  /// StartLink ID label in search result
   ///
   /// In zh, this message translates to:
-  /// **'绿泡泡号：{lppId}'**
+  /// **'星络号：{lppId}'**
   String addFriendLppIdLabel(String lppId);
 
   /// Add friend button

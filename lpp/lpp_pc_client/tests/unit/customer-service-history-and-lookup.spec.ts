@@ -172,7 +172,7 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("findTenantMemberByHistoryIdentity");
     expect(customerServiceHistoryReport).toContain("已关联通讯录");
     expect(customerServiceHistoryReport).toContain("未关联通讯录");
-    expect(customerServiceHistoryReport).toContain("绿泡泡号");
+    expect(customerServiceHistoryReport).toContain("星络号");
     expect(customerServiceHistoryReport).toContain('staffIdentity: "客服"');
     expect(customerServiceHistoryReport).toContain("HistoryPartyInlineProfile");
     expect(customerServiceHistoryReport).toContain('className="cs-history-party-avatar"');
@@ -292,7 +292,9 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceConversationStatsReport).toContain("坐席效率");
     expect(customerServiceConversationStatsReport).not.toContain("AI 辅助");
     expect(customerServiceConversationStatsReport).toContain("导出统计报表");
-    expect(customerServiceConversationStatsReport).toContain("接口未返回 staffPerformance");
+    expect(customerServiceConversationStatsReport).toContain("暂无坐席效率数据");
+    expect(customerServiceConversationStatsReport).toContain("resolveServicePerformanceStaff(stats)");
+    expect(customerServiceConversationStatsReport).not.toContain("接口未返回 staffPerformance");
     expect(customerServiceConversationStatsReport).toContain("接口未返回 channelDistribution");
     expect(customerServiceConversationStatsReport).not.toContain("接口未返回 localeDistribution");
     expect(customerServiceConversationStatsReport).toContain("今日");
@@ -325,7 +327,12 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceConversationStatsReport).not.toContain("cs-stats-panel-badge");
     expect(customerServiceConversationStatsReport).toContain("ConversationTrendChart");
     expect(customerServiceConversationStatsReport).toContain("cs-stats-trend-chart");
-    expect(customerServiceConversationStatsReport).toContain("width: 760");
+    expect(customerServiceConversationStatsReport).toContain("width: 1280");
+    expect(customerServiceConversationStatsReport).toContain("const rawMax = Math.max(...values, 0)");
+    expect(customerServiceConversationStatsReport).toContain("cs-stats-trend-y-label");
+    expect(customerServiceConversationStatsReport).toContain("cs-stats-trend-average");
+    expect(customerServiceConversationStatsReport).toContain('point.isZero ? "zero" : ""');
+    expect(customerServiceConversationStatsReport).toContain('point.isPeak ? "peak" : ""');
     expect(customerServiceConversationStatsReport).toContain("labelStride");
     expect(customerServiceConversationStatsReport).toContain("point.showLabel");
     expect(customerServiceConversationStatsReport).toContain("hoveredIndex");
@@ -355,8 +362,13 @@ describe("customer-service history and lookup surfaces", () => {
     expect(productPagesCss).toContain(".cs-stats-trend-summary");
     expect(productPagesCss).toContain(".cs-stats-trend-tooltip");
     expect(productPagesCss).toContain(".cs-stats-trend-hit");
+    expect(productPagesCss).toContain(".cs-stats-trend-y-label");
+    expect(productPagesCss).toContain(".cs-stats-trend-average");
+    expect(productPagesCss).toContain(".cs-stats-trend-point.zero");
+    expect(productPagesCss).toContain(".cs-stats-trend-point.peak");
     expect(productPagesCss).toContain("grid-template-columns: minmax(620px, 1fr) minmax(260px, 300px)");
-    expect(productPagesCss).toContain("grid-template-rows: minmax(250px, 0.78fr) minmax(0, 1fr)");
+    expect(productPagesCss).toContain("grid-template-rows: minmax(300px, 0.86fr) minmax(0, 1fr)");
+    expect(productPagesCss).toContain("height: clamp(238px, 28vh, 300px)");
     expect(productPagesCss).toContain("grid-column: 1 / -1");
     expect(productPagesCss).toContain("grid-template-rows: repeat(2, minmax(0, 1fr))");
     expect(productPagesCss).toContain(".cs-stats-pie");
@@ -417,7 +429,7 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceMonitorPanel).toContain("getCustomerServiceMonitorDashboard()");
     expect(customerServiceMonitorPanel).toContain("getCustomerServiceMonitorStaffStatuses()");
     expect(customerServiceMonitorPanel).toContain("getCustomerServiceMonitorSlaDashboard()");
-    expect(customerServiceMonitorPanel).toContain("getCustomerServiceMonitorThreads(queryFilters)");
+    expect(customerServiceMonitorPanel).toContain("loadMonitorThreadItems(client!, queryFilters)");
     expect(customerServiceMonitorPanel).toContain("getCustomerServiceMonitorThreadDetail");
     expect(customerServiceMonitorPanel).toContain("assignedStaffUserId");
     expect(customerServiceMonitorPanel).toContain("status");

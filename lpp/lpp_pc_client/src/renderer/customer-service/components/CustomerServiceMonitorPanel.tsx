@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useState, type DragEvent, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import {
   Activity,
   ArrowRightLeft,
   ExternalLink,
   LayoutGrid,
+  Lock,
   Maximize2,
   Minimize2,
+  Power,
   Radio,
   RefreshCw,
   Search,
   ShieldAlert,
   TriangleAlert,
+  Unlock,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -24,7 +27,6 @@ import { CustomerServiceTransferDialog } from "./CustomerServiceTransferDialog";
 import type { CustomerServiceApiClient } from "../../data/api/customer-service-client";
 import type {
   CustomerServiceMonitorDashboardDto,
-  CustomerServiceReadStatusDto,
   CustomerServiceSlaDashboardDto,
   CustomerServiceSlaRiskItemDto,
   CustomerServiceStaffStatusDto,
@@ -32,7 +34,9 @@ import type {
   MessageItemDto,
 } from "../../data/api-client";
 import type { CustomerServiceTransferTarget } from "../../data/customer-service/cs-transfer-targets";
+import { customerServiceHistoryStatusKey } from "../../data/customer-service-display";
 import { pcQueryKeys } from "../../data/query-keys";
+import { applyCustomerServiceReadStatusToMessages } from "../../data/customer-service/cs-message-read-status";
 import { createCustomerServiceIdentityViewModel } from "../../data/customer-service/cs-identity-view-model";
 import {
   createCustomerServiceStaffProfileViewModel,
@@ -54,6 +58,7 @@ import {
   pruneWatchedThreadKeys,
   removeWatchedThreadKey,
   replaceWatchedThreadKey,
+  selectWatchedThreadKey,
   sortMonitorThreadsByPriority,
   trimWatchedThreadKeys,
   type MonitorLayoutMode,
@@ -68,12 +73,21 @@ type MonitorFilters = {
   status: string;
 };
 
+type MonitorThreadQueryParams = NonNullable<
+  Parameters<CustomerServiceApiClient["getCustomerServiceMonitorThreads"]>[0]
+>;
+type MonitorHistoryQueryParams = NonNullable<
+  Parameters<CustomerServiceApiClient["getCustomerServiceHistoryThreads"]>[0]
+>;
+
 type DetailQueryState = {
   data?: unknown;
   error?: unknown;
   isError?: boolean;
   isLoading?: boolean;
 };
+
+type MonitorManagementAction = "force-close" | "freeze" | "unfreeze";
 
 type MonitorProfilePopoverState = {
   kind: "customer" | "staff";
@@ -82,27 +96,6 @@ type MonitorProfilePopoverState = {
 };
 
 type MonitorStaffProfile = CustomerServiceStaffProfileViewModel;
-
-type MonitorReadMember = {
-  userId: string;
-  lastReadSeq: number;
-  lastReadAt?: string | null;
-};
-
-type MonitorReadSnapshot = {
-  customer?: MonitorReadMember;
-  latestCustomerSeq?: number;
-  latestStaffSeq?: number;
-  staff?: MonitorReadMember;
-  visitorUserId?: string;
-};
-
-type MonitorReadChip = {
-  className: "read" | "unread" | "unknown";
-  key: string;
-  label: string;
-  title: string;
-};
 
 const defaultFilters: MonitorFilters = {
   assignedStaffUserIds: [],
@@ -113,6 +106,7 @@ const defaultFilters: MonitorFilters = {
 const emptyThreads: CustomerServiceThread[] = [];
 const emptyStaffItems: CustomerServiceStaffStatusDto[] = [];
 const emptyMessageAnnotations: Record<string, string> = {};
+const monitorHistoryLimit = 100;
 const monitorThreadDragMime = "application/x-lpp-cs-monitor-thread-key";
 const monitorPollIntervalMs = 5_000;
 const monitorBackoffMs = 60_000;
@@ -137,7 +131,10 @@ export function CustomerServiceMonitorPanel({
   const [layoutMode, setLayoutMode] = useState<MonitorLayoutMode>("2x1");
   const [focusedThreadKey, setFocusedThreadKey] = useState("");
   const [watchedThreadKeys, setWatchedThreadKeys] = useState<string[]>([]);
+  const [manualWallSelection, setManualWallSelection] = useState(false);
   const [replacementThreadKey, setReplacementThreadKey] = useState("");
+  const [focusedEmptySlotIndex, setFocusedEmptySlotIndex] = useState<number | null>(null);
+  const [recentlyReplacedThreadKey, setRecentlyReplacedThreadKey] = useState("");
   const [expandedThreadKey, setExpandedThreadKey] = useState("");
   const [transferThread, setTransferThread] = useState<CustomerServiceThread | null>(null);
   const [transferReason, setTransferReason] = useState("");
@@ -146,7 +143,14 @@ export function CustomerServiceMonitorPanel({
   const [backoffUntilMs, setBackoffUntilMs] = useState(0);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
-  const queryFilters = useMemo(() => monitorQueryParams(), []);
+  const replacementFeedbackTimerRef = useRef<number | null>(null);
+  const queryFilters = useMemo(() => monitorQueryParams(filters), [filters]);
+  const historyQueryFilters = useMemo(
+    () => monitorHistoryQueryParams(filters),
+    [filters],
+  );
+  const monitorRealtimeEnabled = filters.status !== "closed";
+  const monitorHistoryEnabled = filters.status === "" || filters.status === "closed";
   const backoffRemainingMs = Math.max(0, backoffUntilMs - nowMs);
   const queryRefetchInterval = backoffRemainingMs > 0 ? false : monitorPollIntervalMs;
 
@@ -178,8 +182,8 @@ export function CustomerServiceMonitorPanel({
     staleTime: monitorStaleMs,
   });
   const threadsQuery = useQuery({
-    enabled: Boolean(client),
-    queryFn: () => client!.getCustomerServiceMonitorThreads(queryFilters),
+    enabled: Boolean(client && monitorRealtimeEnabled),
+    queryFn: () => loadMonitorThreadItems(client!, queryFilters),
     queryKey: pcQueryKeys.customerServiceMonitorThreads(
       apiBaseUrl,
       tenantToken,
@@ -190,10 +194,44 @@ export function CustomerServiceMonitorPanel({
     retry: false,
     staleTime: monitorStaleMs,
   });
+  const historyThreadsQuery = useQuery({
+    enabled: Boolean(client && monitorHistoryEnabled),
+    queryFn: () => loadMonitorHistoryThreadItems(client!, historyQueryFilters),
+    queryKey: [
+      ...pcQueryKeys.customerServiceHistory(
+        apiBaseUrl,
+        tenantToken,
+        monitorHistoryLimit,
+      ),
+      "monitor",
+      historyQueryFilters,
+    ],
+    refetchOnWindowFocus: false,
+    refetchInterval: queryRefetchInterval,
+    retry: false,
+    staleTime: monitorStaleMs,
+  });
 
   const staffItems = staffQuery.data ?? emptyStaffItems;
-  const rawThreads = threadsQuery.data?.items ?? emptyThreads;
-  const allMonitorThreads = rawThreads;
+  const realtimeMonitorThreads = monitorRealtimeEnabled
+    ? (threadsQuery.data ?? emptyThreads)
+    : emptyThreads;
+  const historyMonitorThreads = monitorHistoryEnabled
+    ? (historyThreadsQuery.data ?? emptyThreads)
+    : emptyThreads;
+  const realtimeServiceThreads = useMemo(
+    () => realtimeMonitorThreads.filter(isOnlineServiceMonitorThread),
+    [realtimeMonitorThreads],
+  );
+  const allMonitorThreads = useMemo(
+    () =>
+      monitorThreadsForFilter(
+        realtimeMonitorThreads,
+        historyMonitorThreads,
+        filters.status,
+      ),
+    [filters.status, historyMonitorThreads, realtimeMonitorThreads],
+  );
   const visiblePoolThreads = useMemo(
     () =>
       filterMonitorThreads(
@@ -203,7 +241,10 @@ export function CustomerServiceMonitorPanel({
       ),
     [allMonitorThreads, filters, staffItems],
   );
-  const riskItems = useMemo(() => flattenSlaRiskItems(slaQuery.data), [slaQuery.data]);
+  const riskItems = useMemo(
+    () => flattenSlaRiskItems(slaQuery.data).filter(isOnlineServiceSlaRiskItem),
+    [slaQuery.data],
+  );
   const riskThreadKeys = useMemo(() => riskThreadKeySet(riskItems), [riskItems]);
   const prioritizedThreads = useMemo(
     () => sortMonitorThreadsByPriority(visiblePoolThreads, riskThreadKeys),
@@ -221,12 +262,14 @@ export function CustomerServiceMonitorPanel({
     dashboardQuery.isLoading ||
     staffQuery.isLoading ||
     slaQuery.isLoading ||
-    threadsQuery.isLoading;
+    (monitorRealtimeEnabled && threadsQuery.isLoading) ||
+    (monitorHistoryEnabled && historyThreadsQuery.isLoading);
   const error =
     dashboardQuery.error ||
     staffQuery.error ||
     slaQuery.error ||
-    threadsQuery.error;
+    (monitorRealtimeEnabled ? threadsQuery.error : null) ||
+    (monitorHistoryEnabled ? historyThreadsQuery.error : null);
   const rateLimited = isRateLimitError(error);
 
   useEffect(() => {
@@ -246,6 +289,7 @@ export function CustomerServiceMonitorPanel({
       staffQuery.dataUpdatedAt,
       slaQuery.dataUpdatedAt,
       threadsQuery.dataUpdatedAt,
+      historyThreadsQuery.dataUpdatedAt,
     );
     if (latest > 0) setLastSyncedAt(latest);
   }, [
@@ -253,6 +297,7 @@ export function CustomerServiceMonitorPanel({
     staffQuery.dataUpdatedAt,
     slaQuery.dataUpdatedAt,
     threadsQuery.dataUpdatedAt,
+    historyThreadsQuery.dataUpdatedAt,
   ]);
 
   useEffect(() => {
@@ -268,13 +313,15 @@ export function CustomerServiceMonitorPanel({
   }, [allThreadKeys, focusedThreadKey, threadKeys]);
 
   useEffect(() => {
+    if (manualWallSelection) return;
     if (watchedThreadKeys.length > 0 || !prioritizedThreads[0]) return;
     const firstKey = threadKey(prioritizedThreads[0]);
     setFocusedThreadKey(firstKey);
     setWatchedThreadKeys(addWatchedThreadKey([], firstKey, layoutMode));
-  }, [layoutMode, prioritizedThreads, watchedThreadKeys.length]);
+  }, [layoutMode, manualWallSelection, prioritizedThreads, watchedThreadKeys.length]);
 
   useEffect(() => {
+    if (manualWallSelection) return;
     const topThread = prioritizedThreads[0];
     if (!topThread || monitorThreadPriority(topThread, riskThreadKeys) <= 0) return;
     const topKey = threadKey(topThread);
@@ -284,7 +331,35 @@ export function CustomerServiceMonitorPanel({
         : promoteWatchedThreadKey(current, topKey, layoutMode),
     );
     setFocusedThreadKey((current) => current || topKey);
-  }, [layoutMode, prioritizedThreads, riskThreadKeys]);
+  }, [layoutMode, manualWallSelection, prioritizedThreads, riskThreadKeys]);
+
+  useEffect(() => {
+    if (watchedThreadKeys.length === 0) setManualWallSelection(false);
+  }, [watchedThreadKeys.length]);
+
+  useEffect(() => {
+    if (!replacementThreadKey || allThreadKeys.includes(replacementThreadKey)) return;
+    setReplacementThreadKey("");
+  }, [allThreadKeys, replacementThreadKey]);
+
+  useEffect(() => {
+    if (focusedEmptySlotIndex === null) return;
+    if (
+      focusedEmptySlotIndex < watchedThreadKeys.length ||
+      focusedEmptySlotIndex >= monitorLayoutCapacity(layoutMode)
+    ) {
+      setFocusedEmptySlotIndex(null);
+    }
+  }, [focusedEmptySlotIndex, layoutMode, watchedThreadKeys.length]);
+
+  useEffect(
+    () => () => {
+      if (replacementFeedbackTimerRef.current !== null) {
+        window.clearTimeout(replacementFeedbackTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const watchedThreads = watchedThreadKeys
     .map((key) => allMonitorThreads.find((thread) => threadKey(thread) === key))
@@ -304,7 +379,7 @@ export function CustomerServiceMonitorPanel({
           thread.threadType,
           thread.threadId,
         ),
-        "monitor",
+        isMonitorHistoryThread(thread) ? "monitor-history" : "monitor",
       ],
       refetchOnWindowFocus: false,
       refetchInterval: queryRefetchInterval,
@@ -319,7 +394,12 @@ export function CustomerServiceMonitorPanel({
     ]),
   );
   const transferThreadMessages = transferThread
-    ? readDetailMessages(detailQueryByKey.get(threadKey(transferThread))?.data)
+    ? readDetailMessages(
+        monitorThreadDetailData(
+          transferThread,
+          detailQueryByKey.get(threadKey(transferThread))?.data,
+        ),
+      )
     : [];
   const transferTargets = useMemo(
     () =>
@@ -328,6 +408,13 @@ export function CustomerServiceMonitorPanel({
         : [],
     [staffItems, transferThread, transferThreadMessages],
   );
+  const refreshMonitorQueries = () => {
+    void dashboardQuery.refetch();
+    void staffQuery.refetch();
+    void slaQuery.refetch();
+    if (monitorRealtimeEnabled) void threadsQuery.refetch();
+    if (monitorHistoryEnabled) void historyThreadsQuery.refetch();
+  };
   const transferThreadMutation = useMutation({
     mutationFn: async (payload: {
       reason: string;
@@ -335,13 +422,10 @@ export function CustomerServiceMonitorPanel({
       thread: CustomerServiceThread;
     }) => {
       if (!client) throw new Error("Customer service API is not ready");
-      return client.transferCustomerServiceThread(
+      return client.assignCustomerServiceThread(
         payload.thread.threadType,
         payload.thread.threadId,
-        {
-          reason: payload.reason,
-          toStaffUserId: payload.targetId,
-        },
+        { staffUserId: payload.targetId },
       );
     },
     onSuccess: () => {
@@ -349,51 +433,105 @@ export function CustomerServiceMonitorPanel({
       setTransferReason("");
       setSelectedTransferTargetId("");
       setTransferErrorText(null);
-      void dashboardQuery.refetch();
-      void staffQuery.refetch();
-      void slaQuery.refetch();
-      void threadsQuery.refetch();
+      refreshMonitorQueries();
     },
     onError: (error) => {
       setTransferErrorText(formatError(error));
+    },
+  });
+  const managementActionMutation = useMutation({
+    mutationFn: async (payload: {
+      action: MonitorManagementAction;
+      thread: CustomerServiceThread;
+    }) => {
+      if (!client) throw new Error("Customer service API is not ready");
+      if (payload.action === "force-close") {
+        return client.forceCloseCustomerServiceThread(
+          payload.thread.threadType,
+          payload.thread.threadId,
+        );
+      }
+      if (payload.action === "freeze") {
+        return client.freezeCustomerServiceThread(
+          payload.thread.threadType,
+          payload.thread.threadId,
+        );
+      }
+      return client.unfreezeCustomerServiceThread(
+        payload.thread.threadType,
+        payload.thread.threadId,
+      );
+    },
+    onSuccess: () => {
+      refreshMonitorQueries();
+    },
+    onError: (error) => {
+      window.alert(formatError(error));
     },
   });
 
   const setLayout = (nextLayoutMode: MonitorLayoutMode) => {
     setLayoutMode(nextLayoutMode);
     setWatchedThreadKeys((current) => trimWatchedThreadKeys(current, nextLayoutMode));
+    setFocusedEmptySlotIndex(null);
+    setReplacementThreadKey("");
     setExpandedThreadKey("");
   };
   const watchThread = (thread: CustomerServiceThread) => {
     const key = threadKey(thread);
+    setManualWallSelection(true);
     if (
+      focusedEmptySlotIndex !== null &&
       !watchedThreadKeys.includes(key) &&
-      watchedThreadKeys.length >= monitorLayoutCapacity(layoutMode)
+      watchedThreadKeys.length < monitorLayoutCapacity(layoutMode)
     ) {
-      setReplacementThreadKey(key);
-      setFocusedThreadKey("");
+      setWatchedThreadKeys((current) =>
+        dropWatchedThreadKeyAtIndex(current, key, focusedEmptySlotIndex, layoutMode),
+      );
+      setFocusedThreadKey(key);
+      setFocusedEmptySlotIndex(null);
+      setReplacementThreadKey("");
       return;
     }
-    setFocusedThreadKey(key);
-    setReplacementThreadKey("");
-    setWatchedThreadKeys((current) =>
-      addWatchedThreadKey(current, key, layoutMode),
+    const nextSelection = selectWatchedThreadKey(
+      watchedThreadKeys,
+      key,
+      focusedThreadKey,
+      layoutMode,
     );
+    setWatchedThreadKeys(nextSelection.watchedThreadKeys);
+    setFocusedThreadKey(nextSelection.focusedThreadKey);
+    setFocusedEmptySlotIndex(null);
+    setReplacementThreadKey(nextSelection.replacementThreadKey);
+    if (nextSelection.replaced) {
+      setRecentlyReplacedThreadKey(nextSelection.focusedThreadKey);
+      if (replacementFeedbackTimerRef.current !== null) {
+        window.clearTimeout(replacementFeedbackTimerRef.current);
+      }
+      replacementFeedbackTimerRef.current = window.setTimeout(() => {
+        setRecentlyReplacedThreadKey("");
+        replacementFeedbackTimerRef.current = null;
+      }, 600);
+    }
   };
   const dropThreadToWatchSlot = (draggedThreadKey: string, slotIndex: number) => {
     if (!allThreadKeys.includes(draggedThreadKey)) return;
+    setManualWallSelection(true);
     setFocusedThreadKey(draggedThreadKey);
+    setFocusedEmptySlotIndex(null);
     setReplacementThreadKey("");
     setWatchedThreadKeys((current) =>
       dropWatchedThreadKeyAtIndex(current, draggedThreadKey, slotIndex, layoutMode),
     );
   };
   const openThreadForAssist = (thread: CustomerServiceThread) => {
+    if (isMonitorHistoryThread(thread)) return;
     openCustomerServiceThread(thread.threadId || thread.conversationId, "user");
     setActiveModule("onlineService");
     onOpenOnlineService();
   };
   const openTransferDialog = (thread: CustomerServiceThread) => {
+    if (isMonitorHistoryThread(thread)) return;
     setTransferThread(thread);
     setTransferReason("");
     setSelectedTransferTargetId("");
@@ -407,12 +545,18 @@ export function CustomerServiceMonitorPanel({
       thread: transferThread,
     });
   };
+  const executeManagementAction = (
+    thread: CustomerServiceThread,
+    action: MonitorManagementAction,
+  ) => {
+    if (isMonitorHistoryThread(thread) || managementActionMutation.isPending) return;
+    const confirmText = monitorManagementConfirmText(thread, action, t);
+    if (confirmText && !window.confirm(confirmText)) return;
+    managementActionMutation.mutate({ action, thread });
+  };
   const refetchAll = () => {
     setBackoffUntilMs(0);
-    void dashboardQuery.refetch();
-    void staffQuery.refetch();
-    void slaQuery.refetch();
-    void threadsQuery.refetch();
+    refreshMonitorQueries();
   };
 
   return (
@@ -428,9 +572,9 @@ export function CustomerServiceMonitorPanel({
         backoffRemainingMs={backoffRemainingMs}
         lastSyncedAt={lastSyncedAt}
         riskCount={riskItems.length}
+        serviceThreads={realtimeServiceThreads}
         staffItems={staffItems}
         t={t}
-        visibleThreads={visiblePoolThreads.length}
       />
 
       {error && (
@@ -457,16 +601,27 @@ export function CustomerServiceMonitorPanel({
           apiBaseUrl={apiBaseUrl}
           detailQueryByKey={detailQueryByKey}
           expandedThreadKey={expandedThreadKey}
+          focusedEmptySlotIndex={focusedEmptySlotIndex}
           focusedThreadKey={focusedThreadKey}
           layoutMode={layoutMode}
-          onFocusThread={setFocusedThreadKey}
+          onFocusThread={(key) => {
+            setFocusedThreadKey(key);
+            setFocusedEmptySlotIndex(null);
+          }}
+          onFocusEmptySlot={(slotIndex) => {
+            setFocusedThreadKey("");
+            setFocusedEmptySlotIndex(slotIndex);
+          }}
+          onManagementAction={executeManagementAction}
           onOpenThreadForAssist={openThreadForAssist}
           onOpenTransfer={openTransferDialog}
-          onRemoveThread={(key) =>
-            setWatchedThreadKeys((current) => removeWatchedThreadKey(current, key))
-          }
+          onRemoveThread={(key) => {
+            setManualWallSelection(true);
+            setWatchedThreadKeys((current) => removeWatchedThreadKey(current, key));
+          }}
           onDropThreadToSlot={dropThreadToWatchSlot}
           onReplaceThread={(targetKey) => {
+            setManualWallSelection(true);
             setWatchedThreadKeys((current) =>
               replaceWatchedThreadKey(current, targetKey, replacementThreadKey, layoutMode),
             );
@@ -480,6 +635,7 @@ export function CustomerServiceMonitorPanel({
             (thread) => threadKey(thread) === replacementThreadKey,
           )}
           onCancelReplace={() => setReplacementThreadKey("")}
+          recentlyReplacedThreadKey={recentlyReplacedThreadKey}
           riskThreadKeys={riskThreadKeys}
           staffItems={staffItems}
           t={t}
@@ -528,9 +684,9 @@ function MonitorToolbar({
   onLayoutChange,
   onRefresh,
   riskCount,
+  serviceThreads,
   staffItems,
   t,
-  visibleThreads,
 }: {
   backoffRemainingMs: number;
   dashboard?: CustomerServiceMonitorDashboardDto;
@@ -542,9 +698,9 @@ function MonitorToolbar({
   onLayoutChange: (layoutMode: MonitorLayoutMode) => void;
   onRefresh: () => void;
   riskCount: number;
+  serviceThreads: CustomerServiceThread[];
   staffItems: CustomerServiceStaffStatusDto[];
   t: Translate;
-  visibleThreads: number;
 }) {
   const syncText =
     backoffRemainingMs > 0
@@ -564,7 +720,7 @@ function MonitorToolbar({
           <span>{syncText}</span>
         </div>
         <div className="cs-monitor-toolbar-stats" aria-label={t("workbench.monitor.kpisAria")}>
-          {monitorKpis(dashboard, visibleThreads, riskCount, t).map((item) => (
+          {monitorKpis(dashboard, serviceThreads, riskCount, t).map((item) => (
             <span key={item.label}>
               {item.label}
               <strong>{item.value}</strong>
@@ -595,14 +751,24 @@ function MonitorToolbar({
           >
             <option value="active">{t("workbench.monitor.status.active")}</option>
             <option value="queued">{t("workbench.monitor.status.queued")}</option>
+            <option value="closed">{t("customerService.status.closed")}</option>
             <option value="">{t("workbench.monitor.all")}</option>
           </select>
-          <MonitorStaffMultiSelect
+          <MonitorStaffSelect
             filters={filters}
             onFilterChange={onFilterChange}
             staffItems={staffItems}
             t={t}
           />
+          <select
+            value={filters.slaRisk}
+            onChange={(event) =>
+              onFilterChange({ ...filters, slaRisk: event.target.value })
+            }
+          >
+            <option value="">{t("workbench.monitor.all")}</option>
+            <option value="true">{t("workbench.monitor.kpi.slaRisk")}</option>
+          </select>
           <label className="cs-monitor-search">
             <Search size={14} />
             <input
@@ -621,7 +787,7 @@ function MonitorToolbar({
           type="button"
         >
           <RefreshCw size={14} />
-          {t("common.retry")}
+          {t("common.query")}
         </button>
       </div>
     </header>
@@ -688,12 +854,7 @@ function MonitorThreadPool({
                 }}
                 >
                 <button type="button" onClick={() => onFocusThread(thread)}>
-                  <span className={`cs-monitor-thread-avatars ${unassigned ? "single" : ""}`} aria-hidden="true">
-                    <PcAvatar
-                      avatarUrl={customerIdentity.avatarUrl}
-                      className={`e-avatar cs-monitor-thread-avatar customer ${customerIdentity.avatarTone}`}
-                      name={customerIdentity.avatarName}
-                    />
+                  <span className="cs-monitor-thread-avatars" aria-hidden="true">
                     {!unassigned && (
                       <PcAvatar
                         avatarUrl={staffProfile.avatarUrl}
@@ -701,13 +862,17 @@ function MonitorThreadPool({
                         name={staffProfile.displayName}
                       />
                     )}
+                    <PcAvatar
+                      avatarUrl={customerIdentity.avatarUrl}
+                      className={`e-avatar cs-monitor-thread-avatar customer ${customerIdentity.avatarTone}`}
+                      name={customerIdentity.avatarName}
+                    />
                   </span>
                   <span className="cs-monitor-thread-main">
                     <strong>{threadTitle(thread, t)}</strong>
-                    <em>{thread.lastMessagePreview || t("customerService.threadList.noMessage")}</em>
+                    <em>{monitorThreadPreview(thread, t)}</em>
                   </span>
                   <span className="cs-monitor-thread-meta">
-                    <small>{threadStatusLabel(thread.status, t)}</small>
                     {!unassigned && <small>{staffProfile.displayName}</small>}
                   </span>
                   <small className="cs-monitor-thread-time">{formatThreadTime(thread)}</small>
@@ -722,7 +887,7 @@ function MonitorThreadPool({
   );
 }
 
-function MonitorStaffMultiSelect({
+function MonitorStaffSelect({
   filters,
   onFilterChange,
   staffItems,
@@ -733,90 +898,38 @@ function MonitorStaffMultiSelect({
   staffItems: CustomerServiceStaffStatusDto[];
   t: Translate;
 }) {
-  const [open, setOpen] = useState(false);
-  const [keyword, setKeyword] = useState("");
-  const selectedIds = filters.assignedStaffUserIds;
-  const selectedSet = new Set(selectedIds);
-  const normalizedKeyword = keyword.trim().toLowerCase();
-  const filteredStaffItems = staffItems.filter((staff) => {
-    if (!normalizedKeyword) return true;
-    return [staff.displayName, staff.staffUserId, staff.serviceStatus, staff.status]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(normalizedKeyword));
-  });
-  const selectedNames = selectedIds
-    .map((id) => staffItems.find((staff) => staff.staffUserId === id))
-    .map((staff, index) => staff?.displayName || staff?.staffUserId || selectedIds[index])
-    .filter(Boolean);
-  const label =
-    selectedNames.length === 0
-      ? t("workbench.monitor.allStaff")
-      : selectedNames.length === 1
-        ? selectedNames[0]
-        : `已选 ${selectedNames.length} 位客服`;
-  const updateSelected = (staffUserId: string, selected: boolean) => {
-    const next = selected
-      ? [...selectedIds, staffUserId]
-      : selectedIds.filter((id) => id !== staffUserId);
+  const selectedStaffUserId = filters.assignedStaffUserIds[0] ?? "";
+  const selectStaff = (staffUserId: string) => {
     onFilterChange({
       ...filters,
-      assignedStaffUserIds: Array.from(new Set(next)).filter(Boolean),
+      assignedStaffUserIds: staffUserId ? [staffUserId] : [],
     });
   };
 
   return (
-    <div className="cs-monitor-staff-filter">
-      <button
-        className={selectedIds.length > 0 ? "active" : ""}
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{label}</span>
-      </button>
-      {open && (
-        <div className="cs-monitor-staff-filter-menu">
-          <label>
-            <Search size={13} />
-            <input
-              value={keyword}
-              placeholder="搜索客服"
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-          </label>
-          <div className="cs-monitor-staff-filter-actions">
-            <button
-              type="button"
-              onClick={() => onFilterChange({ ...filters, assignedStaffUserIds: [] })}
-            >
-              {t("workbench.monitor.allStaff")}
-            </button>
-          </div>
-          <div className="cs-monitor-staff-filter-list">
-            {filteredStaffItems.length === 0 ? (
-              <p>{t("workbench.monitor.emptyThreads")}</p>
-            ) : (
-              filteredStaffItems.map((staff) => (
-                <label key={staff.staffUserId}>
-                  <input
-                    type="checkbox"
-                    checked={selectedSet.has(staff.staffUserId)}
-                    onChange={(event) =>
-                      updateSelected(staff.staffUserId, event.currentTarget.checked)
-                    }
-                  />
-                  <PcAvatar
-                    avatarUrl={staff.avatarUrl}
-                    className="e-avatar cs-monitor-staff-filter-avatar"
-                    name={staff.displayName || staff.staffUserId}
-                  />
-                  <span>{staff.displayName || staff.staffUserId}</span>
-                </label>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    <select
+      className={`cs-monitor-staff-select ${selectedStaffUserId ? "active" : ""}`}
+      value={selectedStaffUserId}
+      onChange={(event) => selectStaff(event.target.value)}
+    >
+      <option value="">{t("workbench.monitor.allStaff")}</option>
+      {staffItems.map((staff) => {
+        const displayName = staff.displayName || staff.staffUserId;
+        const activeCount = staff.activeSessionCount;
+        const maxCount = staff.maxConcurrentSessions;
+        const loadText =
+          activeCount === undefined || activeCount === null
+            ? ""
+            : maxCount === undefined || maxCount === null
+              ? String(activeCount)
+              : `${activeCount}/${maxCount}`;
+        return (
+          <option key={staff.staffUserId} value={staff.staffUserId}>
+            {loadText ? `${displayName} ${loadText}` : displayName}
+          </option>
+        );
+      })}
+    </select>
   );
 }
 
@@ -824,10 +937,13 @@ function MonitorWall({
   apiBaseUrl,
   detailQueryByKey,
   expandedThreadKey,
+  focusedEmptySlotIndex,
   focusedThreadKey,
   layoutMode,
   onCancelReplace,
+  onFocusEmptySlot,
   onFocusThread,
+  onManagementAction,
   onOpenThreadForAssist,
   onOpenTransfer,
   onDropThreadToSlot,
@@ -835,6 +951,7 @@ function MonitorWall({
   onReplaceThread,
   onToggleExpanded,
   replacementThread,
+  recentlyReplacedThreadKey,
   riskThreadKeys,
   staffItems,
   t,
@@ -844,10 +961,16 @@ function MonitorWall({
   apiBaseUrl?: string;
   detailQueryByKey: Map<string, DetailQueryState | undefined>;
   expandedThreadKey: string;
+  focusedEmptySlotIndex: number | null;
   focusedThreadKey: string;
   layoutMode: MonitorLayoutMode;
   onCancelReplace: () => void;
+  onFocusEmptySlot: (slotIndex: number) => void;
   onFocusThread: (threadKey: string) => void;
+  onManagementAction: (
+    thread: CustomerServiceThread,
+    action: MonitorManagementAction,
+  ) => void;
   onOpenThreadForAssist: (thread: CustomerServiceThread) => void;
   onOpenTransfer: (thread: CustomerServiceThread) => void;
   onDropThreadToSlot: (threadKey: string, slotIndex: number) => void;
@@ -855,6 +978,7 @@ function MonitorWall({
   onReplaceThread: (targetThreadKey: string) => void;
   onToggleExpanded: (threadKey: string) => void;
   replacementThread?: CustomerServiceThread;
+  recentlyReplacedThreadKey: string;
   riskThreadKeys: Set<string>;
   staffItems: CustomerServiceStaffStatusDto[];
   t: Translate;
@@ -898,12 +1022,14 @@ function MonitorWall({
               layoutMode={layoutMode}
               onFocus={() => onFocusThread(threadKey(thread))}
               onDropThread={(draggedThreadKey) => onDropThreadToSlot(draggedThreadKey, index)}
+              onManagementAction={(action) => onManagementAction(thread, action)}
               onOpenThreadForAssist={() => onOpenThreadForAssist(thread)}
               onOpenTransfer={() => onOpenTransfer(thread)}
               onRemove={() => onRemoveThread(threadKey(thread))}
               onReplace={() => onReplaceThread(threadKey(thread))}
               onToggleExpanded={() => onToggleExpanded(threadKey(thread))}
               replacementActive={Boolean(replacementThread)}
+              recentlyReplaced={threadKey(thread) === recentlyReplacedThreadKey}
               risky={riskThreadKeys.has(threadKey(thread))}
               staffItems={staffItems}
               t={t}
@@ -912,8 +1038,9 @@ function MonitorWall({
             />
           ) : (
             <article
-              className="cs-monitor-empty-slot"
+              className={`cs-monitor-empty-slot ${focusedEmptySlotIndex === index ? "focused" : ""}`}
               key={`slot-${index}`}
+              onClick={() => onFocusEmptySlot(index)}
               onDragOver={(event) => {
                 if (!hasMonitorThreadDragData(event)) return;
                 event.preventDefault();
@@ -944,12 +1071,14 @@ function MonitorWindow({
   layoutMode,
   onFocus,
   onDropThread,
+  onManagementAction,
   onOpenThreadForAssist,
   onOpenTransfer,
   onRemove,
   onReplace,
   onToggleExpanded,
   replacementActive,
+  recentlyReplaced,
   risky,
   staffItems,
   t,
@@ -963,12 +1092,14 @@ function MonitorWindow({
   layoutMode: MonitorLayoutMode;
   onFocus: () => void;
   onDropThread: (threadKey: string) => void;
+  onManagementAction: (action: MonitorManagementAction) => void;
   onOpenThreadForAssist: () => void;
   onOpenTransfer: () => void;
   onRemove: () => void;
   onReplace: () => void;
   onToggleExpanded: () => void;
   replacementActive: boolean;
+  recentlyReplaced: boolean;
   risky: boolean;
   staffItems: CustomerServiceStaffStatusDto[];
   t: Translate;
@@ -977,9 +1108,14 @@ function MonitorWindow({
 }) {
   const [profilePopover, setProfilePopover] =
     useState<MonitorProfilePopoverState | null>(null);
-  const messages = readDetailMessages(detailQuery?.data);
-  const readSnapshot = createMonitorReadSnapshot(detailQuery?.data, messages);
-  const displayMessages = applyMonitorReadStatusToMessages(messages, readSnapshot);
+  const historyThread = isMonitorHistoryThread(thread);
+  const detailData = monitorThreadDetailData(thread, detailQuery?.data, t);
+  const frozen = isMonitorThreadFrozen(detailData) || isMonitorThreadFrozen(thread);
+  const messages = readDetailMessages(detailData);
+  const displayMessages = applyCustomerServiceReadStatusToMessages(
+    detailData,
+    messages,
+  );
   const {
     handleScroll: handleMessageStageScroll,
     jumpToLatest,
@@ -991,13 +1127,22 @@ function MonitorWindow({
     messageKey: monitorMessageKey,
     messages: displayMessages,
   });
-  const messageStageState = monitorMessageStageState(detailQuery, displayMessages, t);
+  const messageStageState = monitorMessageStageState(
+    detailQuery,
+    displayMessages,
+    t,
+    historyThread,
+  );
   const customerIdentity = createCustomerServiceIdentityViewModel({
     fallbackName: threadCustomerName(thread, t),
     thread,
   });
   const customerName = customerIdentity.displayName;
-  const staffProfile = threadStaffProfile(thread, staffItems, messages);
+  const staffProfile = threadStaffProfile(
+    monitorThreadForProfile(thread, detailData),
+    staffItems,
+    messages,
+  );
   const staffName = staffProfile.displayName;
   const sourceSummary = threadSourceSummary(thread);
   const customerTags = monitorCustomerTags(thread);
@@ -1024,7 +1169,7 @@ function MonitorWindow({
   };
   return (
     <article
-      className={`cs-monitor-window ${expanded ? "expanded" : ""} ${focused ? "focused" : ""} ${replacementActive ? "replace-target" : ""} ${threadStatusClass(thread.status)} ${unassigned ? "unassigned" : ""} ${risky ? "risk" : ""}`}
+      className={`cs-monitor-window ${expanded ? "expanded" : ""} ${focused ? "focused" : ""} ${replacementActive ? "replace-target" : ""} ${recentlyReplaced ? "recently-replaced" : ""} ${threadStatusClass(thread.status)} ${unassigned ? "unassigned" : ""} ${risky ? "risk" : ""}`}
       onClick={() => {
         setProfilePopover(null);
         onFocus();
@@ -1100,15 +1245,47 @@ function MonitorWindow({
           </div>
         </div>
         <div className="cs-monitor-window-actions">
-          <button aria-label={t("customerService.transfer.open")} onClick={(event) => { event.stopPropagation(); onOpenTransfer(); }} title={t("customerService.transfer.open")} type="button">
-            <ArrowRightLeft size={13} />
-          </button>
+          {!historyThread && (
+            <button aria-label="改派客服" onClick={(event) => { event.stopPropagation(); onOpenTransfer(); }} title="改派客服" type="button">
+              <ArrowRightLeft size={13} />
+            </button>
+          )}
+          {!historyThread && (
+            <button
+              aria-label={frozen ? "解冻会话" : "冻结会话"}
+              className={frozen ? "warning" : ""}
+              onClick={(event) => {
+                event.stopPropagation();
+                onManagementAction(frozen ? "unfreeze" : "freeze");
+              }}
+              title={frozen ? "解冻会话" : "冻结会话"}
+              type="button"
+            >
+              {frozen ? <Unlock size={13} /> : <Lock size={13} />}
+            </button>
+          )}
+          {!historyThread && (
+            <button
+              aria-label="强制关闭"
+              className="danger"
+              onClick={(event) => {
+                event.stopPropagation();
+                onManagementAction("force-close");
+              }}
+              title="强制关闭"
+              type="button"
+            >
+              <Power size={13} />
+            </button>
+          )}
           <button aria-label={expanded ? t("workbench.monitor.shrinkWindow") : t("workbench.monitor.expandWindow")} onClick={(event) => { event.stopPropagation(); onToggleExpanded(); }} title={expanded ? t("workbench.monitor.shrinkWindow") : t("workbench.monitor.expandWindow")} type="button">
             {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
           </button>
-          <button aria-label={t("workbench.monitor.jumpThread")} onClick={(event) => { event.stopPropagation(); onOpenThreadForAssist(); }} title={t("workbench.monitor.jumpThread")} type="button">
-            <ExternalLink size={13} />
-          </button>
+          {!historyThread && (
+            <button aria-label={t("workbench.monitor.jumpThread")} onClick={(event) => { event.stopPropagation(); onOpenThreadForAssist(); }} title={t("workbench.monitor.jumpThread")} type="button">
+              <ExternalLink size={13} />
+            </button>
+          )}
           <button aria-label={t("workbench.monitor.closeWindow")} onClick={(event) => { event.stopPropagation(); onRemove(); }} title={t("workbench.monitor.closeWindow")} type="button">
             <X size={13} />
           </button>
@@ -1153,6 +1330,7 @@ function MonitorWindow({
           <MonitorProfilePopover
             customerAvatarUrl={customerAvatarUrl}
             customerName={customerIdentity.displayName}
+            historyThread={historyThread}
             kind={profilePopover.kind}
             onClose={() => setProfilePopover(null)}
             onOpenReadonlyDetail={onOpenThreadForAssist}
@@ -1190,6 +1368,7 @@ function PanelHeader({
 function MonitorProfilePopover({
   customerAvatarUrl,
   customerName,
+  historyThread,
   kind,
   onClose,
   onOpenReadonlyDetail,
@@ -1203,6 +1382,7 @@ function MonitorProfilePopover({
 }: {
   customerAvatarUrl?: string | null;
   customerName: string;
+  historyThread: boolean;
   kind: "customer" | "staff";
   onClose: () => void;
   onOpenReadonlyDetail: () => void;
@@ -1288,7 +1468,7 @@ function MonitorProfilePopover({
           {tags.map((tag) => <span key={tag}>{tag}</span>)}
         </div>
       )}
-      {kind === "customer" && (
+      {kind === "customer" && !historyThread && (
         <footer className="cs-monitor-profile-actions">
           <button type="button" onClick={onOpenReadonlyDetail}>
             <ExternalLink size={13} />
@@ -1304,6 +1484,7 @@ function monitorMessageStageState(
   detailQuery: DetailQueryState | undefined,
   messages: MessageItemDto[],
   t: Translate,
+  historyThread = false,
 ) {
   if (detailQuery?.isError) {
     return {
@@ -1322,158 +1503,13 @@ function monitorMessageStageState(
   if (messages.length === 0) {
     return {
       kind: "empty" as const,
-      text: t("workbench.monitor.emptyMessages"),
+      text: historyThread
+        ? "历史会话暂无消息快照。"
+        : t("workbench.monitor.emptyMessages"),
       tone: "muted" as const,
     };
   }
   return undefined;
-}
-
-function createMonitorReadSnapshot(
-  detail: unknown,
-  messages: MessageItemDto[],
-): MonitorReadSnapshot | null {
-  const readStatus = readDetailReadStatus(detail);
-  if (!readStatus?.members.length) return null;
-  const visitorUserId =
-    readStatus.visitorUserId ||
-    messages.map(messageSenderUserId).find((userId, index) =>
-      Boolean(userId && !isStaffMessage(messages[index])),
-    ) ||
-    "";
-  const customer = readStatus.members.find((member) => member.userId === visitorUserId);
-  const staff = readStatus.members.find((member) => member.userId !== customer?.userId);
-  return {
-    customer: customer ? normalizeMonitorReadMember(customer) : undefined,
-    latestCustomerSeq: latestConversationSeq(messages, (message) => !isStaffMessage(message)),
-    latestStaffSeq: latestConversationSeq(messages, isStaffMessage),
-    staff: staff ? normalizeMonitorReadMember(staff) : undefined,
-    visitorUserId,
-  };
-}
-
-function applyMonitorReadStatusToMessages(
-  messages: MessageItemDto[],
-  snapshot: MonitorReadSnapshot | null,
-) {
-  if (!snapshot) return messages;
-  return messages.map((message) => {
-    const seq = message.conversationSeq;
-    if (!seq || seq <= 0) return message;
-    const mine = isStaffMessage(message);
-    const reader = mine ? snapshot.customer : snapshot.staff;
-    if (!reader) return message;
-    const read = reader.lastReadSeq >= seq;
-    if (read) {
-      return {
-        ...message,
-        isRead: true,
-        readAt: reader.lastReadAt ?? message.readAt ?? null,
-        readCount: Math.max(1, Number(message.readCount ?? 0) || 0),
-      };
-    }
-    return {
-      ...message,
-      isRead: false,
-      readAt: null,
-      readCount: 0,
-      status: normalizeMonitorUnreadMessageStatus(message.status),
-    };
-  });
-}
-
-function monitorReadStatusChips(snapshot: MonitorReadSnapshot | null): MonitorReadChip[] {
-  if (!snapshot) return [];
-  return [
-    monitorReadStatusChip({
-      key: "customer",
-      member: snapshot.customer,
-      readerLabel: "客户",
-      targetSeq: snapshot.latestStaffSeq,
-    }),
-    monitorReadStatusChip({
-      key: "staff",
-      member: snapshot.staff,
-      readerLabel: "客服",
-      targetSeq: snapshot.latestCustomerSeq,
-    }),
-  ].filter((chip): chip is MonitorReadChip => Boolean(chip));
-}
-
-function monitorReadStatusChip({
-  key,
-  member,
-  readerLabel,
-  targetSeq,
-}: {
-  key: string;
-  member?: MonitorReadMember;
-  readerLabel: string;
-  targetSeq?: number;
-}): MonitorReadChip | null {
-  if (!targetSeq) return null;
-  if (!member) {
-    return {
-      className: "unknown",
-      key,
-      label: `${readerLabel}未知`,
-      title: `${readerLabel}暂无已读上报`,
-    };
-  }
-  const read = member.lastReadSeq >= targetSeq;
-  const timeText = formatMonthDayTime(member.lastReadAt);
-  return {
-    className: read ? "read" : "unread",
-    key,
-    label: `${readerLabel}${read ? "已读" : "未读"}`,
-    title: `${readerLabel}读到 #${member.lastReadSeq}${timeText ? ` · ${timeText}` : ""}`,
-  };
-}
-
-function readDetailReadStatus(detail: unknown): CustomerServiceReadStatusDto | null {
-  if (!detail || typeof detail !== "object") return null;
-  const record = detail as Record<string, unknown>;
-  const status = record.readStatus;
-  if (!status || typeof status !== "object") return null;
-  const typed = status as CustomerServiceReadStatusDto;
-  return Array.isArray(typed.members) ? typed : null;
-}
-
-function normalizeMonitorReadMember(
-  member: CustomerServiceReadStatusDto["members"][number],
-): MonitorReadMember {
-  return {
-    userId: member.userId,
-    lastReadSeq: Math.max(0, Math.floor(Number(member.lastReadSeq ?? 0) || 0)),
-    lastReadAt: member.lastReadAt ?? null,
-  };
-}
-
-function latestConversationSeq(
-  messages: MessageItemDto[],
-  predicate: (message: MessageItemDto) => boolean,
-) {
-  const seq = messages
-    .filter(predicate)
-    .map((message) => Number(message.conversationSeq ?? 0))
-    .filter((value) => Number.isFinite(value) && value > 0);
-  return seq.length ? Math.max(...seq) : undefined;
-}
-
-function messageSenderUserId(message: MessageItemDto) {
-  const record = message as MessageItemDto & Record<string, unknown>;
-  return readStringField(record, [
-    "senderUserId",
-    "senderId",
-    "fromUserId",
-    "userId",
-    "visitorUserId",
-  ]);
-}
-
-function normalizeMonitorUnreadMessageStatus(status?: string) {
-  const normalized = String(status ?? "").trim().toLowerCase();
-  return normalized === "read" || normalized === "seen" ? "sent" : status;
 }
 
 function noop() {}
@@ -1512,10 +1548,128 @@ function dropWatchedThreadKeyAtIndex(
   return [...current, key].slice(0, capacity);
 }
 
-function monitorQueryParams() {
-  return {
+function monitorQueryParams(filters: MonitorFilters): MonitorThreadQueryParams[] {
+  const keyword = filters.keyword.trim();
+  const slaRisk = filters.slaRisk.trim();
+  const base: MonitorThreadQueryParams = {
     pageSize: 100,
+    ...(keyword ? { keyword } : {}),
+    ...(slaRisk ? { slaRisk } : {}),
+    ...(filters.status === "active" || filters.status === "queued"
+      ? { status: filters.status }
+      : {}),
+    threadType: "temp_session" as const,
   };
+  return monitorSelectedStaffUserIds(filters).map((staffUserId) => ({
+    ...base,
+    ...(staffUserId ? { assignedStaffUserId: staffUserId } : {}),
+  }));
+}
+
+function monitorHistoryQueryParams(filters: MonitorFilters): MonitorHistoryQueryParams[] {
+  const keyword = filters.keyword.trim();
+  const slaRisk = filters.slaRisk.trim();
+  const base: MonitorHistoryQueryParams = {
+    limit: monitorHistoryLimit,
+    ...(keyword ? { keyword } : {}),
+    ...(slaRisk ? { slaRisk } : {}),
+    status: "closed",
+    threadType: "temp_session" as const,
+  };
+  return monitorSelectedStaffUserIds(filters).map((staffUserId) => ({
+    ...base,
+    ...(staffUserId ? { staffUserId } : {}),
+  }));
+}
+
+function monitorSelectedStaffUserIds(filters: MonitorFilters) {
+  const staffUserIds = Array.from(new Set(filters.assignedStaffUserIds.filter(Boolean)));
+  return staffUserIds.length > 0 ? staffUserIds : [""];
+}
+
+async function loadMonitorThreadItems(
+  client: CustomerServiceApiClient,
+  paramsList: MonitorThreadQueryParams[],
+) {
+  const responses = await Promise.all(
+    paramsList.map((params) => client.getCustomerServiceMonitorThreads(params)),
+  );
+  return dedupeMonitorThreads(responses.flatMap((response) => response.items ?? []));
+}
+
+async function loadMonitorHistoryThreadItems(
+  client: CustomerServiceApiClient,
+  paramsList: MonitorHistoryQueryParams[],
+) {
+  const responses = await Promise.all(
+    paramsList.map((params) => client.getCustomerServiceHistoryThreads(params)),
+  );
+  return dedupeMonitorThreads(responses.flatMap((response) => response.items ?? []));
+}
+
+function monitorThreadsForFilter(
+  realtimeThreads: CustomerServiceThread[],
+  historyThreads: CustomerServiceThread[],
+  status: string,
+) {
+  const realtimeServiceThreads = realtimeThreads.filter(isOnlineServiceMonitorThread);
+  const historyServiceThreads = historyThreads.filter(isOnlineServiceMonitorThread);
+  if (status === "active" || status === "queued") return realtimeServiceThreads;
+  if (status === "closed") return sortMonitorThreadsByRecent(historyServiceThreads);
+  return sortMonitorThreadsByStatusAndRecent(
+    dedupeMonitorThreads([...realtimeServiceThreads, ...historyServiceThreads]),
+  );
+}
+
+function isOnlineServiceMonitorThread(thread: CustomerServiceThread) {
+  return thread.threadType === "temp_session";
+}
+
+function dedupeMonitorThreads(threads: CustomerServiceThread[]) {
+  const byKey = new Map<string, CustomerServiceThread>();
+  for (const thread of threads) {
+    const key = threadKey(thread);
+    if (!key || byKey.has(key)) continue;
+    byKey.set(key, thread);
+  }
+  return Array.from(byKey.values());
+}
+
+function sortMonitorThreadsByRecent(threads: CustomerServiceThread[]) {
+  return [...threads].sort(
+    (left, right) => monitorThreadRecentMs(right) - monitorThreadRecentMs(left),
+  );
+}
+
+function sortMonitorThreadsByStatusAndRecent(threads: CustomerServiceThread[]) {
+  return [...threads].sort((left, right) => {
+    const rankDelta = monitorThreadStatusRank(left) - monitorThreadStatusRank(right);
+    if (rankDelta !== 0) return rankDelta;
+    return monitorThreadRecentMs(right) - monitorThreadRecentMs(left);
+  });
+}
+
+function monitorThreadStatusRank(thread: CustomerServiceThread) {
+  if (monitorThreadMatchesStatus(thread, "active")) return 0;
+  if (monitorThreadMatchesStatus(thread, "queued")) return 1;
+  if (isClosedMonitorThreadStatus(thread.status)) return 3;
+  return 2;
+}
+
+function monitorThreadRecentMs(thread: CustomerServiceThread) {
+  const record = thread as CustomerServiceThread & Record<string, unknown>;
+  return Math.max(
+    dateValueMs(thread.lastMessageAt),
+    dateValueMs(thread.updatedAt),
+    dateValueMs(thread.assignedAt),
+    dateValueMs(readStringField(record, ["closedAt", "acceptedAt", "startedAt", "createdAt"])),
+  );
+}
+
+function dateValueMs(value?: string | null) {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function filterMonitorThreads(
@@ -1554,7 +1708,34 @@ function monitorThreadMatchesStatus(thread: CustomerServiceThread, status: strin
       normalized.includes("ongoing")
     );
   }
+  if (status === "closed") return isClosedMonitorThreadStatus(thread.status);
   return normalized === status.toLowerCase();
+}
+
+function isMonitorThreadFrozen(value: unknown) {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  const frozen =
+    readBooleanField(record, ["isFrozen", "frozen"]) ||
+    String(record.freezeStatus ?? record.freeze_status ?? "")
+      .trim()
+      .toLowerCase() === "frozen";
+  return frozen;
+}
+
+function monitorManagementConfirmText(
+  thread: CustomerServiceThread,
+  action: MonitorManagementAction,
+  t: Translate,
+) {
+  const title = threadTitle(thread, t);
+  if (action === "force-close") {
+    return `确认强制关闭「${title}」？关闭后会话将进入历史只读。`;
+  }
+  if (action === "freeze") {
+    return `确认冻结「${title}」？冻结后客户和客服将暂时无法继续发送消息。`;
+  }
+  return `确认解冻「${title}」？解冻后会话可恢复发送。`;
 }
 
 function monitorThreadSearchText(
@@ -1583,13 +1764,19 @@ function monitorThreadSearchText(
 
 function monitorKpis(
   dashboard: CustomerServiceMonitorDashboardDto | undefined,
-  visibleThreads: number,
+  serviceThreads: CustomerServiceThread[],
   riskCount: number,
   t: Translate,
 ) {
+  const activeCount = serviceThreads.filter((thread) =>
+    monitorThreadMatchesStatus(thread, "active"),
+  ).length;
+  const queuedCount = serviceThreads.filter((thread) =>
+    monitorThreadMatchesStatus(thread, "queued"),
+  ).length;
   return [
-    { label: t("workbench.monitor.kpi.active"), value: numberLabel(dashboard?.activeCount ?? visibleThreads) },
-    { label: t("workbench.monitor.kpi.queued"), value: numberLabel(dashboard?.queuedCount) },
+    { label: t("workbench.monitor.kpi.active"), value: numberLabel(activeCount) },
+    { label: t("workbench.monitor.kpi.queued"), value: numberLabel(queuedCount) },
     { label: t("workbench.monitor.kpi.onlineStaff"), value: numberLabel(dashboard?.onlineStaffCount) },
     { label: t("workbench.monitor.kpi.slaRisk"), value: numberLabel(riskCount) },
   ];
@@ -1603,6 +1790,10 @@ function flattenSlaRiskItems(
     ...(dashboard?.warningItems ?? []),
     ...(dashboard?.items ?? []),
   ];
+}
+
+function isOnlineServiceSlaRiskItem(item: CustomerServiceSlaRiskItemDto) {
+  return !item.threadType || item.threadType === "temp_session";
 }
 
 function riskThreadKeySet(items: CustomerServiceSlaRiskItemDto[]) {
@@ -1686,7 +1877,7 @@ function threadStatusLabel(status: string | undefined, t: Translate) {
   const normalized = String(status ?? "").toLowerCase();
   if (normalized.includes("queue")) return t("workbench.monitor.status.queued");
   if (normalized.includes("active") || normalized.includes("serving")) return t("workbench.monitor.status.active");
-  if (normalized.includes("closed") || normalized.includes("ended")) return t("customerService.status.closed");
+  if (isClosedMonitorThreadStatus(status)) return t("customerService.status.closed");
   return status || "--";
 }
 
@@ -1694,8 +1885,21 @@ function threadStatusClass(status: string | undefined) {
   const normalized = String(status ?? "").toLowerCase();
   if (normalized.includes("queue")) return "queued";
   if (normalized.includes("active") || normalized.includes("serving")) return "active";
-  if (normalized.includes("closed") || normalized.includes("ended")) return "closed";
+  if (isClosedMonitorThreadStatus(status)) return "closed";
   return "unknown";
+}
+
+function isClosedMonitorThreadStatus(status: string | undefined) {
+  const normalized = String(status ?? "").toLowerCase();
+  return (
+    normalized.includes("closed") ||
+    normalized.includes("ended") ||
+    normalized.includes("archived")
+  );
+}
+
+function isMonitorHistoryThread(thread: CustomerServiceThread) {
+  return Boolean(thread.historyItem) || isClosedMonitorThreadStatus(thread.status);
 }
 
 function threadStaffName(
@@ -1716,6 +1920,17 @@ function threadStaffProfile(
     statusLabel: staffStatusLabel,
     thread,
   });
+}
+
+function monitorThreadForProfile(
+  thread: CustomerServiceThread,
+  detailData: unknown,
+): CustomerServiceThread {
+  if (!detailData || typeof detailData !== "object") return thread;
+  return {
+    ...thread,
+    ...(detailData as Partial<CustomerServiceThread>),
+  };
 }
 
 function monitorTransferTargets(
@@ -1749,6 +1964,14 @@ function readStringField(record: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function readFirstStringField(records: Record<string, unknown>[], keys: string[]) {
+  for (const record of records) {
+    const value = readStringField(record, keys);
+    if (value) return value;
   }
   return "";
 }
@@ -1788,6 +2011,39 @@ function formatThreadTime(thread: CustomerServiceThread) {
   return formatMonthDayTime(thread.updatedAt || thread.lastMessageAt || thread.assignedAt);
 }
 
+function monitorThreadPreview(thread: CustomerServiceThread, t: Translate) {
+  const preview = thread.lastMessagePreview?.trim();
+  if (preview) return preview;
+  if (isMonitorHistoryThread(thread)) return monitorClosedNotificationText(thread, t);
+  return t("customerService.threadList.noMessage");
+}
+
+function monitorClosedNotificationText(thread: CustomerServiceThread, t: Translate) {
+  const statusText = t(customerServiceHistoryStatusKey(thread.status || "closed"));
+  const timeText = formatMonitorClosedTime(thread);
+  return [
+    t("customerService.status.closed"),
+    statusText,
+    timeText,
+  ].filter(Boolean).join(" · ");
+}
+
+function formatMonitorClosedTime(thread: CustomerServiceThread) {
+  const record = thread as CustomerServiceThread & Record<string, unknown>;
+  return formatMonthDayTime(
+    readStringField(record, [
+      "closedAt",
+      "endedAt",
+      "updatedAt",
+      "lastMessageAt",
+      "assignedAt",
+      "acceptedAt",
+      "startedAt",
+      "createdAt",
+    ]),
+  );
+}
+
 function staffStatusLabel(staff?: CustomerServiceStaffStatusDto) {
   const value = staff?.serviceStatus ?? staff?.status;
   return value === undefined || value === null || value === "" ? "--" : String(value);
@@ -1807,6 +2063,124 @@ function usefulSourceLabel(value?: string | null) {
   const normalized = label.toLowerCase().replace(/[\s_-]+/g, "");
   if (normalized === "unknownsource" || normalized === "unknown") return "";
   return label;
+}
+
+function monitorThreadDetailData(
+  thread: CustomerServiceThread,
+  detail: unknown,
+  t?: Translate,
+) {
+  if (!isMonitorHistoryThread(thread)) return detail;
+  const record = thread as CustomerServiceThread & Record<string, unknown>;
+  const historyRecord =
+    thread.historyItem && typeof thread.historyItem === "object"
+      ? (thread.historyItem as Record<string, unknown>)
+      : {};
+  const detailRecord = detail && typeof detail === "object"
+    ? (detail as Record<string, unknown>)
+    : {};
+  return {
+    ...historyRecord,
+    ...record,
+    ...detailRecord,
+    messages: readHistorySnapshotMessages(t, detailRecord, record, historyRecord),
+    readStatus: readHistorySnapshotReadStatus(detailRecord, record, historyRecord),
+  };
+}
+
+function readHistorySnapshotMessages(
+  t: Translate | undefined,
+  ...records: Record<string, unknown>[]
+) {
+  const messages = firstMessageArray(
+    records.flatMap((record) => [
+      record.messages,
+      record.messageItems,
+      record.chatMessages,
+      record.messageSnapshots,
+    ]),
+  );
+  return appendHistoryClosedNoticeMessage(messages, records, t);
+}
+
+function readHistorySnapshotReadStatus(
+  ...records: Record<string, unknown>[]
+) {
+  const value = records
+    .map((record) => record.readStatus ?? record.read_status)
+    .find((item) => item && typeof item === "object");
+  return value && typeof value === "object" ? value : null;
+}
+
+function firstMessageArray(values: unknown[]) {
+  const value = values.find(Array.isArray);
+  return Array.isArray(value) ? [...(value as MessageItemDto[])] : [];
+}
+
+function appendHistoryClosedNoticeMessage(
+  messages: MessageItemDto[],
+  records: Record<string, unknown>[],
+  t?: Translate,
+) {
+  if (historyMessagesContainClosedNotice(messages)) return messages;
+  const notice = historyClosedNoticeMessage(records, t);
+  return notice ? [...messages, notice] : messages;
+}
+
+function historyClosedNoticeMessage(
+  records: Record<string, unknown>[],
+  t?: Translate,
+): MessageItemDto | null {
+  const status = readFirstStringField(records, ["status"]);
+  if (!isClosedMonitorThreadStatus(status)) return null;
+  const sentAt = readFirstStringField(records, [
+    "closedAt",
+    "endedAt",
+    "updatedAt",
+    "lastMessageAt",
+  ]);
+  const preview = historyClosedNoticeText(status || "closed", sentAt, t);
+  const conversationId = readFirstStringField(records, ["conversationId", "threadId"]) || "history";
+  return {
+    body: {
+      event: "customer_service_thread_closed",
+      text: preview,
+    },
+    conversationId,
+    direction: "system",
+    messageId: `${conversationId}:history-closed-notice`,
+    messageType: "event",
+    preview,
+    sentAt,
+    status: "sent",
+  };
+}
+
+function historyClosedNoticeText(status: string, sentAt?: string, t?: Translate) {
+  const statusText = t?.(customerServiceHistoryStatusKey(status)) || status || "Closed";
+  const closedText = t?.("customerService.status.closed") || "Closed";
+  const timeText = formatMonthDayTime(sentAt);
+  return [closedText, statusText, timeText].filter(Boolean).join(" · ");
+}
+
+function historyMessagesContainClosedNotice(messages: MessageItemDto[]) {
+  return messages.some((message) => {
+    const type = String(message.messageType ?? "").trim().toLowerCase();
+    const body = message.body ?? {};
+    const event = String(body.event ?? body.type ?? "").trim().toLowerCase();
+    const text = [
+      message.preview,
+      body.text,
+      body.eventText,
+      body.notice,
+    ].map((value) => String(value ?? "").toLowerCase()).join(" ");
+    return (
+      event.includes("closed") ||
+      event.includes("ended") ||
+      ((type === "event" || type === "system" || type === "notice") &&
+        (text.includes("关闭") || text.includes("结束") || text.includes("closed") || text.includes("ended")))
+    );
+  });
 }
 
 function readDetailMessages(detail: unknown): MessageItemDto[] {
@@ -1871,3 +2245,4 @@ function numberLabel(value?: number | string | null) {
   if (!Number.isFinite(numeric)) return "--";
   return numeric.toLocaleString();
 }
+

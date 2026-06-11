@@ -2,7 +2,7 @@
 
 ## 背景
 
-用户提供的绿色气泡应用图片位于 Lark 缓存目录，但该路径不是 PC 客户端构建输入。排查确认仓库中已有同款 `assets/app-icon-green-bubble.png` 和 Windows `.ico`，但图标生效链路不完整：`index.html` 没有 favicon，打包配置没有 `mac.icon`，仓库没有 `.icns`，macOS Dock/应用包图标和浏览器页签不会可靠更新。
+用户提供的绿色气泡应用图片位于 Lark 缓存目录，但该路径不是 PC 客户端构建输入。排查确认仓库中已有同款 `assets/app-icon-startlink.png` 和 Windows `.ico`，但图标生效链路不完整：`index.html` 没有 favicon，打包配置没有 `mac.icon`，仓库没有 `.icns`，macOS Dock/应用包图标和浏览器页签不会可靠更新。
 
 ## 风险边界
 
@@ -12,10 +12,10 @@
 
 ## 实现摘要
 
-- 以 `assets/app-icon-green-bubble.png` 作为 canonical source，并复制为 `public/app-icon-green-bubble.png` 供 Vite dev/build favicon 使用。
-- 保留 `assets/app-icon-green-bubble.ico` 作为 Windows 窗口、NSIS 安装器、卸载器和 extraResources 图标。
-- 新增 `assets/app-icon-green-bubble.icns`，用于 macOS 应用包/Dock 图标。
-- `package.json` 新增 `build.mac.icon = assets/app-icon-green-bubble.icns`，Windows/NSIS 配置继续指向 `.ico`。
+- 以 `assets/app-icon-startlink.png` 作为 canonical source，并复制为 `public/app-icon-startlink.png` 供 Vite dev/build favicon 使用。
+- 保留 `assets/app-icon-startlink.ico` 作为 Windows 窗口、NSIS 安装器、卸载器和 extraResources 图标。
+- 新增 `assets/app-icon-startlink.icns`，用于 macOS 应用包/Dock 图标。
+- `package.json` 新增 `build.mac.icon = assets/app-icon-startlink.icns`，Windows/NSIS 配置继续指向 `.ico`。
 - `index.html` 增加 `rel="icon"`。
 - macOS 开发态通过 `app.dock?.setIcon(...)` 设置 Dock 图标；不影响 Windows。
 
@@ -24,7 +24,7 @@
 - TDD 红灯：新增 `app-brand-assets.spec.ts` 后，旧实现因缺少 ICNS、`mac.icon`、favicon 和 Dock 图标设置按预期失败。
 - 绿灯验证：
   - `npx vitest run tests/unit/app-brand-assets.spec.ts`：通过，3 tests。
-  - `npm run build`：通过；`dist/renderer/index.html` 已包含 favicon，`dist/renderer/app-icon-green-bubble.png` 已生成，`dist/main/main.js` 已包含 macOS dev Dock 图标设置。
+  - `npm run build`：通过；`dist/renderer/index.html` 已包含 favicon，`dist/renderer/app-icon-startlink.png` 已生成，`dist/main/main.js` 已包含 macOS dev Dock 图标设置。
   - `npm run build:electron`：通过。
   - `npm run check:quick`：通过，包含 typecheck、Electron typecheck、core lint、hooks lint、架构边界、IPC validation、docs check、P19 audit 和 shape lint。
   - `npm run docs:check`：通过。

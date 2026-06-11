@@ -60,5 +60,5 @@ git diff --check
 ## 人工验收要点
 
 1. 文件卡片底部来源显示 `package.json build.productName` 对应的客户端程序名。
-2. `FileMessageCard` 不再硬编码 `LPP 客服客户端`。
+2. `FileMessageCard` 不再硬编码 `星络`。
 3. 后续修改客户端程序名时，renderer build 输出自动跟随。

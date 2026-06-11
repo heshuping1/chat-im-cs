@@ -8,7 +8,7 @@ This contract covers the first Windows x64 release of the LPP PC client updater.
 
 Query parameters:
 
-- `appId`: `lppchat`
+- `appId`: `startlink`
 - `platform`: `windows`
 - `arch`: `x64`
 - `currentVersion`: client semantic version
@@ -27,11 +27,11 @@ The client sends `Authorization: Bearer <tenantToken>` when a tenant session exi
   "force": false,
   "releaseNotes": "Bug fixes and desktop update support.",
   "updateKind": "delta",
-  "packageUrl": "https://cdn.example.com/lppchat-0.1.0-to-0.1.1-win-x64.patch",
+  "packageUrl": "https://cdn.example.com/startlink-0.1.0-to-0.1.1-win-x64.patch",
   "latestYmlUrl": "https://cdn.example.com/latest.yml",
   "sha512": "base64-sha512",
   "sizeBytes": 123456,
-  "fallbackFullPackageUrl": "https://cdn.example.com/lppchat-0.1.1-win-x64.exe",
+  "fallbackFullPackageUrl": "https://cdn.example.com/startlink-0.1.1-win-x64.exe",
   "fallbackSha512": "base64-sha512",
   "publishedAt": "2026-06-05T00:00:00.000Z"
 }

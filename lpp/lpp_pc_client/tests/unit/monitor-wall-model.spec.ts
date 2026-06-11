@@ -9,6 +9,7 @@ import {
   pruneWatchedThreadKeys,
   removeWatchedThreadKey,
   replaceWatchedThreadKey,
+  selectWatchedThreadKey,
   sortMonitorThreadsByPriority,
   trimWatchedThreadKeys,
 } from "../../src/renderer/customer-service/models/monitorWallModel";
@@ -83,6 +84,45 @@ describe("monitor wall model", () => {
       "e",
       "d",
     ]);
+  });
+
+  it("uses the focused monitor window as the replacement target when full", () => {
+    expect(selectWatchedThreadKey(["a", "b"], "c", "b", "2x1")).toEqual({
+      focusedThreadKey: "c",
+      replacementThreadKey: "",
+      replaced: true,
+      watchedThreadKeys: ["a", "c"],
+    });
+  });
+
+  it("enters explicit replacement mode when full without a focused window", () => {
+    expect(selectWatchedThreadKey(["a", "b"], "c", "", "2x1")).toEqual({
+      focusedThreadKey: "",
+      replacementThreadKey: "c",
+      replaced: false,
+      watchedThreadKeys: ["a", "b"],
+    });
+    expect(selectWatchedThreadKey(["a", "b"], "c", "missing", "2x1")).toEqual({
+      focusedThreadKey: "",
+      replacementThreadKey: "c",
+      replaced: false,
+      watchedThreadKeys: ["a", "b"],
+    });
+  });
+
+  it("focuses existing sessions and adds new sessions while capacity remains", () => {
+    expect(selectWatchedThreadKey(["a", "b"], "b", "a", "2x1")).toEqual({
+      focusedThreadKey: "b",
+      replacementThreadKey: "",
+      replaced: false,
+      watchedThreadKeys: ["a", "b"],
+    });
+    expect(selectWatchedThreadKey(["a"], "b", "a", "2x1")).toEqual({
+      focusedThreadKey: "b",
+      replacementThreadKey: "",
+      replaced: false,
+      watchedThreadKeys: ["a", "b"],
+    });
   });
 
   it("prunes conversations that are no longer visible after filtering", () => {

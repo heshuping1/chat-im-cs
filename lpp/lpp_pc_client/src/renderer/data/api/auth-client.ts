@@ -30,7 +30,7 @@ export class AuthApiClient extends ApiBaseClient {
         issueRefreshToken: true,
         deviceId: instance.deviceId,
         devicePlatform: "pc",
-        deviceName: `LPP PC Client (${instance.profileName})`,
+        deviceName: `StartLink PC Client (${instance.profileName})`,
         appVersion: "0.1.0",
         clientInstanceId: instance.clientInstanceId,
         profileName: instance.profileName,

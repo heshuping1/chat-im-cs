@@ -36,7 +36,7 @@ const _enableQuickLogin =
 const _quickLoginAccounts = [
   _QuickLoginAccount(
     label: '所有者(4)',
-    name: 'LPP所有者',
+    name: 'StartLink所有者',
     identifier: 'lpp_owner_1776587541@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -47,7 +47,7 @@ const _quickLoginAccounts = [
   ),
   _QuickLoginAccount(
     label: '管理员(3)',
-    name: 'LPP管理员',
+    name: 'StartLink管理员',
     identifier: 'lpp_admin2_1776587541@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -57,7 +57,7 @@ const _quickLoginAccounts = [
   ),
   _QuickLoginAccount(
     label: '客服(2) 邮箱',
-    name: 'LPP客服',
+    name: 'StartLink客服',
     identifier: 'lpp_cs2_1776587541@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -66,7 +66,7 @@ const _quickLoginAccounts = [
   ),
   _QuickLoginAccount(
     label: '技术支持(1) 邮箱',
-    name: 'LPP技术支持',
+    name: 'StartLink技术支持',
     identifier: 'lpp_tech2_1776587541@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -75,7 +75,7 @@ const _quickLoginAccounts = [
   ),
   _QuickLoginAccount(
     label: '普通员工(0) 邮箱',
-    name: 'LPP普通员工',
+    name: 'StartLink普通员工',
     identifier: 'lpp_member2_1776587541@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -83,28 +83,28 @@ const _quickLoginAccounts = [
     email: 'lpp_member2_1776587541@test.com',
   ),
   _QuickLoginAccount(
-    label: '客户归属客服 绿泡泡号',
+    label: '客户归属客服 星络号',
     name: '文档用户',
     identifier: 'lpp_hlty0ap2',
     password: '123123123',
     tab: _LoginTab.loginName,
-    description: '绿泡泡号登录',
+    description: '星络号登录',
     lppId: 'lpp_hlty0ap2',
     enterprise: 'Mouse 测试企业',
-    assignedServiceStaff: 'LPP客服',
+    assignedServiceStaff: 'StartLink客服',
   ),
   _QuickLoginAccount(
-    label: '客服无归属 绿泡泡号',
+    label: '客服无归属 星络号',
     name: 'mouse客服',
     identifier: 'lpp_gs9fn2c7',
     password: '123123123',
     tab: _LoginTab.loginName,
-    description: '绿泡泡号登录',
+    description: '星络号登录',
     lppId: 'lpp_gs9fn2c7',
   ),
   _QuickLoginAccount(
-    label: 'LPP客户1 邮箱',
-    name: 'LPP客户1',
+    label: 'StartLink客户1 邮箱',
+    name: 'StartLink客户1',
     identifier: 'lpp_cust1_1776587541@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -114,8 +114,8 @@ const _quickLoginAccounts = [
     assignedServiceStaff: '未分配',
   ),
   _QuickLoginAccount(
-    label: 'LPP客户2 邮箱',
-    name: 'LPP客户2',
+    label: 'StartLink客户2 邮箱',
+    name: 'StartLink客户2',
     identifier: 'lpp_cust2_1776587541@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -125,8 +125,8 @@ const _quickLoginAccounts = [
     assignedServiceStaff: '未分配',
   ),
   _QuickLoginAccount(
-    label: 'LPP客户3 邮箱',
-    name: 'LPP客户3',
+    label: 'StartLink客户3 邮箱',
+    name: 'StartLink客户3',
     identifier: 'lpp_cust3_1776618853@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -136,8 +136,8 @@ const _quickLoginAccounts = [
     assignedServiceStaff: '-',
   ),
   _QuickLoginAccount(
-    label: 'LPP客户4 邮箱',
-    name: 'LPP客户4',
+    label: 'StartLink客户4 邮箱',
+    name: 'StartLink客户4',
     identifier: 'lpp_cust4_1776618853@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -147,8 +147,8 @@ const _quickLoginAccounts = [
     assignedServiceStaff: '-',
   ),
   _QuickLoginAccount(
-    label: 'LPP客户5 邮箱',
-    name: 'LPP客户5',
+    label: 'StartLink客户5 邮箱',
+    name: 'StartLink客户5',
     identifier: 'lpp_cust5_1776618853@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -158,8 +158,8 @@ const _quickLoginAccounts = [
     assignedServiceStaff: '未分配',
   ),
   _QuickLoginAccount(
-    label: 'LPP客户6 邮箱',
-    name: 'LPP客户6',
+    label: 'StartLink客户6 邮箱',
+    name: 'StartLink客户6',
     identifier: 'lpp_cust6_1776618853@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -169,8 +169,8 @@ const _quickLoginAccounts = [
     assignedServiceStaff: '未分配',
   ),
   _QuickLoginAccount(
-    label: 'LPP客户7 邮箱',
-    name: 'LPP客户7',
+    label: 'StartLink客户7 邮箱',
+    name: 'StartLink客户7',
     identifier: 'lpp_cust7_1776618853@test.com',
     password: '123123123',
     tab: _LoginTab.email,
@@ -1095,7 +1095,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  // 绿泡泡号表单：绿泡泡号 + 密码。登录不需要企业码；企业选择由平台登录结果决定。
+  // 星络号表单：星络号 + 密码。登录不需要企业码；企业选择由平台登录结果决定。
   Widget _buildLoginNameForm() {
     final l10n = AppLocalizations.of(context);
     return Column(
@@ -1899,7 +1899,7 @@ class _QuickLoginAccountButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '绿泡泡号：${account.lppId ?? '-'}',
+                      '星络号：${account.lppId ?? '-'}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,

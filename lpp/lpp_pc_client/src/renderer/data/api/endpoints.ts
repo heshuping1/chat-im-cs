@@ -123,8 +123,12 @@ export const endpointPlan = {
     "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}",
   adminCustomerServiceCenterThreadAssign:
     "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}/assign",
+  adminCustomerServiceCenterThreadFreeze:
+    "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}/freeze",
   adminCustomerServiceCenterThreadForceClose:
     "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}/force-close",
+  adminCustomerServiceCenterThreadUnfreeze:
+    "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}/unfreeze",
   adminCustomerServiceCenterCustomersServiceHistory:
     "/api/admin/v1/customer-service/center/customers/service-history",
   adminCustomerServiceCenterStaffServiceHistory:

@@ -574,7 +574,7 @@ export function LoginPage() {
     <main className="login-page">
       <section className="login-panel auth-panel">
         <div className="auth-panel-heading">
-          <h1>lppchat</h1>
+          <h1>{t("app.title")}</h1>
           <p>{t("auth.subtitle")}</p>
         </div>
 

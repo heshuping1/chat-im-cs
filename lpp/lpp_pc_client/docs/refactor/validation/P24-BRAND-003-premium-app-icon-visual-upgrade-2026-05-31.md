@@ -12,17 +12,17 @@
 
 ## 实现摘要
 
-- 保留“绿色会话 + 全球沟通”的品牌识别，重绘 `assets/app-icon-green-bubble.png` 为小尺寸优先的圆角方形系统图标。
+- 保留“绿色会话 + 全球沟通”的品牌识别，重绘 `assets/app-icon-startlink.png` 为小尺寸优先的圆角方形系统图标。
 - 去掉旧图标的大面积硬白底与过多表情/点阵细节，改为低饱和 emerald 绿、简化气泡轮廓、少量经纬线和客服在线感知点。
-- 同步更新 `public/app-icon-green-bubble.png`、`assets/app-icon-green-bubble.ico` 与 `assets/app-icon-green-bubble.icns`，保持浏览器、Windows、macOS 使用同一视觉源。
+- 同步更新 `public/app-icon-startlink.png`、`assets/app-icon-startlink.ico` 与 `assets/app-icon-startlink.icns`，保持浏览器、Windows、macOS 使用同一视觉源。
 - 新增 `docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png`，用于 16/32/64/128/256px 小尺寸验收，避免只看大图通过。
 - 扩展 `app-brand-assets.spec.ts`，验证 canonical PNG、favicon PNG 与多尺寸验收图的尺寸和存在性。
 
 ## 验证
 
-- `file assets/app-icon-green-bubble.png assets/app-icon-green-bubble.ico assets/app-icon-green-bubble.icns public/app-icon-green-bubble.png docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png`：通过，PNG/ICO/ICNS 均可识别。
-- `sips -g pixelWidth -g pixelHeight assets/app-icon-green-bubble.png public/app-icon-green-bubble.png docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png`：通过，canonical 与 favicon 为 1254x1254，验收图为 1180x420。
-- `sips -g pixelWidth -g pixelHeight assets/app-icon-green-bubble.icns`：通过，macOS 图标最大尺寸为 1024x1024。
+- `file assets/app-icon-startlink.png assets/app-icon-startlink.ico assets/app-icon-startlink.icns public/app-icon-startlink.png docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png`：通过，PNG/ICO/ICNS 均可识别。
+- `sips -g pixelWidth -g pixelHeight assets/app-icon-startlink.png public/app-icon-startlink.png docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png`：通过，canonical 与 favicon 为 1254x1254，验收图为 1180x420。
+- `sips -g pixelWidth -g pixelHeight assets/app-icon-startlink.icns`：通过，macOS 图标最大尺寸为 1024x1024。
 - `npx vitest run tests/unit/app-brand-assets.spec.ts`：通过，4 tests。
 - `npm run build`：通过，renderer 和 Electron main 构建成功。
 - `npm run build:electron`：通过。

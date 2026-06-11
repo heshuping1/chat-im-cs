@@ -56,7 +56,7 @@ async function loginWithRegressionAccount(page: Page) {
   await page.getByText("高级设置").click();
   await page.locator("label", { hasText: "服务地址" }).locator("input").fill(apiBaseUrl);
   await page
-    .locator("label", { hasText: "LPP 号 / 邮箱 / 手机号" })
+    .locator("label", { hasText: "星络号 / 邮箱 / 手机号" })
     .locator("input")
     .fill(email);
   await page.locator("label", { hasText: "密码" }).locator("input").fill(password);

@@ -1330,9 +1330,9 @@ Base URL：`/api/client/v1`，需要租户级 Token。
 
 说明：
 
-- 绿泡泡模式下，客户（`userType=1`）不能查看企业成员列表
+- 星络模式下，客户（`userType=1`）不能查看企业成员列表
 - 该接口返回的是租户成员关系，不包含官方服务号等系统投影用户
-- **2026-06-04 起**，`/tenant/members` 返回的每个成员（`TenantMemberDto`，见 reference §4.2）附带 `lppId`（绿泡泡号，对应平台账号的全局唯一 `lpp_id`；未设置时为 `null`），供通讯录展示
+- **2026-06-04 起**，`/tenant/members` 返回的每个成员（`TenantMemberDto`，见 reference §4.2）附带 `lppId`（星络号，对应平台账号的全局唯一 `lpp_id`；未设置时为 `null`），供通讯录展示
 
 ### 4.3 邀请管理
 

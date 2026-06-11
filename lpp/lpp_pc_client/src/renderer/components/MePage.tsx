@@ -149,7 +149,7 @@ export function MePage() {
       <section className="settings-main">
         <section className="settings-hero-panel settings-hero-compact">
           <div>
-            <span className="eyebrow">lppchat</span>
+            <span className="eyebrow">{t("app.title")}</span>
             <h1>{t("me.title")}</h1>
             <p>{t("me.heroSubtitle")}</p>
           </div>

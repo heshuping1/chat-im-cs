@@ -144,7 +144,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get navMe => 'マイページ';
 
   @override
-  String get authLoginTitle => 'LPPにログイン';
+  String get authLoginTitle => 'StartLinkにログイン';
 
   @override
   String get authTabMobile => '電話番号';
@@ -153,7 +153,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get authTabEmail => 'メールアドレス';
 
   @override
-  String get authTabLoginName => 'LPP ID';
+  String get authTabLoginName => 'StartLink ID';
 
   @override
   String get authHintMobile => '電話番号を入力してください';
@@ -168,7 +168,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get authHintCode => '認証コードを入力してください';
 
   @override
-  String get authHintLoginName => 'LPP IDを入力してください（lpp_xxxxxxxx）';
+  String get authHintLoginName => 'StartLink IDを入力してください（lpp_xxxxxxxx）';
 
   @override
   String get authLoginButton => 'ログイン / 登録';
@@ -215,7 +215,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get authErrorEmptyPassword => 'パスワードを入力してください';
 
   @override
-  String get authErrorEmptyLoginName => 'LPP IDを入力してください';
+  String get authErrorEmptyLoginName => 'StartLink IDを入力してください';
 
   @override
   String get authErrorWrongCredentials => 'アカウントまたはパスワードが正しくありません';
@@ -779,11 +779,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get myLeaveEnterpriseFailed => '退出に失敗しました。もう一度お試しください';
 
   @override
-  String get myLppIdCopied => 'LPP IDをコピーしました';
+  String get myLppIdCopied => 'StartLink IDをコピーしました';
 
   @override
   String myLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override
@@ -846,7 +846,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get profileBasicSection => '基本情報';
 
   @override
-  String get profileLppId => 'LPP ID';
+  String get profileLppId => 'StartLink ID';
 
   @override
   String get profileLppIdNotSet => '未設定';
@@ -885,13 +885,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get profileSaveFailed => '保存に失敗しました。もう一度お試しください';
 
   @override
-  String get profileLppIdTitle => 'LPP ID';
+  String get profileLppIdTitle => 'StartLink ID';
 
   @override
-  String get profileLppIdSetOnce => 'LPP IDは一度しか変更できません。慎重に入力してください。';
+  String get profileLppIdSetOnce => 'StartLink IDは一度しか変更できません。慎重に入力してください。';
 
   @override
-  String get profileLppIdChangeFailed => '変更に失敗しました（LPP IDは一度しか変更できません）';
+  String get profileLppIdChangeFailed => '変更に失敗しました（StartLink IDは一度しか変更できません）';
 
   @override
   String get profileChangePasswordOld => '現在のパスワード';
@@ -954,7 +954,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsChatHistory => 'トーク履歴';
 
   @override
-  String get settingsAbout => 'LPPについて';
+  String get settingsAbout => 'StartLinkについて';
 
   @override
   String get settingsLanguage => '言語';
@@ -1202,7 +1202,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get friendAddTitle => '友達を追加';
 
   @override
-  String get friendSearchHint => '電話番号 / メール / LPP ID';
+  String get friendSearchHint => '電話番号 / メール / StartLink ID';
 
   @override
   String get friendRequestSent => '友達申請を送りました';
@@ -1250,7 +1250,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get friendSendMessage => 'メッセージを送る';
 
   @override
-  String get friendMatchTypeLppId => 'LPP IDで一致';
+  String get friendMatchTypeLppId => 'StartLink IDで一致';
 
   @override
   String get friendMatchTypeMobile => '電話番号で一致';
@@ -1304,7 +1304,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get profilePageFriendsOnly => 'このユーザーは友達にのみプロフィールを公開しています';
 
   @override
-  String get profilePageLppId => 'LPP ID';
+  String get profilePageLppId => 'StartLink ID';
 
   @override
   String get profilePageRemarkName => 'ニックネーム';
@@ -1322,7 +1322,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get searchTitle => '検索';
 
   @override
-  String get searchHint => '電話番号、メール、またはLPP IDで検索';
+  String get searchHint => '電話番号、メール、またはStartLink IDで検索';
 
   @override
   String get searchNoResults => '結果が見つかりません';
@@ -1535,7 +1535,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get spaceEnterEnterprise => '企業スペースに入る';
 
   @override
-  String get aboutTitle => 'LPPについて';
+  String get aboutTitle => 'StartLinkについて';
 
   @override
   String get aboutVersion => 'バージョン';
@@ -1761,7 +1761,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get privacySearchableByMobile => '電話番号での検索を許可';
 
   @override
-  String get privacySearchableByLppId => 'LPP IDでの検索を許可';
+  String get privacySearchableByLppId => 'StartLink IDでの検索を許可';
 
   @override
   String get privacyAllowFriendRequest => '友達申請を許可';
@@ -1977,11 +1977,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get addFriendTitle => '友達を追加';
 
   @override
-  String get addFriendSearchHint => '電話番号 / メール / LPP ID';
+  String get addFriendSearchHint => '電話番号 / メール / StartLink ID';
 
   @override
   String addFriendLppIdLabel(String lppId) {
-    return 'LPP ID: $lppId';
+    return 'StartLink ID: $lppId';
   }
 
   @override

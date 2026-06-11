@@ -163,7 +163,7 @@ class StartupGatePage extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              '绿泡泡',
+              '星络',
               style: TextStyle(
                 color: colorScheme.onSurface,
                 fontSize: 18,

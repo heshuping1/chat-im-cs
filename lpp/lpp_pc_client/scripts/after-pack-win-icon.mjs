@@ -9,8 +9,8 @@ const root = resolve(dirname(__filename), "..");
 export default async function afterPack(context) {
   if (context.electronPlatformName !== "win32") return;
 
-  const exePath = join(context.appOutDir, "lppchat.exe");
-  const iconPath = join(root, "assets", "app-icon-green-bubble.ico");
+  const exePath = join(context.appOutDir, "startlink.exe");
+  const iconPath = join(root, "assets", "app-icon-startlink.ico");
   if (!existsSync(exePath)) {
     throw new Error(`Cannot patch Windows icon, exe not found: ${exePath}`);
   }

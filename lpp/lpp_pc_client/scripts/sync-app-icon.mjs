@@ -8,13 +8,13 @@ const root = resolve(dirname(__filename), "..");
 
 const paths = {
   sourcePng: join(root, "assets", "brand", "app-icon-source.png"),
-  assetPng: join(root, "assets", "app-icon-green-bubble.png"),
-  publicPng: join(root, "public", "app-icon-green-bubble.png"),
-  ico: join(root, "assets", "app-icon-green-bubble.ico"),
-  icns: join(root, "assets", "app-icon-green-bubble.icns"),
-  packagedExe: join(root, "release", "win-unpacked", "lppchat.exe"),
+  assetPng: join(root, "assets", "app-icon-startlink.png"),
+  publicPng: join(root, "public", "app-icon-startlink.png"),
+  ico: join(root, "assets", "app-icon-startlink.ico"),
+  icns: join(root, "assets", "app-icon-startlink.icns"),
+  packagedExe: join(root, "release", "win-unpacked", "startlink.exe"),
 };
-const outputManifest = ["assets/app-icon-green-bubble.ico", "public/app-icon-green-bubble.png"];
+const outputManifest = ["assets/app-icon-startlink.ico", "public/app-icon-startlink.png"];
 
 const pngSignature = "89504e470d0a1a0a";
 
