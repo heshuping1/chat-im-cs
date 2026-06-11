@@ -26,6 +26,10 @@ import {
   customerServiceRealtimePollIntervalMs,
   customerServiceRealtimeRefetchInBackground,
 } from "../../data/customer-service/cs-realtime-config";
+import {
+  customerServiceReadStatusFromDirectStatus,
+  mergeCustomerServiceThreadDetailReadStatus,
+} from "../../data/customer-service/cs-message-read-status";
 import { createCustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
 import {
   createCustomerServiceWorkspaceViewModel,
@@ -39,7 +43,6 @@ import {
   type CustomerServiceThreadTransferPayload,
 } from "../../data/customer-service/cs-action-service";
 import {
-  isCustomerServiceTypingPreviewExpired,
   type CustomerServiceTypingPreview,
 } from "../../data/customer-service/cs-typing-preview";
 import { formatError } from "../../lib/format";
@@ -130,6 +133,24 @@ export function useCustomerServiceWorkspaceController({
     refetchInterval: selectedThreadIsLive ? 2_500 : false,
     refetchIntervalInBackground: true,
   });
+  const readStatusQuery = useQuery({
+    queryKey: pcQueryKeys.customerServiceThreadReadStatus(...queryBaseKey, threadType, threadId),
+    enabled: Boolean(client && selectedThread),
+    queryFn: async () => {
+      if (!client || !selectedThread) return null;
+      if (selectedThread.threadType === "temp_session") {
+        return client.getTempSessionReadStatus(selectedThread.threadId);
+      }
+      const directConversationId = selectedThread.conversationId || selectedThread.threadId;
+      const directStatus = await client.getDirectReadStatus(directConversationId);
+      return customerServiceReadStatusFromDirectStatus(
+        directStatus,
+        directConversationId,
+      );
+    },
+    refetchInterval: selectedThreadIsLive ? 10_000 : false,
+    refetchIntervalInBackground: true,
+  });
   useMessageDetailSync({
     enabled: Boolean(client && selectedThread && selectedThreadIsLive),
     isFetching: detailQuery.isFetching,
@@ -199,20 +220,10 @@ export function useCustomerServiceWorkspaceController({
       thread: selectedThread,
     });
   }, [profileQuery.data, selectedThread, session]);
-  useEffect(() => {
-    const preview = typingPreviewQuery.data;
-    if (!preview) return undefined;
-    if (isCustomerServiceTypingPreviewExpired(preview)) {
-      queryClient.setQueryData(typingPreviewQueryKey, null);
-      return undefined;
-    }
-    const timeout = window.setTimeout(() => {
-      queryClient.setQueryData(typingPreviewQueryKey, null);
-    }, Math.max(0, preview.expiresAt - Date.now()));
-    return () => window.clearTimeout(timeout);
-  }, [queryClient, typingPreviewQuery.data, typingPreviewQueryKey]);
-
-  const detail = detailQuery.data;
+  const detail = useMemo(
+    () => mergeCustomerServiceThreadDetailReadStatus(detailQuery.data, readStatusQuery.data),
+    [detailQuery.data, readStatusQuery.data],
+  );
   const localSelectedThread = localThreadsQuery.data?.find(
     (thread) =>
       thread.threadId === selectedThread?.threadId &&

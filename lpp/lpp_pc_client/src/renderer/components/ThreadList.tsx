@@ -35,9 +35,9 @@ import {
   type ServiceThreadFilter,
 } from "../data/workspace-ui/workspace-ui-store";
 import {
+  createCustomerServiceLiveCounters,
   createServiceHistoryThreadStatusDescriptor,
   createServiceHistoryTabBadge,
-  createServiceThreadListCounts,
   isRiskyCustomerServiceThread,
   type ServiceTextDescriptor,
   type ServiceThreadListMode,
@@ -127,16 +127,16 @@ export function ThreadList() {
     },
   });
 
-  const currentThreads = useMemo(
+  const currentLiveCounters = useMemo(
     () =>
-      [
-        ...(threadsQuery.data?.queueItems ?? []),
-        ...(threadsQuery.data?.activeItems ?? []),
-      ]
-        .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
-        .filter((thread) => !isCustomerServiceHistoryThread(thread)),
+      createCustomerServiceLiveCounters({
+        activeItems: threadsQuery.data?.activeItems,
+        isRiskyThread: isRiskyCustomerServiceThread,
+        queueItems: threadsQuery.data?.queueItems,
+      }),
     [threadsQuery.data],
   );
+  const currentThreads = currentLiveCounters.currentTempSessions;
   const historyThreads = useMemo(
     () => {
       const readonlyHistoryThreads = [
@@ -153,8 +153,13 @@ export function ThreadList() {
     [historyItems, threadsQuery.data],
   );
   const currentCounts = useMemo(
-    () => createServiceThreadListCounts(currentThreads, isRiskyCustomerServiceThread),
-    [currentThreads],
+    () => ({
+      all: currentLiveCounters.totalCount,
+      queued: currentLiveCounters.queuedCount,
+      serving: currentLiveCounters.activeCount,
+      sla: currentLiveCounters.slaRiskCount,
+    }),
+    [currentLiveCounters],
   );
   const historyTabBadge = useMemo(
     () => createServiceHistoryTabBadge(historyThreads),

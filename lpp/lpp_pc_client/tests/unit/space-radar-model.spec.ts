@@ -212,7 +212,7 @@ describe("space radar model", () => {
     ).toBe(8);
   });
 
-  it("shows current space local badge as unread messages instead of no reminder", () => {
+  it("shows current space local badge as current reminders instead of no reminder", () => {
     const currentItem = {
       current: true,
       hasNewReminder: false,
@@ -230,7 +230,7 @@ describe("space radar model", () => {
       }),
     ).toEqual({
       live: true,
-      text: "3 条未读消息",
+      text: "3 条当前提醒",
     });
     expect(
       spaceRadarItemReminderPresentation(otherItem, {

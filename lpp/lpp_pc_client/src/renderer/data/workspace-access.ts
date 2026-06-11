@@ -86,7 +86,7 @@ export function derivePcWorkspaceAccess(
     return access;
   }
   if (roleKind === "admin") {
-    const access = employeeBusinessAccess(roleKind, "team-admin");
+    const access = employeeBusinessAccess(roleKind, "enterprise-owner");
     logWorkspaceAccess(session, tenantMembershipRole, membershipRole, access, "admin_role");
     return access;
   }

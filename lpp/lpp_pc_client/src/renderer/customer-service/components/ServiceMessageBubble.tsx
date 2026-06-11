@@ -2,6 +2,7 @@ import type { MouseEvent } from "react";
 
 import { ChatMessageBubble } from "../../components/ChatMessageBubble";
 import type { MessageItemDto } from "../../data/api-client";
+import { customerServiceMessageReadReceiptState } from "../../data/customer-service/cs-message-read-status";
 import { createChatMessageViewModel } from "../../data/message/message-view-model";
 import { useI18n } from "../../i18n/useI18n";
 import { formatChatMessageTime } from "../../lib/format";
@@ -42,6 +43,10 @@ export function ServiceMessageBubble({
 }) {
   const { t } = useI18n();
   const fallbackSender = senderFallback || t("customerService.visitor");
+  const customerReadReceiptText = customerServiceReadReceiptText(
+    customerServiceMessageReadReceiptState(message, mine, threadType),
+    message.readAt,
+  );
   const messageViewModel = createChatMessageViewModel({
     conversationFallbackName,
     conversationType: threadType,
@@ -50,6 +55,7 @@ export function ServiceMessageBubble({
     mineAvatarUrl,
     senderAvatarUrl,
     senderFallback: fallbackSender,
+    statusText: customerReadReceiptText,
     timeText: formatChatMessageTime(message.sentAt),
     translationText,
   });
@@ -68,9 +74,21 @@ export function ServiceMessageBubble({
       onAvatarClick={onAvatarClick}
       onUploadAction={onUploadAction}
       senderFallback={fallbackSender}
+      statusText={customerReadReceiptText}
       timeText={formatChatMessageTime(message.sentAt)}
       translationText={translationText}
       viewModel={messageViewModel}
     />
   );
+}
+
+function customerServiceReadReceiptText(
+  state: ReturnType<typeof customerServiceMessageReadReceiptState>,
+  readAt?: string | null,
+) {
+  if (!state) return undefined;
+  if (state === "unread") return "客户未读";
+  if (state === "unknown") return "客户已读时间未知";
+  const timeText = formatChatMessageTime(readAt);
+  return timeText ? `客户已读 ${timeText}` : "客户已读时间未知";
 }

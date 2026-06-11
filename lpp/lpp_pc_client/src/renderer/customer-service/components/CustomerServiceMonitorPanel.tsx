@@ -35,6 +35,10 @@ import type { CustomerServiceTransferTarget } from "../../data/customer-service/
 import { pcQueryKeys } from "../../data/query-keys";
 import { createCustomerServiceIdentityViewModel } from "../../data/customer-service/cs-identity-view-model";
 import {
+  createCustomerServiceStaffProfileViewModel,
+  type CustomerServiceStaffProfileViewModel,
+} from "../../data/customer-service/cs-staff-profile-view-model";
+import {
   useOpenCustomerServiceThread,
   useSetActiveModule,
 } from "../../data/workspace-ui/workspace-ui-store";
@@ -77,17 +81,7 @@ type MonitorProfilePopoverState = {
   y: number;
 };
 
-type MonitorStaffProfile = {
-  activeSessionCount?: number | null;
-  avatarUrl?: string | null;
-  displayName: string;
-  lastHeartbeatAt?: string | null;
-  lastOnlineAt?: string | null;
-  maxConcurrentSessions?: number | null;
-  queueAcceptEnabled?: boolean | null;
-  staffUserId: string;
-  statusLabel: string;
-};
+type MonitorStaffProfile = CustomerServiceStaffProfileViewModel;
 
 type MonitorReadMember = {
   userId: string;
@@ -680,7 +674,7 @@ function MonitorThreadPool({
               fallbackName: t("customerService.visitor"),
               thread,
             });
-            const unassigned = staffProfile.displayName === "--";
+            const unassigned = !staffProfile.isAssigned;
             return (
               <article
                 className={`${key === focusedThreadKey ? "active" : ""} ${watched ? "watched" : ""} ${key === replacementThreadKey ? "replace-pending" : ""} ${statusClass} ${unassigned ? "unassigned" : ""} ${risky ? "risk" : ""}`}
@@ -694,25 +688,29 @@ function MonitorThreadPool({
                 }}
                 >
                 <button type="button" onClick={() => onFocusThread(thread)}>
-                  <span className={`cs-monitor-status-dot ${statusClass}`} />
-                  <span className="cs-monitor-thread-avatars" aria-hidden="true">
-                    <PcAvatar
-                      avatarUrl={staffProfile.avatarUrl}
-                      className={`e-avatar cs-monitor-thread-avatar staff ${unassigned ? "unassigned" : ""}`}
-                      name={unassigned ? t("workbench.monitor.unassigned") : staffProfile.displayName}
-                    />
+                  <span className={`cs-monitor-thread-avatars ${unassigned ? "single" : ""}`} aria-hidden="true">
                     <PcAvatar
                       avatarUrl={customerIdentity.avatarUrl}
                       className={`e-avatar cs-monitor-thread-avatar customer ${customerIdentity.avatarTone}`}
                       name={customerIdentity.avatarName}
                     />
+                    {!unassigned && (
+                      <PcAvatar
+                        avatarUrl={staffProfile.avatarUrl}
+                        className="e-avatar cs-monitor-thread-avatar staff"
+                        name={staffProfile.displayName}
+                      />
+                    )}
                   </span>
-                  <span>
+                  <span className="cs-monitor-thread-main">
                     <strong>{threadTitle(thread, t)}</strong>
                     <em>{thread.lastMessagePreview || t("customerService.threadList.noMessage")}</em>
                   </span>
-                  <small>{threadStatusLabel(thread.status, t)}</small>
-                  <small>{staffProfile.displayName} · {formatThreadTime(thread)}</small>
+                  <span className="cs-monitor-thread-meta">
+                    <small>{threadStatusLabel(thread.status, t)}</small>
+                    {!unassigned && <small>{staffProfile.displayName}</small>}
+                  </span>
+                  <small className="cs-monitor-thread-time">{formatThreadTime(thread)}</small>
                   {risky && <b>{t("workbench.monitor.slaRisk")}</b>}
                 </button>
               </article>
@@ -1004,7 +1002,7 @@ function MonitorWindow({
   const sourceSummary = threadSourceSummary(thread);
   const customerTags = monitorCustomerTags(thread);
   const customerAvatarUrl = customerIdentity.avatarUrl;
-  const unassigned = staffName === "--";
+  const unassigned = !staffProfile.isAssigned;
   const openProfilePopover = (
     kind: MonitorProfilePopoverState["kind"],
     event: MouseEvent<HTMLElement>,
@@ -1026,7 +1024,7 @@ function MonitorWindow({
   };
   return (
     <article
-      className={`cs-monitor-window ${expanded ? "expanded" : ""} ${focused ? "focused" : ""} ${replacementActive ? "replace-target" : ""} ${threadStatusClass(thread.status)} ${staffName === "--" ? "unassigned" : ""} ${risky ? "risk" : ""}`}
+      className={`cs-monitor-window ${expanded ? "expanded" : ""} ${focused ? "focused" : ""} ${replacementActive ? "replace-target" : ""} ${threadStatusClass(thread.status)} ${unassigned ? "unassigned" : ""} ${risky ? "risk" : ""}`}
       onClick={() => {
         setProfilePopover(null);
         onFocus();
@@ -1068,7 +1066,7 @@ function MonitorWindow({
             <PcAvatar
               avatarUrl={staffProfile.avatarUrl}
               className="e-avatar cs-monitor-avatar"
-              name={staffName === "--" ? t("workbench.monitor.unassigned") : staffName}
+              name={unassigned ? t("workbench.monitor.unassigned") : staffName}
             />
           </button>
           <button
@@ -1712,72 +1710,12 @@ function threadStaffProfile(
   staffItems: CustomerServiceStaffStatusDto[],
   messages: MessageItemDto[] = [],
 ): MonitorStaffProfile {
-  const record = thread as CustomerServiceThread & Record<string, unknown>;
-  const directName = readStringField(record, [
-    "assignedStaffDisplayName",
-    "assignedStaffName",
-    "staffDisplayName",
-    "staffName",
-  ]);
-  const staffUserId = readStringField(record, [
-    "assignedStaffUserId",
-    "staffUserId",
-    "serviceStaffUserId",
-  ]);
-  const directAvatarUrl = readStringField(record, [
-    "assignedStaffAvatarUrl",
-    "staffAvatarUrl",
-    "serviceStaffAvatarUrl",
-  ]);
-  const messageStaff = latestStaffMessageProfile(messages);
-  const resolvedStaffUserId = staffUserId || messageStaff.staffUserId;
-  const staff = staffItems.find((item) => item.staffUserId === resolvedStaffUserId);
-  return {
-    activeSessionCount: staff?.activeSessionCount,
-    avatarUrl: staff?.avatarUrl || directAvatarUrl || messageStaff.avatarUrl || null,
-    displayName:
-      directName ||
-      staff?.displayName ||
-      messageStaff.displayName ||
-      resolvedStaffUserId ||
-      "--",
-    lastHeartbeatAt: staff?.lastHeartbeatAt,
-    lastOnlineAt: staff?.lastOnlineAt,
-    maxConcurrentSessions: staff?.maxConcurrentSessions,
-    queueAcceptEnabled: staff?.queueAcceptEnabled,
-    staffUserId: staff?.staffUserId || resolvedStaffUserId,
-    statusLabel: staffStatusLabel(staff),
-  };
-}
-
-function latestStaffMessageProfile(messages: MessageItemDto[]) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (!message || !isStaffMessage(message)) continue;
-    const record = message as MessageItemDto & Record<string, unknown>;
-    return {
-      avatarUrl: readStringField(record, [
-        "staffAvatarUrl",
-        "senderAvatarUrl",
-        "avatarUrl",
-      ]),
-      displayName: readStringField(record, [
-        "staffDisplayName",
-        "senderDisplayName",
-        "senderName",
-        "displayName",
-        "nickname",
-      ]),
-      staffUserId: readStringField(record, [
-        "staffUserId",
-        "serviceStaffUserId",
-        "senderUserId",
-        "senderId",
-        "fromUserId",
-      ]),
-    };
-  }
-  return { avatarUrl: "", displayName: "", staffUserId: "" };
+  return createCustomerServiceStaffProfileViewModel({
+    messages,
+    staffItems,
+    statusLabel: staffStatusLabel,
+    thread,
+  });
 }
 
 function monitorTransferTargets(
@@ -1803,8 +1741,8 @@ function monitorTransferCurrentStaffName(
   unassignedLabel: string,
   messages: MessageItemDto[] = [],
 ) {
-  const name = threadStaffProfile(thread, staffItems, messages).displayName;
-  return name === "--" ? unassignedLabel : name;
+  const profile = threadStaffProfile(thread, staffItems, messages);
+  return profile.isAssigned ? profile.displayName : unassignedLabel;
 }
 
 function readStringField(record: Record<string, unknown>, keys: string[]) {

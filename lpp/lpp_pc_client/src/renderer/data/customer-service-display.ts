@@ -1,5 +1,6 @@
 import { customerServiceStatuses } from "./static-config";
 import type { CustomerServiceThread } from "./api-client";
+import { isQueuedCustomerServiceThreadStatus } from "./customer-service/cs-thread-state";
 
 export interface CustomerServiceTextDescriptor {
   key: string;
@@ -7,8 +8,7 @@ export interface CustomerServiceTextDescriptor {
 }
 
 export function isQueuedCustomerServiceThread(thread: CustomerServiceThread) {
-  const status = normalizeStatus(thread.status);
-  return status === "queued" || status.includes("queue") || status.includes("waiting");
+  return isQueuedCustomerServiceThreadStatus(thread.status);
 }
 
 export function createCustomerServiceThreadStatusDescriptor(

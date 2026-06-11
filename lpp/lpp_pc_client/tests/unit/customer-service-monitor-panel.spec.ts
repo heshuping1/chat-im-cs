@@ -95,12 +95,13 @@ describe("customer service monitor wall", () => {
   });
 
   it("falls back to staff identity from readonly message snapshots", () => {
+    expect(source).toContain("createCustomerServiceStaffProfileViewModel");
     expect(source).toContain("threadStaffProfile(thread, staffItems, messages)");
-    expect(source).toContain("latestStaffMessageProfile");
-    expect(source).toContain('"staffAvatarUrl"');
-    expect(source).toContain('"senderAvatarUrl"');
-    expect(source).toContain('"staffDisplayName"');
-    expect(source).toContain('"senderDisplayName"');
+    expect(source).not.toContain("latestStaffMessageProfile");
+    expect(source).not.toContain("cs-monitor-status-dot");
+    expect(styles).not.toContain("cs-monitor-status-dot");
+    expect(source).toContain('className={`cs-monitor-thread-avatars ${unassigned ? "single" : ""}`}');
+    expect(source).toContain("{!unassigned && (");
   });
 
   it("keeps manager actions to transfer and open without exposing intervention copy", () => {
@@ -112,7 +113,7 @@ describe("customer service monitor wall", () => {
     expect(source).toContain("transferThreadMessages");
     expect(source).toContain("monitorTransferTargets(transferThread, staffItems, transferThreadMessages)");
     expect(source).toContain("currentStaffName={monitorTransferCurrentStaffName");
-    expect(source).toContain("threadStaffProfile(thread, staffItems, messages).displayName");
+    expect(source).toContain("profile.isAssigned ? profile.displayName : unassignedLabel");
     expect(source).not.toContain('t("workbench.monitor.assistThread")');
   });
 

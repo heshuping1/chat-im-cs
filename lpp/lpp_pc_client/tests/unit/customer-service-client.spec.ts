@@ -242,6 +242,48 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("loads temp-session read status through the client token API", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      response: {
+        conversation_id: "conversation-1",
+        members: [
+          {
+            user_id: "staff-1",
+            last_read_seq: 0,
+            last_read_at: null,
+          },
+          {
+            user_id: "visitor-1",
+            last_read_seq: 12,
+            last_read_at: "2026-06-11T08:17:43.566Z",
+          },
+        ],
+        session_id: "session-1",
+        visitor_user_id: "visitor-1",
+      },
+    });
+
+    await expect(client.getTempSessionReadStatus("session-1")).resolves.toMatchObject({
+      conversationId: "conversation-1",
+      members: [
+        { userId: "staff-1", lastReadSeq: 0, lastReadAt: null },
+        {
+          userId: "visitor-1",
+          lastReadSeq: 12,
+          lastReadAt: "2026-06-11T08:17:43.566Z",
+        },
+      ],
+      sessionId: "session-1",
+      visitorUserId: "visitor-1",
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        path: "/api/client/v1/customer-service/temp-sessions/session-1/read-status",
+      },
+    ]);
+  });
+
   it("loads temp-session notes through the client token API and keeps pinned notes first", async () => {
     const client = new RecordingCustomerServiceApiClient({
       response: {

@@ -30,6 +30,16 @@ export interface CustomerServiceThreadEntity {
   provider?: string;
   avatarUrl?: string | null;
   customerAvatarUrl?: string | null;
+  assignedStaffAvatarUrl?: string | null;
+  assignedStaffDisplayName?: string | null;
+  assignedStaffName?: string | null;
+  assignedStaffUserId?: string | null;
+  serviceStaffAvatarUrl?: string | null;
+  serviceStaffUserId?: string | null;
+  staffAvatarUrl?: string | null;
+  staffDisplayName?: string | null;
+  staffName?: string | null;
+  staffUserId?: string | null;
   isVip?: boolean;
   customerLevel?: string;
   priority?: string;
@@ -191,6 +201,16 @@ export function normalizeCustomerServiceThreadDto(
       provider: stringField(record, "provider"),
       avatarUrl: nullableStringField(record, "avatarUrl", "avatar_url", "customerAvatarUrl", "customer_avatar_url"),
       customerAvatarUrl: nullableStringField(record, "customerAvatarUrl", "customer_avatar_url"),
+      assignedStaffAvatarUrl: nullableStringField(record, "assignedStaffAvatarUrl", "assigned_staff_avatar_url"),
+      assignedStaffDisplayName: nullableStringField(record, "assignedStaffDisplayName", "assigned_staff_display_name"),
+      assignedStaffName: nullableStringField(record, "assignedStaffName", "assigned_staff_name"),
+      assignedStaffUserId: nullableStringField(record, "assignedStaffUserId", "assigned_staff_user_id"),
+      serviceStaffAvatarUrl: nullableStringField(record, "serviceStaffAvatarUrl", "service_staff_avatar_url"),
+      serviceStaffUserId: nullableStringField(record, "serviceStaffUserId", "service_staff_user_id"),
+      staffAvatarUrl: nullableStringField(record, "staffAvatarUrl", "staff_avatar_url"),
+      staffDisplayName: nullableStringField(record, "staffDisplayName", "staff_display_name"),
+      staffName: nullableStringField(record, "staffName", "staff_name"),
+      staffUserId: nullableStringField(record, "staffUserId", "staff_user_id"),
       isVip: booleanField(record, "isVip", "is_vip"),
       customerLevel: stringField(record, "customerLevel", "customer_level", "level", "grade", "rank"),
       priority: stringField(record, "priority"),
@@ -232,6 +252,16 @@ export function customerServiceThreadEntityToDto(
     provider: entity.provider,
     avatarUrl: entity.avatarUrl,
     customerAvatarUrl: entity.customerAvatarUrl,
+    assignedStaffAvatarUrl: entity.assignedStaffAvatarUrl,
+    assignedStaffDisplayName: entity.assignedStaffDisplayName,
+    assignedStaffName: entity.assignedStaffName,
+    assignedStaffUserId: entity.assignedStaffUserId,
+    serviceStaffAvatarUrl: entity.serviceStaffAvatarUrl,
+    serviceStaffUserId: entity.serviceStaffUserId,
+    staffAvatarUrl: entity.staffAvatarUrl,
+    staffDisplayName: entity.staffDisplayName,
+    staffName: entity.staffName,
+    staffUserId: entity.staffUserId,
     isVip: entity.isVip,
     customerLevel: entity.customerLevel,
     priority: entity.priority,

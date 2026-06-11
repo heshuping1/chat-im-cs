@@ -27,7 +27,7 @@ import type {
 import { PanelState } from "./PanelState";
 
 export function DataCenterPage({
-  dataCenterView = "team-admin",
+  dataCenterView = "enterprise-owner",
 }: {
   dataCenterView?: PcDataCenterView;
 }) {

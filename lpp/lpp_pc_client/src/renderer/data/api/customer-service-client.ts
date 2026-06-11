@@ -42,6 +42,7 @@ import {
   applyCustomerServiceThreadOverlay,
   customerServiceIndexScopeKey,
 } from "../customer-service/cs-conversation-index";
+import { isQueuedCustomerServiceThreadStatus } from "../customer-service/cs-thread-state";
 import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
 import { recordMessageSourceObserved } from "../diagnostics/message-source-diagnostics";
 import { recordMessageTraceEvent } from "../diagnostics/message-trace-diagnostics";
@@ -537,6 +538,12 @@ export class CustomerServiceApiClient extends MessagesApiClient {
         .replace("{threadType}", threadRoutePathType(threadType))
         .replace("{threadId}", threadId),
     ).then((profile) => normalizeCustomerProfileFromContract(profile, threadId));
+  }
+
+  getTempSessionReadStatus(sessionId: string) {
+    return this.request<CustomerServiceReadStatusDto>(
+      endpointPlan.customerServiceTempSessionReadStatus.replace("{sessionId}", sessionId),
+    ).then((status) => normalizeCustomerServiceReadStatus(status));
   }
 
   getWorkbenchThreadDetail(
@@ -1037,6 +1044,34 @@ function adminTempSessionItemToCustomerServiceThread(
   return {
     accessMode: "management_readonly",
     assignedAt: readString(item.assignedAt) || null,
+    assignedStaffAvatarUrl:
+      readString(item.assignedStaffAvatarUrl) ||
+      readString(item.assigned_staff_avatar_url) ||
+      readString(item.staffAvatarUrl) ||
+      readString(item.staff_avatar_url) ||
+      readString(item.serviceStaffAvatarUrl) ||
+      readString(item.service_staff_avatar_url) ||
+      null,
+    assignedStaffDisplayName:
+      readString(item.assignedStaffDisplayName) ||
+      readString(item.assigned_staff_display_name) ||
+      readString(item.staffDisplayName) ||
+      readString(item.staff_display_name) ||
+      null,
+    assignedStaffName:
+      readString(item.assignedStaffName) ||
+      readString(item.assigned_staff_name) ||
+      readString(item.staffName) ||
+      readString(item.staff_name) ||
+      null,
+    assignedStaffUserId:
+      readString(item.assignedStaffUserId) ||
+      readString(item.assigned_staff_user_id) ||
+      readString(item.staffUserId) ||
+      readString(item.staff_user_id) ||
+      readString(item.serviceStaffUserId) ||
+      readString(item.service_staff_user_id) ||
+      null,
     avatarUrl: readString(item.avatarUrl) ?? null,
     conversationId,
     customerAvatarUrl: readString(item.customerAvatarUrl) ?? null,
@@ -1082,6 +1117,34 @@ function adminCenterThreadItemToCustomerServiceThread(
   return {
     accessMode: "management_readonly",
     assignedAt: readString(item.assignedAt) || readString(item.acceptedAt) || null,
+    assignedStaffAvatarUrl:
+      readString(item.assignedStaffAvatarUrl) ||
+      readString(item.assigned_staff_avatar_url) ||
+      readString(item.staffAvatarUrl) ||
+      readString(item.staff_avatar_url) ||
+      readString(item.serviceStaffAvatarUrl) ||
+      readString(item.service_staff_avatar_url) ||
+      null,
+    assignedStaffDisplayName:
+      readString(item.assignedStaffDisplayName) ||
+      readString(item.assigned_staff_display_name) ||
+      readString(item.staffDisplayName) ||
+      readString(item.staff_display_name) ||
+      null,
+    assignedStaffName:
+      readString(item.assignedStaffName) ||
+      readString(item.assigned_staff_name) ||
+      readString(item.staffName) ||
+      readString(item.staff_name) ||
+      null,
+    assignedStaffUserId:
+      readString(item.assignedStaffUserId) ||
+      readString(item.assigned_staff_user_id) ||
+      readString(item.staffUserId) ||
+      readString(item.staff_user_id) ||
+      readString(item.serviceStaffUserId) ||
+      readString(item.service_staff_user_id) ||
+      null,
     avatarUrl: readString(item.avatarUrl) ?? null,
     conversationId,
     customerAvatarUrl:
@@ -1104,6 +1167,10 @@ function adminCenterThreadItemToCustomerServiceThread(
       readString(item.channel) ||
       readString(item.entryChannel),
     status: readString(item.status) || "active",
+    staffAvatarUrl: readString(item.staffAvatarUrl) || readString(item.staff_avatar_url) || null,
+    staffDisplayName: readString(item.staffDisplayName) || readString(item.staff_display_name) || null,
+    staffName: readString(item.staffName) || readString(item.staff_name) || null,
+    staffUserId: readString(item.staffUserId) || readString(item.staff_user_id) || null,
     threadId,
     threadType,
     title:
@@ -1141,8 +1208,7 @@ function readAdminThreadSummary(
 }
 
 function isQueuedThreadStatus(status?: string | null) {
-  const normalized = normalizeResponseWireType(status);
-  return normalized === "queued" || normalized === "queueing" || normalized === "waiting";
+  return isQueuedCustomerServiceThreadStatus(status);
 }
 
 function isClosedThreadStatus(status?: string | null) {
@@ -1355,6 +1421,8 @@ function normalizeWorkbenchThreadDetail(
   const directChat = asRecord(detail.directChat ?? detail.direct_chat);
   const nested = asNestedPayload(tempSession) ?? asNestedPayload(directChat);
   const sourceRecord = nested ?? {};
+  const detailRecord = detail as CustomerServiceThreadDetailResponse & Record<string, unknown>;
+  const sourceFieldRecord = sourceRecord as NestedThreadPayload & Record<string, unknown>;
   const threadType = normalizeResponseThreadType(detail.threadType || options.fallbackThreadType);
   const threadId = detail.threadId || options.fallbackThreadId;
   const conversationId = detail.conversationId || detail.threadId || options.fallbackThreadId;
@@ -1388,6 +1456,54 @@ function normalizeWorkbenchThreadDetail(
       readString(sourceRecord.customerAvatarUrl) ||
       readString(sourceRecord.visitorAvatarUrl) ||
       readString(sourceRecord.avatarUrl) ||
+      null,
+    assignedStaffAvatarUrl:
+      readString(detailRecord.assignedStaffAvatarUrl) ||
+      readString(detailRecord.assigned_staff_avatar_url) ||
+      readString(detailRecord.staffAvatarUrl) ||
+      readString(detailRecord.staff_avatar_url) ||
+      readString(detailRecord.serviceStaffAvatarUrl) ||
+      readString(detailRecord.service_staff_avatar_url) ||
+      readString(sourceFieldRecord.assignedStaffAvatarUrl) ||
+      readString(sourceFieldRecord.assigned_staff_avatar_url) ||
+      readString(sourceFieldRecord.staffAvatarUrl) ||
+      readString(sourceFieldRecord.staff_avatar_url) ||
+      readString(sourceFieldRecord.serviceStaffAvatarUrl) ||
+      readString(sourceFieldRecord.service_staff_avatar_url) ||
+      null,
+    assignedStaffDisplayName:
+      readString(detailRecord.assignedStaffDisplayName) ||
+      readString(detailRecord.assigned_staff_display_name) ||
+      readString(detailRecord.staffDisplayName) ||
+      readString(detailRecord.staff_display_name) ||
+      readString(sourceFieldRecord.assignedStaffDisplayName) ||
+      readString(sourceFieldRecord.assigned_staff_display_name) ||
+      readString(sourceFieldRecord.staffDisplayName) ||
+      readString(sourceFieldRecord.staff_display_name) ||
+      null,
+    assignedStaffName:
+      readString(detailRecord.assignedStaffName) ||
+      readString(detailRecord.assigned_staff_name) ||
+      readString(detailRecord.staffName) ||
+      readString(detailRecord.staff_name) ||
+      readString(sourceFieldRecord.assignedStaffName) ||
+      readString(sourceFieldRecord.assigned_staff_name) ||
+      readString(sourceFieldRecord.staffName) ||
+      readString(sourceFieldRecord.staff_name) ||
+      null,
+    assignedStaffUserId:
+      readString(detailRecord.assignedStaffUserId) ||
+      readString(detailRecord.assigned_staff_user_id) ||
+      readString(detailRecord.staffUserId) ||
+      readString(detailRecord.staff_user_id) ||
+      readString(detailRecord.serviceStaffUserId) ||
+      readString(detailRecord.service_staff_user_id) ||
+      readString(sourceFieldRecord.assignedStaffUserId) ||
+      readString(sourceFieldRecord.assigned_staff_user_id) ||
+      readString(sourceFieldRecord.staffUserId) ||
+      readString(sourceFieldRecord.staff_user_id) ||
+      readString(sourceFieldRecord.serviceStaffUserId) ||
+      readString(sourceFieldRecord.service_staff_user_id) ||
       null,
     source:
       readString(detail.source) ||

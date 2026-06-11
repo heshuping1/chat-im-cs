@@ -135,6 +135,17 @@ describe("customer-service history and lookup surfaces", () => {
     expect(productPagesCss).toContain("scrollbar-gutter: stable");
   });
 
+  it("keeps customer typing preview in a non-overlapping dock below the message scroller", () => {
+    expect(messageStage).toContain("cs-message-stage-shell");
+    expect(messageStage).toContain("cs-typing-preview-dock");
+    expect(messageStage).toContain('className="h-message-stage"');
+    expect(messageStage.indexOf("cs-typing-preview-dock")).toBeGreaterThan(
+      messageStage.indexOf("</section>"),
+    );
+    expect(messageStage).not.toContain("className=\"cs-typing-preview\" aria-live=\"polite\"");
+    expect(workbenchKnowledgeCss).toContain(".cs-monitor-window .cs-message-stage-shell");
+  });
+
   it("keeps history participant ids out of the primary table columns", () => {
     const primaryOrderStart = customerServiceHistoryReport.indexOf("const primaryHistoryFieldOrder = [");
     const primaryOrderEnd = customerServiceHistoryReport.indexOf("];", primaryOrderStart);
@@ -378,6 +389,9 @@ describe("customer-service history and lookup surfaces", () => {
   it("keeps the role workbench dense and defaults managers to live service monitoring", () => {
     expect(workbenchPage).toContain("defaultWorkbenchShortcutId");
     expect(workbenchPage).toContain('return role === "admin" || role === "owner" ? "wb-admin-service-center" : "wb-cs-notices"');
+    expect(staticConfig).toContain("currentTenantMembershipRole(session)");
+    expect(staticConfig).toContain('if (membershipRole === 4) return "owner"');
+    expect(staticConfig).toContain('if (membershipRole === 3) return "admin"');
     expect(workbenchPage).toContain("workbench-main-grid");
     expect(workbenchPage).toContain("workbench-tabs");
     expect(workbenchPage).not.toContain("Object.entries(grouped)");

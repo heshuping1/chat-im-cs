@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   createCustomerServiceThreadState,
+  isQueuedCustomerServiceThreadStatus,
   logCustomerServiceThreadStateTransition,
   transitionCustomerServiceThreadState,
 } from "../../src/renderer/data/customer-service/cs-thread-state";
@@ -21,6 +22,12 @@ describe("customer service thread state", () => {
       kind: "queued",
       replyGate: "claim",
     });
+    expect(createCustomerServiceThreadState("pending")).toMatchObject({
+      kind: "queued",
+      replyGate: "claim",
+    });
+    expect(isQueuedCustomerServiceThreadStatus("pending")).toBe(true);
+    expect(isQueuedCustomerServiceThreadStatus("serving")).toBe(false);
   });
 
   it("maps AI states to takeover gate", () => {

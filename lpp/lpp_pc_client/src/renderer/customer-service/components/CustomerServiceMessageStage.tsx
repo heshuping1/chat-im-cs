@@ -73,75 +73,83 @@ export function CustomerServiceMessageStage({
   onUploadAction: (localTaskId: string, action: "pause" | "resume" | "cancel" | "retry") => void;
 }) {
   const { t } = useI18n();
+  const showTypingPreview =
+    messageStageState?.kind !== "loading" &&
+    messageStageState?.kind !== "error" &&
+    Boolean(typingPreview);
   return (
     <>
-      <section
-        className="h-message-stage"
-        aria-label={t("customerService.messageStage.aria")}
-        onScroll={onScroll}
-        ref={stageRef}
+      <div
+        className={`cs-message-stage-shell ${showTypingPreview ? "has-typing-preview" : ""}`}
         style={chatBackgroundStyleVariables(chatBackgroundPreset) as CSSProperties}
       >
-        {pendingNewMessageCount > 0 && (
-          <button
-            className="pc-chat-latest-jump"
-            type="button"
-            onClick={jumpToLatest}
-          >
-            {t("customerService.messageStage.newMessages", { count: pendingNewMessageCount })}
-          </button>
-        )}
-        {messageStageState && (
-          <PanelState text={messageStageState.text} tone={messageStageState.tone} />
-        )}
-        {messageStageState?.kind !== "loading" &&
-          messageStageState?.kind !== "error" &&
-          messages.map((message) => {
-            const mine = isMineMessage(message);
-            return (
-              <div
-                key={message.messageId}
-                className={`cs-message-row ${mine ? "mine" : "other"}`}
-                data-message-id={message.messageId}
-                data-message-render-key={
-                  message.messageId ||
-                  `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`
-                }
-              >
-                <ServiceMessageBubble
-                  message={message}
-                  mine={mine}
-                  translationText={message.messageId ? messageAnnotations[message.messageId] : undefined}
-                  assetBaseUrl={assetBaseUrl}
-                  authToken={authToken}
-                  mediaCacheContext={{
-                    accountId,
-                    conversationId: selectedThread.threadId || selectedThread.conversationId,
-                  }}
-                  mineAvatarUrl={mineAvatarUrl}
-                  conversationFallbackName={title || t("customerService.messageStage.customerFallback")}
-                  senderFallback={title}
-                  onContextMenu={onContextMenu}
-                  onAvatarClick={onAvatarClick}
-                  onUploadAction={onUploadAction}
-                  senderAvatarUrl={!mine ? message.senderAvatarUrl || message.avatarUrl || peerAvatarUrl : undefined}
-                  threadType={selectedThread.threadType}
-                />
-              </div>
-            );
-          })}
-        {messageStageState?.kind !== "loading" &&
-          messageStageState?.kind !== "error" &&
-          typingPreview && (
-            <div className="cs-typing-preview" aria-live="polite">
+        <section
+          className="h-message-stage"
+          aria-label={t("customerService.messageStage.aria")}
+          onScroll={onScroll}
+          ref={stageRef}
+        >
+          {pendingNewMessageCount > 0 && (
+            <button
+              className="pc-chat-latest-jump"
+              type="button"
+              onClick={jumpToLatest}
+            >
+              {t("customerService.messageStage.newMessages", { count: pendingNewMessageCount })}
+            </button>
+          )}
+          {messageStageState && (
+            <PanelState text={messageStageState.text} tone={messageStageState.tone} />
+          )}
+          {messageStageState?.kind !== "loading" &&
+            messageStageState?.kind !== "error" &&
+            messages.map((message) => {
+              const mine = isMineMessage(message);
+              return (
+                <div
+                  key={message.messageId}
+                  className={`cs-message-row ${mine ? "mine" : "other"}`}
+                  data-message-id={message.messageId}
+                  data-message-render-key={
+                    message.messageId ||
+                    `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`
+                  }
+                >
+                  <ServiceMessageBubble
+                    message={message}
+                    mine={mine}
+                    translationText={message.messageId ? messageAnnotations[message.messageId] : undefined}
+                    assetBaseUrl={assetBaseUrl}
+                    authToken={authToken}
+                    mediaCacheContext={{
+                      accountId,
+                      conversationId: selectedThread.threadId || selectedThread.conversationId,
+                    }}
+                    mineAvatarUrl={mineAvatarUrl}
+                    conversationFallbackName={title || t("customerService.messageStage.customerFallback")}
+                    senderFallback={title}
+                    onContextMenu={onContextMenu}
+                    onAvatarClick={onAvatarClick}
+                    onUploadAction={onUploadAction}
+                    senderAvatarUrl={!mine ? message.senderAvatarUrl || message.avatarUrl || peerAvatarUrl : undefined}
+                    threadType={selectedThread.threadType}
+                  />
+                </div>
+              );
+            })}
+        </section>
+        {showTypingPreview && typingPreview && (
+          <div className="cs-typing-preview-dock" aria-live="polite">
+            <div className="cs-typing-preview">
               <span>{t("customerService.messageStage.typingPreviewLabel")}</span>
               <p>
                 {typingPreview.previewText ||
                   t("customerService.messageStage.typingPreviewEmpty")}
               </p>
             </div>
-          )}
-      </section>
+          </div>
+        )}
+      </div>
 
       {messageMenu && (
         <ServiceMessageContextMenu

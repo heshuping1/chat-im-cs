@@ -48,9 +48,10 @@ describe("customer-service message avatars", () => {
     expect(messageStageSource).toContain("message.conversationSeq");
   });
 
-  it("does not render visitor read receipts as inline bubble text", () => {
+  it("renders customer read receipts only through the outgoing service bubble gate", () => {
+    expect(serviceMessageBubbleSource).toContain("customerServiceMessageReadReceiptState(message, mine, threadType)");
+    expect(serviceMessageBubbleSource).toContain("statusText={customerReadReceiptText}");
     expect(serviceMessageBubbleSource).not.toContain("messageReadStatusText");
     expect(serviceMessageBubbleSource).not.toContain("customerMessageReadText");
-    expect(serviceMessageBubbleSource).not.toContain("statusText={");
   });
 });

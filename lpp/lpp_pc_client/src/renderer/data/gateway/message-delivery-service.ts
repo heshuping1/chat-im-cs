@@ -7,6 +7,7 @@ import { isStrictImConversationType } from "../im/im-conversation-boundary";
 import type { CustomerServiceStatus } from "../types";
 import {
   mergeCustomerServiceGatewayMessage,
+  mergeCustomerServiceReadEvent,
   notifyCustomerServiceQueue,
 } from "./gateway-cs-side-effects";
 import {
@@ -117,6 +118,25 @@ export function createMessageDeliveryService(options: MessageDeliveryServiceOpti
       });
       invalidateCustomerService(input.threadId);
       notifyCustomerServiceQueue(input.payload, input.threadId ?? "");
+    },
+
+    deliverCustomerServiceRead(input: DeliverCustomerServiceMessageInput) {
+      recordMessageDeliveryDiagnostic({
+        owner: "customerService",
+        phase: "read",
+        route: input.route,
+        scopeKey,
+        source: input.source,
+        summary: {
+          latency: deliveryLatencySummary(input.payload),
+          message: deliveryPayloadSummary(input.payload),
+          threadId: input.threadId,
+        },
+      });
+      const merged = mergeCustomerServiceReadEvent(queryClient, input.payload, input.threadId ?? "");
+      if (!merged) {
+        invalidateCustomerService(input.threadId);
+      }
     },
 
     deliverImMessage(input: DeliverImMessageInput) {

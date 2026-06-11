@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { ModuleKey } from "../../src/renderer/data/types";
+import { roleFromSession } from "../../src/renderer/data/static-config";
 import {
   derivePcWorkspaceAccess,
   normalizeActiveModuleForAccess,
@@ -86,7 +87,7 @@ describe("pc workspace access model", () => {
         membershipRole: 3,
         tenantToken: "token",
       }).dataCenterView,
-    ).toBe("team-admin");
+    ).toBe("enterprise-owner");
 
     expect(
       derivePcWorkspaceAccess({
@@ -96,6 +97,43 @@ describe("pc workspace access model", () => {
         tenantToken: "token",
       }).dataCenterView,
     ).toBe("enterprise-owner");
+  });
+
+  it("derives workbench role from membership role before stale role labels", () => {
+    expect(
+      roleFromSession({
+        apiBaseUrl: "https://api.example",
+        displayName: "admin",
+        membershipRole: 3,
+        roleLabel: "customer service",
+        tenantToken: "token",
+      }),
+    ).toBe("admin");
+    expect(
+      roleFromSession({
+        apiBaseUrl: "https://api.example",
+        displayName: "owner",
+        membershipRole: 4,
+        roleLabel: "admin",
+        tenantToken: "token",
+      }),
+    ).toBe("owner");
+    expect(
+      roleFromSession({
+        apiBaseUrl: "https://api.example",
+        displayName: "tenant-admin",
+        roleLabel: "customer service",
+        tenantId: "tenant-1",
+        tenantToken: "token",
+        tenants: [
+          {
+            membershipRole: 3,
+            tenantId: "tenant-1",
+            tenantName: "Tenant",
+          },
+        ],
+      }),
+    ).toBe("admin");
   });
 
   it("does not classify unknown high membership roles as employees", () => {

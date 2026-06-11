@@ -1,5 +1,6 @@
 import {
   normalizeCustomerServiceThreadType,
+  type CustomerServiceReadStatusDto,
   type CustomerProfileCard,
   type CustomerServiceThread,
   type CustomerServiceThreadType,
@@ -31,6 +32,7 @@ export interface CustomerServiceThreadDetailView {
   messages?: MessageItemDto[];
   platform?: string;
   provider?: string;
+  readStatus?: CustomerServiceReadStatusDto | null;
   source?: string;
   sourceChannel?: string;
   status?: string;

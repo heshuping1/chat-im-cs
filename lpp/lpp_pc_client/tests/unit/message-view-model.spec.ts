@@ -128,7 +128,7 @@ describe("message view model", () => {
     });
   });
 
-  it("does not expose customer-service read time as visible bubble text", () => {
+  it("exposes customer-service read time as visible bubble text for outgoing messages", () => {
     const message = {
       body: { text: "hello" },
       direction: "out",
@@ -149,13 +149,14 @@ describe("message view model", () => {
         mine: true,
         readReceiptText: "客户已读 17:20",
         senderFallback: "Customer",
+        statusText: "客户已读 17:20",
         timeText: "17:18",
       }),
     ).toMatchObject({
       status: {
         receipt: "read",
         readReceiptText: undefined,
-        statusText: undefined,
+        statusText: "客户已读 17:20",
       },
     });
   });

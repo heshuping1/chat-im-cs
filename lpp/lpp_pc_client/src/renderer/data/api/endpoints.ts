@@ -101,6 +101,8 @@ export const endpointPlan = {
     "/api/client/v1/customer-service/im-direct/{threadId}/transfer",
   customerServiceTempSessionTransfer:
     "/api/client/v1/customer-service/temp-sessions/{sessionId}/transfer",
+  customerServiceTempSessionReadStatus:
+    "/api/client/v1/customer-service/temp-sessions/{sessionId}/read-status",
   customerServiceTempSessionNotes:
     "/api/client/v1/customer-service/temp-sessions/{sessionId}/notes",
   customerServiceTempSessionNotePin:

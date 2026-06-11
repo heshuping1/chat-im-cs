@@ -113,7 +113,7 @@ type HistoryPartyProfile = {
 };
 
 export function CustomerServiceHistoryReport({
-  dataCenterView = "team-admin",
+  dataCenterView = "enterprise-owner",
   report,
 }: {
   dataCenterView?: PcDataCenterView;

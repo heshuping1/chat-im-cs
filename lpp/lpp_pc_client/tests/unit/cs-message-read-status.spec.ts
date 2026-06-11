@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { CustomerServiceThreadDetailDto, MessageItemDto } from "../../src/renderer/data/api/types";
-import { applyCustomerServiceReadStatusToMessages } from "../../src/renderer/data/customer-service/cs-message-read-status";
+import {
+  applyCustomerServiceReadStatusToMessages,
+  createCustomerServiceGatewayReadStatus,
+  customerServiceMessageReadReceiptState,
+  customerServiceReadStatusFromDirectStatus,
+  mergeCustomerServiceReadStatuses,
+  mergeCustomerServiceThreadDetailReadStatus,
+} from "../../src/renderer/data/customer-service/cs-message-read-status";
 
 describe("customer service message read status", () => {
   it("marks visitor messages from the staff read sequence", () => {
@@ -54,6 +61,75 @@ describe("customer service message read status", () => {
       readAt: null,
       readCount: 0,
     });
+  });
+
+  it("merges detail, read-status query and realtime read status by highest sequence", () => {
+    const detail = createDetail({
+      visitorUserId: "visitor-1",
+      customerLastReadSeq: 5,
+      staffLastReadSeq: 20,
+    });
+    const queryStatus = {
+      members: [
+        {
+          lastReadAt: "2026-06-11T09:05:00.000Z",
+          lastReadSeq: 7,
+          userId: "visitor-1",
+        },
+      ],
+      visitorUserId: "visitor-1",
+    };
+    const realtimeStatus = createCustomerServiceGatewayReadStatus({
+      readAt: "2026-06-11T09:06:00.000Z",
+      readSeq: 9,
+      readerUserId: "visitor-1",
+      sessionId: "thread-1",
+      visitorUserId: "visitor-1",
+    });
+
+    const mergedStatus = mergeCustomerServiceReadStatuses(
+      detail.readStatus,
+      queryStatus,
+      realtimeStatus,
+    );
+    const mergedDetail = mergeCustomerServiceThreadDetailReadStatus(detail, mergedStatus);
+    const result = applyCustomerServiceReadStatusToMessages(
+      mergedDetail,
+      [
+        createMessage("staff-read", 9, "staff-1", "outbound"),
+        createMessage("staff-unread", 10, "staff-1", "outbound"),
+      ],
+    );
+
+    expect(result[0]).toMatchObject({
+      isRead: true,
+      readAt: "2026-06-11T09:06:00.000Z",
+    });
+    expect(result[1]).toMatchObject({
+      isRead: false,
+      readAt: null,
+    });
+  });
+
+  it("normalizes direct customer-service read-status into the shared read status shape", () => {
+    const status = customerServiceReadStatusFromDirectStatus(
+      {
+        peerLastReadAt: null,
+        peerLastReadSeq: 11,
+      },
+      "direct-1",
+    );
+    const result = applyCustomerServiceReadStatusToMessages(
+      { readStatus: status },
+      [createMessage("staff-direct-read", 11, "staff-1", "outbound")],
+    );
+
+    expect(result[0]).toMatchObject({
+      isRead: true,
+      readAt: null,
+      readCount: 1,
+    });
+    expect(customerServiceMessageReadReceiptState(result[0], true, "im_direct")).toBe("unknown");
   });
 });
 

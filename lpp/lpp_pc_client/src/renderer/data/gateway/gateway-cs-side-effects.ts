@@ -3,6 +3,10 @@ import type { MessageItemDto } from "../api-client";
 import { getAuthSessionSnapshot } from "../auth/auth-store";
 import { applyCustomerServiceGatewayMessageCache } from "../customer-service/cs-cache-adapter";
 import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
+import {
+  createCustomerServiceGatewayReadStatus,
+  mergeCustomerServiceReadStatuses,
+} from "../customer-service/cs-message-read-status";
 import { buildCustomerServiceNotificationPresentation } from "../customer-service/cs-notification-presentation";
 import { consumeCustomerServiceMessageReminder } from "../customer-service/cs-reminder-model";
 import {
@@ -33,6 +37,7 @@ import {
   imConversationId,
   isSelfCustomerServiceGatewayMessage,
   normalizeThreadType,
+  numberField,
   stringField,
 } from "./gateway-payload-utils";
 
@@ -119,6 +124,91 @@ export function mergeCustomerServiceGatewayMessage(
   }
 }
 
+export function mergeCustomerServiceReadEvent(
+  queryClient: QueryClient,
+  payload: Record<string, unknown>,
+  fallbackThreadId = "",
+) {
+  const session = getAuthSessionSnapshot();
+  const scopeKey = workspaceScopeKeyFromSession(session);
+  const conversationId =
+    imConversationId(payload) ||
+    stringField(payload, "conversationId", "conversation_id", "chatId", "chat_id");
+  const threadId =
+    stringField(payload, "threadId", "thread_id", "sessionId", "session_id") ||
+    customerServiceThreadId(payload, scopeKey) ||
+    fallbackThreadId ||
+    conversationId;
+  if (!threadId && !conversationId) return false;
+  const readSeq =
+    numberField(payload, "readSeq", "read_seq", "lastReadSeq", "last_read_seq", "conversationSeq", "conversation_seq") ??
+    0;
+  if (readSeq <= 0) return false;
+  const readerUserId = stringField(
+    payload,
+    "userId",
+    "user_id",
+    "readerUserId",
+    "reader_user_id",
+    "senderUserId",
+    "sender_user_id",
+    "visitorUserId",
+    "visitor_user_id",
+    "customerUserId",
+    "customer_user_id",
+  );
+  if (readerIsCurrentUser(readerUserId, session)) return false;
+  const readAt = stringField(payload, "readAt", "read_at", "lastReadAt", "last_read_at");
+  let changed = false;
+  const updateReadStatus = (old: { readStatus?: ReturnType<typeof mergeCustomerServiceReadStatuses> } | undefined) => {
+    if (!old) return old;
+    const visitorUserId = readerUserId || old.readStatus?.visitorUserId;
+    const status = createCustomerServiceGatewayReadStatus({
+      conversationId,
+      readAt,
+      readSeq,
+      readerUserId,
+      sessionId: threadId,
+      visitorUserId,
+    });
+    const merged = mergeCustomerServiceReadStatuses(old.readStatus, status);
+    if (!merged) return old;
+    changed = true;
+    return { ...old, readStatus: merged };
+  };
+
+  queryClient.setQueriesData<{ readStatus?: ReturnType<typeof mergeCustomerServiceReadStatuses> }>(
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-cs-thread-detail" &&
+        (query.queryKey.includes(threadId) || Boolean(conversationId && query.queryKey.includes(conversationId))),
+    },
+    updateReadStatus,
+  );
+  queryClient.setQueriesData<ReturnType<typeof mergeCustomerServiceReadStatuses>>(
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-cs-thread-read-status" &&
+        (query.queryKey.includes(threadId) || Boolean(conversationId && query.queryKey.includes(conversationId))),
+    },
+    (old) => {
+      const status = createCustomerServiceGatewayReadStatus({
+        conversationId,
+        readAt,
+        readSeq,
+        readerUserId,
+        sessionId: threadId,
+        visitorUserId: readerUserId || old?.visitorUserId,
+      });
+      const merged = mergeCustomerServiceReadStatuses(old, status);
+      if (!merged) return old;
+      changed = true;
+      return merged;
+    },
+  );
+  return changed;
+}
+
 export function notifyCustomerServiceQueue(payload: Record<string, unknown>, threadId: string) {
   const reminderActions = getReminderActions();
   const settings = getPcSettingsSnapshot();
@@ -174,6 +264,16 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
       },
     );
   }
+}
+
+function readerIsCurrentUser(
+  readerUserId: string | undefined,
+  session: ReturnType<typeof getAuthSessionSnapshot>,
+) {
+  if (!readerUserId || !session) return false;
+  return [session.userId, session.platformUserId, session.lppId]
+    .filter(Boolean)
+    .some((id) => id === readerUserId);
 }
 
 function notifyCustomerServiceMessage(

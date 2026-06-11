@@ -9,21 +9,25 @@ describe("customer service badge view", () => {
       activeItems: [
         thread({ threadId: "active-1", unreadCount: 2 }),
         thread({ threadId: "active-2", unreadCount: 3 }),
+        thread({ status: "pending", threadId: "pending-1", unreadCount: 6 }),
       ],
       queueItems: [thread({ status: "queued", threadId: "queue-1", unreadCount: 9 })],
       summaryQueuedCount: 4,
       threadDataLoaded: true,
     });
 
-    expect(view.queuedTempSessions.map((item) => item.threadId)).toEqual(["queue-1"]);
+    expect(view.queuedTempSessions.map((item) => item.threadId)).toEqual([
+      "queue-1",
+      "pending-1",
+    ]);
     expect(view.activeTempSessions.map((item) => item.threadId)).toEqual([
       "active-1",
       "active-2",
     ]);
-    expect(view.queuedServiceCount).toBe(1);
+    expect(view.queuedServiceCount).toBe(2);
     expect(view.activeServiceUnreadCount).toBe(5);
     expect(view.taskbarServiceUnreadCount).toBe(5);
-    expect(view.serviceAlertCount).toBe(6);
+    expect(view.serviceAlertCount).toBe(7);
   });
 
   it("does not create strong service alerts from summary-only queued counts", () => {
@@ -78,6 +82,28 @@ describe("customer service badge view", () => {
     expect(view.taskbarServiceUnreadCount).toBe(2);
     expect(view.serviceAlertCount).toBe(3);
     expect(view.closedHistoryUnreadCount).toBe(12);
+  });
+
+  it("keeps closed unread and direct pending threads out of strong service alerts", () => {
+    const view = resolveCustomerServiceBadgeView({
+      activeItems: [
+        thread({ status: "pending", threadId: "temp-pending", threadType: "temp_session", unreadCount: 4 }),
+        thread({ status: "closed_by_staff", threadId: "temp-history", threadType: "temp_session", unreadCount: 8 }),
+        thread({ status: "pending", threadId: "direct-pending", threadType: "im_direct", unreadCount: 9 }),
+      ],
+      queueItems: [
+        thread({ status: "archived", threadId: "archived-queue", threadType: "temp_session", unreadCount: 6 }),
+      ],
+      threadDataLoaded: true,
+    });
+
+    expect(view.queuedTempSessions.map((item) => item.threadId)).toEqual(["temp-pending"]);
+    expect(view.activeTempSessions).toEqual([]);
+    expect(view.activeServiceUnreadCount).toBe(0);
+    expect(view.queuedServiceCount).toBe(1);
+    expect(view.serviceAlertCount).toBe(1);
+    expect(view.taskbarServiceUnreadCount).toBe(0);
+    expect(view.closedHistoryUnreadCount).toBe(14);
   });
 });
 

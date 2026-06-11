@@ -30,8 +30,8 @@ export function createCustomerServiceLiveCounters(
   input: CustomerServiceLiveCountersInput,
 ): CustomerServiceLiveCounters {
   const currentTempSessions = [
-    ...(input.activeItems ?? []),
     ...(input.queueItems ?? []),
+    ...(input.activeItems ?? []),
   ].filter(isDisplayableTempSession);
   const queuedTempSessions = currentTempSessions.filter(isQueuedCustomerServiceThread);
   const activeTempSessions = currentTempSessions.filter(

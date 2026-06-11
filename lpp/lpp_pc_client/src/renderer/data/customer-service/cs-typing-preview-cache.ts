@@ -11,9 +11,8 @@ export function applyCustomerServiceTypingPreviewCache(
   queryClient: QueryClient,
   session: AuthSession,
   event: CustomerServiceTypingPreviewEvent,
-  now = Date.now(),
 ) {
-  const nextPreview = reduceCustomerServiceTypingPreview(event, now);
+  const nextPreview = reduceCustomerServiceTypingPreview(event);
   if (nextPreview === undefined) return;
   queryClient.setQueryData(
     pcQueryKeys.customerServiceTypingPreview(

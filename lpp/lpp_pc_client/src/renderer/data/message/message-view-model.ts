@@ -133,6 +133,7 @@ export function createChatMessageViewModel(
       showSendingIndicator: status.showSendingIndicator,
       readReceiptText: undefined,
       statusText: visibleStatusText({
+        allowReceiptStatusText: isCustomerServiceConversation(input.conversationType) && Boolean(input.statusText),
         mine: input.mine,
         receipt: status.receiptState,
         statusText: input.statusText ?? status.statusLabel,
@@ -178,15 +179,18 @@ function uploadActionTaskId(
 }
 
 function visibleStatusText({
+  allowReceiptStatusText,
   mine,
   receipt,
   statusText,
 }: {
+  allowReceiptStatusText?: boolean;
   mine: boolean;
   receipt: ChatMessageReceiptState;
   statusText: string | undefined;
 }) {
   if (!mine) return undefined;
+  if (allowReceiptStatusText && statusText) return statusText;
   return receipt === "read" ||
     receipt === "unread" ||
     receipt === "group_unread" ||
@@ -194,6 +198,11 @@ function visibleStatusText({
     receipt === "group_all"
     ? undefined
     : statusText;
+}
+
+function isCustomerServiceConversation(conversationType?: string | null) {
+  const normalized = String(conversationType ?? "").trim().toLowerCase().replace(/-/g, "_");
+  return normalized === "temp_session" || normalized === "im_direct";
 }
 
 function stringField(record: Record<string, unknown>, ...keys: string[]) {

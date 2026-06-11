@@ -349,6 +349,27 @@ export function createGatewayEventRouter(options: {
 
     if (eventName === "msg.read" || eventName === "msg.recalled" || eventName === "space.notice") {
       if (eventName === "msg.read") {
+        if (isCustomerServiceGatewayPayload(payload, scopeKey)) {
+          const threadId =
+            classification.threadId ||
+            customerServiceThreadId(payload, scopeKey) ||
+            stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "conversationId", "conversation_id");
+          recordGatewayReminderDiagnostic({
+            eventName,
+            payload,
+            phase: "routed",
+            route: "customer-service-read",
+            scopeKey,
+            source: "gateway-router",
+          });
+          delivery.deliverCustomerServiceRead({
+            payload,
+            route: "customer-service-read",
+            source: "gateway-router",
+            threadId,
+          });
+          return;
+        }
         recordGatewayReminderDiagnostic({
           eventName,
           payload,

@@ -352,4 +352,29 @@ describe("online service responsive layout", () => {
     expect(css).toContain(".h-message-stage .cs-message-row.other");
     expect(css).toContain("justify-content: flex-start;");
   });
+
+  it("keeps customer typing preview below the scroller without overlaying messages", () => {
+    const stage = readFileSync(
+      new URL(
+        "../../src/renderer/customer-service/components/CustomerServiceMessageStage.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const css = readFileSync(
+      new URL(
+        "../../src/renderer/styles/customer-service/customer-service.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(stage).toContain("cs-message-stage-shell");
+    expect(stage).toContain("cs-typing-preview-dock");
+    expect(css).toContain("grid-template-rows: minmax(0, 1fr) auto;");
+    expect(css).toContain(".cs-typing-preview-dock");
+    expect(css).toContain("justify-content: flex-start;");
+    expect(css).not.toContain(".cs-typing-preview-dock {\n  position: absolute");
+    expect(css).not.toContain(".cs-typing-preview-dock {\n  position: fixed");
+  });
 });

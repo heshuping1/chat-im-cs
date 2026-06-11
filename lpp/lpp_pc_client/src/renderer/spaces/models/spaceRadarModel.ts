@@ -81,7 +81,7 @@ export function spaceRadarItemReminderPresentation(
   if (item.current && normalizedCurrentBadgeCount > 0) {
     return {
       live: true,
-      text: `${formatPlainBadgeCount(normalizedCurrentBadgeCount)} 条未读消息`,
+      text: `${formatPlainBadgeCount(normalizedCurrentBadgeCount)} 条当前提醒`,
     };
   }
   if (item.hasNewReminder) {

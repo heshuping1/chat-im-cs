@@ -81,6 +81,18 @@ export const pcQueryKeys = {
       threadType ?? "",
       threadId ?? "",
     ] as const,
+  customerServiceThreadReadStatus: (
+    apiBaseUrl?: string,
+    tenantToken?: string,
+    threadType?: string,
+    threadId?: string,
+  ) =>
+    [
+      "pc-cs-thread-read-status",
+      ...sessionKey(apiBaseUrl, tenantToken),
+      threadType ?? "",
+      threadId ?? "",
+    ] as const,
   customerServiceThreadProfile: (
     apiBaseUrl?: string,
     tenantToken?: string,

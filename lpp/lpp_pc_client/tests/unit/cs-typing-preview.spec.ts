@@ -1,25 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  CUSTOMER_SERVICE_TYPING_PREVIEW_TTL_MS,
   normalizeCustomerServiceTypingPreviewText,
   reduceCustomerServiceTypingPreview,
 } from "../../src/renderer/data/customer-service/cs-typing-preview";
 
 describe("customer service typing preview", () => {
-  it("creates a short-lived customer typing preview", () => {
-    const preview = reduceCustomerServiceTypingPreview(
-      {
-        isTyping: true,
-        previewText: "  hello\nthere  ",
-        receivedAt: 100,
-        senderRole: "visitor",
-        senderUserId: "visitor-1",
-        threadId: "thread-1",
-        threadType: "temp_session",
-      },
-      1_000,
-    );
+  it("creates a customer typing preview until the input is empty", () => {
+    const preview = reduceCustomerServiceTypingPreview({
+      isTyping: true,
+      previewText: "  hello\nthere  ",
+      receivedAt: 100,
+      senderRole: "visitor",
+      senderUserId: "visitor-1",
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
 
     expect(preview).toMatchObject({
       previewText: "hello\nthere",
@@ -27,7 +23,6 @@ describe("customer service typing preview", () => {
       threadId: "thread-1",
       threadType: "temp_session",
       receivedAt: 100,
-      expiresAt: 1_000 + CUSTOMER_SERVICE_TYPING_PREVIEW_TTL_MS,
     });
   });
 
@@ -35,6 +30,19 @@ describe("customer service typing preview", () => {
     expect(
       reduceCustomerServiceTypingPreview({
         isTyping: false,
+        receivedAt: 100,
+        senderRole: "visitor",
+        threadId: "thread-1",
+        threadType: "temp_session",
+      }),
+    ).toBeNull();
+  });
+
+  it("clears the preview when the customer input text is empty", () => {
+    expect(
+      reduceCustomerServiceTypingPreview({
+        isTyping: true,
+        previewText: "   ",
         receivedAt: 100,
         senderRole: "visitor",
         threadId: "thread-1",

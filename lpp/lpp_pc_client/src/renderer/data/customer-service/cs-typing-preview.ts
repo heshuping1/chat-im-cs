@@ -1,6 +1,5 @@
 import type { CustomerServiceThreadType } from "../api-client";
 
-export const CUSTOMER_SERVICE_TYPING_PREVIEW_TTL_MS = 5_000;
 export const CUSTOMER_SERVICE_TYPING_PREVIEW_MAX_LENGTH = 500;
 
 export interface CustomerServiceTypingPreviewEvent {
@@ -19,7 +18,6 @@ export interface CustomerServiceTypingPreview {
   previewText: string;
   senderUserId?: string;
   receivedAt: number;
-  expiresAt: number;
 }
 
 export type CustomerServiceTypingPreviewResult =
@@ -29,26 +27,19 @@ export type CustomerServiceTypingPreviewResult =
 
 export function reduceCustomerServiceTypingPreview(
   event: CustomerServiceTypingPreviewEvent,
-  now = Date.now(),
 ): CustomerServiceTypingPreviewResult {
   if (!event.threadId) return undefined;
   if (isStaffTypingSender(event.senderRole)) return undefined;
   if (!event.isTyping) return null;
+  const previewText = normalizeCustomerServiceTypingPreviewText(event.previewText);
+  if (!previewText) return null;
   return {
     threadId: event.threadId,
     threadType: event.threadType,
-    previewText: normalizeCustomerServiceTypingPreviewText(event.previewText),
+    previewText,
     senderUserId: event.senderUserId,
     receivedAt: event.receivedAt,
-    expiresAt: now + CUSTOMER_SERVICE_TYPING_PREVIEW_TTL_MS,
   };
-}
-
-export function isCustomerServiceTypingPreviewExpired(
-  preview: CustomerServiceTypingPreview,
-  now = Date.now(),
-) {
-  return preview.expiresAt <= now;
 }
 
 export function normalizeCustomerServiceTypingPreviewText(value?: string) {

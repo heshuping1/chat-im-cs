@@ -82,8 +82,26 @@ export const workbenchShortcuts: WorkbenchShortcut[] = [
 ];
 
 export function roleFromSession(session: AuthSession | null): WorkspaceRole {
+  const membershipRole =
+    finiteNumber(session?.membershipRole) ?? currentTenantMembershipRole(session);
+  if (membershipRole === 4) return "owner";
+  if (membershipRole === 3) return "admin";
+  if (membershipRole === 2) return "customer_service";
   const label = `${session?.roleLabel ?? ""}`.toLowerCase();
   if (label.includes("owner") || label.includes("\u6240\u6709\u8005")) return "owner";
   if (label.includes("admin") || label.includes("\u7ba1\u7406\u5458")) return "admin";
   return "customer_service";
+}
+
+function currentTenantMembershipRole(session: AuthSession | null) {
+  const tenantId = session?.tenantId;
+  if (!tenantId) return undefined;
+  const tenant = session?.tenants?.find((item) => item.tenantId === tenantId);
+  return finiteNumber(tenant?.membershipRole);
+}
+
+function finiteNumber(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : undefined;
 }

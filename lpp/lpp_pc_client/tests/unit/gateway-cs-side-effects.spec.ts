@@ -442,4 +442,69 @@ describe("gateway customer service side effects", () => {
       queueItems: [{ threadType: "im_direct", unreadCount: 2 }],
     });
   });
+
+  it("merges customer-service read events into customer-service caches", async () => {
+    const { mergeCustomerServiceReadEvent } = await import(
+      "../../src/renderer/data/gateway/gateway-cs-side-effects"
+    );
+    rememberCustomerServiceConversationIndex({
+      conversationId: "conversation-1",
+      lastMessagePreview: "reply",
+      source: "test",
+      threadId: "session-1",
+      threadType: "temp_session",
+    });
+    const queryClient = {
+      setQueriesData: vi.fn(),
+    };
+
+    const merged = mergeCustomerServiceReadEvent(
+      queryClient as never,
+      {
+        conversationId: "conversation-1",
+        readAt: "2026-06-11T08:17:43.566Z",
+        readSeq: 12,
+        userId: "visitor-1",
+      },
+      "session-1",
+    );
+
+    expect(merged).toBe(false);
+    const detailUpdate = queryClient.setQueriesData.mock.calls[0]?.[1] as
+      | ((old: unknown) => unknown)
+      | undefined;
+    expect(
+      detailUpdate?.({
+        readStatus: {
+          members: [{ userId: "visitor-1", lastReadSeq: 8, lastReadAt: null }],
+          visitorUserId: "visitor-1",
+        },
+      }),
+    ).toMatchObject({
+      readStatus: {
+        members: [
+          {
+            userId: "visitor-1",
+            lastReadSeq: 12,
+            lastReadAt: "2026-06-11T08:17:43.566Z",
+          },
+        ],
+        visitorUserId: "visitor-1",
+      },
+    });
+    const readStatusUpdate = queryClient.setQueriesData.mock.calls[1]?.[1] as
+      | ((old: unknown) => unknown)
+      | undefined;
+    expect(readStatusUpdate?.(null)).toMatchObject({
+      members: [{ userId: "visitor-1", lastReadSeq: 12 }],
+      visitorUserId: "visitor-1",
+    });
+    expect(queryClient.setQueriesData.mock.calls.every((call) => {
+      const filter = call[0] as { predicate?: (query: { queryKey: unknown[] }) => boolean };
+      return (
+        filter.predicate?.({ queryKey: ["pc-cs-thread-detail", "x", "y", "temp_session", "session-1"] }) ||
+        filter.predicate?.({ queryKey: ["pc-cs-thread-read-status", "x", "y", "temp_session", "session-1"] })
+      );
+    })).toBe(true);
+  });
 });

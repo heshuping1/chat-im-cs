@@ -16,6 +16,9 @@ export { MessagesApiClient } from "./api/messages-client";
 export { CustomerServiceApiClient } from "./api/customer-service-client";
 export { AdminApiClient } from "./api/admin-client";
 export { staffServiceHistoryItemToThread } from "./customer-service/cs-history-model";
-export { isTerminalCustomerServiceThreadStatus } from "./customer-service/cs-thread-state";
+export {
+  isQueuedCustomerServiceThreadStatus,
+  isTerminalCustomerServiceThreadStatus,
+} from "./customer-service/cs-thread-state";
 
 export class ApiClient extends AdminApiClient {}

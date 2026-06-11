@@ -19,6 +19,7 @@ describe("customer service workbench model", () => {
         thread({ threadId: "direct-1", status: "serving", threadType: "im_direct", unreadCount: 9 }),
         thread({ threadId: "closed-1", status: "closed_by_staff", unreadCount: 7 }),
         thread({ threadId: "queued-in-active", status: "queued", unreadCount: 4 }),
+        thread({ threadId: "pending-in-active", status: "pending", unreadCount: 8 }),
       ],
       isRiskyThread: (item) => item.priority === "urgent",
       queueItems: [
@@ -30,17 +31,18 @@ describe("customer service workbench model", () => {
     expect(counters).toMatchObject({
       activeCount: 1,
       activeUnreadCount: 2,
-      queuedCount: 2,
-      serviceAlertCount: 4,
+      queuedCount: 3,
+      serviceAlertCount: 5,
       slaRiskCount: 1,
-      totalCount: 3,
+      totalCount: 4,
     });
     expect(counters.activeTempSessions.map((item) => item.threadId)).toEqual([
       "serving-1",
     ]);
     expect(counters.queuedTempSessions.map((item) => item.threadId)).toEqual([
-      "queued-in-active",
       "queued-1",
+      "queued-in-active",
+      "pending-in-active",
     ]);
   });
 
@@ -179,6 +181,27 @@ describe("customer service workbench model", () => {
       queued: 1,
       serving: 2,
       sla: 1,
+    });
+  });
+
+  it("counts pending temp sessions as queued instead of active reminders", () => {
+    expect(
+      createServiceThreadListCounts(
+        [
+          thread({ status: "pending", threadId: "pending-1", unreadCount: 4 }),
+          thread({ status: "queueing", threadId: "queueing-1" }),
+          thread({ status: "serving", threadId: "serving-1", unreadCount: 2 }),
+          thread({ status: "archived", threadId: "archived-1", unreadCount: 9 }),
+          thread({ status: "transferred", threadId: "transferred-1", unreadCount: 5 }),
+          thread({ status: "pending", threadId: "direct-pending", threadType: "im_direct", unreadCount: 7 }),
+        ],
+        () => false,
+      ),
+    ).toEqual({
+      all: 3,
+      queued: 2,
+      serving: 1,
+      sla: 0,
     });
   });
 
