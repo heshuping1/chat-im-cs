@@ -1,42 +1,54 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canControlCustomerServiceReception,
+  canReadCustomerServiceHistory,
   canUseCustomerServiceManagementReadonly,
   canUseCustomerServiceStaffEndpoints,
 } from "../../src/renderer/data/customer-service/cs-role-capabilities";
 
 describe("customer service role capabilities", () => {
-  it("keeps owner and admin on management readonly APIs instead of staff workbench APIs", () => {
+  it("lets admin and owner read service history without controlling personal reception", () => {
     expect(canUseCustomerServiceStaffEndpoints({ membershipRole: 4 })).toBe(false);
     expect(canUseCustomerServiceStaffEndpoints({ membershipRole: 3 })).toBe(false);
+    expect(canControlCustomerServiceReception({ membershipRole: 4 })).toBe(false);
+    expect(canControlCustomerServiceReception({ membershipRole: 3 })).toBe(false);
+    expect(canReadCustomerServiceHistory({ membershipRole: 4 })).toBe(true);
+    expect(canReadCustomerServiceHistory({ membershipRole: 3 })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 4 })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 3 })).toBe(true);
   });
 
-  it("keeps customer service staff on staff workbench APIs", () => {
+  it("keeps customer service staff on staff workbench and reception APIs", () => {
     expect(canUseCustomerServiceStaffEndpoints({ membershipRole: 2 })).toBe(true);
+    expect(canControlCustomerServiceReception({ membershipRole: 2 })).toBe(true);
+    expect(canReadCustomerServiceHistory({ membershipRole: 2 })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 2 })).toBe(false);
   });
 
   it("accepts string and label based customer service roles for staff actions", () => {
     expect(canUseCustomerServiceStaffEndpoints({ membershipRole: "2" })).toBe(true);
-    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "客服" })).toBe(true);
     expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "customer_service" })).toBe(true);
+    expect(canReadCustomerServiceHistory({ roleLabel: "customer_service" })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: "2" })).toBe(false);
-    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "客服" })).toBe(false);
+    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "customer_service" })).toBe(false);
   });
 
   it("keeps label based owner and admin accounts on readonly management access", () => {
-    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "管理员" })).toBe(false);
+    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "admin" })).toBe(false);
     expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "owner" })).toBe(false);
-    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "管理员" })).toBe(true);
+    expect(canControlCustomerServiceReception({ roleLabel: "admin" })).toBe(false);
+    expect(canControlCustomerServiceReception({ roleLabel: "owner" })).toBe(false);
+    expect(canReadCustomerServiceHistory({ roleLabel: "admin" })).toBe(true);
+    expect(canReadCustomerServiceHistory({ roleLabel: "owner" })).toBe(true);
+    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "admin" })).toBe(true);
     expect(canUseCustomerServiceManagementReadonly({ roleLabel: "owner" })).toBe(true);
   });
 
-  it("does not block token or tenant-account sessions when role metadata is incomplete", () => {
-    expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "已配置 Token" })).toBe(true);
+  it("does not block configured token sessions when role metadata is incomplete", () => {
     expect(canUseCustomerServiceStaffEndpoints({ roleLabel: "tenant-account" })).toBe(true);
-    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "已配置 Token" })).toBe(false);
+    expect(canReadCustomerServiceHistory({ roleLabel: "tenant-account" })).toBe(true);
+    expect(canUseCustomerServiceManagementReadonly({ roleLabel: "tenant-account" })).toBe(false);
   });
 
   it("falls back to the current tenant membership role", () => {
@@ -53,6 +65,12 @@ describe("customer service role capabilities", () => {
       }),
     ).toBe(false);
     expect(
+      canReadCustomerServiceHistory({
+        tenantId: "tenant-1",
+        tenants: [{ tenantId: "tenant-1", membershipRole: 3 }],
+      }),
+    ).toBe(true);
+    expect(
       canUseCustomerServiceManagementReadonly({
         tenantId: "tenant-1",
         tenants: [{ tenantId: "tenant-1", membershipRole: 3 }],
@@ -60,11 +78,13 @@ describe("customer service role capabilities", () => {
     ).toBe(true);
   });
 
-  it("does not treat unknown high role numbers as management roles", () => {
+  it("does not treat unknown high role numbers as service history roles", () => {
     expect(canUseCustomerServiceManagementReadonly({ membershipRole: 5 })).toBe(false);
+    expect(canReadCustomerServiceHistory({ membershipRole: 5 })).toBe(false);
   });
 
   it("does not block configured token sessions without role metadata", () => {
     expect(canUseCustomerServiceStaffEndpoints({})).toBe(true);
+    expect(canReadCustomerServiceHistory({})).toBe(true);
   });
 });

@@ -14,13 +14,12 @@ import {
 import {
   isTerminalCustomerServiceThreadStatus,
   normalizeCustomerServiceThreadType,
-  staffServiceHistoryItemToThread,
   type CustomerProfileCard,
 } from "../data/api-client";
 import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
-import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
+import { canReadCustomerServiceHistory } from "../data/customer-service/cs-role-capabilities";
 import { useActiveThreadId } from "../data/workspace-ui/workspace-ui-store";
 import { useI18n } from "../i18n/useI18n";
 import { CustomerServiceSessionNotesPanel } from "../customer-service/components/CustomerServiceSessionNotesPanel";
@@ -35,7 +34,7 @@ export function useCustomerContextPanelModel() {
   const selectedThreadId = useActiveThreadId();
   const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken];
-  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
+  const canReadHistory = canReadCustomerServiceHistory(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -44,10 +43,10 @@ export function useCustomerContextPanelModel() {
   });
   const historyQuery = useInfiniteQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
-    enabled: Boolean(client && canUseStaffEndpoints),
+    enabled: Boolean(client && canReadHistory),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
-      client!.getStaffServiceHistory({
+      client!.getCustomerServiceHistoryThreads({
         cursor: pageParam,
         limit: staffServiceHistoryPageSize,
         threadType: "temp_session",
@@ -71,7 +70,6 @@ export function useCustomerContextPanelModel() {
       .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
       .filter((thread) => !isTerminalCustomerServiceThreadStatus(thread.status));
     const historyThreads = historyItems
-      .map(staffServiceHistoryItemToThread)
       .filter((thread) => thread.threadType === "temp_session");
     return [...currentThreads, ...historyThreads].find(
       (thread) => thread.threadId === normalizedSelectedThreadId,

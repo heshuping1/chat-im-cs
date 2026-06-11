@@ -67,6 +67,10 @@ describe("customer-service history and lookup surfaces", () => {
     resolve(process.cwd(), "src/renderer/components/ThreadList.tsx"),
     "utf8",
   );
+  const customerContextPanel = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/CustomerContextPanel.tsx"),
+    "utf8",
+  );
   const workspaceController = readFileSync(
     resolve(process.cwd(), "src/renderer/customer-service/hooks/useCustomerServiceWorkspaceController.ts"),
     "utf8",
@@ -185,6 +189,15 @@ describe("customer-service history and lookup surfaces", () => {
     expect(threadList).toContain("function isCustomerServiceHistoryThread");
     expect(threadList).toContain("return isTerminalCustomerServiceThreadStatus(thread.status);");
     expect(threadList).not.toContain('thread.accessMode === "management_readonly"');
+    expect(threadList).toContain("canReadCustomerServiceHistory");
+    expect(threadList).toContain("getCustomerServiceHistoryThreads({");
+    expect(threadList).not.toContain("getStaffServiceHistory({");
+    expect(workspaceController).toContain("canReadCustomerServiceHistory");
+    expect(workspaceController).toContain("getCustomerServiceHistoryThreads({");
+    expect(workspaceController).not.toContain("getStaffServiceHistory({");
+    expect(customerContextPanel).toContain("canReadCustomerServiceHistory");
+    expect(customerContextPanel).toContain("getCustomerServiceHistoryThreads({");
+    expect(customerContextPanel).not.toContain("getStaffServiceHistory({");
     expect(threadList).toContain("queued && canUseStaffEndpoints");
     expect(workspaceController).toContain("if (!canUseStaffEndpoints)");
     expect(chatWorkspace).toContain("canUseStaffActions={canUseStaffEndpoints}");

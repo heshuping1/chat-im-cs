@@ -41,7 +41,7 @@ import {
 } from "../data/customer-service/cs-realtime-config";
 import { consumeCustomerServiceMessageReminder } from "../data/customer-service/cs-reminder-model";
 import { isExplicitCustomerServiceThreadOpenSource } from "../data/customer-service/customer-service-read-visibility";
-import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
+import { canControlCustomerServiceReception } from "../data/customer-service/cs-role-capabilities";
 import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
 import {
   useImReadStateByConversation,
@@ -235,7 +235,7 @@ export function Sidebar() {
     refetchIntervalInBackground: customerServiceRealtimeRefetchInBackground,
     queryFn: async () => requireApiClient(authSession).getWorkbenchThreads(),
   });
-  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(authSession);
+  const canControlReception = canControlCustomerServiceReception(authSession);
   const receptionStatusQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceReception(
       authSession?.apiBaseUrl,
@@ -244,7 +244,7 @@ export function Sidebar() {
     enabled: Boolean(
       authSession &&
         workspaceAccess.canReadServiceWorkbench &&
-        canUseStaffEndpoints,
+        canControlReception,
     ),
     refetchInterval: customerServiceReceptionPollIntervalMs,
     refetchIntervalInBackground: customerServiceReceptionRefetchInBackground,
@@ -291,6 +291,7 @@ export function Sidebar() {
   };
   const receptionStatusMutation = useMutation({
     mutationFn: async (serviceStatus: CustomerServiceStatus) => {
+      if (!canControlReception) throw new Error(t("sidebar.service.receptionNotSynced"));
       const currentReception = receptionStatusQuery.data;
       return requireApiClient(authSession).updateReceptionStatus({
         serviceStatus,
@@ -332,6 +333,7 @@ export function Sidebar() {
   });
   const queueAcceptMutation = useMutation({
     mutationFn: async (mode: ReceptionQueueMode) => {
+      if (!canControlReception) throw new Error(t("sidebar.service.receptionNotSynced"));
       const serviceStatus = receptionStatusQuery.data?.serviceStatus ?? confirmedServiceStatus;
       const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
       if (!patch) throw new Error(t("sidebar.service.receptionNotSynced"));
@@ -1222,7 +1224,9 @@ export function Sidebar() {
                         role="radio"
                         aria-checked={effectiveReceptionStatus === item.value}
                         disabled={
-                          receptionStatusMutation.isPending || queueAcceptMutation.isPending
+                          !canControlReception ||
+                          receptionStatusMutation.isPending ||
+                          queueAcceptMutation.isPending
                         }
                         key={item.value}
                         onClick={() => receptionStatusMutation.mutate(item.value)}
@@ -1257,7 +1261,9 @@ export function Sidebar() {
                           role="radio"
                           aria-checked={selected}
                           disabled={
-                            receptionStatusMutation.isPending || queueAcceptMutation.isPending
+                            !canControlReception ||
+                            receptionStatusMutation.isPending ||
+                            queueAcceptMutation.isPending
                           }
                           title={modeDescription}
                           key={mode}

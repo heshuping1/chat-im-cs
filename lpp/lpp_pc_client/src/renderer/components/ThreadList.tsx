@@ -11,7 +11,6 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   isTerminalCustomerServiceThreadStatus,
   normalizeCustomerServiceThreadType,
-  staffServiceHistoryItemToThread,
   type CustomerServiceThread,
 } from "../data/api-client";
 import { useAuthSession } from "../data/auth/auth-store";
@@ -21,7 +20,10 @@ import {
 } from "../data/customer-service-display";
 import { createCustomerServiceIdentityViewModel } from "../data/customer-service/cs-identity-view-model";
 import { markCustomerServiceThreadClaimed } from "../data/customer-service/cs-cache-adapter";
-import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
+import {
+  canReadCustomerServiceHistory,
+  canUseCustomerServiceStaffEndpoints,
+} from "../data/customer-service/cs-role-capabilities";
 import { chatConversationEntityFromCustomerServiceThread } from "../data/conversation/conversation-domain";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
@@ -77,6 +79,7 @@ export function ThreadList() {
   );
   const queryBaseKey = [authSession?.apiBaseUrl, authSession?.tenantToken];
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(authSession);
+  const canReadHistory = canReadCustomerServiceHistory(authSession);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -85,10 +88,10 @@ export function ThreadList() {
   });
   const historyQuery = useInfiniteQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
-    enabled: Boolean(client && canUseStaffEndpoints),
+    enabled: Boolean(client && canReadHistory),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
-      client!.getStaffServiceHistory({
+      client!.getCustomerServiceHistoryThreads({
         cursor: pageParam,
         limit: staffServiceHistoryPageSize,
         threadType: "temp_session",
@@ -143,7 +146,6 @@ export function ThreadList() {
         .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
         .filter(isCustomerServiceHistoryThread);
       const staffHistoryThreads = historyItems
-        .map(staffServiceHistoryItemToThread)
         .filter((thread) => thread.threadType === "temp_session")
         .filter((thread) => isTerminalCustomerServiceThreadStatus(thread.status));
       return dedupeThreadList([...readonlyHistoryThreads, ...staffHistoryThreads]);

@@ -250,10 +250,13 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).not.toContain("IM {imStatusLabel}");
     expect(sidebarSource).not.toContain("IM 在线状态");
     expect(sidebarSource).toContain("useSetCustomerServiceStatus");
+    expect(sidebarSource).toContain("canControlCustomerServiceReception");
     expect(sidebarSource).toContain("confirmedServiceStatus");
     expect(sidebarSource).toContain("confirmedQueueAcceptEnabled");
     expect(sidebarSource).toContain("onMutate");
     expect(onlineServicePageSource).toContain("confirmedQueueAcceptEnabled");
+    expect(onlineServicePageSource).toContain("canControlCustomerServiceReception");
+    expect(onlineServicePageSource).toContain("disabled={!client || !canControlReception}");
     expect(onlineServicePageSource).toContain("onMutate");
     expect(sidebarSource).toContain('t("sidebar.service.syncFailed"');
     expect(sidebarSource).not.toContain("serviceAutoSidebarCollapsed");
@@ -282,9 +285,9 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).not.toContain("? receptionSummary.queueModeLabel");
     expect(sidebarSource).not.toContain("<b>{receptionSummary.queueModeLabel}</b>");
     expect(sidebarSource).not.toContain("receptionStatus?.activeSessionCount ??\n      (hasServiceThreadData ? activeTempSessions.length : null)");
-    expect(sidebarSource).toContain("const activeReceptionCount = receptionStatus?.activeSessionCount ?? null");
+    expect(sidebarSource).toContain("const activeServiceCount = hasServiceThreadData ? activeTempSessions.length : null");
     expect(sidebarSource).toContain('label: t("sidebar.service.counterReceptionShort")');
-    expect(sidebarSource).toContain('value: activeReceptionCount ?? "--"');
+    expect(sidebarSource).toContain('value: activeServiceCount ?? "--"');
     expect(sidebarSource).toContain('label: t("sidebar.service.counterQueueShort")');
     expect(sidebarSource).toContain('label: t("sidebar.service.counterUnreadShort")');
     expect(sidebarSource).toContain('name: t("sidebar.service.counterReception")');

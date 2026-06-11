@@ -43,6 +43,7 @@ export interface CustomerServiceWorkspaceViewModelInput {
   detailLoading?: boolean;
   formatSourceLabel?: (source?: string) => string;
   historyItems?: StaffServiceHistoryItem[];
+  historyThreads?: CustomerServiceThread[];
   profile?: CustomerProfileCard;
   selectedThread?: CustomerServiceThread;
   selectedThreadId?: string | null;
@@ -93,6 +94,7 @@ export function createCustomerServiceWorkspaceViewModel(
     input.selectedThread ??
     selectCustomerServiceThread({
       historyItems: input.historyItems ?? [],
+      historyThreads: input.historyThreads ?? [],
       selectedThreadId: input.selectedThreadId,
       threads: input.threads,
     });
@@ -235,6 +237,7 @@ export function createCustomerServiceMessageStageState(input: {
 
 export function selectCustomerServiceThread(input: {
   historyItems?: StaffServiceHistoryItem[];
+  historyThreads?: CustomerServiceThread[];
   selectedThreadId?: string | null;
   threads?: {
     activeItems?: CustomerServiceThread[];
@@ -250,6 +253,7 @@ export function selectCustomerServiceThread(input: {
 
 export function listCustomerServiceSelectableThreads(input: {
   historyItems?: StaffServiceHistoryItem[];
+  historyThreads?: CustomerServiceThread[];
   threads?: {
     activeItems?: CustomerServiceThread[];
     queueItems?: CustomerServiceThread[];
@@ -268,8 +272,14 @@ export function listCustomerServiceSelectableThreads(input: {
   const historyThreads = (input.historyItems ?? [])
     .map(staffServiceHistoryItemToThread)
     .filter((thread) => thread.threadType === "temp_session");
+  const normalizedHistoryThreads = (input.historyThreads ?? [])
+    .filter((thread) => thread.threadType === "temp_session");
 
-  return dedupeCustomerServiceThreads([...currentThreads, ...historyThreads]);
+  return dedupeCustomerServiceThreads([
+    ...currentThreads,
+    ...historyThreads,
+    ...normalizedHistoryThreads,
+  ]);
 }
 
 function dedupeCustomerServiceThreads(threads: CustomerServiceThread[]) {

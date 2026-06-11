@@ -32,7 +32,7 @@ import {
 } from "../data/customer-service/cs-realtime-config";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
-import { canUseCustomerServiceStaffEndpoints } from "../data/customer-service/cs-role-capabilities";
+import { canControlCustomerServiceReception } from "../data/customer-service/cs-role-capabilities";
 import type { CustomerServiceStatus } from "../data/types";
 import { useI18n } from "../i18n/useI18n";
 import {
@@ -280,7 +280,7 @@ export function OnlineServicePage() {
     [session],
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken];
-  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
+  const canControlReception = canControlCustomerServiceReception(session);
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
     enabled: Boolean(client),
@@ -290,7 +290,7 @@ export function OnlineServicePage() {
   });
   const receptionStatusQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceReception(...queryBaseKey),
-    enabled: Boolean(client && canUseStaffEndpoints),
+    enabled: Boolean(client && canControlReception),
     queryFn: async () => client!.getReceptionStatus(),
     refetchInterval: customerServiceReceptionPollIntervalMs,
     refetchIntervalInBackground: customerServiceReceptionRefetchInBackground,
@@ -371,6 +371,9 @@ export function OnlineServicePage() {
   const receptionStatusMutation = useMutation({
     mutationFn: async (serviceStatus: CustomerServiceStatus) => {
       if (!client) throw new Error("Customer service API is not ready");
+      if (!canControlReception) {
+        throw new Error(t("customerService.online.receptionNotSynced"));
+      }
       return client.updateReceptionStatus({
         serviceStatus,
         queueAcceptEnabled:
@@ -421,6 +424,9 @@ export function OnlineServicePage() {
   const queueAcceptMutation = useMutation({
     mutationFn: async (mode: ReceptionQueueMode) => {
       if (!client) throw new Error("Customer service API is not ready");
+      if (!canControlReception) {
+        throw new Error(t("customerService.online.receptionNotSynced"));
+      }
       const serviceStatus = receptionStatus?.serviceStatus ?? confirmedServiceStatus;
       const patch = resolveReceptionQueueModePatch(mode, serviceStatus);
       if (!patch) throw new Error(t("customerService.online.receptionNotSynced"));
@@ -714,7 +720,7 @@ export function OnlineServicePage() {
       }
     >
       <ServiceCommandBar
-        disabled={!client}
+        disabled={!client || !canControlReception}
         layoutMode={serviceLayoutMode}
         metrics={commandMetrics}
         onSetQueueMode={(mode) => queueAcceptMutation.mutate(mode)}

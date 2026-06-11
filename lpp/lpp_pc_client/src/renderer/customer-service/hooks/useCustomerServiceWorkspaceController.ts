@@ -10,7 +10,10 @@ import {
   markCustomerServiceThreadClosed,
   markCustomerServiceThreadTransferred,
 } from "../../data/customer-service/cs-cache-adapter";
-import { canUseCustomerServiceStaffEndpoints } from "../../data/customer-service/cs-role-capabilities";
+import {
+  canReadCustomerServiceHistory,
+  canUseCustomerServiceStaffEndpoints,
+} from "../../data/customer-service/cs-role-capabilities";
 import {
   listLocalCustomerServiceThreadSnapshots,
   profileFromLocalCustomerSnapshot,
@@ -59,6 +62,7 @@ export function useCustomerServiceWorkspaceController({
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
+  const canReadHistory = canReadCustomerServiceHistory(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -69,10 +73,10 @@ export function useCustomerServiceWorkspaceController({
   });
   const historyQuery = useInfiniteQuery({
     queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
-    enabled: Boolean(client && canUseStaffEndpoints),
+    enabled: Boolean(client && canReadHistory),
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) =>
-      client!.getStaffServiceHistory({
+      client!.getCustomerServiceHistoryThreads({
         cursor: pageParam,
         limit: staffServiceHistoryPageSize,
         threadType: "temp_session",
@@ -86,7 +90,7 @@ export function useCustomerServiceWorkspaceController({
 
   const selectedThread = useMemo(() => {
     return selectCustomerServiceThread({
-      historyItems,
+      historyThreads: historyItems,
       selectedThreadId,
       threads: threadsQuery.data,
     });
@@ -94,7 +98,7 @@ export function useCustomerServiceWorkspaceController({
   const selectableThreads = useMemo(
     () =>
       listCustomerServiceSelectableThreads({
-        historyItems,
+        historyThreads: historyItems,
         threads: threadsQuery.data,
       }),
     [historyItems, threadsQuery.data],

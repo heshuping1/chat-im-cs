@@ -12,6 +12,29 @@ export function canUseCustomerServiceStaffEndpoints(input?: {
   return true;
 }
 
+export function canControlCustomerServiceReception(input?: {
+  membershipRole?: number | string | null;
+  roleLabel?: string | null;
+  tenantId?: string | null;
+  tenants?: Array<{ tenantId?: string | null; membershipRole?: number | string | null }>;
+} | null) {
+  return canUseCustomerServiceStaffEndpoints(input);
+}
+
+export function canReadCustomerServiceHistory(input?: {
+  membershipRole?: number | string | null;
+  roleLabel?: string | null;
+  tenantId?: string | null;
+  tenants?: Array<{ tenantId?: string | null; membershipRole?: number | string | null }>;
+} | null) {
+  const role = resolveMembershipRole(input);
+  if (role !== undefined) return role === 2 || role === 3 || role === 4;
+  const roleLabel = normalizeRoleLabel(input?.roleLabel);
+  if (roleLabel && isManagementRoleLabel(roleLabel)) return true;
+  if (roleLabel && isCustomerServiceRoleLabel(roleLabel)) return true;
+  return true;
+}
+
 export function canUseCustomerServiceManagementReadonly(input?: {
   membershipRole?: number | string | null;
   roleLabel?: string | null;
