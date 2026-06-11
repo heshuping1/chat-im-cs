@@ -13,6 +13,7 @@ import {
 import {
   canReadCustomerServiceHistory,
   canSuperviseCustomerServiceClose,
+  canSuperviseCustomerServiceTransfer,
   canUseCustomerServiceStaffEndpoints,
 } from "../../data/customer-service/cs-role-capabilities";
 import {
@@ -65,6 +66,7 @@ export function useCustomerServiceWorkspaceController({
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
   const canReadHistory = canReadCustomerServiceHistory(session);
   const canSuperviseClose = canSuperviseCustomerServiceClose(session);
+  const canSuperviseTransfer = canSuperviseCustomerServiceTransfer(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -241,7 +243,12 @@ export function useCustomerServiceWorkspaceController({
       } else if (!canUseStaffEndpoints) {
         throw new Error("Only customer service staff can perform this action.");
       }
-      return executeCustomerServiceThreadAction({ action, client, thread: selectedThread });
+      return executeCustomerServiceThreadAction({
+        action,
+        client,
+        mode: action === "close" && !canUseStaffEndpoints && canSuperviseClose ? "management" : "staff",
+        thread: selectedThread,
+      });
     },
     onSuccess: async (result, action) => {
       if (selectedThread) {
@@ -261,7 +268,15 @@ export function useCustomerServiceWorkspaceController({
   const transferThreadMutation = useMutation({
     mutationFn: async (payload: CustomerServiceThreadTransferPayload) => {
       if (!client || !selectedThread) throw new Error("Select a customer service conversation.");
-      return executeCustomerServiceThreadTransfer({ client, payload, thread: selectedThread });
+      if (!canUseStaffEndpoints && !canSuperviseTransfer) {
+        throw new Error("Only customer service staff, administrators, or owners can transfer this conversation.");
+      }
+      return executeCustomerServiceThreadTransfer({
+        client,
+        mode: !canUseStaffEndpoints && canSuperviseTransfer ? "management" : "staff",
+        payload,
+        thread: selectedThread,
+      });
     },
     onSuccess: async (result) => {
       if (selectedThread) {

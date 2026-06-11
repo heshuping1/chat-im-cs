@@ -119,6 +119,10 @@ export const endpointPlan = {
     "/api/admin/v1/customer-service/center/threads",
   adminCustomerServiceCenterThread:
     "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}",
+  adminCustomerServiceCenterThreadAssign:
+    "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}/assign",
+  adminCustomerServiceCenterThreadForceClose:
+    "/api/admin/v1/customer-service/center/threads/{threadType}/{threadId}/force-close",
   adminCustomerServiceCenterCustomersServiceHistory:
     "/api/admin/v1/customer-service/center/customers/service-history",
   adminCustomerServiceCenterStaffServiceHistory:

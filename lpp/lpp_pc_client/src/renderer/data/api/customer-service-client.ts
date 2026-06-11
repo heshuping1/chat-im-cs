@@ -631,6 +631,26 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     return this.customerServiceThreadAction(threadType, threadId, "close");
   }
 
+  async forceCloseCustomerServiceThread(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<{
+      threadType?: CustomerServiceThreadType;
+      threadId?: string;
+      status?: string;
+      closed?: boolean;
+    }>(
+      endpointPlan.adminCustomerServiceCenterThreadForceClose
+        .replace("{threadType}", threadType)
+        .replace("{threadId}", encodeURIComponent(threadId)),
+      { method: "POST" },
+      true,
+    );
+  }
+
   recallCustomerServiceMessage(messageId: string) {
     return this.request<{ messageId?: string; silent?: boolean }>(
       endpointPlan.messageRecallSilent.replace("{messageId}", messageId),
@@ -661,6 +681,30 @@ export class CustomerServiceApiClient extends MessagesApiClient {
           ...(reason ? { reason } : {}),
         }),
       },
+    );
+  }
+
+  async assignCustomerServiceThread(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+    payload: { staffUserId: string },
+  ) {
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    return this.request<{
+      threadType?: CustomerServiceThreadType;
+      threadId?: string;
+      status?: string;
+      assignedStaffUserId?: string | null;
+    }>(
+      endpointPlan.adminCustomerServiceCenterThreadAssign
+        .replace("{threadType}", threadType)
+        .replace("{threadId}", encodeURIComponent(threadId)),
+      {
+        method: "POST",
+        body: JSON.stringify({ staffUserId: payload.staffUserId }),
+      },
+      true,
     );
   }
 

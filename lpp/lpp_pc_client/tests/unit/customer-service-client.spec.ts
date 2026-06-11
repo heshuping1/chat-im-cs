@@ -485,6 +485,57 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("force closes customer service threads through the admin center endpoint", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-force-close",
+      response: { closed: true, status: "closed_by_staff" },
+    });
+
+    await expect(
+      client.forceCloseCustomerServiceThread("temp_session", "session-1"),
+    ).resolves.toMatchObject({ closed: true });
+
+    expect(client.platformRequests).toEqual([
+      {
+        body: { tenantId: "tenant-force-close" },
+        path: "/api/platform/v1/auth/admin-token",
+      },
+    ]);
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/center/threads/temp_session/session-1/force-close",
+      },
+    ]);
+  });
+
+  it("assigns customer service threads through the admin center endpoint", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-assign-thread",
+      response: { assignedStaffUserId: "staff-2", status: "active" },
+    });
+
+    await expect(
+      client.assignCustomerServiceThread("im_direct", "thread-1", { staffUserId: "staff-2" }),
+    ).resolves.toMatchObject({ assignedStaffUserId: "staff-2" });
+
+    expect(client.platformRequests).toEqual([
+      {
+        body: { tenantId: "tenant-assign-thread" },
+        path: "/api/platform/v1/auth/admin-token",
+      },
+    ]);
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        body: { staffUserId: "staff-2" },
+        path: "/api/admin/v1/customer-service/center/threads/im_direct/thread-1/assign",
+      },
+    ]);
+  });
+
   it("loads owner closed history from admin unified history sessions instead of realtime center threads", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,

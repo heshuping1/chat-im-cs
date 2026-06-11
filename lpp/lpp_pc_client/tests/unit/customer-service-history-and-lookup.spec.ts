@@ -200,8 +200,11 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerContextPanel).not.toContain("getStaffServiceHistory({");
     expect(threadList).toContain("queued && canUseStaffEndpoints");
     expect(workspaceController).toContain("canSuperviseCustomerServiceClose");
+    expect(workspaceController).toContain("canSuperviseCustomerServiceTransfer");
     expect(workspaceController).toContain('if (action === "close")');
     expect(workspaceController).toContain("!canUseStaffEndpoints && !canSuperviseClose");
+    expect(workspaceController).toContain('mode: action === "close" && !canUseStaffEndpoints && canSuperviseClose ? "management" : "staff"');
+    expect(workspaceController).toContain('mode: !canUseStaffEndpoints && canSuperviseTransfer ? "management" : "staff"');
     expect(chatWorkspace).toContain("canUseStaffActions={canUseStaffEndpoints}");
     expect(chatWorkspace).toContain("canClose={canCloseThread}");
     expect(threadActionButton).toContain("if (!canUseStaffActions) return null;");
