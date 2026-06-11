@@ -195,11 +195,16 @@ export function MessageListPanel({
         ? pendingGroupReadReceiptSnapshotTargets({
             identity: authSession ?? null,
             maxTargets: activeGroupReadReceiptAutoSyncMaxTargets(),
-            messages,
+            messages: messageRenderWindow.renderedMessages,
             totalReadableMembers: groupReadReceiptTotal,
           })
         : [],
-    [authSession, conversation.conversationType, groupReadReceiptTotal, messages],
+    [
+      authSession,
+      conversation.conversationType,
+      groupReadReceiptTotal,
+      messageRenderWindow.renderedMessages,
+    ],
   );
 
   useEffect(() => {

@@ -93,30 +93,23 @@ export function ChatMessageBubble({
     : computedModel;
   const senderName = model.sender.name;
   const reply = model.bubble.reply;
-  const directReadReceipt =
-    mine && (model.status.receipt === "read" || model.status.receipt === "group_all");
+  const directReadReceipt = mine && model.status.receipt === "read";
   const groupReadReceipt =
     mine &&
     model.status.groupReadReceipt &&
-    model.status.receipt !== "group_all" &&
     model.status.groupReadReceiptClickable &&
     Boolean(onGroupReadReceiptClick);
-  const groupReadVisualRatio = 0.42;
-  const directReadReceiptLabel = model.status.readReceiptText;
+  const groupReadVisualRatio =
+    typeof model.status.groupReadReceipt?.ratio === "number"
+      ? model.status.groupReadReceipt.ratio
+      : 0;
   const groupReadLabel = groupReadReceiptLabel(model.status.groupReadReceipt);
-  const statusReceipt = directReadReceipt ? (
-    <span
-      aria-label={directReadReceiptLabel || "已读"}
-      className="pc-chat-bubble-receipt pc-chat-direct-read-receipt"
-      role="img"
-      title={directReadReceiptLabel}
-    >
-      <DirectReadReceiptIcon />
-    </span>
-  ) : groupReadReceipt ? (
+  const statusReceipt = groupReadReceipt ? (
     <button
       aria-label={groupReadLabel}
-      className="pc-chat-bubble-receipt pc-chat-group-read-pie-button"
+      className={`pc-chat-bubble-receipt pc-chat-group-read-pie-button ${
+        groupReadVisualRatio > 0 ? "has-read" : "empty"
+      }`}
       type="button"
       onClick={(event) => {
         event.stopPropagation();
@@ -125,14 +118,17 @@ export function ChatMessageBubble({
     >
       <GroupReadPieIcon ratio={groupReadVisualRatio} />
     </button>
+  ) : directReadReceipt ? (
+    <span
+      aria-label="已读"
+      className="pc-chat-bubble-receipt pc-chat-direct-read-receipt"
+      role="img"
+    >
+      <DirectReadReceiptIcon />
+    </span>
   ) : null;
   const inlineStatusText = model.status.statusText ? (
     <span className="pc-chat-inline-status">{model.status.statusText}</span>
-  ) : null;
-  const readReceiptText = model.status.readReceiptText ? (
-    <span className="pc-chat-inline-status pc-chat-inline-read-receipt">
-      {model.status.readReceiptText}
-    </span>
   ) : null;
   const sendStatusSlot = mine && model.status.sendStatusSlot !== "none" ? (
     <MessageSendStatusSlot
@@ -198,12 +194,12 @@ export function ChatMessageBubble({
         )}
         <time className="pc-chat-time">
           <span>{model.status.timeText}</span>
-          {(inlineStatusText || readReceiptText) && (
+          {inlineStatusText && (
             <>
               <span className="pc-chat-time-separator" aria-hidden="true">
                 ·
               </span>
-              {readReceiptText || inlineStatusText}
+              {inlineStatusText}
             </>
           )}
         </time>

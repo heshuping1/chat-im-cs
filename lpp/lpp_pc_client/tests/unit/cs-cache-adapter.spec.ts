@@ -462,6 +462,72 @@ describe("customer service cache adapter", () => {
     expect(detailMessages(queryClient)).toEqual([]);
   });
 
+  it("keeps a local customer-service echo at the bottom before server seq arrives", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    queryClient.setQueryData(detailKey(), {
+      messages: [
+        message({
+          conversationSeq: 1,
+          messageId: "welcome",
+          preview: "welcome",
+          sentAt: "2026-05-29T12:00:00.000Z",
+        }),
+        message({
+          conversationSeq: 2,
+          messageId: "queue",
+          preview: "queue",
+          sentAt: "2026-05-29T12:01:00.000Z",
+        }),
+      ],
+    });
+
+    appendCustomerServiceLocalMessage(
+      queryClient,
+      thread(),
+      message({
+        conversationSeq: undefined,
+        messageId: "pc-cs-local-text-1",
+        preview: "agent local reply",
+        sentAt: "2026-05-29T12:02:00.000Z",
+        status: "sending",
+      }),
+    );
+
+    expect(detailMessages(queryClient).map((item) => item.messageId)).toEqual([
+      "welcome",
+      "queue",
+      "pc-cs-local-text-1",
+    ]);
+  });
+
+  it("uses sentAt to keep mixed seq and seq-less customer-service messages chronological", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+
+    mergeLoadedCustomerServiceThreadDetail(queryClient, thread(), {
+      messages: [
+        message({
+          conversationSeq: 2,
+          messageId: "sequenced",
+          preview: "sequenced",
+          sentAt: "2026-05-29T12:01:00.000Z",
+        }),
+        message({
+          conversationSeq: undefined,
+          messageId: "seq-less-old",
+          preview: "seq less old",
+          sentAt: "2026-05-29T11:59:00.000Z",
+        }),
+      ],
+    });
+
+    expect(getCustomerServiceThreadIndex("thread-1")).toMatchObject({
+      lastMessageId: "sequenced",
+      lastMessagePreview: "sequenced",
+    });
+  });
+
   it("removes recalled customer-service messages from the agent detail cache", () => {
     const queryClient = createQueryClient();
     seedCaches(queryClient);

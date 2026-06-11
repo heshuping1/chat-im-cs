@@ -1612,7 +1612,7 @@
 .pc-chat-group-read-pie-button {
   appearance: none;
   -webkit-appearance: none;
-  color: #13bfa6;
+  color: #8fa0b3;
   margin: 0;
   padding: 0;
   border: 0;
@@ -1621,6 +1621,14 @@
   box-shadow: none;
   cursor: pointer;
   line-height: 0;
+}
+
+.pc-chat-group-read-pie-button.has-read {
+  color: #13bfa6;
+}
+
+.pc-chat-group-read-pie-button.empty {
+  color: #8fa0b3;
 }
 
 .pc-chat-group-read-pie-button:hover {

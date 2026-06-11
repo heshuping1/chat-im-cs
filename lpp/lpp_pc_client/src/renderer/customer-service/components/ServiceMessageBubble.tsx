@@ -6,10 +6,6 @@ import { createChatMessageViewModel } from "../../data/message/message-view-mode
 import { useI18n } from "../../i18n/useI18n";
 import { formatChatMessageTime } from "../../lib/format";
 
-type ReadStatusTranslator = (
-  key: "customerService.messageStage.read" | "customerService.messageStage.unread",
-) => string;
-
 export function ServiceMessageBubble({
   assetBaseUrl,
   authToken,
@@ -46,23 +42,14 @@ export function ServiceMessageBubble({
 }) {
   const { t } = useI18n();
   const fallbackSender = senderFallback || t("customerService.visitor");
-  const customerReadAtText =
-    mine && message.readAt
-      ? t("customerService.messageStage.customerReadAt", {
-          time: formatChatMessageTime(message.readAt),
-        })
-      : undefined;
-  const customerMessageReadText = !mine ? messageReadStatusText(message, t) : undefined;
   const messageViewModel = createChatMessageViewModel({
     conversationFallbackName,
     conversationType: threadType,
     message,
     mine,
     mineAvatarUrl,
-    readReceiptText: customerReadAtText,
     senderAvatarUrl,
     senderFallback: fallbackSender,
-    statusText: customerMessageReadText,
     timeText: formatChatMessageTime(message.sentAt),
     translationText,
   });
@@ -81,36 +68,9 @@ export function ServiceMessageBubble({
       onAvatarClick={onAvatarClick}
       onUploadAction={onUploadAction}
       senderFallback={fallbackSender}
-      statusText={customerMessageReadText}
       timeText={formatChatMessageTime(message.sentAt)}
       translationText={translationText}
       viewModel={messageViewModel}
     />
   );
-}
-
-function messageReadStatusText(message: MessageItemDto, t: ReadStatusTranslator) {
-  if (message.readAt) {
-    return `${t("customerService.messageStage.read")} ${formatChatMessageTime(message.readAt)}`;
-  }
-  const record = message as MessageItemDto & Record<string, unknown>;
-  const status = String(message.status ?? "").trim().toLowerCase();
-  const readCount = Number(record.readCount ?? record.read_count);
-  if (
-    message.isRead ||
-    status === "read" ||
-    status === "seen" ||
-    record.deliveryStatus === "read" ||
-    (Number.isFinite(readCount) && readCount > 0)
-  ) {
-    return t("customerService.messageStage.read");
-  }
-  if (
-    message.isRead === false ||
-    status === "unread" ||
-    (Number.isFinite(readCount) && readCount === 0)
-  ) {
-    return t("customerService.messageStage.unread");
-  }
-  return undefined;
 }

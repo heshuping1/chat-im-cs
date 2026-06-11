@@ -660,18 +660,34 @@ export function syncGroupReadReceiptSnapshotToCache(
     conversationType,
     conversation.conversationId,
   );
+  let syncedMessage: MessageItemDto | undefined;
   queryClient.setQueryData<MessageItemDto[]>(queryKey, (old) =>
     old
-      ? syncGroupReadReceiptSnapshot({
-          conversationType,
-          identity: session ?? null,
-          messageId,
-          messageSeq,
-          messages: old,
-          readCount,
-        })
+      ? (() => {
+          const next = syncGroupReadReceiptSnapshot({
+            conversationType,
+            identity: session ?? null,
+            messageId,
+            messageSeq,
+            messages: old,
+            readCount,
+          });
+          syncedMessage = next.find((message) =>
+            message.messageId === messageId ||
+            (messageSeq > 0 && Number(message.conversationSeq ?? 0) === messageSeq),
+          );
+          return next;
+        })()
       : old,
   );
+  if (session && syncedMessage) {
+    void getImMessageStore().upsertMessages(
+      imMessageScopeKey(session),
+      conversationType,
+      conversation.conversationId,
+      [syncedMessage],
+    );
+  }
 }
 
 export function markMessageRecalledInCache(

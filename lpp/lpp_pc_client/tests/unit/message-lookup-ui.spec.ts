@@ -473,24 +473,13 @@ describe("message lookup UI", () => {
     expect(messageCenter).toContain("useContactAddFriendController");
   });
 
-  it("marks direct read receipts with a green check without changing unread receipts", () => {
+  it("keeps direct read receipts as an icon without inline text", () => {
+    expect(chatMessageBubble).toContain("const groupReadReceipt =");
+    expect(chatMessageBubble).toContain("const directReadReceipt =");
     expect(chatMessageBubble).toContain('model.status.receipt === "read"');
-    expect(chatMessageBubble).toContain('model.status.receipt === "group_all"');
     expect(chatMessageBubble).toContain("DirectReadReceiptIcon");
-    expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt-icon");
-    expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt-ring");
-    expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt-check");
-    expect(chatMessageBubble).not.toContain('from "lucide-react"');
     expect(chatMessageBubble).toContain("pc-chat-direct-read-receipt");
-    expect(chatMessageBubble).toContain("pc-chat-bubble-shell");
-    expect(messageCenterCss).toContain(".pc-chat-direct-read-receipt");
-    expect(messageCenterCss).toContain("color: #13bfa6");
-    expect(messageCenterCss).toContain("left: var(--pc-chat-receipt-left, -18px)");
-    expect(messageCenterCss).toContain("bottom: var(--pc-chat-receipt-bottom, 0px)");
-    expect(messageCenterCss).toContain("--pc-chat-receipt-bottom: 4px");
-    expect(messageCenterCss).toContain(".pc-chat-bubble-shell:has(.message-file-card)");
-    expect(messageCenterCss).not.toContain("pc-chat-direct-read-receipt {\n  border:");
-    expect(messageCenterCss).not.toContain("pc-chat-direct-read-receipt {\n  box-shadow:");
+    expect(chatMessageBubble).not.toContain("pc-chat-inline-read-receipt");
   });
 
   it("fast-tracks direct read receipt polling only while own sent messages are pending", () => {
@@ -509,13 +498,18 @@ describe("message lookup UI", () => {
     expect(chatMessageBubble).toContain("GroupReadPieIcon");
     expect(chatMessageBubble).toContain("groupReadPiePath");
     expect(chatMessageBubble).toContain("model.status.groupReadReceipt");
-    expect(chatMessageBubble).toContain('model.status.receipt !== "group_all"');
+    expect(chatMessageBubble).toContain("model.status.groupReadReceipt?.ratio");
+    expect(chatMessageBubble).toContain('groupReadVisualRatio > 0 ? "has-read" : "empty"');
+    expect(chatMessageBubble).not.toContain('model.status.receipt !== "group_all"');
     expect(chatMessageBubble).not.toContain("title={groupReadLabel}");
     expect(chatMessageBubble).toContain("model.status.groupReadReceiptClickable");
     expect(chatMessageBubble).toContain("groupReadVisualRatio");
+    expect(chatMessageBubble).not.toContain("const groupReadVisualRatio = 0.42");
+    expect(chatMessageBubble).not.toContain("model.status.groupReadReceipt?.readCount");
     expect(chatMessageBubble).not.toContain('groupReadCount > 0 ? "read" : "unread"');
     expect(listPanel).toContain("GroupReadReceiptPopover");
     expect(listPanel).toContain("pendingGroupReadReceiptSnapshotTargets");
+    expect(listPanel).toContain("messages: messageRenderWindow.renderedMessages");
     expect(listPanel).toContain("groupReadReceiptAutoSyncTargets");
     expect(listPanel).toContain("useQueries");
     expect(listPanel).toContain("activeGroupReadReceiptAutoSyncIntervalMs");
@@ -562,6 +556,9 @@ describe("message lookup UI", () => {
     expect(messageCenterCss).toContain(".pc-chat-group-read-pie-fill");
     expect(messageCenterCss).not.toContain(".pc-chat-group-read-pie-button.read");
     expect(messageCenterCss).not.toContain(".pc-chat-group-read-pie-button.unread");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-button.empty");
+    expect(messageCenterCss).toContain("color: #8fa0b3");
+    expect(messageCenterCss).toContain(".pc-chat-group-read-pie-button.has-read");
     expect(messageCenterCss).toContain("color: #13bfa6");
     expect(messageCenterCss).toContain("fill: #ffffff");
     expect(messageCenterCss).toContain("stroke: currentColor");

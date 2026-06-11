@@ -167,7 +167,7 @@ describe("group read receipts model", () => {
 
   it("uses a short active-conversation auto sync policy for group read receipts", () => {
     expect(activeGroupReadReceiptAutoSyncIntervalMs()).toBe(2_000);
-    expect(activeGroupReadReceiptAutoSyncMaxTargets()).toBe(4);
+    expect(activeGroupReadReceiptAutoSyncMaxTargets()).toBe(20);
     expect(activeGroupReadReceiptAutoSyncStaleMs()).toBe(1_000);
   });
 });

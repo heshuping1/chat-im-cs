@@ -92,13 +92,13 @@ describe("message view model", () => {
     ).toMatchObject({
       status: {
         receipt: "read",
-        readReceiptText: expect.any(String),
+        readReceiptText: undefined,
         statusText: undefined,
       },
     });
   });
 
-  it("exposes direct readCount snapshots as visible read receipt text", () => {
+  it("keeps direct readCount snapshots as non-text receipt state", () => {
     const message = {
       body: { text: "hello" },
       direction: "out",
@@ -122,13 +122,13 @@ describe("message view model", () => {
     ).toMatchObject({
       status: {
         receipt: "read",
-        readReceiptText: expect.any(String),
+        readReceiptText: undefined,
         statusText: undefined,
       },
     });
   });
 
-  it("exposes customer-service read time text when supplied", () => {
+  it("does not expose customer-service read time as visible bubble text", () => {
     const message = {
       body: { text: "hello" },
       direction: "out",
@@ -154,7 +154,39 @@ describe("message view model", () => {
     ).toMatchObject({
       status: {
         receipt: "read",
-        readReceiptText: "客户已读 17:20",
+        readReceiptText: undefined,
+        statusText: undefined,
+      },
+    });
+  });
+
+  it("does not expose incoming read status text in the shared bubble chrome", () => {
+    const message = {
+      body: { text: "hello" },
+      direction: "in",
+      isMine: false,
+      isRead: false,
+      messageId: "m-peer-unread",
+      messageType: "text",
+      sentAt: "2026-06-11T09:20:00.000Z",
+      status: "unread",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Visitor",
+        conversationType: "temp_session",
+        message,
+        mine: false,
+        senderFallback: "Visitor",
+        statusText: "未读",
+        timeText: "17:20",
+      }),
+    ).toMatchObject({
+      ownership: "other",
+      status: {
+        receipt: "none",
+        readReceiptText: undefined,
         statusText: undefined,
       },
     });

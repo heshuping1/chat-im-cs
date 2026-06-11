@@ -18,6 +18,7 @@ import {
 import { recordMessageReminderDiagnostic } from "../diagnostics/message-reminder-diagnostics";
 import { isQueryInWorkspaceScope, workspaceScopeKeyFromSession } from "../workspace-scope";
 import {
+  compareCustomerServiceMessagesAscending,
   customerServiceMessageFromSendResult,
   latestCustomerServiceMessage,
   previewFromCustomerServiceMessage,
@@ -806,12 +807,7 @@ function appendMessage(old: MessageItemDto[] | undefined, message: MessageItemDt
   const items = old ? [...old] : [];
   if (items.some((item) => item.messageId === message.messageId)) return old;
   items.push(message);
-  items.sort((a, b) => {
-    const seqA = a.conversationSeq ?? 0;
-    const seqB = b.conversationSeq ?? 0;
-    if (seqA !== seqB) return seqA - seqB;
-    return Date.parse(a.sentAt ?? "") - Date.parse(b.sentAt ?? "");
-  });
+  items.sort(compareCustomerServiceMessagesAscending);
   return items;
 }
 

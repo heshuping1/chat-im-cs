@@ -29,7 +29,7 @@ export function activeGroupReadReceiptAutoSyncIntervalMs() {
 }
 
 export function activeGroupReadReceiptAutoSyncMaxTargets() {
-  return 4;
+  return 20;
 }
 
 export function activeGroupReadReceiptAutoSyncStaleMs() {

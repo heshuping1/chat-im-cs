@@ -124,7 +124,7 @@ describe("messageCacheMutationModel", () => {
     expect(currentScope).not.toBe(otherScope);
   });
 
-  it("syncs group read receipt snapshots into the scoped message cache", () => {
+  it("syncs group read receipt snapshots into the scoped message cache", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const session = {
       apiBaseUrl: "https://api.example.test",
@@ -140,21 +140,24 @@ describe("messageCacheMutationModel", () => {
       conversationType: "group",
       title: "Group",
     } as ConversationListItem;
+    const scopeKey = imMessageScopeKey(session);
+    const store = getImMessageStore();
+    await store.clearScope(scopeKey);
+    const message = {
+      conversationId: "group-1",
+      conversationSeq: 8,
+      direction: "out",
+      isMine: true,
+      messageId: "m-target",
+      messageType: "text",
+      readCount: 0,
+      senderUserId: "u-self",
+      sentAt: "2026-06-09T09:00:00.000Z",
+      status: "sent",
+    } as MessageItemDto;
     const queryKey = pcQueryKeys.imMessagesForSession(session, "group", "group-1");
-    queryClient.setQueryData<MessageItemDto[]>(queryKey, [
-      {
-        conversationId: "group-1",
-        conversationSeq: 8,
-        direction: "out",
-        isMine: true,
-        messageId: "m-target",
-        messageType: "text",
-        readCount: 0,
-        senderUserId: "u-self",
-        sentAt: "2026-06-09T09:00:00.000Z",
-        status: "sent",
-      } as MessageItemDto,
-    ]);
+    queryClient.setQueryData<MessageItemDto[]>(queryKey, [message]);
+    await store.upsertMessages(scopeKey, "group", "group-1", [message]);
 
     syncGroupReadReceiptSnapshotToCache(queryClient, {
       conversation,
@@ -167,6 +170,10 @@ describe("messageCacheMutationModel", () => {
     expect(queryClient.getQueryData<MessageItemDto[]>(queryKey)).toMatchObject([
       { messageId: "m-target", readCount: 2 },
     ]);
+    await Promise.resolve();
+    expect(
+      await store.listMessages(imMessageConversationKey(scopeKey, "group", "group-1"), { limit: 50 }),
+    ).toMatchObject([{ messageId: "m-target", readCount: 2 }]);
   });
 
   it("upserts and replaces local outgoing messages by conversation key", () => {

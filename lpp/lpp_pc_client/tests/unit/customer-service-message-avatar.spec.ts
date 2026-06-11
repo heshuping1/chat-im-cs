@@ -47,4 +47,10 @@ describe("customer-service message avatars", () => {
     expect(messageStageSource).toContain("data-message-render-key");
     expect(messageStageSource).toContain("message.conversationSeq");
   });
+
+  it("does not render visitor read receipts as inline bubble text", () => {
+    expect(serviceMessageBubbleSource).not.toContain("messageReadStatusText");
+    expect(serviceMessageBubbleSource).not.toContain("customerMessageReadText");
+    expect(serviceMessageBubbleSource).not.toContain("statusText={");
+  });
 });

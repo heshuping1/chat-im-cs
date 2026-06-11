@@ -60,12 +60,28 @@ export function customerServiceMessageFromSendResult(params: {
 }
 
 export function latestCustomerServiceMessage(messages: MessageItemDto[]) {
-  return [...messages].sort((a, b) => {
-    const seqA = a.conversationSeq ?? 0;
-    const seqB = b.conversationSeq ?? 0;
-    if (seqA !== seqB) return seqB - seqA;
-    return Date.parse(b.sentAt ?? "") - Date.parse(a.sentAt ?? "");
-  })[0];
+  return [...messages].sort(compareCustomerServiceMessagesAscending).at(-1);
+}
+
+export function compareCustomerServiceMessagesAscending(
+  left: MessageItemDto,
+  right: MessageItemDto,
+) {
+  const leftSeq = positiveSeq(left.conversationSeq);
+  const rightSeq = positiveSeq(right.conversationSeq);
+  if (leftSeq !== undefined && rightSeq !== undefined && leftSeq !== rightSeq) {
+    return leftSeq - rightSeq;
+  }
+
+  const leftTime = timestamp(left.sentAt);
+  const rightTime = timestamp(right.sentAt);
+  if (leftTime !== undefined && rightTime !== undefined && leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+
+  if (leftSeq !== undefined && rightSeq === undefined) return -1;
+  if (leftSeq === undefined && rightSeq !== undefined) return 1;
+  return 0;
 }
 
 export function customerServiceMessageIdentity(message: MessageItemDto) {
@@ -111,4 +127,17 @@ function normalizeCustomerServiceCacheMessageKind(
   if (normalized === "video") return "video";
   if (normalized === "file") return "file";
   return "text";
+}
+
+function positiveSeq(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const normalized = Math.floor(number);
+  return normalized > 0 ? normalized : undefined;
+}
+
+function timestamp(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

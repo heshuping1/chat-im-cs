@@ -131,11 +131,12 @@ export function createChatMessageViewModel(
       sendStatusSlot: status.sendStatusSlot,
       showFailureMarker: status.showFailureMarker,
       showSendingIndicator: status.showSendingIndicator,
-      readReceiptText:
-        input.mine && status.receiptState === "read"
-          ? input.readReceiptText || status.statusLabel
-          : undefined,
-      statusText: visibleStatusText(input.statusText ?? status.statusLabel, status.receiptState),
+      readReceiptText: undefined,
+      statusText: visibleStatusText({
+        mine: input.mine,
+        receipt: status.receiptState,
+        statusText: input.statusText ?? status.statusLabel,
+      }),
       timeText: input.timeText,
     },
     actions: {
@@ -176,10 +177,16 @@ function uploadActionTaskId(
     : undefined;
 }
 
-function visibleStatusText(
-  statusText: string | undefined,
-  receipt: ChatMessageReceiptState,
-) {
+function visibleStatusText({
+  mine,
+  receipt,
+  statusText,
+}: {
+  mine: boolean;
+  receipt: ChatMessageReceiptState;
+  statusText: string | undefined;
+}) {
+  if (!mine) return undefined;
   return receipt === "read" ||
     receipt === "unread" ||
     receipt === "group_unread" ||
