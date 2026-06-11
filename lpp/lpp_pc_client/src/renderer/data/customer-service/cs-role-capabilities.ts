@@ -35,6 +35,15 @@ export function canReadCustomerServiceHistory(input?: {
   return true;
 }
 
+export function canSuperviseCustomerServiceTransfer(input?: {
+  membershipRole?: number | string | null;
+  roleLabel?: string | null;
+  tenantId?: string | null;
+  tenants?: Array<{ tenantId?: string | null; membershipRole?: number | string | null }>;
+} | null) {
+  return canUseCustomerServiceManagementReadonly(input);
+}
+
 export function canUseCustomerServiceManagementReadonly(input?: {
   membershipRole?: number | string | null;
   roleLabel?: string | null;

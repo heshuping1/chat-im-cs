@@ -59,6 +59,7 @@ import {
 import {
   extractActionResultText,
 } from "../messages/models/messageComposerModel";
+import { canSuperviseCustomerServiceTransfer } from "../data/customer-service/cs-role-capabilities";
 import {
   messageDangerConfirmationDescriptor,
   requestMessageDangerConfirmation,
@@ -306,14 +307,9 @@ export function ChatWorkspace({
   const canTransferThread = useMemo(() => {
     if (transferPermission.enabled) return true;
     if (!selectedThread) return false;
-    const detailAccessMode = (detail as { accessMode?: string } | undefined)?.accessMode;
-    const selectedThreadAccessMode = (selectedThread as { accessMode?: string }).accessMode;
-    const managementReadonly =
-      detailAccessMode === "management_readonly" ||
-      selectedThreadAccessMode === "management_readonly";
-    if (!managementReadonly) return false;
+    if (!canSuperviseCustomerServiceTransfer(session)) return false;
     return !createCustomerServiceThreadState(status || selectedThread.status).readOnly;
-  }, [detail, selectedThread, status, transferPermission.enabled]);
+  }, [selectedThread, session, status, transferPermission.enabled]);
   const closePermission = useMemo(
     () =>
       getCustomerServiceActionPermission("close", {

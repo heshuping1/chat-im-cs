@@ -425,8 +425,8 @@ describe("customer-service history and lookup surfaces", () => {
     expect(workspaceHeader).toContain("onCloseThread");
     expect(chatWorkspace).toContain("canClose={canUseStaffEndpoints && closePermission.enabled}");
     expect(chatWorkspace).toContain("const canTransferThread = useMemo");
-    expect(chatWorkspace).toContain('detailAccessMode === "management_readonly"');
-    expect(chatWorkspace).toContain('selectedThreadAccessMode === "management_readonly"');
+    expect(chatWorkspace).toContain("canSuperviseCustomerServiceTransfer");
+    expect(chatWorkspace).toContain("!createCustomerServiceThreadState(status || selectedThread.status).readOnly");
     expect(chatWorkspace).toContain("canTransfer={canTransferThread}");
     expect(chatWorkspace).toContain("currentCustomerServiceStaffName");
     expect(chatWorkspace).toContain("currentStaffName={currentTransferStaffName}");
