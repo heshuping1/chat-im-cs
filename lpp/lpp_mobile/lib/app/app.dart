@@ -5,6 +5,7 @@ import 'package:lpp_mobile/l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/app/router/router.dart';
+import 'package:lpp_mobile/app/system_ui.dart';
 import 'package:lpp_mobile/core/diagnostics/app_error_reporter.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/providers/font_size_provider.dart';
@@ -20,6 +21,8 @@ import 'package:lpp_mobile/features/call/presentation/widgets/incoming_call_over
 import 'package:lpp_mobile/features/chat/domain/services/chat_startup_recovery.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/gateway_provider.dart';
+import 'package:lpp_mobile/features/startup/presentation/pages/startup_gate_page.dart';
+import 'package:lpp_mobile/features/startup/presentation/widgets/startup_brand_loading_view.dart';
 
 class App extends ConsumerStatefulWidget {
   const App({super.key});
@@ -139,6 +142,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     final fontSizeScale = ref.watch(fontSizeScaleProvider);
     final isAuthenticated =
         ref.watch(authProvider).valueOrNull?.status == AuthStatus.authenticated;
+    final showStartupHandoffOverlay = ref.watch(startupHandoffOverlayProvider);
     if (isAuthenticated) {
       ref.watch(gatewayProvider);
     }
@@ -162,6 +166,14 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
             IncomingCallOverlay(router: _appRouter.router),
             ActiveCallMiniOverlay(router: _appRouter.router),
             const NetworkStatusBanner(),
+            if (showStartupHandoffOverlay)
+              StartupHandoffOverlay(
+                onDismissed: () {
+                  unawaited(configureAppSystemUi());
+                  ref.read(startupHandoffOverlayProvider.notifier).state =
+                      false;
+                },
+              ),
           ],
         );
       },

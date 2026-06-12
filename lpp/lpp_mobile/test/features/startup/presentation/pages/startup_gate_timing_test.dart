@@ -69,14 +69,15 @@ void main() {
             .readAsStringSync();
     final appSource = File('lib/app/app.dart').readAsStringSync();
 
-    expect(source, contains('SystemUiMode.immersiveSticky'));
+    expect(source, contains('SystemUiMode.manual'));
+    expect(source, contains('overlays: const []'));
     expect(source, contains('configureAppSystemUi()'));
     expect(source, contains('startupHandoffOverlayProvider'));
     expect(source.indexOf('startupHandoffOverlayProvider'),
         lessThan(source.indexOf('context.go(destination)')));
     expect(appSource, contains('StartupHandoffOverlay'));
     expect(
-      source.indexOf('SystemUiMode.immersiveSticky'),
+      source.indexOf('SystemUiMode.manual'),
       lessThan(source.indexOf('return const StartupBrandLoadingView()')),
     );
   });

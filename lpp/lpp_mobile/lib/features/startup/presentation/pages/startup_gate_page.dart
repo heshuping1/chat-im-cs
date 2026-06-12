@@ -23,6 +23,8 @@ const _avatarLookupBudget = Duration(seconds: 1);
 @visibleForTesting
 const minimumStartupBrandDisplay = Duration(milliseconds: 1200);
 
+final startupHandoffOverlayProvider = StateProvider<bool>((ref) => false);
+
 final _startupDestinationProvider = FutureProvider<String>((ref) async {
   return waitForMinimumStartupBrandDisplay(() async {
     final storage = ref.read(secureStorageProvider);
@@ -147,6 +149,8 @@ class StartupGatePage extends ConsumerStatefulWidget {
 }
 
 class _StartupGatePageState extends ConsumerState<StartupGatePage> {
+  var _hasNavigated = false;
+
   @override
   void initState() {
     super.initState();
@@ -156,16 +160,20 @@ class _StartupGatePageState extends ConsumerState<StartupGatePage> {
 
   @override
   void dispose() {
-    unawaited(configureAppSystemUi());
+    if (!ref.read(startupHandoffOverlayProvider)) {
+      unawaited(configureAppSystemUi());
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final destination = ref.watch(_startupDestinationProvider).valueOrNull;
-    if (destination != null) {
+    if (destination != null && !_hasNavigated) {
+      _hasNavigated = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
+        ref.read(startupHandoffOverlayProvider.notifier).state = true;
         context.go(destination);
       });
     }
