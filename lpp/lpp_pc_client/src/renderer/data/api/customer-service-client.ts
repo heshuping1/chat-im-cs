@@ -42,6 +42,7 @@ import {
   applyCustomerServiceThreadOverlay,
   customerServiceIndexScopeKey,
 } from "../customer-service/cs-conversation-index";
+import { auditCustomerServiceMessage } from "../customer-service/cs-message-audit-diagnostics";
 import { isQueuedCustomerServiceThreadStatus } from "../customer-service/cs-thread-state";
 import { recordCsRoutingDiagnostic } from "../customer-service/cs-routing-diagnostics";
 import { recordMessageSourceObserved } from "../diagnostics/message-source-diagnostics";
@@ -576,6 +577,19 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     body: Record<string, unknown>,
     options: { clientMsgId?: string } = {},
   ) {
+    const clientMsgId =
+      options.clientMsgId ||
+      `pc-cs-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    auditCustomerServiceMessage({
+      source: "http",
+      stage: "send.http.start",
+      traceId: clientMsgId,
+      clientMsgId,
+      threadId,
+      threadType,
+      body,
+      messageType,
+    });
     return this.request<{
       threadType: CustomerServiceThreadType;
       threadId?: string;
@@ -592,15 +606,34 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       {
         method: "POST",
         body: JSON.stringify({
-          clientMsgId:
-            options.clientMsgId ||
-            `pc-cs-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          clientMsgId,
           messageType,
           body,
           replyToMessageId: null,
         }),
       },
-    );
+    ).then((result) => {
+      auditCustomerServiceMessage({
+        source: "http",
+        stage: "send.http.done",
+        traceId: clientMsgId,
+        clientMsgId,
+        messageId: result.messageId,
+        threadId: result.threadId || threadId,
+        threadType: result.threadType || threadType,
+        conversationId: result.conversationId,
+        conversationSeq: result.conversationSeq,
+        message: result.message,
+        body: result.message?.body ?? body,
+        preview: result.message?.preview,
+        messageType: result.message?.messageType ?? messageType,
+        context: {
+          hasCanonicalMessage: Boolean(result.message),
+          serverTime: result.serverTime,
+        },
+      });
+      return result;
+    });
   }
 
   sendWorkbenchTextMessage(
@@ -1369,7 +1402,8 @@ function normalizeCustomerServiceThreadFromContract(
   item: CustomerServiceThread,
   api: string,
 ): CustomerServiceThread | null {
-  const result = normalizeCustomerServiceThreadDto(item);
+  const enrichedItem = enrichCustomerServiceThreadLastMessage(item);
+  const result = normalizeCustomerServiceThreadDto(enrichedItem);
   logApiContractDiagnostic({
     api,
     phase: "normalize",
@@ -1382,7 +1416,63 @@ function normalizeCustomerServiceThreadFromContract(
     },
     error: result.error,
   });
-  return result.data ? customerServiceThreadEntityToDto(result.data, item) : null;
+  return result.data ? customerServiceThreadEntityToDto(result.data, enrichedItem) : null;
+}
+
+function enrichCustomerServiceThreadLastMessage(
+  item: CustomerServiceThread,
+): CustomerServiceThread {
+  const record = item as CustomerServiceThread & Record<string, unknown>;
+  const nestedLastMessage =
+    asRecord(record.lastMessage) ||
+    asRecord(record.last_message) ||
+    asRecord(record.latestMessage) ||
+    asRecord(record.latest_message);
+  const conversationId =
+    readString(record.conversationId) ||
+    readString(record.conversation_id) ||
+    readString(nestedLastMessage?.conversationId) ||
+    readString(nestedLastMessage?.conversation_id) ||
+    item.conversationId ||
+    item.threadId;
+  const rawMessages =
+    readMessages(record.messages) ??
+    readMessages(record.recentMessages) ??
+    readMessages(record.recent_messages) ??
+    readMessages(record.messageItems) ??
+    readMessages(record.message_items) ??
+    [];
+  const normalizedMessages = normalizeCustomerServiceMessagesFromContract(rawMessages, {
+    conversationId,
+    threadId: item.threadId,
+    threadType: item.threadType,
+  });
+  const latest = latestMessage(normalizedMessages);
+  const lastMessagePreview =
+    readString(record.lastMessagePreview) ||
+    readString(record.last_message_preview) ||
+    readString(nestedLastMessage?.preview) ||
+    readString(nestedLastMessage?.text) ||
+    readString(nestedLastMessage?.content) ||
+    previewFromMessage(latest);
+  const lastMessageAt =
+    readString(record.lastMessageAt) ||
+    readString(record.last_message_at) ||
+    readString(nestedLastMessage?.sentAt) ||
+    readString(nestedLastMessage?.sent_at) ||
+    latest?.sentAt;
+
+  if (
+    lastMessagePreview === item.lastMessagePreview &&
+    lastMessageAt === item.lastMessageAt
+  ) {
+    return item;
+  }
+  return {
+    ...item,
+    lastMessageAt: lastMessageAt ?? item.lastMessageAt,
+    lastMessagePreview: lastMessagePreview ?? item.lastMessagePreview,
+  };
 }
 
 function normalizeCustomerProfileFromContract(
@@ -2077,5 +2167,5 @@ function previewFromMessage(message?: MessageItemDto) {
   if (type === "file" || body.file) return "[File]";
   if (type === "voice" || body.voice) return "[Voice]";
   if (type === "video" || body.video) return "[Video]";
-  return "[Message]";
+  return undefined;
 }

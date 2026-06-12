@@ -146,14 +146,16 @@ describe("customer-service history and lookup surfaces", () => {
     expect(productPagesCss).toContain(".cs-history-staff-list");
   });
 
-  it("keeps customer typing preview in a non-overlapping dock below the message scroller", () => {
+  it("keeps customer typing preview as a composer status row outside the message stage", () => {
     expect(messageStage).toContain("cs-message-stage-shell");
-    expect(messageStage).toContain("cs-typing-preview-dock");
     expect(messageStage).toContain('className="h-message-stage"');
-    expect(messageStage.indexOf("cs-typing-preview-dock")).toBeGreaterThan(
-      messageStage.indexOf("</section>"),
+    expect(messageStage).not.toContain("cs-composer-typing-preview");
+    expect(messageStage).not.toContain("typingPreview");
+    expect(chatWorkspace).toContain("CustomerServiceComposerTypingPreview");
+    expect(chatWorkspace).toContain("cs-composer-typing-preview");
+    expect(chatWorkspace.indexOf("CustomerServiceComposerTypingPreview")).toBeLessThan(
+      chatWorkspace.indexOf("<ChatComposerSurface"),
     );
-    expect(messageStage).not.toContain("className=\"cs-typing-preview\" aria-live=\"polite\"");
     expect(workbenchKnowledgeCss).toContain(".cs-monitor-window .cs-message-stage-shell");
   });
 

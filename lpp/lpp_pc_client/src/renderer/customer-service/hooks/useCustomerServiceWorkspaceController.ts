@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { createApiClient } from "../../data/runtime";
+import type { MessageItemDto } from "../../data/api-client";
 import { useAuthSession } from "../../data/auth/auth-store";
 import { pcQueryKeys } from "../../data/query-keys";
 import {
@@ -9,6 +10,7 @@ import {
   markCustomerServiceThreadClaimed,
   markCustomerServiceThreadClosed,
   markCustomerServiceThreadTransferred,
+  reconcileCustomerServiceThreadDetailMessages,
 } from "../../data/customer-service/cs-cache-adapter";
 import {
   canReadCustomerServiceHistory,
@@ -33,6 +35,7 @@ import {
 import { createCustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
 import {
   createCustomerServiceWorkspaceViewModel,
+  isCustomerServiceThreadAssignedAwayFromCurrentStaff,
   listCustomerServiceSelectableThreads,
   selectCustomerServiceThread,
 } from "../../data/customer-service/cs-workspace-view-model";
@@ -121,15 +124,32 @@ export function useCustomerServiceWorkspaceController({
     () =>
       selectedThread
         ? selectedThread.accessMode !== "management_readonly" &&
-          !createCustomerServiceThreadState(selectedThread.status).readOnly
+          !createCustomerServiceThreadState(selectedThread.status).readOnly &&
+          !isCustomerServiceThreadAssignedAwayFromCurrentStaff(selectedThread, session)
         : false,
-    [selectedThread],
+    [selectedThread, session],
   );
 
+  const detailQueryKey = useMemo(
+    () => pcQueryKeys.customerServiceThreadDetail(...queryBaseKey, threadType, threadId),
+    [queryBaseKey, threadId, threadType],
+  );
   const detailQuery = useQuery({
-    queryKey: pcQueryKeys.customerServiceThreadDetail(...queryBaseKey, threadType, threadId),
+    queryKey: detailQueryKey,
     enabled: Boolean(client && selectedThread),
-    queryFn: async () => client!.getWorkbenchThreadDetail(threadType, threadId),
+    queryFn: async () => {
+      const previous = queryClient.getQueryData<{ messages?: MessageItemDto[] }>(
+        detailQueryKey,
+      );
+      const detail = await client!.getWorkbenchThreadDetail(threadType, threadId);
+      return {
+        ...detail,
+        messages: reconcileCustomerServiceThreadDetailMessages(
+          previous?.messages,
+          detail.messages,
+        ),
+      };
+    },
     refetchInterval: selectedThreadIsLive ? 2_500 : false,
     refetchIntervalInBackground: true,
   });
@@ -234,6 +254,7 @@ export function useCustomerServiceWorkspaceController({
   const workspaceViewModel = useMemo(
     () =>
       createCustomerServiceWorkspaceViewModel({
+        currentStaffIdentity: session,
         detail,
         detailErrorText: detailQuery.error ? formatError(detailQuery.error) : undefined,
         detailLoading: detailQuery.isLoading,
@@ -241,7 +262,7 @@ export function useCustomerServiceWorkspaceController({
         profile,
         selectedThread,
       }),
-    [detail, detailQuery.error, detailQuery.isLoading, formatSourceLabel, profile, selectedThread],
+    [detail, detailQuery.error, detailQuery.isLoading, formatSourceLabel, profile, selectedThread, session],
   );
 
   const threadActionMutation = useMutation({

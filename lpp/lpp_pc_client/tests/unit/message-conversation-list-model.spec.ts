@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -116,6 +118,18 @@ describe("message conversation list model", () => {
     expect(isVisibleImConversationInScope(directShapedCustomerService, "scope-a")).toBe(false);
     expect(isVisibleImConversationInScope(directShapedCustomerService, "scope-b")).toBe(true);
   });
+
+  it("keeps the IM read executor behind the same customer-service ownership boundary", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/hooks/useImReadCommandExecutor.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain("customerServiceIndexScopeKey(session)");
+    expect(source).toContain("isVisibleImConversationInScope(");
+    expect(source).not.toContain("isImConversation(conversation)");
+  });
+
 
   it("adds lightweight customer identity and real source to direct conversations", () => {
     const item = conversation({

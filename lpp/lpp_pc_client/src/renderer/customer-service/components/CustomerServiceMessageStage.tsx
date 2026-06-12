@@ -1,11 +1,16 @@
 import type { CSSProperties, MouseEvent, Ref } from "react";
+import { useEffect, useRef } from "react";
 
 import { PanelState } from "../../components/PanelState";
 import type { CustomerServiceThread } from "../../data/api-client";
 import type { MessageItemDto } from "../../data/api-client";
-import type { CustomerServiceTypingPreview } from "../../data/customer-service/cs-typing-preview";
+import {
+  auditCustomerServiceMessage,
+  customerServiceMessagePreviewKind,
+} from "../../data/customer-service/cs-message-audit-diagnostics";
 import { useI18n } from "../../i18n/useI18n";
-import { formatChatMessageTime } from "../../lib/format";
+import { formatFullDateTime } from "../../lib/format";
+import { chatMessageRenderKey } from "../../messages/models/messageRenderKey";
 import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
 import {
   ServiceMessageContextMenu,
@@ -43,7 +48,6 @@ export function CustomerServiceMessageStage({
   selectedThread,
   stageRef,
   title,
-  typingPreview,
   onContextMenu,
   onAvatarClick,
   onMenuAction,
@@ -66,7 +70,6 @@ export function CustomerServiceMessageStage({
   selectedThread: CustomerServiceThread;
   stageRef: Ref<HTMLElement>;
   title: string;
-  typingPreview?: CustomerServiceTypingPreview | null;
   onContextMenu: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
   onAvatarClick?: (event: MouseEvent<HTMLButtonElement>, message: MessageItemDto, mine: boolean) => void;
   onMenuAction: (action: ServiceMessageContextAction, message: MessageItemDto) => void;
@@ -74,14 +77,50 @@ export function CustomerServiceMessageStage({
   onUploadAction: (localTaskId: string, action: "pause" | "resume" | "cancel" | "retry") => void;
 }) {
   const { t } = useI18n();
-  const showTypingPreview =
-    messageStageState?.kind !== "loading" &&
-    messageStageState?.kind !== "error" &&
-    Boolean(typingPreview);
+  const renderedAuditKeysRef = useRef(new Set<string>());
+  useEffect(() => {
+    const duplicateMessageIds = countMessageValues(messages, (message) => message.messageId);
+    const duplicateClientIds = countMessageValues(messages, customerServiceClientMessageId);
+    for (const message of messages) {
+      const renderKey = chatMessageRenderKey(message);
+      const clientMsgId = customerServiceClientMessageId(message);
+      const duplicateMessageIdCount = message.messageId
+        ? duplicateMessageIds.get(message.messageId) ?? 0
+        : 0;
+      const duplicateClientMsgIdCount = clientMsgId
+        ? duplicateClientIds.get(clientMsgId) ?? 0
+        : 0;
+      const suspicious =
+        customerServiceMessagePreviewKind(message.preview) === "generic_message" ||
+        duplicateMessageIdCount > 1 ||
+        duplicateClientMsgIdCount > 1;
+      const auditKey = `${selectedThread.threadId}:${renderKey}:${duplicateMessageIdCount}:${duplicateClientMsgIdCount}`;
+      if (!suspicious || renderedAuditKeysRef.current.has(auditKey)) continue;
+      renderedAuditKeysRef.current.add(auditKey);
+      auditCustomerServiceMessage({
+        source: "ui",
+        stage: "ui.render.observed",
+        traceId: clientMsgId || message.messageId || renderKey,
+        clientMsgId,
+        messageId: message.messageId,
+        threadId: selectedThread.threadId,
+        threadType: selectedThread.threadType,
+        conversationId: message.conversationId || selectedThread.conversationId,
+        conversationSeq: message.conversationSeq,
+        message,
+        duplicateClientMsgIdCount,
+        duplicateMessageIdCount,
+        context: {
+          renderKey,
+          visibleMessageCount: messages.length,
+        },
+      });
+    }
+  }, [messages, selectedThread.conversationId, selectedThread.threadId, selectedThread.threadType]);
   return (
     <>
       <div
-        className={`cs-message-stage-shell ${showTypingPreview ? "has-typing-preview" : ""}`}
+        className="cs-message-stage-shell"
         style={chatBackgroundStyleVariables(chatBackgroundPreset) as CSSProperties}
       >
         <section
@@ -107,20 +146,18 @@ export function CustomerServiceMessageStage({
             messages.map((message) => {
               const system = isSystemServiceMessage(message);
               const mine = !system && isMineMessage(message);
+              const renderKey = chatMessageRenderKey(message);
               return (
                 <div
-                  key={message.messageId}
+                  key={renderKey}
                   className={`cs-message-row ${system ? "system" : mine ? "mine" : "other"}`}
                   data-message-id={message.messageId}
-                  data-message-render-key={
-                    message.messageId ||
-                    `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`
-                  }
+                  data-message-render-key={renderKey}
                 >
                   {system ? (
                     <div className="cs-system-message" role="status">
                       <span>{serviceSystemMessageText(message)}</span>
-                      {message.sentAt && <time>{formatChatMessageTime(message.sentAt)}</time>}
+                      {message.sentAt && <time>{formatFullDateTime(message.sentAt)}</time>}
                     </div>
                   ) : (
                     <ServiceMessageBubble
@@ -147,17 +184,6 @@ export function CustomerServiceMessageStage({
               );
             })}
         </section>
-        {showTypingPreview && typingPreview && (
-          <div className="cs-typing-preview-dock" aria-live="polite">
-            <div className="cs-typing-preview">
-              <span>{t("customerService.messageStage.typingPreviewLabel")}</span>
-              <p>
-                {typingPreview.previewText ||
-                  t("customerService.messageStage.typingPreviewEmpty")}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
       {messageMenu && (
@@ -182,6 +208,27 @@ function isSystemServiceMessage(message: MessageItemDto) {
     type === "system" ||
     type === "notice"
   );
+}
+
+function countMessageValues(
+  messages: MessageItemDto[],
+  readValue: (message: MessageItemDto) => string | undefined,
+) {
+  const counts = new Map<string, number>();
+  for (const message of messages) {
+    const value = readValue(message);
+    if (!value) continue;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function customerServiceClientMessageId(message: MessageItemDto) {
+  return readNonEmptyString(message.clientMsgId) || readNonEmptyString(message.clientMessageId);
+}
+
+function readNonEmptyString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function serviceSystemMessageText(message: MessageItemDto) {

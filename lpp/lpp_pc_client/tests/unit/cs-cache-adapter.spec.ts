@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   CustomerServiceThread,
   MessageItemDto,
+  StaffServiceHistoryItem,
 } from "../../src/renderer/data/api/types";
 import {
   appendCustomerServiceLocalMessage,
@@ -11,10 +12,12 @@ import {
   markCustomerServiceThreadClaimed,
   markCustomerServiceThreadClosed,
   markCustomerServiceThreadReadInCache,
+  markCustomerServiceThreadReopened,
   markCustomerServiceThreadTransferred,
   mergeLoadedCustomerServiceThreadDetail,
   mergeSentCustomerServiceMessage,
   patchCustomerServiceLocalMessage,
+  reconcileCustomerServiceThreadDetailMessages,
   removeCustomerServiceMessage,
   removeCustomerServiceLocalMessage,
 } from "../../src/renderer/data/customer-service/cs-cache-adapter";
@@ -188,6 +191,43 @@ describe("customer service cache adapter", () => {
     });
   });
 
+  it("updates queued workbench preview when only the gateway conversation id matches", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    queryClient.setQueryData(["pc-cs-workbench-threads"], {
+      activeItems: [],
+      queueItems: [
+        thread({
+          conversationId: "widget-conversation-queued",
+          lastMessagePreview: "当前排队第 1 位，请稍候。",
+          status: "queued",
+          threadId: "server-session-queued",
+          unreadCount: 0,
+        }),
+      ],
+    });
+
+    applyCustomerServiceGatewayMessageCache(queryClient, {
+      conversationId: "widget-conversation-queued",
+      message: message({
+        conversationId: "widget-conversation-queued",
+        messageId: "gw-queued-alias",
+        preview: "9895959596",
+        sentAt: "2026-06-13T01:59:10.000Z",
+      }),
+      read: false,
+      threadId: "gateway-unmatched-thread",
+      threadType: "temp_session",
+    });
+
+    expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({
+      lastMessageAt: "2026-06-13T01:59:10.000Z",
+      lastMessagePreview: "9895959596",
+      threadId: "server-session-queued",
+      unreadCount: 1,
+    });
+  });
+
   it("does not increment unread twice for the same gateway message", () => {
     const queryClient = createQueryClient();
     seedCaches(queryClient);
@@ -217,6 +257,75 @@ describe("customer service cache adapter", () => {
     expect(getCustomerServiceThreadIndex("thread-1")).toMatchObject({
       lastMessagePreview: "visitor",
       overlayUnreadCount: 1,
+    });
+  });
+
+  it("merges gateway self echo into the local customer-service echo", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+
+    appendCustomerServiceLocalMessage(
+      queryClient,
+      thread(),
+      message({
+        body: { text: "self gateway text", messageType: "text" },
+        clientMsgId: "client-gateway-self",
+        messageId: "pc-cs-local-gateway-self",
+        preview: "self gateway text",
+        status: "sending",
+      }),
+    );
+
+    applyCustomerServiceGatewayMessageCache(queryClient, {
+      message: message({
+        body: {},
+        clientMsgId: "client-gateway-self",
+        messageId: "server-gateway-self",
+        preview: "[Message]",
+        status: "sent",
+      }),
+      read: true,
+      selfMessage: true,
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    expect(detailMessages(queryClient)).toHaveLength(1);
+    expect(detailMessages(queryClient)[0]).toMatchObject({
+      body: { text: "self gateway text", messageType: "text" },
+      clientMsgId: "client-gateway-self",
+      messageId: "server-gateway-self",
+      preview: "self gateway text",
+    });
+  });
+
+  it("reconciles detail refetch without letting generic previews overwrite local content", () => {
+    const messages = reconcileCustomerServiceThreadDetailMessages(
+      [
+        message({
+          body: { text: "detail local text", messageType: "text" },
+          clientMsgId: "client-detail-self",
+          conversationSeq: 8,
+          messageId: "server-detail-self",
+          preview: "detail local text",
+        }),
+      ],
+      [
+        message({
+          body: {},
+          conversationSeq: 8,
+          messageId: "server-detail-self",
+          preview: "[Message]",
+        }),
+      ],
+    );
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      body: { text: "detail local text", messageType: "text" },
+      conversationSeq: 8,
+      messageId: "server-detail-self",
+      preview: "detail local text",
     });
   });
 
@@ -277,6 +386,52 @@ describe("customer service cache adapter", () => {
     expect(queryClient.getQueryData<{ status?: string }>(detailKey())).toMatchObject({
       status: "closed_by_visitor",
     });
+  });
+
+  it("moves a timeout-closed thread back to current service when it is reopened", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient, { status: "closed_timeout", unreadCount: 2 });
+    queryClient.setQueryData(["pc-cs-staff-service-history"], {
+      pages: [
+        {
+          items: [
+            {
+              conversationId: "thread-1",
+              status: "closed_timeout",
+              threadId: "thread-1",
+              threadType: "temp_session",
+              title: "Old visitor",
+              unreadCount: 2,
+            },
+          ],
+        },
+      ],
+    });
+
+    markCustomerServiceThreadReopened(queryClient, {
+      reopenedAt: "2026-06-12T10:00:00.000Z",
+      status: "reopened",
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    expect(workbenchCache(queryClient).queueItems).toHaveLength(0);
+    expect(workbenchCache(queryClient).activeItems[0]).toMatchObject({
+      accessMode: "workbench",
+      status: "reopened",
+      threadId: "thread-1",
+      unreadCount: 2,
+      updatedAt: "2026-06-12T10:00:00.000Z",
+    });
+    expect(queryClient.getQueryData<{ status?: string; accessMode?: string }>(detailKey())).toMatchObject({
+      accessMode: "workbench",
+      status: "reopened",
+    });
+    expect(
+      queryClient.getQueryData<{ pages: Array<{ items: StaffServiceHistoryItem[] }> }>([
+        "pc-cs-staff-service-history",
+      ])?.pages[0].items,
+    ).toEqual([]);
   });
 
   it("moves a claimed queued thread into the active list immediately", () => {
@@ -499,6 +654,181 @@ describe("customer service cache adapter", () => {
       "queue",
       "pc-cs-local-text-1",
     ]);
+  });
+
+  it("replaces a local customer-service text echo with server ack without losing composer text", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+
+    appendCustomerServiceLocalMessage(
+      queryClient,
+      thread(),
+      message({
+        body: { text: "真实回复", messageType: "text" },
+        clientMsgId: "client-text-1",
+        messageId: "pc-cs-local-text-1",
+        preview: "真实回复",
+        status: "sending",
+      }),
+    );
+
+    mergeSentCustomerServiceMessage(queryClient, {
+      body: { text: "真实回复" },
+      clientMsgId: "client-text-1",
+      messageType: "text",
+      result: {
+        message: {
+          body: {},
+          clientMsgId: "client-text-1",
+          messageId: "server-text-1",
+          messageType: "text",
+          preview: "[Message]",
+          sentAt: "2026-05-29T12:03:00.000Z",
+        },
+      },
+      thread: thread(),
+    });
+
+    expect(detailMessages(queryClient)).toHaveLength(1);
+    expect(detailMessages(queryClient)[0]).toMatchObject({
+      body: { text: "真实回复", messageType: "text" },
+      clientMsgId: "client-text-1",
+      messageId: "server-text-1",
+      preview: "真实回复",
+    });
+    expect(workbenchCache(queryClient).queueItems[0]).toMatchObject({
+      lastMessagePreview: "真实回复",
+    });
+  });
+
+  it("replaces a local customer-service text echo when server ack omits clientMsgId", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+
+    appendCustomerServiceLocalMessage(
+      queryClient,
+      thread(),
+      message({
+        body: { text: "client text", messageType: "text" },
+        clientMsgId: "client-text-no-ack",
+        messageId: "pc-cs-local-text-no-ack",
+        preview: "client text",
+        status: "sending",
+      }),
+    );
+
+    mergeSentCustomerServiceMessage(queryClient, {
+      body: { text: "client text" },
+      clientMsgId: "client-text-no-ack",
+      messageType: "text",
+      result: {
+        message: {
+          body: {},
+          messageId: "server-text-no-client-id",
+          messageType: "text",
+          preview: "[消息]",
+          sentAt: "2026-05-29T12:04:00.000Z",
+        },
+      },
+      thread: thread(),
+    });
+
+    expect(detailMessages(queryClient)).toHaveLength(1);
+    expect(detailMessages(queryClient)[0]).toMatchObject({
+      body: { text: "client text", messageType: "text" },
+      clientMsgId: "client-text-no-ack",
+      messageId: "server-text-no-client-id",
+      preview: "client text",
+    });
+  });
+
+  it("confirms a local customer-service text echo by localMessageId when ack has no client id", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+
+    appendCustomerServiceLocalMessage(
+      queryClient,
+      thread(),
+      message({
+        body: { text: "local identity text", messageType: "text" },
+        clientMsgId: "client-only-local",
+        messageId: "pc-cs-local-only",
+        preview: "local identity text",
+        status: "sending",
+      }),
+    );
+
+    mergeSentCustomerServiceMessage(queryClient, {
+      body: { text: "local identity text" },
+      localMessageId: "pc-cs-local-only",
+      messageType: "text",
+      result: {
+        message: {
+          body: {},
+          messageId: "server-local-only",
+          messageType: "text",
+          preview: "[Message]",
+          sentAt: "2026-05-29T12:04:30.000Z",
+        },
+      },
+      thread: thread(),
+    });
+
+    expect(detailMessages(queryClient)).toHaveLength(1);
+    expect(detailMessages(queryClient)[0]).toMatchObject({
+      body: { text: "local identity text", messageType: "text" },
+      clientMsgId: "client-only-local",
+      messageId: "server-local-only",
+      preview: "local identity text",
+    });
+  });
+
+  it("replaces a local customer-service media echo without losing local media fallback", () => {
+    const queryClient = createQueryClient();
+    seedCaches(queryClient);
+    const image = {
+      fileName: "proof.png",
+      localPreviewUrl: "blob:local-preview",
+      url: "blob:local-open",
+    };
+
+    appendCustomerServiceLocalMessage(
+      queryClient,
+      thread(),
+      message({
+        body: { image, messageType: "image" },
+        clientMsgId: "client-image-1",
+        messageId: "pc-cs-local-image-1",
+        messageType: "image",
+        preview: "[图片]",
+        status: "uploading",
+      }),
+    );
+
+    mergeSentCustomerServiceMessage(queryClient, {
+      body: { image },
+      clientMsgId: "client-image-1",
+      messageType: "image",
+      result: {
+        message: {
+          body: {},
+          messageId: "server-image-1",
+          messageType: "image",
+          preview: "[Message]",
+          sentAt: "2026-05-29T12:05:00.000Z",
+        },
+      },
+      thread: thread(),
+    });
+
+    expect(detailMessages(queryClient)).toHaveLength(1);
+    expect(detailMessages(queryClient)[0]).toMatchObject({
+      body: { image, messageType: "image" },
+      clientMsgId: "client-image-1",
+      messageId: "server-image-1",
+      messageType: "image",
+      preview: "[图片]",
+    });
   });
 
   it("uses sentAt to keep mixed seq and seq-less customer-service messages chronological", () => {

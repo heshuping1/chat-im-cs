@@ -161,7 +161,7 @@ describe("workspace ui store selectors", () => {
     }
   });
 
-  it("opens the message module as a list until a conversation is explicitly selected", () => {
+  it("preserves the active IM conversation when reopening the message module", () => {
     const previousState = useWorkspaceStore.getState();
     try {
       useWorkspaceStore.setState({
@@ -172,8 +172,8 @@ describe("workspace ui store selectors", () => {
 
       useWorkspaceStore.getState().setActiveModule("messages");
       expect(useWorkspaceStore.getState()).toMatchObject({
-        activeImConversationId: "",
-        activeImConversationVisibility: "hidden",
+        activeImConversationId: "conversation-1",
+        activeImConversationVisibility: "paneVisible",
         activeModule: "messages",
       });
 
@@ -188,6 +188,30 @@ describe("workspace ui store selectors", () => {
 
       useWorkspaceStore.getState().setActiveImConversationVisibility("paneVisible");
       expect(useWorkspaceStore.getState().activeImConversationVisibility).toBe("paneVisible");
+    } finally {
+      useWorkspaceStore.setState({
+        activeImConversationId: previousState.activeImConversationId,
+        activeImConversationVisibility: previousState.activeImConversationVisibility,
+        activeModule: previousState.activeModule,
+      });
+    }
+  });
+
+  it("hides the IM pane but keeps the selected conversation when leaving messages", () => {
+    const previousState = useWorkspaceStore.getState();
+    try {
+      useWorkspaceStore.setState({
+        activeImConversationId: "conversation-1",
+        activeImConversationVisibility: "paneVisible",
+        activeModule: "messages",
+      });
+
+      useWorkspaceStore.getState().setActiveModule("contacts");
+      expect(useWorkspaceStore.getState()).toMatchObject({
+        activeImConversationId: "conversation-1",
+        activeImConversationVisibility: "hidden",
+        activeModule: "contacts",
+      });
     } finally {
       useWorkspaceStore.setState({
         activeImConversationId: previousState.activeImConversationId,

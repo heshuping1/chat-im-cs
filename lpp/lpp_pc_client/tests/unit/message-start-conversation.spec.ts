@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,6 +9,12 @@ import {
   formatGroupCreateError,
   normalizeCreateGroupChatPayload,
 } from "../../src/renderer/messages/models/groupCreateModel";
+import {
+  buildCreatedDirectConversationItem,
+  extractCreatedDirectConversationId,
+  upsertImConversationListItem,
+} from "../../src/renderer/messages/models/startConversationModel";
+import { pcQueryKeys } from "../../src/renderer/data/query-keys";
 
 describe("group create contract model", () => {
   it("normalizes title and member ids before submit", () => {
@@ -126,5 +133,77 @@ describe("message start UI closure", () => {
     expect(startDialogs).toContain("messages.start.noGroupPermission");
     expect(startDialogs).toContain("aria-disabled");
     expect(conversationListPanel).toContain("groupCreateAccess");
+  });
+
+  it("selects the new conversation before background invalidation can block", () => {
+    const controllerSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/messages/hooks/useMessageStartConversationController.ts"),
+      "utf8",
+    );
+    const directSuccess = controllerSource.slice(
+      controllerSource.indexOf("onSuccess: (chat, peerUserId)"),
+      controllerSource.indexOf("onError: (error)", controllerSource.indexOf("onSuccess: (chat, peerUserId)")),
+    );
+    const setActiveIndex = directSuccess.indexOf("setActiveConversation(conversationId)");
+    const invalidateIndex = directSuccess.indexOf("invalidateQueries");
+
+    expect(setActiveIndex).toBeGreaterThan(-1);
+    expect(invalidateIndex).toBeGreaterThan(-1);
+    expect(setActiveIndex).toBeLessThan(invalidateIndex);
+    expect(directSuccess).not.toContain("await queryClient.invalidateQueries");
+  });
+});
+
+describe("direct conversation creation model", () => {
+  it("extracts new direct conversation ids from compatible server response shapes", () => {
+    expect(extractCreatedDirectConversationId({ conversationId: "c1", chatId: "chat" })).toBe("c1");
+    expect(extractCreatedDirectConversationId({ chatId: "chat" })).toBe("chat");
+    expect(extractCreatedDirectConversationId({ id: "id1" })).toBe("id1");
+  });
+
+  it("builds and upserts a minimal direct conversation into the session scoped cache", () => {
+    const queryClient = new QueryClient();
+    const session = {
+      apiBaseUrl: "https://api.example",
+      platformUserId: "platform-current",
+      spaceType: 2,
+      tenantId: "tenant-a",
+      tenantToken: "tenant-token",
+      userId: "user-current",
+    };
+    const queryKey = pcQueryKeys.imConversationsForSession(session);
+    queryClient.setQueryData(queryKey, {
+      items: [
+        {
+          conversationId: "existing",
+          conversationType: "direct",
+          title: "Existing",
+          unreadCount: 0,
+        },
+      ],
+    });
+
+    const item = buildCreatedDirectConversationItem(
+      {
+        chatId: "new-direct",
+        peerDisplayName: "Alice",
+        peerUserId: "alice-id",
+      },
+      { avatarUrl: "https://avatar.example/a.png" },
+    );
+    expect(item).toMatchObject({
+      conversationId: "new-direct",
+      conversationType: "direct",
+      peerUserId: "alice-id",
+      title: "Alice",
+    });
+    upsertImConversationListItem(queryClient, session, item!);
+
+    expect(queryClient.getQueryData(queryKey)).toMatchObject({
+      items: [
+        { conversationId: "new-direct", title: "Alice" },
+        { conversationId: "existing", title: "Existing" },
+      ],
+    });
   });
 });

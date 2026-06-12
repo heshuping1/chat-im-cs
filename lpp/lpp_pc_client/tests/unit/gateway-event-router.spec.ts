@@ -7,10 +7,20 @@ import {
 const mocks = vi.hoisted(() => ({
   applySpaceNoticeReminder: vi.fn(),
   mergeCustomerServiceGatewayMessage: vi.fn(),
+  mergeCustomerServiceReadEvent: vi.fn(),
   mergeImGatewayMessage: vi.fn(),
   mergeReadEvent: vi.fn(),
   notifyCustomerServiceQueue: vi.fn(),
   removeCustomerServiceMessageByThreadId: vi.fn(),
+  removeSilentCustomerServiceRecall: vi.fn(
+    (queryClient: unknown, payload: Record<string, unknown>, threadId: string) => {
+      const messageId = typeof payload.messageId === "string" ? payload.messageId : "";
+      if (threadId && messageId) {
+        mocks.removeCustomerServiceMessageByThreadId(queryClient, threadId, messageId);
+      }
+    },
+  ),
+  reopenCustomerServiceThreadFromGateway: vi.fn(),
   spaceReminderScopeKey: vi.fn(
     (apiBaseUrl?: string, platformToken?: string) =>
       `scope:${apiBaseUrl ?? ""}:${platformToken ?? ""}`,
@@ -19,7 +29,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../src/renderer/data/gateway/gateway-cs-side-effects", () => ({
   mergeCustomerServiceGatewayMessage: mocks.mergeCustomerServiceGatewayMessage,
+  mergeCustomerServiceReadEvent: mocks.mergeCustomerServiceReadEvent,
   notifyCustomerServiceQueue: mocks.notifyCustomerServiceQueue,
+  removeSilentCustomerServiceRecall: mocks.removeSilentCustomerServiceRecall,
+  reopenCustomerServiceThreadFromGateway: mocks.reopenCustomerServiceThreadFromGateway,
 }));
 
 vi.mock("../../src/renderer/data/gateway/gateway-im-side-effects", () => ({
@@ -180,6 +193,44 @@ describe("createGatewayEventRouter", () => {
     });
   });
 
+  it("routes customer service read receipts without writing message previews", async () => {
+    const { createGatewayEventRouter } = await import(
+      "../../src/renderer/data/gateway/gateway-event-router"
+    );
+    const queryClient = {
+      clear: vi.fn(),
+      invalidateQueries: vi.fn(),
+    };
+    const router = createGatewayEventRouter({
+      clearAuthSession: vi.fn(),
+      queryClient: queryClient as never,
+      session: {} as never,
+      setCustomerServiceStatus: vi.fn(),
+    });
+
+    router.handleEvent("msg.read", [
+      {
+        data: {
+          conversationId: "thread-read-customer",
+          conversationType: "temp_session",
+          readSeq: 7,
+          sourceType: "widget",
+        },
+      },
+    ]);
+
+    expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
+    expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
+    expect(mocks.mergeCustomerServiceReadEvent).toHaveBeenCalledWith(
+      queryClient,
+      expect.objectContaining({
+        conversationId: "thread-read-customer",
+        conversationType: "temp_session",
+      }),
+      "thread-read-customer",
+    );
+  });
+
   it("routes customer typing events to preview cache without merging messages", async () => {
     const { createGatewayEventRouter } = await import(
       "../../src/renderer/data/gateway/gateway-event-router"
@@ -224,6 +275,63 @@ describe("createGatewayEventRouter", () => {
     );
     expect(mocks.mergeCustomerServiceGatewayMessage).not.toHaveBeenCalled();
     expect(mocks.mergeImGatewayMessage).not.toHaveBeenCalled();
+  });
+
+  it("writes customer typing preview cache for both session and conversation ids", async () => {
+    const { createGatewayEventRouter } = await import(
+      "../../src/renderer/data/gateway/gateway-event-router"
+    );
+    const queryClient = {
+      clear: vi.fn(),
+      invalidateQueries: vi.fn(),
+      setQueryData: vi.fn(),
+    };
+    const router = createGatewayEventRouter({
+      clearAuthSession: vi.fn(),
+      queryClient: queryClient as never,
+      session: {
+        apiBaseUrl: "https://api.example.test",
+        tenantToken: "tenant-token",
+      } as never,
+      setCustomerServiceStatus: vi.fn(),
+    });
+
+    router.handleEvent("temp_session.typing", [
+      {
+        sessionId: "temp-session-typing-1",
+        conversationId: "conversation-typing-1",
+        isTyping: true,
+        preview: "typing draft",
+        senderType: "visitor",
+      },
+    ]);
+
+    expect(queryClient.setQueryData).toHaveBeenCalledWith(
+      [
+        "pc-cs-typing-preview",
+        "https://api.example.test",
+        "tenant-token",
+        "temp_session",
+        "temp-session-typing-1",
+      ],
+      expect.objectContaining({
+        previewText: "typing draft",
+        threadId: "temp-session-typing-1",
+      }),
+    );
+    expect(queryClient.setQueryData).toHaveBeenCalledWith(
+      [
+        "pc-cs-typing-preview",
+        "https://api.example.test",
+        "tenant-token",
+        "temp_session",
+        "conversation-typing-1",
+      ],
+      expect.objectContaining({
+        previewText: "typing draft",
+        threadId: "conversation-typing-1",
+      }),
+    );
   });
 
   it("routes unmarked msg.new payloads through the customer-service conversation index", async () => {

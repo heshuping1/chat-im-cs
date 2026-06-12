@@ -45,6 +45,14 @@ describe("chatMessageRenderKey", () => {
       resolve(process.cwd(), "src/renderer/messages/components/MessageListPanel.tsx"),
       "utf8",
     );
+    const chatWorkspace = readFileSync(
+      resolve(process.cwd(), "src/renderer/components/ChatWorkspace.tsx"),
+      "utf8",
+    );
+    const customerServiceMessageStage = readFileSync(
+      resolve(process.cwd(), "src/renderer/customer-service/components/CustomerServiceMessageStage.tsx"),
+      "utf8",
+    );
 
     expect(messageCenter).toContain('from "../messages/models/messageRenderKey"');
     expect(messageCenter).toContain("messageKey: chatMessageRenderKey");
@@ -52,5 +60,10 @@ describe("chatMessageRenderKey", () => {
     expect(messageListPanel).toContain("const renderKey = chatMessageRenderKey(message)");
     expect(messageListPanel).toContain("data-message-render-key={renderKey}");
     expect(messageListPanel).toContain("key={renderKey}");
+    expect(chatWorkspace).toContain("messageKey: chatMessageRenderKey");
+    expect(customerServiceMessageStage).toContain("chatMessageRenderKey");
+    expect(customerServiceMessageStage).toContain("const renderKey = chatMessageRenderKey(message)");
+    expect(customerServiceMessageStage).toContain("data-message-render-key={renderKey}");
+    expect(customerServiceMessageStage).toContain("key={renderKey}");
   });
 });

@@ -13,6 +13,7 @@ import {
 import type { CustomerServiceThreadAction } from "../data/customer-service/cs-action-service";
 import { getCustomerServiceActionPermission } from "../data/customer-service/cs-action-permissions";
 import { createCustomerServiceThreadState } from "../data/customer-service/cs-thread-state";
+import type { CustomerServiceTypingPreview } from "../data/customer-service/cs-typing-preview";
 import {
   invalidateCustomerServiceQueries,
   removeCustomerServiceMessage,
@@ -67,6 +68,7 @@ import {
   messageDangerConfirmationDescriptor,
   requestMessageDangerConfirmation,
 } from "../messages/runtime/messageConfirm";
+import { chatMessageRenderKey } from "../messages/models/messageRenderKey";
 import { ChatToastNotice, isNoticeErrorText } from "../messages/components/ChatToastNotice";
 import { MessageHistoryLookupDialog } from "../messages/components/MessageHistoryLookupDialog";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
@@ -184,6 +186,7 @@ export function ChatWorkspace({
   const {
     canReply,
     closedUnreadNoticeText,
+    closureReasonText,
     composerDisabledText,
     identity,
     messageStageState,
@@ -228,6 +231,9 @@ export function ChatWorkspace({
   const translatedClosedUnreadNoticeText = closedUnreadNoticeText
     ? formatCustomerServiceWorkspaceText(closedUnreadNoticeText, t)
     : undefined;
+  const translatedClosureReasonText = closureReasonText
+    ? formatCustomerServiceWorkspaceText(closureReasonText, t)
+    : undefined;
   const translatedComposerDisabledText = composerDisabledText
     ? formatCustomerServiceWorkspaceText(composerDisabledText, t)
     : undefined;
@@ -237,6 +243,10 @@ export function ChatWorkspace({
         text: formatCustomerServiceWorkspaceText(messageStageState.text, t),
       }
     : undefined;
+  const showTypingPreview =
+    translatedMessageStageState?.kind !== "loading" &&
+    translatedMessageStageState?.kind !== "error" &&
+    Boolean(typingPreview);
   const translatedModeLabel = formatCustomerServiceWorkspaceText(modeLabel, t);
   const translatedReceptionText = formatCustomerServiceWorkspaceText(receptionText, t);
   const translatedTitle = translateCustomerServiceValue(title, t);
@@ -274,9 +284,7 @@ export function ChatWorkspace({
   } = useWechatBottomFollow({
     conversationKey: selectedThread?.threadId,
     isMineMessage: (message: MessageItemDto) => isMineMessage(message, session),
-    messageKey: (message: MessageItemDto) =>
-      message.messageId ||
-      `${message.conversationSeq ?? ""}-${message.sentAt ?? ""}-${message.preview ?? ""}`,
+    messageKey: chatMessageRenderKey,
     messages: displayMessages,
   });
   const lookupCounts = useMemo(() => getHistoryFilterCounts(displayMessages), [displayMessages]);
@@ -713,6 +721,7 @@ export function ChatWorkspace({
     >
       <CustomerServiceWorkspaceHeader
         identity={translatedIdentity}
+        closureReason={translatedClosureReasonText}
         modeLabel={translatedModeLabel}
         readOnly={readOnly}
         replyGate={replyGate}
@@ -872,7 +881,6 @@ export function ChatWorkspace({
         selectedThread={selectedThread}
         stageRef={messageStageRef}
         title={translatedTitle}
-        typingPreview={typingPreview}
         onContextMenu={openServiceMessageMenu}
         onMenuAction={(action, message) =>
           void handleServiceMessageMenuAction(action, message)
@@ -880,6 +888,10 @@ export function ChatWorkspace({
         onScroll={handleMessageStageScroll}
         onUploadAction={handleServiceUploadAction}
       />
+
+      {showTypingPreview && typingPreview && (
+        <CustomerServiceComposerTypingPreview preview={typingPreview} />
+      )}
 
       {canReply && (
         <ChatComposerSurface
@@ -971,6 +983,25 @@ export function ChatWorkspace({
         <div className="composer-disabled-note">{translatedComposerDisabledText}</div>
       )}
     </main>
+  );
+}
+
+function CustomerServiceComposerTypingPreview({
+  preview,
+}: {
+  preview: CustomerServiceTypingPreview;
+}) {
+  const { t } = useI18n();
+  const text =
+    preview.previewText || t("customerService.messageStage.typingPreviewEmpty");
+  return (
+    <div className="cs-composer-typing-preview" aria-live="polite">
+      <span className="cs-composer-typing-preview-label">
+        <i aria-hidden="true" />
+        {t("customerService.messageStage.typingPreviewLabel")}
+      </span>
+      <p title={text}>{text}</p>
+    </div>
   );
 }
 

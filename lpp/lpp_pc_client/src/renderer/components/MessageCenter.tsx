@@ -12,10 +12,16 @@ import type {
 import type { CurrentUserIdentity } from "../data/message-display";
 import { pcQueryKeys } from "../data/query-keys";
 import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
+import {
+  contactMessageOpenTraceForConversation,
+  recordContactMessageOpenDiagnostic,
+} from "../data/diagnostics/contact-message-open-diagnostics";
 import { workspaceScopeFromSession, workspaceScopeDiagnostic } from "../data/workspace-scope";
 import { requireApiClient } from "../data/runtime";
 import { useAuthSession } from "../data/auth/auth-store";
 import { failedMessageRetryAction } from "../data/message/message-retry-model";
+import { customerServiceIndexScopeKey } from "../data/customer-service/cs-conversation-index";
+import { isVisibleImConversationInScope } from "../data/im/im-conversation-boundary";
 import { useI18n } from "../i18n/useI18n";
 import {
   useClearPendingImRead,
@@ -673,10 +679,104 @@ export function MessageCenter() {
     conversationId: activeConversation?.conversationId,
     messageLayoutMode,
   });
+  const activeConversationOpenTrace =
+    contactMessageOpenTraceForConversation(activeConversationId);
+  const firstPaneVisibleTraceKeysRef = useRef(new Set<string>());
   useEffect(() => {
     setActiveImConversationVisibility(activeConversationVisibility);
   }, [activeConversationVisibility, setActiveImConversationVisibility]);
   const activeConversationMessagesLoaded = messagesLoaded;
+  useEffect(() => {
+    if (!activeConversationOpenTrace || activeModule !== "messages" || !activeConversationId) {
+      return;
+    }
+    recordContactMessageOpenDiagnostic(
+      "message-center.route-observed",
+      {
+        activeConversationId,
+        activeConversationVisibility,
+        activeModule,
+        conversationDrawerOpen,
+        messageLayoutMode,
+      },
+      activeConversationOpenTrace,
+    );
+  }, [
+    activeConversationId,
+    activeConversationOpenTrace?.traceId,
+    activeConversationVisibility,
+    activeModule,
+    conversationDrawerOpen,
+    messageLayoutMode,
+  ]);
+  useEffect(() => {
+    if (!activeConversationOpenTrace || !activeConversationId) return;
+    const rawConversation = conversationsQuery.data?.items.find(
+      (item) => item.conversationId === activeConversationId,
+    );
+    const ownershipScopeKey = session ? customerServiceIndexScopeKey(session) : undefined;
+    recordContactMessageOpenDiagnostic(
+      "message-center.active-conversation.resolve",
+      {
+        activeConversationFound: Boolean(activeConversation),
+        activeConversationId,
+        conversationCount: conversations.length,
+        filteredByCustomerServiceBoundary: Boolean(
+          rawConversation &&
+            ownershipScopeKey &&
+            !isVisibleImConversationInScope(rawConversation, ownershipScopeKey),
+        ),
+        messagesLoaded,
+        rawConversationFound: Boolean(rawConversation),
+        rawConversationType: rawConversation?.conversationType,
+        visibleConversationCount: visibleConversations.length,
+        visibleConversationFound: visibleConversations.some(
+          (item) => item.conversationId === activeConversationId,
+        ),
+      },
+      activeConversationOpenTrace,
+    );
+  }, [
+    activeConversation,
+    activeConversationId,
+    activeConversationOpenTrace?.traceId,
+    conversations.length,
+    conversationsQuery.data?.items,
+    messagesLoaded,
+    session,
+    visibleConversations,
+  ]);
+  useEffect(() => {
+    if (
+      !activeConversationOpenTrace ||
+      activeConversationVisibility !== "paneVisible" ||
+      !activeConversation ||
+      activeConversation.conversationId !== activeConversationId
+    ) {
+      return;
+    }
+    const traceKey = `${activeConversationOpenTrace.traceId}:${activeConversation.conversationId}`;
+    if (firstPaneVisibleTraceKeysRef.current.has(traceKey)) return;
+    firstPaneVisibleTraceKeysRef.current.add(traceKey);
+    recordContactMessageOpenDiagnostic(
+      "message-center.first-pane-visible",
+      {
+        activeConversationId,
+        activeConversationType,
+        messagesLoaded,
+        visibleMessagesLength: visibleMessages.length,
+      },
+      activeConversationOpenTrace,
+    );
+  }, [
+    activeConversation,
+    activeConversationId,
+    activeConversationOpenTrace?.traceId,
+    activeConversationType,
+    activeConversationVisibility,
+    messagesLoaded,
+    visibleMessages.length,
+  ]);
   useEffect(() => {
     recordMessageReminderDiagnostic({
       event: "im.message-center.mounted",
@@ -767,6 +867,7 @@ export function MessageCenter() {
     activeConversationVisibility,
     conversationListError: conversationsQuery.error,
     conversationListLoading: conversationsQuery.isLoading,
+    conversationOwnershipScopeKey: session ? customerServiceIndexScopeKey(session) : undefined,
     conversations,
     draftsByConversation,
     friends: friendsQuery.data ?? [],

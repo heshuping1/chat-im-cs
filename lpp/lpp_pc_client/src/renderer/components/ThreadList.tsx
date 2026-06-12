@@ -7,7 +7,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   isTerminalCustomerServiceThreadStatus,
   normalizeCustomerServiceThreadType,
@@ -19,7 +19,12 @@ import {
   isQueuedCustomerServiceThread,
 } from "../data/customer-service-display";
 import { createCustomerServiceIdentityViewModel } from "../data/customer-service/cs-identity-view-model";
-import { markCustomerServiceThreadClaimed } from "../data/customer-service/cs-cache-adapter";
+import { dedupeCustomerServiceThreads } from "../data/customer-service/customer-service-live-counters";
+import {
+  selectCustomerServiceThreadCardPreview,
+  shouldHydrateCustomerServiceThreadPreview,
+  threadPreviewFromCustomerServiceDetail,
+} from "../data/customer-service/cs-thread-preview";
 import {
   canReadCustomerServiceHistory,
   canUseCustomerServiceStaffEndpoints,
@@ -42,6 +47,7 @@ import {
   type ServiceTextDescriptor,
   type ServiceThreadListMode,
 } from "../customer-service/models/serviceWorkbenchModel";
+import { applyClaimedCustomerServiceThread } from "../customer-service/models/customerServiceThreadClaimModel";
 import { useI18n } from "../i18n/useI18n";
 import {
   createThreadRenderWindow,
@@ -54,6 +60,7 @@ import { PcAvatar } from "./PcAvatar";
 type ThreadMode = ServiceThreadListMode;
 type ThreadListEmptyAction = "clearSearch" | "viewAll" | "viewQueued";
 const staffServiceHistoryPageSize = 50;
+const threadPreviewHydrationLimit = 30;
 
 interface ThreadListEmptyStateView {
   action?: ThreadListEmptyAction;
@@ -109,7 +116,7 @@ export function ThreadList() {
       return client.claimCustomerServiceThread(thread.threadType, thread.threadId);
     },
     onSuccess: (result, thread) => {
-      markCustomerServiceThreadClaimed(queryClient, thread, result);
+      applyClaimedCustomerServiceThread(queryClient, thread, result);
       openCustomerServiceThread(thread.threadId, "claim");
       void queryClient.invalidateQueries({
         queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -138,7 +145,7 @@ export function ThreadList() {
       const staffHistoryThreads = historyItems
         .filter((thread) => thread.threadType === "temp_session")
         .filter((thread) => isTerminalCustomerServiceThreadStatus(thread.status));
-      return dedupeThreadList([...readonlyHistoryThreads, ...staffHistoryThreads]);
+      return dedupeCustomerServiceThreads([...readonlyHistoryThreads, ...staffHistoryThreads]);
     },
     [historyItems, threadsQuery.data],
   );
@@ -192,6 +199,36 @@ export function ThreadList() {
       }),
     [expandedThreadCount, visibleThreads],
   );
+  const previewHydrationThreads = useMemo(
+    () => {
+      if (mode !== "current") return [];
+      return threadRenderWindow.renderedThreads
+        .filter((thread) => thread.threadId && shouldHydrateCustomerServiceThreadPreview(thread))
+        .slice(0, threadPreviewHydrationLimit);
+    },
+    [mode, threadRenderWindow.renderedThreads],
+  );
+  const previewHydrationQueries = useQueries({
+    queries: previewHydrationThreads.map((thread) => ({
+      queryKey: pcQueryKeys.customerServiceThreadDetail(
+        ...queryBaseKey,
+        thread.threadType,
+        thread.threadId,
+      ),
+      enabled: Boolean(client),
+      queryFn: async () =>
+        client!.getWorkbenchThreadDetail(thread.threadType, thread.threadId),
+      staleTime: 30_000,
+    })),
+  });
+  const hydratedPreviewsByThreadId = new Map<
+    string,
+    { preview?: string; sentAt?: string | null }
+  >();
+  previewHydrationThreads.forEach((thread, index) => {
+    const preview = threadPreviewFromCustomerServiceDetail(previewHydrationQueries[index]?.data);
+    if (preview.preview) hydratedPreviewsByThreadId.set(thread.threadId, preview);
+  });
 
   const canLoadMoreHistory = mode === "history" && Boolean(historyQuery.hasNextPage);
   const listLoading = threadsQuery.isLoading || historyQuery.isLoading;
@@ -313,6 +350,11 @@ export function ThreadList() {
           !listError &&
           threadRenderWindow.renderedThreads.map((thread) => {
             const entity = chatConversationEntityFromCustomerServiceThread(thread);
+            const hydratedPreview = hydratedPreviewsByThreadId.get(thread.threadId);
+            const lastMessagePreview = selectCustomerServiceThreadCardPreview(
+              entity.lastMessage?.preview,
+              hydratedPreview?.preview,
+            );
             const identity = createCustomerServiceIdentityViewModel({
               fallbackName: entity.title || (mode === "history" ? t("customerService.visitor") : t("customerService.threadList.unknownCustomer")),
               history: mode === "history",
@@ -365,7 +407,7 @@ export function ThreadList() {
                       : formatServiceText(createCustomerServiceThreadStatusDescriptor(thread), t)}
                     <ChannelBadge source={thread.source ?? thread.sourceChannel} compact />
                   </small>
-                  <p>{entity.lastMessage?.preview || (mode === "history" ? t("customerService.threadList.historyThread") : t("customerService.threadList.noMessage"))}</p>
+                  <p>{lastMessagePreview || (mode === "history" ? t("customerService.threadList.historyThread") : t("customerService.threadList.noMessage"))}</p>
                 </span>
                 <span className="h-thread-sla">
                   {queued && canUseStaffEndpoints ? (
@@ -392,7 +434,7 @@ export function ThreadList() {
                       <Clock3 size={14} />
                       {mode === "history"
                         ? t("customerService.threadList.readonly")
-                        : formatChatTime(thread.lastMessageAt ?? thread.updatedAt ?? thread.assignedAt)}
+                        : formatChatTime(hydratedPreview?.sentAt ?? thread.lastMessageAt ?? thread.updatedAt ?? thread.assignedAt)}
                     </>
                   )}
                 </span>
@@ -430,16 +472,6 @@ export function ThreadList() {
 
 function isCustomerServiceHistoryThread(thread: CustomerServiceThread) {
   return isTerminalCustomerServiceThreadStatus(thread.status);
-}
-
-function dedupeThreadList(threads: CustomerServiceThread[]) {
-  const seen = new Set<string>();
-  return threads.filter((thread) => {
-    const key = `${thread.threadType}:${thread.threadId}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function FilterButton({

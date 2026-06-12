@@ -27,8 +27,12 @@ describe("gateway event registry", () => {
     expect(isCustomerServiceMessageEventName("customer_service.thread.message")).toBe(true);
     expect(isCustomerServiceQueueEventName("customer_service.queue.created")).toBe(true);
     expect(isCustomerServiceLifecycleEventName("customer_service.staff.status_changed")).toBe(true);
+    expect(isCustomerServiceLifecycleEventName("temp_session.reopened")).toBe(true);
     expect(customerServiceThreadEventKinds.get("customer_service.queue.created")).toBe(
       "queue_created",
+    );
+    expect(customerServiceThreadEventKinds.get("temp_session.reopened")).toBe(
+      "thread_reopened",
     );
   });
 });

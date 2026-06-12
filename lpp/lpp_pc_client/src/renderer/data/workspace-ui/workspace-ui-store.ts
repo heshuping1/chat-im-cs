@@ -8,6 +8,7 @@ import {
   type ServiceAssistantPane,
 } from "./workspace-store-core";
 import type { TrayStatus } from "../../../shared/desktop-api";
+import type { ContactMessageOpenTrace } from "../diagnostics/contact-message-open-diagnostics";
 import type { ContactFilter, ModuleKey } from "../types";
 import type { CustomerServiceStatus } from "../types";
 
@@ -59,7 +60,7 @@ export interface WorkspaceUiCompatibleState {
     source: Exclude<CustomerServiceThreadOpenSource, "none">,
   ) => void;
   closeOpenServiceThread: (id: string) => void;
-  setActiveImConversation: (id: string) => void;
+  setActiveImConversation: (id: string, trace?: ContactMessageOpenTrace) => void;
   setActiveImConversationVisibility: (visibility: ActiveImConversationVisibility) => void;
   setActiveContact: (id: string) => void;
   setListPaneWidth: (width: number) => void;

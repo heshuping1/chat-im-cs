@@ -39,6 +39,16 @@ describe("diagnostics package", () => {
             },
           },
         ],
+        __lppCustomerServiceMessageAuditDiagnostics: [
+          {
+            traceId: "cs-audit-1",
+            module: "cs-message-audit",
+            event: "cs.message.audit",
+            phase: "cache.merge.sent",
+            result: "ok",
+            previewKind: "generic_message",
+          },
+        ],
         localStorage: {
           getItem: (key: string) =>
             key === "lpp.sendDiagnostics.buffer.v1"
@@ -71,7 +81,18 @@ describe("diagnostics package", () => {
     expect(payload.breadcrumbs).toContain("gateway:205");
     expect(payload.breadcrumbs).toContain("runtime-error:1");
     expect(payload.breadcrumbs).toContain("send:1");
+    expect(payload.breadcrumbs).toContain("cs-message-audit:1");
     expect(payload.diagnostics?.gateway.records).toHaveLength(200);
+    expect(payload.diagnostics?.["cs-message-audit"].records).toEqual([
+      {
+        traceId: "cs-audit-1",
+        module: "cs-message-audit",
+        event: "cs.message.audit",
+        phase: "cache.merge.sent",
+        result: "ok",
+        previewKind: "generic_message",
+      },
+    ]);
     expect(payload.diagnostics?.["runtime-error"].records).toHaveLength(1);
     expect(payload.diagnostics?.send.records).toEqual([
       {

@@ -4,9 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { CustomerServiceSessionNoteDto } from "../../data/api-client";
 import { useAuthSession } from "../../data/auth/auth-store";
-import { invalidateCustomerServiceQueries } from "../../data/customer-service/cs-cache-adapter";
 import { pcQueryKeys } from "../../data/query-keys";
 import { createApiClient } from "../../data/runtime";
+import { requestMessageCustomConfirmation } from "../../messages/runtime/messageConfirm";
+import { refreshCustomerServiceSessionNoteQueries } from "../models/customerServiceSessionNotesModel";
 import { useI18n } from "../../i18n/useI18n";
 import { formatError, formatMonthDayTime } from "../../lib/format";
 import { PanelState } from "../../components/PanelState";
@@ -47,20 +48,6 @@ export function CustomerServiceSessionNotesPanel({
     setNotice(null);
   }, [sessionId]);
 
-  const refreshSessionNoteQueries = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: notesQueryKey }),
-      queryClient.invalidateQueries({
-        queryKey: pcQueryKeys.customerServiceThreadDetail(
-          ...queryBaseKey,
-          "temp_session",
-          sessionId,
-        ),
-      }),
-      invalidateCustomerServiceQueries(queryClient),
-    ]);
-  };
-
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!client) throw new Error(t("auth.login"));
@@ -83,7 +70,7 @@ export function CustomerServiceSessionNotesPanel({
       setDraft("");
       setPinnedDraft(false);
       setNotice(t("customerService.sessionNotes.created"));
-      await refreshSessionNoteQueries();
+      await refreshCustomerServiceSessionNoteQueries(queryClient, queryBaseKey, sessionId);
     },
     onError: (error) => {
       setNotice(t("customerService.sessionNotes.createFailed", {
@@ -99,7 +86,7 @@ export function CustomerServiceSessionNotesPanel({
     },
     onSuccess: async () => {
       setNotice(t("customerService.sessionNotes.pinUpdated"));
-      await refreshSessionNoteQueries();
+      await refreshCustomerServiceSessionNoteQueries(queryClient, queryBaseKey, sessionId);
     },
     onError: (error) => {
       setNotice(t("customerService.sessionNotes.pinFailed", {
@@ -116,7 +103,7 @@ export function CustomerServiceSessionNotesPanel({
     },
     onSuccess: async () => {
       setNotice(t("customerService.sessionNotes.deleted"));
-      await refreshSessionNoteQueries();
+      await refreshCustomerServiceSessionNoteQueries(queryClient, queryBaseKey, sessionId);
     },
     onError: (error) => {
       setNotice(t("customerService.sessionNotes.deleteFailed", {
@@ -246,8 +233,12 @@ export function CustomerServiceSessionNotesPanel({
                   className="danger"
                   type="button"
                   disabled={pending}
-                  onClick={() => {
-                    if (window.confirm(t("customerService.sessionNotes.deleteConfirm"))) {
+                  onClick={async () => {
+                    const confirmed = await requestMessageCustomConfirmation(
+                      t("customerService.sessionNotes.deleteConfirm"),
+                      { tone: "danger" },
+                    );
+                    if (confirmed) {
                       deleteMutation.mutate(note);
                     }
                   }}

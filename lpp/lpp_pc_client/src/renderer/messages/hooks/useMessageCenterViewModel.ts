@@ -10,6 +10,7 @@ import {
   conversationKey as imConversationKey,
   type ConversationReadState,
 } from "../../data/im-read-model";
+import { isVisibleImConversationInScope } from "../../data/im/im-conversation-boundary";
 import { imConversationEffectiveUnreadCount } from "../../data/im-read/im-conversation-read-view";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { chatConversationEntityFromImConversation } from "../../data/conversation/conversation-domain";
@@ -53,6 +54,7 @@ export interface CreateMessageCenterViewModelInput {
   activeConversationMessagesLoaded?: boolean;
   activeConversationVisibility?: ActiveImConversationVisibility;
   conversations: ConversationListItem[];
+  conversationOwnershipScopeKey?: string;
   visibleConversations: ConversationListItem[];
   draftsByConversation: Record<string, string>;
   friends: FriendDto[];
@@ -93,6 +95,7 @@ export function useMessageCenterViewModel(input: CreateMessageCenterViewModelInp
       input.activeConversationVisibility,
       input.conversationListError,
       input.conversationListLoading,
+      input.conversationOwnershipScopeKey,
       input.conversations,
       input.draftsByConversation,
       input.friends,
@@ -115,10 +118,10 @@ export function createMessageCenterViewModel(
   copy: MessageCenterViewModelCopy = defaultMessageCenterViewModelCopy,
 ): MessageCenterViewModel {
   const activeConversation = input.activeConversationId
-    ? input.visibleConversations.find(
+    ? scopedVisibleConversations(input).find(
         (item) => item.conversationId === input.activeConversationId,
       ) ??
-      input.conversations.find((item) => item.conversationId === input.activeConversationId)
+      scopedConversations(input).find((item) => item.conversationId === input.activeConversationId)
     : undefined;
   const activeConversationType = getImConversationType(activeConversation);
   const activeConversationKey =
@@ -154,7 +157,7 @@ export function createMessageCenterViewModel(
       loading: Boolean(input.conversationListLoading),
     },
     counts: getConversationCounts(
-      input.conversations,
+      scopedConversations(input),
       input.unreadIdentity,
       input.activeConversationId,
       input.activeConversationMessagesLoaded,
@@ -294,4 +297,18 @@ function messageCenterErrorText(
     return `${copy.messageListFailed}: ${formatError(input.messagesError)}`;
   }
   return null;
+}
+
+function scopedConversations(input: CreateMessageCenterViewModelInput) {
+  if (!input.conversationOwnershipScopeKey) return input.conversations;
+  return input.conversations.filter((item) =>
+    isVisibleImConversationInScope(item, input.conversationOwnershipScopeKey),
+  );
+}
+
+function scopedVisibleConversations(input: CreateMessageCenterViewModelInput) {
+  if (!input.conversationOwnershipScopeKey) return input.visibleConversations;
+  return input.visibleConversations.filter((item) =>
+    isVisibleImConversationInScope(item, input.conversationOwnershipScopeKey),
+  );
 }

@@ -10,6 +10,7 @@ import {
   rememberCustomerServiceStaffSentMessage,
   resetCustomerServiceConversationIndexForTest,
 } from "../../src/renderer/data/customer-service/cs-conversation-index";
+import { staffServiceHistoryItemToThread } from "../../src/renderer/data/customer-service/cs-history-model";
 import { customerServiceDirectPeerReaderId } from "../../src/renderer/data/customer-service/cs-message-read-status";
 import { workspaceScopeKeyFromSession } from "../../src/renderer/data/workspace-scope";
 
@@ -104,6 +105,20 @@ describe("CustomerServiceApiClient", () => {
     delete (globalThis as { window?: unknown }).window;
   });
 
+  it("does not fabricate service history last message preview when the API omits it", () => {
+    const thread = staffServiceHistoryItemToThread({
+      acceptedAt: "2026-06-12T14:00:00.000Z",
+      closedAt: "2026-06-12T14:30:00.000Z",
+      lastMessageAt: "2026-06-12T14:20:00.000Z",
+      participation: "transferred",
+      status: "closed",
+      threadId: "history-thread-no-preview",
+      threadType: "temp_session",
+    });
+
+    expect(thread.lastMessagePreview).toBeUndefined();
+  });
+
   it("keeps live workbench conversations on the client token for owner workspaces", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,
@@ -152,6 +167,82 @@ describe("CustomerServiceApiClient", () => {
         path: "/api/client/v1/customer-service/workbench/threads",
       },
     ]);
+  });
+
+  it("normalizes workbench thread preview from nested last message snapshots", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      response: {
+        activeItems: [
+          {
+            conversationId: "conversation-1",
+            lastMessage: {
+              preview: "nested latest text",
+              sentAt: "2026-06-13T01:20:00.000Z",
+            },
+            status: "active",
+            threadId: "session-1",
+            threadType: "temp_session",
+            title: "Visitor A",
+          },
+        ],
+        queueItems: [],
+      },
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          lastMessageAt: "2026-06-13T01:20:00.000Z",
+          lastMessagePreview: "nested latest text",
+          threadId: "session-1",
+        },
+      ],
+    });
+  });
+
+  it("normalizes workbench thread preview from the latest message array item", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      response: {
+        activeItems: [
+          {
+            conversationId: "conversation-1",
+            messages: [
+              {
+                body: { text: "older text" },
+                conversationId: "conversation-1",
+                conversationSeq: 1,
+                messageId: "message-1",
+                messageType: "text",
+                sentAt: "2026-06-13T01:18:00.000Z",
+              },
+              {
+                body: { text: "newest text" },
+                conversationId: "conversation-1",
+                conversationSeq: 2,
+                messageId: "message-2",
+                messageType: "text",
+                sentAt: "2026-06-13T01:21:00.000Z",
+              },
+            ],
+            status: "active",
+            threadId: "session-1",
+            threadType: "temp_session",
+            title: "Visitor A",
+          },
+        ],
+        queueItems: [],
+      },
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      activeItems: [
+        {
+          lastMessageAt: "2026-06-13T01:21:00.000Z",
+          lastMessagePreview: "newest text",
+          threadId: "session-1",
+        },
+      ],
+    });
   });
 
   it("loads owner temp-session detail through the workbench client endpoint", async () => {
@@ -1127,7 +1218,7 @@ describe("CustomerServiceApiClient", () => {
     await expect(new HistoryClient().getStaffServiceHistory()).resolves.toMatchObject({
       items: [
         {
-          lastMessagePreview: "visitor unread before close",
+          lastMessagePreview: "",
           threadId: "temp-thread-closed-unread",
           unreadCount: 0,
         },
@@ -1172,7 +1263,7 @@ describe("CustomerServiceApiClient", () => {
     await expect(new HistoryClient().getStaffServiceHistory()).resolves.toMatchObject({
       items: [
         {
-          lastMessagePreview: "visitor unread before close",
+          lastMessagePreview: "",
           threadId: "temp-thread-missing-unread",
           unreadCount: 4,
         },
@@ -1387,6 +1478,44 @@ describe("CustomerServiceApiClient", () => {
         {
           lastMessagePreview: "99998888",
           unreadCount: 2,
+        },
+      ],
+    });
+  });
+
+  it("does not let queued placeholder previews overwrite gateway visitor text", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "widget-conversation-queued-preview",
+      lastMessageAt: "2026-06-13T03:27:49.000Z",
+      lastMessageId: "widget-message-queued-preview",
+      lastMessagePreview: "98985956",
+      overlayUnreadCount: 1,
+      scopeKey: testScopeKey,
+      threadId: "widget-thread-queued-preview",
+      threadType: "temp_session",
+    });
+    const client = new TestCustomerServiceApiClient({
+      activeItems: [],
+      queueItems: [
+        {
+          conversationId: "widget-conversation-queued-preview",
+          lastMessageAt: "2026-06-13T03:27:11.000Z",
+          lastMessagePreview: "当前排队第 1 位，请稍候。",
+          status: "queued",
+          threadId: "widget-thread-queued-preview",
+          threadType: "temp_session",
+          title: "Visitor",
+          unreadCount: 0,
+        },
+      ],
+    });
+
+    await expect(client.getWorkbenchThreads()).resolves.toMatchObject({
+      queueItems: [
+        {
+          lastMessageAt: "2026-06-13T03:27:49.000Z",
+          lastMessagePreview: "98985956",
+          unreadCount: 1,
         },
       ],
     });

@@ -29,11 +29,16 @@ import {
 } from "../data/contact-directory";
 import type { ContactFilter, ContactItem } from "../data/types";
 import {
+  useActiveModule,
   useActiveContactId,
   useContactFilter,
   useSetActiveContact,
   useSetContactFilter,
 } from "../data/workspace-ui/workspace-ui-store";
+import {
+  createContactMessageOpenTrace,
+  recordContactMessageOpenDiagnostic,
+} from "../data/diagnostics/contact-message-open-diagnostics";
 import { useContactsDirectoryController } from "../contacts/hooks/useContactsDirectoryController";
 import type { TranslationParams } from "../i18n/dictionary";
 import { useI18n } from "../i18n/useI18n";
@@ -56,6 +61,7 @@ const ROLE_LABEL = {
 
 export function ContactsPage() {
   const { t } = useI18n();
+  const activeModule = useActiveModule();
   const activeContactId = useActiveContactId();
   const setActiveContact = useSetActiveContact();
   const contactFilter = useContactFilter();
@@ -154,6 +160,25 @@ export function ContactsPage() {
     }
     if (!(await confirmMessageDanger("block-user", t))) return;
     blockContact(contact);
+  };
+
+  const onOpenMessage = (contact: ContactItem) => {
+    const trace = createContactMessageOpenTrace(contact.id);
+    recordContactMessageOpenDiagnostic(
+      "contacts.message-click",
+      {
+        activeModule,
+        contactId: contact.id,
+        contactKind: contact.kind,
+        conversationId: contact.conversationId,
+        createDirectChatPending,
+        hasConversationId: Boolean(contact.conversationId),
+        hasUserId: Boolean(contact.userId),
+        userId: contact.userId,
+      },
+      trace,
+    );
+    openMessage(contact, trace);
   };
 
   return (
@@ -276,7 +301,7 @@ export function ContactsPage() {
             </div>
 
             <div className="contacts-actions">
-              <button className="primary" onClick={() => openMessage(activeContactDetail)} type="button">
+              <button className="primary" onClick={() => onOpenMessage(activeContactDetail)} type="button">
                 <MessageSquare size={16} />
                 {createDirectChatPending
                   ? t("contacts.page.action.opening")

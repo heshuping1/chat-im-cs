@@ -107,6 +107,16 @@ export function formatUserMonthDayTime(
   return `${pad2(parts.month)}/${pad2(parts.day)} ${pad2(parts.hour)}:${pad2(parts.minute)}`;
 }
 
+export function formatUserFullDateTime(
+  value?: string | null,
+  options: UserTimezoneFormattingOptions = {},
+) {
+  const date = parseDateValue(value);
+  if (!date) return value || "--";
+  const parts = getUserDateParts(date, options.timezone);
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)} ${pad2(parts.hour)}:${pad2(parts.minute)}`;
+}
+
 export function formatUserChatTime(
   value?: string | null,
   options: UserTimezoneFormattingOptions = {},

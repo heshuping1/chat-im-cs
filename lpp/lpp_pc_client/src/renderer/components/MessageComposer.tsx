@@ -151,6 +151,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
     null,
   );
   const [moreOpen, setMoreOpen] = useState(false);
+  const [emojiPanelPosition, setEmojiPanelPosition] = useState<FloatingPanelPosition | null>(null);
   const [morePanelPosition, setMorePanelPosition] = useState<FloatingPanelPosition | null>(null);
   const [mentionPanelPosition, setMentionPanelPosition] = useState<FloatingPanelPosition | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -166,6 +167,8 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lexicalInputRef = useRef<LexicalChatInputHandle | null>(null);
   const composerRef = useRef<HTMLElement | null>(null);
+  const emojiButtonRef = useRef<HTMLButtonElement | null>(null);
+  const emojiPanelRef = useRef<HTMLDivElement | null>(null);
   const mentionPanelRef = useRef<HTMLDivElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
   const morePanelRef = useRef<HTMLDivElement | null>(null);
@@ -218,6 +221,30 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
             Math.max(margin, window.innerHeight - panelHeight - margin),
           );
     setMorePanelPosition({ left, top });
+  }, []);
+
+  const updateEmojiPanelPosition = useCallback(() => {
+    const button = emojiButtonRef.current;
+    if (!button) return;
+    const buttonRect = button.getBoundingClientRect();
+    const panelWidth = Math.min(520, Math.max(280, window.innerWidth - 24));
+    const panelHeight =
+      emojiPanelRef.current?.getBoundingClientRect().height ??
+      Math.min(420, window.innerHeight - 24);
+    const margin = 12;
+    const gap = 10;
+    const maxLeft = Math.max(margin, window.innerWidth - panelWidth - margin);
+    const left = Math.min(maxLeft, Math.max(margin, buttonRect.left));
+    const topAbove = buttonRect.top - panelHeight - gap;
+    const topBelow = buttonRect.bottom + gap;
+    const top =
+      topAbove >= margin
+        ? topAbove
+        : Math.min(
+            Math.max(margin, topBelow),
+            Math.max(margin, window.innerHeight - panelHeight - margin),
+          );
+    setEmojiPanelPosition({ left, top });
   }, []);
 
   const updateMentionPanelPosition = useCallback(() => {
@@ -335,6 +362,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
     const closeFloatingPanels = (event: globalThis.PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && composerRef.current?.contains(target)) return;
+      if (target instanceof Node && emojiPanelRef.current?.contains(target)) return;
       if (target instanceof Node && morePanelRef.current?.contains(target)) return;
       setEmojiOpen(false);
       setMoreOpen(false);
@@ -351,6 +379,22 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [emojiOpen, moreOpen]);
+
+  useEffect(() => {
+    if (!emojiOpen) {
+      setEmojiPanelPosition(null);
+      return undefined;
+    }
+    updateEmojiPanelPosition();
+    const raf = window.requestAnimationFrame(updateEmojiPanelPosition);
+    window.addEventListener("resize", updateEmojiPanelPosition);
+    window.addEventListener("scroll", updateEmojiPanelPosition, true);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateEmojiPanelPosition);
+      window.removeEventListener("scroll", updateEmojiPanelPosition, true);
+    };
+  }, [emojiOpen, updateEmojiPanelPosition]);
 
   useEffect(() => {
     if (!moreOpen) {
@@ -687,6 +731,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
       )}
       <div className={dense ? "h-tool-row" : "tool-row"}>
         <button
+          ref={emojiButtonRef}
           type="button"
           disabled={disabled}
           className={emojiOpen ? "active" : ""}
@@ -806,10 +851,20 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
         </button>
       </div>
       {emojiOpen && (
-        <MessageComposerEmojiPanel
-          onPick={insertEmoji}
-          recentEmojis={recentEmojis}
-        />
+        typeof document !== "undefined" &&
+        createPortal(
+          <MessageComposerEmojiPanel
+            ref={emojiPanelRef}
+            onPick={insertEmoji}
+            recentEmojis={recentEmojis}
+            style={{
+              left: emojiPanelPosition?.left ?? 0,
+              top: emojiPanelPosition?.top ?? 0,
+              visibility: emojiPanelPosition ? "visible" : "hidden",
+            } satisfies CSSProperties}
+          />,
+          document.body,
+        )
       )}
       {moreOpen && (
         typeof document !== "undefined" &&

@@ -244,7 +244,7 @@ Base URL：`/api/client/v1`
 | `/direct-chats/{chatId}/read-status` | GET | 无 | `PeerReadStatusDto` | 查询对端已读位置;🆕 2026-06-10 `peerLastReadAt` 为真实已读时间(只在对端标记已读时推进),从未上报为 `null` |
 | `/direct-chats/{chatId}/pin` | PUT | `pinned` | `chatId` | 会话个人设置 |
 | `/direct-chats/{chatId}/mute` | PUT | `muted` | `chatId` | 会话个人设置 |
-| `/direct-chats/{chatId}/typing` | POST | `preview?`(可省略 body) | `chatId` `userId` | 🆕 2026-06-10 正在输入预览:对端收 `msg.typing` 帧(含未发送内容,截断 500 字);`preview=null`/空 body = 停止输入 |
+| `/direct-chats/{chatId}/typing` | POST | `preview?`(可省略 body) | `chatId` `userId` | 🆕 2026-06-10 正在输入预览:对端收 `msg.typing` 帧。**三态**(2026-06-12):`{"preview":"…"}`=输入中、`{"preview":""}`=清空、`null`/空 body=停止;详见「输入预览三态」 |
 | `/direct-chats/{chatId}/files` | GET | `mediaKind?` `limit?` | `ChatFileDto[]` | `mediaKind=image/video/voice/file` |
 | `/direct-chats/{chatId}/draft` | PUT | `draftText` | `chatId` | 保存草稿 |
 | `/direct-chats/{chatId}/draft` | DELETE | 无 | `chatId` | 删除草稿 |
@@ -382,7 +382,7 @@ Base URL：`/api/widget/v1`
 | `/sessions/{sessionId}/handoff` | POST | `reason?` | `sessionId` `requested=true` | 请求转人工 |
 | `/sessions/{sessionId}/rate` | POST | `rating` `tags?` `comment?` | `sessionId` `rating` | 会话评价 |
 | `/sessions/{sessionId}/reopen` | POST | 无 | `sessionId` `visitorToken` | 重新打开已关闭的会话，并返回新的访客 Token;🆕 2026-06-10 与 `rate` 同级豁免 token 版本校验(超时/客服关闭后持旧 token 仍可重开续聊) |
-| `/sessions/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 访客正在输入预览;客服端收 `temp_session.typing` 帧 |
+| `/sessions/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 访客正在输入预览;客服端收 `temp_session.typing` 帧。**三态**(2026-06-12):`""`=清空、`null`/空 body=停止;详见「输入预览三态」 |
 | `/sessions/{sessionId}/read` | POST | `readSeq` | `sessionId` `readSeq` | 🆕 2026-06-10 访客已读上报;推进已读位置与已读时间,客服端收 `msg.read` 帧(含 `readAt`)。客服侧无专用端点:复用 WS `ReadAsync(conversationId, readSeq)` 或 `POST /direct-chats/{conversationId}/read`(对临时会话同样生效),访客 widget 收 `msg.read` 帧 |
 
 补充：
@@ -638,7 +638,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `/{sessionId}/messages` | POST | `clientMsgId` `messageType` `body` | `TempSessionMessageDto` | 发送访客会话消息 |
 | `/{sessionId}/close` | POST | 无 | `sessionId` | 关闭访客会话 |
 | `/{sessionId}/transfer` | POST | `toStaffUserId` `reason?` | `TempSessionDetailDto` | 🆕 2026-06-10 坐席间转接;仅当前接待坐席可调,目标须为客服角色;服务端自动给访客落礼貌系统消息,被转接坐席收 `temp_session.transferred` 帧 |
-| `/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 坐席正在输入预览;访客端收 `temp_session.typing` 帧 |
+| `/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 坐席正在输入预览;访客端收 `temp_session.typing` 帧。**三态**(2026-06-12):`""`=清空、`null`/空 body=停止;详见「输入预览三态」 |
 | `/{sessionId}/read-status` | GET | 无 | `sessionId` `conversationId` `visitorUserId` `members[]{userId,lastReadSeq,lastReadAt}` | 🆕 2026-06-10 会话全员已读位置/时间;客服侧上报已读走标准 IM 通道(WS `ReadAsync` / `POST /direct-chats/{conversationId}/read`),见主文档 §12.16"客服侧上报已读" |
 | `/{sessionId}/notes` | GET | 无 | `TempSessionNoteDto[]` | 🆕 2026-06-10 会话备注列表(置顶在前);备注访客不可见,主管/质检可见 |
 | `/{sessionId}/notes` | POST | `content`(≤2000 字) `isPinned?` | `TempSessionNoteDto` | 🆕 新建备注;`{noteId,staffDisplayName,content,isPinned,createdAt}` |
@@ -1074,8 +1074,8 @@ Hub 路径：`/ws/client`（标准客户端）、`/ws/widget`（访客 Widget）
 | `presence.changed` | 好友/同租户成员 | `userId` `isOnline` `customStatus?` | 在线状态变更；只包含这 3 个字段 |
 | `msg.read` | 会话其他成员 | `tenantId` `conversationId` `userId` `readSeq` `readAt?`(🆕) | 已读回执推送;`readAt` 为对方上报已读的服务器时间(2026-06-10 新增) |
 | `msg.recalled` | 会话所有成员 | `tenantId` `messageId` `conversationId` `conversationSeq` `operatorUserId` `silent`(🆕) | 消息撤回推送;`silent=true`(2026-06-10)时直接移除气泡、不渲染任何撤回提示 |
-| `msg.typing` | 会话其他成员 | `conversationId` `senderUserId` `preview?` `isTyping` `at` | 🆕 2026-06-10 IM 单聊正在输入预览(瞬时帧,不落库);widget 渠道对应帧为 `temp_session.typing` |
-| `temp_session.typing` | 租户客服 + 访客 Widget | `sessionId` `conversationId` `senderUserId` `senderType` `preview?` `isTyping` `at` | 🆕 2026-06-10 临时会话正在输入预览(双向;`senderType=visitor/staff`) |
+| `msg.typing` | 会话其他成员 | `conversationId` `senderUserId` `preview?` `isTyping` `at` | 🆕 2026-06-10 IM 单聊正在输入预览(瞬时帧,不落库);widget 渠道对应帧为 `temp_session.typing`。三态语义见下方「输入预览三态」 |
+| `temp_session.typing` | 租户客服 + 访客 Widget | `sessionId` `conversationId` `senderUserId` `senderType` `preview?` `isTyping` `at` | 🆕 2026-06-10 临时会话正在输入预览(双向;`senderType=visitor/staff`)。三态语义见下方「输入预览三态」 |
 | `temp_session.transferred` | 租户客服 + 访客 Widget | `sessionId` `fromStaffUserId` `toStaffUserId` `reason?` | 🆕 2026-06-10 临时会话坐席间转接 |
 | `customer_service.thread.transferred` | 新坐席与客户(定向) | `threadId` `conversationId` `customerUserId` `fromStaffUserId` `toStaffUserId` `reason?` `transferredAt` `recipientRole` | 🆕 2026-06-10 IM 客服直聊转接通知;`recipientRole=staff/customer` |
 | `group.settings.updated` | 群在群成员 | `conversationId` `operatorUserId` `title` `avatarUrl?` `muteMode` `settings` `updatedAt` | 群设置/全员禁言/群名群头像变更推送（2026-06-06 新增）；完整快照，收到后可直接覆盖或重拉群详情；纯 `/ws/client` 多端同步信号，不进 push/webhook（详见 client-api.md §10.10.3） |
@@ -1085,6 +1085,22 @@ Hub 路径：`/ws/client`（标准客户端）、`/ws/widget`（访客 Widget）
 | `temp_session.rated` | 租户客服 | `tenantId` `sessionId` `rating` `tags?` `comment?` `ratedAt` | 访客评价推送 |
 | `tenant.join_request.reviewed` | 申请人平台连接 | `tenantId` `requestId` `platformUserId` `status` `rejectReason?` `reviewedAt` | 加入申请审核结果；当前仅拒绝时推送 |
 | `customer_service.assigned` | 客户平台连接 | `tenantId` `customerUserId` `platformUserId` `staffUserId` `staffDisplayName?` `transferConversation` `changedAt` | 客服归属变更推送 |
+
+#### 输入预览三态(`msg.typing` / `temp_session.typing`,2026-06-12 澄清)
+
+`isTyping` + `preview` 两字段一起表达三种状态。上报端按需 POST `…/typing`,接收端据此渲染:
+
+| 语义 | 上报 body | 帧字段 | 接收端建议渲染 |
+|---|---|---|---|
+| **正在输入** | `{"preview":"已打的内容"}` | `isTyping=true`、`preview="…"`(截断 500 字) | 显示「对方正在输入:…」并实时跟随 |
+| **清空输入**(仍聚焦输入框但把字删光了) | `{"preview":""}` | `isTyping=true`、`preview=""` | 保留「对方正在输入」气泡但清掉预览文本(对方还在,只是空了) |
+| **停止输入**(离开输入框/不打了) | `{"preview":null}` 或空 body | `isTyping=false`、`preview=null` | 收起「对方正在输入」提示 |
+
+要点:
+- **发送正式消息后,后端会自动补推一帧 `isTyping=false`(停止)** 来清掉预览 —— 不必、也不应依赖客户端在发送后再手动调一次 typing。即便上报端没发停止帧、或瞬时帧因网络丢失、或接收端只靠轮询拿到了正式消息,预览也不会「粘住」。
+- **向后兼容**:只看 `isTyping` 的老客户端仍正确(清空与输入都是 `true`、停止是 `false`);要区分「清空 vs 输入中」的新客户端再看 `preview===""`。
+- 纯空白(如 `"   "`)归一为清空(`preview=""`、`isTyping=true`),避免空格刷屏被当成真实输入。
+- typing 是**瞬时帧**(不落库、不进 outbox、best-effort),与正式消息(`msg.new`)是两条独立通道。
 
 ### 6.3 Widget Gateway（`/ws/widget`）
 

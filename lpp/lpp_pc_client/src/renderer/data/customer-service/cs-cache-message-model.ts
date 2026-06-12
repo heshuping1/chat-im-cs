@@ -17,17 +17,35 @@ export function customerServiceMessageFromSendResult(params: {
   };
   messageType: CustomerServiceCacheMessageKind;
   body: Record<string, unknown>;
+  clientMsgId?: string;
   identity?: CurrentUserIdentity | null;
 }): MessageItemDto {
+  const fallbackBody = bodyWithMessageType(params.messageType, params.body);
+  const fallbackPreview = previewFromComposerBody(params.messageType, params.body);
   if (params.result.message) {
+    const serverType = normalizeCustomerServiceCacheMessageKind(
+      params.result.message.messageType || params.messageType,
+    );
+    const body = hasMeaningfulComposerBody(serverType, params.result.message.body)
+      ? bodyWithMessageType(serverType, params.result.message.body ?? {})
+      : bodyWithMessageType(serverType, params.body);
+    const serverPreview = params.result.message.preview?.trim();
+    const preview =
+      serverPreview && !isGenericMessagePreview(serverPreview)
+        ? serverPreview
+        : previewFromComposerBody(serverType, body) || fallbackPreview;
     return {
       ...params.result.message,
+      ...(params.clientMsgId && !params.result.message.clientMsgId
+        ? { clientMsgId: params.clientMsgId }
+        : {}),
       conversationId:
         params.result.message.conversationId ||
         params.thread.conversationId ||
         params.thread.threadId,
-      messageType: params.result.message.messageType || params.messageType,
-      body: params.result.message.body ?? params.body,
+      messageType: params.result.message.messageType || serverType,
+      body,
+      preview,
       isSelf: true,
       direction: params.result.message.direction || "out",
     };
@@ -38,6 +56,7 @@ export function customerServiceMessageFromSendResult(params: {
       `pc-cs-local-${params.thread.threadId}-${Date.now()}-${Math.random()
         .toString(16)
         .slice(2)}`,
+    ...(params.clientMsgId ? { clientMsgId: params.clientMsgId } : {}),
     conversationId: params.thread.conversationId || params.thread.threadId,
     conversationSeq: params.result.conversationSeq,
     senderUserId: params.identity?.userId || undefined,
@@ -51,8 +70,8 @@ export function customerServiceMessageFromSendResult(params: {
         ? ((params.identity as { avatarUrl?: string }).avatarUrl ?? null)
         : null,
     messageType: params.messageType,
-    body: { ...params.body, messageType: params.messageType },
-    preview: previewFromComposerBody(params.messageType, params.body),
+    body: fallbackBody,
+    preview: fallbackPreview,
     sentAt: params.result.sentAt || params.result.serverTime || new Date().toISOString(),
     isSelf: true,
     direction: "out",
@@ -117,6 +136,29 @@ function previewFromComposerBody(
   if (messageType === "video") return "[视频]";
   if (messageType === "file") return "[文件]";
   return "[消息]";
+}
+
+function bodyWithMessageType(
+  messageType: CustomerServiceCacheMessageKind,
+  body: Record<string, unknown>,
+) {
+  return { ...body, messageType };
+}
+
+function hasMeaningfulComposerBody(
+  messageType: CustomerServiceCacheMessageKind,
+  body: Record<string, unknown> | undefined,
+) {
+  if (!body) return false;
+  if (messageType === "text") {
+    return typeof body.text === "string" && Boolean(body.text.trim());
+  }
+  return Boolean(body[messageType]);
+}
+
+function isGenericMessagePreview(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "[message]" || normalized === "[消息]";
 }
 
 function normalizeCustomerServiceCacheMessageKind(

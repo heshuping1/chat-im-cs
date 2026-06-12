@@ -3,7 +3,6 @@ import type {
   CustomerServiceThreadType,
   StaffServiceHistoryItem,
 } from "../api/types";
-import { formatMonthDayTime } from "../../lib/format";
 
 export function staffServiceHistoryItemToThread(
   item: StaffServiceHistoryItem,
@@ -78,15 +77,7 @@ export function staffServiceHistoryItemToThread(
       "staffUserId",
       "staff_user_id",
     ], ["staffUserId", "userId", "id"]),
-    lastMessagePreview:
-      item.lastMessagePreview ??
-      (item.closedAt
-        ? `Closed at ${formatApiShortDateTime(item.closedAt)}`
-        : item.lastMessageAt
-          ? `Last active ${formatApiShortDateTime(item.lastMessageAt)}`
-          : item.participation === "transferred"
-        ? "Transferred history conversation"
-            : "History conversation"),
+    lastMessagePreview: item.lastMessagePreview,
     lastMessageAt: item.lastMessageAt ?? item.closedAt ?? item.acceptedAt ?? item.startedAt,
     unreadCount: item.unreadCount ?? 0,
     historyItem: item as StaffServiceHistoryItem & Record<string, unknown>,
@@ -161,6 +152,3 @@ function readNestedStaffStringField(
   return null;
 }
 
-function formatApiShortDateTime(value: string) {
-  return formatMonthDayTime(value);
-}

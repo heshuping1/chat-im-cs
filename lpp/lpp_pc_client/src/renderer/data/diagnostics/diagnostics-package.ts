@@ -15,6 +15,7 @@ type DiagnosticsWindowKey =
   | "__lppApiTrafficDiagnostics"
   | "__lppAuthDiagnostics"
   | "__lppCustomerServiceCacheDiagnostics"
+  | "__lppCustomerServiceMessageAuditDiagnostics"
   | "__lppCustomerServiceStateDiagnostics"
   | "__lppGatewayDiagnostics"
   | "__lppImReadDiagnostics"
@@ -70,6 +71,7 @@ const diagnosticsSources: DiagnosticsSource[] = [
   { module: "message-center", key: "__lppMessageCenterDiagnostics" },
   { module: "cs-state", key: "__lppCustomerServiceStateDiagnostics" },
   { module: "cs-cache", key: "__lppCustomerServiceCacheDiagnostics" },
+  { module: "cs-message-audit", key: "__lppCustomerServiceMessageAuditDiagnostics" },
   { module: "startup", key: "__lppStartupDiagnostics" },
   { module: "runtime-error", key: "__lppRuntimeErrorDiagnostics" },
 ];

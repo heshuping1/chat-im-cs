@@ -2312,7 +2312,7 @@ body.is-composer-resizing * {
 }
 
 .sidebar-space-status-row:has(.sidebar-space-unread-badge) {
-  grid-template-columns: var(--sidebar-footer-icon-size, 30px) minmax(0, 1fr) auto 12px;
+  grid-template-columns: var(--sidebar-footer-icon-size, 30px) minmax(0, 1fr) 12px;
 }
 
 .sidebar-space-status-row.has-space-alert {
@@ -2339,6 +2339,15 @@ body.is-composer-resizing * {
   background: transparent !important;
   box-shadow: none !important;
   color: #8aa0b6 !important;
+}
+
+.sidebar-space-logo-wrap {
+  position: relative;
+  display: inline-grid;
+  width: var(--sidebar-footer-icon-size, 30px);
+  height: var(--sidebar-footer-icon-size, 30px);
+  place-items: center;
+  overflow: visible;
 }
 
 .sidebar-space-logo {
@@ -2369,6 +2378,10 @@ body.is-composer-resizing * {
 }
 
 .sidebar-space-unread-badge {
+  position: absolute;
+  z-index: 2;
+  top: -7px;
+  right: -8px;
   display: inline-grid;
   min-width: 18px;
   height: 18px;
@@ -3074,6 +3087,11 @@ body.is-composer-resizing * {
 .sidebar.collapsed .sidebar-space-logo {
   width: 30px !important;
   height: 30px !important;
+}
+
+.sidebar.collapsed .sidebar-space-logo-wrap {
+  width: 30px;
+  height: 30px;
 }
 
 .sidebar.collapsed .sidebar-collapse-button {

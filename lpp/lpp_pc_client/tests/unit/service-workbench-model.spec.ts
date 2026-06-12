@@ -54,6 +54,7 @@ describe("customer service workbench model", () => {
         activeSessionCount: 2,
         maxConcurrentSessions: 5,
         queueAcceptEnabled: true,
+        reservedSessionCount: 1,
         serviceStatus: "online",
       },
       threads: {
@@ -74,7 +75,8 @@ describe("customer service workbench model", () => {
       activeCount: 2,
       activeSessions: 2,
       activeUnreadCount: 3,
-      capacityText: "2/5",
+      assignedSessions: 3,
+      capacityText: "3/5",
       hasReceptionStatus: true,
       hasThreadData: true,
       queuedCount: 1,
@@ -85,7 +87,8 @@ describe("customer service workbench model", () => {
       totalCount: 3,
     });
     expect(metrics.metrics.map((item) => item.value)).toEqual([
-      "2/5",
+      "3/5",
+      "5",
       "1",
       "2",
       "3",
@@ -114,7 +117,8 @@ describe("customer service workbench model", () => {
     expect(metrics).toMatchObject({
       activeCount: 0,
       activeSessions: 0,
-      capacityText: "0/10",
+      assignedSessions: 1,
+      capacityText: "1/10",
       queuedCount: 0,
       totalCount: 0,
     });
@@ -129,6 +133,7 @@ describe("customer service workbench model", () => {
       activeCount: 0,
       activeSessions: null,
       activeUnreadCount: 0,
+      assignedSessions: null,
       capacityText: "--",
       hasReceptionStatus: false,
       hasThreadData: false,
@@ -138,7 +143,8 @@ describe("customer service workbench model", () => {
       totalCount: 0,
     });
     expect(metrics.metrics.map((item) => [item.label, item.value])).toEqual([
-      ["容量", "--"],
+      ["已分配", "--"],
+      ["最大", "--"],
       ["排队", "--"],
       ["进行中", "--"],
       ["未读", "--"],
@@ -169,9 +175,9 @@ describe("customer service workbench model", () => {
     expect(
       createServiceThreadListCounts(
         [
-          thread({ status: "queued" }),
-          thread({ priority: "urgent", status: "serving" }),
-          thread({ status: "serving" }),
+          thread({ conversationId: "queued-count", status: "queued", threadId: "queued-count" }),
+          thread({ conversationId: "urgent-count", priority: "urgent", status: "serving", threadId: "urgent-count" }),
+          thread({ conversationId: "serving-count", status: "serving", threadId: "serving-count" }),
           thread({ status: "serving", threadType: "im_direct" }),
           thread({ status: "closed_timeout" }),
         ],
@@ -221,6 +227,80 @@ describe("customer service workbench model", () => {
       queued: 2,
       serving: 2,
       sla: 1,
+    });
+  });
+
+  it("deduplicates current service cards across queue and active aliases", () => {
+    const view = createServiceThreadListViewModel({
+      isRiskyThread: (item) => item.priority === "urgent",
+      threads: {
+        activeItems: [
+          thread({
+            conversationId: "conv-dup",
+            lastMessageAt: "2026-06-13T01:59:10.000Z",
+            lastMessagePreview: "new visitor text",
+            status: "serving",
+            threadId: "active-thread",
+            unreadCount: 2,
+            updatedAt: "2026-06-13T01:59:10.000Z",
+          }),
+        ],
+        queueItems: [
+          thread({
+            conversationId: "conv-dup",
+            lastMessageAt: "2026-06-13T01:58:00.000Z",
+            lastMessagePreview: "当前排队第 1 位，请稍候。",
+            status: "queued",
+            threadId: "queued-thread",
+            unreadCount: 5,
+            updatedAt: "2026-06-13T01:58:00.000Z",
+          }),
+        ],
+      },
+    });
+
+    expect(view.currentThreads).toHaveLength(1);
+    expect(view.currentThreads[0]).toMatchObject({
+      conversationId: "conv-dup",
+      lastMessagePreview: "new visitor text",
+      status: "serving",
+      threadId: "active-thread",
+      unreadCount: 5,
+    });
+    expect(view.counts).toEqual({
+      all: 1,
+      queued: 0,
+      serving: 1,
+      sla: 0,
+    });
+  });
+
+  it("deduplicates current service cards when a thread id is another item conversation id", () => {
+    const view = createServiceThreadListViewModel({
+      isRiskyThread: () => false,
+      threads: {
+        activeItems: [
+          thread({
+            conversationId: "conv-alias",
+            status: "serving",
+            threadId: "server-thread",
+          }),
+        ],
+        queueItems: [
+          thread({
+            conversationId: "legacy-conversation",
+            status: "queued",
+            threadId: "conv-alias",
+          }),
+        ],
+      },
+    });
+
+    expect(view.currentThreads.map((item) => item.threadId)).toEqual(["server-thread"]);
+    expect(view.counts).toMatchObject({
+      all: 1,
+      queued: 0,
+      serving: 1,
     });
   });
 

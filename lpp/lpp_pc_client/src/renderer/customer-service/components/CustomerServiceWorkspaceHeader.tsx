@@ -8,6 +8,7 @@ import type { AutoTranslateConversationMode } from "../../translation/models/aut
 
 export function CustomerServiceWorkspaceHeader({
   identity,
+  closureReason,
   modeLabel,
   readOnly,
   replyGate,
@@ -26,6 +27,7 @@ export function CustomerServiceWorkspaceHeader({
   onOpenCustomerContext,
 }: {
   identity: CustomerServiceIdentityViewModel;
+  closureReason?: string;
   modeLabel: string;
   readOnly?: boolean;
   replyGate: CustomerServiceReplyGate;
@@ -67,6 +69,7 @@ export function CustomerServiceWorkspaceHeader({
             <ChannelBadge source={source} compact />
             <span>{identity.isVip ? t("customerService.header.vipCustomer") : t("customerService.header.normalCustomer")}</span>
             <span>{modeLabel}</span>
+            {closureReason && <span className="attention">{closureReason}</span>}
             <span className={`reply-gate-${replyGate}`}>
               {replyGateLabel(replyGate, readOnly, t)}
             </span>

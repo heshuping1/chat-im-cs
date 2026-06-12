@@ -1,8 +1,10 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { CustomerServiceThreadType } from "../api-client";
 import type { MessageItemDto } from "../api-client";
 import { getAuthSessionSnapshot } from "../auth/auth-store";
 import { applyCustomerServiceGatewayMessageCache } from "../customer-service/cs-cache-adapter";
 import { customerServiceIndexScopeKey } from "../customer-service/cs-conversation-index";
+import { clearCustomerServiceTypingPreviewCache } from "../customer-service/cs-typing-preview-cache";
 import {
   createCustomerServiceGatewayReadStatus,
   mergeCustomerServiceReadStatuses,
@@ -40,6 +42,10 @@ import {
   numberField,
   stringField,
 } from "./gateway-payload-utils";
+import {
+  markCustomerServiceThreadReopened,
+  removeCustomerServiceMessageByThreadId,
+} from "../customer-service/cs-cache-adapter";
 
 const notifiedCustomerServiceQueueIds = new Set<string>();
 
@@ -106,6 +112,16 @@ export function mergeCustomerServiceGatewayMessage(
     threadId,
     threadType,
   });
+  if (!self && session) {
+    clearCustomerServiceTypingPreviewCache(queryClient, session, {
+      aliasThreadIds: [imConversationId(payload), message.conversationId].filter(
+        (value): value is string => Boolean(value),
+      ),
+      reason: "message-received",
+      threadId,
+      threadType,
+    });
+  }
   void materializeReceivedMediaMessage({
     accountId: accountIdFromSession(session),
     assetBaseUrl: session?.apiBaseUrl,
@@ -263,6 +279,40 @@ export function notifyCustomerServiceQueue(payload: Record<string, unknown>, thr
         settings,
       },
     );
+  }
+}
+
+export function reopenCustomerServiceThreadFromGateway(
+  queryClient: QueryClient,
+  options: {
+    conversationId?: string;
+    reopenedAt?: string;
+    status?: string;
+    thread?: Record<string, unknown>;
+    threadId: string;
+    threadType?: CustomerServiceThreadType;
+    unreadCount?: number;
+  },
+) {
+  markCustomerServiceThreadReopened(queryClient, {
+    conversationId: options.conversationId,
+    reopenedAt: options.reopenedAt,
+    status: options.status,
+    thread: options.thread,
+    threadId: options.threadId,
+    threadType: options.threadType,
+    unreadCount: options.unreadCount,
+  });
+}
+
+export function removeSilentCustomerServiceRecall(
+  queryClient: QueryClient,
+  payload: Record<string, unknown>,
+  threadId: string,
+) {
+  const messageId = stringField(payload, "messageId", "message_id", "id");
+  if (threadId && messageId) {
+    removeCustomerServiceMessageByThreadId(queryClient, threadId, messageId);
   }
 }
 

@@ -421,6 +421,8 @@ export const vi: MessageDictionary = {
       expandUnreadTitle: 'Mở hội thoại chưa đọc, hiện có {count}',
       metrics: {
         capacity: 'Capacity',
+        assigned: 'Assigned',
+        maxAssignable: 'Max assignable',
         queued: 'Queued',
         active: 'Active',
         unread: 'Unread',
@@ -513,6 +515,7 @@ export const vi: MessageDictionary = {
         claim: 'Hội thoại này vẫn đang trong hàng đợi. Hãy tiếp nhận trước.',
         managementReadonly: 'Chế độ xem. Bạn không thể trả lời. Hội thoại vẫn đang diễn ra và có thể chuyển cho nhân viên.',
         readonly: 'Hội thoại đã kết thúc, không thể tiếp tục trả lời',
+        transferred: 'Hội thoại đã được chuyển tiếp, không thể trả lời',
         takeover: 'Hội thoại này vẫn do AI xử lý. Hãy tiếp quản thủ công trước.',
       },
       currentCustomer: 'Khách hiện tại',

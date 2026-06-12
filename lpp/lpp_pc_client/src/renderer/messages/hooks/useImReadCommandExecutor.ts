@@ -4,7 +4,9 @@ import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
-import { isImConversation, type CurrentUserIdentity } from "../../data/message-display";
+import { customerServiceIndexScopeKey } from "../../data/customer-service/cs-conversation-index";
+import { isVisibleImConversationInScope } from "../../data/im/im-conversation-boundary";
+import type { CurrentUserIdentity } from "../../data/message-display";
 import {
   conversationKey as imConversationKey,
   reduceImCoreEvent,
@@ -245,6 +247,14 @@ export function useImReadCommandExecutor({
       });
     }
     if (!activeConversation || !session || !activeConversationType) return;
+    if (
+      !isVisibleImConversationInScope(
+        activeConversation,
+        customerServiceIndexScopeKey(session),
+      )
+    ) {
+      return;
+    }
     if (!canAutoRead) return;
     const key = imConversationKey(
       activeConversationType,
@@ -290,9 +300,10 @@ export function useImReadCommandExecutor({
   useEffect(() => {
     if (!session || !unreadIdentity) return;
     if (conversationItems.length === 0) return;
+    const ownershipScopeKey = customerServiceIndexScopeKey(session);
     let stateByConversation = getImReadSnapshot().imReadStateByConversation;
     for (const conversation of conversationItems) {
-      if (!isImConversation(conversation)) continue;
+      if (!isVisibleImConversationInScope(conversation, ownershipScopeKey)) continue;
       const conversationType = getImConversationType(conversation);
       if (!conversationType) continue;
       const key = imConversationKey(conversationType, conversation.conversationId);

@@ -330,6 +330,44 @@ describe("online service responsive layout", () => {
     expect(css).toContain("z-index: 8;");
   });
 
+  it("keeps the online service thread pool header compact", () => {
+    const css = readFileSync(
+      new URL(
+        "../../src/renderer/styles/customer-service/customer-service.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(css).toContain("Keep the online-service thread pool dense enough");
+    expect(css).toContain(".h-flagship-grid .h-service-head");
+    expect(css).toContain("min-height: 0 !important;");
+    expect(css).toContain("padding: 0 2px 1px !important;");
+    expect(css).toContain("flex: 0 0 36px !important;");
+    expect(css).toContain("min-height: 34px !important;");
+  });
+
+  it("lets the service grid fill the shell when the command bar is unavailable", () => {
+    const page = readFileSync(
+      new URL("../../src/renderer/components/OnlineServicePage.tsx", import.meta.url),
+      "utf8",
+    );
+    const css = readFileSync(
+      new URL(
+        "../../src/renderer/styles/customer-service/customer-service.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(page).toContain("const showServiceCommandBar = canControlReception;");
+    expect(page).toContain('showServiceCommandBar ? "" : "service-command-hidden"');
+    expect(css).toContain(".h-flagship-shell.service-command-hidden");
+    expect(css).toContain("grid-template-rows: minmax(0, 1fr) !important;");
+    expect(css).toContain(".h-flagship-shell.service-command-hidden .h-flagship-grid");
+    expect(css).toContain("grid-row: 1 !important;");
+  });
+
   it("keeps online service message rows aligned to the chat edges", () => {
     const stage = readFileSync(
       new URL(
@@ -356,10 +394,17 @@ describe("online service responsive layout", () => {
     expect(css).toContain(".cs-system-message");
   });
 
-  it("keeps customer typing preview below the scroller without overlaying messages", () => {
+  it("keeps customer typing preview above the composer without overlaying messages", () => {
     const stage = readFileSync(
       new URL(
         "../../src/renderer/customer-service/components/CustomerServiceMessageStage.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const workspace = readFileSync(
+      new URL(
+        "../../src/renderer/components/ChatWorkspace.tsx",
         import.meta.url,
       ),
       "utf8",
@@ -373,11 +418,42 @@ describe("online service responsive layout", () => {
     );
 
     expect(stage).toContain("cs-message-stage-shell");
-    expect(stage).toContain("cs-typing-preview-dock");
-    expect(css).toContain("grid-template-rows: minmax(0, 1fr) auto;");
-    expect(css).toContain(".cs-typing-preview-dock");
-    expect(css).toContain("justify-content: flex-start;");
-    expect(css).not.toContain(".cs-typing-preview-dock {\n  position: absolute");
-    expect(css).not.toContain(".cs-typing-preview-dock {\n  position: fixed");
+    expect(stage).not.toContain("cs-composer-typing-preview");
+    expect(stage).not.toContain("typingPreview");
+    expect(workspace).toContain("CustomerServiceComposerTypingPreview");
+    expect(workspace.indexOf("CustomerServiceComposerTypingPreview")).toBeLessThan(
+      workspace.indexOf("<ChatComposerSurface"),
+    );
+    expect(css).toContain("grid-template-rows: minmax(0, 1fr);");
+    expect(css).toContain(".cs-composer-typing-preview");
+    expect(css).toContain("grid-template-columns: auto minmax(0, 1fr);");
+    expect(css).toContain("-webkit-line-clamp: 3;");
+    expect(css).not.toContain(".cs-composer-typing-preview {\n  position: absolute");
+    expect(css).not.toContain(".cs-composer-typing-preview {\n  position: fixed");
+    expect(css).not.toContain(".cs-composer-typing-preview {\n  position: sticky");
+  });
+
+  it("clips crowded customer header chips instead of wrapping them", () => {
+    const css = readFileSync(
+      new URL(
+        "../../src/renderer/styles/customer-service/customer-service.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const chipsRuleStart = css.indexOf(".h-flagship-grid .h-customer-title .chat-header-meta-chips {");
+    const chipsRuleEnd = css.indexOf("}", chipsRuleStart);
+    const chipsRule = css.slice(chipsRuleStart, chipsRuleEnd);
+    const chipItemRuleStart = css.indexOf(
+      ".h-flagship-grid .h-customer-title .chat-header-meta-chips > span,",
+    );
+    const chipItemRuleEnd = css.indexOf("}", chipItemRuleStart);
+    const chipItemRule = css.slice(chipItemRuleStart, chipItemRuleEnd);
+
+    expect(chipsRule).toContain("overflow: hidden;");
+    expect(chipsRule).toContain("flex-wrap: nowrap;");
+    expect(chipsRule).toContain("white-space: nowrap;");
+    expect(chipItemRule).toContain("flex: 0 0 auto;");
+    expect(chipItemRule).toContain("white-space: nowrap;");
   });
 });

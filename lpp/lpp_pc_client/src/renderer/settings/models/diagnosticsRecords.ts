@@ -47,6 +47,7 @@ type DiagnosticsWindowKey =
   | "__lppApiErrorDiagnostics"
   | "__lppApiTrafficDiagnostics"
   | "__lppCustomerServiceCacheDiagnostics"
+  | "__lppCustomerServiceMessageAuditDiagnostics"
   | "__lppCustomerServiceStateDiagnostics"
   | "__lppGatewayDiagnostics"
   | "__lppMessageCenterDiagnostics"
@@ -92,6 +93,12 @@ const diagnosticsSources: DiagnosticsSource[] = [
     module: "gateway",
     moduleFilter: "gateway",
     moduleLabel: "网关",
+  },
+  {
+    key: "__lppCustomerServiceMessageAuditDiagnostics",
+    module: "cs-message-audit",
+    moduleFilter: "message",
+    moduleLabel: "CS message audit",
   },
   {
     key: "__lppCustomerServiceStateDiagnostics",
@@ -221,7 +228,9 @@ function recordMatchesFilter(
   record: DiagnosticRecordViewModel,
   filter: Exclude<DiagnosticsRecordModuleFilter, "all">,
 ) {
-  if (filter === "message") return record.module === "message-center";
+  if (filter === "message") {
+    return record.module === "message-center" || record.module === "cs-message-audit";
+  }
   if (filter === "gateway") return record.module === "gateway";
   if (filter === "cs-routing") return record.module === "cs-state" || record.module === "cs-cache";
   if (filter === "api-traffic") return record.module === "api-traffic";

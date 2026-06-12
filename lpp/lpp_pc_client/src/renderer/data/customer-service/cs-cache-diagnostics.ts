@@ -11,6 +11,7 @@ export interface CustomerServiceCacheDiagnosticRecord {
     | "cache.thread.read"
     | "cache.thread.claimed"
     | "cache.thread.closed"
+    | "cache.thread.reopened"
     | "cache.thread.transferred";
   phase: "cache";
   result: "ok" | "ignored";

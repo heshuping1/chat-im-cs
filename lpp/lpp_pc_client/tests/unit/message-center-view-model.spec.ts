@@ -1,12 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   createMessageCenterViewModel,
   getImConversationType,
 } from "../../src/renderer/messages/hooks/useMessageCenterViewModel";
+import {
+  rememberCustomerServiceConversationIndex,
+  resetCustomerServiceConversationIndexForTest,
+} from "../../src/renderer/data/customer-service/cs-conversation-index";
 import type { ConversationListItem, FriendDto } from "../../src/renderer/data/api/types";
 
 describe("message center view model", () => {
+  beforeEach(() => {
+    resetCustomerServiceConversationIndexForTest();
+  });
+
   it("selects an explicitly active conversation and derives stable keys", () => {
     const conversations = [
       conversation({ conversationId: "hidden", title: "Hidden", conversationType: "group" }),
@@ -159,6 +167,43 @@ describe("message center view model", () => {
 
     expect(getImConversationType(directCustomer)).toBeUndefined();
   });
+
+  it("does not activate or count direct-shaped conversations owned by customer service", () => {
+    const indexedCustomerService = conversation({
+      conversationId: "cs-temp-session",
+      conversationType: "direct",
+      lastMessageSeq: 3,
+      lastReadSeq: 2,
+      title: "Service",
+      unreadCount: 1,
+    });
+    rememberCustomerServiceConversationIndex({
+      conversationId: "cs-temp-session",
+      scopeKey: "scope-a",
+      source: "send",
+      threadId: "thread-1",
+      threadType: "temp_session",
+    });
+
+    expect(
+      createMessageCenterViewModel({
+        activeConversationId: "cs-temp-session",
+        conversationOwnershipScopeKey: "scope-a",
+        conversations: [indexedCustomerService],
+        draftsByConversation: {},
+        friends: [],
+        groupMembers: [],
+        imReadStateByConversation: {},
+        unreadIdentity: { userId: "current-user" },
+        visibleConversations: [indexedCustomerService],
+      }),
+    ).toMatchObject({
+      activeConversation: undefined,
+      counts: { unread: 0 },
+      selectedConversation: false,
+    });
+  });
+
 
   it("does not inject fake source channel for direct conversation fallback contacts", () => {
     const direct = conversation({

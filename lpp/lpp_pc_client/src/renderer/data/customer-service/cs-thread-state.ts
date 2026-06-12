@@ -70,6 +70,16 @@ const terminalStatuses = new Set([
 ]);
 
 const ratedStatuses = new Set(["rated", "reviewed", "evaluated"]);
+const reopenedStatuses = new Set([
+  "reopen",
+  "reopened",
+  "reopened_active",
+  "reopened_by_visitor",
+  "resumed",
+  "resume",
+  "continued",
+  "continue",
+]);
 
 export function createCustomerServiceThreadState(
   status?: string | number | null,
@@ -79,6 +89,10 @@ export function createCustomerServiceThreadState(
 
   if (isRatedStatus(normalizedStatus)) {
     return state("rated", "Rated", rawStatus, normalizedStatus, true, "readonly");
+  }
+
+  if (isReopenedStatus(normalizedStatus)) {
+    return state("serving", "Agent serving", rawStatus, normalizedStatus, false, "open");
   }
 
   if (isTerminalStatus(normalizedStatus)) {
@@ -194,6 +208,10 @@ function isAiStatus(status: string) {
 
 function isRatedStatus(status: string) {
   return ratedStatuses.has(status) || status.includes("rated");
+}
+
+function isReopenedStatus(status: string) {
+  return reopenedStatuses.has(status) || status.includes("reopen") || status.includes("resume");
 }
 
 function isReadonlyStatus(status: string) {

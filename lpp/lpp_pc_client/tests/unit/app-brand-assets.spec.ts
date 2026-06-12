@@ -116,12 +116,12 @@ describe("app brand assets", () => {
     expect(readPngMetadata("assets/app-icon-startlink.png")).toEqual({
       width: 1024,
       height: 1024,
-      colorType: 2,
+      colorType: 6,
     });
     expect(readPngMetadata("public/app-icon-startlink.png")).toEqual({
       width: 1024,
       height: 1024,
-      colorType: 2,
+      colorType: 6,
     });
     expect(existsSync(resolve(root, "docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png"))).toBe(
       true,

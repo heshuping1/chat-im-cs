@@ -1,17 +1,27 @@
+import { forwardRef } from "react";
+import type { CSSProperties } from "react";
 import type { WechatEmojiItem } from "../lib/wechatEmoji";
 import { wechatEmojiItems } from "../lib/wechatEmoji";
 import { useI18n } from "../i18n/useI18n";
 
-export function MessageComposerEmojiPanel({
-  onPick,
-  recentEmojis,
-}: {
+export const MessageComposerEmojiPanel = forwardRef<HTMLDivElement, {
   onPick: (emoji: WechatEmojiItem) => void;
   recentEmojis: WechatEmojiItem[];
-}) {
+  style?: CSSProperties;
+}>(function MessageComposerEmojiPanel({
+  onPick,
+  recentEmojis,
+  style,
+}, ref) {
   const { t } = useI18n();
   return (
-    <div className="composer-emoji-panel" role="dialog" aria-label={t("composer.emoji.panelAria")}>
+    <div
+      className="composer-emoji-panel"
+      ref={ref}
+      role="dialog"
+      aria-label={t("composer.emoji.panelAria")}
+      style={style}
+    >
       <section>
         <h4>{t("composer.emoji.recent")}</h4>
         {recentEmojis.length > 0 && (
@@ -48,4 +58,4 @@ export function MessageComposerEmojiPanel({
       </section>
     </div>
   );
-}
+});

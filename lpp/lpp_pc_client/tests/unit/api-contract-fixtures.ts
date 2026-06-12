@@ -198,7 +198,7 @@ export const apiContractFixtures: ApiContractFixture[] = [
     },
   },
   {
-    name: "customer-service timeout-closed temp session remains resumable",
+    name: "customer-service timeout-closed temp session is terminal in thread normalization",
     normalize: () =>
       normalizeCustomerServiceThreadDto({
         session_id: "cs-timeout-1",
@@ -213,7 +213,7 @@ export const apiContractFixtures: ApiContractFixture[] = [
         id: "cs-timeout-1",
         type: "temp_session",
         normalizedStatus: "closed_timeout",
-        isTerminal: false,
+        isTerminal: true,
         title: "Visitor C",
         unreadCount: 2,
       },

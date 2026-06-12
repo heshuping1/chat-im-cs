@@ -67,13 +67,13 @@ describe("customer service workspace view model", () => {
     const selectableThreads = listCustomerServiceSelectableThreads({
       threads: {
         activeItems: [
-          thread({ status: "serving", threadId: "serving-1" }),
+          thread({ conversationId: "serving-1", status: "serving", threadId: "serving-1" }),
           thread({ status: "closed_by_staff", threadId: "closed-active", unreadCount: 4 }),
           thread({ status: "serving", threadId: "direct-1", threadType: "im_direct" }),
         ],
         queueItems: [
-          thread({ status: "queued", threadId: "queued-1" }),
-          thread({ status: "pending", threadId: "queued-2" }),
+          thread({ conversationId: "queued-1", status: "queued", threadId: "queued-1" }),
+          thread({ conversationId: "queued-2", status: "pending", threadId: "queued-2" }),
           thread({ status: "closed_timeout", threadId: "closed-queue" }),
         ],
       },
@@ -200,6 +200,9 @@ describe("customer service workspace view model", () => {
       key: "customerService.workspace.closedUnreadNotice",
       params: { count: 2 },
     });
+    expect(closed.closureReasonText).toEqual({
+      key: "customerService.threadList.historyStatus.closedByStaff",
+    });
     expect(closed.composerDisabledText).toEqual({
       key: "customerService.workspace.composerDisabled.readonly",
     });
@@ -229,6 +232,19 @@ describe("customer service workspace view model", () => {
     expect(vm.readOnly).toBe(true);
     expect(vm.replyGate).toBe("readonly");
     expect(vm.selectedThreadIsLive).toBe(false);
+    expect(vm.closureReasonText).toEqual({
+      key: "customerService.threadList.historyStatus.closedTimeout",
+    });
+  });
+
+  it("exposes visitor close reason for closed customer service conversations", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      selectedThread: thread({ status: "closed_by_visitor" }),
+    });
+
+    expect(vm.closureReasonText).toEqual({
+      key: "customerService.threadList.historyStatus.closedByVisitor",
+    });
   });
 
   it("disables replies after the thread is transferred away from the current agent", () => {
@@ -242,7 +258,7 @@ describe("customer service workspace view model", () => {
 
     expect(vm.canReply).toBe(false);
     expect(vm.composerDisabledText).toEqual({
-      key: "customerService.workspace.composerDisabled.readonly",
+      key: "customerService.workspace.composerDisabled.transferred",
     });
     expect(vm.modeLabel).toEqual({ key: "customerService.workspace.mode.history" });
     expect(vm.readOnly).toBe(true);
@@ -252,6 +268,47 @@ describe("customer service workspace view model", () => {
     });
     expect(vm.replyGate).toBe("readonly");
     expect(vm.selectedThreadIsLive).toBe(false);
+  });
+
+  it("disables replies when assignment moved to another staff even if status is still serving", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      currentStaffIdentity: { platformUserId: "staff-1", userId: "staff-1-user" },
+      selectedThread: thread({
+        assignedStaffUserId: "staff-2",
+        status: "serving",
+      }),
+    });
+
+    expect(vm.canReply).toBe(false);
+    expect(vm.composerDisabledText).toEqual({
+      key: "customerService.workspace.composerDisabled.transferred",
+    });
+    expect(vm.closureReasonText).toEqual({
+      key: "customerService.threadList.historyStatus.transferred",
+    });
+    expect(vm.readOnly).toBe(true);
+    expect(vm.receptionText).toEqual({
+      key: "customerService.workspace.reception.ended",
+      params: { status: "customerService.threadList.historyStatus.transferred" },
+    });
+    expect(vm.replyGate).toBe("readonly");
+    expect(vm.selectedThreadIsLive).toBe(false);
+  });
+
+  it("keeps the assigned staff able to reply to a serving transferred-in thread", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      currentStaffIdentity: { platformUserId: "staff-2" },
+      selectedThread: thread({
+        assignedStaffUserId: "staff-2",
+        status: "serving",
+      }),
+    });
+
+    expect(vm.canReply).toBe(true);
+    expect(vm.composerDisabledText).toBeUndefined();
+    expect(vm.readOnly).toBe(false);
+    expect(vm.replyGate).toBe("open");
+    expect(vm.selectedThreadIsLive).toBe(true);
   });
 
   it("treats management readonly live threads as non-replyable viewing mode", () => {

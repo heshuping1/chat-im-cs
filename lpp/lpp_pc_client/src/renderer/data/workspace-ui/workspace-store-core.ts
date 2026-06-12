@@ -14,6 +14,11 @@ import {
 import type { ConversationReadState, ImConversationType } from '../im-read-model';
 import { conversationKey } from '../im-read-model';
 import { logImReadDiagnostic } from '../im-read/im-read-diagnostics';
+import {
+  type ContactMessageOpenTrace,
+  elapsedMsFromTrace,
+  rememberContactMessageOpenTrace,
+} from '../diagnostics/contact-message-open-diagnostics';
 import { recordMessageReminderDiagnostic } from '../diagnostics/message-reminder-diagnostics';
 import { writeRendererAppLog } from '../logging/app-log';
 import {
@@ -226,7 +231,7 @@ interface WorkspaceState {
     source: Exclude<CustomerServiceThreadOpenSource, 'none'>,
   ) => void;
   closeOpenServiceThread: (id: string) => void;
-  setActiveImConversation: (id: string) => void;
+  setActiveImConversation: (id: string, trace?: ContactMessageOpenTrace) => void;
   setActiveImConversationVisibility: (visibility: ActiveImConversationVisibility) => void;
   markImConversationReadLocally: (
     id: string,
@@ -310,11 +315,37 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   pcSettings: readStoredPcSettings(),
   realtimeReminders: [],
   setActiveModule: (activeModule) =>
-    set(
-      activeModule === 'messages'
-        ? { activeModule, activeImConversationId: '', activeImConversationVisibility: 'hidden' }
-        : { activeModule, activeImConversationVisibility: 'hidden' },
-    ),
+    set((state) => {
+      const noOp = state.activeModule === activeModule;
+      const nextActiveImConversationVisibility =
+        activeModule === 'messages'
+          ? state.activeImConversationVisibility
+          : 'hidden';
+      const nextState = {
+        activeModule,
+        activeImConversationVisibility: nextActiveImConversationVisibility,
+      };
+      recordMessageReminderDiagnostic({
+        event: 'workspace.module.set-active',
+        source: 'workspace-store-core',
+        phase: noOp ? 'no-op' : 'state-change',
+        route: activeModule,
+        classification: {
+          nextActiveConversationId: state.activeImConversationId,
+          nextActiveConversationVisibility: nextActiveImConversationVisibility,
+          nextActiveModule: activeModule,
+          previousActiveConversationId: state.activeImConversationId,
+          previousActiveConversationVisibility: state.activeImConversationVisibility,
+          previousActiveModule: state.activeModule,
+          preservedActiveImConversationId:
+            activeModule === 'messages' && Boolean(state.activeImConversationId),
+        },
+      });
+      return noOp &&
+        state.activeImConversationVisibility === nextActiveImConversationVisibility
+        ? state
+        : nextState;
+    }),
   setActiveThread: (id) =>
     set((state) => ({
       activeThreadId: id,
@@ -339,12 +370,26 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         activeThreadOpenSource: next.activeThreadId ? 'auto' : 'none',
       };
     }),
-  setActiveImConversation: (id) =>
-    set((state) =>
-      state.activeImConversationId === id && state.activeModule === 'messages'
-        ? state
-        : { activeImConversationId: id, activeModule: 'messages' },
-    ),
+  setActiveImConversation: (id, trace) =>
+    set((state) => {
+      const noOp = state.activeImConversationId === id && state.activeModule === 'messages';
+      rememberContactMessageOpenTrace(id, trace);
+      recordMessageReminderDiagnostic({
+        event: 'workspace.im.set-active',
+        source: 'workspace-store-core',
+        phase: noOp ? 'no-op' : 'state-change',
+        route: 'messages',
+        classification: {
+          elapsedMs: elapsedMsFromTrace(trace),
+          nextActiveConversationId: id,
+          nextActiveModule: 'messages',
+          previousActiveConversationId: state.activeImConversationId,
+          previousActiveModule: state.activeModule,
+          traceId: trace?.traceId,
+        },
+      });
+      return noOp ? state : { activeImConversationId: id, activeModule: 'messages' };
+    }),
   setActiveImConversationVisibility: (activeImConversationVisibility) =>
     set((state) =>
       state.activeImConversationVisibility === activeImConversationVisibility

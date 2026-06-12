@@ -57,6 +57,7 @@ export interface ServiceCommandMetrics {
   activeCount: number;
   activeSessions?: number | null;
   activeUnreadCount: number;
+  assignedSessions?: number | null;
   capacityText: string;
   hasReceptionStatus: boolean;
   hasThreadData: boolean;
@@ -294,19 +295,27 @@ export function createServiceCommandMetrics(input: {
   const serviceStatus =
     input.receptionStatus?.serviceStatus ?? input.lastKnownStatus ?? "unknown";
   const activeSessions = hasReceptionStatus && hasThreadData ? activeCount : null;
-  const maxSessions = input.receptionStatus?.maxConcurrentSessions;
+  const apiActiveSessions = nonNegativeInteger(input.receptionStatus?.activeSessionCount);
+  const reservedSessions = nonNegativeInteger(input.receptionStatus?.reservedSessionCount);
+  const assignedSessions =
+    apiActiveSessions !== null || reservedSessions !== null
+      ? (apiActiveSessions ?? 0) + (reservedSessions ?? 0)
+      : activeSessions;
+  const maxSessions = positiveInteger(input.receptionStatus?.maxConcurrentSessions);
   const capacityText =
-    activeSessions === null
+    assignedSessions === null
       ? "--"
       : typeof maxSessions === "number" && maxSessions > 0
-        ? `${activeSessions}/${maxSessions}`
-        : `${activeSessions}/--`;
+        ? `${assignedSessions}/${maxSessions}`
+        : `${assignedSessions}/--`;
+  const maxSessionsText = maxSessions === null ? "--" : String(maxSessions);
   const threadMetricValue = (value: number) => (hasThreadData ? String(value) : "--");
 
   return {
     activeCount,
     activeSessions,
     activeUnreadCount,
+    assignedSessions,
     capacityText,
     hasReceptionStatus,
     hasThreadData,
@@ -319,13 +328,24 @@ export function createServiceCommandMetrics(input: {
     slaRiskCount,
     totalCount,
     metrics: [
-      { label: "容量", labelKey: "customerService.online.metrics.capacity", value: capacityText, tone: "success" },
+      { label: "已分配", labelKey: "customerService.online.metrics.assigned", value: capacityText, tone: "success" },
+      { label: "最大", labelKey: "customerService.online.metrics.maxAssignable", value: maxSessionsText, tone: "normal" },
       { label: "排队", labelKey: "customerService.online.metrics.queued", value: threadMetricValue(queuedCount), tone: queuedCount > 0 ? "warning" : "normal" },
       { label: "进行中", labelKey: "customerService.online.metrics.active", value: threadMetricValue(activeCount), tone: "normal" },
       { label: "未读", labelKey: "customerService.online.metrics.unread", value: threadMetricValue(activeUnreadCount), tone: activeUnreadCount > 0 ? "warning" : "normal" },
       { label: "SLA", labelKey: "customerService.online.metrics.sla", value: threadMetricValue(slaRiskCount), tone: slaRiskCount > 0 ? "danger" : "normal" },
     ],
   };
+}
+
+function nonNegativeInteger(value?: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.floor(value));
+}
+
+function positiveInteger(value?: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return Math.floor(value);
 }
 
 function serviceStatusLabelKey(status?: string | null) {

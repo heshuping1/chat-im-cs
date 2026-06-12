@@ -78,11 +78,10 @@
 }
 
 .composer-emoji-panel {
-  position: absolute;
-  z-index: 31;
-  left: 14px;
-  bottom: calc(100% - 4px);
-  width: min(520px, calc(100% - 28px));
+  position: fixed;
+  z-index: 130;
+  box-sizing: border-box;
+  width: min(520px, calc(100vw - 24px));
   max-height: min(460px, 70vh);
   overflow: auto;
   padding: 18px 20px;

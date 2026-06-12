@@ -1117,9 +1117,9 @@ export interface StaffReceptionStatusDto {
   displayName?: string;
   serviceStatus: "online" | "busy" | "break" | "offline" | string;
   queueAcceptEnabled?: boolean;
-  maxConcurrentSessions?: number;
-  reservedSessionCount?: number;
-  activeSessionCount?: number;
+  maxConcurrentSessions?: number | null;
+  reservedSessionCount?: number | null;
+  activeSessionCount?: number | null;
   lastOnlineAt?: string | null;
   lastAssignedAt?: string | null;
   lastHeartbeatAt?: string | null;

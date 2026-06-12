@@ -282,6 +282,7 @@ export function OnlineServicePage() {
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken];
   const canControlReception = canControlCustomerServiceReception(session);
+  const showServiceCommandBar = canControlReception;
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
     enabled: Boolean(client),
@@ -709,6 +710,7 @@ export function OnlineServicePage() {
         effectiveServiceAssistantPane ? "service-assistant-open" : "",
         effectiveServiceCustomerPaneCollapsed ? "service-customer-collapsed" : "",
         effectiveServiceListPaneCollapsed ? "service-list-collapsed" : "",
+        showServiceCommandBar ? "" : "service-command-hidden",
         serviceCustomerFirst ? "service-context-order-customer-first" : "",
       ].filter(Boolean).join(" ")}
       style={
@@ -721,7 +723,7 @@ export function OnlineServicePage() {
         } as CSSProperties
       }
     >
-      {canControlReception && (
+      {showServiceCommandBar && (
         <ServiceCommandBar
           disabled={!client}
           layoutMode={serviceLayoutMode}
@@ -849,7 +851,7 @@ function ServiceCommandBar({
 
       <div className="h-top-actions service-command-actions">
         <ServiceReceptionControl
-          activeSessions={metrics.activeSessions}
+          activeSessions={metrics.assignedSessions}
           disabled={disabled}
           layout={getReceptionControlLayout(layoutMode)}
           maxSessions={metrics.maxSessions}

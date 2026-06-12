@@ -48,6 +48,7 @@ import {
 } from "../../data/workspace-ui/workspace-ui-store";
 import { formatError, formatMonthDayTime } from "../../lib/format";
 import { useWechatBottomFollow } from "../../lib/useWechatBottomFollow";
+import { requestMessageCustomConfirmation } from "../../messages/runtime/messageConfirm";
 import {
   addOrReplaceWatchedThreadKey,
   addWatchedThreadKey,
@@ -545,13 +546,19 @@ export function CustomerServiceMonitorPanel({
       thread: transferThread,
     });
   };
-  const executeManagementAction = (
+  const executeManagementAction = async (
     thread: CustomerServiceThread,
     action: MonitorManagementAction,
   ) => {
     if (isMonitorHistoryThread(thread) || managementActionMutation.isPending) return;
     const confirmText = monitorManagementConfirmText(thread, action, t);
-    if (confirmText && !window.confirm(confirmText)) return;
+    if (confirmText) {
+      const confirmed = await requestMessageCustomConfirmation(confirmText, {
+        confirmText: t("common.confirm"),
+        tone: "danger",
+      });
+      if (!confirmed) return;
+    }
     managementActionMutation.mutate({ action, thread });
   };
   const refetchAll = () => {
@@ -1306,7 +1313,6 @@ function MonitorWindow({
         selectedThread={thread}
         stageRef={messageStageRef}
         title={threadTitle(thread, t)}
-        typingPreview={null}
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();

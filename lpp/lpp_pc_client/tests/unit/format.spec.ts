@@ -6,6 +6,7 @@ import {
   formatChatMessageTime,
   formatChatTime,
   formatClockTime,
+  formatFullDateTime,
   formatMonthDayTime,
   formatShortDate,
   timestampFromDateValue,
@@ -37,6 +38,7 @@ describe("format helpers", () => {
     expect(formatShortDate(value, { timezone: "UTC+00:00" })).toBe("2026-05-30");
     expect(formatShortDate(value, { timezone: "UTC+08:00" })).toBe("2026-05-31");
     expect(formatMonthDayTime(value, { timezone: "UTC+08:00" })).toBe("05/31 07:30");
+    expect(formatFullDateTime(value, { timezone: "UTC+08:00" })).toBe("2026-05-31 07:30");
     expect(formatClockTime(value, { timezone: "UTC+00:00" })).toBe("23:30");
     expect(formatClockTime(value, { timezone: "UTC+08:00" })).toBe("07:30");
   });

@@ -17,11 +17,15 @@ import {
   createCustomerServiceIdentityViewModel,
   type CustomerServiceIdentityViewModel,
 } from "./cs-identity-view-model";
-import { createCustomerServiceLiveCounters } from "./customer-service-live-counters";
+import {
+  createCustomerServiceLiveCounters,
+  dedupeCustomerServiceThreads,
+} from "./customer-service-live-counters";
 import { isSilentCustomerServiceRecalledMessage } from "./cs-silent-recall";
 
 export interface CustomerServiceThreadDetailView {
   accessMode?: "workbench" | "management_readonly";
+  assignedStaffUserId?: string | null;
   avatarUrl?: string | null;
   channel?: string;
   entryChannel?: string;
@@ -40,6 +44,7 @@ export interface CustomerServiceThreadDetailView {
 }
 
 export interface CustomerServiceWorkspaceViewModelInput {
+  currentStaffIdentity?: CustomerServiceCurrentStaffIdentity | null;
   detail?: CustomerServiceThreadDetailView;
   detailErrorText?: string;
   detailLoading?: boolean;
@@ -63,6 +68,12 @@ export interface CustomerServiceWorkspaceInlineState {
   tone: "error" | "muted";
 }
 
+export interface CustomerServiceCurrentStaffIdentity {
+  lppId?: string | null;
+  platformUserId?: string | null;
+  userId?: string | null;
+}
+
 export interface CustomerServiceWorkspaceTextDescriptor {
   key: string;
   params?: Record<string, string | number>;
@@ -71,6 +82,7 @@ export interface CustomerServiceWorkspaceTextDescriptor {
 export interface CustomerServiceWorkspaceViewModel {
   canReply: boolean;
   closedUnreadNoticeText?: CustomerServiceWorkspaceTextDescriptor;
+  closureReasonText?: CustomerServiceWorkspaceTextDescriptor;
   composerDisabledText?: CustomerServiceWorkspaceTextDescriptor;
   identity: CustomerServiceIdentityViewModel;
   messageStageState?: CustomerServiceWorkspaceInlineState;
@@ -104,11 +116,29 @@ export function createCustomerServiceWorkspaceViewModel(
   const threadId = selectedThread?.threadId ?? "";
   const status = String(input.detail?.status ?? selectedThread?.status ?? "");
   const baseThreadState = createCustomerServiceThreadState(status);
+  const transferredAway =
+    isCustomerServiceTransferredAwayStatus(baseThreadState.normalizedStatus) ||
+    isCustomerServiceThreadAssignedAwayFromCurrentStaff(
+      {
+        assignedStaffUserId:
+          input.detail?.assignedStaffUserId ?? selectedThread?.assignedStaffUserId,
+      },
+      input.currentStaffIdentity,
+    );
   const managementReadonly =
     input.detail?.accessMode === "management_readonly" ||
     selectedThread?.accessMode === "management_readonly";
-  const managementReadonlyView = managementReadonly && !baseThreadState.readOnly;
-  const threadState: CustomerServiceThreadState = managementReadonly
+  const managementReadonlyView = managementReadonly && !baseThreadState.readOnly && !transferredAway;
+  const threadState: CustomerServiceThreadState = transferredAway && !baseThreadState.readOnly
+    ? {
+        ...baseThreadState,
+        kind: "closed",
+        label: "Transferred",
+        readOnly: true,
+        replyGate: "readonly",
+        terminal: true,
+      }
+    : managementReadonly
     ? {
         ...baseThreadState,
         kind: "readonly",
@@ -148,9 +178,14 @@ export function createCustomerServiceWorkspaceViewModel(
       readOnly: readOnly && !managementReadonlyView,
       unreadCount: selectedThread?.unreadCount,
     }),
+    closureReasonText: createCustomerServiceClosureReasonText({
+      readOnly: readOnly && !managementReadonlyView,
+      status: transferredAway ? "transferred" : status,
+    }),
     composerDisabledText: createCustomerServiceComposerDisabledText({
       managementReadonlyView,
       replyGate: threadState.replyGate,
+      transferredAway,
     }),
     identity,
     messageStageState: createCustomerServiceMessageStageState({
@@ -172,7 +207,7 @@ export function createCustomerServiceWorkspaceViewModel(
       readOnly,
       replyGate: threadState.replyGate,
       sourceLabel,
-      status,
+      status: transferredAway ? "transferred" : status,
     }),
     replyGate: threadState.replyGate,
     selectedThread,
@@ -278,16 +313,6 @@ export function listCustomerServiceSelectableThreads(input: {
   ]);
 }
 
-function dedupeCustomerServiceThreads(threads: CustomerServiceThread[]) {
-  const seen = new Set<string>();
-  return threads.filter((thread) => {
-    const key = `${thread.threadType}-${thread.threadId}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 function usableThreadTitle(value?: string | null) {
   const title = value?.trim();
   if (!title || title.startsWith("\u5386\u53f2\u4f1a\u8bdd")) return undefined;
@@ -332,7 +357,11 @@ function customerServiceLiveStatusKey(status: string) {
 function createCustomerServiceComposerDisabledText(input: {
   managementReadonlyView?: boolean;
   replyGate: CustomerServiceReplyGate;
+  transferredAway?: boolean;
 }) {
+  if (input.transferredAway) {
+    return { key: "customerService.workspace.composerDisabled.transferred" };
+  }
   if (input.managementReadonlyView) {
     return { key: "customerService.workspace.composerDisabled.managementReadonly" };
   }
@@ -350,4 +379,45 @@ function createCustomerServiceClosedUnreadNoticeText(input: {
   const unreadCount = Math.max(0, Number(input.unreadCount ?? 0));
   if (!input.readOnly || unreadCount <= 0) return undefined;
   return { key: "customerService.workspace.closedUnreadNotice", params: { count: unreadCount } };
+}
+
+function createCustomerServiceClosureReasonText(input: {
+  readOnly: boolean;
+  status: string;
+}) {
+  if (!input.readOnly) return undefined;
+  return { key: customerServiceHistoryStatusKey(input.status) };
+}
+
+export function isCustomerServiceThreadAssignedAwayFromCurrentStaff(
+  thread:
+    | Pick<CustomerServiceThread, "assignedStaffUserId">
+    | Pick<CustomerServiceThreadDetailView, "assignedStaffUserId">
+    | undefined,
+  identity?: CustomerServiceCurrentStaffIdentity | null,
+) {
+  const assignedStaffUserId = normalizeCustomerServiceIdentityValue(thread?.assignedStaffUserId);
+  if (!assignedStaffUserId) return false;
+  const currentIds = new Set(
+    [identity?.userId, identity?.platformUserId, identity?.lppId]
+      .map(normalizeCustomerServiceIdentityValue)
+      .filter(Boolean),
+  );
+  if (currentIds.size === 0) return false;
+  return !currentIds.has(assignedStaffUserId);
+}
+
+function isCustomerServiceTransferredAwayStatus(status?: string | number | null) {
+  const normalized = String(status ?? "").trim().toLowerCase().replace(/-/g, "_");
+  return (
+    normalized === "transferred" ||
+    normalized === "transferred_out" ||
+    normalized === "assigned_away" ||
+    normalized === "handoff"
+  );
+}
+
+function normalizeCustomerServiceIdentityValue(value?: string | null) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized || "";
 }

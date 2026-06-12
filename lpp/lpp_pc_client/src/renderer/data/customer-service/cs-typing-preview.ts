@@ -5,7 +5,9 @@ export const CUSTOMER_SERVICE_TYPING_PREVIEW_MAX_LENGTH = 500;
 export interface CustomerServiceTypingPreviewEvent {
   threadId: string;
   threadType: CustomerServiceThreadType;
+  aliasThreadIds?: string[];
   isTyping: boolean;
+  hasPreviewText?: boolean;
   previewText?: string;
   senderRole?: string;
   senderUserId?: string;

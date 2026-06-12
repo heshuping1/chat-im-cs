@@ -8,6 +8,7 @@ import {
   resolveCustomerServiceOverlayUnread,
   resolveCustomerServiceThreadUnread,
 } from "./customer-service-unread-ledger";
+import { isCustomerServicePlaceholderThreadPreview } from "./cs-thread-preview";
 
 export interface CustomerServiceConversationIndexEntry {
   compatLastMessageId?: string;
@@ -282,9 +283,12 @@ export function applyCustomerServiceThreadOverlay(thread: CustomerServiceThread,
     reconcile.canUpdateStrongFields ||
     (!overlay.lastMessageId && !overlay.lastMessagePreview && !overlay.lastMessageAt);
   const threadLastMessageId = stringField(thread as unknown as Record<string, unknown>, "lastMessageId");
+  const serverPreview = isCustomerServicePlaceholderThreadPreview(thread.lastMessagePreview)
+    ? undefined
+    : thread.lastMessagePreview;
   const lastMessagePreview = canUseSnapshotStrongFields
-    ? thread.lastMessagePreview || overlay.lastMessagePreview
-    : overlay.lastMessagePreview || thread.lastMessagePreview;
+    ? serverPreview || overlay.lastMessagePreview || thread.lastMessagePreview
+    : overlay.lastMessagePreview || serverPreview || thread.lastMessagePreview;
   const lastMessageAt = latestTimestamp(thread.lastMessageAt, overlay.lastMessageAt);
   const lastMessageId = canUseSnapshotStrongFields
     ? threadLastMessageId || overlay.lastMessageId || overlay.compatLastMessageId

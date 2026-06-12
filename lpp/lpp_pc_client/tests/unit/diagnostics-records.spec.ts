@@ -91,6 +91,43 @@ describe("diagnostics records view model", () => {
     });
   });
 
+  it("includes customer service message audit records in the message chain filter", () => {
+    const records = getRecentDiagnosticsRecords({
+      moduleFilter: "message",
+      target: {
+        __lppCustomerServiceMessageAuditDiagnostics: [
+          {
+            traceId: "cs-audit-1",
+            module: "cs-message-audit",
+            event: "cs.message.audit",
+            phase: "cache.merge.sent",
+            result: "ok",
+            timestamp: 1_700_000_002_000,
+          },
+        ],
+        __lppMessageCenterDiagnostics: [
+          {
+            traceId: "msg-trace-1",
+            module: "message-center",
+            event: "command.failed",
+            phase: "command",
+            result: "failed",
+            timestamp: 1_700_000_001_000,
+          },
+        ],
+      },
+    });
+
+    expect(records.map((record) => record.module)).toEqual([
+      "cs-message-audit",
+      "message-center",
+    ]);
+    expect(getDiagnosticsRecordFilterSummaries(records).find((item) => item.id === "message")).toMatchObject({
+      count: 2,
+      failedCount: 1,
+    });
+  });
+
   it("redacts sensitive details and truncates long summaries", () => {
     const records = getRecentDiagnosticsRecords({
       target: {

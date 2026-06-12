@@ -66,7 +66,9 @@ export type CustomerServiceGatewayChangeKind =
   | "thread_queued"
   | "thread_assigned"
   | "thread_closed"
+  | "thread_reopened"
   | "thread_rated"
+  | "thread_transferred"
   | "thread_status_changed"
   | "staff_status_changed"
   | "sla_warning"
@@ -84,7 +86,9 @@ export interface GatewayCustomerServiceMessageReceivedEvent extends GatewayEvent
 export interface GatewayCustomerServiceThreadChangedEvent extends GatewayEventEnvelope {
   kind: "cs.thread.changed";
   changeKind: CustomerServiceGatewayChangeKind;
+  conversationId?: string;
   threadId?: string;
+  threadType?: CustomerServiceThreadType;
   serviceStatus?: string;
   threadStatus?: string;
   shouldNotifyQueue?: boolean;
@@ -94,7 +98,10 @@ export interface GatewayCustomerServiceTypingPreviewEvent extends GatewayEventEn
   kind: "cs.typing.preview";
   threadId: string;
   threadType: CustomerServiceThreadType;
+  aliasThreadIds?: string[];
+  conversationId?: string;
   isTyping: boolean;
+  hasPreviewText?: boolean;
   previewText: string;
   senderRole?: string;
   senderUserId?: string;

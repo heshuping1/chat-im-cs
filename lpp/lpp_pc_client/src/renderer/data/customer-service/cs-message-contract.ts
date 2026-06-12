@@ -51,20 +51,20 @@ export function normalizeCustomerServiceMessageDto(
       "messageSeq",
       "message_seq",
     );
-    const rawBody =
+    const structuredBody =
       asNullableRecord(record.body) ||
       asNullableRecord(record.messageBody) ||
       asNullableRecord(record.message_body) ||
-      asNullableRecord(record.content) ||
-      {};
+      asNullableRecord(record.content);
     const type =
       normalizeMessageType({
         messageId: "type-probe",
         messageType: stringField(record, "messageType", "message_type", "type"),
-        body: rawBody,
+        body: structuredBody ?? {},
       }) ||
-      inferMessageType(rawBody) ||
+      inferMessageType(structuredBody ?? {}) ||
       "text";
+    const rawBody = structuredBody ?? textBodyFromRecord(record, type) ?? {};
     const body = normalizeMessageBody(rawBody, type);
     const rawId = stringField(record, "messageId", "message_id", "id");
     const id = rawId || options.fallbackMessageId || "";
@@ -99,9 +99,9 @@ export function normalizeCustomerServiceMessageDto(
     }
 
     const preview =
-      stringField(record, "preview", "text", "message") ||
+      stringField(record, "preview", "text", "message", "content") ||
       messagePreviewFromBody(body, type) ||
-      "[Message]";
+      "";
     const dto: MessageItemDto = {
       messageId: id || `${options.threadId}:unknown`,
       conversationId,
@@ -200,6 +200,7 @@ export function normalizeCustomerServiceMessageDto(
         threadId: options.threadId,
         threadType: options.threadType,
       }),
+      preview,
       source: "customer_service",
       threadId: options.threadId,
       threadType: options.threadType,
@@ -241,6 +242,12 @@ function stringField(record: Record<string, unknown>, ...keys: string[]) {
     if (typeof value === "number") return String(value);
   }
   return undefined;
+}
+
+function textBodyFromRecord(record: Record<string, unknown>, type: string) {
+  if (normalizeMessageType(type) !== "text") return undefined;
+  const text = stringField(record, "text", "message", "content");
+  return text ? { text } : undefined;
 }
 
 function nullableStringField(record: Record<string, unknown>, ...keys: string[]) {

@@ -421,6 +421,8 @@ export const th: MessageDictionary = {
       expandUnreadTitle: 'ขยายการสนทนาที่ยังไม่ได้อ่าน ขณะนี้ {count} รายการ',
       metrics: {
         capacity: 'Capacity',
+        assigned: 'Assigned',
+        maxAssignable: 'Max assignable',
         queued: 'Queued',
         active: 'Active',
         unread: 'Unread',
@@ -513,6 +515,7 @@ export const th: MessageDictionary = {
         claim: 'การสนทนานี้ยังอยู่ในคิว โปรดรับเรื่องก่อน',
         managementReadonly: 'โหมดดูเท่านั้น ไม่สามารถตอบกลับได้ การสนทนายังดำเนินอยู่และสามารถโอนไปยังเจ้าหน้าที่ได้',
         readonly: 'การสนทนานี้สิ้นสุดแล้ว ไม่สามารถตอบต่อได้',
+        transferred: 'การสนทนานี้ถูกโอนแล้ว ไม่สามารถตอบกลับได้',
         takeover: 'การสนทนานี้ยังให้ AI จัดการอยู่ โปรดรับช่วงด้วยตนเองก่อน',
       },
       currentCustomer: 'ลูกค้าปัจจุบัน',

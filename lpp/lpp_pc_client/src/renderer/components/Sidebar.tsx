@@ -1318,28 +1318,30 @@ export function Sidebar() {
                 setServiceStatusOpen(false);
               }}
             >
-              {tenantLogoUrl || isPersonalSpace || spaceCode !== "--" ? (
-                <PcAvatar
-                  avatarUrl={tenantLogoUrl}
-                  className="sidebar-space-logo"
-                  iconSize={16}
-                  kind={isPersonalSpace ? "person" : "tenant"}
-                  name={spaceName}
-                />
-              ) : (
-                <span className="sidebar-space-logo sidebar-space-logo-empty" aria-hidden="true">
-                  <Building2 size={16} />
-                </span>
-              )}
+              <span className="sidebar-space-logo-wrap">
+                {tenantLogoUrl || isPersonalSpace || spaceCode !== "--" ? (
+                  <PcAvatar
+                    avatarUrl={tenantLogoUrl}
+                    className="sidebar-space-logo"
+                    iconSize={16}
+                    kind={isPersonalSpace ? "person" : "tenant"}
+                    name={spaceName}
+                  />
+                ) : (
+                  <span className="sidebar-space-logo sidebar-space-logo-empty" aria-hidden="true">
+                    <Building2 size={16} />
+                  </span>
+                )}
+                {currentSpaceBadgeCount > 0 && (
+                  <span className="sidebar-space-unread-badge" aria-hidden="true">
+                    {formatBadgeCount(currentSpaceBadgeCount)}
+                  </span>
+                )}
+              </span>
               <span className="sidebar-status-copy">
                 <strong>{spaceName}</strong>
                 <em>{spaceMeta}</em>
               </span>
-              {currentSpaceBadgeCount > 0 && (
-                <span className="sidebar-space-unread-badge" aria-hidden="true">
-                  {formatBadgeCount(currentSpaceBadgeCount)}
-                </span>
-              )}
               <ChevronRight size={14} aria-hidden="true" />
             </button>
             {spaceStatusOpen && (

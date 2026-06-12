@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { AuthSession } from "../auth/auth-session";
+import type { CustomerServiceThread } from "../api/types";
 import type { CustomerServiceStatus } from "../types";
 import {
   handleFirstStageCustomerServiceGatewayEvent,
@@ -40,11 +41,14 @@ import { recordGatewayReminderDiagnostic } from "./gateway-message-reminder-diag
 import { createMessageDeliveryService } from "./message-delivery-service";
 import { pcQueryKeys } from "../query-keys";
 import {
+  reopenCustomerServiceThreadFromGateway,
+  removeSilentCustomerServiceRecall,
+} from "./gateway-cs-side-effects";
+import {
   applySpaceNoticeReminder,
   spaceReminderScopeKey,
 } from "../spaces/space-reminder-ledger";
 import { applyCustomerServiceTypingPreviewCache } from "../customer-service/cs-typing-preview-cache";
-import { removeCustomerServiceMessageByThreadId } from "../customer-service/cs-cache-adapter";
 
 export function createGatewayEventRouter(options: {
   clearAuthSession: () => void;
@@ -107,6 +111,25 @@ export function createGatewayEventRouter(options: {
           if (event.serviceStatus && isCustomerServiceStatus(event.serviceStatus)) {
             setCustomerServiceStatus(event.serviceStatus);
           }
+          if (event.changeKind === "thread_reopened" && event.threadId) {
+            reopenCustomerServiceThreadFromGateway(queryClient, {
+              conversationId: event.conversationId,
+              reopenedAt: stringField(
+                event.rawPayload,
+                "reopenedAt",
+                "reopened_at",
+                "resumedAt",
+                "resumed_at",
+                "updatedAt",
+                "updated_at",
+              ),
+              status: event.threadStatus,
+              thread: asRecord(event.rawPayload.thread) as Partial<CustomerServiceThread>,
+              threadId: event.threadId,
+              threadType: event.threadType,
+              unreadCount: numberField(event.rawPayload, "unreadCount", "unread_count"),
+            });
+          }
           invalidateCustomerService(event.threadId);
           if (event.shouldNotifyQueue) {
             delivery.deliverCustomerServiceQueue({
@@ -119,6 +142,8 @@ export function createGatewayEventRouter(options: {
         },
         onTypingPreview: (event) => {
           applyCustomerServiceTypingPreviewCache(queryClient, session, {
+            aliasThreadIds: event.aliasThreadIds,
+            hasPreviewText: event.hasPreviewText,
             isTyping: event.isTyping,
             previewText: event.previewText,
             receivedAt: event.receivedAt,
@@ -474,10 +499,7 @@ export function createGatewayEventRouter(options: {
     const threadId =
       customerServiceThreadId(payload, scopeKey) ||
       stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "conversationId", "chatId");
-    const messageId = stringField(payload, "messageId", "message_id", "id");
-    if (threadId && messageId) {
-      removeCustomerServiceMessageByThreadId(queryClient, threadId, messageId);
-    }
+    removeSilentCustomerServiceRecall(queryClient, payload, threadId);
     invalidateCustomerService(threadId);
     recordGatewayReminderDiagnostic({
       eventName: "msg.recalled",

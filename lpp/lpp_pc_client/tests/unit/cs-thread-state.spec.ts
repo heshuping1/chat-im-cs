@@ -71,6 +71,21 @@ describe("customer service thread state", () => {
     });
   });
 
+  it("maps reopened timeout conversations back to an open reply gate", () => {
+    expect(createCustomerServiceThreadState("reopened")).toMatchObject({
+      kind: "serving",
+      normalizedStatus: "reopened",
+      readOnly: false,
+      replyGate: "open",
+      terminal: false,
+    });
+    expect(createCustomerServiceThreadState("resumed")).toMatchObject({
+      kind: "serving",
+      readOnly: false,
+      replyGate: "open",
+    });
+  });
+
   it("keeps transferred-away conversations readonly for the previous agent", () => {
     expect(createCustomerServiceThreadState("transferred")).toMatchObject({
       kind: "closed",

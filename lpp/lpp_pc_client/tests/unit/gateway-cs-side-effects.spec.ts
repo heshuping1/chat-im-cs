@@ -69,6 +69,24 @@ vi.mock("../../src/renderer/data/workspace-ui/workspace-ui-store", () => ({
   }),
 }));
 
+function findSetQueriesDataResult(
+  queryClient: { setQueriesData: ReturnType<typeof vi.fn> },
+  oldValue: unknown,
+  matches: (value: unknown) => boolean,
+) {
+  for (const call of queryClient.setQueriesData.mock.calls) {
+    const update = call[1];
+    if (typeof update !== "function") continue;
+    try {
+      const nextValue = update(oldValue);
+      if (matches(nextValue)) return nextValue;
+    } catch {
+      // Different query updaters expect different cache shapes.
+    }
+  }
+  return undefined;
+}
+
 describe("gateway customer service side effects", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -122,6 +140,7 @@ describe("gateway customer service side effects", () => {
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 
@@ -152,6 +171,26 @@ describe("gateway customer service side effects", () => {
         channel: "serviceQueue",
       }),
     );
+    expect(queryClient.setQueryData).toHaveBeenCalledWith(
+      [
+        "pc-cs-typing-preview",
+        "https://api.example.test",
+        "tenant-token",
+        "temp_session",
+        "temp-session-1",
+      ],
+      null,
+    );
+    expect(queryClient.setQueryData).toHaveBeenCalledWith(
+      [
+        "pc-cs-typing-preview",
+        "https://api.example.test",
+        "tenant-token",
+        "temp_session",
+        "im-conversation-cs-1",
+      ],
+      null,
+    );
   });
 
   it("starts background media materialization when a customer service media message is received", async () => {
@@ -159,6 +198,7 @@ describe("gateway customer service side effects", () => {
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 
@@ -224,6 +264,7 @@ describe("gateway customer service side effects", () => {
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 
@@ -253,6 +294,7 @@ describe("gateway customer service side effects", () => {
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 
@@ -311,6 +353,7 @@ describe("gateway customer service side effects", () => {
       threadType: "temp_session",
     });
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 
@@ -328,10 +371,17 @@ describe("gateway customer service side effects", () => {
       "widget-conversation-1",
     );
 
-    const detailUpdate = queryClient.setQueriesData.mock.calls[1]?.[1] as
-      | ((old: unknown) => unknown)
-      | undefined;
-    expect(detailUpdate?.({ messages: [] })).toMatchObject({
+    expect(
+      findSetQueriesDataResult(
+        queryClient,
+        { messages: [] },
+        (value) =>
+          typeof value === "object" &&
+          value !== null &&
+          "threadId" in value &&
+          value.threadId === "widget-thread-1",
+      ),
+    ).toMatchObject({
       threadId: "widget-thread-1",
       threadType: "temp_session",
     });
@@ -348,6 +398,7 @@ describe("gateway customer service side effects", () => {
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 
@@ -395,6 +446,7 @@ describe("gateway customer service side effects", () => {
       "../../src/renderer/data/gateway/gateway-cs-side-effects"
     );
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 
@@ -414,10 +466,17 @@ describe("gateway customer service side effects", () => {
     expect(mocks.pushRealtimeReminder).not.toHaveBeenCalled();
     expect(mocks.notifyDesktopOrBrowser).not.toHaveBeenCalled();
 
-    const detailUpdate = queryClient.setQueriesData.mock.calls[1]?.[1] as
-      | ((old: unknown) => unknown)
-      | undefined;
-    expect(detailUpdate?.({ messages: [] })).toMatchObject({
+    expect(
+      findSetQueriesDataResult(
+        queryClient,
+        { messages: [] },
+        (value) =>
+          typeof value === "object" &&
+          value !== null &&
+          "threadId" in value &&
+          value.threadId === "im-customer-service-thread",
+      ),
+    ).toMatchObject({
       threadId: "im-customer-service-thread",
       threadType: "im_direct",
     });
@@ -455,6 +514,7 @@ describe("gateway customer service side effects", () => {
       threadType: "temp_session",
     });
     const queryClient = {
+      setQueryData: vi.fn(),
       setQueriesData: vi.fn(),
     };
 

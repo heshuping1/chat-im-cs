@@ -16,8 +16,8 @@ import {
   invalidateCustomerServiceQueries,
   mergeSentCustomerServiceMessage,
   patchCustomerServiceLocalMessage,
-  removeCustomerServiceLocalMessage,
 } from "../../data/customer-service/cs-cache-adapter";
+import { auditCustomerServiceMessage } from "../../data/customer-service/cs-message-audit-diagnostics";
 import {
   isCustomerServiceMediaRecord,
   restoreCustomerServiceOutboxRecord,
@@ -170,12 +170,25 @@ export function useCustomerServiceSendController({
         runtime.createLocalIdentity("pc-cs-local-text");
       const body = { text: content };
       const sendStartedAt = createdAt;
+      auditCustomerServiceMessage({
+        source: "send",
+        stage: "send.compose.submit",
+        traceId: clientMsgId,
+        clientMsgId,
+        localMessageId,
+        threadId: selectedThread.threadId,
+        threadType: selectedThread.threadType,
+        conversationId: selectedThread.conversationId,
+        body,
+        messageType: "text",
+      });
       const localMessage = {
         ...customerServiceMessageFromSendResult({
           thread: selectedThread,
           result: { messageId: localMessageId, sentAt: currentIsoTimestamp() },
           messageType: "text",
           body,
+          clientMsgId,
           identity: session,
         }),
         localSendStartedAt: sendStartedAt,
@@ -200,7 +213,7 @@ export function useCustomerServiceSendController({
           content,
           { clientMsgId },
         );
-        return { body, localMessageId, result, runtime, thread: selectedThread };
+        return { body, clientMsgId, localMessageId, result, runtime, thread: selectedThread };
       } catch (error) {
         const failedAt = Date.now();
         const reason = formatError(error);
@@ -218,7 +231,7 @@ export function useCustomerServiceSendController({
         throw error;
       }
     },
-    onSuccess: async ({ body, localMessageId, result, runtime, thread }) => {
+    onSuccess: async ({ body, clientMsgId, localMessageId, result, runtime, thread }) => {
       if (thread) {
         runtime.log({
           phase: "send",
@@ -233,12 +246,13 @@ export function useCustomerServiceSendController({
             messageKind: "text",
           },
         });
-        removeCustomerServiceLocalMessage(queryClient, thread, localMessageId);
         mergeSentCustomerServiceMessage(queryClient, {
           thread,
           result,
           messageType: "text",
           body,
+          clientMsgId,
+          localMessageId,
           identity: session,
         });
         void runtime.deleteOutboxRecord(localMessageId);
@@ -539,12 +553,11 @@ export function useCustomerServiceSendController({
             result.messageId || task.localMessageId,
           );
           const localPreviewForSent = task.localPreviewUrl;
-          removeCustomerServiceLocalMessage(queryClient, task.thread, task.localMessageId);
           mergeSentCustomerServiceMessage(queryClient, {
             thread: task.thread,
-            result,
-            messageType: task.kind,
-            body: {
+          result,
+          messageType: task.kind,
+          body: {
               [task.kind]:
                 localOpenForSent || ((task.kind === "image" || task.kind === "video") && localPreviewForSent)
                   ? {
@@ -557,6 +570,8 @@ export function useCustomerServiceSendController({
                     }
                   : media,
             },
+            clientMsgId: task.clientMsgId,
+            localMessageId: task.localMessageId,
             identity: session,
           });
           logChatSendDiagnostic({
@@ -686,6 +701,7 @@ export function useCustomerServiceSendController({
         result: { messageId: localMessageId, sentAt: currentIsoTimestamp() },
         messageType: kind,
         body,
+        clientMsgId,
         identity: session,
       });
       const localMessage = {

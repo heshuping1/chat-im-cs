@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-import type { DepartmentMemberDto, FriendRequestDto } from "../../data/api-client";
+import type { DepartmentMemberDto } from "../../data/api-client";
 import { useAuthSession } from "../../data/auth/auth-store";
 import {
   contactMatchesDirectoryFilter,
@@ -21,8 +21,20 @@ import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import type { ContactFilter, ContactItem } from "../../data/types";
 import { useSetActiveImConversation } from "../../data/workspace-ui/workspace-ui-store";
+import {
+  type ContactMessageOpenTrace,
+  createContactMessageOpenTrace,
+  elapsedMsFromTrace,
+  recordContactMessageOpenDiagnostic,
+  rememberContactMessageOpenTrace,
+} from "../../data/diagnostics/contact-message-open-diagnostics";
 import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
+import {
+  buildCreatedDirectConversationItem,
+  extractCreatedDirectConversationId,
+  upsertImConversationListItem,
+} from "../../messages/models/startConversationModel";
 
 export function useContactsDirectoryController({
   activeContactId,
@@ -77,7 +89,7 @@ export function useContactsDirectoryController({
     queryFn: async () => requireApiClient(session).getDepartments(),
   });
   const conversationsQuery = useQuery({
-    queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
+    queryKey: pcQueryKeys.imConversationsForSession(session),
     enabled: Boolean(session),
     queryFn: async () => requireApiClient(session).getConversations({ limit: 100 }),
   });
@@ -109,11 +121,81 @@ export function useContactsDirectoryController({
   });
 
   const createDirectChatMutation = useMutation({
-    mutationFn: async (peerUserId: string) =>
-      requireApiClient(session).createDirectChat(peerUserId),
-    onSuccess: (chat) => setActiveConversation(chat.chatId),
-    onError: (error) =>
-      setNotice(t("contacts.notice.openConversationFailedWithError", { error: formatError(error) })),
+    mutationFn: async ({
+      contact,
+    }: {
+      contact: ContactItem;
+      trace: ContactMessageOpenTrace;
+    }) => requireApiClient(session).createDirectChat(contact.userId ?? ""),
+    onSuccess: (chat, variables) => {
+      const conversationId = extractCreatedDirectConversationId(chat);
+      recordContactOpenMessageDiagnostic("create-direct.success", {
+        contactId: variables.contact.id,
+        conversationId,
+        elapsedMs: elapsedMsFromTrace(variables.trace),
+        peerUserId: variables.contact.userId,
+      }, variables.trace);
+      if (!conversationId) {
+        setNotice(t("contacts.notice.openConversationFailedWithError", { error: "Missing conversation id" }));
+        return;
+      }
+      rememberContactMessageOpenTrace(conversationId, variables.trace);
+      const preview = buildCreatedDirectConversationItem(chat, {
+        avatarUrl: variables.contact.avatarUrl,
+        name: variables.contact.name,
+        peerLppId: variables.contact.greenBubbleNo,
+        peerUserId: variables.contact.userId,
+      });
+      if (preview) {
+        recordContactOpenMessageDiagnostic("im.conversation-cache.upsert-start", {
+          conversationId,
+          hasPreview: true,
+        }, variables.trace);
+        upsertImConversationListItem(queryClient, session, preview);
+        recordContactOpenMessageDiagnostic("im.conversation-cache.upsert-success", {
+          conversationId,
+        }, variables.trace);
+      }
+      recordContactOpenMessageDiagnostic("set-active.before", {
+        conversationId,
+        peerUserId: variables.contact.userId,
+        route: "create-direct",
+      }, variables.trace);
+      setActiveConversation(conversationId, variables.trace);
+      recordContactOpenMessageDiagnostic("set-active.after", {
+        contactId: variables.contact.id,
+        conversationId,
+        elapsedMs: elapsedMsFromTrace(variables.trace),
+        peerUserId: variables.contact.userId,
+        route: "create-direct",
+      }, variables.trace);
+      recordContactOpenMessageDiagnostic("im.conversation-cache.invalidate-background-start", {
+        conversationId,
+      }, variables.trace);
+      void queryClient
+        .invalidateQueries({
+          queryKey: pcQueryKeys.imConversationsForSession(session),
+        })
+        .then(() => {
+          recordContactOpenMessageDiagnostic("im.conversation-cache.invalidate-background-done", {
+            conversationId,
+          }, variables.trace);
+        })
+        .catch((error) => {
+          recordContactOpenMessageDiagnostic("im.conversation-cache.invalidate-background-error", {
+            conversationId,
+            error: formatError(error),
+          }, variables.trace);
+        });
+    },
+    onError: (error, variables) => {
+      recordContactOpenMessageDiagnostic("create-direct.error", {
+        contactId: variables.contact.id,
+        error: formatError(error),
+        peerUserId: variables.contact.userId,
+      }, variables.trace);
+      setNotice(t("contacts.notice.openConversationFailedWithError", { error: formatError(error) }));
+    },
   });
   const requestMutation = useMutation({
     mutationFn: async ({
@@ -249,15 +331,50 @@ export function useContactsDirectoryController({
     organizationLoading ||
     (effectiveContactFilter === "requests" && requestsQuery.isLoading);
 
-  const openMessage = (activeContact?: ContactItem) => {
+  const openMessage = (
+    activeContact?: ContactItem,
+    trace = createContactMessageOpenTrace(activeContact?.id),
+  ) => {
     if (!activeContact) return;
+    recordContactOpenMessageDiagnostic("openMessage.enter", {
+      contactId: activeContact.id,
+      conversationId: activeContact.conversationId,
+      hasConversationId: Boolean(activeContact.conversationId),
+      hasUserId: Boolean(activeContact.userId),
+      peerUserId: activeContact.userId,
+    }, trace);
     if (activeContact.conversationId) {
-      setActiveConversation(activeContact.conversationId);
+      rememberContactMessageOpenTrace(activeContact.conversationId, trace);
+      recordContactOpenMessageDiagnostic("known-conversation.route-start", {
+        contactId: activeContact.id,
+        conversationId: activeContact.conversationId,
+        elapsedMs: elapsedMsFromTrace(trace),
+        peerUserId: activeContact.userId,
+      }, trace);
+      recordContactOpenMessageDiagnostic("set-active.before", {
+        conversationId: activeContact.conversationId,
+        route: "known-conversation",
+      }, trace);
+      setActiveConversation(activeContact.conversationId, trace);
+      recordContactOpenMessageDiagnostic("set-active.after", {
+        conversationId: activeContact.conversationId,
+        route: "known-conversation",
+      }, trace);
       return;
     }
     if (activeContact.userId) {
-      createDirectChatMutation.mutate(activeContact.userId);
+      recordContactOpenMessageDiagnostic("create-direct.mutate-start", {
+        contactId: activeContact.id,
+        elapsedMs: elapsedMsFromTrace(trace),
+        peerUserId: activeContact.userId,
+      }, trace);
+      createDirectChatMutation.mutate({ contact: activeContact, trace });
+      return;
     }
+    recordContactOpenMessageDiagnostic("openMessage.missing-target", {
+      contactId: activeContact.id,
+      contactKind: activeContact.kind,
+    }, trace);
   };
 
   const handleRequest = (requestId: string, action: "accept" | "reject") => {
@@ -316,7 +433,15 @@ async function refreshContactRelations(
       queryKey: pcQueryKeys.accountBlocklist(session?.apiBaseUrl, session?.tenantToken),
     }),
     queryClient.invalidateQueries({
-      queryKey: pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken),
+      queryKey: pcQueryKeys.imConversationsForSession(session),
     }),
   ]);
+}
+
+function recordContactOpenMessageDiagnostic(
+  phase: string,
+  classification: Record<string, unknown>,
+  trace?: ContactMessageOpenTrace,
+) {
+  recordContactMessageOpenDiagnostic(phase, classification, trace);
 }

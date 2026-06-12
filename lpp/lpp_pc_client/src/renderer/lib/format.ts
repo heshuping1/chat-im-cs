@@ -4,6 +4,7 @@ import {
   formatUserChatMessageTime,
   formatUserChatTime,
   formatUserClockTime,
+  formatUserFullDateTime,
   formatUserMonthDayTime,
   formatUserShortDate,
   type UserTimezoneFormattingOptions,
@@ -43,6 +44,13 @@ export function formatMonthDayTime(
   options: UserTimezoneFormattingOptions = currentTimezoneOptions(),
 ) {
   return formatUserMonthDayTime(value, options);
+}
+
+export function formatFullDateTime(
+  value?: string | null,
+  options: UserTimezoneFormattingOptions = currentTimezoneOptions(),
+) {
+  return formatUserFullDateTime(value, options);
 }
 
 export function formatChatTime(

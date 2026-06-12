@@ -2,10 +2,9 @@ import type { MouseEvent } from "react";
 
 import { ChatMessageBubble } from "../../components/ChatMessageBubble";
 import type { MessageItemDto } from "../../data/api-client";
-import { customerServiceMessageReadReceiptState } from "../../data/customer-service/cs-message-read-status";
 import { createChatMessageViewModel } from "../../data/message/message-view-model";
 import { useI18n } from "../../i18n/useI18n";
-import { formatChatMessageTime } from "../../lib/format";
+import { formatFullDateTime } from "../../lib/format";
 
 export function ServiceMessageBubble({
   assetBaseUrl,
@@ -43,11 +42,7 @@ export function ServiceMessageBubble({
 }) {
   const { t } = useI18n();
   const fallbackSender = senderFallback || t("customerService.visitor");
-  const customerReadReceiptText = customerServiceReadReceiptText(
-    customerServiceMessageReadReceiptState(message, mine, threadType),
-    message.readAt,
-    t,
-  );
+  const timeText = formatFullDateTime(message.sentAt);
   const messageViewModel = createChatMessageViewModel({
     conversationFallbackName,
     conversationType: threadType,
@@ -56,8 +51,7 @@ export function ServiceMessageBubble({
     mineAvatarUrl,
     senderAvatarUrl,
     senderFallback: fallbackSender,
-    statusText: customerReadReceiptText,
-    timeText: formatChatMessageTime(message.sentAt),
+    timeText,
     translationText,
   });
 
@@ -75,33 +69,9 @@ export function ServiceMessageBubble({
       onAvatarClick={onAvatarClick}
       onUploadAction={onUploadAction}
       senderFallback={fallbackSender}
-      statusText={customerReadReceiptText}
-      timeText={formatChatMessageTime(message.sentAt)}
+      timeText={timeText}
       translationText={translationText}
       viewModel={messageViewModel}
     />
   );
-}
-
-function customerServiceReadReceiptText(
-  state: ReturnType<typeof customerServiceMessageReadReceiptState>,
-  readAt?: string | null,
-  t?: (key: string, params?: Record<string, string | number>) => string,
-) {
-  if (!state) return undefined;
-  if (state === "unread") {
-    return t?.("customerService.messageStage.customerUnread") ?? "Customer unread";
-  }
-  if (state === "unknown") {
-    return (
-      t?.("customerService.messageStage.customerReadTimeUnknown") ??
-      "Customer read time unknown"
-    );
-  }
-  const timeText = formatChatMessageTime(readAt);
-  return timeText
-    ? t?.("customerService.messageStage.customerReadAt", { time: timeText }) ??
-        `Customer read ${timeText}`
-    : t?.("customerService.messageStage.customerReadTimeUnknown") ??
-        "Customer read time unknown";
 }

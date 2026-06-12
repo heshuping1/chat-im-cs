@@ -124,7 +124,17 @@ def mark_session_closed(
     terminal_ref["closed"] = True
     terminal_ref["status"] = normalized_status
     suffix = f"（{reason}）" if reason else ""
-    print(f'\n[会话已结束{suffix}，后续不会再发送消息或结束请求。状态：{normalized_status}]')
+    print(f'\n[会话已结束{suffix}，状态：{normalized_status}。输入 /continue 可继续对话。]')
+    print("> ", end="", flush=True)
+
+
+def mark_session_open(
+    terminal_ref: dict[str, Any],
+    status: str | None,
+) -> None:
+    terminal_ref["closed"] = False
+    terminal_ref["status"] = extract_session_status({"status": status}) or "active"
+    print(f'\n[会话已继续，状态：{terminal_ref["status"]}]')
     print("> ", end="", flush=True)
 
 
@@ -168,6 +178,22 @@ def refresh_visitor_token(args: argparse.Namespace, session_id: str, token: str)
     if not new_token:
         raise ApiFailure("refresh visitor token response missing visitorToken", payload)
     return str(new_token)
+
+
+def reopen_session(
+    args: argparse.Namespace,
+    session_id: str,
+    token: str,
+) -> dict[str, Any]:
+    payload = request_json(
+        "POST",
+        f"{args.base_chat}/api/widget/v1/sessions/{session_id}/reopen",
+        token=token,
+    )
+    data = require_ok(payload, "reopen widget session")
+    if not data.get("visitorToken"):
+        raise ApiFailure("reopen widget session response missing visitorToken", payload)
+    return data
 
 
 def is_unauthorized(exc: Exception) -> bool:
@@ -254,12 +280,30 @@ def poll_loop(
         stop.wait(args.poll_seconds)
 
 
+def start_poller(
+    args: argparse.Namespace,
+    session_id: str,
+    token_ref: dict[str, str],
+    terminal_ref: dict[str, Any],
+    errors: "queue.Queue[Exception]",
+) -> tuple[threading.Event, threading.Thread]:
+    stop = threading.Event()
+    poller = threading.Thread(
+        target=poll_loop,
+        args=(args, session_id, token_ref, terminal_ref, stop, errors),
+        daemon=True,
+    )
+    poller.start()
+    return stop, poller
+
+
 def print_help() -> None:
     print(
         "\n命令：\n"
         "  直接输入文字并回车：发送给客服\n"
         "  /status：查看会话状态\n"
         "  /refresh：立即刷新消息\n"
+        "  /continue 或 /reopen：会话超时关闭后继续对话\n"
         "  /quit：退出临时聊天窗口\n"
     )
 
@@ -286,7 +330,6 @@ def main() -> int:
     print("请在 App 打开：工作台 > 在线客服，然后进入这个临时会话。")
     print_help()
 
-    stop = threading.Event()
     terminal_ref: dict[str, Any] = {
         "closed": is_terminal_session_status(extract_session_status(session)),
         "status": extract_session_status(session),
@@ -294,12 +337,7 @@ def main() -> int:
     if terminal_ref["closed"]:
         print(f'会话已结束，状态：{terminal_ref["status"] or "closed"}')
     errors: "queue.Queue[Exception]" = queue.Queue()
-    poller = threading.Thread(
-        target=poll_loop,
-        args=(args, session_id, token_ref, terminal_ref, stop, errors),
-        daemon=True,
-    )
-    poller.start()
+    stop, poller = start_poller(args, session_id, token_ref, terminal_ref, errors)
 
     try:
         while True:
@@ -316,9 +354,31 @@ def main() -> int:
             if text == "/help":
                 print_help()
                 continue
+            if text in {"/continue", "/reopen", "/resume"}:
+                if not terminal_ref.get("closed"):
+                    print("会话仍在进行中，无需继续对话。")
+                    continue
+                reopened = reopen_session(args, session_id, token_ref["token"])
+                next_session_id = str(reopened.get("sessionId") or session_id)
+                token_ref["token"] = str(reopened["visitorToken"])
+                mark_session_open(terminal_ref, extract_session_status(reopened))
+                stop.set()
+                poller.join(timeout=1)
+                session_id = next_session_id
+                stop, poller = start_poller(
+                    args,
+                    session_id,
+                    token_ref,
+                    terminal_ref,
+                    errors,
+                )
+                continue
             if text == "/status":
                 if terminal_ref.get("closed"):
-                    print(f'会话已结束，状态：{terminal_ref.get("status") or "closed"}')
+                    print(
+                        f'会话已结束，状态：{terminal_ref.get("status") or "closed"}。'
+                        "输入 /continue 可继续对话。"
+                    )
                     continue
                 try:
                     status = get_session(args, session_id, token_ref["token"])
@@ -346,7 +406,10 @@ def main() -> int:
                 continue
             if text == "/refresh":
                 if terminal_ref.get("closed"):
-                    print(f'会话已结束，状态：{terminal_ref.get("status") or "closed"}')
+                    print(
+                        f'会话已结束，状态：{terminal_ref.get("status") or "closed"}。'
+                        "输入 /continue 可继续对话。"
+                    )
                     continue
                 try:
                     messages = get_messages(args, session_id, token_ref["token"])
@@ -363,7 +426,10 @@ def main() -> int:
                     print_message(message)
                 continue
             if terminal_ref.get("closed"):
-                print(f'会话已结束，消息未发送。状态：{terminal_ref.get("status") or "closed"}')
+                print(
+                    f'会话已结束，消息未发送。状态：{terminal_ref.get("status") or "closed"}。'
+                    "输入 /continue 可继续对话。"
+                )
                 continue
             try:
                 send_message(args, session_id, token_ref["token"], text)

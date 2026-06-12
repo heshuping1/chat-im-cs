@@ -18,9 +18,16 @@ describe("IM conversation query policy", () => {
     const sidebarSource = readSource("src/renderer/components/Sidebar.tsx");
     const messageCenterSource = readSource("src/renderer/components/MessageCenter.tsx");
     const hookSource = readSource("src/renderer/messages/hooks/useImConversationsQuery.ts");
+    const contactsSource = readSource(
+      "src/renderer/contacts/hooks/useContactsDirectoryController.ts",
+    );
 
     expect(sidebarSource).toContain("useImConversationsQuery(authSession)");
     expect(messageCenterSource).toContain("useImConversationsQuery(session)");
+    expect(contactsSource).toContain("pcQueryKeys.imConversationsForSession(session)");
+    expect(contactsSource).not.toContain(
+      "pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken)",
+    );
     expect(hookSource).toContain("realtimeSyncPolicy.im.conversationListFallbackPollMs");
     expect(hookSource).toContain("pcQueryKeys.imConversationsForSession(session)");
   });

@@ -249,6 +249,8 @@ describe("architecture boundaries", () => {
           "src/renderer/customer-service/hooks/useCustomerServiceSendController.ts",
           "src/renderer/customer-service/hooks/useCustomerServiceThreadLifecycle.ts",
           "src/renderer/customer-service/hooks/useCustomerServiceWorkspaceController.ts",
+          "src/renderer/customer-service/models/customerServiceSessionNotesModel.ts",
+          "src/renderer/customer-service/models/customerServiceThreadClaimModel.ts",
           "src/renderer/data/gateway/gateway-cs-side-effects.ts",
           "src/renderer/vite-env.d.ts",
         ]),
@@ -261,6 +263,7 @@ describe("architecture boundaries", () => {
           "src/renderer/messages/hooks/useMessageListData.ts",
           "src/renderer/messages/hooks/useMessageMediaSendController.ts",
           "src/renderer/messages/hooks/useMessageTextSendController.ts",
+          "src/renderer/messages/models/groupReadReceiptCacheModel.ts",
         ]),
       ],
     ]);

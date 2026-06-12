@@ -40,6 +40,70 @@ describe("customer service message contract", () => {
     });
   });
 
+  it("keeps server preview as the message preview", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-preview-1",
+        conversationId: "cs-conv-preview",
+        conversationSeq: 6,
+        messageType: "text",
+        preview: "server says hello",
+        body: {},
+      },
+      {
+        threadId: "thread-preview",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.data?.preview).toBe("server says hello");
+  });
+
+  it("normalizes top-level text content into a renderable text body", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-content-1",
+        conversationId: "cs-conv-content",
+        conversationSeq: 8,
+        messageType: "text",
+        content: "top level content",
+      },
+      {
+        threadId: "thread-content",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(result.status).toBe("ok");
+    expect(customerServiceMessageEntityToDto(result.data!)).toMatchObject({
+      messageId: "cs-content-1",
+      messageType: "text",
+      body: { text: "top level content", messageType: "text" },
+      preview: "top level content",
+    });
+  });
+
+  it("does not fabricate a generic preview when server text is absent", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-empty-preview",
+        conversationId: "cs-conv-empty-preview",
+        conversationSeq: 7,
+        messageType: "text",
+        body: {},
+      },
+      {
+        threadId: "thread-empty-preview",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.data?.preview).toBe("");
+    expect(customerServiceMessageEntityToDto(result.data!).preview).toBe("");
+  });
+
   it("keeps messages without id or sequence as degraded for compatibility", () => {
     const result = normalizeCustomerServiceMessageDto(
       {

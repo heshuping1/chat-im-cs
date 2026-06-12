@@ -37,7 +37,7 @@ import {
   groupReadReceiptMemberProfileTarget,
   readableGroupReadReceiptMemberCount,
 } from "../models/groupManagementModel";
-import { syncGroupReadReceiptSnapshotToCache } from "../models/messageCacheMutationModel";
+import { applyGroupReadReceiptSnapshot as syncGroupReadReceiptSnapshotToCache } from "../models/groupReadReceiptCacheModel";
 
 export interface MessageListPanelProps {
   accountId?: string;

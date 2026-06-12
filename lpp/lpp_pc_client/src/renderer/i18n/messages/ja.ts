@@ -421,6 +421,8 @@ export const ja: MessageDictionary = {
       expandUnreadTitle: '未読会話を展開、現在 {count} 件',
       metrics: {
         capacity: 'Capacity',
+        assigned: 'Assigned',
+        maxAssignable: 'Max assignable',
         queued: 'Queued',
         active: 'Active',
         unread: 'Unread',
@@ -513,6 +515,7 @@ export const ja: MessageDictionary = {
         claim: 'この会話はまだキュー内です。先に受付してください。',
         managementReadonly: '閲覧モードです。返信はできません。会話はまだ進行中で、担当者へ転送できます。',
         readonly: 'この会話は終了しており、返信できません',
+        transferred: 'この会話は転送済みのため、返信できません',
         takeover: 'この会話はまだ AI が対応中です。先に有人対応へ切り替えてください。',
       },
       currentCustomer: '現在の顧客',

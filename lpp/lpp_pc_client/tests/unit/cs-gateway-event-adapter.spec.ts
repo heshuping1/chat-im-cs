@@ -65,6 +65,51 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.message.messageId).toBe("m2");
   });
 
+  it("does not adapt customer service read receipts as new messages", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "msg.read",
+      receivedAt: 21,
+      args: [
+        {
+          conversationId: "conversation-read-1",
+          conversationType: "temp_session",
+          sourceType: "widget",
+          readSeq: 5,
+          senderUserId: "visitor-1",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("ignored");
+    if (event.kind !== "ignored") return;
+    expect(event.reason).toBe("non_cs_event");
+  });
+
+  it("keeps top-level text content from gateway payloads", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "customer_service.message.new",
+      receivedAt: 14,
+      args: [
+        {
+          threadId: "thread-content",
+          threadType: "temp_session",
+          messageId: "m-content",
+          messageType: "text",
+          content: "gateway top-level text",
+          senderUserId: "customer-1",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.message.received");
+    if (event.kind !== "cs.message.received") return;
+    expect(event.message.body).toMatchObject({
+      text: "gateway top-level text",
+      messageType: "text",
+    });
+    expect(event.message.preview).toBe("gateway top-level text");
+  });
+
   it("adapts queue and status events as thread changes", () => {
     const queueEvent = adaptCustomerServiceGatewayEvent({
       eventName: "customer_service.queue.created",
@@ -107,6 +152,70 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.threadStatus).toBe("closed_by_visitor");
   });
 
+  it("adapts transferred events as thread changes instead of messages", () => {
+    const tempSessionEvent = adaptCustomerServiceGatewayEvent({
+      eventName: "temp_session.transferred",
+      receivedAt: 9,
+      args: [
+        {
+          assignedStaffUserId: "staff-2",
+          sessionId: "temp-session-transferred-1",
+          status: "transferred_out",
+          transferredAt: "2026-06-12T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(tempSessionEvent.kind).toBe("cs.thread.changed");
+    if (tempSessionEvent.kind !== "cs.thread.changed") return;
+    expect(tempSessionEvent.changeKind).toBe("thread_transferred");
+    expect(tempSessionEvent.threadId).toBe("temp-session-transferred-1");
+    expect(tempSessionEvent.threadStatus).toBe("transferred_out");
+
+    const directEvent = adaptCustomerServiceGatewayEvent({
+      eventName: "customer_service.thread.transferred",
+      receivedAt: 10,
+      args: [
+        {
+          assignedStaffUserId: "staff-2",
+          threadId: "direct-transferred-1",
+          threadType: "im_direct",
+          status: "assigned_away",
+        },
+      ],
+    });
+
+    expect(directEvent.kind).toBe("cs.thread.changed");
+    if (directEvent.kind !== "cs.thread.changed") return;
+    expect(directEvent.changeKind).toBe("thread_transferred");
+    expect(directEvent.threadId).toBe("direct-transferred-1");
+    expect(directEvent.threadStatus).toBe("assigned_away");
+    expect(directEvent.threadType).toBe("im_direct");
+  });
+
+  it("adapts temp-session reopened events for continue-chat state recovery", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "temp_session.reopened",
+      receivedAt: 8,
+      args: [
+        {
+          conversationId: "conversation-reopened-1",
+          reopenedAt: "2026-06-12T10:00:00.000Z",
+          sessionId: "temp-session-reopened-1",
+          status: "reopened",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.thread.changed");
+    if (event.kind !== "cs.thread.changed") return;
+    expect(event.changeKind).toBe("thread_reopened");
+    expect(event.conversationId).toBe("conversation-reopened-1");
+    expect(event.threadId).toBe("temp-session-reopened-1");
+    expect(event.threadStatus).toBe("reopened");
+    expect(event.threadType).toBe("temp_session");
+  });
+
   it("adapts temp-session typing events as customer preview state", () => {
     const event = adaptCustomerServiceGatewayEvent({
       eventName: "temp_session.typing",
@@ -126,8 +235,72 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.threadId).toBe("temp-session-typing-1");
     expect(event.threadType).toBe("temp_session");
     expect(event.isTyping).toBe(true);
+    expect(event.hasPreviewText).toBe(true);
     expect(event.previewText).toBe("I need help with my order");
     expect(event.senderRole).toBe("visitor");
+  });
+
+  it("keeps temp-session typing keyed by session id when conversation id is also present", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "temp_session.typing",
+      receivedAt: 12,
+      args: [
+        {
+          sessionId: "temp-session-typing-1",
+          conversationId: "conversation-typing-1",
+          isTyping: true,
+          preview: "draft through widget",
+          senderType: "visitor",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.typing.preview");
+    if (event.kind !== "cs.typing.preview") return;
+    expect(event.threadId).toBe("temp-session-typing-1");
+    expect(event.conversationId).toBe("conversation-typing-1");
+    expect(event.aliasThreadIds).toEqual(["conversation-typing-1"]);
+    expect(event.hasPreviewText).toBe(true);
+    expect(event.previewText).toBe("draft through widget");
+  });
+
+  it("keeps missing typing preview text distinguishable from explicit empty input", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "temp_session.typing",
+      receivedAt: 12,
+      args: [
+        {
+          sessionId: "temp-session-typing-1",
+          isTyping: true,
+          senderRole: "visitor",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.typing.preview");
+    if (event.kind !== "cs.typing.preview") return;
+    expect(event.hasPreviewText).toBe(false);
+    expect(event.previewText).toBe("");
+  });
+
+  it("marks explicit empty typing preview text as present", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "temp_session.typing",
+      receivedAt: 12,
+      args: [
+        {
+          sessionId: "temp-session-typing-1",
+          isTyping: true,
+          content: "",
+          senderRole: "visitor",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.typing.preview");
+    if (event.kind !== "cs.typing.preview") return;
+    expect(event.hasPreviewText).toBe(true);
+    expect(event.previewText).toBe("");
   });
 
   it("adapts direct-customer msg.typing events as online-service direct preview state", () => {
@@ -149,6 +322,7 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     if (event.kind !== "cs.typing.preview") return;
     expect(event.threadId).toBe("thread-direct-typing");
     expect(event.threadType).toBe("im_direct");
+    expect(event.hasPreviewText).toBe(true);
     expect(event.previewText).toBe("direct draft");
   });
 

@@ -141,7 +141,7 @@ function applyStaffServiceHistoryOverlay(
   return {
     ...item,
     lastMessageAt: overlayed.lastMessageAt ?? item.lastMessageAt,
-    lastMessagePreview: overlayed.lastMessagePreview ?? item.lastMessagePreview,
+    lastMessagePreview: item.lastMessagePreview,
     unreadCount: hasServerUnreadCount ? item.unreadCount : overlayed.unreadCount,
   };
 }

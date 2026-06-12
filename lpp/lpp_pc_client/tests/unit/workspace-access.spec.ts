@@ -304,7 +304,8 @@ describe("workspace access integration closure", () => {
     expect(sidebarSource).toContain("onMutate");
     expect(onlineServicePageSource).toContain("confirmedQueueAcceptEnabled");
     expect(onlineServicePageSource).toContain("canControlCustomerServiceReception");
-    expect(onlineServicePageSource).toContain("{canControlReception && (");
+    expect(onlineServicePageSource).toContain("const showServiceCommandBar = canControlReception;");
+    expect(onlineServicePageSource).toContain("{showServiceCommandBar && (");
     expect(onlineServicePageSource).toContain("disabled={!client}");
     expect(onlineServicePageSource).toContain("onMutate");
     expect(sidebarSource).toContain('t("sidebar.service.syncFailed"');
@@ -385,7 +386,12 @@ describe("workspace access integration closure", () => {
     expect(porcelainShellSource).toContain("word-break: keep-all");
     expect(porcelainShellSource).toContain(".sidebar-status-error");
     expect(porcelainShellSource).toContain(".sidebar-space-status-row");
+    expect(porcelainShellSource).toContain(".sidebar-space-logo-wrap");
     expect(porcelainShellSource).toContain(".sidebar-space-logo");
+    expect(porcelainShellSource).toContain(".sidebar-space-unread-badge");
+    expect(porcelainShellSource).toContain("position: absolute");
+    expect(porcelainShellSource).toContain("top: -7px");
+    expect(porcelainShellSource).toContain("right: -8px");
     expect(porcelainShellSource).toContain("height: 42px");
     expect(porcelainShellSource).toContain("height: var(--sidebar-footer-account-height, 42px) !important");
     expect(porcelainShellSource).toContain("border: 1px solid transparent !important");

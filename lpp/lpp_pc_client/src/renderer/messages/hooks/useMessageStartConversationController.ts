@@ -13,6 +13,12 @@ import {
   normalizeCreateGroupChatPayload,
   type CreateGroupChatPayload,
 } from "../models/groupCreateModel";
+import {
+  buildCreatedDirectConversationItem,
+  buildCreatedGroupConversationItem,
+  extractCreatedDirectConversationId,
+  upsertImConversationListItem,
+} from "../models/startConversationModel";
 
 type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
 
@@ -34,15 +40,19 @@ export function useMessageStartConversationController({
   const createDirectChatMutation = useMutation({
     mutationFn: async (peerUserId: string) =>
       requireApiClient(session).createDirectChat(peerUserId),
-    onSuccess: async (chat) => {
-      const conversationId = createdConversationId(chat);
+    onSuccess: (chat, peerUserId) => {
+      const conversationId = extractCreatedDirectConversationId(chat);
       if (!conversationId) {
         setNotice(t("messages.startConversation.directMissingId"));
         return;
       }
       setComposerDialog(null);
-      await queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+      const preview = buildCreatedDirectConversationItem(chat, { peerUserId });
+      if (preview) {
+        upsertImConversationListItem(queryClient, session, preview);
+      }
       setActiveConversation(conversationId);
+      void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
     },
     onError: (error) =>
       setNotice(t("messages.startConversation.directFailed", { error: formatError(error) })),
@@ -57,15 +67,19 @@ export function useMessageStartConversationController({
         normalizeCreateGroupChatPayload(payload),
       );
     },
-    onSuccess: async (group) => {
+    onSuccess: (group) => {
       const conversationId = extractCreatedGroupConversationId(group);
       if (!conversationId) {
         setNotice(t("messages.startConversation.groupMissingId"));
         return;
       }
       setComposerDialog(null);
-      await queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
+      const preview = buildCreatedGroupConversationItem(group);
+      if (preview) {
+        upsertImConversationListItem(queryClient, session, preview);
+      }
       setActiveConversation(conversationId);
+      void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
     },
     onError: (error) =>
       setNotice(t("messages.startConversation.groupFailed", { error: formatGroupCreateError(error) })),
@@ -86,18 +100,4 @@ export function useMessageStartConversationController({
     createInviteQrMutation,
     groupCreateAccess,
   };
-}
-
-function createdConversationId(result: unknown) {
-  if (!result || typeof result !== "object") return "";
-  const record = result as Record<string, unknown>;
-  return stringField(record, "conversationId", "chatId", "groupId", "id");
-}
-
-function stringField(record: Record<string, unknown>, ...keys: string[]) {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return undefined;
 }

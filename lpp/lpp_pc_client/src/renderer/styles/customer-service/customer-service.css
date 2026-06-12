@@ -290,6 +290,8 @@
 
 .h-flagship-grid .h-chat-head {
   min-height: 72px !important;
+  min-width: 0 !important;
+  overflow: hidden;
   padding: 0 20px !important;
   border-bottom: 1px solid rgba(216, 226, 237, 0.8) !important;
   background: #fff !important;
@@ -299,6 +301,12 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.h-flagship-grid .h-customer-title .h-customer-avatar-button {
+  flex: 0 0 auto;
 }
 
 .h-flagship-grid .h-customer-title h2 {
@@ -347,7 +355,7 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   background:
     linear-gradient(180deg, var(--chat-stage-background-wash, rgba(255, 255, 255, 0.38)), rgba(255, 255, 255, 0) 170px),
@@ -419,39 +427,44 @@
   animation: csLookupMessageHit 1.6s ease;
 }
 
-.cs-typing-preview {
+.cs-composer-typing-preview {
   display: grid;
-  width: min(520px, 100%);
-  align-self: flex-start;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 8px;
-  background: rgba(236, 253, 245, 0.94);
-  color: #065f46;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-}
-
-.cs-typing-preview-dock {
-  display: flex;
   min-width: 0;
-  justify-content: flex-start;
-  padding: 0 24px 14px;
-  background: transparent;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 7px 18px;
+  border-top: 1px solid rgba(16, 185, 129, 0.14);
+  background: rgba(240, 253, 250, 0.72);
+  color: #065f46;
 }
 
-.cs-typing-preview span {
+.cs-composer-typing-preview-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 1px;
+  color: #047857;
   font-size: 12px;
   font-weight: 850;
+  white-space: nowrap;
 }
 
-.cs-typing-preview p {
+.cs-composer-typing-preview-label i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+
+.cs-composer-typing-preview p {
   display: -webkit-box;
   overflow: hidden;
   margin: 0;
-  color: #1f2937;
+  color: #334155;
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.4;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   -webkit-box-orient: vertical;
@@ -844,6 +857,8 @@
 
 .h-flagship-grid .h-chat-head {
   min-height: 64px !important;
+  min-width: 0 !important;
+  overflow: hidden;
   padding: 0 16px !important;
 }
 
@@ -874,6 +889,7 @@
 }
 
 .h-flagship-grid .h-chat-head-actions {
+  flex: 0 0 auto;
   gap: 6px;
 }
 
@@ -909,8 +925,8 @@
   padding: var(--chat-stage-padding) !important;
 }
 
-.h-flagship-grid .cs-typing-preview-dock {
-  padding: 0 18px 12px !important;
+.h-flagship-grid .cs-composer-typing-preview {
+  padding: 7px 18px !important;
 }
 
 .h-flagship-grid .h-service-message > div {
@@ -2716,17 +2732,18 @@
 .h-flagship-grid .h-customer-title > div,
 .e-chat-title > div {
   min-width: 0;
+  overflow: hidden;
 }
 
 .h-flagship-grid .h-customer-title .chat-header-meta-chips {
-  max-width: min(430px, 46vw);
-  overflow: visible;
-  flex-wrap: wrap;
-  white-space: normal;
+  max-width: 100%;
+  overflow: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .h-flagship-grid .h-customer-title .chat-header-meta-chips > span {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
 }
 
 .customer-profile-hero {
@@ -3750,6 +3767,14 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
   box-shadow: 0 16px 42px rgba(31, 45, 61, 0.08);
 }
 
+.h-flagship-shell.service-command-hidden {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+.h-flagship-shell.service-command-hidden .h-flagship-grid {
+  grid-row: 1 !important;
+}
+
 .h-flagship-topbar.service-command-bar {
   grid-template-columns: minmax(214px, 250px) minmax(340px, 1fr) minmax(220px, auto) !important;
   min-width: 0;
@@ -3805,7 +3830,7 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
 }
 
 .h-metric-strip.service-command-metrics {
-  grid-template-columns: repeat(5, minmax(58px, 1fr)) !important;
+  grid-template-columns: repeat(6, minmax(52px, 1fr)) !important;
   gap: 6px !important;
   padding: 0 10px !important;
 }
@@ -3932,11 +3957,14 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
 
 .h-flagship-grid .h-chat-head {
   min-height: 70px;
+  min-width: 0;
+  overflow: hidden;
   padding: 10px 16px;
 }
 
 .h-flagship-grid .h-chat-head-actions {
   display: flex;
+  flex: 0 0 auto;
   min-width: max-content;
   align-items: center;
   gap: 8px;
@@ -3977,18 +4005,26 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
 
 .h-flagship-grid .h-customer-title {
   gap: 10px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .h-flagship-grid .h-customer-title h2 {
   max-width: min(420px, 42vw);
+  overflow: hidden;
   font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .h-flagship-grid .h-customer-title .chat-header-meta-chips {
   display: flex;
-  max-width: min(620px, 58vw);
+  max-width: 100%;
   gap: 5px;
   margin-top: 6px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .h-flagship-grid .h-customer-title .chat-header-meta-chips > span,
@@ -4003,9 +4039,11 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
   border-radius: 999px;
   background: #ffffff;
   color: #52647a;
+  flex: 0 0 auto;
   font-size: 11px;
   font-weight: 850;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .h-flagship-grid .h-customer-title .chat-header-meta-chips > button {
@@ -4464,4 +4502,64 @@ body.is-pane-resizing .h-flagship-grid .service-profile-resizer {
 .service-reception-control-header .service-reception-pill,
 .service-reception-control-compact .service-reception-pill {
   max-width: min(240px, 28vw) !important;
+}
+
+/* Keep the online-service thread pool dense enough to show active sessions above the fold. */
+.h-flagship-grid .h-service-list {
+  gap: 8px !important;
+  padding: 12px 12px 12px !important;
+}
+
+.h-flagship-grid .h-service-head {
+  min-height: 0 !important;
+  padding: 0 2px 1px !important;
+}
+
+.h-flagship-grid .h-service-head h1 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  line-height: 1.15 !important;
+}
+
+.h-flagship-grid .h-service-head p {
+  max-width: none !important;
+  margin-top: 2px !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+}
+
+.h-flagship-grid .h-service-list > .e-search {
+  flex: 0 0 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  margin-top: 0 !important;
+}
+
+.h-flagship-grid .h-service-list > .e-search input {
+  line-height: 36px !important;
+}
+
+.h-flagship-grid .h-switch-tabs {
+  margin-top: 0 !important;
+}
+
+.h-flagship-grid .h-switch-tabs button {
+  height: 28px !important;
+  min-height: 28px !important;
+}
+
+.h-flagship-grid .e-filter-row.compact {
+  min-height: 34px !important;
+  margin-top: 0 !important;
+  border-radius: 12px !important;
+}
+
+.h-flagship-grid .e-filter-row.compact button {
+  min-height: 28px !important;
+}
+
+.h-flagship-grid .h-thread-list {
+  gap: 6px !important;
+  padding-top: 2px !important;
 }
