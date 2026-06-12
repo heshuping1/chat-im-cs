@@ -315,6 +315,9 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceConversationStatsReport).toContain("cs-stats-range-inline");
     expect(customerServiceConversationStatsReport).toContain("statsRange");
     expect(customerServiceConversationStatsReport).toContain("getTempSessionStats(statsParams)");
+    expect(customerServiceConversationStatsReport).toContain('{ label: "全部", value: "all" }');
+    expect(customerServiceConversationStatsReport).toContain('if (input.preset === "all") return {};');
+    expect(customerServiceConversationStatsReport).toContain('preset === "all" || Boolean(input.from && input.to)');
     expect(customerServiceConversationStatsReport).toContain("自定义");
     expect(customerServiceConversationStatsReport).toContain('dataCenterView !== "self-service"');
     expect(customerServiceConversationStatsReport).toContain("当前账号无权查看团队统计数据");
@@ -511,14 +514,14 @@ describe("customer-service history and lookup surfaces", () => {
       "staffUserId",
       "locale",
       "sourcePlatform",
-      "sourceChannel",
       "country",
       "region",
       "minRiskLevel",
     ].forEach((field) => {
       expect(customerServiceClient).toContain(`"${field}"`);
     });
-    expect(customerServiceHistoryReport).toContain("sourceChannel");
+    expect(customerServiceHistoryReport).not.toContain("createSourceChannelOptionsFromThreads");
+    expect(customerServiceHistoryReport).not.toContain("filters.sourceChannel");
     expect(customerServiceHistoryReport).toContain('"sourcePlatform"');
     expect(customerServiceHistoryReport).toContain("sourcePlatformLabel(firstHistoryText(raw.sourcePlatform, thread.platform, thread.provider, thread.source))");
     expect(customerServiceHistoryReport).toContain("slaRisk");

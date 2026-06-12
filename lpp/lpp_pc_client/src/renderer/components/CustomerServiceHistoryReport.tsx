@@ -59,7 +59,6 @@ type HistoryFilters = {
   region: string;
   senderUserId: string;
   slaRisk: string;
-  sourceChannel: string;
   sourcePlatform: string;
   staffUserId: string;
   threadType: "all" | CustomerServiceThreadType;
@@ -82,7 +81,6 @@ const defaultFilters: HistoryFilters = {
   region: "",
   senderUserId: "",
   slaRisk: "",
-  sourceChannel: "",
   sourcePlatform: "",
   staffUserId: "",
   threadType: "all",
@@ -221,10 +219,6 @@ export function CustomerServiceHistoryReport({
     () => createHistorySummary(historySummary ?? undefined, allLoadedThreads),
     [allLoadedThreads, historySummary],
   );
-  const sourceChannelOptions = useMemo(
-    () => createSourceChannelOptionsFromThreads(allLoadedThreads),
-    [allLoadedThreads],
-  );
   const detailMessages = useMemo(
     () => readDetailMessages(detailQuery.data).filter(isVisibleHistoryMessage),
     [detailQuery.data],
@@ -308,13 +302,6 @@ export function CustomerServiceHistoryReport({
     });
   };
 
-  const setSourceChannel = (value: string) => {
-    setHistoryPageIndex(0);
-    setFilters((current) => ({
-      ...current,
-      sourceChannel: value === "all" ? "" : value,
-    }));
-  };
   const selectStaffFilter = (staffUserId: string) => {
     setHistoryPageIndex(0);
     setStaffPickerOpen(false);
@@ -444,15 +431,6 @@ export function CustomerServiceHistoryReport({
                   threadType: threadType as HistoryFilters["threadType"],
                 }))
               }
-            />
-            <HistoryFilterOptionRow
-              label="来源渠道"
-              value={filters.sourceChannel || "all"}
-              options={[
-                ["all", "全部"],
-                ...sourceChannelOptions,
-              ]}
-              onChange={setSourceChannel}
             />
           </div>
           <div className="cs-history-filter-line">
@@ -1698,7 +1676,6 @@ function historyQueryParams(filters: HistoryFilters, limit: number) {
     ...(filters.staffUserId ? { staffUserId: filters.staffUserId } : {}),
     ...(filters.locale ? { locale: filters.locale } : {}),
     ...(filters.sourcePlatform ? { sourcePlatform: filters.sourcePlatform } : {}),
-    ...(filters.sourceChannel ? { sourceChannel: filters.sourceChannel } : {}),
     ...(filters.country ? { country: filters.country } : {}),
     ...(filters.region ? { region: filters.region } : {}),
     ...(rating ? { minRating: rating, maxRating: rating } : {}),
@@ -1720,31 +1697,6 @@ function historyExportFilters(filters: HistoryFilters) {
     ...(filters.from ? { from: filters.from } : {}),
     ...(filters.to ? { to: filters.to } : {}),
   };
-}
-
-function createSourceChannelOptionsFromThreads(
-  threads: CustomerServiceThread[],
-): Array<[string, string]> {
-  const options = new Map<string, string>();
-  threads.forEach((thread) => {
-    const value =
-      thread.sourceChannel ||
-      thread.channel ||
-      thread.source ||
-      thread.provider ||
-      "";
-    if (!value || isThreadTypeSourceValue(value)) return;
-    const label = sourceChannelFilterLabel(value);
-    if (!options.has(value)) options.set(value, label);
-  });
-  return Array.from(options.entries())
-    .map(([value, label]) => [value, label] as [string, string])
-    .sort((left, right) => left[1].localeCompare(right[1]));
-}
-
-function isThreadTypeSourceValue(value: string) {
-  const normalized = value.trim().toLowerCase().replace(/[-\s]+/g, "_");
-  return normalized === "im_direct" || normalized === "direct_customer" || normalized === "temp_session";
 }
 
 function sourceChannelFilterLabel(value: string) {

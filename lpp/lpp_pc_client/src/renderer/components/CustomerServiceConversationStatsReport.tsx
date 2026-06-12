@@ -21,6 +21,7 @@ import type {
 } from "./data-center/dataCenterReportTypes";
 
 type ExportPreset =
+  | "all"
   | "today"
   | "yesterday"
   | "last7"
@@ -38,6 +39,7 @@ type ExportRange = {
 };
 
 const exportPresets: Array<{ label: string; value: ExportPreset }> = [
+  { label: "全部", value: "all" },
   { label: "今日", value: "today" },
   { label: "昨日", value: "yesterday" },
   { label: "近7天", value: "last7" },
@@ -426,7 +428,7 @@ export function CustomerServiceConversationStatsReport({
               <button
                 type="button"
                 className="primary"
-                disabled={exportMutation.isPending || !exportRange.from || !exportRange.to}
+                disabled={exportMutation.isPending || !isExportRangeSubmittable(exportRange)}
                 onClick={() => exportMutation.mutate()}
               >
                 {exportMutation.isPending ? "正在创建" : "确认导出"}
@@ -921,10 +923,15 @@ function triggerBrowserDownload(blob: Blob, fileName: string) {
 }
 
 function statsExportFilters(input: ExportRange) {
+  if (input.preset === "all") return {};
   return {
     ...(input.from ? { from: input.from } : {}),
     ...(input.to ? { to: input.to } : {}),
   };
+}
+
+function isExportRangeSubmittable(input: ExportRange) {
+  return input.preset === "all" || Boolean(input.from && input.to);
 }
 
 function distributionRows(items: TempDistributionPointDto[]) {
@@ -1053,6 +1060,7 @@ function parseTrendDateParts(year: number, month: number, day: number) {
 
 function presetRange(preset: ExportPreset, current?: ExportRange): ExportRange {
   const today = startOfDay(new Date());
+  if (preset === "all") return { from: "", preset: "all", to: "" };
   if (preset === "custom" && current) return { ...current, preset: "custom" };
   if (preset === "yesterday") {
     const day = addDays(today, -1);
