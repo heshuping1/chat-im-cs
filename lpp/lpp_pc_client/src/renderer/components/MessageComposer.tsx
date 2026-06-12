@@ -67,6 +67,7 @@ import type { MentionOption } from "../messages/models/messageComposerModel";
 export type { ScreenshotShortcut };
 
 export type MessageComposerHandle = {
+  contains: (node: Node | null) => boolean;
   focus: () => void;
   insertText: (text: string) => void;
 };
@@ -249,6 +250,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, MessageComposer
   useImperativeHandle(
     ref,
     () => ({
+      contains: (node) => Boolean(node && composerRef.current?.contains(node)),
       focus: () => focusComposerInput(textareaRef, compactComposer, lexicalInputRef),
       insertText: (text) => {
         if (disabled || !text) return;

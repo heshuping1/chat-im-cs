@@ -582,6 +582,22 @@ export function ChatWorkspace({
     setNotice,
   });
 
+  const focusComposerAfterSend = useCallback((shouldRestoreFocus: boolean) => {
+    if (!shouldRestoreFocus) return;
+    requestAnimationFrame(() => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement &&
+        activeElement !== document.body &&
+        !composerRef.current?.contains(activeElement)
+      ) {
+        return;
+      }
+      composerRef.current?.focus();
+      window.setTimeout(() => composerRef.current?.focus(), 0);
+    });
+  }, []);
+
   const handleThreadAction = useCallback(
     (action: CustomerServiceThreadAction) => {
       if (action === "close") {
@@ -907,7 +923,14 @@ export function ChatWorkspace({
                 )
           }
           onSendText={async (content) => {
-            await sendTextMutation.mutateAsync(content);
+            const shouldRestoreFocus = Boolean(
+              composerRef.current?.contains(document.activeElement),
+            );
+            try {
+              await sendTextMutation.mutateAsync(content);
+            } finally {
+              focusComposerAfterSend(shouldRestoreFocus);
+            }
           }}
           onTranslateDraft={async (content) => {
             if (!client) throw new Error(t("auth.login"));

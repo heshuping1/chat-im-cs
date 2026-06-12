@@ -9,6 +9,7 @@ import {
   createCustomerServiceMessageStageState,
   createCustomerServiceNoThreadState,
   createCustomerServiceWorkspaceViewModel,
+  listCustomerServiceSelectableThreads,
   selectCustomerServiceThread,
 } from "../../src/renderer/data/customer-service/cs-workspace-view-model";
 import {
@@ -60,6 +61,29 @@ describe("customer service workspace view model", () => {
         },
       })?.threadId,
     ).toBe("history");
+  });
+
+  it("uses the same current temp-session source for selectable workspace threads", () => {
+    const selectableThreads = listCustomerServiceSelectableThreads({
+      threads: {
+        activeItems: [
+          thread({ status: "serving", threadId: "serving-1" }),
+          thread({ status: "closed_by_staff", threadId: "closed-active", unreadCount: 4 }),
+          thread({ status: "serving", threadId: "direct-1", threadType: "im_direct" }),
+        ],
+        queueItems: [
+          thread({ status: "queued", threadId: "queued-1" }),
+          thread({ status: "pending", threadId: "queued-2" }),
+          thread({ status: "closed_timeout", threadId: "closed-queue" }),
+        ],
+      },
+    });
+
+    expect(selectableThreads.map((item) => item.threadId)).toEqual([
+      "queued-1",
+      "queued-2",
+      "serving-1",
+    ]);
   });
 
   it("derives title, source, status, reply gate and messages", () => {

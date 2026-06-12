@@ -1049,15 +1049,15 @@ function normalizeAdminTempSessionsResponse(
   const items = readAdminConversationItems(response)
     .map(adminTempSessionItemToCustomerServiceThread)
     .filter((item): item is CustomerServiceThread => Boolean(item));
+  const queueItems = items.filter((item) => isQueuedThreadStatus(item.status));
+  const activeItems = items.filter((item) => !isQueuedThreadStatus(item.status));
   return {
-    activeItems: items,
-    queueItems: [],
-    summary: {
-      activeCount: 0,
-      allCount: 0,
-      queuedCount: 0,
-      vipCount: 0,
-    },
+    activeItems,
+    queueItems,
+    summary: readAdminThreadSummary(response, {
+      activeItems,
+      queueItems,
+    }),
   };
 }
 

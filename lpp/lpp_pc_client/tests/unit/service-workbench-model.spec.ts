@@ -9,6 +9,7 @@ import {
   createServiceHistoryUnreadCount,
   createServiceThreadListCounts,
   createServiceThreadListEmptyState,
+  createServiceThreadListViewModel,
 } from "../../src/renderer/customer-service/models/serviceWorkbenchModel";
 
 describe("customer service workbench model", () => {
@@ -179,6 +180,45 @@ describe("customer service workbench model", () => {
     ).toEqual({
       all: 3,
       queued: 1,
+      serving: 2,
+      sla: 1,
+    });
+  });
+
+  it("builds one current thread view model for tabs, filters and cards", () => {
+    const view = createServiceThreadListViewModel({
+      isRiskyThread: (item) => item.priority === "urgent",
+      threads: {
+        activeItems: [
+          thread({ status: "serving", threadId: "serving-1" }),
+          thread({ priority: "urgent", status: "active", threadId: "serving-2" }),
+          thread({ status: "closed_timeout", threadId: "closed-active" }),
+        ],
+        queueItems: [
+          thread({ status: "queued", threadId: "queued-1" }),
+          thread({ status: "pending", threadId: "queued-2" }),
+        ],
+      },
+    });
+
+    expect(view.currentThreads.map((item) => item.threadId)).toEqual([
+      "queued-1",
+      "queued-2",
+      "serving-1",
+      "serving-2",
+    ]);
+    expect(view.queuedThreads.map((item) => item.threadId)).toEqual([
+      "queued-1",
+      "queued-2",
+    ]);
+    expect(view.servingThreads.map((item) => item.threadId)).toEqual([
+      "serving-1",
+      "serving-2",
+    ]);
+    expect(view.slaThreads.map((item) => item.threadId)).toEqual(["serving-2"]);
+    expect(view.counts).toEqual({
+      all: 4,
+      queued: 2,
       serving: 2,
       sla: 1,
     });

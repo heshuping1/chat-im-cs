@@ -586,6 +586,61 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("splits managed temp sessions into queued and active workbench buckets", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-1",
+      response: {
+        items: [
+          {
+            conversationId: "conversation-queued",
+            lastMessagePreview: "waiting",
+            status: "queued",
+            sessionId: "thread-queued",
+            title: "Visitor Q",
+          },
+          {
+            conversationId: "conversation-pending",
+            lastMessagePreview: "pending",
+            status: "pending",
+            sessionId: "thread-pending",
+            title: "Visitor P",
+          },
+          {
+            conversationId: "conversation-active",
+            lastMessagePreview: "active",
+            status: "serving",
+            sessionId: "thread-active",
+            title: "Visitor A",
+          },
+        ],
+      },
+    });
+
+    const result = await (
+      client as unknown as {
+        getManagedCustomerServiceThreads: () => Promise<CustomerServiceThreadsResponse>;
+      }
+    ).getManagedCustomerServiceThreads();
+
+    expect(result.queueItems.map((item) => item.threadId)).toEqual([
+      "thread-queued",
+      "thread-pending",
+    ]);
+    expect(result.activeItems.map((item) => item.threadId)).toEqual(["thread-active"]);
+    expect(result.summary).toMatchObject({
+      activeCount: 1,
+      allCount: 3,
+      queuedCount: 2,
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/temp-sessions?page=1&pageSize=50",
+      },
+    ]);
+  });
+
   it("normalizes monitor customer and staff avatar snake_case fields", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,

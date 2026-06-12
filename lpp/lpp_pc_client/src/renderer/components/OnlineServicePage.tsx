@@ -11,6 +11,7 @@ import { CustomerServiceQuickReplyPanel } from "../customer-service/components/C
 import { ServiceReceptionControl } from "../customer-service/components/ServiceReceptionControl";
 import {
   createServiceCommandMetrics,
+  createServiceThreadListViewModel,
   type ServiceCommandMetrics,
 } from "../customer-service/models/serviceWorkbenchModel";
 import {
@@ -297,11 +298,12 @@ export function OnlineServicePage() {
   });
 
   const selectableThreads = useMemo(
-    () => [
-      ...(threadsQuery.data?.activeItems ?? []),
-      ...(threadsQuery.data?.queueItems ?? []),
-    ],
-    [threadsQuery.data?.activeItems, threadsQuery.data?.queueItems],
+    () =>
+      createServiceThreadListViewModel({
+        isRiskyThread,
+        threads: threadsQuery.data,
+      }).currentThreads,
+    [threadsQuery.data],
   );
   const selectedThread = selectableThreads.find((thread) => thread.threadId === activeThreadId);
   const aiReplyTarget = aiReplyTargetForServiceThread(selectedThread);

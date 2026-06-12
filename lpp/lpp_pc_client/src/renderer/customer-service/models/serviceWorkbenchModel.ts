@@ -7,7 +7,10 @@ import {
   createCustomerServiceLiveCounters,
 } from "../../data/customer-service/customer-service-live-counters";
 import { isTerminalCustomerServiceThreadStatus } from "../../data/customer-service/cs-thread-state";
-import { customerServiceHistoryStatusKey } from "../../data/customer-service-display";
+import {
+  customerServiceHistoryStatusKey,
+  isQueuedCustomerServiceThread,
+} from "../../data/customer-service-display";
 import type { CustomerServiceStatus } from "../../data/types";
 
 export type ServiceThreadListMode = "current" | "history";
@@ -41,6 +44,15 @@ export interface ServiceTextDescriptor {
   params?: Record<string, string | number>;
 }
 
+export interface ServiceThreadListViewModel {
+  counts: ServiceThreadListCounts;
+  currentThreads: CustomerServiceThread[];
+  historyThreads: CustomerServiceThread[];
+  queuedThreads: CustomerServiceThread[];
+  servingThreads: CustomerServiceThread[];
+  slaThreads: CustomerServiceThread[];
+}
+
 export interface ServiceCommandMetrics {
   activeCount: number;
   activeSessions?: number | null;
@@ -60,6 +72,36 @@ export interface ServiceCommandMetrics {
 }
 
 export { createCustomerServiceLiveCounters };
+
+export function createServiceThreadListViewModel(input: {
+  historyThreads?: CustomerServiceThread[];
+  isRiskyThread: (thread: CustomerServiceThread) => boolean;
+  threads?: Pick<CustomerServiceThreadsResponse, "activeItems" | "queueItems">;
+}): ServiceThreadListViewModel {
+  const liveCounters = createCustomerServiceLiveCounters({
+    activeItems: input.threads?.activeItems,
+    isRiskyThread: input.isRiskyThread,
+    queueItems: input.threads?.queueItems,
+  });
+  const currentThreads = liveCounters.currentTempSessions;
+  const queuedThreads = currentThreads.filter(isQueuedCustomerServiceThread);
+  const servingThreads = currentThreads.filter((thread) => !isQueuedCustomerServiceThread(thread));
+  const slaThreads = currentThreads.filter(input.isRiskyThread);
+
+  return {
+    counts: {
+      all: currentThreads.length,
+      queued: queuedThreads.length,
+      serving: servingThreads.length,
+      sla: slaThreads.length,
+    },
+    currentThreads,
+    historyThreads: input.historyThreads ?? [],
+    queuedThreads,
+    servingThreads,
+    slaThreads,
+  };
+}
 
 export function createServiceThreadListCounts(
   threads: CustomerServiceThread[],

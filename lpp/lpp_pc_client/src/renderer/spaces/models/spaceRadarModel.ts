@@ -61,10 +61,14 @@ export function currentSpaceSidebarBadgeCount({
 }
 
 export function spaceRadarNewReminderSummary(viewModel: SpaceRadarViewModel) {
-  const totalNewReminderCount = finiteCount(viewModel.totalNewReminderCount);
+  const alertItems = viewModel.items.filter((item) => !item.current && item.hasNewReminder);
+  const totalNewReminderCount = alertItems.reduce(
+    (sum, item) => sum + finiteCount(item.newReminderCount),
+    0,
+  );
   if (totalNewReminderCount <= 0) return null;
   return {
-    reminderSpaceCount: viewModel.items.filter((item) => item.hasNewReminder).length,
+    reminderSpaceCount: alertItems.length,
     totalNewReminderCount,
   };
 }
@@ -187,10 +191,14 @@ export function buildSpaceRadarViewModel({
     )
     .sort(compareSpaceRadarItems);
 
+  const totalNewReminderCount = items
+    .filter((item) => !item.current)
+    .reduce((sum, item) => sum + finiteCount(item.newReminderCount), 0);
+
   return {
     items,
     syncState,
-    totalNewReminderCount: reminderSnapshot?.totalNewReminderCount ?? 0,
+    totalNewReminderCount,
     totalUnreadConversationCount:
       syncState === "error" ? null : finiteCount(unreadSummary?.totalUnreadConversationCount),
     totalUnreadMessageCount:
@@ -294,7 +302,7 @@ function recordToItem({
       : syncState === "error"
         ? null
         : 0;
-  const newReminderCount = reminder?.newReminderCount ?? 0;
+  const newReminderCount = current ? 0 : reminder?.newReminderCount ?? 0;
   const attentionLevel = spaceRadarAttentionLevel({
     backlogUnreadMessageCount,
     newReminderCount,

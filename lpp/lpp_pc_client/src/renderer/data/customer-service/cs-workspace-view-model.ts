@@ -1,5 +1,4 @@
 import {
-  normalizeCustomerServiceThreadType,
   type CustomerServiceReadStatusDto,
   type CustomerProfileCard,
   type CustomerServiceThread,
@@ -18,6 +17,7 @@ import {
   createCustomerServiceIdentityViewModel,
   type CustomerServiceIdentityViewModel,
 } from "./cs-identity-view-model";
+import { createCustomerServiceLiveCounters } from "./customer-service-live-counters";
 import { isSilentCustomerServiceRecalledMessage } from "./cs-silent-recall";
 
 export interface CustomerServiceThreadDetailView {
@@ -261,16 +261,10 @@ export function listCustomerServiceSelectableThreads(input: {
     queueItems?: CustomerServiceThread[];
   };
 }) {
-  const currentThreads = [
-    ...(input.threads?.queueItems ?? []),
-    ...(input.threads?.activeItems ?? []),
-  ]
-    .filter((thread) => normalizeCustomerServiceThreadType(thread.threadType) === "temp_session")
-    .filter(
-      (thread) =>
-        thread.accessMode === "management_readonly" ||
-        !createCustomerServiceThreadState(thread.status).readOnly,
-    );
+  const currentThreads = createCustomerServiceLiveCounters({
+    activeItems: input.threads?.activeItems,
+    queueItems: input.threads?.queueItems,
+  }).currentTempSessions;
   const historyThreads = (input.historyItems ?? [])
     .map(staffServiceHistoryItemToThread)
     .filter((thread) => thread.threadType === "temp_session");

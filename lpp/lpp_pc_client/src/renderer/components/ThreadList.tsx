@@ -35,9 +35,9 @@ import {
   type ServiceThreadFilter,
 } from "../data/workspace-ui/workspace-ui-store";
 import {
-  createCustomerServiceLiveCounters,
   createServiceHistoryThreadStatusDescriptor,
   createServiceHistoryTabBadge,
+  createServiceThreadListViewModel,
   isRiskyCustomerServiceThread,
   type ServiceTextDescriptor,
   type ServiceThreadListMode,
@@ -127,16 +127,6 @@ export function ThreadList() {
     },
   });
 
-  const currentLiveCounters = useMemo(
-    () =>
-      createCustomerServiceLiveCounters({
-        activeItems: threadsQuery.data?.activeItems,
-        isRiskyThread: isRiskyCustomerServiceThread,
-        queueItems: threadsQuery.data?.queueItems,
-      }),
-    [threadsQuery.data],
-  );
-  const currentThreads = currentLiveCounters.currentTempSessions;
   const historyThreads = useMemo(
     () => {
       const readonlyHistoryThreads = [
@@ -152,28 +142,29 @@ export function ThreadList() {
     },
     [historyItems, threadsQuery.data],
   );
-  const currentCounts = useMemo(
-    () => ({
-      all: currentLiveCounters.totalCount,
-      queued: currentLiveCounters.queuedCount,
-      serving: currentLiveCounters.activeCount,
-      sla: currentLiveCounters.slaRiskCount,
-    }),
-    [currentLiveCounters],
+  const listViewModel = useMemo(
+    () =>
+      createServiceThreadListViewModel({
+        historyThreads,
+        isRiskyThread: isRiskyCustomerServiceThread,
+        threads: threadsQuery.data,
+      }),
+    [historyThreads, threadsQuery.data],
   );
+  const { counts: currentCounts, currentThreads } = listViewModel;
   const historyTabBadge = useMemo(
-    () => createServiceHistoryTabBadge(historyThreads),
-    [historyThreads],
+    () => createServiceHistoryTabBadge(listViewModel.historyThreads),
+    [listViewModel.historyThreads],
   );
   const visibleThreads = useMemo(() => {
-    const source = mode === "history" ? historyThreads : currentThreads;
+    const source = mode === "history" ? listViewModel.historyThreads : currentThreads;
     const normalizedQuery = query.trim().toLowerCase();
     return source
       .filter((thread) => {
         if (mode === "history") return true;
-        if (filter === "queued") return isQueuedCustomerServiceThread(thread);
-        if (filter === "serving") return !isQueuedCustomerServiceThread(thread);
-        if (filter === "sla") return isRiskyCustomerServiceThread(thread);
+        if (filter === "queued") return listViewModel.queuedThreads.includes(thread);
+        if (filter === "serving") return listViewModel.servingThreads.includes(thread);
+        if (filter === "sla") return listViewModel.slaThreads.includes(thread);
         return true;
       })
       .filter((thread) => {
@@ -188,7 +179,7 @@ export function ThreadList() {
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedQuery));
       });
-  }, [currentThreads, filter, historyThreads, mode, query]);
+  }, [currentThreads, filter, listViewModel, mode, query]);
   useEffect(() => {
     setExpandedThreadCount(0);
   }, [filter, mode, query]);
@@ -210,12 +201,12 @@ export function ThreadList() {
       createThreadListEmptyStateView({
         currentCounts,
         filter,
-        historyCount: historyThreads.length,
+        historyCount: listViewModel.historyThreads.length,
         mode,
         query,
         t,
       }),
-    [currentCounts, filter, historyThreads.length, mode, query, t],
+    [currentCounts, filter, listViewModel.historyThreads.length, mode, query, t],
   );
 
   return (
@@ -227,7 +218,7 @@ export function ThreadList() {
             {t("customerService.threadList.summary", {
               current: currentCounts.all,
               queued: currentCounts.queued,
-              history: historyThreads.length,
+              history: listViewModel.historyThreads.length,
             })}
           </p>
         </div>

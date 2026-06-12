@@ -25,6 +25,9 @@ describe("space radar model", () => {
     expect(spaceRadarPopoverSource).toContain('aria-label={t("spaceRadar.title")}');
     expect(spaceRadarPopoverSource).toContain('t("spaceRadar.title")');
     expect(spaceRadarPopoverSource).toContain('t("spaceRadar.subtitle")');
+    expect(spaceRadarPopoverSource).toContain(
+      'filter === "alerts" && (item.current || !item.hasNewReminder)',
+    );
     expect(spaceRadarPopoverSource).not.toContain("空间任务雷达");
     expect(spaceRadarPopoverSource).not.toContain("任务");
   });
@@ -141,6 +144,55 @@ describe("space radar model", () => {
     expect(spaceRadarNewReminderSummary(viewModel)).toBeNull();
   });
 
+  it("excludes current space ledger reminders from cross-space reminder summary", () => {
+    const viewModel = buildSpaceRadarViewModel({
+      authSession: session({ tenantId: "tenant-current", tenantName: "Mouse Test Enterprise" }),
+      currentTenant: {
+        tenantCode: "mouse-corp",
+        tenantId: "tenant-current",
+        tenantName: "Mouse Test Enterprise",
+      },
+      spaces: [tenant("tenant-current", "Mouse Test Enterprise", "mouse-corp")],
+      unreadSummary: {
+        spaces: [summary("tenant-current", "Mouse Test Enterprise", 4, 24)],
+        totalUnreadConversationCount: 4,
+        totalUnreadMessageCount: 24,
+        unreadSpaceCount: 1,
+      },
+      unreadSummaryError: null,
+      reminderSnapshot: {
+        items: {
+          "tenant:tenant-current": {
+            baselineUnreadMessageCount: 0,
+            hasNewReminder: true,
+            identityKey: "tenant:tenant-current",
+            latestUnreadMessageCount: 24,
+            newReminderCount: 24,
+          },
+        },
+        scopeKey: "scope",
+        totalNewReminderCount: 24,
+      },
+    });
+
+    expect(viewModel.totalNewReminderCount).toBe(0);
+    expect(spaceRadarNewReminderSummary(viewModel)).toBeNull();
+    expect(viewModel.items[0]).toMatchObject({
+      attentionLevel: "none",
+      current: true,
+      hasNewReminder: false,
+      newReminderCount: 0,
+    });
+    expect(
+      spaceRadarItemReminderPresentation(viewModel.items[0], {
+        currentSpaceBadgeCount: 4,
+      }),
+    ).toEqual({
+      live: true,
+      text: "4 条当前提醒",
+    });
+  });
+
   it("marks cross-space new message reminders as attention targets", () => {
     const viewModel = buildSpaceRadarViewModel({
       authSession: session({ tenantId: "tenant-current", tenantName: "Mouse 客服中心" }),
@@ -191,6 +243,64 @@ describe("space radar model", () => {
     expect(spaceRadarNewReminderSummary(viewModel)).toEqual({
       reminderSpaceCount: 1,
       totalNewReminderCount: 3,
+    });
+  });
+
+  it("counts personal space reminders as cross-space reminders from an enterprise space", () => {
+    const viewModel = buildSpaceRadarViewModel({
+      authSession: session({ tenantId: "tenant-current", tenantName: "Mouse Test Enterprise" }),
+      currentTenant: {
+        tenantCode: "mouse-corp",
+        tenantId: "tenant-current",
+        tenantName: "Mouse Test Enterprise",
+      },
+      spaces: [tenant("tenant-current", "Mouse Test Enterprise", "mouse-corp")],
+      unreadSummary: {
+        spaces: [
+          summary("tenant-current", "Mouse Test Enterprise", 1, 4),
+          personalSummary(1, 20),
+        ],
+        totalUnreadConversationCount: 2,
+        totalUnreadMessageCount: 24,
+        unreadSpaceCount: 2,
+      },
+      unreadSummaryError: null,
+      reminderSnapshot: {
+        items: {
+          personal: {
+            baselineUnreadMessageCount: 0,
+            hasNewReminder: true,
+            identityKey: "personal",
+            latestUnreadMessageCount: 20,
+            newReminderCount: 20,
+          },
+          "tenant:tenant-current": {
+            baselineUnreadMessageCount: 0,
+            hasNewReminder: true,
+            identityKey: "tenant:tenant-current",
+            latestUnreadMessageCount: 4,
+            newReminderCount: 4,
+          },
+        },
+        scopeKey: "scope",
+        totalNewReminderCount: 24,
+      },
+    });
+
+    expect(viewModel.totalNewReminderCount).toBe(20);
+    expect(spaceRadarNewReminderSummary(viewModel)).toEqual({
+      reminderSpaceCount: 1,
+      totalNewReminderCount: 20,
+    });
+    expect(viewModel.items.find((item) => item.identityKey === "personal")).toMatchObject({
+      current: false,
+      hasNewReminder: true,
+      newReminderCount: 20,
+    });
+    expect(viewModel.items.find((item) => item.identityKey === "tenant:tenant-current")).toMatchObject({
+      current: true,
+      hasNewReminder: false,
+      newReminderCount: 0,
     });
   });
 
@@ -374,6 +484,22 @@ function summary(
     spaceType: 2,
     tenantCode: tenantId.toUpperCase(),
     tenantId,
+    unreadConversationCount,
+    unreadMessageCount,
+  };
+}
+
+function personalSummary(
+  unreadConversationCount: number,
+  unreadMessageCount: number,
+): NonNullable<PlatformSpaceUnreadSummaryDto["spaces"]>[number] {
+  return {
+    hasUnread: unreadMessageCount > 0,
+    logoUrl: null,
+    spaceName: "Personal Space",
+    spaceType: 1,
+    tenantCode: null,
+    tenantId: null,
     unreadConversationCount,
     unreadMessageCount,
   };

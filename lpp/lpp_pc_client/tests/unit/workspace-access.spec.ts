@@ -449,6 +449,14 @@ describe("workspace access integration closure", () => {
     expect(sharedComposerSurfaceSource).toContain("enableScreenshot");
   });
 
+  it("returns focus to the customer-service composer after enter-to-send completes", () => {
+    expect(serviceWorkspaceSource).toContain("const focusComposerAfterSend = useCallback");
+    expect(serviceWorkspaceSource).toContain("composerRef.current?.contains(document.activeElement)");
+    expect(serviceWorkspaceSource).toContain("window.setTimeout(() => composerRef.current?.focus(), 0)");
+    expect(serviceWorkspaceSource).toContain("await sendTextMutation.mutateAsync(content)");
+    expect(serviceWorkspaceSource).toContain("focusComposerAfterSend(shouldRestoreFocus)");
+  });
+
   it("keeps online-service message reminders deduped and visitor-only", () => {
     expect(serviceReminderModelSource).toContain("consumeCustomerServiceMessageReminder");
     expect(serviceReminderModelSource).toContain("isMineCustomerServiceMessage");

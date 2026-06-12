@@ -48,8 +48,8 @@ export function SpaceRadarPopover({
     () => filterSpaceRadarItems(viewModel.items, filter, keyword),
     [filter, keyword, viewModel.items],
   );
-  const hasAlerts = viewModel.items.some((item) => item.hasNewReminder);
   const newReminderSummary = spaceRadarNewReminderSummary(viewModel);
+  const hasCrossSpaceAlerts = Boolean(newReminderSummary);
   const totalReminderText = formatBadgeCount(newReminderSummary?.totalNewReminderCount ?? 0);
 
   return (
@@ -132,8 +132,22 @@ export function SpaceRadarPopover({
         {visibleItems.length === 0 ? (
           <div className="space-radar-empty">
             <Building2 size={17} />
-            <strong>{hasAlerts ? t("spaceRadar.noMatch") : t("spaceRadar.noNewMessages")}</strong>
-            <span>{hasAlerts ? t("spaceRadar.tryAnotherKeyword") : t("spaceRadar.switchToViewSpace")}</span>
+            <strong>
+              {spaceRadarEmptyTitle({
+                filter,
+                hasCrossSpaceAlerts,
+                keyword,
+                t,
+              })}
+            </strong>
+            <span>
+              {spaceRadarEmptyDetail({
+                filter,
+                hasCrossSpaceAlerts,
+                keyword,
+                t,
+              })}
+            </span>
           </div>
         ) : (
           visibleItems.map((item) => (
@@ -263,10 +277,43 @@ function filterSpaceRadarItems(
 ) {
   const normalizedKeyword = keyword.trim().toLowerCase();
   return items.filter((item) => {
-    if (filter === "alerts" && !item.hasNewReminder) {
+    if (filter === "alerts" && (item.current || !item.hasNewReminder)) {
       return false;
     }
     if (!normalizedKeyword) return true;
     return `${item.displayName} ${item.displayCode}`.toLowerCase().includes(normalizedKeyword);
   });
+}
+
+function spaceRadarEmptyTitle({
+  filter,
+  hasCrossSpaceAlerts,
+  keyword,
+  t,
+}: {
+  filter: SpaceRadarFilter;
+  hasCrossSpaceAlerts: boolean;
+  keyword: string;
+  t: SpaceRadarTranslate;
+}) {
+  if (keyword.trim()) return t("spaceRadar.noMatch");
+  if (filter === "alerts") return t("spaceRadar.noCrossSpaceNewMessages");
+  return hasCrossSpaceAlerts ? t("spaceRadar.noMatch") : t("spaceRadar.noSpaceReminders");
+}
+
+function spaceRadarEmptyDetail({
+  filter,
+  hasCrossSpaceAlerts,
+  keyword,
+  t,
+}: {
+  filter: SpaceRadarFilter;
+  hasCrossSpaceAlerts: boolean;
+  keyword: string;
+  t: SpaceRadarTranslate;
+}) {
+  if (keyword.trim() || hasCrossSpaceAlerts) return t("spaceRadar.tryAnotherKeyword");
+  return filter === "alerts"
+    ? t("spaceRadar.noCrossSpaceNewMessagesDetail")
+    : t("spaceRadar.switchToViewSpace");
 }
