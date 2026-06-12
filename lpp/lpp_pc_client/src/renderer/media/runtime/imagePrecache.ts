@@ -29,12 +29,15 @@ export function selectImagePrecacheCandidates(
 ): ImagePrecacheCandidate[] {
   const messageById = new Map(messages.map((message) => [message.messageId, message]));
   return selectImageMaterializationCandidates(messages, assetBaseUrl).map(
-    ({ cacheIdentity, cacheKey, fileName, messageId, url }) => ({
-      ...(cacheIdentity ? { cacheIdentity } : {}),
-      cacheKey,
-      fileName,
-      url: preferredSignedImageUrl(messageById.get(messageId), assetBaseUrl) || url,
-    }),
+    ({ cacheIdentity, cacheKey, fileName, messageId, url }) => {
+      const sourceMessage = messageId ? messageById.get(messageId) : undefined;
+      return {
+        ...(cacheIdentity ? { cacheIdentity } : {}),
+        cacheKey,
+        fileName,
+        url: preferredSignedImageUrl(sourceMessage, assetBaseUrl) || url,
+      };
+    },
   );
 }
 
