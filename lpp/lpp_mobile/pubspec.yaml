@@ -92,3 +92,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/app_icon.png
+    - assets/brand/startlink_loading.png
