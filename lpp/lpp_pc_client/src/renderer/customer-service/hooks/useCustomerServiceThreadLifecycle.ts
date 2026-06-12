@@ -26,6 +26,41 @@ import {
   accountIdFromSession,
   materializeMediaMessages,
 } from "../../media/runtime/mediaMaterialization";
+import { requireApiClient } from "../../data/runtime";
+
+export interface CustomerServiceReadReportTarget {
+  conversationId: string;
+  readSeq: number;
+}
+
+export function resolveCustomerServiceReadReportTarget({
+  detailLoaded,
+  messages,
+  selectedThread,
+  visibility,
+}: {
+  detailLoaded: boolean;
+  messages: MessageItemDto[];
+  selectedThread?: Pick<CustomerServiceThread, "conversationId">;
+  visibility: CustomerServiceThreadReadVisibility;
+}): CustomerServiceReadReportTarget | null {
+  if (
+    !detailLoaded ||
+    !selectedThread?.conversationId ||
+    !canMarkCustomerServiceThreadRead({ visibility })
+  ) {
+    return null;
+  }
+  const readSeq = messages.reduce((maxSeq, message) => {
+    const seq = Math.max(0, Math.floor(Number(message.conversationSeq ?? 0) || 0));
+    return seq > maxSeq ? seq : maxSeq;
+  }, 0);
+  if (readSeq <= 0) return null;
+  return {
+    conversationId: selectedThread.conversationId,
+    readSeq,
+  };
+}
 
 export function useCustomerServiceThreadLifecycle({
   activeModule,
@@ -56,6 +91,7 @@ export function useCustomerServiceThreadLifecycle({
     status?: string;
     threadId?: string;
   }>({});
+  const reportedReadSeqByConversationRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!selectedThread) return;
@@ -141,13 +177,52 @@ export function useCustomerServiceThreadLifecycle({
     if (selectedThread.conversationId !== selectedThread.threadId) {
       dismissRealtimeRemindersForTarget("onlineService", selectedThread.conversationId);
     }
+    const reportTarget = resolveCustomerServiceReadReportTarget({
+      detailLoaded: Boolean(detail),
+      messages,
+      selectedThread,
+      visibility: readVisibility,
+    });
+    if (!session || !reportTarget) return;
+    const previousReadSeq =
+      reportedReadSeqByConversationRef.current[reportTarget.conversationId] ?? 0;
+    if (previousReadSeq >= reportTarget.readSeq) return;
+    reportedReadSeqByConversationRef.current[reportTarget.conversationId] =
+      reportTarget.readSeq;
+    void requireApiClient(session)
+      .markConversationRead(
+        "direct",
+        reportTarget.conversationId,
+        reportTarget.readSeq,
+      )
+      .catch((error) => {
+        reportedReadSeqByConversationRef.current[reportTarget.conversationId] =
+          previousReadSeq;
+        recordMessageReminderDiagnostic({
+          event: "cs.ui.read.report_failed",
+          source: "use-customer-service-thread-lifecycle",
+          phase: "execute",
+          route: "direct-read",
+          classification: {
+            conversationId: reportTarget.conversationId,
+            readSeq: reportTarget.readSeq,
+            threadId: selectedThread.threadId,
+          },
+          summary: {
+            error: error instanceof Error ? error.message : String(error),
+            selectedThread,
+          },
+        });
+      });
   }, [
     activeModule,
     activeThreadOpenSource,
     detail,
     dismissRealtimeRemindersForTarget,
+    messages,
     queryClient,
     readVisibility,
     selectedThread,
+    session,
   ]);
 }
