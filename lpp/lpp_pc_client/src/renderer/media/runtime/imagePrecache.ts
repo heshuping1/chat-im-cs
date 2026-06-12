@@ -30,7 +30,10 @@ export function selectImagePrecacheCandidates(
   const messageById = new Map(messages.map((message) => [message.messageId, message]));
   return selectImageMaterializationCandidates(messages, assetBaseUrl).map(
     ({ cacheIdentity, cacheKey, fileName, messageId, url }) => {
-      const sourceMessage = messageId ? messageById.get(messageId) : undefined;
+      const sourceMessage =
+        typeof messageId === "string" && messageId.length > 0
+          ? messageById.get(messageId)
+          : undefined;
       return {
         ...(cacheIdentity ? { cacheIdentity } : {}),
         cacheKey,
