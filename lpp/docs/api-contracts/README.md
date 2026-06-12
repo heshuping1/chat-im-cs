@@ -47,6 +47,7 @@
 
 | 文档 | 说明 |
 |---|---|
+| [history-sessions-unified-2026-06-10.md](./history-sessions-unified-2026-06-10.md) | 🆕 "历史对话"页面统一查询接口 `/center/history-sessions`:组合筛选 + 游标分页 + 与列表同口径 summary |
 | [customer-service-suite-2026-06-10.md](./customer-service-suite-2026-06-10.md) | 在线客服八项能力:历史/转接/监控/统计、🆕 正在输入预览、🆕 已读时间、🆕 静默撤回、超时后续聊 |
 | [customer-service-config-notes-resume-2026-06-10.md](./customer-service-config-notes-resume-2026-06-10.md) | 🆕 管理端配置开场白/自动发话/快捷回复、🆕 客服会话备注、🆕 复访续聊 `resumeRecentSession` |
 | [group-invite-qr-and-at-all-2026-06-06.md](./group-invite-qr-and-at-all-2026-06-06.md) | 群二维码进群 + @所有人服务端校验 |

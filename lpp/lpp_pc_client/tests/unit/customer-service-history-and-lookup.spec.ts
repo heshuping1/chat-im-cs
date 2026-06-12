@@ -119,6 +119,14 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("getWorkbenchThreadDetail(");
     expect(customerServiceHistoryReport).toContain("createCustomerServiceExportTask");
     expect(customerServiceHistoryReport).toContain("historyExportType(report)");
+    expect(customerServiceHistoryReport).toContain("HistoryStaffPicker");
+    expect(customerServiceHistoryReport).toContain("createHistoryStaffPickerMembers");
+    expect(customerServiceHistoryReport).toContain("filterHistoryStaffPickerMembers");
+    expect(customerServiceHistoryReport).toContain("当前接口仅支持单个参与客服筛选");
+    expect(customerServiceHistoryReport).toContain("搜索员工姓名 / 绿泡号");
+    expect(customerServiceHistoryReport).toContain("setFilters((current) => ({ ...current, staffUserId }))");
+    expect(customerServiceHistoryReport).toContain("`${dateText}T${normalizeHistoryTime");
+    expect(customerServiceHistoryReport).not.toContain('HistoryInput label="参与客服 ID"');
     expect(customerServiceClient).not.toContain("if (!staffUserId && !hasCustomerFilter) return null");
     expect(customerServiceClient).not.toContain("getAdminTempSessionHistory");
     expect(customerServiceClient).toContain("adminCustomerServiceCenterHistorySessions");
@@ -133,6 +141,9 @@ describe("customer-service history and lookup surfaces", () => {
     expect(productPagesCss).toContain(".cs-history-pagination");
     expect(productPagesCss).toContain(".cs-history-summary-grid");
     expect(productPagesCss).toContain("scrollbar-gutter: stable");
+    expect(productPagesCss).toContain(".cs-history-staff-picker");
+    expect(productPagesCss).toContain(".cs-history-staff-popover");
+    expect(productPagesCss).toContain(".cs-history-staff-list");
   });
 
   it("keeps customer typing preview in a non-overlapping dock below the message scroller", () => {

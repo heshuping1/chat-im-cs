@@ -186,7 +186,7 @@ Base URL：`/api/client/v1`
 | `/tenant/info` | GET | 无 | `TenantDetailDto` | `status=0(pending_approval)`、`1(active)`、`2(suspended)`、`9(deleted)` |
 | `/tenant/info` | PUT | `UpdateTenantInfoRequest` | `updated=true` | 仅更新传入字段；支持维护 `tenantDescription` |
 | `/tenant/leave` | POST | 无 | `left=true` `tenantId` | 最后一个所有者不能直接退出 |
-| `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户。**2026-06-04 起**每个成员附带 `lppId`（星络号），供通讯录展示 |
+| `/tenant/members` | GET | 无 | `TenantMemberDto[]` | 仅员工/客服可访问；不返回官方服务号等系统投影用户。**2026-06-04 起**每个成员附带 `lppId`（绿泡泡号），供通讯录展示 |
 | `/tenant/members/{userId}` | DELETE | 路径参数：`userId` | `userId` | 当前实现返回被移除用户 ID |
 | `/tenant/members/{userId}/role` | PUT | `membershipRole` | `userId` | 仅所有者可修改角色 |
 | `/tenant/invitations` | POST | `maxUses` `expireHours` `targetIdentifier?` `targetMembershipRole?` | `InvitationDto` | **客服/管理员/所有者**可调用(2026-05-31 起放宽,原为仅管理员/所有者);`inviteType=0(public)`、`1(targeted)`；`status=0(revoked)`、`1(active)`、`3(exhausted)`；权限不足返回 `403 TENANT_PERMISSION_DENIED`。**2026-06-03 起** `targetMembershipRole?`(1=技术/2=客服/3=管理员,省略=普通成员)→接受后直接落地为员工角色;只能签发<自己的角色,否则 `403 INVITATION_ROLE_TOO_HIGH`;请求 `4(Owner)` 返回 `400 INVITATION_ROLE_INVALID` |
@@ -383,7 +383,7 @@ Base URL：`/api/widget/v1`
 | `/sessions/{sessionId}/rate` | POST | `rating` `tags?` `comment?` | `sessionId` `rating` | 会话评价 |
 | `/sessions/{sessionId}/reopen` | POST | 无 | `sessionId` `visitorToken` | 重新打开已关闭的会话，并返回新的访客 Token;🆕 2026-06-10 与 `rate` 同级豁免 token 版本校验(超时/客服关闭后持旧 token 仍可重开续聊) |
 | `/sessions/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 访客正在输入预览;客服端收 `temp_session.typing` 帧 |
-| `/sessions/{sessionId}/read` | POST | `readSeq` | `sessionId` `readSeq` | 🆕 2026-06-10 访客已读上报;推进已读位置与已读时间,客服端收 `msg.read` 帧(含 `readAt`) |
+| `/sessions/{sessionId}/read` | POST | `readSeq` | `sessionId` `readSeq` | 🆕 2026-06-10 访客已读上报;推进已读位置与已读时间,客服端收 `msg.read` 帧(含 `readAt`)。客服侧无专用端点:复用 WS `ReadAsync(conversationId, readSeq)` 或 `POST /direct-chats/{conversationId}/read`(对临时会话同样生效),访客 widget 收 `msg.read` 帧 |
 
 补充：
 
@@ -465,7 +465,7 @@ Base URL：`/api/client/v1/customer-service`
 |---|---|---|---|---|
 | `/quick-replies` | GET | `scope?=all/temp_session/direct_customer` | `CustomerServiceQuickReplyDto[]` | 仅返回启用话术；`scope=all` 话术会在所有场景返回 |
 | `/quick-replies/sync` | GET | `updatedSince?` | `{ items[], updatedSince, serverTime }`，`items` 额外带 `deletedAt`（墓碑） | 增量同步；首次留空取全量，之后传上次 `serverTime`；`deletedAt!=null` 删除本地缓存 |
-| `/customers/service-history` | GET | `customerUserId?` `visitorUserId?` `customerId?` `limit?` `cursor?`（前三者择一） | `{ items[], nextCursor }`，`items` 含 `threadType`(`temp_session`/`direct`) `threadId` `staffUserId?` `status` `startedAt?` `firstResponseAt?` `closedAt?` `riskLevel` 等 | 按客户身份聚合跨频道服务历史；管理端同名见 [admin-api.md](./admin-api.md) |
+| `/temp-sessions/customers/service-history` | GET | `customerUserId?` `visitorUserId?` `customerId?` `limit?` `cursor?`（前三者择一） | `{ items[], nextCursor }`，`items` 含 `threadType`(`temp_session`/`direct`) `threadId` `staffUserId?` `status` `startedAt?` `firstResponseAt?` `closedAt?` `riskLevel` 等 | 按客户身份聚合跨频道服务历史；⚠️ 路径含 `/temp-sessions` 子段（完整 `/api/client/v1/customer-service/temp-sessions/customers/service-history`），与下行 `/staff/service-history` 分属不同子组；管理端同名见 [admin-api.md](./admin-api.md) |
 | `/staff/service-history` | GET | `threadType?`(`temp_session`/`im_direct`) `status?`(`open`/`queued`/`active`/`closed` 或数字状态码) `limit?` `cursor?` | `{ items[], nextCursor }`，`items` 字段同上并额外带 `participation`(`current_owner`/`transferred`) | 按**接待人**聚合"我接待过的历史会话"——`staffUserId` 恒为当前登录客服(不可查他人)；曾参与即算(当前归属或转接历史 from/to)；按 `lastMessageAt` 倒序；管理端按任意客服查见 [admin-api.md](./admin-api.md) |
 
 ### 2.9B 客服自助接待状态（Reception）
@@ -639,7 +639,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `/{sessionId}/close` | POST | 无 | `sessionId` | 关闭访客会话 |
 | `/{sessionId}/transfer` | POST | `toStaffUserId` `reason?` | `TempSessionDetailDto` | 🆕 2026-06-10 坐席间转接;仅当前接待坐席可调,目标须为客服角色;服务端自动给访客落礼貌系统消息,被转接坐席收 `temp_session.transferred` 帧 |
 | `/{sessionId}/typing` | POST | `preview?`(可省略 body) | `sessionId` | 🆕 2026-06-10 坐席正在输入预览;访客端收 `temp_session.typing` 帧 |
-| `/{sessionId}/read-status` | GET | 无 | `sessionId` `conversationId` `visitorUserId` `members[]{userId,lastReadSeq,lastReadAt}` | 🆕 2026-06-10 会话全员已读位置/时间 |
+| `/{sessionId}/read-status` | GET | 无 | `sessionId` `conversationId` `visitorUserId` `members[]{userId,lastReadSeq,lastReadAt}` | 🆕 2026-06-10 会话全员已读位置/时间;客服侧上报已读走标准 IM 通道(WS `ReadAsync` / `POST /direct-chats/{conversationId}/read`),见主文档 §12.16"客服侧上报已读" |
 | `/{sessionId}/notes` | GET | 无 | `TempSessionNoteDto[]` | 🆕 2026-06-10 会话备注列表(置顶在前);备注访客不可见,主管/质检可见 |
 | `/{sessionId}/notes` | POST | `content`(≤2000 字) `isPinned?` | `TempSessionNoteDto` | 🆕 新建备注;`{noteId,staffDisplayName,content,isPinned,createdAt}` |
 | `/{sessionId}/notes/{noteId}/pin` | PUT | `pinned` | `sessionId` `noteId` `pinned` | 🆕 置顶/取消置顶 |
@@ -699,7 +699,7 @@ Base URL：`/api/client/v1/customer-service/temp-sessions`
 | `membershipRole` | short | 角色：`0=member`、`1=technical`、`2=customer_service`、`3=admin`、`4=owner` |
 | `joinMethod` | short | 加入方式：`0=self`、`1=invite`、`2=approval` |
 | `joinedAt` | DateTimeOffset? | 入租时间 |
-| `lppId` | string? | **2026-06-04 新增**。成员对应平台账号的全局唯一 `lpp_id`（星络号）；未设置时为 `null`。用于在通讯录展示成员的星络号 |
+| `lppId` | string? | **2026-06-04 新增**。成员对应平台账号的全局唯一 `lpp_id`（绿泡泡号）；未设置时为 `null`。用于在通讯录展示成员的绿泡泡号 |
 
 ### 4.3 `InvitationDto`
 

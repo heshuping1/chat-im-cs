@@ -1,4 +1,4 @@
-package com.lpp.mobile
+package com.startlink.lite
 
 import android.content.ContentValues
 import android.os.Build
@@ -68,7 +68,7 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        val uri = resolver.insert(collection, values)
+        val uri = resolver.insert(collection)
             ?: throw IllegalStateException("failed to create media item")
         try {
             resolver.openOutputStream(uri)?.use { output ->

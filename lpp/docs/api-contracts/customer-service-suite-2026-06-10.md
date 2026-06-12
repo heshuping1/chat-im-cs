@@ -30,6 +30,10 @@
 
 ### 1.1 历史会话列表与搜寻(管理后台)
 
+> **🆕 2026-06-10:新增"历史对话"页面专用统一查询接口**
+> `GET /api/admin/v1/customer-service/center/history-sessions`
+> 一个接口完成 **时间范围 + 客户 + 坐席 + 状态 + 关键字 + 来源 + 评分 + SLA 风险** 的组合筛选,跨渠道单列表 + 游标分页,**首页附带与列表同口径的统计 summary**(总数/首响均值/时长均值/满意度/渠道分布)。做"历史对话(含统计与搜寻)"页面请直接以它为主查询,详见专项文档 **[history-sessions-unified-2026-06-10.md](history-sessions-unified-2026-06-10.md)**。下列窄入口接口全部保留,适合单客户/单坐席钻取场景。
+
 - **跨渠道统一列表** `GET /api/admin/v1/customer-service/center/threads`
   查询参数:`keyword`(关键字)、`threadType`(`temp_session`/`im_direct`)、`status`(仅 `queued`/`active`——此接口是工作台**实时视图**,响应只有排队/接待中两组,不含已结束;查已结束历史请用下方 service-history)、`assignedStaffUserId`(按坐席)、`locale`。
 - **按客户查历史** `GET /api/admin/v1/customer-service/center/customers/service-history`

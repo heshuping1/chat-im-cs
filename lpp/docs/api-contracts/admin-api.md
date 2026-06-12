@@ -651,7 +651,7 @@ POST /api/platform/v1/auth/admin-token
 |---|---|---|
 | `userId` | GUID | 客户用户 ID |
 | `displayName` | string | 昵称 |
-| `lppId` | string? | 星络号 |
+| `lppId` | string? | LPP 号 |
 | `mobileMasked` | string? | 手机号掩码 |
 | `avatarUrl` | string? | 头像 |
 | `status` | number | 用户状态(`1`=正常) |
@@ -908,15 +908,37 @@ POST /api/platform/v1/auth/admin-token
 > (`widget` / `im_direct` 各自 KPI)。合并不变量:顶层 `sessionsServed` == Σ `byChannel[].sessionsServed`。
 > 数据由后台 Worker 周期聚合(约 5 分钟一次,UPSERT 当天+昨天),故统计有分钟级延迟,不是实时。
 
+> **2026-06-11 变更(第二轮)— 全部聚合字段按 from/to 统一区间**:新增 `from`/`to` 查询参数,
+> **所有字段(KPI、渠道/分类/语言分布、`sessionTrend`、`staffPerformance`)都按同一时间区间计算**。
+> 此前(第一轮)只有 `sessionTrend` 按窗口、KPI/分布仍是全量,导致「趋势总量 ≠ 对话总量」的不一致
+> (例:趋势 210 vs 对话总量 226)。现已修正:
+> - 会话按 **`CreatedAt`(进线时间,UTC 日期)** 落区间,`to` 含当天;
+> - 不变量:`totalSessions` == Σ `sessionTrend[].value` == Σ `channelDistribution[].value`
+>   == Σ `categoryDistribution[].value` == Σ `localeDistribution[].value`;
+> - 评分按 `RatedAt`、客服绩效按日表 `StatDate` 落同一区间;
+> - 趋势仍**按天补零**成连续序列(0 进线天 `value:0`,不跳过)。
+
+> **2026-06-11 变更(第一轮)— 进线趋势窗口可配 + 补零**:`sessionTrend` 此前后端硬编码只返回最近
+> **7** 个「有进线的日期」(无窗口参数、空窗天跳过)。已改为按窗口返回连续补零序列;窗口由
+> 下面的 `from`/`to`(或兼容别名 `trendDays`)控制,默认 **30** 天。
+
 权限要求：`customer_service.temp_stats.view`
 
-无请求参数。
+请求参数（query，全部可选）:
 
-响应 `data`：`TempSessionStatsDto`
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `from` | date (YYYY-MM-DD) | `today-29` | 区间起始日(UTC,含当天)。**对所有聚合字段生效**。 |
+| `to` | date (YYYY-MM-DD) | `today` | 区间结束日(UTC,**含当天**)。`to < from` 自动交换;跨度上限 366 天(超出则从 `to` 往前取 366 天)。 |
+| `trendDays` | int | — | 兼容旧调用的窗口天数别名,**仅在 `from`/`to` 都缺省时生效**,等价 `from=today-(trendDays-1)`、`to=today`;越界夹到 `[1, 366]`(0→1)。新接入请用 `from`/`to`。 |
+
+三者都不传 → 默认最近 30 天。返回的 `sessionTrend` 点数恒等于区间天数。
+
+响应 `data`：`TempSessionStatsDto`（**所有字段均为所选区间内的聚合,非全量**）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `totalSessions` | int | 总会话数 |
+| `totalSessions` | int | 区间内总会话数(按 `CreatedAt` 落区间)。**== Σ `sessionTrend[].value` == Σ 各分布 `value`**。 |
 | `totalQueued` | int | 总排队数 |
 | `totalServed` | int | 总服务数 |
 | `totalAbandoned` | int | 总放弃数 |
@@ -931,11 +953,11 @@ POST /api/platform/v1/auth/admin-token
 | `failedAiJobs` | int | 失败的 AI 任务数 |
 | `avgAiLatencyMs` | int | AI 平均响应延迟（毫秒） |
 | `aiEstimatedCostUsd` | decimal | AI 预估费用（美元） |
-| `sessionTrend` | array | 会话趋势分布 |
-| `channelDistribution` | array | 渠道分布 |
-| `categoryDistribution` | array | 分类分布 |
-| `localeDistribution` | array | 语言分布 |
-| `staffPerformance` | array | 客服绩效列表 |
+| `sessionTrend` | array | 进线趋势:区间内**逐日进线数**,按天补零成连续序列(`label` 为 `MM-dd`,空窗天 `value:0`)。点数恒等于区间天数。 |
+| `channelDistribution` | array | 渠道分布(区间内,按 `source_platform`/`source_channel`)。Σ `value` == `totalSessions`。 |
+| `categoryDistribution` | array | 分类分布(区间内)。Σ `value` == `totalSessions`。 |
+| `localeDistribution` | array | 语言分布(区间内)。Σ `value` == `totalSessions`。 |
+| `staffPerformance` | array | 客服绩效列表(区间内,按日表 `StatDate` 过滤后聚合)。 |
 
 `sessionTrend` / `channelDistribution` / `categoryDistribution` / `localeDistribution` 数组项（`TempDistributionPointDto`）：
 
@@ -967,6 +989,79 @@ POST /api/platform/v1/auth/admin-token
 | `avgDurationSeconds` | int | 该渠道平均会话时长秒数 |
 | `avgRating` | decimal | 该渠道平均评分 |
 | `excellentRate` | decimal | 该渠道质检合格率 |
+
+请求示例（指定区间;不传 `from`/`to` 则默认最近 30 天）：
+
+```
+GET /api/admin/v1/customer-service/temp-sessions/stats?from=2026-05-13&to=2026-06-11
+Authorization: Bearer <admin-token>
+```
+
+响应示例（节选;**注意 `totalSessions` == Σ `sessionTrend[].value` == Σ 各分布 `value`,全部为该区间内的聚合**）：
+
+```json
+{
+  "code": "OK",
+  "message": "success",
+  "requestId": "01...",
+  "data": {
+    "totalSessions": 86,
+    "totalQueued": 5,
+    "totalServed": 79,
+    "totalAbandoned": 2,
+    "avgWaitSeconds": 83,
+    "avgFirstResponseSeconds": 97,
+    "avgDurationSeconds": 828,
+    "avgRating": 4.72,
+    "aiServedSessions": 36,
+    "aiHandoffSessions": 12,
+    "aiResolvedSessions": 20,
+    "aiMessageCount": 146,
+    "failedAiJobs": 0,
+    "avgAiLatencyMs": 913,
+    "aiEstimatedCostUsd": 1.2846,
+    "sessionTrend": [
+      { "label": "05-13", "value": 4 },
+      { "label": "05-14", "value": 0 },
+      { "label": "05-15", "value": 6 },
+      { "label": "06-11", "value": 3 }
+    ],
+    "channelDistribution": [
+      { "label": "web", "value": 51 },
+      { "label": "widget", "value": 23 },
+      { "label": "h5", "value": 12 }
+    ],
+    "categoryDistribution": [
+      { "label": "售前咨询", "value": 40 },
+      { "label": "技术支持", "value": 30 },
+      { "label": "未分类", "value": 16 }
+    ],
+    "localeDistribution": [
+      { "label": "zh-CN", "value": 60 },
+      { "label": "en-US", "value": 26 }
+    ],
+    "staffPerformance": [
+      {
+        "staffUserId": "0196...",
+        "displayName": "Alice Chen",
+        "sessionsServed": 28,
+        "avgFirstResponseSeconds": 82,
+        "avgDurationSeconds": 790,
+        "avgRating": 4.9,
+        "excellentRate": 0.86,
+        "byChannel": [
+          { "channel": "widget", "sessionsServed": 18, "avgFirstResponseSeconds": 76, "avgDurationSeconds": 720, "avgRating": 4.9, "excellentRate": 0.88 },
+          { "channel": "im_direct", "sessionsServed": 10, "avgFirstResponseSeconds": 93, "avgDurationSeconds": 916, "avgRating": 4.8, "excellentRate": 0.82 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+> `sessionTrend` 上方为节选;实际逐日补零,点数 == `to - from + 1` 天(本例 30 个点,末点 `06-11`),`Σ value == totalSessions == 86`。`staffPerformance` 同样只展示 1 行示意。
+
+> 兼容旧调用:`GET …/stats?trendDays=7` 仍可用,等价 `from=today-6&to=today`(仅在 `from`/`to` 都缺省时生效)。
 
 #### 3.2B.4 `GET /api/admin/v1/customer-service/temp-sessions/visitors/{visitorId}`
 
@@ -1905,7 +2000,7 @@ AI 信息字段（`TempSessionAiInfoDto`）：
 
 #### 3.2C.2 `POST /api/admin/v1/users/{userId}/rate-limit`
 
-设置用户发消息频率限制。为指定用户设置自定义发消息频率上限，覆盖全局限流策略。
+设置用户发消息频率限制。为指定用户设置自定义发消息频率上限。
 
 权限要求：`admin.user.rate_limit`
 
@@ -1919,13 +2014,16 @@ AI 信息字段（`TempSessionAiInfoDto`）：
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `maxMessagesPerMinute` | int? | 否 | 每分钟最大消息数；为空或 ≤0 表示清除覆盖值，恢复全局策略 |
+| `maxMessagesPerMinute` | int? | 否 | 每分钟最大消息数；为空或 ≤0 表示清除限制（默认 = 不限） |
 
 响应 `data`：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `userId` | GUID | 目标用户 ID |
+
+> **2026-06-11 生效语义**:限制在所有"用户主动发消息"路径上强制执行——IM 单聊/群聊(REST 与 WebSocket 发送)、客服临时会话的访客/坐席/接待台代发。超限返回 HTTP 429,业务错误码 `MESSAGE_RATE_LIMITED`,固定 1 分钟窗口;管理员清除限制后立即恢复,无需等窗口过期。系统消息/AI 回复/群发任务/开放平台 bot 不受此限制(它们不是"用户"身份)。客户端收到 `MESSAGE_RATE_LIMITED` 应提示用户放慢发送并稍后重试,不要自动无限重发。
+> 此前版本该接口只保存设置、发送路径未执行(设了也不拦),2026-06-11 起真正生效;存量已设置的覆盖值将开始被强制执行,如有历史遗留的误设值请先核查清理。
 
 #### 3.2C.3 `POST /api/admin/v1/users/{userId}/force-profile`
 
@@ -4559,7 +4657,7 @@ Query 参数:
 | `userId` | GUID | 用户 ID |
 | `platformUserId` | GUID? | 平台用户 ID |
 | `loginName` | string | 登录名 |
-| `lppId` | string? | startlink ID |
+| `lppId` | string? | LPP ID |
 | `displayName` | string | 显示名 |
 | `avatarUrl` | string? | 头像 URL |
 | `mobile` | string? | 手机号 |
@@ -4629,7 +4727,7 @@ Query 参数:
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `lppId` | string? | 否 | startlink ID |
+| `lppId` | string? | 否 | LPP ID |
 | `password` | string | 是 | 初始密码 |
 | `displayName` | string | 是 | 显示名 |
 | `mobile` | string? | 否 | 手机号 |
@@ -4661,7 +4759,7 @@ Query 参数:
 |---|---|---|---|
 | `displayName` | string? | 否 | 显示名 |
 | `avatarUrl` | string? | 否 | 头像 URL |
-| `lppId` | string? | 否 | startlink ID |
+| `lppId` | string? | 否 | LPP ID |
 | `userType` | short? | 否 | 用户类型 |
 | `status` | short? | 否 | 用户状态 |
 | `membershipRole` | short? | 否 | 成员角色 |
@@ -4821,7 +4919,7 @@ Query 参数:
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `platformUserId` | GUID | 平台用户 ID |
-| `lppId` | string? | startlink ID |
+| `lppId` | string? | LPP ID |
 | `displayName` | string | 显示名 |
 | `mobile` | string? | 手机号 |
 | `email` | string? | 邮箱 |
@@ -4865,7 +4963,7 @@ Query 参数:
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `lppId` | string? | 否 | startlink ID |
+| `lppId` | string? | 否 | LPP ID |
 | `status` | short? | 否 | 用户状态 |
 | `isPlatformAdmin` | bool? | 否 | 是否为平台管理员 |
 

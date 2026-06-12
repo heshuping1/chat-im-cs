@@ -45,7 +45,7 @@ val jpushChannel = providers.gradleProperty("JPUSH_CHANNEL")
     .get()
 
 android {
-    namespace = "com.lpp.mobile"
+    namespace = "com.startlink.lite"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -60,14 +60,14 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.lpp.mobile"
+        applicationId = "com.startlink.lite"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["JPUSH_PKGNAME"] = "com.lpp.mobile"
+        manifestPlaceholders["JPUSH_PKGNAME"] = "com.startlink.lite"
         manifestPlaceholders["JPUSH_APPKEY"] = jpushAppKey
         manifestPlaceholders["JPUSH_CHANNEL"] = jpushChannel
     }

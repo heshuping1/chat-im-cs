@@ -87,7 +87,7 @@
 | `/users/{userId}/mute` | POST | `AdminMuteUserRequest` | `userId` |
 | `/users/{userId}/unmute` | POST | 无 | `userId` |
 | `/users/{userId}/mute-status` | GET | 无 | `AdminUserMuteStatusDto` |
-| `/users/{userId}/rate-limit` | POST | `AdminSetRateLimitRequest` | `userId` |
+| `/users/{userId}/rate-limit` | POST | `AdminSetRateLimitRequest` | `userId`;2026-06-11 起真正生效:超限发送返回 429 `MESSAGE_RATE_LIMITED`(覆盖 IM 单聊/群聊/客服会话全部用户主动发送路径,详见 [admin-api.md §3.2C.2](./admin-api.md)) |
 | `/users/{userId}/force-profile` | POST | `AdminForceProfileRequest` | `userId` |
 | `/users/{userId}/note` | PUT | `AdminSetNoteRequest` | `userId` |
 | `/users/{userId}/governance` | GET | 无 | `AdminUserGovernanceSummaryDto` |
@@ -176,6 +176,7 @@ Base URL：`/api/admin/v1/customer-service/center`
 | `/dashboard` | GET | 无 | `CustomerServiceAdminDashboardDto` |
 | `/customers/service-history` | GET | `customerUserId?` `visitorUserId?` `customerId?` `limit?` `cursor?`（前三者择一） | `{ items[], nextCursor }`，`items` 含 `threadType`(`temp_session`/`direct`) `threadId` `staffUserId?` `status` `startedAt?` `firstResponseAt?` `closedAt?` `riskLevel` 等；与客户端同名接口一致 |
 | `/staff/{staffUserId}/service-history` | GET | `threadType?`(`temp_session`/`im_direct`) `status?` `limit?` `cursor?` | `{ items[], nextCursor }`，`items` 字段同上并额外带 `participation`(`current_owner`/`transferred`) | 按**接待人**聚合指定客服"曾参与"的跨频道历史会话(当前归属或转接历史 from/to)；权限 `customer_service.center.view`/`customer_service.temp_session.view`；客户端本人自查见 [client-api.md §12.11A1b](./client-api.md) |
+| `/history-sessions` 🆕 | GET | `from?` `to?` `keyword?` `threadType?` `status?`(语义值/数字) `customerUserId?` `visitorUserId?` `customerId?` `staffUserId?` `sourcePlatform?` `sourceChannel?` `country?` `region?` `locale?` `minRating?` `maxRating?` `minRiskLevel?` `limit?` `cursor?` `includeSummary?` | `{ items[], nextCursor, summary? }`；`items` 带双 ID(`threadType`=`temp_session`/`im_direct` + `threadId`)、语义 `status`+原始 `statusCode`、客户/坐席显示名、时间线、`firstResponseSeconds`/`durationSeconds`、`rating`、`riskLevel`、来源/地区；`summary` 仅首页返回且与列表**同谓词**(总数/渠道分布/评分为精确聚合,时长均值按最近样本上限 2 万行/渠道,`sampledSessions` 显式报告)。**2026-06-10 新增,"历史对话"页面主查询**,详见 [history-sessions-unified-2026-06-10.md](./history-sessions-unified-2026-06-10.md) |
 
 ### 2.5+ 客服主动群发
 
@@ -686,8 +687,8 @@ Base URL：`/api/admin/v1/customer-service/temp-sessions`
 | `failedAiJobs` | int | 失败的 AI 任务数 |
 | `avgAiLatencyMs` | int | AI 平均延迟毫秒 |
 | `aiEstimatedCostUsd` | decimal | AI 预估费用 |
-| `sessionTrend` | array | 会话趋势 |
-| `channelDistribution` | array | 渠道分布 |
+| `sessionTrend` | array | 进线趋势:区间(GET query `from`/`to`,默认近 30 天;兼容别名 `trendDays`)内逐日进线数,按天补零连续(`label`=`MM-dd`,空窗天 `value:0`,点数==区间天数)。2026-06-11 起 **所有聚合字段按同一 from/to 区间**,`totalSessions`==Σ trend/各分布。详见 `admin-api.md` 3.2B.3 |
+| `channelDistribution` | array | 渠道分布(区间内,Σ value==totalSessions) |
 | `categoryDistribution` | array | 分类分布 |
 | `localeDistribution` | array | 语言分布 |
 | `staffPerformance` | array | 客服绩效(2026-06-07 起**跨渠道合并**:每项顶层为临时会话+IM直聊合并 KPI,新增 `byChannel` 渠道下钻 `widget`/`im_direct`。详见 `admin-api.md` 3.2B.3) |

@@ -6,6 +6,8 @@ import {
   Eye,
   Info,
   RefreshCw,
+  Search,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -123,6 +125,8 @@ export function CustomerServiceHistoryReport({
   const [filters, setFilters] = useState<HistoryFilters>(defaultFilters);
   const [datePreset, setDatePreset] = useState<HistoryDatePreset>("all");
   const [customDatePickerOpen, setCustomDatePickerOpen] = useState(false);
+  const [staffPickerOpen, setStaffPickerOpen] = useState(false);
+  const [staffPickerKeyword, setStaffPickerKeyword] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [historyPageIndex, setHistoryPageIndex] = useState(0);
   const [historyPageSize, setHistoryPageSize] = useState(20);
@@ -190,6 +194,10 @@ export function CustomerServiceHistoryReport({
   });
   const tenantMemberByIdentity = useMemo(
     () => createTenantMemberIdentityMap(tenantMembersQuery.data ?? []),
+    [tenantMembersQuery.data],
+  );
+  const staffFilterMembers = useMemo(
+    () => createHistoryStaffPickerMembers(tenantMembersQuery.data ?? []),
     [tenantMembersQuery.data],
   );
 
@@ -307,6 +315,18 @@ export function CustomerServiceHistoryReport({
       sourceChannel: value === "all" ? "" : value,
     }));
   };
+  const selectStaffFilter = (staffUserId: string) => {
+    setHistoryPageIndex(0);
+    setStaffPickerOpen(false);
+    setStaffPickerKeyword("");
+    setFilters((current) => ({ ...current, staffUserId }));
+  };
+  const clearStaffFilter = () => {
+    setHistoryPageIndex(0);
+    setStaffPickerOpen(false);
+    setStaffPickerKeyword("");
+    setFilters((current) => ({ ...current, staffUserId: "" }));
+  };
   const openDetail = (thread: CustomerServiceThread) => {
     setDetailThreadKey(threadKey(thread));
     setDetailSearch("");
@@ -359,12 +379,25 @@ export function CustomerServiceHistoryReport({
             onChange={(keyword) => setFilters((current) => ({ ...current, keyword }))}
           />
           <HistoryInput label="客户 ID" value={filters.customerId} onChange={(customerId) => setFilters((current) => ({ ...current, customerId }))} />
-          <HistoryInput label="参与客服 ID" value={filters.staffUserId} onChange={(staffUserId) => setFilters((current) => ({ ...current, staffUserId }))} />
+          <HistoryStaffPicker
+            keyword={staffPickerKeyword}
+            loading={tenantMembersQuery.isLoading}
+            members={staffFilterMembers}
+            open={staffPickerOpen}
+            selectedUserId={filters.staffUserId}
+            syncError={tenantMembersQuery.error}
+            onClear={clearStaffFilter}
+            onKeywordChange={setStaffPickerKeyword}
+            onOpenChange={setStaffPickerOpen}
+            onSelect={selectStaffFilter}
+          />
           <div className="cs-history-actions">
             <button type="button" onClick={() => {
               setHistoryPageIndex(0);
               setDatePreset("all");
               setCustomDatePickerOpen(false);
+              setStaffPickerOpen(false);
+              setStaffPickerKeyword("");
               setFilters(defaultFilters);
             }}>
               重置
@@ -1152,6 +1185,114 @@ function HistoryInput({
   );
 }
 
+function HistoryStaffPicker({
+  keyword,
+  loading,
+  members,
+  onClear,
+  onKeywordChange,
+  onOpenChange,
+  onSelect,
+  open,
+  selectedUserId,
+  syncError,
+}: {
+  keyword: string;
+  loading: boolean;
+  members: TenantMemberDto[];
+  onClear: () => void;
+  onKeywordChange: (value: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (staffUserId: string) => void;
+  open: boolean;
+  selectedUserId: string;
+  syncError: unknown;
+}) {
+  const selectedMember = members.find((member) => member.userId === selectedUserId);
+  const visibleMembers = filterHistoryStaffPickerMembers(members, keyword);
+  const hasSyncError = Boolean(syncError);
+  const buttonLabel = selectedMember
+    ? historyStaffPickerName(selectedMember)
+    : selectedUserId
+      ? `已选员工 ${selectedUserId}`
+      : "从通讯录选择";
+
+  return (
+    <div className="cs-history-staff-picker">
+      <span>参与客服</span>
+      <div className="cs-history-staff-picker-control">
+        <button
+          className={`cs-history-staff-trigger ${selectedUserId ? "selected" : ""}`}
+          type="button"
+          onClick={() => onOpenChange(!open)}
+        >
+          <span>{buttonLabel}</span>
+          {selectedUserId && (
+            <em>{selectedMember ? historyStaffPickerMeta(selectedMember) : "单选员工"}</em>
+          )}
+        </button>
+        {selectedUserId && (
+          <button
+            className="cs-history-staff-clear"
+            type="button"
+            aria-label="清除参与客服筛选"
+            onClick={onClear}
+          >
+            <X size={13} />
+          </button>
+        )}
+        {open && (
+          <div className="cs-history-staff-popover">
+            <label className="cs-history-staff-search">
+              <Search size={14} aria-hidden="true" />
+              <input
+                value={keyword}
+                placeholder="搜索员工姓名 / 绿泡号"
+                onChange={(event) => onKeywordChange(event.target.value)}
+              />
+            </label>
+            <div className="cs-history-staff-list" role="listbox" aria-label="选择参与客服">
+              {loading && <p>正在读取通讯录...</p>}
+              {!loading && hasSyncError && <p>通讯录同步失败，无法选择员工。</p>}
+              {!loading && !hasSyncError && visibleMembers.length === 0 && (
+                <p>{keyword.trim() ? "未找到匹配员工" : "通讯录暂无可选员工"}</p>
+              )}
+              {!loading &&
+                !hasSyncError &&
+                visibleMembers.map((member) => (
+                  <button
+                    key={member.userId}
+                    type="button"
+                    role="option"
+                    aria-selected={member.userId === selectedUserId}
+                    className={member.userId === selectedUserId ? "selected" : undefined}
+                    onClick={() => onSelect(member.userId)}
+                  >
+                    <PcAvatar
+                      avatarUrl={member.avatarUrl}
+                      className="cs-history-staff-avatar"
+                      name={historyStaffPickerName(member)}
+                    />
+                    <span>
+                      <strong>{historyStaffPickerName(member)}</strong>
+                      <em>{historyStaffPickerMeta(member)}</em>
+                    </span>
+                  </button>
+                ))}
+            </div>
+            <footer>
+              <span>当前接口仅支持单个参与客服筛选</span>
+              <button type="button" onClick={() => onOpenChange(false)}>
+                关闭
+              </button>
+            </footer>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HistoryPartyInlineProfile({ profile }: { profile: HistoryPartyProfile }) {
   return (
     <>
@@ -1451,7 +1592,7 @@ function formatHistoryDate(date?: Date) {
 function formatHistoryDateTime(date: Date | undefined, time: string) {
   const dateText = formatHistoryDate(date);
   if (!dateText) return "";
-  return `${dateText} ${normalizeHistoryTime(time, "00:00:00")}`;
+  return `${dateText}T${normalizeHistoryTime(time, "00:00:00")}`;
 }
 
 function historyTimePart(value: string, fallback: string) {
@@ -1481,6 +1622,66 @@ function startOfHistoryDay(date: Date) {
 
 function addHistoryDays(date: Date, days: number) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+function createHistoryStaffPickerMembers(members: TenantMemberDto[]) {
+  return members
+    .filter((member) => member.userId && isSelectableHistoryStaffMember(member))
+    .slice()
+    .sort((left, right) =>
+      historyStaffPickerName(left).localeCompare(historyStaffPickerName(right), "zh-Hans-CN"),
+    );
+}
+
+function filterHistoryStaffPickerMembers(members: TenantMemberDto[], keyword: string) {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  if (!normalizedKeyword) return members.slice(0, 80);
+  return members
+    .filter((member) => historyStaffPickerSearchText(member).includes(normalizedKeyword))
+    .slice(0, 80);
+}
+
+function isSelectableHistoryStaffMember(member: TenantMemberDto) {
+  return Number(member.membershipRole ?? 1) !== 0;
+}
+
+function historyStaffPickerName(member: TenantMemberDto) {
+  return member.displayName?.trim() || member.greenBubbleNo || member.userId || "未命名员工";
+}
+
+function historyStaffPickerMeta(member: TenantMemberDto) {
+  return [
+    historyStaffRoleLabel(member.membershipRole),
+    member.greenBubbleNo ? `绿泡号 ${member.greenBubbleNo}` : "",
+    member.userId ? `ID ${shortHistoryIdentity(member.userId)}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function historyStaffPickerSearchText(member: TenantMemberDto) {
+  return [
+    member.displayName,
+    member.userId,
+    member.platformUserId,
+    member.greenBubbleNo,
+    historyStaffRoleLabel(member.membershipRole),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function historyStaffRoleLabel(role?: number) {
+  if (role === 4) return "所有者";
+  if (role === 3) return "管理员";
+  if (role === 2) return "客服";
+  if (role === 1) return "员工";
+  return "成员";
+}
+
+function shortHistoryIdentity(value: string) {
+  return value.length > 12 ? `${value.slice(0, 8)}...` : value;
 }
 
 function historyQueryParams(filters: HistoryFilters, limit: number) {

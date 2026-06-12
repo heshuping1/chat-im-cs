@@ -2501,7 +2501,7 @@ class _LocationBubble extends StatelessWidget {
                               TileLayer(
                                 urlTemplate:
                                     'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                userAgentPackageName: 'com.lpp.mobile',
+                                userAgentPackageName: 'com.startlink.lite',
                               ),
                             ],
                           ),
