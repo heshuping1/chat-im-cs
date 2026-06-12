@@ -68,7 +68,7 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        val uri = resolver.insert(collection)
+        val uri = resolver.insert(collection, values)
             ?: throw IllegalStateException("failed to create media item")
         try {
             resolver.openOutputStream(uri)?.use { output ->

@@ -16,40 +16,55 @@ const _conversationWarmBudget = Duration(seconds: 2);
 const _avatarWarmBudget = Duration(milliseconds: 900);
 const _avatarLookupBudget = Duration(seconds: 1);
 
-final _startupGateCompletedProvider = FutureProvider<bool>((ref) async {
-  final storage = ref.read(secureStorageProvider);
-  return await storage.read(SecureStorageService.startupGateCompletedKey) ==
-      'true';
-});
+@visibleForTesting
+const minimumStartupBrandDisplay = Duration(milliseconds: 1200);
 
 final _startupDestinationProvider = FutureProvider<String>((ref) async {
-  final storage = ref.read(secureStorageProvider);
-  final hasCompletedStartupGate =
-      await storage.read(SecureStorageService.startupGateCompletedKey) ==
-          'true';
-  final authState = await ref.watch(authProvider.future);
-  if (authState.status != AuthStatus.authenticated) {
-    final hasPendingTenants = authState.availableTenants.length > 1;
-    await storage.write(SecureStorageService.startupGateCompletedKey, 'true');
-    ref.invalidate(_startupGateCompletedProvider);
-    return hasPendingTenants ? AppRoutes.tenantSelect : AppRoutes.login;
-  }
+  return waitForMinimumStartupBrandDisplay(() async {
+    final storage = ref.read(secureStorageProvider);
+    final hasCompletedStartupGate =
+        await storage.read(SecureStorageService.startupGateCompletedKey) ==
+            'true';
+    final authState = await ref.watch(authProvider.future);
+    if (authState.status != AuthStatus.authenticated) {
+      final hasPendingTenants = authState.availableTenants.length > 1;
+      await storage.write(SecureStorageService.startupGateCompletedKey, 'true');
+      return hasPendingTenants ? AppRoutes.tenantSelect : AppRoutes.login;
+    }
 
-  final space = ref.watch(currentSpaceProvider) ?? authState.currentSpace;
-  if (!hasCompletedStartupGate &&
-      space != null &&
-      space.accessToken.isNotEmpty) {
-    await _warmHomeFirstScreen(ref, space).timeout(
-      _startupWarmBudget,
-      onTimeout: () {
-        debugPrint('[StartupGate] warm home timed out, continue to home');
-      },
-    );
-  }
-  await storage.write(SecureStorageService.startupGateCompletedKey, 'true');
-  ref.invalidate(_startupGateCompletedProvider);
-  return AppRoutes.home;
+    final space = ref.watch(currentSpaceProvider) ?? authState.currentSpace;
+    if (!hasCompletedStartupGate &&
+        space != null &&
+        space.accessToken.isNotEmpty) {
+      await _warmHomeFirstScreen(ref, space).timeout(
+        _startupWarmBudget,
+        onTimeout: () {
+          debugPrint('[StartupGate] warm home timed out, continue to home');
+        },
+      );
+    }
+    await storage.write(SecureStorageService.startupGateCompletedKey, 'true');
+    return AppRoutes.home;
+  });
 });
+
+@visibleForTesting
+Future<T> waitForMinimumStartupBrandDisplay<T>(
+  Future<T> Function() resolve, {
+  DateTime Function()? now,
+  Future<void> Function(Duration duration)? delay,
+}) async {
+  final currentTime = now ?? DateTime.now;
+  final wait = delay ?? Future<void>.delayed;
+  final startedAt = currentTime();
+  final result = await resolve();
+  final elapsed = currentTime().difference(startedAt);
+  final remaining = minimumStartupBrandDisplay - elapsed;
+  if (remaining > Duration.zero) {
+    await wait(remaining);
+  }
+  return result;
+}
 
 Future<void> _warmHomeFirstScreen(Ref ref, SpaceContext space) async {
   setAvatarAuthTokenForPrefetch(space.accessToken);
@@ -112,18 +127,12 @@ class StartupGatePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasCompletedStartupGate =
-        ref.watch(_startupGateCompletedProvider).valueOrNull;
     final destination = ref.watch(_startupDestinationProvider).valueOrNull;
     if (destination != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
         context.go(destination);
       });
-    }
-
-    if (hasCompletedStartupGate != false) {
-      return const Scaffold(backgroundColor: Color(0xFF020B0A));
     }
 
     return const StartupBrandLoadingView();

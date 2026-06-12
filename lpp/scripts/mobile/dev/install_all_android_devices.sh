@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LPP_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 APP_DIR="$LPP_ROOT/lpp_mobile"
-PACKAGE_NAME="com.lpp.mobile"
+PACKAGE_NAME="com.startlink.lite"
 
 BUILD_MODE="debug"
 RUN_BUILD=true
@@ -15,6 +15,20 @@ INSTALL_METHOD="adb"
 AUTO_CONFIRM_VIVO=true
 VIVO_INSTALL_CHOICE_TEXT_REGEX="保留数据安装|保留数据|覆盖安装|替换安装"
 VIVO_INSTALL_CONFIRM_TEXT_REGEX="继续安装|仍要安装|^安装$|重新安装|重新安装应用|重新安裝|重新安裝應用|从新安装|重装|确定|允许"
+
+is_guided_install_device_brand() {
+  local brand="$1"
+  local manufacturer="$2"
+  local normalized
+
+  normalized="$(printf '%s %s' "$brand" "$manufacturer" |
+    tr -d '\r' |
+    tr '[:upper:]' '[:lower:]')"
+  case "$normalized" in
+    *vivo*|*iqoo*|*oppo*|*oplus*|*oneplus*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 extract_uiautomator_bounds_by_resource_id_from_xml() {
   local xml="$1"
@@ -77,10 +91,10 @@ Options:
   --method=pm   Push APK and install with adb shell pm install.
   --no-build    Skip flutter build and install the existing APK.
   --no-pub-get  Skip flutter pub get before build.
-  --launch      Launch com.lpp.mobile after installing. Default.
+  --launch      Launch com.startlink.lite after installing. Default.
   --no-launch   Do not launch com.lpp.mobile after installing.
   --no-auto-confirm
-               Do not auto-tap vivo/iQOO install confirmation prompts.
+               Do not auto-tap Android vendor install confirmation prompts.
   -h, --help    Show this help.
 
 Examples:
@@ -190,6 +204,14 @@ is_vivo_device() {
   esac
 }
 
+is_guided_install_device() {
+  local serial="$1"
+  local brand manufacturer
+  brand="$(adb -s "$serial" shell getprop ro.product.brand 2>/dev/null || true)"
+  manufacturer="$(adb -s "$serial" shell getprop ro.product.manufacturer 2>/dev/null || true)"
+  is_guided_install_device_brand "$brand" "$manufacturer"
+}
+
 auto_confirm_vivo_install_prompt() {
   local serial="$1"
 
@@ -272,8 +294,8 @@ run_install_command() {
   local confirm_pid=""
   local status
 
-  if [ "$AUTO_CONFIRM_VIVO" = true ] && is_vivo_device "$serial"; then
-    echo "Auto-confirm enabled for vivo/iQOO install prompts on $serial"
+  if [ "$AUTO_CONFIRM_VIVO" = true ] && is_guided_install_device "$serial"; then
+    echo "Auto-confirm enabled for vendor install prompts on $serial"
     auto_confirm_vivo_install_prompt "$serial" &
     confirm_pid="$!"
   fi

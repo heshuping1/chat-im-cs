@@ -44,6 +44,7 @@ import { defaultApiBaseUrl, createTraceId } from "../data/runtime";
 import { primarySiteBaseUrl, primarySiteLine, siteLineManager } from "../data/network/site-line-manager";
 import { localeLabels, supportedLocales } from "../i18n/locales";
 import { useI18n } from "../i18n/useI18n";
+import { AppBrandLogo } from "./AppBrandLogo";
 
 type PendingLogin = {
   baseUrl: string;
@@ -574,8 +575,11 @@ export function LoginPage() {
     <main className="login-page">
       <section className="login-panel auth-panel">
         <div className="auth-panel-heading">
-          <h1>{t("app.title")}</h1>
-          <p>{t("auth.subtitle")}</p>
+          <AppBrandLogo className="auth-brand-logo" />
+          <span>
+            <h1>{t("app.title")}</h1>
+            <p>{t("auth.subtitle")}</p>
+          </span>
         </div>
 
         <label className="auth-language-select">

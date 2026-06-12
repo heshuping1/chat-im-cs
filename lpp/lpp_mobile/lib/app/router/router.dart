@@ -163,8 +163,7 @@ class AppRouter {
         return AppRoutes.login;
       }
       if (!isAuthenticated && isStartupRoute) {
-        if (hasPendingTenants) return AppRoutes.tenantSelect;
-        return AppRoutes.login;
+        return null;
       }
       if (isAuthenticated && isStartupRoute) {
         return null;

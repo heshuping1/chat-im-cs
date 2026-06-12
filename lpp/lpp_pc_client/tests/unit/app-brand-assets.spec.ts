@@ -21,6 +21,7 @@ describe("app brand assets", () => {
   const mainSource = readFileSync(resolve(root, "src/main/main.ts"), "utf8");
   const appMetadataSource = readFileSync(resolve(root, "src/renderer/app/appMetadata.ts"), "utf8");
   const sidebarSource = readFileSync(resolve(root, "src/renderer/components/Sidebar.tsx"), "utf8");
+  const brandLogoSource = readFileSync(resolve(root, "src/renderer/components/AppBrandLogo.tsx"), "utf8");
   const iconSyncSource = readFileSync(resolve(root, "scripts/sync-app-icon.mjs"), "utf8");
   const iconVerifySource = readFileSync(resolve(root, "scripts/verify-packaged-icon.mjs"), "utf8");
   const startPackagedSource = readFileSync(resolve(root, "scripts/start-packaged.mjs"), "utf8");
@@ -91,10 +92,22 @@ describe("app brand assets", () => {
     expect(fixTaskbarSource).toContain("rcedit-x64.exe");
   });
 
-  it("uses the app icon in the PC sidebar brand instead of a letter fallback", () => {
+  it("uses a clean vector brand mark in the PC sidebar instead of cropping the app icon", () => {
     expect(appMetadataSource).toContain("import.meta.env.BASE_URL");
     expect(appMetadataSource).toContain("app-icon-startlink.png");
-    expect(sidebarSource).toContain("appIconSrc");
+    expect(sidebarSource).toContain("AppBrandLogo");
+    expect(brandLogoSource).toContain("<svg");
+    expect(brandLogoSource).toContain("app-brand-logo-mark");
+    expect(brandLogoSource).toContain("#076B4A");
+    expect(brandLogoSource).toContain("#00E676");
+    expect(brandLogoSource).toContain("#A8FFD1");
+    expect(brandLogoSource).toContain("#F5F7EB");
+    expect(brandLogoSource).toContain("#E6C97A");
+    expect(brandLogoSource).not.toContain("#21d68d");
+    expect(brandLogoSource).not.toContain("#06a86f");
+    expect(brandLogoSource).not.toContain("#047857");
+    expect(sidebarSource).not.toContain("appIconSrc");
+    expect(sidebarSource).not.toContain('src={appIconSrc}');
     expect(sidebarSource).not.toContain('src="/app-icon-startlink.png"');
     expect(sidebarSource).not.toContain('className="sidebar-brand-logo" aria-hidden="true">\n            L');
   });

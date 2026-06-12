@@ -26,7 +26,20 @@
 
 .auth-panel-heading {
   display: grid;
-  gap: 6px;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-panel-heading span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.auth-brand-logo {
+  width: 54px;
+  height: 54px;
 }
 
 .login-panel h1 {

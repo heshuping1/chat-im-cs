@@ -87,7 +87,8 @@ import {
   useSetImPresenceStatus,
   type CustomerServiceThreadOpenSource,
 } from "../data/workspace-ui/workspace-ui-store";
-import { appIconSrc, appProductName } from "../app/appMetadata";
+import { appProductName } from "../app/appMetadata";
+import { AppBrandLogo } from "./AppBrandLogo";
 import { requireApiClient } from "../data/runtime";
 import { imPresenceStatuses } from "../data/static-config";
 import type { CustomerServiceStatus, ModuleKey } from "../data/types";
@@ -858,9 +859,7 @@ export function Sidebar() {
             setSpaceStatusOpen(false);
           }}
         >
-          <span className="sidebar-brand-logo" aria-hidden="true">
-            <img alt="" src={appIconSrc} />
-          </span>
+          <AppBrandLogo className="sidebar-brand-logo" />
           <span className="sidebar-brand-copy">
             <strong>{appProductName}</strong>
             <em>{productVersionLabel}</em>
@@ -869,9 +868,7 @@ export function Sidebar() {
         {brandInfoOpen && (
           <div className="sidebar-brand-popover" role="dialog" aria-label={t("sidebar.brand.about")}>
             <div className="sidebar-brand-popover-title">
-              <span className="sidebar-brand-logo small" aria-hidden="true">
-                <img alt="" src={appIconSrc} />
-              </span>
+              <AppBrandLogo className="sidebar-brand-logo small" />
               <span>
                 <strong>{appProductName}</strong>
                 <em>{productVersionLabel}</em>

@@ -11,6 +11,10 @@ describe("auth page contract", () => {
     resolve(process.cwd(), "src/renderer/components/auth/AuthPageParts.tsx"),
     "utf8",
   );
+  const brandLogoSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/AppBrandLogo.tsx"),
+    "utf8",
+  );
   const modelSource = readFileSync(
     resolve(process.cwd(), "src/renderer/data/auth/auth-flow-model.ts"),
     "utf8",
@@ -31,6 +35,21 @@ describe("auth page contract", () => {
     expect(authSource).toContain("auth.register");
     expect(authSource).toContain('onChange("register")');
     expect(source).toContain("platformRegister");
+  });
+
+  it("renders a clean vector brand mark on the auth page instead of cropping the app icon", () => {
+    expect(source).toContain('from "./AppBrandLogo"');
+    expect(source).toContain("<AppBrandLogo");
+    expect(source).toContain("auth-brand-logo");
+    expect(brandLogoSource).toContain("<svg");
+    expect(brandLogoSource).toContain("app-brand-logo-mark");
+    expect(brandLogoSource).toContain("#076B4A");
+    expect(brandLogoSource).toContain("#00E676");
+    expect(brandLogoSource).toContain("#A8FFD1");
+    expect(brandLogoSource).toContain("#F5F7EB");
+    expect(brandLogoSource).toContain("#E6C97A");
+    expect(source).not.toContain("appIconSrc");
+    expect(source).not.toContain("app-icon-startlink.png");
   });
 
   it("lets new users choose a polished personal avatar during registration", () => {
