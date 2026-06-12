@@ -112,6 +112,46 @@ class CustomerServiceRepository {
         fallbackAvatarUrl: fallbackAvatarUrl,
       );
 
+  Future<CsThread> transferThread({
+    required String threadType,
+    required String threadId,
+    required String toStaffUserId,
+    String? reason,
+    String? fallbackTitle,
+    String? fallbackAvatarUrl,
+  }) =>
+      _remote.transferThread(
+        threadType: threadType,
+        threadId: threadId,
+        toStaffUserId: toStaffUserId,
+        reason: reason,
+        fallbackTitle: fallbackTitle,
+        fallbackAvatarUrl: fallbackAvatarUrl,
+      );
+
+  Future<void> recallThreadMessageSilently(String messageId) =>
+      _remote.recallThreadMessageSilently(messageId);
+
+  Future<void> sendTyping({
+    required String threadType,
+    required String threadId,
+    required String preview,
+  }) =>
+      _remote.sendTyping(
+        threadType: threadType,
+        threadId: threadId,
+        preview: preview,
+      );
+
+  Future<CustomerServiceReadStatus> getThreadReadStatus({
+    required String threadType,
+    required String threadId,
+  }) =>
+      _remote.getThreadReadStatus(
+        threadType: threadType,
+        threadId: threadId,
+      );
+
   Future<List<CsKnowledgeSearchResult>> searchKnowledge({
     required String query,
     int topK = 8,
@@ -274,11 +314,22 @@ class AdminCustomerServiceRepository {
     String? keyword,
     String? status,
     String? threadType,
+    String? assignedStaffUserId,
   }) =>
       _remote.getCenterThreads(
         keyword: keyword,
         status: status,
         threadType: threadType,
+        assignedStaffUserId: assignedStaffUserId,
+      );
+
+  Future<CsThreadDetail> getCenterThreadDetail({
+    required String threadType,
+    required String threadId,
+  }) =>
+      _remote.getCenterThreadDetail(
+        threadType: threadType,
+        threadId: threadId,
       );
 
   Future<List<CsThread>> getDirectCustomerThreads({

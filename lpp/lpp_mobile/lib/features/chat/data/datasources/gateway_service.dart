@@ -136,10 +136,12 @@ class MessageReadEvent extends GatewayEvent {
   final String conversationId;
   final String userId;
   final int readSeq;
+  final DateTime? readAt;
   MessageReadEvent({
     required this.conversationId,
     required this.userId,
     required this.readSeq,
+    this.readAt,
   });
 }
 
@@ -149,11 +151,59 @@ class MessageRecalledEvent extends GatewayEvent {
   final String conversationId;
   final int conversationSeq;
   final String operatorUserId;
+  final bool silent;
   MessageRecalledEvent({
     required this.messageId,
     required this.conversationId,
     required this.conversationSeq,
     required this.operatorUserId,
+    this.silent = false,
+  });
+}
+
+class CustomerServiceTypingEvent extends GatewayEvent {
+  final String threadType;
+  final String threadId;
+  final String conversationId;
+  final String senderUserId;
+  final String? senderRole;
+  final String? preview;
+  final bool isTyping;
+  final DateTime? at;
+
+  CustomerServiceTypingEvent({
+    required this.threadType,
+    required this.threadId,
+    required this.conversationId,
+    required this.senderUserId,
+    this.senderRole,
+    this.preview,
+    required this.isTyping,
+    this.at,
+  });
+}
+
+class CustomerServiceThreadTransferredEvent extends GatewayEvent {
+  final String threadType;
+  final String threadId;
+  final String conversationId;
+  final String? customerUserId;
+  final String? fromStaffUserId;
+  final String toStaffUserId;
+  final String? reason;
+  final String? recipientRole;
+  final DateTime? transferredAt;
+
+  CustomerServiceThreadTransferredEvent({
+    required this.threadType,
+    required this.threadId,
+    required this.conversationId,
+    this.customerUserId,
+    this.fromStaffUserId,
+    required this.toStaffUserId,
+    this.reason,
+    this.recipientRole,
+    this.transferredAt,
   });
 }
 
@@ -433,6 +483,7 @@ class GatewayService {
     connection.on('msg.new', _onMsgNew);
     connection.on('msg.read', _onMsgRead);
     connection.on('msg.recalled', _onMsgRecalled);
+    connection.on('msg.typing', _onDirectTyping);
     connection.on('auth.force_logout', _onForceLogout);
     connection.on('auth.session.revoked', _onForceLogout);
     connection.on('auth.device.kicked', _onForceLogout);
@@ -443,6 +494,10 @@ class GatewayService {
     connection.on('temp_session.assigned', _onTempSessionAssigned);
     connection.on('temp_session.closed', _onTempSessionClosed);
     connection.on('temp_session.rated', _onTempSessionRated);
+    connection.on('temp_session.typing', _onTempSessionTyping);
+    connection.on('temp_session.transferred', _onTempSessionTransferred);
+    connection.on('customer_service.thread.transferred',
+        _onCustomerServiceThreadTransferred);
     connection.on('tenant.join_request.reviewed', _onTenantJoinRequestReviewed);
     connection.on('friend.request.created', _onFriendRequestChanged);
     connection.on('friend.request.accepted', _onFriendRequestChanged);
@@ -559,6 +614,7 @@ class GatewayService {
       conversationId: data['conversationId'] as String? ?? '',
       userId: data['userId'] as String? ?? '',
       readSeq: data['readSeq'] as int? ?? 0,
+      readAt: DateTime.tryParse(data['readAt']?.toString() ?? ''),
     ));
   }
 
@@ -570,6 +626,68 @@ class GatewayService {
       conversationId: data['conversationId'] as String? ?? '',
       conversationSeq: data['conversationSeq'] as int? ?? 0,
       operatorUserId: data['operatorUserId'] as String? ?? '',
+      silent: data['silent'] as bool? ?? false,
+    ));
+  }
+
+  void _onTempSessionTyping(List<Object?>? args) {
+    final data = _eventData(args);
+    if (data == null) return;
+    _eventController.add(CustomerServiceTypingEvent(
+      threadType: 'temp_session',
+      threadId: data['sessionId'] as String? ?? '',
+      conversationId: data['conversationId'] as String? ?? '',
+      senderUserId: data['senderUserId'] as String? ?? '',
+      senderRole: data['senderType'] as String? ?? data['senderRole'] as String?,
+      preview: data['preview'] as String?,
+      isTyping: data['isTyping'] as bool? ?? false,
+      at: DateTime.tryParse(data['at']?.toString() ?? ''),
+    ));
+  }
+
+  void _onDirectTyping(List<Object?>? args) {
+    final data = _eventData(args);
+    if (data == null) return;
+    _eventController.add(CustomerServiceTypingEvent(
+      threadType: 'im_direct',
+      threadId: data['conversationId'] as String? ?? '',
+      conversationId: data['conversationId'] as String? ?? '',
+      senderUserId: data['senderUserId'] as String? ?? '',
+      senderRole: data['senderType'] as String? ?? data['senderRole'] as String?,
+      preview: data['preview'] as String?,
+      isTyping: data['isTyping'] as bool? ?? false,
+      at: DateTime.tryParse(data['at']?.toString() ?? ''),
+    ));
+  }
+
+  void _onTempSessionTransferred(List<Object?>? args) {
+    final data = _eventData(args);
+    if (data == null) return;
+    _eventController.add(CustomerServiceThreadTransferredEvent(
+      threadType: 'temp_session',
+      threadId: data['sessionId'] as String? ?? data['threadId'] as String? ?? '',
+      conversationId: data['conversationId'] as String? ?? '',
+      fromStaffUserId: data['fromStaffUserId'] as String?,
+      toStaffUserId: data['toStaffUserId'] as String? ?? '',
+      reason: data['reason'] as String?,
+      recipientRole: data['recipientRole'] as String?,
+      transferredAt: DateTime.tryParse(data['transferredAt']?.toString() ?? ''),
+    ));
+  }
+
+  void _onCustomerServiceThreadTransferred(List<Object?>? args) {
+    final data = _eventData(args);
+    if (data == null) return;
+    _eventController.add(CustomerServiceThreadTransferredEvent(
+      threadType: 'im_direct',
+      threadId: data['threadId'] as String? ?? '',
+      conversationId: data['conversationId'] as String? ?? '',
+      customerUserId: data['customerUserId'] as String?,
+      fromStaffUserId: data['fromStaffUserId'] as String?,
+      toStaffUserId: data['toStaffUserId'] as String? ?? '',
+      reason: data['reason'] as String?,
+      recipientRole: data['recipientRole'] as String?,
+      transferredAt: DateTime.tryParse(data['transferredAt']?.toString() ?? ''),
     ));
   }
 

@@ -292,6 +292,34 @@ void _handleEvent(
     // 客服工作台相关事件：刷新会话列表（客服端）
     ref.invalidate(conversationsProvider(spaceId));
     _refreshCustomerServiceWorkbench(ref);
+  } else if (event is CustomerServiceThreadTransferredEvent) {
+    final currentUserId = ref.read(currentSpaceProvider)?.userId ?? '';
+    ref.read(customerServiceTransferNoticeProvider.notifier).apply(
+          threadType: event.threadType,
+          threadId: event.threadId,
+          conversationId: event.conversationId,
+          customerUserId: event.customerUserId,
+          fromStaffUserId: event.fromStaffUserId,
+          toStaffUserId: event.toStaffUserId,
+          reason: event.reason,
+          recipientRole: event.recipientRole,
+          currentStaffUserId: currentUserId,
+          transferredAt: event.transferredAt,
+        );
+    ref.invalidate(conversationsProvider(spaceId));
+    _refreshCustomerServiceWorkbench(ref);
+  } else if (event is CustomerServiceTypingEvent) {
+    ref.read(customerServiceTypingPreviewProvider.notifier).apply(
+          threadType: event.threadType,
+          threadId: event.threadId,
+          conversationId: event.conversationId,
+          isTyping: event.isTyping,
+          preview: event.preview,
+          senderRole: event.senderRole,
+          senderUserId: event.senderUserId,
+          at: event.at,
+        );
+    _refreshCustomerServiceWorkbench(ref);
   } else if (event is TenantJoinRequestReviewedEvent) {
     // 加入申请被拒绝：刷新空间列表（用户可能需要重新申请）
     ref.invalidate(spacesProvider);
@@ -357,11 +385,18 @@ void _handleMessageRead(
 
   final conversationType =
       _resolveConversationType(ref, spaceId, event.conversationId);
-  if (conversationType != ConversationType.direct) {
+  final isCustomerServiceConversation = conversationType != null &&
+      _isCustomerServiceConversation(
+        ref,
+        event.conversationId,
+        conversationType,
+      );
+  if (conversationType != ConversationType.direct &&
+      !isCustomerServiceConversation) {
     return;
   }
 
-  // 对端已读回执：只更新私聊里自己发的消息；群聊人数以服务端详情接口为准。
+  // 对端已读回执：只更新私聊或客服线程里自己发的消息；群聊人数以服务端详情接口为准。
   _updateChatIfKnown(ref, spaceId, event.conversationId, (notifier) {
     notifier.updatePeerReadSeq(event.userId, event.readSeq);
   });
@@ -497,14 +532,15 @@ void _handleFriendProfileUpdated(
 void _refreshCustomerServiceWorkbench(Ref ref) {
   final space = ref.read(currentSpaceProvider);
   if (space == null || !space.isEmployee) return;
+  final capabilities = ref.read(currentCustomerServiceRoleCapabilitiesProvider);
 
-  if (space.isCustomerService) {
+  if (capabilities.canUseStaffEndpoints) {
     ref.invalidate(customerServiceReceptionStatusProvider);
     ref.invalidate(customerServiceThreadsProvider);
     ref.invalidate(customerServiceDashboardProvider);
   }
 
-  if (space.isAdminOrAbove) {
+  if (capabilities.canUseManagementReadonly) {
     ref.invalidate(adminCustomerServiceDashboardProvider);
     ref.invalidate(adminCustomerServiceStaffStatusesProvider);
     ref.invalidate(adminCustomerServiceThreadsProvider);
@@ -532,10 +568,24 @@ void _handleMessageRecalled(
       'messageId': event.messageId,
       'conversationSeq': event.conversationSeq,
       'operatorUserId': event.operatorUserId,
+      'silent': event.silent,
     },
   );
-  // 更新 chatProvider 内存中的消息状态为已撤回
+  // 客服静默撤回：所有客户端直接移除消息，不展示撤回占位。
   final convId = event.conversationId;
+  if (event.silent) {
+    _updateChatIfKnown(ref, spaceId, convId, (notifier) {
+      notifier.deleteMessageLocally(event.messageId);
+    });
+    Future.microtask(() async {
+      try {
+        final local = ChatLocalDataSourceImpl();
+        await local.deleteMessage(spaceId, convId, event.messageId);
+      } catch (_) {}
+    });
+    return;
+  }
+  // 普通撤回：更新 chatProvider 内存中的消息状态为已撤回。
   _updateChatIfKnown(ref, spaceId, convId, (notifier) {
     notifier.markRecalled(event.messageId);
   });
@@ -1003,9 +1053,18 @@ void _updateChatIfKnown(
   void Function(ChatNotifier notifier) update,
 ) {
   final type = _resolveConversationType(ref, spaceId, conversationId);
-  if (type == null) return;
-  final isGroup = _isGroupConversationType(type);
-  try {
-    update(ref.read(chatProvider((spaceId, conversationId, isGroup)).notifier));
-  } catch (_) {}
+  final keys = <(String, String, bool)>[];
+  if (type != null) {
+    keys.add((spaceId, conversationId, _isGroupConversationType(type)));
+    if (type == ConversationType.tempSession) {
+      keys.add((spaceId, conversationId, false));
+    }
+  } else {
+    keys.add((spaceId, conversationId, false));
+  }
+  for (final key in keys) {
+    try {
+      update(ref.read(chatProvider(key).notifier));
+    } catch (_) {}
+  }
 }

@@ -890,10 +890,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get profileLppIdTitle => 'StartLink ID';
 
   @override
-  String get profileLppIdSetOnce => 'StartLink ID는 한 번만 변경할 수 있습니다. 신중하게 입력해 주십시오.';
+  String get profileLppIdSetOnce =>
+      'StartLink ID는 한 번만 변경할 수 있습니다. 신중하게 입력해 주십시오.';
 
   @override
-  String get profileLppIdChangeFailed => '변경에 실패했습니다 (StartLink ID는 한 번만 변경 가능)';
+  String get profileLppIdChangeFailed =>
+      '변경에 실패했습니다 (StartLink ID는 한 번만 변경 가능)';
 
   @override
   String get profileChangePasswordOld => '현재 비밀번호';

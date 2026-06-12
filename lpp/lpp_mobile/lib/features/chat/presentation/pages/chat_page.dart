@@ -51,11 +51,14 @@ import 'package:lpp_mobile/features/chat/presentation/models/customer_service_ch
 import 'package:lpp_mobile/features/chat/presentation/models/message_context_action_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
+import 'package:lpp_mobile/features/chat/presentation/widgets/customer_service_ended_notice.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/marketing_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/message_bubble.dart';
 import 'package:lpp_mobile/features/contacts/presentation/pages/profile_page.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
+import 'package:lpp_mobile/features/customer_service/domain/customer_service_realtime_models.dart';
+import 'package:lpp_mobile/features/customer_service/domain/customer_service_role_capabilities.dart';
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
 import 'package:lpp_mobile/features/profile/presentation/pages/my_page.dart';
 import 'package:lpp_mobile/features/settings/presentation/providers/chat_background_provider.dart';
@@ -126,6 +129,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   bool _customerServiceDetailLoaded = false;
   bool _isQuickTranslating = false;
   bool _isReceptionActionRunning = false;
+  bool _isCustomerServiceEndedRefreshing = false;
 
   // 多选模式
   bool _multiSelectMode = false;
@@ -148,7 +152,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       widget.customerServiceThreadId != null &&
       widget.customerServiceThreadId!.isNotEmpty;
 
-  bool get _isReadOnlyConversation => widget.customerServiceReadOnly;
+  bool get _isReadOnlyConversation {
+    if (!_isCustomerServiceThread) return widget.customerServiceReadOnly;
+    if (!ref
+        .read(currentCustomerServiceRoleCapabilitiesProvider)
+        .canUseStaffEndpoints) {
+      return true;
+    }
+    final detail = _customerServiceDetail;
+    if (detail != null && !detail.isTerminal) return false;
+    return widget.customerServiceReadOnly;
+  }
 
   CustomerServiceChatState get _customerServiceChatState =>
       CustomerServiceChatState.fromDetail(
@@ -166,6 +180,48 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   String get _activeConversationId =>
       _createdConversationId ?? widget.conversationId;
+
+  CustomerServiceActionReplyGate get _customerServiceActionReplyGate {
+    if (!_isCustomerServiceThread ||
+        _isReadOnlyConversation ||
+        _customerServiceThreadEnded) {
+      return CustomerServiceActionReplyGate.readonly;
+    }
+    return switch (_customerServiceChatState.replyGate) {
+      CustomerServiceReplyGate.claim => CustomerServiceActionReplyGate.claim,
+      CustomerServiceReplyGate.takeover =>
+        CustomerServiceActionReplyGate.takeover,
+      CustomerServiceReplyGate.open => CustomerServiceActionReplyGate.open,
+    };
+  }
+
+  CustomerServiceActionPermission _customerServiceActionPermission(
+    CustomerServiceAction action, {
+    CustomerServiceRoleCapabilities? capabilities,
+  }) {
+    return customerServiceActionPermission(
+      action,
+      CustomerServiceActionPermissionInput(
+        hasThread: _isCustomerServiceThread,
+        capabilities: capabilities ??
+            ref.read(currentCustomerServiceRoleCapabilitiesProvider),
+        replyGate: _customerServiceActionReplyGate,
+      ),
+    );
+  }
+
+  String _customerServiceActionDeniedText(
+    CustomerServiceActionPermission permission,
+  ) {
+    return switch (permission.reason) {
+      CustomerServiceActionReason.requiresClaim => '请先接入该会话',
+      CustomerServiceActionReason.requiresTakeover => '请先人工接管该会话',
+      CustomerServiceActionReason.readonly => '当前为只读会话，不能执行该操作',
+      CustomerServiceActionReason.roleDenied => '当前角色不能执行该客服操作',
+      CustomerServiceActionReason.noThread => '当前会话暂不可操作',
+      _ => '当前状态暂不可操作',
+    };
+  }
 
   bool get _isPendingDirectChat =>
       _createdConversationId == null &&
@@ -329,6 +385,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return text;
   }
 
+  CustomerServiceTypingPreview? _typingPreviewFor(
+    Map<String, CustomerServiceTypingPreview> previews, {
+    required String threadType,
+    required String threadId,
+    required String conversationId,
+  }) {
+    final normalizedType = threadType.trim().replaceAll('-', '_');
+    final effectiveType =
+        normalizedType.isEmpty ? 'temp_session' : normalizedType;
+    final keys = [
+      '$effectiveType:${threadId.trim()}',
+      '$effectiveType:${conversationId.trim()}',
+    ];
+    for (final key in keys) {
+      final preview = previews[key];
+      if (preview != null) return preview;
+    }
+    return null;
+  }
+
   String _customerServiceSubtitle(
     CustomerProfileCard? profile,
     CsThread? thread,
@@ -350,6 +426,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   bool get _customerServiceThreadEnded => _customerServiceChatState.ended;
+
+  Future<void> _handleCustomerServiceEndedRefresh() async {
+    if (_isCustomerServiceEndedRefreshing) return;
+    setState(() => _isCustomerServiceEndedRefreshing = true);
+    try {
+      await _syncCustomerServiceThread(showError: true);
+      if (!mounted) return;
+      if (!_customerServiceThreadEnded) {
+        ref.invalidate(customerServiceThreadsProvider);
+        ref.invalidate(customerServiceDashboardProvider);
+        AppToast.success(context, '会话已恢复，可继续接待');
+      } else {
+        AppToast.info(context, '客户尚未继续对话');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCustomerServiceEndedRefreshing = false);
+      }
+    }
+  }
 
   void _markCustomerServiceThreadEnded({
     String status = 'closed',
@@ -423,11 +519,35 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       for (final message in detail.messages) {
         notifier.appendMessage(message);
       }
+      _applyCustomerServiceReadStatus(detail, notifier);
     } catch (_) {
       if (showError && mounted) {
         AppToast.error(context, AppLocalizations.of(context).commonLoadFailed);
       }
     }
+  }
+
+  void _applyCustomerServiceReadStatus(
+    CsThreadDetail detail,
+    ChatNotifier notifier,
+  ) {
+    final directReadSeq = detail.customerLastReadSeq;
+    if (directReadSeq != null && directReadSeq > 0) {
+      notifier.updatePeerReadSeq(
+        detail.customerUserId ?? detail.peerUserId ?? '',
+        directReadSeq,
+      );
+      return;
+    }
+    final readStatus = detail.readStatus;
+    if (readStatus == null) return;
+    final visitorUserId = readStatus.visitorUserId;
+    if (visitorUserId == null || visitorUserId.trim().isEmpty) return;
+    final visitorMember = readStatus.members
+        .where((member) => member.userId == visitorUserId)
+        .firstOrNull;
+    if (visitorMember == null || visitorMember.lastReadSeq <= 0) return;
+    notifier.updatePeerReadSeq(visitorUserId, visitorMember.lastReadSeq);
   }
 
   Future<void> _handleCustomerServiceTakeover(CsThread thread) async {
@@ -447,6 +567,77 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (mounted) AppToast.error(context, '接管失败，请重试');
     } finally {
       if (mounted) setState(() => _isReceptionActionRunning = false);
+    }
+  }
+
+  Future<void> _openCustomerServiceTransferSheet() async {
+    final permission =
+        _customerServiceActionPermission(CustomerServiceAction.transfer);
+    if (!permission.enabled) {
+      AppToast.info(context, _customerServiceActionDeniedText(permission));
+      return;
+    }
+    final thread = _customerServiceThreadForDisplay();
+    if (thread.threadId.trim().isEmpty) {
+      AppToast.error(context, '当前会话暂不能转接');
+      return;
+    }
+    final currentUserId = ref.read(currentSpaceProvider)?.userId ?? '';
+    final members = ref.read(tenantMembersProvider).valueOrNull ?? const [];
+    final targets = createCustomerServiceTransferTargets(
+      members
+          .map((member) => CustomerServiceStaffCandidate(
+                userId: member.userId,
+                displayName: member.displayName,
+                avatarUrl: member.avatarUrl,
+                membershipRole: member.customerTag == '客服' ? 2 : null,
+              ))
+          .toList(growable: false),
+      currentUserIds: [
+        currentUserId,
+        thread.assignedStaffUserId,
+      ],
+    );
+    if (targets.isEmpty) {
+      AppToast.info(context, '暂无可转接的客服');
+      return;
+    }
+    final result = await showModalBottomSheet<_CustomerServiceTransferResult>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => _CustomerServiceTransferSheet(targets: targets),
+    );
+    if (result == null) return;
+    try {
+      await ref.read(customerServiceRepositoryProvider).transferThread(
+            threadType: thread.threadType,
+            threadId: thread.threadId,
+            toStaffUserId: result.toStaffUserId,
+            reason: result.reason,
+            fallbackTitle: thread.title,
+            fallbackAvatarUrl: thread.avatarUrl,
+          );
+      ref.invalidate(customerServiceThreadsProvider);
+      ref.invalidate(customerServiceDashboardProvider);
+      if (!mounted) return;
+      AppToast.success(context, '已转交会话');
+      unawaited(_syncCustomerServiceThread(showError: false));
+    } catch (error) {
+      AppDiagnostics.instance.error(
+        'customer-service.transfer',
+        'transfer failed',
+        context: {
+          'threadType': thread.threadType,
+          'threadId': thread.threadId,
+          'error': error.toString(),
+        },
+      );
+      if (mounted) AppToast.error(context, '转交失败，请重试');
     }
   }
 
@@ -674,6 +865,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       message,
       currentUserId: ref.read(currentSpaceProvider)?.userId ?? '',
     );
+    final currentUserId = ref.read(currentSpaceProvider)?.userId ?? '';
+    final silentRecallPermission =
+        _customerServiceActionPermission(CustomerServiceAction.silentRecall);
+    final canCustomerServiceSilentRecall = _isCustomerServiceThread &&
+        silentRecallPermission.enabled &&
+        message.status.isServerUsable &&
+        !message.isRecalled &&
+        (message.isSelf || message.senderUserId == currentUserId);
 
     // 构建菜单项列表
     final items = <_WxMenuItem>[
@@ -702,7 +901,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       if (capabilities.canFavorite)
         _WxMenuItem('favorite', Icons.star_outline,
             AppLocalizations.of(context).chatMenuFavorite),
-      if (capabilities.canRecall)
+      if (capabilities.canRecall || canCustomerServiceSilentRecall)
         _WxMenuItem('recall', Icons.undo_outlined,
             AppLocalizations.of(context).chatMenuRecall,
             danger: true),
@@ -819,20 +1018,62 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
   }
 
-  /// 撤回消息（调用服务端 API，2分钟内有效）
+  /// 撤回消息。普通 IM 保持 2 分钟占位撤回；客服线程使用静默撤回。
   Future<void> _handleRecall(List<Message> messages) async {
     final msg = _findSelectedMessage(messages);
     if (msg == null) return;
     final msgId = msg.messageId;
+    final notifier = ref.read(
+        chatProvider((_spaceId, widget.conversationId, _effectiveIsGroup))
+            .notifier);
+
+    if (_isCustomerServiceThread) {
+      final permission =
+          _customerServiceActionPermission(CustomerServiceAction.silentRecall);
+      if (!permission.enabled ||
+          !msg.status.isServerUsable ||
+          msg.isRecalled ||
+          !(msg.isSelf ||
+              msg.senderUserId ==
+                  (ref.read(currentSpaceProvider)?.userId ?? ''))) {
+        AppToast.info(context, _customerServiceActionDeniedText(permission));
+        return;
+      }
+      try {
+        await ref
+            .read(customerServiceRepositoryProvider)
+            .recallThreadMessageSilently(msgId);
+        notifier.deleteMessageLocally(msgId);
+        ref.invalidate(customerServiceThreadsProvider);
+        ref.invalidate(customerServiceDashboardProvider);
+        if (mounted) {
+          AppToast.success(
+              context, AppLocalizations.of(context).chatRecallSuccess);
+        }
+      } catch (error) {
+        AppDiagnostics.instance.error(
+          'customer-service.recall',
+          'silent recall failed',
+          context: {
+            'conversationId': widget.conversationId,
+            'messageId': msgId,
+            'error': error.toString(),
+          },
+        );
+        if (mounted) {
+          AppToast.error(
+              context, AppLocalizations.of(context).chatRecallFailed);
+        }
+      }
+      return;
+    }
+
     // 检查是否在 2 分钟内
     final elapsed = DateTime.now().difference(msg.sentAt);
     if (elapsed.inMinutes >= 2) {
       AppToast.info(context, AppLocalizations.of(context).chatRecallTimeout);
       return;
     }
-    final notifier = ref.read(
-        chatProvider((_spaceId, widget.conversationId, _effectiveIsGroup))
-            .notifier);
     try {
       await ref
           .read(conversationActionsControllerProvider)
@@ -1324,6 +1565,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required void Function(Message message) onOptimisticInsert,
     required void Function(String clientMsgId, Message updated) onMessageUpdate,
   }) async {
+    if (_isCustomerServiceThread) {
+      final action = type == MessageType.text
+          ? CustomerServiceAction.sendText
+          : CustomerServiceAction.sendMedia;
+      final permission = _customerServiceActionPermission(action);
+      if (!permission.enabled) {
+        throw ServerError(
+          code: 'CS_ACTION_DENIED',
+          message: _customerServiceActionDeniedText(permission),
+        );
+      }
+    }
     if (_isReadOnlyConversation) {
       throw const ServerError(
         code: 'CHAT_READ_ONLY',
@@ -1539,7 +1792,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             body: body,
             clientMsgId: clientMsgId,
             replyToMessageId: replyToMessageId,
-            readOnly: widget.customerServiceReadOnly,
+            readOnly: _isReadOnlyConversation,
             onOptimisticInsert: onOptimisticInsert,
             onMessageUpdate: onMessageUpdate,
           );
@@ -2081,6 +2334,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         : null;
     final currentUserId = ref.watch(currentSpaceProvider)?.userId ?? '';
     final space = ref.watch(currentSpaceProvider);
+    final customerServiceCapabilities =
+        ref.watch(currentCustomerServiceRoleCapabilitiesProvider);
     final groupDetailValue = groupDetail?.valueOrNull;
     final groupPermissions = groupDetailValue == null
         ? null
@@ -2110,7 +2365,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         const <ChatMentionCandidate>[];
     final isEmployee = space?.type == SpaceType.employee;
     final quickReplyScope =
-        !effectiveIsGroup && AppPermissions.canUseCustomerWorkbench(space)
+        !effectiveIsGroup && customerServiceCapabilities.canUseStaffEndpoints
             ? (widget.customerServiceThreadType == 'temp_session'
                 ? 'temp_session'
                 : 'direct_customer')
@@ -2138,6 +2393,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         : null;
     final serviceThreadForDisplay =
         _isCustomerServiceThread ? _customerServiceThreadForDisplay() : null;
+    final customerTypingPreviewMap = _isCustomerServiceThread
+        ? ref.watch(customerServiceTypingPreviewProvider)
+        : const <String, CustomerServiceTypingPreview>{};
+    final customerTypingPreview = _isCustomerServiceThread
+        ? _typingPreviewFor(
+            customerTypingPreviewMap,
+            threadType: widget.customerServiceThreadType ?? 'temp_session',
+            threadId: widget.customerServiceThreadId ?? '',
+            conversationId: activeConversationId,
+          )
+        : null;
     final currentTitle = _isCustomerServiceThread
         ? (_usableCustomerServiceTitle(
                 customerServiceProfile?.identity.displayName) ??
@@ -2171,6 +2437,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final receptionThread = _customerServiceDetail == null
         ? null
         : _customerServiceThreadForDisplay();
+    final transferPermission = _isCustomerServiceThread
+        ? _customerServiceActionPermission(
+            CustomerServiceAction.transfer,
+            capabilities: customerServiceCapabilities,
+          )
+        : null;
 
     PreferredSizeWidget appBarWidget;
     if (_multiSelectMode) {
@@ -2197,6 +2469,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         readOnly: _isReadOnlyConversation,
         onCustomerProfile:
             _isCustomerServiceThread ? _openCustomerProfileSheet : null,
+        onCustomerServiceTransfer:
+            _isCustomerServiceThread && (transferPermission?.enabled ?? false)
+                ? _openCustomerServiceTransferSheet
+                : null,
         customerServiceSubtitle: _isCustomerServiceThread
             ? _customerServiceSubtitle(
                 customerServiceProfile,
@@ -2332,13 +2608,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   text: _replyingTo!.text,
                   onClose: () => setState(() => _replyingTo = null),
                 ),
+              if (customerTypingPreview != null &&
+                  customerTypingPreview.previewText.isNotEmpty)
+                _CustomerTypingPreviewBar(
+                  previewText: customerTypingPreview.previewText,
+                ),
               // 非好友提示 or 输入框。群全员禁言时仍展示工具栏，但统一置灰不可操作。
               if (_isReadOnlyConversation)
                 _isCustomerServiceThread
                     ? const SizedBox.shrink()
                     : const _ReadOnlyConversationNotice()
               else if (_customerServiceThreadEnded)
-                const _CustomerServiceEndedNotice()
+                CustomerServiceEndedNotice(
+                  statusLabel: _customerServiceChatState.statusLabel,
+                  onRefresh: _handleCustomerServiceEndedRefresh,
+                  refreshing: _isCustomerServiceEndedRefreshing,
+                )
               else if (_customerServiceRequiresManualEntry)
                 _CustomerServiceManualEntryNotice(
                   gate: _customerServiceChatState.replyGate,
@@ -2827,6 +3112,7 @@ class _ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final bool readOnly;
   final String? customerServiceSubtitle;
   final VoidCallback? onCustomerProfile;
+  final VoidCallback? onCustomerServiceTransfer;
   final VoidCallback onQuickTranslate;
 
   const _ChatAppBar({
@@ -2840,6 +3126,7 @@ class _ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
     this.readOnly = false,
     this.customerServiceSubtitle,
     this.onCustomerProfile,
+    this.onCustomerServiceTransfer,
     required this.onQuickTranslate,
   });
 
@@ -3044,6 +3331,16 @@ class _ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
               color: Color(0xFF1D2129),
             ),
           ),
+        if (onCustomerServiceTransfer != null)
+          IconButton(
+            tooltip: AppLocalizations.of(context)
+                .customerServiceTransferConversation,
+            onPressed: onCustomerServiceTransfer,
+            icon: const Icon(
+              Icons.switch_account_outlined,
+              color: Color(0xFF1D2129),
+            ),
+          ),
         IconButton(
           tooltip: AppLocalizations.of(context).autoTranslateTitle,
           onPressed: isQuickTranslating ? null : onQuickTranslate,
@@ -3133,6 +3430,149 @@ class _CustomerProfileSheet extends ConsumerWidget {
                 ),
                 data: (card) => _CustomerProfileContent(card: card),
               ),
+      ),
+    );
+  }
+}
+
+class _CustomerServiceTransferResult {
+  final String toStaffUserId;
+  final String? reason;
+
+  const _CustomerServiceTransferResult({
+    required this.toStaffUserId,
+    this.reason,
+  });
+}
+
+class _CustomerServiceTransferSheet extends StatefulWidget {
+  final List<CustomerServiceTransferTarget> targets;
+
+  const _CustomerServiceTransferSheet({required this.targets});
+
+  @override
+  State<_CustomerServiceTransferSheet> createState() =>
+      _CustomerServiceTransferSheetState();
+}
+
+class _CustomerServiceTransferSheetState
+    extends State<_CustomerServiceTransferSheet> {
+  final TextEditingController _reasonController = TextEditingController();
+  String? _selectedUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedUserId = widget.targets.firstOrNull?.userId;
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 12, 10),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '转交会话',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: widget.targets.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final target = widget.targets[index];
+                    final selected = target.userId == _selectedUserId;
+                    return ListTile(
+                      leading: UserAvatar(
+                        avatarUrl: target.avatarUrl,
+                        name: target.displayName,
+                        size: 40,
+                      ),
+                      title: Text(
+                        target.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: const Text('客服'),
+                      trailing: selected
+                          ? const Icon(Icons.check_circle,
+                              color: Color(0xFF07C160))
+                          : const Icon(Icons.radio_button_unchecked),
+                      onTap: () {
+                        setState(() => _selectedUserId = target.userId);
+                      },
+                    );
+                  },
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: TextField(
+                  controller: _reasonController,
+                  minLines: 2,
+                  maxLines: 3,
+                  maxLength: 200,
+                  decoration: const InputDecoration(
+                    hintText: '添加备注（可选）',
+                    border: OutlineInputBorder(),
+                    counterText: '',
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: FilledButton(
+                    onPressed: _selectedUserId == null
+                        ? null
+                        : () {
+                            final reason = _reasonController.text.trim();
+                            Navigator.of(context).pop(
+                              _CustomerServiceTransferResult(
+                                toStaffUserId: _selectedUserId!,
+                                reason: reason.isEmpty ? null : reason,
+                              ),
+                            );
+                          },
+                    child: const Text('确认转交'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -4121,6 +4561,46 @@ class _ReplyPreview extends StatelessWidget {
   }
 }
 
+class _CustomerTypingPreviewBar extends StatelessWidget {
+  final String previewText;
+
+  const _CustomerTypingPreviewBar({required this.previewText});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFBF0),
+        border: Border(top: BorderSide(color: Color(0xFFFFE3A3))),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.edit_note_outlined,
+            size: 18,
+            color: Color(0xFFB7791F),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '客户正在输入：$previewText',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF7C4A03),
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 非好友提示（参考微信：「你已不是对方好友，无法发送消息」）
 // ---------------------------------------------------------------------------
@@ -4203,32 +4683,6 @@ class _CustomerServiceManualEntryNotice extends StatelessWidget {
           Text(
             isClaim ? '请先接入会话后再回复' : '请先人工接管后再回复',
             style: const TextStyle(fontSize: 13, color: Color(0xFF86909C)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CustomerServiceEndedNotice extends StatelessWidget {
-  const _CustomerServiceEndedNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF7F8FA),
-        border: Border(top: BorderSide(color: Color(0xFFE5E6EB))),
-      ),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF86909C)),
-          SizedBox(width: 6),
-          Text(
-            '会话已结束',
-            style: TextStyle(fontSize: 13, color: Color(0xFF86909C)),
           ),
         ],
       ),
@@ -4551,10 +5005,10 @@ class _MessageList extends ConsumerWidget {
                       groupId: isGroup ? conversationId : null,
                       onGroupReadReceiptTap: const MessageReadReceiptService()
                               .canShowGroupReadReceipt(
-                            message,
-                            isSelf: isSelf,
-                            isGroup: isGroup,
-                          )
+                        message,
+                        isSelf: isSelf,
+                        isGroup: isGroup,
+                      )
                           ? () => context.push(
                                 '/group-read-receipts/'
                                 '${Uri.encodeComponent(conversationId)}/'

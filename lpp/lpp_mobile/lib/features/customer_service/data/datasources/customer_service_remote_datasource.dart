@@ -293,6 +293,94 @@ class CustomerServiceRemoteDataSource {
     );
   }
 
+  Future<CsThread> transferThread({
+    required String threadType,
+    required String threadId,
+    required String toStaffUserId,
+    String? reason,
+    String? fallbackTitle,
+    String? fallbackAvatarUrl,
+  }) async {
+    final normalized = _serverThreadType(threadType);
+    if (normalized == 'temp_session') {
+      final resp = await _dio.post<Map<String, dynamic>>(
+        '/api/client/v1/customer-service/temp-sessions/$threadId/transfer',
+        data: {
+          'toStaffUserId': toStaffUserId,
+          if (reason?.trim().isNotEmpty == true) 'reason': reason!.trim(),
+        },
+      );
+      final data = resp.data?['data'] as Map<String, dynamic>? ?? {};
+      return CsThread.fromJson({
+        ...data,
+        'threadType': 'temp_session',
+        'threadId': data['threadId'] ?? data['sessionId'] ?? threadId,
+        'conversationId':
+            data['conversationId'] ?? data['threadId'] ?? threadId,
+        if (fallbackTitle != null) 'title': fallbackTitle,
+        if (fallbackAvatarUrl != null) 'avatarUrl': fallbackAvatarUrl,
+      });
+    }
+    return transferDirectCustomer(
+      threadId: threadId,
+      toStaffUserId: toStaffUserId,
+      reason: reason,
+      fallbackTitle: fallbackTitle,
+      fallbackAvatarUrl: fallbackAvatarUrl,
+    );
+  }
+
+  Future<void> recallThreadMessageSilently(String messageId) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/api/client/v1/messages/${messageId.trim()}/recall-silent',
+    );
+  }
+
+  Future<void> sendTyping({
+    required String threadType,
+    required String threadId,
+    required String preview,
+  }) async {
+    final normalized = _serverThreadType(threadType);
+    if (normalized == 'temp_session') {
+      await _dio.post<Map<String, dynamic>>(
+        '/api/client/v1/customer-service/temp-sessions/$threadId/typing',
+        data: preview.trim().isEmpty ? null : {'preview': preview},
+      );
+      return;
+    }
+    await _dio.post<Map<String, dynamic>>(
+      '/api/client/v1/direct-chats/$threadId/typing',
+      data: preview.trim().isEmpty ? null : {'preview': preview},
+    );
+  }
+
+  Future<CustomerServiceReadStatus> getThreadReadStatus({
+    required String threadType,
+    required String threadId,
+  }) async {
+    final normalized = _serverThreadType(threadType);
+    if (normalized == 'temp_session') {
+      final resp = await _dio.get<Map<String, dynamic>>(
+        '/api/client/v1/customer-service/temp-sessions/$threadId/read-status',
+      );
+      final data = resp.data?['data'] as Map<String, dynamic>? ?? {};
+      return CustomerServiceReadStatus.fromJson(data);
+    }
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/api/client/v1/direct-chats/$threadId/read-status',
+    );
+    final data = resp.data?['data'] as Map<String, dynamic>? ?? {};
+    return CustomerServiceReadStatus.fromDirectPeer(
+      conversationId: threadId,
+      customerUserId: data['peerUserId']?.toString() ?? '',
+      customerLastReadSeq: data['peerLastReadSeq'] as int? ?? 0,
+      customerLastReadAt: DateTime.tryParse(
+        data['peerLastReadAt']?.toString() ?? '',
+      ),
+    );
+  }
+
   Future<List<CsKnowledgeSearchResult>> searchKnowledge({
     required String query,
     int topK = 8,
@@ -926,12 +1014,51 @@ class AdminCustomerServiceRemoteDataSource {
     String? keyword,
     String? status,
     String? threadType,
+    String? assignedStaffUserId,
+  }) async {
+    try {
+      final resp = await _dio.get<Map<String, dynamic>>(
+        '/api/admin/v1/customer-service/center/threads',
+        queryParameters: {
+          if (keyword != null && keyword.trim().isNotEmpty)
+            'keyword': keyword.trim(),
+          if (assignedStaffUserId != null &&
+              assignedStaffUserId.trim().isNotEmpty)
+            'assignedStaffUserId': assignedStaffUserId.trim(),
+          if (status != null && status.trim().isNotEmpty)
+            'status': status.trim(),
+          if (threadType != null && threadType.trim().isNotEmpty)
+            'threadType': _centerThreadTypeParam(threadType.trim()),
+        },
+      );
+      return _centerThreadItems(resp.data?['data'])
+          .map(CsThread.fromJson)
+          .where((thread) => thread.threadId.isNotEmpty)
+          .toList(growable: false);
+    } on DioException {
+      return _getConversationManagementServiceThreads(
+        keyword: keyword,
+        status: status,
+        threadType: threadType,
+        assignedStaffUserId: assignedStaffUserId,
+      );
+    }
+  }
+
+  Future<List<CsThread>> _getConversationManagementServiceThreads({
+    String? keyword,
+    String? status,
+    String? threadType,
+    String? assignedStaffUserId,
   }) async {
     final resp = await _dio.get<Map<String, dynamic>>(
       '/api/admin/v1/conversation-management/conversations',
       queryParameters: {
         if (keyword != null && keyword.trim().isNotEmpty)
           'keyword': keyword.trim(),
+        if (assignedStaffUserId != null &&
+            assignedStaffUserId.trim().isNotEmpty)
+          'assignedStaffUserId': assignedStaffUserId.trim(),
         if (status != null && status.trim().isNotEmpty)
           'frozen': status.trim() == 'frozen',
         if (threadType != null && threadType.trim().isNotEmpty)
@@ -961,6 +1088,26 @@ class AdminCustomerServiceRemoteDataSource {
               Map<String, dynamic>.from(e),
             ))
         .toList();
+  }
+
+  Future<CsThreadDetail> getCenterThreadDetail({
+    required String threadType,
+    required String threadId,
+  }) async {
+    final normalizedThreadType =
+        threadType.trim().replaceAll('-', '_') == 'temp_session'
+            ? 'temp_session'
+            : 'im_direct';
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/api/admin/v1/customer-service/center/threads/'
+      '$normalizedThreadType/${threadId.trim()}',
+    );
+    final data = _mapAdminData(resp.data?['data']);
+    return CsThreadDetail.fromJson({
+      ...data,
+      'threadType': normalizedThreadType,
+      'threadId': data['threadId'] ?? data['sessionId'] ?? threadId,
+    });
   }
 
   Future<List<CsThread>> getDirectCustomerThreads({
@@ -1005,6 +1152,12 @@ class AdminCustomerServiceRemoteDataSource {
         .toList(growable: false);
   }
 
+  static Map<String, dynamic> _mapAdminData(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return const {};
+  }
+
   static String? _stringValue(Object? value) {
     final text = value?.toString().trim();
     return text == null || text.isEmpty ? null : text;
@@ -1027,6 +1180,35 @@ class AdminCustomerServiceRemoteDataSource {
       return 'direct';
     }
     return normalized;
+  }
+
+  static String _centerThreadTypeParam(String threadType) {
+    final normalized = threadType.replaceAll('-', '_');
+    if (normalized == 'direct_customer' || normalized == 'direct') {
+      return 'im_direct';
+    }
+    if (normalized == 'temp_session') return 'temp_session';
+    return normalized;
+  }
+
+  static List<Map<String, dynamic>> _centerThreadItems(Object? data) {
+    final rawItems = switch (data) {
+      {'items': final List<dynamic> items} => items,
+      {'threads': final List<dynamic> threads} => threads,
+      {
+        'queueItems': final List<dynamic> queueItems,
+        'activeItems': final List<dynamic> activeItems,
+      } =>
+        <dynamic>[...queueItems, ...activeItems],
+      {'queueItems': final List<dynamic> queueItems} => queueItems,
+      {'activeItems': final List<dynamic> activeItems} => activeItems,
+      List<dynamic> list => list,
+      _ => const <dynamic>[],
+    };
+    return rawItems
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
   }
 
   static CsThread _conversationManagementItemToThread(

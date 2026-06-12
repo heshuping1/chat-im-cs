@@ -9,6 +9,7 @@ import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
+import 'package:lpp_mobile/features/startup/presentation/widgets/startup_brand_loading_view.dart';
 
 const _startupWarmBudget = Duration(seconds: 3);
 const _conversationWarmBudget = Duration(seconds: 2);
@@ -121,67 +122,10 @@ class StartupGatePage extends ConsumerWidget {
       });
     }
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final background =
-        isDark ? const Color(0xFF111111) : const Color(0xFFF7F7F7);
-
     if (hasCompletedStartupGate != false) {
-      return Scaffold(backgroundColor: background);
+      return const Scaffold(backgroundColor: Color(0xFF020B0A));
     }
 
-    return Scaffold(
-      backgroundColor: background,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: const Color(0xFF07C160),
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'L',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 38,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0,
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              '星络',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: colorScheme.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return const StartupBrandLoadingView();
   }
 }

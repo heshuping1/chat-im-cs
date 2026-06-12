@@ -13,9 +13,13 @@ import 'package:lpp_mobile/core/widgets/app_toast.dart';
 import 'package:lpp_mobile/core/widgets/person_avatar_with_badge.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/effective_space_provider.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/customer_service_chat_state_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
+import 'package:lpp_mobile/features/customer_service/domain/customer_service_monitor_wall.dart';
+import 'package:lpp_mobile/features/customer_service/domain/customer_service_realtime_models.dart';
 import 'package:lpp_mobile/features/customer_service/presentation/providers/customer_service_providers.dart';
 import 'package:lpp_mobile/features/settings/presentation/providers/timezone_provider.dart';
 
@@ -1991,6 +1995,7 @@ class _AdminAuditLogList extends ConsumerWidget {
 }
 
 enum _AdminServiceCenterTab {
+  monitor,
   customer,
   online,
   staff,
@@ -2008,7 +2013,7 @@ class _AdminServiceCenterContent extends ConsumerStatefulWidget {
 
 class _AdminServiceCenterContentState
     extends ConsumerState<_AdminServiceCenterContent> {
-  _AdminServiceCenterTab _selectedTab = _AdminServiceCenterTab.customer;
+  _AdminServiceCenterTab _selectedTab = _AdminServiceCenterTab.monitor;
 
   @override
   Widget build(BuildContext context) {
@@ -2028,6 +2033,10 @@ class _AdminServiceCenterContentState
             _AdminServiceCenterTab.customer =>
               const _AdminCustomerConversationList(
                 key: ValueKey('customer'),
+              ),
+            _AdminServiceCenterTab.monitor =>
+              const _AdminRealtimeMonitorContent(
+                key: ValueKey('monitor'),
               ),
             _AdminServiceCenterTab.online =>
               const _AdminOnlineServiceThreadList(
@@ -2119,6 +2128,7 @@ class _AdminServiceCenterTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     const options = [
+      MapEntry(_AdminServiceCenterTab.monitor, '实时监控'),
       MapEntry(_AdminServiceCenterTab.customer, '客户会话'),
       MapEntry(_AdminServiceCenterTab.online, '在线客服'),
       MapEntry(_AdminServiceCenterTab.staff, '客服状态'),
@@ -2185,6 +2195,692 @@ class _AdminServiceCenterTabBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AdminRealtimeMonitorContent extends ConsumerStatefulWidget {
+  const _AdminRealtimeMonitorContent({super.key});
+
+  @override
+  ConsumerState<_AdminRealtimeMonitorContent> createState() =>
+      _AdminRealtimeMonitorContentState();
+}
+
+class _AdminRealtimeMonitorContentState
+    extends ConsumerState<_AdminRealtimeMonitorContent> {
+  String? _staffUserId;
+  String? _threadType;
+  String? _status = 'active';
+  MonitorLayoutMode _layoutMode = MonitorLayoutMode.twoByOne;
+  String _focusedThreadKey = '';
+  List<String> _watchedThreadKeys = const [];
+
+  @override
+  Widget build(BuildContext context) {
+    final query = AdminCustomerServiceThreadQuery(
+      assignedStaffUserId: _staffUserId,
+      threadType: _threadType,
+    );
+    final threadsAsync = ref.watch(adminCustomerServiceThreadsProvider(query));
+    final staffAsync = ref.watch(adminCustomerServiceStaffStatusesProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        staffAsync.when(
+          loading: () => _AdminMonitorFilters(
+            staffItems: const [],
+            selectedStaffUserId: _staffUserId,
+            selectedStatus: _status,
+            selectedThreadType: _threadType,
+            layoutMode: _layoutMode,
+            onStaffChanged: _setStaffFilter,
+            onStatusChanged: _setStatusFilter,
+            onThreadTypeChanged: _setThreadTypeFilter,
+            onLayoutChanged: _setLayoutMode,
+            loadingStaff: true,
+          ),
+          error: (_, __) => _AdminMonitorFilters(
+            staffItems: const [],
+            selectedStaffUserId: _staffUserId,
+            selectedStatus: _status,
+            selectedThreadType: _threadType,
+            layoutMode: _layoutMode,
+            onStaffChanged: _setStaffFilter,
+            onStatusChanged: _setStatusFilter,
+            onThreadTypeChanged: _setThreadTypeFilter,
+            onLayoutChanged: _setLayoutMode,
+          ),
+          data: (staffItems) => _AdminMonitorFilters(
+            staffItems: staffItems,
+            selectedStaffUserId: _staffUserId,
+            selectedStatus: _status,
+            selectedThreadType: _threadType,
+            layoutMode: _layoutMode,
+            onStaffChanged: _setStaffFilter,
+            onStatusChanged: _setStatusFilter,
+            onThreadTypeChanged: _setThreadTypeFilter,
+            onLayoutChanged: _setLayoutMode,
+          ),
+        ),
+        const SizedBox(height: 12),
+        threadsAsync.when(
+          loading: () => const _AdminLoadingCard(),
+          error: (_, __) => const _AdminErrorCard(
+            message: '实时监控加载失败',
+          ),
+          data: (items) {
+            final filtered = sortCustomerServiceMonitorThreadsByPriority(
+              filterCustomerServiceMonitorThreads(
+                items,
+                CustomerServiceMonitorFilter(
+                  staffUserId: _staffUserId,
+                  status: _status,
+                  threadType: _threadType,
+                ),
+              ),
+            );
+            final visibleKeys =
+                filtered.map(customerServiceMonitorThreadKey).toSet();
+            final watchedKeys = trimCustomerServiceMonitorWatchedKeys(
+              _watchedThreadKeys
+                  .where(visibleKeys.contains)
+                  .toList(growable: false),
+              _layoutMode,
+            );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _AdminMonitorThreadPool(
+                  items: filtered,
+                  watchedThreadKeys: watchedKeys,
+                  focusedThreadKey: _focusedThreadKey,
+                  onWatch: _watchThread,
+                ),
+                const SizedBox(height: 12),
+                _AdminMonitorWall(
+                  threads: filtered,
+                  watchedThreadKeys: watchedKeys,
+                  focusedThreadKey: _focusedThreadKey,
+                  layoutMode: _layoutMode,
+                  onFocus: (key) => setState(() => _focusedThreadKey = key),
+                  onClose: _removeWatchedThread,
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _setStaffFilter(String? value) {
+    setState(() {
+      _staffUserId = value?.trim().isEmpty == true ? null : value;
+      _focusedThreadKey = '';
+      _watchedThreadKeys = const [];
+    });
+  }
+
+  void _setStatusFilter(String? value) {
+    setState(() {
+      _status = value?.trim().isEmpty == true ? null : value;
+      _focusedThreadKey = '';
+      _watchedThreadKeys = const [];
+    });
+  }
+
+  void _setThreadTypeFilter(String? value) {
+    setState(() {
+      _threadType = value?.trim().isEmpty == true ? null : value;
+      _focusedThreadKey = '';
+      _watchedThreadKeys = const [];
+    });
+  }
+
+  void _setLayoutMode(MonitorLayoutMode value) {
+    setState(() {
+      _layoutMode = value;
+      _watchedThreadKeys =
+          trimCustomerServiceMonitorWatchedKeys(_watchedThreadKeys, value);
+      if (!_watchedThreadKeys.contains(_focusedThreadKey)) {
+        _focusedThreadKey = _watchedThreadKeys.firstOrNull ?? '';
+      }
+    });
+  }
+
+  void _watchThread(CsThread thread) {
+    final key = customerServiceMonitorThreadKey(thread);
+    final result = selectCustomerServiceMonitorWatchedKey(
+      watchedThreadKeys: _watchedThreadKeys,
+      threadKey: key,
+      focusedThreadKey: _focusedThreadKey,
+      layoutMode: _layoutMode,
+    );
+    setState(() {
+      _focusedThreadKey = result.focusedThreadKey;
+      _watchedThreadKeys = result.watchedThreadKeys;
+    });
+  }
+
+  void _removeWatchedThread(String key) {
+    setState(() {
+      _watchedThreadKeys =
+          _watchedThreadKeys.where((item) => item != key).toList();
+      if (_focusedThreadKey == key) {
+        _focusedThreadKey = _watchedThreadKeys.firstOrNull ?? '';
+      }
+    });
+  }
+}
+
+class _AdminMonitorFilters extends StatelessWidget {
+  final List<AdminStaffStatus> staffItems;
+  final String? selectedStaffUserId;
+  final String? selectedStatus;
+  final String? selectedThreadType;
+  final MonitorLayoutMode layoutMode;
+  final ValueChanged<String?> onStaffChanged;
+  final ValueChanged<String?> onStatusChanged;
+  final ValueChanged<String?> onThreadTypeChanged;
+  final ValueChanged<MonitorLayoutMode> onLayoutChanged;
+  final bool loadingStaff;
+
+  const _AdminMonitorFilters({
+    required this.staffItems,
+    required this.selectedStaffUserId,
+    required this.selectedStatus,
+    required this.selectedThreadType,
+    required this.layoutMode,
+    required this.onStaffChanged,
+    required this.onStatusChanged,
+    required this.onThreadTypeChanged,
+    required this.onLayoutChanged,
+    this.loadingStaff = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.monitor_heart_outlined, color: _primary, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '实时监控客服对话',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Icon(Icons.circle, size: 8, color: _primary),
+            ],
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String?>(
+            initialValue: selectedStaffUserId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: loadingStaff ? '正在同步客服' : '按客服筛选',
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('全部客服'),
+              ),
+              ...staffItems.map((item) => DropdownMenuItem<String?>(
+                    value: item.staffUserId,
+                    child: Text(
+                      '${item.displayName} · ${item.label}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  )),
+            ],
+            onChanged: onStaffChanged,
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MonitorChoice<String?>(
+                label: '进行中',
+                value: 'active',
+                groupValue: selectedStatus,
+                onSelected: onStatusChanged,
+              ),
+              _MonitorChoice<String?>(
+                label: '排队',
+                value: 'queued',
+                groupValue: selectedStatus,
+                onSelected: onStatusChanged,
+              ),
+              _MonitorChoice<String?>(
+                label: '全部状态',
+                value: null,
+                groupValue: selectedStatus,
+                onSelected: onStatusChanged,
+              ),
+              _MonitorChoice<String?>(
+                label: '全部渠道',
+                value: null,
+                groupValue: selectedThreadType,
+                onSelected: onThreadTypeChanged,
+              ),
+              _MonitorChoice<String?>(
+                label: '访客咨询',
+                value: 'temp_session',
+                groupValue: selectedThreadType,
+                onSelected: onThreadTypeChanged,
+              ),
+              _MonitorChoice<String?>(
+                label: 'IM 客服',
+                value: 'im_direct',
+                groupValue: selectedThreadType,
+                onSelected: onThreadTypeChanged,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SegmentedButton<MonitorLayoutMode>(
+            segments: const [
+              ButtonSegment(
+                value: MonitorLayoutMode.oneByOne,
+                icon: Icon(Icons.crop_square, size: 16),
+                label: Text('1'),
+              ),
+              ButtonSegment(
+                value: MonitorLayoutMode.twoByOne,
+                icon: Icon(Icons.view_column_outlined, size: 16),
+                label: Text('2'),
+              ),
+              ButtonSegment(
+                value: MonitorLayoutMode.twoByTwo,
+                icon: Icon(Icons.grid_view_outlined, size: 16),
+                label: Text('4'),
+              ),
+            ],
+            selected: {layoutMode},
+            showSelectedIcon: false,
+            onSelectionChanged: (values) => onLayoutChanged(values.first),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonitorChoice<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final T groupValue;
+  final ValueChanged<T> onSelected;
+
+  const _MonitorChoice({
+    required this.label,
+    required this.value,
+    required this.groupValue,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = value == groupValue;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(value),
+      selectedColor: const Color(0xFFE8F8EF),
+      labelStyle: TextStyle(
+        color: selected ? _primary : Theme.of(context).colorScheme.onSurface,
+        fontSize: 13,
+        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+      ),
+      side: BorderSide(
+        color: selected ? _primary : Theme.of(context).dividerColor,
+      ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    );
+  }
+}
+
+class _AdminMonitorThreadPool extends StatelessWidget {
+  final List<CsThread> items;
+  final List<String> watchedThreadKeys;
+  final String focusedThreadKey;
+  final ValueChanged<CsThread> onWatch;
+
+  const _AdminMonitorThreadPool({
+    required this.items,
+    required this.watchedThreadKeys,
+    required this.focusedThreadKey,
+    required this.onWatch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _WorkbenchEmptyState(
+        icon: Icons.monitor_heart_outlined,
+        message: '暂无符合条件的进行中客服对话',
+        minHeight: 120,
+      );
+    }
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: items.take(30).map((thread) {
+          final key = customerServiceMonitorThreadKey(thread);
+          final watched = watchedThreadKeys.contains(key);
+          return ListTile(
+            leading: PersonAvatarWithBadge(
+              avatarUrl: thread.avatarUrl,
+              name: thread.title,
+              size: 40,
+              userType: thread.isTempSession ? 1 : null,
+            ),
+            title: Text(
+              thread.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              _adminMonitorThreadSubtitle(thread),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: OutlinedButton.icon(
+              onPressed: () => onWatch(thread),
+              icon: Icon(
+                watched ? Icons.visibility : Icons.add,
+                size: 16,
+              ),
+              label: Text(watched ? '已监控' : '监控'),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _AdminMonitorWall extends StatelessWidget {
+  final List<CsThread> threads;
+  final List<String> watchedThreadKeys;
+  final String focusedThreadKey;
+  final MonitorLayoutMode layoutMode;
+  final ValueChanged<String> onFocus;
+  final ValueChanged<String> onClose;
+
+  const _AdminMonitorWall({
+    required this.threads,
+    required this.watchedThreadKeys,
+    required this.focusedThreadKey,
+    required this.layoutMode,
+    required this.onFocus,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final threadByKey = {
+      for (final thread in threads)
+        customerServiceMonitorThreadKey(thread): thread,
+    };
+    final visibleThreads = watchedThreadKeys
+        .map((key) => MapEntry(key, threadByKey[key]))
+        .where((entry) => entry.value != null)
+        .toList(growable: false);
+    if (visibleThreads.isEmpty) {
+      return const _WorkbenchEmptyState(
+        icon: Icons.dashboard_customize_outlined,
+        message: '从上方会话池选择要并排监控的对话',
+        minHeight: 140,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 680 &&
+                layoutMode != MonitorLayoutMode.oneByOne
+            ? 2
+            : 1;
+        final gap = columns > 1 ? 10.0 : 0.0;
+        final cardWidth = columns == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - gap) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: 10,
+          children: visibleThreads.map((entry) {
+            final key = entry.key;
+            return SizedBox(
+              width: cardWidth,
+              child: _AdminMonitorWindow(
+                thread: entry.value!,
+                threadKey: key,
+                focused: key == focusedThreadKey,
+                onFocus: () => onFocus(key),
+                onClose: () => onClose(key),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+class _AdminMonitorWindow extends ConsumerWidget {
+  final CsThread thread;
+  final String threadKey;
+  final bool focused;
+  final VoidCallback onFocus;
+  final VoidCallback onClose;
+
+  const _AdminMonitorWindow({
+    required this.thread,
+    required this.threadKey,
+    required this.focused,
+    required this.onFocus,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final detailAsync = ref.watch(adminCustomerServiceThreadDetailProvider((
+      threadType: thread.serverThreadType,
+      threadId: thread.threadId,
+    )));
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onFocus,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: focused ? _primary : Theme.of(context).dividerColor,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  PersonAvatarWithBadge(
+                    avatarUrl: thread.avatarUrl,
+                    name: thread.title,
+                    size: 34,
+                    userType: thread.isTempSession ? 1 : null,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          thread.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          thread.assignedStaffDisplayName ?? '未分配客服',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                colorScheme.onSurface.withValues(alpha: 0.56),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '移除',
+                    onPressed: onClose,
+                    icon: const Icon(Icons.close, size: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              detailAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (_, __) => const _MonitorWindowMessage(
+                  text: '详情同步失败，请稍后刷新',
+                  icon: Icons.sync_problem_outlined,
+                ),
+                data: (detail) {
+                  final messages = detail.messages.take(6).toList();
+                  if (messages.isEmpty) {
+                    return const _MonitorWindowMessage(
+                      text: '暂无可预览消息',
+                      icon: Icons.chat_bubble_outline,
+                    );
+                  }
+                  return Column(
+                    children: messages.map((message) {
+                      final mine =
+                          message.senderUserId == detail.assignedStaffUserId;
+                      return Align(
+                        alignment:
+                            mine ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          constraints: const BoxConstraints(maxWidth: 260),
+                          decoration: BoxDecoration(
+                            color: mine
+                                ? const Color(0xFFE8F8EF)
+                                : colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _messagePreviewText(message.body),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MonitorWindowMessage extends StatelessWidget {
+  final String text;
+  final IconData icon;
+
+  const _MonitorWindowMessage({
+    required this.text,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Column(
+        children: [
+          Icon(icon, color: colorScheme.onSurface.withValues(alpha: 0.35)),
+          const SizedBox(height: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.52),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _adminMonitorThreadSubtitle(CsThread thread) {
+  final staff = thread.assignedStaffDisplayName?.trim();
+  final status = CustomerServiceChatState.statusLabelFor(thread.status);
+  final channel = thread.isTempSession ? '访客咨询' : 'IM 客服';
+  return [
+    channel,
+    if (staff != null && staff.isNotEmpty) staff,
+    if (status.isNotEmpty) status,
+    thread.lastMessagePreview,
+  ].whereType<String>().where((item) => item.trim().isNotEmpty).join(' · ');
+}
+
+String _messagePreviewText(MessageBody body) {
+  final text = body.text?.trim();
+  if (text != null && text.isNotEmpty) return text;
+  if (body.image != null) return '[图片]';
+  if (body.video != null) return '[视频]';
+  if (body.voice != null) return '[语音]';
+  if (body.file != null) return '[文件]';
+  if (body.location != null) return '[位置]';
+  if (body.contactCard != null) return '[名片]';
+  if (body.callLog != null) return '[通话]';
+  return '[消息]';
 }
 
 class _AdminServiceCenterStaffStatusList extends ConsumerWidget {
@@ -4670,6 +5366,7 @@ class _OnlineServiceTabState extends ConsumerState<_OnlineServiceTab> {
   Widget build(BuildContext context) {
     final threadsAsync = ref.watch(customerServiceThreadsProvider);
     final historyAsync = ref.watch(customerServiceStaffHistoryProvider);
+    final transferNotices = ref.watch(customerServiceTransferNoticeProvider);
     final staffHistoryThreads = historyAsync.valueOrNull ?? const <CsThread>[];
     return threadsAsync.when(
       loading: () => _buildContent(
@@ -4677,18 +5374,27 @@ class _OnlineServiceTabState extends ConsumerState<_OnlineServiceTab> {
         ref,
         const CsThreadsData([], []),
         staffHistoryThreads: staffHistoryThreads,
+        notice: transferNotices.isEmpty
+            ? null
+            : _TransferNoticeCard(notice: transferNotices.first),
       ),
       error: (e, __) => _buildContent(
         context,
         ref,
         const CsThreadsData([], []),
         staffHistoryThreads: staffHistoryThreads,
+        notice: transferNotices.isEmpty
+            ? null
+            : _TransferNoticeCard(notice: transferNotices.first),
       ),
       data: (data) => _buildContent(
         context,
         ref,
         data,
         staffHistoryThreads: staffHistoryThreads,
+        notice: transferNotices.isEmpty
+            ? null
+            : _TransferNoticeCard(notice: transferNotices.first),
       ),
     );
   }
@@ -5303,6 +6009,86 @@ class _OnlineThreadEmptyState extends StatelessWidget {
         style: TextStyle(
           fontSize: 13,
           color: colorScheme.onSurface.withValues(alpha: 0.48),
+        ),
+      ),
+    );
+  }
+}
+
+class _TransferNoticeCard extends ConsumerWidget {
+  final CustomerServiceTransferNotice notice;
+
+  const _TransferNoticeCard({required this.notice});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: const Color(0xFFE8F8EF),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          if (notice.conversationId.isEmpty) {
+            AppToast.info(context, '会话正在同步，请稍后刷新');
+            return;
+          }
+          ref
+              .read(customerServiceTransferNoticeProvider.notifier)
+              .dismiss(notice.noticeId);
+          context.push(
+            '/chat/${notice.conversationId}',
+            extra: {
+              'isGroup': false,
+              'title': '转接会话',
+              'customerServiceThreadType': notice.threadType,
+              'customerServiceThreadId': notice.threadId,
+              'customerServiceReadOnly': false,
+            },
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          child: Row(
+            children: [
+              const Icon(Icons.swap_horiz_outlined, color: _primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notice.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF075E45),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      notice.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurface.withValues(alpha: 0.64),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: '关闭通知',
+                onPressed: () {
+                  ref
+                      .read(customerServiceTransferNoticeProvider.notifier)
+                      .dismiss(notice.noticeId);
+                },
+                icon: const Icon(Icons.close, size: 18),
+              ),
+            ],
+          ),
         ),
       ),
     );

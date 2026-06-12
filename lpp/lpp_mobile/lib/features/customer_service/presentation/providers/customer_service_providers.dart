@@ -5,13 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:lpp_mobile/core/admin/admin_access.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
-import 'package:lpp_mobile/core/permissions/app_permissions.dart';
 import 'package:lpp_mobile/core/storage/hive_storage.dart';
 import 'package:lpp_mobile/core/storage/secure_storage.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/customer_service/data/datasources/customer_service_remote_datasource.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
 import 'package:lpp_mobile/features/customer_service/data/repositories/customer_service_repository.dart';
+import 'package:lpp_mobile/features/customer_service/domain/customer_service_realtime_models.dart';
+import 'package:lpp_mobile/features/customer_service/domain/customer_service_role_capabilities.dart';
 
 final customerServiceRepositoryProvider =
     Provider<CustomerServiceRepository>((ref) {
@@ -26,6 +27,154 @@ final adminCustomerServiceRepositoryProvider =
     AdminCustomerServiceRemoteDataSource(ref.watch(adminDioProvider)),
   );
 });
+
+final currentCustomerServiceRoleCapabilitiesProvider =
+    Provider<CustomerServiceRoleCapabilities>((ref) {
+  final space = ref.watch(currentSpaceProvider);
+  return customerServiceRoleCapabilities(
+    membershipRole: space?.membershipRole,
+  );
+});
+
+final customerServiceTypingPreviewProvider = StateNotifierProvider<
+    CustomerServiceTypingPreviewNotifier,
+    Map<String, CustomerServiceTypingPreview>>((ref) {
+  return CustomerServiceTypingPreviewNotifier();
+});
+
+final customerServiceTransferNoticeProvider = StateNotifierProvider<
+    CustomerServiceTransferNoticeNotifier,
+    List<CustomerServiceTransferNotice>>((ref) {
+  return CustomerServiceTransferNoticeNotifier();
+});
+
+class CustomerServiceTransferNoticeNotifier
+    extends StateNotifier<List<CustomerServiceTransferNotice>> {
+  CustomerServiceTransferNoticeNotifier() : super(const []);
+
+  void apply({
+    required String threadType,
+    required String threadId,
+    required String conversationId,
+    String? customerUserId,
+    String? fromStaffUserId,
+    required String toStaffUserId,
+    String? reason,
+    String? recipientRole,
+    required String currentStaffUserId,
+    DateTime? transferredAt,
+  }) {
+    final notice = createCustomerServiceTransferNotice(
+      CustomerServiceTransferNoticeEvent(
+        threadType: threadType,
+        threadId: threadId,
+        conversationId: conversationId,
+        customerUserId: customerUserId,
+        fromStaffUserId: fromStaffUserId,
+        toStaffUserId: toStaffUserId,
+        reason: reason,
+        recipientRole: recipientRole,
+      ),
+      currentStaffUserId: currentStaffUserId,
+      receivedAt: transferredAt,
+    );
+    if (notice == null) return;
+    state = [
+      notice,
+      ...state.where((item) => item.threadKey != notice.threadKey),
+    ].take(5).toList(growable: false);
+  }
+
+  void dismiss(String noticeId) {
+    state = state.where((item) => item.noticeId != noticeId).toList();
+  }
+
+  void clear() {
+    state = const [];
+  }
+}
+
+class CustomerServiceTypingPreviewNotifier
+    extends StateNotifier<Map<String, CustomerServiceTypingPreview>> {
+  final Map<String, Timer> _timers = {};
+
+  CustomerServiceTypingPreviewNotifier() : super(const {});
+
+  void apply({
+    required String threadType,
+    required String threadId,
+    required String conversationId,
+    required bool isTyping,
+    String? preview,
+    String? senderRole,
+    String? senderUserId,
+    DateTime? at,
+  }) {
+    final primaryId = threadId.trim().isNotEmpty ? threadId : conversationId;
+    if (primaryId.trim().isEmpty) return;
+    final event = CustomerServiceTypingPreviewEvent(
+      threadId: primaryId,
+      threadType: threadType,
+      isTyping: isTyping,
+      previewText: preview,
+      senderRole: senderRole,
+      senderUserId: senderUserId,
+      receivedAt: at ?? DateTime.now(),
+    );
+    final result = reduceCustomerServiceTypingPreview(event);
+    final keys = {
+      _key(threadType, primaryId),
+      if (conversationId.trim().isNotEmpty) _key(threadType, conversationId),
+    };
+    if (result == CustomerServiceTypingPreviewResult.clear || result == null) {
+      for (final key in keys) {
+        _clearKey(key);
+      }
+      return;
+    }
+    final previewModel = result as CustomerServiceTypingPreview;
+    for (final key in keys) {
+      _timers[key]?.cancel();
+      state = {...state, key: previewModel};
+      _timers[key] = Timer(customerServiceTypingPreviewTtl, () {
+        _clearKey(key);
+      });
+    }
+  }
+
+  CustomerServiceTypingPreview? previewFor({
+    required String threadType,
+    required String threadId,
+    required String conversationId,
+  }) {
+    final normalizedThreadType =
+        threadType.trim().isEmpty ? 'temp_session' : threadType;
+    return state[_key(normalizedThreadType, threadId)] ??
+        state[_key(normalizedThreadType, conversationId)];
+  }
+
+  void _clearKey(String key) {
+    _timers.remove(key)?.cancel();
+    if (!state.containsKey(key)) return;
+    final next = Map<String, CustomerServiceTypingPreview>.from(state)
+      ..remove(key);
+    state = next;
+  }
+
+  static String _key(String threadType, String id) {
+    final normalizedType = threadType.trim().replaceAll('-', '_');
+    return '$normalizedType:${id.trim()}';
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _timers.values) {
+      timer.cancel();
+    }
+    _timers.clear();
+    super.dispose();
+  }
+}
 
 final adminManagementCredentialAvailableProvider =
     FutureProvider.family<bool, String>((ref, spaceId) async {
@@ -64,7 +213,11 @@ final adminAccessibleTenantsProvider =
 final currentSpaceHasAdminConsoleAccessProvider = Provider<bool>((ref) {
   final space = ref.watch(currentSpaceProvider);
   if (space == null || !space.isEmployee) return false;
-  if (space.isAdminOrAbove) return true;
+  if (ref
+      .watch(currentCustomerServiceRoleCapabilitiesProvider)
+      .canUseManagementReadonly) {
+    return true;
+  }
   final tenants = ref.watch(adminAccessibleTenantsProvider).valueOrNull;
   return tenants?.any(
         (tenant) =>
@@ -89,7 +242,9 @@ final customerServiceThreadsProvider =
     FutureProvider<CsThreadsData>((ref) async {
   final space = ref.watch(currentSpaceProvider);
   if (space == null) return const CsThreadsData([], []);
-  if (!AppPermissions.canUseCustomerWorkbench(space)) {
+  if (!ref
+      .watch(currentCustomerServiceRoleCapabilitiesProvider)
+      .canUseStaffEndpoints) {
     throw StateError('当前角色不是客服，不能调用客服工作台接口');
   }
   return ref.read(customerServiceRepositoryProvider).getThreads();
@@ -99,7 +254,9 @@ final customerServiceStaffHistoryProvider =
     FutureProvider<List<CsThread>>((ref) async {
   final space = ref.watch(currentSpaceProvider);
   if (space == null) return const <CsThread>[];
-  if (!AppPermissions.canUseCustomerWorkbench(space)) {
+  if (!ref
+      .watch(currentCustomerServiceRoleCapabilitiesProvider)
+      .canUseStaffEndpoints) {
     throw StateError('当前角色不是客服，不能调用客服接待历史接口');
   }
   return ref
@@ -111,7 +268,9 @@ final customerServiceDashboardProvider =
     FutureProvider<CsDashboardData>((ref) async {
   final space = ref.watch(currentSpaceProvider);
   if (space == null) return const CsDashboardData();
-  if (!AppPermissions.canUseCustomerWorkbench(space)) {
+  if (!ref
+      .watch(currentCustomerServiceRoleCapabilitiesProvider)
+      .canUseStaffEndpoints) {
     throw StateError('当前角色不是客服，不能调用客服工作台接口');
   }
   return ref.read(customerServiceRepositoryProvider).getDashboard();
@@ -146,7 +305,10 @@ class CustomerServiceReceptionStatusNotifier
   @override
   Future<CsReceptionStatus> build() async {
     final space = ref.watch(currentSpaceProvider);
-    if (space == null || !AppPermissions.canUseCustomerWorkbench(space)) {
+    if (space == null ||
+        !ref
+            .watch(currentCustomerServiceRoleCapabilitiesProvider)
+            .canUseStaffEndpoints) {
       throw StateError('当前角色不是客服，不能调用客服接待状态接口');
     }
     return ref.read(customerServiceRepositoryProvider).getReceptionStatus();
@@ -154,7 +316,10 @@ class CustomerServiceReceptionStatusNotifier
 
   Future<void> setStatus(String serviceStatus) async {
     final space = ref.read(currentSpaceProvider);
-    if (space == null || !AppPermissions.canUseCustomerWorkbench(space)) {
+    if (space == null ||
+        !ref
+            .read(currentCustomerServiceRoleCapabilitiesProvider)
+            .canUseStaffEndpoints) {
       state = AsyncError(
         StateError('当前角色不是客服，不能切换客服接待状态'),
         StackTrace.current,
@@ -188,7 +353,10 @@ class CustomerServiceReceptionStatusNotifier
 
   Future<void> setQueueAcceptEnabled(bool enabled) async {
     final space = ref.read(currentSpaceProvider);
-    if (space == null || !AppPermissions.canUseCustomerWorkbench(space)) {
+    if (space == null ||
+        !ref
+            .read(currentCustomerServiceRoleCapabilitiesProvider)
+            .canUseStaffEndpoints) {
       state = AsyncError(
         StateError('当前角色不是客服，不能切换接入模式'),
         StackTrace.current,
@@ -341,21 +509,24 @@ final adminCustomerProfileCardProvider =
 class AdminCustomerServiceThreadQuery {
   final String? status;
   final String? threadType;
+  final String? assignedStaffUserId;
 
   const AdminCustomerServiceThreadQuery({
     this.status,
     this.threadType,
+    this.assignedStaffUserId,
   });
 
   @override
   bool operator ==(Object other) {
     return other is AdminCustomerServiceThreadQuery &&
         other.status == status &&
-        other.threadType == threadType;
+        other.threadType == threadType &&
+        other.assignedStaffUserId == assignedStaffUserId;
   }
 
   @override
-  int get hashCode => Object.hash(status, threadType);
+  int get hashCode => Object.hash(status, threadType, assignedStaffUserId);
 }
 
 final adminCustomerServiceThreadsProvider =
@@ -367,6 +538,18 @@ final adminCustomerServiceThreadsProvider =
   return ref.read(adminCustomerServiceRepositoryProvider).getCenterThreads(
         status: query.status,
         threadType: query.threadType,
+        assignedStaffUserId: query.assignedStaffUserId,
+      );
+});
+
+final adminCustomerServiceThreadDetailProvider = FutureProvider.family<
+    CsThreadDetail, ({String threadType, String threadId})>((ref, args) async {
+  if (!ref.watch(currentSpaceHasAdminConsoleAccessProvider)) {
+    throw StateError('当前角色不能查看客服会话详情');
+  }
+  return ref.read(adminCustomerServiceRepositoryProvider).getCenterThreadDetail(
+        threadType: args.threadType,
+        threadId: args.threadId,
       );
 });
 
@@ -395,7 +578,9 @@ class CustomerServiceQuickRepliesNotifier
   Future<List<CsQuickReply>> build(String? arg) async {
     final space = ref.watch(currentSpaceProvider);
     if (space == null) return const [];
-    if (!AppPermissions.canUseCustomerWorkbench(space)) {
+    if (!ref
+        .watch(currentCustomerServiceRoleCapabilitiesProvider)
+        .canUseStaffEndpoints) {
       throw StateError('当前角色不是客服，不能调用客服话术接口');
     }
 
@@ -414,7 +599,9 @@ class CustomerServiceQuickRepliesNotifier
       state = const AsyncData([]);
       return;
     }
-    if (!AppPermissions.canUseCustomerWorkbench(space)) {
+    if (!ref
+        .read(currentCustomerServiceRoleCapabilitiesProvider)
+        .canUseStaffEndpoints) {
       state = AsyncError(
         StateError('当前角色不是客服，不能调用客服话术接口'),
         StackTrace.current,

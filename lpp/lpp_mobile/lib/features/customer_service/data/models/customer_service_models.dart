@@ -1589,6 +1589,9 @@ class CsThreadDetail {
   final String? currentResponderType;
   final String? aiStatus;
   final List<Message> messages;
+  final CustomerServiceReadStatus? readStatus;
+  final int? customerLastReadSeq;
+  final DateTime? customerLastReadAt;
 
   const CsThreadDetail({
     required this.threadType,
@@ -1607,6 +1610,9 @@ class CsThreadDetail {
     this.currentResponderType,
     this.aiStatus,
     this.messages = const [],
+    this.readStatus,
+    this.customerLastReadSeq,
+    this.customerLastReadAt,
   });
 
   factory CsThreadDetail.fromJson(Map<String, dynamic> json) {
@@ -1645,6 +1651,9 @@ class CsThreadDetail {
       aiStatus: json['aiStatus'] as String? ??
           (json['ai'] is Map ? (json['ai'] as Map)['status'] as String? : null),
       messages: _parseMessages(json),
+      readStatus: CustomerServiceReadStatus.fromDetailJson(json),
+      customerLastReadSeq: _directCustomerLastReadSeq(json),
+      customerLastReadAt: _directCustomerLastReadAt(json),
     );
   }
 
@@ -1670,6 +1679,9 @@ class CsThreadDetail {
     String? currentResponderType,
     String? aiStatus,
     List<Message>? messages,
+    CustomerServiceReadStatus? readStatus,
+    int? customerLastReadSeq,
+    DateTime? customerLastReadAt,
   }) {
     return CsThreadDetail(
       threadType: threadType ?? this.threadType,
@@ -1689,6 +1701,9 @@ class CsThreadDetail {
       currentResponderType: currentResponderType ?? this.currentResponderType,
       aiStatus: aiStatus ?? this.aiStatus,
       messages: messages ?? this.messages,
+      readStatus: readStatus ?? this.readStatus,
+      customerLastReadSeq: customerLastReadSeq ?? this.customerLastReadSeq,
+      customerLastReadAt: customerLastReadAt ?? this.customerLastReadAt,
     );
   }
 
@@ -1711,12 +1726,113 @@ class CsThreadDetail {
     return const [];
   }
 
+  static int? _directCustomerLastReadSeq(Map<String, dynamic> json) {
+    final directChat = json['directChat'];
+    if (directChat is! Map) return null;
+    final value = directChat['customerLastReadSeq'];
+    if (value == null) return null;
+    return _intValue(value);
+  }
+
+  static DateTime? _directCustomerLastReadAt(Map<String, dynamic> json) {
+    final directChat = json['directChat'];
+    if (directChat is! Map) return null;
+    return _parseDateTime(directChat['customerLastReadAt']);
+  }
+
   static List<Message> _messageList(List<dynamic> raw) {
     return raw
         .whereType<Map>()
         .map((m) => MessageModel.fromJson(Map<String, dynamic>.from(m)))
         .toList()
       ..sort((a, b) => a.conversationSeq.compareTo(b.conversationSeq));
+  }
+}
+
+class CustomerServiceReadStatus {
+  final String sessionId;
+  final String conversationId;
+  final String? visitorUserId;
+  final List<CustomerServiceReadMember> members;
+
+  const CustomerServiceReadStatus({
+    required this.sessionId,
+    required this.conversationId,
+    this.visitorUserId,
+    this.members = const [],
+  });
+
+  factory CustomerServiceReadStatus.fromJson(Map<String, dynamic> json) {
+    final members = (json['members'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map>()
+        .map((item) => CustomerServiceReadMember.fromJson(
+              Map<String, dynamic>.from(item),
+            ))
+        .where((member) => member.userId.isNotEmpty)
+        .toList(growable: false);
+    return CustomerServiceReadStatus(
+      sessionId: _firstNonBlankString(json, const ['sessionId']) ?? '',
+      conversationId:
+          _firstNonBlankString(json, const ['conversationId']) ?? '',
+      visitorUserId: _firstNonBlankString(json, const ['visitorUserId']),
+      members: members,
+    );
+  }
+
+  factory CustomerServiceReadStatus.fromDirectPeer({
+    required String conversationId,
+    required String customerUserId,
+    required int customerLastReadSeq,
+    DateTime? customerLastReadAt,
+  }) {
+    return CustomerServiceReadStatus(
+      sessionId: '',
+      conversationId: conversationId,
+      visitorUserId: customerUserId,
+      members: [
+        CustomerServiceReadMember(
+          userId: customerUserId,
+          lastReadSeq: customerLastReadSeq,
+          lastReadAt: customerLastReadAt,
+        ),
+      ],
+    );
+  }
+
+  static CustomerServiceReadStatus? fromDetailJson(Map<String, dynamic> json) {
+    final topLevel = json['readStatus'];
+    if (topLevel is Map) {
+      return CustomerServiceReadStatus.fromJson(
+        Map<String, dynamic>.from(topLevel),
+      );
+    }
+    final tempSession = json['tempSession'];
+    if (tempSession is Map && tempSession['readStatus'] is Map) {
+      return CustomerServiceReadStatus.fromJson(
+        Map<String, dynamic>.from(tempSession['readStatus'] as Map),
+      );
+    }
+    return null;
+  }
+}
+
+class CustomerServiceReadMember {
+  final String userId;
+  final int lastReadSeq;
+  final DateTime? lastReadAt;
+
+  const CustomerServiceReadMember({
+    required this.userId,
+    required this.lastReadSeq,
+    this.lastReadAt,
+  });
+
+  factory CustomerServiceReadMember.fromJson(Map<String, dynamic> json) {
+    return CustomerServiceReadMember(
+      userId: _firstNonBlankString(json, const ['userId']) ?? '',
+      lastReadSeq: _intValue(json['lastReadSeq']),
+      lastReadAt: _parseDateTime(json['lastReadAt']),
+    );
   }
 }
 
