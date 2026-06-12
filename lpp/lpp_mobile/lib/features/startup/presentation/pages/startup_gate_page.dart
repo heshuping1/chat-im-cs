@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lpp_mobile/app/router/router.dart';
+import 'package:lpp_mobile/app/system_ui.dart';
 import 'package:lpp_mobile/core/space/space_context.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/storage/secure_storage.dart';
@@ -22,9 +26,6 @@ const minimumStartupBrandDisplay = Duration(milliseconds: 1200);
 final _startupDestinationProvider = FutureProvider<String>((ref) async {
   return waitForMinimumStartupBrandDisplay(() async {
     final storage = ref.read(secureStorageProvider);
-    final hasCompletedStartupGate =
-        await storage.read(SecureStorageService.startupGateCompletedKey) ==
-            'true';
     final authState = await ref.watch(authProvider.future);
     if (authState.status != AuthStatus.authenticated) {
       final hasPendingTenants = authState.availableTenants.length > 1;
@@ -33,10 +34,16 @@ final _startupDestinationProvider = FutureProvider<String>((ref) async {
     }
 
     final space = ref.watch(currentSpaceProvider) ?? authState.currentSpace;
-    if (!hasCompletedStartupGate &&
-        space != null &&
-        space.accessToken.isNotEmpty) {
-      await _warmHomeFirstScreen(ref, space).timeout(
+    final warmSpace = space;
+    if (shouldWarmAuthenticatedHomeFirstScreen(
+      authStatus: authState.status,
+      space: warmSpace,
+      hasCompletedStartupGate: await storage.read(
+            SecureStorageService.startupGateCompletedKey,
+          ) ==
+          'true',
+    )) {
+      await _warmHomeFirstScreen(ref, warmSpace!).timeout(
         _startupWarmBudget,
         onTimeout: () {
           debugPrint('[StartupGate] warm home timed out, continue to home');
@@ -64,6 +71,16 @@ Future<T> waitForMinimumStartupBrandDisplay<T>(
     await wait(remaining);
   }
   return result;
+}
+
+@visibleForTesting
+bool shouldWarmAuthenticatedHomeFirstScreen({
+  required AuthStatus authStatus,
+  required SpaceContext? space,
+  required bool hasCompletedStartupGate,
+}) {
+  if (authStatus != AuthStatus.authenticated) return false;
+  return space != null && space.accessToken.isNotEmpty;
 }
 
 Future<void> _warmHomeFirstScreen(Ref ref, SpaceContext space) async {
@@ -122,11 +139,29 @@ Future<void> _warmHomeFirstScreen(Ref ref, SpaceContext space) async {
   ).timeout(_avatarWarmBudget, onTimeout: () {});
 }
 
-class StartupGatePage extends ConsumerWidget {
+class StartupGatePage extends ConsumerStatefulWidget {
   const StartupGatePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StartupGatePage> createState() => _StartupGatePageState();
+}
+
+class _StartupGatePageState extends ConsumerState<StartupGatePage> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+  }
+
+  @override
+  void dispose() {
+    unawaited(configureAppSystemUi());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final destination = ref.watch(_startupDestinationProvider).valueOrNull;
     if (destination != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

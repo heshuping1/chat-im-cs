@@ -7,6 +7,18 @@ class StartupBrandLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF020B0A),
+      body: StartupBrandLoadingSurface(),
+    );
+  }
+}
+
+class StartupBrandLoadingSurface extends StatelessWidget {
+  const StartupBrandLoadingSurface({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -16,9 +28,9 @@ class StartupBrandLoadingView extends StatelessWidget {
         systemNavigationBarIconBrightness: Brightness.light,
         systemNavigationBarContrastEnforced: false,
       ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF020B0A),
-        body: Image.asset(
+      child: ColoredBox(
+        color: const Color(0xFF020B0A),
+        child: Image.asset(
           AppBrandAssets.loadingPage,
           key: const ValueKey('startup-brand-loading-image'),
           width: double.infinity,
@@ -26,6 +38,47 @@ class StartupBrandLoadingView extends StatelessWidget {
           fit: BoxFit.cover,
           alignment: Alignment.center,
         ),
+      ),
+    );
+  }
+}
+
+class StartupHandoffOverlay extends StatefulWidget {
+  const StartupHandoffOverlay({
+    required this.onDismissed,
+    super.key,
+  });
+
+  final VoidCallback onDismissed;
+
+  @override
+  State<StartupHandoffOverlay> createState() => _StartupHandoffOverlayState();
+}
+
+class _StartupHandoffOverlayState extends State<StartupHandoffOverlay> {
+  var _visible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _visible = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: _visible ? 1 : 0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        onEnd: () {
+          if (_visible) return;
+          widget.onDismissed();
+        },
+        child: const StartupBrandLoadingSurface(),
       ),
     );
   }
