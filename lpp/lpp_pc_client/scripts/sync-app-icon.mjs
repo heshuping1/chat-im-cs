@@ -1,6 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,6 +51,19 @@ function validateSourcePng(file) {
     fail(`source must be a PNG file: ${relative(file)}`);
   }
 
+  const source = readFileSync(file);
+  const width = source.readUInt32BE(16);
+  const height = source.readUInt32BE(20);
+  const colorType = source.readUInt8(25);
+  if (width !== 1024 || height !== 1024 || colorType !== 6) {
+    fail(
+      [
+        "source must be a 1024x1024 RGBA PNG with transparent rounded corners,",
+        `got ${width}x${height} colorType=${colorType}: ${relative(file)}`,
+      ].join(" "),
+    );
+  }
+
   log("validated PNG source");
 }
 
@@ -54,9 +78,11 @@ function syncPngOutputs() {
 function syncConvertedIconOutputs() {
   const magick = findExecutable(["magick.exe", "magick"]);
   if (!magick) {
+    if (syncConvertedIconOutputsWithMacTools()) return;
+
     warn(
       [
-        "ImageMagick was not found; skipped ICO/ICNS regeneration.",
+        "ImageMagick was not found and no local icon fallback was available; skipped ICO/ICNS regeneration.",
         `Existing files are preserved: ${relative(paths.ico)}, ${relative(paths.icns)}.`,
         "Install ImageMagick or provide fresh ICO/ICNS files before release packaging.",
       ].join(" "),
@@ -71,6 +97,91 @@ function syncConvertedIconOutputs() {
     label: `generate ${relative(paths.icns)}`,
     optional: true,
   });
+}
+
+function syncConvertedIconOutputsWithMacTools() {
+  if (process.platform !== "darwin") return false;
+
+  const sips = findExecutable(["sips"]);
+  if (!sips) return false;
+
+  const tmpDir = mkdtempSync(join(tmpdir(), "startlink-icon-sync-"));
+  try {
+    const icoFrameDir = join(tmpDir, "ico");
+    mkdirSync(icoFrameDir, { recursive: true });
+
+    const icoSizes = [256, 128, 64, 48, 32, 16];
+    const icoFrames = icoSizes.map((size) => {
+      const frame = join(icoFrameDir, `icon-${size}.png`);
+      run(sips, ["-z", String(size), String(size), paths.sourcePng, "--out", frame], {
+        label: `render ${size}x${size} ICO frame`,
+      });
+      return { size, frame };
+    });
+    writePngBackedIco(paths.ico, icoFrames);
+
+    const iconutil = findExecutable(["iconutil"]);
+    if (!iconutil) {
+      warn(`iconutil was not found; skipped ${relative(paths.icns)} regeneration.`);
+      return true;
+    }
+
+    const iconsetDir = join(tmpDir, "app-icon.iconset");
+    mkdirSync(iconsetDir, { recursive: true });
+    const iconsetFrames = [
+      ["icon_16x16.png", 16],
+      ["icon_16x16@2x.png", 32],
+      ["icon_32x32.png", 32],
+      ["icon_32x32@2x.png", 64],
+      ["icon_128x128.png", 128],
+      ["icon_128x128@2x.png", 256],
+      ["icon_256x256.png", 256],
+      ["icon_256x256@2x.png", 512],
+      ["icon_512x512.png", 512],
+      ["icon_512x512@2x.png", 1024],
+    ];
+    for (const [fileName, size] of iconsetFrames) {
+      run(sips, ["-z", String(size), String(size), paths.sourcePng, "--out", join(iconsetDir, fileName)], {
+        label: `render ${fileName}`,
+      });
+    }
+    run(iconutil, ["-c", "icns", iconsetDir, "-o", paths.icns], {
+      label: `generate ${relative(paths.icns)}`,
+      optional: true,
+    });
+    return true;
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+function writePngBackedIco(target, frames) {
+  const images = frames.map(({ size, frame }) => ({
+    size,
+    buffer: readFileSync(frame),
+  }));
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(images.length, 4);
+
+  const entries = Buffer.alloc(16 * images.length);
+  let offset = header.length + entries.length;
+  images.forEach((image, index) => {
+    const entryOffset = index * 16;
+    entries.writeUInt8(image.size >= 256 ? 0 : image.size, entryOffset);
+    entries.writeUInt8(image.size >= 256 ? 0 : image.size, entryOffset + 1);
+    entries.writeUInt8(0, entryOffset + 2);
+    entries.writeUInt8(0, entryOffset + 3);
+    entries.writeUInt16LE(1, entryOffset + 4);
+    entries.writeUInt16LE(32, entryOffset + 6);
+    entries.writeUInt32LE(image.buffer.length, entryOffset + 8);
+    entries.writeUInt32LE(offset, entryOffset + 12);
+    offset += image.buffer.length;
+  });
+
+  writeFileSync(target, Buffer.concat([header, entries, ...images.map((image) => image.buffer)]));
+  log(`generated ${relative(target)} with ${images.map((image) => `${image.size}px`).join(", ")} PNG frames`);
 }
 
 function patchPackagedExe() {

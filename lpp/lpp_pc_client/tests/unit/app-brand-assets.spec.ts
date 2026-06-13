@@ -29,7 +29,6 @@ describe("app brand assets", () => {
   const iconVerifySource = readFileSync(resolve(root, "scripts/verify-packaged-icon.mjs"), "utf8");
   const startPackagedSource = readFileSync(resolve(root, "scripts/start-packaged.mjs"), "utf8");
   const fixTaskbarSource = readFileSync(resolve(root, "scripts/fix-taskbar-icon.mjs"), "utf8");
-  const mobileAppIcon = readFileSync(resolve(root, "../lpp_mobile/assets/brand/app_icon.png"));
   const mobileBrandLogoIcon = readFileSync(resolve(root, "../lpp_mobile/assets/brand/brand_logo_icon.png"));
   const brandLogoGeneratorSource = readFileSync(
     resolve(root, "../scripts/brand/generate_brand_logo_assets.py"),
@@ -140,18 +139,24 @@ describe("app brand assets", () => {
   });
 
   it("keeps a small-size visual acceptance board for the app icon", () => {
-    expect(readFileSync(resolve(root, "assets/brand/app-icon-source.png"))).toEqual(mobileAppIcon);
-    expect(readFileSync(resolve(root, "assets/app-icon-startlink.png"))).toEqual(mobileAppIcon);
-    expect(readFileSync(resolve(root, "public/app-icon-startlink.png"))).toEqual(mobileAppIcon);
+    const pcAppIconSource = readFileSync(resolve(root, "assets/brand/app-icon-source.png"));
+    expect(pcAppIconSource).toEqual(readFileSync(resolve(root, "assets/brand/brand-logo-icon.png")));
+    expect(readFileSync(resolve(root, "assets/app-icon-startlink.png"))).toEqual(pcAppIconSource);
+    expect(readFileSync(resolve(root, "public/app-icon-startlink.png"))).toEqual(pcAppIconSource);
+    expect(readPngMetadata("assets/brand/app-icon-source.png")).toEqual({
+      width: 1024,
+      height: 1024,
+      colorType: 6,
+    });
     expect(readPngMetadata("assets/app-icon-startlink.png")).toEqual({
       width: 1024,
       height: 1024,
-      colorType: 2,
+      colorType: 6,
     });
     expect(readPngMetadata("public/app-icon-startlink.png")).toEqual({
       width: 1024,
       height: 1024,
-      colorType: 2,
+      colorType: 6,
     });
     expect(existsSync(resolve(root, "docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png"))).toBe(
       true,
