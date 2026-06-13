@@ -12,7 +12,7 @@ const targets = [
     required: true,
   },
   {
-    exe: process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\startlink\\startlink.exe",
+    exe: process.env.LPP_INSTALLED_EXE || "C:\\Program Files\\StartLink\\startlink.exe",
     outputPng: join(root, "tmp", "installed-exe-icon.png"),
     required: false,
   },

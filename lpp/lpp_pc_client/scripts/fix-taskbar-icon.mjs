@@ -6,8 +6,9 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
 const packagedExe = join(root, "release", "win-unpacked", "startlink.exe");
-const installedExe = process.env.LPP_INSTALLED_EXE || "D:\\Program Files\\startlink\\startlink.exe";
+const installedExe = process.env.LPP_INSTALLED_EXE || "C:\\Program Files\\StartLink\\startlink.exe";
 const ico = join(root, "assets", "app-icon-startlink.ico");
+const installedShortcutIcon = join(dirname(installedExe), "resources", "startlink-shell-icon-v3.ico");
 const syncScript = join(root, "scripts", "sync-app-icon.mjs");
 
 if (process.platform !== "win32") {
@@ -40,10 +41,25 @@ function main() {
     adminHint: true,
   });
 
-  updateShortcuts(installedExe);
+  installShortcutIcon();
+  updateShortcuts(installedExe, installedShortcutIcon);
   refreshIconCache();
   log("installed taskbar icon repair complete");
   log("if the pinned taskbar icon still shows the old image, unpin and pin again or restart Explorer.");
+}
+
+function installShortcutIcon() {
+  const script = [
+    `$source = ${psString(ico)};`,
+    `$target = ${psString(installedShortcutIcon)};`,
+    "$dir = Split-Path $target;",
+    "New-Item -ItemType Directory -Force -Path $dir | Out-Null;",
+    "Copy-Item -Force -LiteralPath $source -Destination $target;",
+  ].join(" ");
+  run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], {
+    label: "install standalone shortcut icon",
+    adminHint: true,
+  });
 }
 
 function stopProcesses(targets) {
@@ -59,10 +75,11 @@ function stopProcesses(targets) {
   });
 }
 
-function updateShortcuts(targetExe) {
+function updateShortcuts(targetExe, shortcutIcon) {
   const script = [
     "$shell = New-Object -ComObject WScript.Shell;",
     `$target = ${psString(targetExe)};`,
+    `$icon = ${psString(`${shortcutIcon},0`)};`,
     "$roots = @(",
     "$env:PUBLIC + '\\Desktop',",
     "$env:USERPROFILE + '\\Desktop',",
@@ -72,13 +89,12 @@ function updateShortcuts(targetExe) {
     "foreach ($root in $roots) {",
     "if (-not (Test-Path $root)) { continue }",
     "Get-ChildItem $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue |",
-    "Where-Object { $_.Name -match 'startlink|LPP|客服|lpp' } |",
     "ForEach-Object {",
     "$shortcut = $shell.CreateShortcut($_.FullName);",
-    "if ($shortcut.TargetPath -eq $target -or $_.Name -match 'startlink|LPP|客服|lpp') {",
+    "if ($shortcut.TargetPath -eq $target -or $shortcut.TargetPath -match 'StartLink|startlink|LPP|lpp' -or $_.Name -match 'startlink|LPP|客服|lpp') {",
     "$shortcut.TargetPath = $target;",
     "$shortcut.WorkingDirectory = Split-Path $target;",
-    "$shortcut.IconLocation = $target + ',0';",
+    "$shortcut.IconLocation = $icon;",
     "$shortcut.Save();",
     "Write-Output $_.FullName;",
     "}",

@@ -33,3 +33,12 @@
     StrCpy $isForceCurrentInstall "1"
   ${EndIf}
 !macroend
+
+!macro customInstall
+  DetailPrint "Updating StartLink shortcut icons"
+  ExecWait `"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\resources\fix-installed-shortcut-icons.ps1" "$INSTDIR"`
+  DetailPrint "Refreshing Windows icon cache"
+  ExecWait '"$SYSDIR\ie4uinit.exe" -ClearIconCache'
+  ExecWait '"$SYSDIR\ie4uinit.exe" -show'
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
+!macroend

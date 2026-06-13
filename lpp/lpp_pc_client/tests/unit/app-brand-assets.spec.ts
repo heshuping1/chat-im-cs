@@ -26,6 +26,7 @@ describe("app brand assets", () => {
   const iconVerifySource = readFileSync(resolve(root, "scripts/verify-packaged-icon.mjs"), "utf8");
   const startPackagedSource = readFileSync(resolve(root, "scripts/start-packaged.mjs"), "utf8");
   const fixTaskbarSource = readFileSync(resolve(root, "scripts/fix-taskbar-icon.mjs"), "utf8");
+  const mobileAppIcon = readFileSync(resolve(root, "../lpp_mobile/assets/brand/app_icon.png"));
   const iconManual = readFileSync(resolve(root, "docs/release/04-PC图标统一管理手册.md"), "utf8");
   const readPngMetadata = (file: string) => {
     const bytes = readFileSync(resolve(root, file));
@@ -75,7 +76,8 @@ describe("app brand assets", () => {
     expect(iconManual).toContain("win-unpacked");
     expect(iconManual).toContain("icon:fix-taskbar");
     expect(iconManual).toContain("icon:sync");
-    expect(iconManual).toContain("D:\\Program Files\\startlink");
+    expect(iconManual).toContain("C:\\Program Files\\StartLink");
+    expect(iconManual).toContain("startlink-shell-icon-v3.ico");
     expect(iconManual).toContain("Windows 图标缓存");
   });
 
@@ -84,11 +86,14 @@ describe("app brand assets", () => {
     expect(iconSyncSource).toContain("app-icon-startlink.ico");
     expect(iconSyncSource).toContain("public/app-icon-startlink.png");
     expect(iconSyncSource).toContain("startlink.exe");
+    expect(JSON.stringify(packageJson.build?.extraResources)).toContain("startlink-shell-icon-v3.ico");
+    expect(iconManual).toContain("Windows 图标缓存");
     expect(iconVerifySource).toContain("packaged-exe-icon.png");
     expect(iconVerifySource).toContain("installed-exe-icon.png");
     expect(startPackagedSource).toContain("sync-app-icon.mjs");
     expect(fixTaskbarSource).toContain("ie4uinit.exe");
-    expect(fixTaskbarSource).toContain("D:\\\\Program Files\\\\startlink");
+    expect(fixTaskbarSource).toContain("C:\\\\Program Files\\\\StartLink");
+    expect(fixTaskbarSource).toContain("startlink-shell-icon-v3.ico");
     expect(fixTaskbarSource).toContain("rcedit-x64.exe");
   });
 
@@ -113,15 +118,18 @@ describe("app brand assets", () => {
   });
 
   it("keeps a small-size visual acceptance board for the app icon", () => {
+    expect(readFileSync(resolve(root, "assets/brand/app-icon-source.png"))).toEqual(mobileAppIcon);
+    expect(readFileSync(resolve(root, "assets/app-icon-startlink.png"))).toEqual(mobileAppIcon);
+    expect(readFileSync(resolve(root, "public/app-icon-startlink.png"))).toEqual(mobileAppIcon);
     expect(readPngMetadata("assets/app-icon-startlink.png")).toEqual({
       width: 1024,
       height: 1024,
-      colorType: 6,
+      colorType: 2,
     });
     expect(readPngMetadata("public/app-icon-startlink.png")).toEqual({
       width: 1024,
       height: 1024,
-      colorType: 6,
+      colorType: 2,
     });
     expect(existsSync(resolve(root, "docs/refactor/validation/P24-BRAND-003-app-icon-size-preview.png"))).toBe(
       true,

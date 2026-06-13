@@ -4,6 +4,7 @@ setlocal
 set "PROJECT_ROOT=%~dp0.."
 set "ICON=%PROJECT_ROOT%\assets\app-icon-startlink.ico"
 set "INSTALLED_EXE=C:\Program Files\StartLink\startlink.exe"
+set "INSTALLED_ICON=C:\Program Files\StartLink\resources\startlink-shell-icon-v3.ico"
 
 net session >nul 2>nul
 if errorlevel 1 (
@@ -42,9 +43,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo [StartLink] Installing standalone shortcut icon...
+copy /Y "%ICON%" "%INSTALLED_ICON%" >nul
+if errorlevel 1 (
+  echo [StartLink] ERROR: failed to copy standalone shortcut icon.
+  pause
+  exit /b 1
+)
+
 echo [StartLink] Updating desktop/start menu shortcuts...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$shell = New-Object -ComObject WScript.Shell; $target = '%INSTALLED_EXE%'; $icon = '%INSTALLED_EXE%,0'; $roots = @($env:PUBLIC + '\Desktop', $env:USERPROFILE + '\Desktop', $env:APPDATA + '\Microsoft\Windows\Start Menu\Programs', $env:ProgramData + '\Microsoft\Windows\Start Menu\Programs'); foreach ($root in $roots) { if (-not (Test-Path $root)) { continue }; Get-ChildItem $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object { $s = $shell.CreateShortcut($_.FullName); if ($s.TargetPath -match 'StartLink|startlink|lppchat|LPP' -or $_.Name -match 'StartLink|startlink|lpp|LPP') { $s.TargetPath = $target; $s.WorkingDirectory = Split-Path $target; $s.IconLocation = $icon; $s.Save(); Write-Output $_.FullName } } }"
+  "$shell = New-Object -ComObject WScript.Shell; $target = '%INSTALLED_EXE%'; $icon = '%INSTALLED_ICON%,0'; $roots = @($env:PUBLIC + '\Desktop', $env:USERPROFILE + '\Desktop', $env:APPDATA + '\Microsoft\Windows\Start Menu\Programs', $env:ProgramData + '\Microsoft\Windows\Start Menu\Programs'); foreach ($root in $roots) { if (-not (Test-Path $root)) { continue }; Get-ChildItem $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object { $s = $shell.CreateShortcut($_.FullName); if ($s.TargetPath -match 'StartLink|startlink|lppchat|LPP' -or $_.Name -match 'StartLink|startlink|lpp|LPP') { $s.TargetPath = $target; $s.WorkingDirectory = Split-Path $target; $s.IconLocation = $icon; $s.Save(); Write-Output $_.FullName } } }"
 
 echo [StartLink] Refreshing Windows icon cache...
 ie4uinit.exe -ClearIconCache >nul 2>nul

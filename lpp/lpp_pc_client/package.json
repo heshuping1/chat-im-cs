@@ -115,6 +115,14 @@
       {
         "from": "assets/app-icon-startlink.ico",
         "to": "app-icon.ico"
+      },
+      {
+        "from": "assets/app-icon-startlink.ico",
+        "to": "startlink-shell-icon-v3.ico"
+      },
+      {
+        "from": "scripts/fix-installed-shortcut-icons.ps1",
+        "to": "fix-installed-shortcut-icons.ps1"
       }
     ],
     "win": {
