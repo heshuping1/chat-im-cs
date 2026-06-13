@@ -24,6 +24,8 @@ const _avatarLookupBudget = Duration(seconds: 1);
 const minimumStartupBrandDisplay = Duration(milliseconds: 1200);
 
 final startupHandoffOverlayProvider = StateProvider<bool>((ref) => false);
+final startupNetworkBannerSuppressedProvider =
+    StateProvider<bool>((ref) => true);
 
 final _startupDestinationProvider = FutureProvider<String>((ref) async {
   return waitForMinimumStartupBrandDisplay(() async {
@@ -154,8 +156,10 @@ class _StartupGatePageState extends ConsumerState<StartupGatePage> {
   @override
   void initState() {
     super.initState();
-    unawaited(
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+    unawaited(SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: const [],
+    ));
   }
 
   @override

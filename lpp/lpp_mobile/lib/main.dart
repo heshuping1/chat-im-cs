@@ -28,7 +28,7 @@ void main() {
       return true;
     };
 
-    await configureAppSystemUi();
+    await configureStartupSystemUi();
     PushNotificationService.registerBackgroundHandler();
     await HiveStorage.init();
     await SiteLineManager.instance.bootstrap(SecureStorageServiceImpl());

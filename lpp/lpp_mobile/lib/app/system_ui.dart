@@ -10,6 +10,23 @@ const SystemUiOverlayStyle appEdgeToEdgeOverlayStyle = SystemUiOverlayStyle(
   systemNavigationBarContrastEnforced: false,
 );
 
+const SystemUiOverlayStyle startupFullScreenOverlayStyle = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.light,
+  statusBarBrightness: Brightness.dark,
+  systemNavigationBarColor: Colors.transparent,
+  systemNavigationBarIconBrightness: Brightness.light,
+  systemNavigationBarContrastEnforced: false,
+);
+
+Future<void> configureStartupSystemUi() async {
+  await SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.manual,
+    overlays: const [],
+  );
+  SystemChrome.setSystemUIOverlayStyle(startupFullScreenOverlayStyle);
+}
+
 Future<void> configureAppSystemUi() async {
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(appEdgeToEdgeOverlayStyle);

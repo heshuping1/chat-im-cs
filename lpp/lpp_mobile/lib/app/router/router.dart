@@ -177,13 +177,19 @@ class AppRouter {
       // 登录页
       GoRoute(
         path: AppRoutes.startup,
-        builder: (context, state) => const StartupGatePage(),
+        pageBuilder: (context, state) => NoTransitionPage(
+          key: state.pageKey,
+          child: const StartupGatePage(),
+        ),
       ),
 
       // 登录页
       GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) => const LoginPage(),
+        pageBuilder: (context, state) => NoTransitionPage(
+          key: state.pageKey,
+          child: const LoginPage(),
+        ),
       ),
 
       // 注册页
@@ -200,7 +206,10 @@ class AppRouter {
       // 租户选择页
       GoRoute(
         path: AppRoutes.tenantSelect,
-        builder: (context, state) => const TenantSelectPage(),
+        pageBuilder: (context, state) => NoTransitionPage(
+          key: state.pageKey,
+          child: const TenantSelectPage(),
+        ),
       ),
 
       // 主页 Shell（底部导航：消息、通讯录、我）

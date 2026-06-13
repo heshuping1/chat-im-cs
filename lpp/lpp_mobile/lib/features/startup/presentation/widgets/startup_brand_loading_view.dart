@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lpp_mobile/core/branding/app_brand_assets.dart';
@@ -56,30 +58,23 @@ class StartupHandoffOverlay extends StatefulWidget {
 }
 
 class _StartupHandoffOverlayState extends State<StartupHandoffOverlay> {
-  var _visible = true;
-
   @override
   void initState() {
     super.initState();
+    unawaited(SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: const [],
+    ));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() => _visible = false);
+      widget.onDismissed();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: AnimatedOpacity(
-        opacity: _visible ? 1 : 0,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-        onEnd: () {
-          if (_visible) return;
-          widget.onDismissed();
-        },
-        child: const StartupBrandLoadingSurface(),
-      ),
+    return const IgnorePointer(
+      child: StartupBrandLoadingSurface(),
     );
   }
 }

@@ -1506,6 +1506,7 @@ class LoginBrandLogo extends StatelessWidget {
     return const StartlinkBrandLogo(
       dimension: 72,
       containerKey: ValueKey('login-brand-logo'),
+      clipKey: ValueKey('login-brand-logo-clip'),
       markKey: ValueKey('login-brand-logo-mark'),
     );
   }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lpp_mobile/core/branding/app_brand_assets.dart';
 import 'package:lpp_mobile/core/branding/startlink_brand_logo.dart';
 import 'package:lpp_mobile/features/auth/presentation/pages/login_page.dart';
 
 void main() {
-  testWidgets('login brand logo uses a clean vector mark', (tester) async {
+  testWidgets('login brand logo uses the high fidelity app icon asset', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -23,6 +24,13 @@ void main() {
     expect(logo.height, 72);
 
     expect(find.byKey(const ValueKey('login-brand-logo-mark')), findsOneWidget);
+    final rasterLogo = tester.widget<Image>(
+      find.byKey(const ValueKey('login-brand-logo-mark')),
+    );
+    expect(rasterLogo.image, isA<AssetImage>());
+    expect((rasterLogo.image as AssetImage).assetName, AppBrandAssets.brandLogoIcon);
+
+    expect(find.byKey(const ValueKey('login-brand-logo-clip')), findsOneWidget);
   });
 
   test('brand logo uses the final icon design palette', () {

@@ -143,6 +143,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     final isAuthenticated =
         ref.watch(authProvider).valueOrNull?.status == AuthStatus.authenticated;
     final showStartupHandoffOverlay = ref.watch(startupHandoffOverlayProvider);
+    final suppressStartupNetworkBanner =
+        ref.watch(startupNetworkBannerSuppressedProvider);
     if (isAuthenticated) {
       ref.watch(gatewayProvider);
     }
@@ -165,13 +167,22 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
             ),
             IncomingCallOverlay(router: _appRouter.router),
             ActiveCallMiniOverlay(router: _appRouter.router),
-            const NetworkStatusBanner(),
+            if (!suppressStartupNetworkBanner) const NetworkStatusBanner(),
             if (showStartupHandoffOverlay)
               StartupHandoffOverlay(
                 onDismissed: () {
                   unawaited(configureAppSystemUi());
                   ref.read(startupHandoffOverlayProvider.notifier).state =
                       false;
+                  unawaited(Future<void>.delayed(
+                    const Duration(milliseconds: 2500),
+                    () {
+                      if (ref.read(startupHandoffOverlayProvider)) return;
+                      ref
+                          .read(startupNetworkBannerSuppressedProvider.notifier)
+                          .state = false;
+                    },
+                  ));
                 },
               ),
           ],

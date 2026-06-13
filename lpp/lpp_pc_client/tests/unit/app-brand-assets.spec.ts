@@ -22,11 +22,19 @@ describe("app brand assets", () => {
   const appMetadataSource = readFileSync(resolve(root, "src/renderer/app/appMetadata.ts"), "utf8");
   const sidebarSource = readFileSync(resolve(root, "src/renderer/components/Sidebar.tsx"), "utf8");
   const brandLogoSource = readFileSync(resolve(root, "src/renderer/components/AppBrandLogo.tsx"), "utf8");
+  const brandLogoAsset = existsSync(resolve(root, "assets/brand/brand-logo-mark.svg"))
+    ? readFileSync(resolve(root, "assets/brand/brand-logo-mark.svg"), "utf8")
+    : "";
   const iconSyncSource = readFileSync(resolve(root, "scripts/sync-app-icon.mjs"), "utf8");
   const iconVerifySource = readFileSync(resolve(root, "scripts/verify-packaged-icon.mjs"), "utf8");
   const startPackagedSource = readFileSync(resolve(root, "scripts/start-packaged.mjs"), "utf8");
   const fixTaskbarSource = readFileSync(resolve(root, "scripts/fix-taskbar-icon.mjs"), "utf8");
   const mobileAppIcon = readFileSync(resolve(root, "../lpp_mobile/assets/brand/app_icon.png"));
+  const mobileBrandLogoIcon = readFileSync(resolve(root, "../lpp_mobile/assets/brand/brand_logo_icon.png"));
+  const brandLogoGeneratorSource = readFileSync(
+    resolve(root, "../scripts/brand/generate_brand_logo_assets.py"),
+    "utf8",
+  );
   const iconManual = readFileSync(resolve(root, "docs/release/04-PC图标统一管理手册.md"), "utf8");
   const readPngMetadata = (file: string) => {
     const bytes = readFileSync(resolve(root, file));
@@ -97,23 +105,37 @@ describe("app brand assets", () => {
     expect(fixTaskbarSource).toContain("rcedit-x64.exe");
   });
 
-  it("uses a clean vector brand mark in the PC sidebar instead of cropping the app icon", () => {
+  it("uses the high fidelity app icon asset in PC brand slots", () => {
     expect(appMetadataSource).toContain("import.meta.env.BASE_URL");
     expect(appMetadataSource).toContain("app-icon-startlink.png");
+    expect(existsSync(resolve(root, "assets/brand/brand-logo-icon.png"))).toBe(true);
+    expect(existsSync(resolve(root, "public/brand-logo-icon.png"))).toBe(true);
+    expect(brandLogoGeneratorSource).toContain("DISPLAY_CROP_INSET = 160");
+    expect(brandLogoGeneratorSource).toContain("alpha-rounded corners");
+    expect(brandLogoGeneratorSource).toContain("lpp_mobile/assets/brand/app_icon.png");
+    expect(readPngMetadata("assets/brand/brand-logo-icon.png")).toEqual({
+      width: 1024,
+      height: 1024,
+      colorType: 6,
+    });
+    expect(readPngMetadata("public/brand-logo-icon.png")).toEqual({
+      width: 1024,
+      height: 1024,
+      colorType: 6,
+    });
+    expect(readFileSync(resolve(root, "assets/brand/brand-logo-icon.png"))).toEqual(mobileBrandLogoIcon);
+    expect(readFileSync(resolve(root, "assets/brand/brand-logo-icon.png"))).toEqual(
+      readFileSync(resolve(root, "public/brand-logo-icon.png")),
+    );
     expect(sidebarSource).toContain("AppBrandLogo");
-    expect(brandLogoSource).toContain("<svg");
+    expect(brandLogoSource).toContain("brand-logo-icon.png");
     expect(brandLogoSource).toContain("app-brand-logo-mark");
-    expect(brandLogoSource).toContain("#076B4A");
-    expect(brandLogoSource).toContain("#00E676");
-    expect(brandLogoSource).toContain("#A8FFD1");
-    expect(brandLogoSource).toContain("#F5F7EB");
-    expect(brandLogoSource).toContain("#E6C97A");
-    expect(brandLogoSource).not.toContain("#21d68d");
-    expect(brandLogoSource).not.toContain("#06a86f");
-    expect(brandLogoSource).not.toContain("#047857");
+    expect(brandLogoSource).not.toContain("appIconSrc");
+    expect(brandLogoSource).not.toContain("brand-logo-mark.svg");
+    expect(brandLogoSource).not.toContain("<rect");
+    expect(brandLogoSource).not.toContain("<path");
     expect(sidebarSource).not.toContain("appIconSrc");
     expect(sidebarSource).not.toContain('src={appIconSrc}');
-    expect(sidebarSource).not.toContain('src="/app-icon-startlink.png"');
     expect(sidebarSource).not.toContain('className="sidebar-brand-logo" aria-hidden="true">\n            L');
   });
 

@@ -37,17 +37,14 @@ describe("auth page contract", () => {
     expect(source).toContain("platformRegister");
   });
 
-  it("renders a clean vector brand mark on the auth page instead of cropping the app icon", () => {
+  it("renders the high fidelity app icon through the shared brand component", () => {
     expect(source).toContain('from "./AppBrandLogo"');
     expect(source).toContain("<AppBrandLogo");
     expect(source).toContain("auth-brand-logo");
-    expect(brandLogoSource).toContain("<svg");
+    expect(brandLogoSource).toContain("brand-logo-icon.png");
     expect(brandLogoSource).toContain("app-brand-logo-mark");
-    expect(brandLogoSource).toContain("#076B4A");
-    expect(brandLogoSource).toContain("#00E676");
-    expect(brandLogoSource).toContain("#A8FFD1");
-    expect(brandLogoSource).toContain("#F5F7EB");
-    expect(brandLogoSource).toContain("#E6C97A");
+    expect(brandLogoSource).not.toContain("appIconSrc");
+    expect(brandLogoSource).not.toContain("<path");
     expect(source).not.toContain("appIconSrc");
     expect(source).not.toContain("app-icon-startlink.png");
   });
