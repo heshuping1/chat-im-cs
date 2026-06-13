@@ -5,10 +5,11 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
-const packagedExe = join(root, "release", "win-unpacked", "startlink.exe");
-const installedExe = process.env.LPP_INSTALLED_EXE || "C:\\Program Files\\StartLink\\startlink.exe";
+const packagedDir = join(root, "release", "win-unpacked");
+const installedExeCandidates = resolveInstalledExeCandidates();
+const installedExe = installedExeCandidates[0] || "C:\\Program Files\\StartLink\\startlink.exe";
 const ico = join(root, "assets", "app-icon-startlink.ico");
-const installedShortcutIcon = join(dirname(installedExe), "resources", "startlink-shell-icon-v3.ico");
+const installedShortcutIcon = join(dirname(installedExe), "resources", "startlink-shell-icon-v4.ico");
 const syncScript = join(root, "scripts", "sync-app-icon.mjs");
 
 if (process.platform !== "win32") {
@@ -19,13 +20,13 @@ main();
 
 function main() {
   log("stopping packaged and installed app processes");
-  stopProcesses([packagedExe, installedExe]);
+  stopProcesses([...resolvePackagedExeCandidates(), ...installedExeCandidates]);
 
   log("syncing source icon outputs and workspace packaged exe");
   run(process.execPath, [syncScript], { label: "run icon:sync" });
 
-  if (!existsSync(installedExe)) {
-    fail(`installed exe not found: ${installedExe}`);
+  if (installedExeCandidates.length === 0) {
+    fail("installed exe not found. Checked StartLink/startlink.exe under Program Files; set LPP_INSTALLED_EXE if installed elsewhere.");
   }
   if (!existsSync(ico)) {
     fail(`ICO not found: ${relative(ico)}`);
@@ -36,13 +37,15 @@ function main() {
     fail("rcedit-x64.exe was not found. Run electron-builder once or set RCEDIT_PATH.");
   }
 
-  run(rcedit, [installedExe, "--set-icon", ico], {
-    label: `patch installed exe: ${installedExe}`,
-    adminHint: true,
-  });
+  for (const target of installedExeCandidates) {
+    run(rcedit, [target, "--set-icon", ico], {
+      label: `patch installed exe: ${target}`,
+      adminHint: true,
+    });
+  }
 
   installShortcutIcon();
-  updateShortcuts(installedExe, installedShortcutIcon);
+  updateShortcuts(installedExeCandidates, installedExe, installedShortcutIcon);
   refreshIconCache();
   log("installed taskbar icon repair complete");
   log("if the pinned taskbar icon still shows the old image, unpin and pin again or restart Explorer.");
@@ -75,10 +78,11 @@ function stopProcesses(targets) {
   });
 }
 
-function updateShortcuts(targetExe, shortcutIcon) {
+function updateShortcuts(targetExes, preferredTargetExe, shortcutIcon) {
   const script = [
     "$shell = New-Object -ComObject WScript.Shell;",
-    `$target = ${psString(targetExe)};`,
+    `$targets = @(${targetExes.map(psString).join(",")});`,
+    `$target = ${psString(preferredTargetExe)};`,
     `$icon = ${psString(`${shortcutIcon},0`)};`,
     "$roots = @(",
     "$env:PUBLIC + '\\Desktop',",
@@ -91,7 +95,7 @@ function updateShortcuts(targetExe, shortcutIcon) {
     "Get-ChildItem $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue |",
     "ForEach-Object {",
     "$shortcut = $shell.CreateShortcut($_.FullName);",
-    "if ($shortcut.TargetPath -eq $target -or $shortcut.TargetPath -match 'StartLink|startlink|LPP|lpp' -or $_.Name -match 'startlink|LPP|客服|lpp') {",
+    "if ($targets -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink|LPP|lpp' -or $_.Name -match '星络|StartLink|startlink|LPP|客服|lpp') {",
     "$shortcut.TargetPath = $target;",
     "$shortcut.WorkingDirectory = Split-Path $target;",
     "$shortcut.IconLocation = $icon;",
@@ -105,6 +109,29 @@ function updateShortcuts(targetExe, shortcutIcon) {
     label: "update desktop/start/taskbar shortcut icon locations",
     optional: true,
   });
+}
+
+function resolveInstalledExeCandidates() {
+  if (process.env.LPP_INSTALLED_EXE) {
+    return existsSync(process.env.LPP_INSTALLED_EXE) ? [process.env.LPP_INSTALLED_EXE] : [];
+  }
+
+  const installDirs = [
+    join(process.env.ProgramFiles || "C:\\Program Files", "StartLink"),
+    join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "StartLink"),
+  ];
+  return uniqueExisting(
+    installDirs.flatMap((dir) => [join(dir, "startlink.exe"), join(dir, "StartLink.exe")]),
+  );
+}
+
+function resolvePackagedExeCandidates() {
+  if (!existsSync(packagedDir)) return [];
+  return uniqueExisting([join(packagedDir, "startlink.exe"), join(packagedDir, "StartLink.exe")]);
+}
+
+function uniqueExisting(paths) {
+  return [...new Set(paths)].filter((path) => existsSync(path));
 }
 
 function refreshIconCache() {

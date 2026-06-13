@@ -23,7 +23,7 @@ const paths = {
   publicPng: join(root, "public", "app-icon-startlink.png"),
   ico: join(root, "assets", "app-icon-startlink.ico"),
   icns: join(root, "assets", "app-icon-startlink.icns"),
-  packagedExe: join(root, "release", "win-unpacked", "startlink.exe"),
+  packagedDir: join(root, "release", "win-unpacked"),
 };
 const outputManifest = ["assets/app-icon-startlink.ico", "public/app-icon-startlink.png"];
 
@@ -185,8 +185,8 @@ function writePngBackedIco(target, frames) {
 }
 
 function patchPackagedExe() {
-  if (!existsSync(paths.packagedExe)) {
-    warn(`packaged exe not found; skipped exe icon patch: ${relative(paths.packagedExe)}`);
+  if (!existsSync(paths.packagedDir)) {
+    warn(`packaged app not found; skipped exe icon patch: ${relative(paths.packagedDir)}`);
     return;
   }
 
@@ -204,9 +204,28 @@ function patchPackagedExe() {
     );
   }
 
-  run(rcedit, [paths.packagedExe, "--set-icon", paths.ico], {
-    label: `patch ${relative(paths.packagedExe)} with ${relative(paths.ico)}`,
-  });
+  const packagedExes = findAppExecutables(paths.packagedDir);
+  if (packagedExes.length === 0) {
+    warn(`packaged exe not found; skipped exe icon patch: ${relative(paths.packagedDir)}`);
+    return;
+  }
+
+  for (const packagedExe of packagedExes) {
+    run(rcedit, [packagedExe, "--set-icon", paths.ico], {
+      label: `patch ${relative(packagedExe)} with ${relative(paths.ico)}`,
+    });
+  }
+}
+
+function findAppExecutables(appDir) {
+  const preferred = [join(appDir, "startlink.exe"), join(appDir, "StartLink.exe")].filter((exePath) =>
+    existsSync(exePath),
+  );
+  if (preferred.length > 0) return [...new Set(preferred)];
+
+  return readdirSync(appDir)
+    .filter((entry) => entry.toLowerCase().endsWith(".exe") && !entry.toLowerCase().includes("uninstall"))
+    .map((entry) => join(appDir, entry));
 }
 
 function findRcedit() {

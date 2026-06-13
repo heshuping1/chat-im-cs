@@ -7,6 +7,7 @@ describe("app brand assets", () => {
   const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
     build?: {
+      executableName?: string;
       icon?: string;
       extraResources?: Array<{ from?: string; to?: string }>;
       mac?: { icon?: string };
@@ -29,6 +30,7 @@ describe("app brand assets", () => {
   const iconVerifySource = readFileSync(resolve(root, "scripts/verify-packaged-icon.mjs"), "utf8");
   const startPackagedSource = readFileSync(resolve(root, "scripts/start-packaged.mjs"), "utf8");
   const fixTaskbarSource = readFileSync(resolve(root, "scripts/fix-taskbar-icon.mjs"), "utf8");
+  const fixInstalledShortcutSource = readFileSync(resolve(root, "scripts/fix-installed-shortcut-icons.ps1"), "utf8");
   const mobileBrandLogoIcon = readFileSync(resolve(root, "../lpp_mobile/assets/brand/brand_logo_icon.png"));
   const brandLogoGeneratorSource = readFileSync(
     resolve(root, "../scripts/brand/generate_brand_logo_assets.py"),
@@ -54,6 +56,7 @@ describe("app brand assets", () => {
 
   it("wires Electron builder icons for Windows installer and macOS app bundles", () => {
     expect(packageJson.build?.icon).toBe("assets/app-icon-startlink.ico");
+    expect(packageJson.build?.executableName).toBe("startlink");
     expect(packageJson.build?.win?.icon).toBe("assets/app-icon-startlink.ico");
     expect(packageJson.build?.nsis?.installerIcon).toBe("assets/app-icon-startlink.ico");
     expect(packageJson.build?.nsis?.uninstallerIcon).toBe("assets/app-icon-startlink.ico");
@@ -84,7 +87,7 @@ describe("app brand assets", () => {
     expect(iconManual).toContain("icon:fix-taskbar");
     expect(iconManual).toContain("icon:sync");
     expect(iconManual).toContain("C:\\Program Files\\StartLink");
-    expect(iconManual).toContain("startlink-shell-icon-v3.ico");
+    expect(iconManual).toContain("startlink-shell-icon-v4.ico");
     expect(iconManual).toContain("Windows 图标缓存");
   });
 
@@ -93,15 +96,22 @@ describe("app brand assets", () => {
     expect(iconSyncSource).toContain("app-icon-startlink.ico");
     expect(iconSyncSource).toContain("public/app-icon-startlink.png");
     expect(iconSyncSource).toContain("startlink.exe");
-    expect(JSON.stringify(packageJson.build?.extraResources)).toContain("startlink-shell-icon-v3.ico");
+    expect(iconSyncSource).toContain("StartLink.exe");
+    expect(JSON.stringify(packageJson.build?.extraResources)).toContain("startlink-shell-icon-v4.ico");
     expect(iconManual).toContain("Windows 图标缓存");
     expect(iconVerifySource).toContain("packaged-exe-icon.png");
     expect(iconVerifySource).toContain("installed-exe-icon.png");
+    expect(iconVerifySource).toContain("StartLink.exe");
     expect(startPackagedSource).toContain("sync-app-icon.mjs");
+    expect(startPackagedSource).toContain("StartLink.exe");
     expect(fixTaskbarSource).toContain("ie4uinit.exe");
     expect(fixTaskbarSource).toContain("C:\\\\Program Files\\\\StartLink");
-    expect(fixTaskbarSource).toContain("startlink-shell-icon-v3.ico");
+    expect(fixTaskbarSource).toContain("startlink-shell-icon-v4.ico");
+    expect(fixTaskbarSource).toContain("StartLink.exe");
     expect(fixTaskbarSource).toContain("rcedit-x64.exe");
+    expect(fixInstalledShortcutSource).toContain("startlink-shell-icon-v4.ico");
+    expect(fixInstalledShortcutSource).toContain("StartLink.exe");
+    expect(fixInstalledShortcutSource).toContain("IconLocation");
   });
 
   it("uses the high fidelity app icon asset in PC brand slots", () => {

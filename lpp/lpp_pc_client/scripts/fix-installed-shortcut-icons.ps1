@@ -3,12 +3,16 @@ param(
   [string]$InstallDir
 )
 
-$target = Join-Path $InstallDir 'startlink.exe'
-$iconPath = Join-Path $InstallDir 'resources\startlink-shell-icon-v3.ico'
+$targetCandidates = @(
+  (Join-Path $InstallDir 'startlink.exe'),
+  (Join-Path $InstallDir 'StartLink.exe')
+)
+$target = $targetCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+$iconPath = Join-Path $InstallDir 'resources\startlink-shell-icon-v4.ico'
 $iconLocation = "$iconPath,0"
 
-if (-not (Test-Path -LiteralPath $target)) {
-  Write-Output "[StartLink] installed exe not found: $target"
+if (-not $target) {
+  Write-Output "[StartLink] installed exe not found under: $InstallDir"
   exit 0
 }
 
@@ -28,7 +32,7 @@ $roots = @(
 foreach ($root in $roots) {
   Get-ChildItem -LiteralPath $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {
     $shortcut = $shell.CreateShortcut($_.FullName)
-    if ($shortcut.TargetPath -eq $target -or $shortcut.TargetPath -match 'StartLink|startlink') {
+    if ($targetCandidates -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink' -or $_.Name -match '星络|StartLink|startlink') {
       $shortcut.TargetPath = $target
       $shortcut.WorkingDirectory = Split-Path $target
       $shortcut.IconLocation = $iconLocation

@@ -99,6 +99,7 @@
   "build": {
     "appId": "com.startlink.desktop",
     "productName": "StartLink",
+    "executableName": "startlink",
     "icon": "assets/app-icon-startlink.ico",
     "mac": {
       "icon": "assets/app-icon-startlink.icns"
@@ -118,7 +119,7 @@
       },
       {
         "from": "assets/app-icon-startlink.ico",
-        "to": "startlink-shell-icon-v3.ico"
+        "to": "startlink-shell-icon-v4.ico"
       },
       {
         "from": "scripts/fix-installed-shortcut-icons.ps1",

@@ -7,12 +7,12 @@ const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
 const targets = [
   {
-    exe: join(root, "release", "win-unpacked", "startlink.exe"),
+    exe: resolvePackagedExe(),
     outputPng: join(root, "tmp", "packaged-exe-icon.png"),
     required: true,
   },
   {
-    exe: process.env.LPP_INSTALLED_EXE || "C:\\Program Files\\StartLink\\startlink.exe",
+    exe: resolveInstalledExe(),
     outputPng: join(root, "tmp", "installed-exe-icon.png"),
     required: false,
   },
@@ -27,6 +27,13 @@ for (const target of targets) {
 }
 
 function extractIcon(target) {
+  if (!target.exe) {
+    const message = "exe not found";
+    if (target.required) fail(message);
+    console.warn(`[icon] WARN ${message}; skipped`);
+    return;
+  }
+
   if (!existsSync(target.exe)) {
     const message = `exe not found: ${target.exe}`;
     if (target.required) fail(message);
@@ -59,6 +66,27 @@ function extractIcon(target) {
   }
 
   console.log(`[icon] extracted ${target.exe} icon to ${relative(target.outputPng)}`);
+}
+
+function resolvePackagedExe() {
+  const packagedDir = join(root, "release", "win-unpacked");
+  for (const candidate of [join(packagedDir, "startlink.exe"), join(packagedDir, "StartLink.exe")]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function resolveInstalledExe() {
+  if (process.env.LPP_INSTALLED_EXE) return process.env.LPP_INSTALLED_EXE;
+  for (const candidate of [
+    "C:\\Program Files\\StartLink\\startlink.exe",
+    "C:\\Program Files\\StartLink\\StartLink.exe",
+    "C:\\Program Files (x86)\\StartLink\\startlink.exe",
+    "C:\\Program Files (x86)\\StartLink\\StartLink.exe",
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 function psString(value) {

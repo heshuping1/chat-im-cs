@@ -9,10 +9,10 @@ const root = resolve(dirname(__filename), "..");
 export default async function afterPack(context) {
   if (context.electronPlatformName !== "win32") return;
 
-  const exePath = join(context.appOutDir, "startlink.exe");
+  const exePaths = findAppExecutables(context.appOutDir);
   const iconPath = join(root, "assets", "app-icon-startlink.ico");
-  if (!existsSync(exePath)) {
-    throw new Error(`Cannot patch Windows icon, exe not found: ${exePath}`);
+  if (exePaths.length === 0) {
+    throw new Error(`Cannot patch Windows icon, exe not found in: ${context.appOutDir}`);
   }
   if (!existsSync(iconPath)) {
     throw new Error(`Cannot patch Windows icon, ico not found: ${iconPath}`);
@@ -23,7 +23,20 @@ export default async function afterPack(context) {
     throw new Error("Cannot patch Windows icon, rcedit-x64.exe was not found.");
   }
 
-  execFileSync(rcedit, [exePath, "--set-icon", iconPath], { stdio: "inherit" });
+  for (const exePath of exePaths) {
+    execFileSync(rcedit, [exePath, "--set-icon", iconPath], { stdio: "inherit" });
+  }
+}
+
+function findAppExecutables(appOutDir) {
+  const preferred = [join(appOutDir, "startlink.exe"), join(appOutDir, "StartLink.exe")].filter((exePath) =>
+    existsSync(exePath),
+  );
+  if (preferred.length > 0) return [...new Set(preferred)];
+
+  return readdirSync(appOutDir)
+    .filter((entry) => entry.toLowerCase().endsWith(".exe") && !entry.toLowerCase().includes("uninstall"))
+    .map((entry) => join(appOutDir, entry));
 }
 
 function findRcedit() {

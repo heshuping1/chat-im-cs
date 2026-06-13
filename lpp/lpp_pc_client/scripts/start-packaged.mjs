@@ -5,15 +5,16 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const root = resolve(dirname(__filename), "..");
-const packagedExe = join(root, "release", "win-unpacked", "startlink.exe");
+const packagedDir = join(root, "release", "win-unpacked");
 const syncScript = join(root, "scripts", "sync-app-icon.mjs");
 
 if (process.platform !== "win32") {
   fail("start:packaged currently supports Windows only.");
 }
 
-if (!existsSync(packagedExe)) {
-  fail(`packaged exe not found: ${relative(packagedExe)}. Run npm.cmd run dist:win first.`);
+const packagedExe = resolvePackagedExe();
+if (!packagedExe) {
+  fail(`packaged exe not found in ${relative(packagedDir)}. Run npm.cmd run dist:win first.`);
 }
 
 stopExistingPackagedProcesses();
@@ -37,6 +38,13 @@ const child = spawn(packagedExe, [], {
 child.unref();
 
 console.log(`[icon] started packaged app: ${relative(packagedExe)}`);
+
+function resolvePackagedExe() {
+  for (const candidate of [join(packagedDir, "startlink.exe"), join(packagedDir, "StartLink.exe")]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
 
 function stopExistingPackagedProcesses() {
   const script = [
