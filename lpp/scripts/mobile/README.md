@@ -6,6 +6,7 @@ app runtime.
 ## Layout
 
 - `dev/` - API verification, tenant debugging, login checks, and local probes
+- `package/` - Android debug and production APK build entrypoints
 - `test/` - repeatable automated test entrypoints for business and platform regression
 - `test/flutter/` - Flutter automated test files
 - `test-data/` - scripts that create or reset tenants, users, and staff data
@@ -22,6 +23,26 @@ otherwise:
 cd lpp/lpp_mobile
 sh ../scripts/mobile/dev/verify_api.sh
 ```
+
+## Build Entrypoints
+
+Run from `lpp/lpp_mobile`:
+
+```bash
+../scripts/mobile/package/build_debug_apk.sh
+../scripts/mobile/package/build_release_apk.sh
+```
+
+Useful options:
+
+```bash
+../scripts/mobile/package/build_debug_apk.sh --clean
+../scripts/mobile/package/build_release_apk.sh --split-per-abi
+../scripts/mobile/package/build_release_apk.sh --dart-define=JPUSH_APP_KEY=your_key
+```
+
+Release signing uses the existing `android/key.properties` Gradle configuration
+when present; the build scripts do not create or modify signing files.
 
 ## Repeatable Test Entrypoints
 
