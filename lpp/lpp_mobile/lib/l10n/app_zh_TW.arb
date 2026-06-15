@@ -86,6 +86,7 @@
   "authEnterpriseCodeHint": "請輸入企業碼",
   "authPendingApproval": "註冊成功，加入企業申請已提交，等待審核",
   "homeTitle": "訊息",
+  "homeGatewayConnectingTitle": "連線中",
   "homePersonalSpace": "個人空間",
   "homeOfficialService": "官方服務空間",
   "homeSwitchSpace": "切換空間",

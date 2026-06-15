@@ -86,6 +86,7 @@
   "authEnterpriseCodeHint": "Nhập mã doanh nghiệp",
   "authPendingApproval": "Đăng ký thành công. Yêu cầu tham gia doanh nghiệp đã được gửi và đang chờ phê duyệt.",
   "homeTitle": "Tin nhắn",
+  "homeGatewayConnectingTitle": "Đang kết nối",
   "homePersonalSpace": "Không gian cá nhân",
   "homeOfficialService": "Dịch vụ chính thức",
   "homeSwitchSpace": "Chuyển không gian",

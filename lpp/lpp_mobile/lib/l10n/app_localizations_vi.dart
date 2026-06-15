@@ -271,6 +271,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get homeTitle => 'Tin nhắn';
 
   @override
+  String get homeGatewayConnectingTitle => 'Đang kết nối';
+
+  @override
   String get homePersonalSpace => 'Không gian cá nhân';
 
   @override

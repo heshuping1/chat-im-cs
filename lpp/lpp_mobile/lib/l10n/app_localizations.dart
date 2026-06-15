@@ -621,6 +621,12 @@ abstract class AppLocalizations {
   /// **'消息'**
   String get homeTitle;
 
+  /// Home title shown while chat gateway is connecting or reconnecting
+  ///
+  /// In zh, this message translates to:
+  /// **'连接中'**
+  String get homeGatewayConnectingTitle;
+
   /// Personal space
   ///
   /// In zh, this message translates to:

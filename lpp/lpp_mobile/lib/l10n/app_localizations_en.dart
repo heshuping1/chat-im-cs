@@ -274,6 +274,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeTitle => 'Chats';
 
   @override
+  String get homeGatewayConnectingTitle => 'Connecting';
+
+  @override
   String get homePersonalSpace => 'Personal';
 
   @override

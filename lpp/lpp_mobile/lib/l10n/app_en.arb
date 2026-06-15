@@ -86,6 +86,7 @@
   "authEnterpriseCodeHint": "Enter enterprise code",
   "authPendingApproval": "Registration successful. Your request to join the enterprise has been submitted and is awaiting approval.",
   "homeTitle": "Chats",
+  "homeGatewayConnectingTitle": "Connecting",
   "homePersonalSpace": "Personal",
   "homeOfficialService": "Official Service",
   "homeSwitchSpace": "Switch Space",

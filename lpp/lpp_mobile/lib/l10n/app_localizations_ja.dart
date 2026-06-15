@@ -270,6 +270,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get homeTitle => 'トーク';
 
   @override
+  String get homeGatewayConnectingTitle => '接続中';
+
+  @override
   String get homePersonalSpace => '個人スペース';
 
   @override

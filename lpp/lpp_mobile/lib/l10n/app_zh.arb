@@ -349,6 +349,10 @@
   "@homeTitle": {
     "description": "Home page title"
   },
+  "homeGatewayConnectingTitle": "连接中",
+  "@homeGatewayConnectingTitle": {
+    "description": "Home title shown while chat gateway is connecting or reconnecting"
+  },
   "homePersonalSpace": "个人空间",
   "@homePersonalSpace": {
     "description": "Personal space"

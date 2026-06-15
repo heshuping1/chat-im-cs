@@ -270,6 +270,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get homeTitle => '채팅';
 
   @override
+  String get homeGatewayConnectingTitle => '연결 중';
+
+  @override
   String get homePersonalSpace => '개인 공간';
 
   @override

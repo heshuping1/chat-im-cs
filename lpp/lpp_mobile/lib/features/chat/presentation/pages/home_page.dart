@@ -7,6 +7,7 @@ import 'package:lpp_mobile/core/space/space_context.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/app_toast.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:lpp_mobile/features/chat/data/datasources/gateway_service.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
@@ -33,6 +34,25 @@ const _kHomeSurface = Color(0xFFFFFFFF);
 const _kSearchFill = Color(0xFFF5F5F5);
 const _kHomeTextPrimary = Color(0xFF111827);
 const _kHomeTextSecondary = Color(0xFF667085);
+
+@visibleForTesting
+String resolveHomeTitleForGatewayStatus({
+  required String messagesLabel,
+  required String connectingLabel,
+  required int messageBadgeCount,
+  required GatewayConnectionStatus gatewayStatus,
+}) {
+  switch (gatewayStatus) {
+    case GatewayConnectionStatus.connecting:
+    case GatewayConnectionStatus.reconnecting:
+      return connectingLabel;
+    case GatewayConnectionStatus.connected:
+    case GatewayConnectionStatus.disconnected:
+      return messageBadgeCount > 0
+          ? '$messagesLabel ($messageBadgeCount)'
+          : messagesLabel;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // HomePage
@@ -181,6 +201,9 @@ class _TopBar extends ConsumerWidget {
     final conversations =
         ref.watch(conversationsProvider(spaceId)).valueOrNull ?? [];
     final messageBadgeCount = calculateMessageBadgeCount(conversations);
+    final gatewayStatus =
+        ref.watch(gatewayConnectionStatusProvider).valueOrNull ??
+            GatewayConnectionStatus.disconnected;
     final currentSpaceInfo =
         spacesAsync.valueOrNull?.where((s) => s.spaceId == spaceId).firstOrNull;
     final currentTenant = authState?.availableTenants
@@ -235,9 +258,14 @@ class _TopBar extends ConsumerWidget {
                     Expanded(
                       child: Center(
                         child: Text(
-                          messageBadgeCount > 0
-                              ? '${AppLocalizations.of(context).navMessages} ($messageBadgeCount)'
-                              : AppLocalizations.of(context).navMessages,
+                          resolveHomeTitleForGatewayStatus(
+                            messagesLabel:
+                                AppLocalizations.of(context).navMessages,
+                            connectingLabel: AppLocalizations.of(context)
+                                .homeGatewayConnectingTitle,
+                            messageBadgeCount: messageBadgeCount,
+                            gatewayStatus: gatewayStatus,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(

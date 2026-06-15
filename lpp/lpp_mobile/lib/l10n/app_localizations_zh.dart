@@ -270,6 +270,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeTitle => '消息';
 
   @override
+  String get homeGatewayConnectingTitle => '连接中';
+
+  @override
   String get homePersonalSpace => '个人空间';
 
   @override
@@ -2446,6 +2449,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get homeTitle => '訊息';
+
+  @override
+  String get homeGatewayConnectingTitle => '連線中';
 
   @override
   String get homePersonalSpace => '個人空間';
