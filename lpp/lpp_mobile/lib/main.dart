@@ -13,7 +13,8 @@ import 'core/storage/secure_storage.dart';
 
 void main() {
   runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+    final binding = WidgetsFlutterBinding.ensureInitialized();
+    binding.deferFirstFrame();
 
     FlutterError.onError = (details) {
       FlutterError.presentError(details);

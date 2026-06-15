@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lpp_mobile/core/notifications/mobile_push_token_provider.dart';
 import 'package:lpp_mobile/core/notifications/push_device_registration_service.dart';
 import 'package:lpp_mobile/core/platform/platform_capabilities.dart';
 import 'package:lpp_mobile/core/storage/secure_storage.dart';
@@ -12,10 +13,10 @@ const _pushDeviceIdKey = 'push_device_id';
 
 /// Cross-platform notification coordinator.
 ///
-/// Desktop builds must not import Firebase/JPush Flutter plugins. The first PC
-/// version uses Gateway events while the app is online, then surfaces important
-/// messages through system local notifications. Mobile native push can be
-/// reintroduced behind a mobile-only adapter without touching PC builds.
+/// Desktop builds must not import Firebase/JPush Flutter plugins. While the app
+/// process is alive, Gateway events surface important messages through system
+/// local notifications. Offline/killed-process delivery stays behind a
+/// mobile-only native push adapter.
 class PushNotificationService {
   static const String messageChannelId = 'lpp_messages';
   static const String callChannelId = 'lpp_calls';
@@ -24,18 +25,22 @@ class PushNotificationService {
       FlutterLocalNotificationsPlugin();
   static bool _localNotificationsReady = false;
 
-  final PushDeviceRegistrationService _registrationService;
+  final PushDeviceRegistrar _registrationService;
   final SecureStorageService _storage;
+  final MobilePushTokenProvider _mobilePushTokenProvider;
 
   bool _initialized = false;
   bool _handledInitialLocalNotification = false;
   GoRouter? _router;
 
   PushNotificationService({
-    required PushDeviceRegistrationService registrationService,
+    required PushDeviceRegistrar registrationService,
     required SecureStorageService storage,
+    MobilePushTokenProvider mobilePushTokenProvider =
+        const DisabledMobilePushTokenProvider(),
   })  : _registrationService = registrationService,
-        _storage = storage;
+        _storage = storage,
+        _mobilePushTokenProvider = mobilePushTokenProvider;
 
   static void registerBackgroundHandler() {
     if (PlatformCapabilities.supportsMobilePush) {
@@ -62,13 +67,31 @@ class PushNotificationService {
 
   Future<void> registerCurrentDevice() async {
     if (!PlatformCapabilities.supportsMobilePush) return;
-    if (!_initialized) {
-      await initialize();
+    final token = await _mobilePushTokenProvider.requestToken();
+    if (token == null) {
+      debugPrint(
+        '[PushNotification] skip remote push device registration: '
+        'mobile native push adapter is disabled or unavailable',
+      );
+      return;
     }
-    debugPrint(
-      '[PushNotification] skip remote push device registration: '
-      'mobile native push adapter is isolated from desktop builds',
-    );
+    final platform = PushDeviceRegistrationService.currentMobilePlatform();
+    if (platform == null) return;
+    try {
+      final deviceId = await _storage.stableDeviceId();
+      await _registrationService.registerOrUpdate(
+        PushDeviceRegistration(
+          deviceId: deviceId,
+          platform: platform,
+          channel: token.channel,
+          token: token.token,
+          region: token.region,
+        ),
+      );
+      await _storage.write(_pushDeviceIdKey, deviceId);
+    } catch (e) {
+      debugPrint('[PushNotification] register device failed: $e');
+    }
   }
 
   Future<void> unregisterCurrentDevice() async {
@@ -83,6 +106,9 @@ class PushNotificationService {
 
   Future<void> dispose() async {}
 
+  static bool get supportsGatewayLocalMessageNotification =>
+      PlatformCapabilities.isMobile || PlatformCapabilities.isDesktop;
+
   static Future<void> showGatewayMessageNotification({
     required String conversationId,
     required bool isGroup,
@@ -94,7 +120,7 @@ class PushNotificationService {
     String? mentionKind,
     String? senderDisplayName,
   }) async {
-    if (!PlatformCapabilities.isDesktop) return;
+    if (!supportsGatewayLocalMessageNotification) return;
     await _showDataNotification({
       'scenario': 'message',
       'conversationId': conversationId,

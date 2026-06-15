@@ -63,7 +63,7 @@ void main() {
     );
   });
 
-  test('startup gate keeps brand loading immersive until handoff', () {
+  test('startup gate navigates without flashing an extra loading overlay', () {
     final source =
         File('lib/features/startup/presentation/pages/startup_gate_page.dart')
             .readAsStringSync();
@@ -71,15 +71,15 @@ void main() {
     final mainSource = File('lib/main.dart').readAsStringSync();
     final routerSource = File('lib/app/router/router.dart').readAsStringSync();
 
+    expect(mainSource, contains('deferFirstFrame()'));
     expect(mainSource, contains('configureStartupSystemUi()'));
     expect(source, contains('SystemUiMode.manual'));
     expect(source, contains('overlays: const []'));
+    expect(source, contains('allowFirstFrame()'));
     expect(source, contains('configureAppSystemUi()'));
-    expect(source, contains('startupHandoffOverlayProvider'));
+    expect(source, isNot(contains('startupHandoffOverlayProvider')));
     expect(source, contains('startupNetworkBannerSuppressedProvider'));
-    expect(source.indexOf('startupHandoffOverlayProvider'),
-        lessThan(source.indexOf('context.go(destination)')));
-    expect(appSource, contains('StartupHandoffOverlay'));
+    expect(appSource, isNot(contains('StartupHandoffOverlay')));
     expect(appSource, contains('!suppressStartupNetworkBanner'));
     expect(
       appSource.indexOf('!suppressStartupNetworkBanner'),
@@ -89,6 +89,14 @@ void main() {
       source.indexOf('SystemUiMode.manual'),
       lessThan(source.indexOf('return const StartupBrandLoadingView()')),
     );
+    final navigationIndex = source.indexOf('context.go(destination)');
+    final deferredReleaseIndex = source.indexOf(
+      '_scheduleStartupUiRelease()',
+      navigationIndex,
+    );
+    expect(navigationIndex, isNonNegative);
+    expect(deferredReleaseIndex, isNonNegative);
+    expect(navigationIndex, lessThan(deferredReleaseIndex));
     expect(routerSource, contains('path: AppRoutes.startup'));
     expect(routerSource, contains('path: AppRoutes.login'));
     expect(routerSource, contains('path: AppRoutes.tenantSelect'));

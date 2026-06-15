@@ -5,7 +5,6 @@ import 'package:lpp_mobile/l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/app/router/router.dart';
-import 'package:lpp_mobile/app/system_ui.dart';
 import 'package:lpp_mobile/core/diagnostics/app_error_reporter.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/providers/font_size_provider.dart';
@@ -18,11 +17,13 @@ import 'package:lpp_mobile/core/storage/secure_storage.dart';
 import 'package:lpp_mobile/core/widgets/network_status_banner.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/call/presentation/widgets/incoming_call_overlay.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/services/chat_startup_recovery.dart';
+import 'package:lpp_mobile/features/chat/domain/usecases/message_badge_count.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_open_controller.dart';
+import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/gateway_provider.dart';
 import 'package:lpp_mobile/features/startup/presentation/pages/startup_gate_page.dart';
-import 'package:lpp_mobile/features/startup/presentation/widgets/startup_brand_loading_view.dart';
 
 class App extends ConsumerStatefulWidget {
   const App({super.key});
@@ -35,6 +36,10 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   late final AppRouter _appRouter;
   ProviderSubscription<AsyncValue<AuthState>>? _authSubscription;
   ProviderSubscription<SpaceContext?>? _spaceSubscription;
+  ProviderSubscription<AsyncValue<List<Conversation>>>?
+      _conversationBadgeSubscription;
+  String? _badgeSpaceId;
+  int? _lastSyncedBadgeCount;
 
   @override
   void initState() {
@@ -45,7 +50,11 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     _authSubscription = ref.listenManual(authProvider, (previous, next) {
       final isAuthenticated =
           next.valueOrNull?.status == AuthStatus.authenticated;
-      if (!isAuthenticated) return;
+      if (!isAuthenticated) {
+        _listenToConversationBadge(null);
+        unawaited(ref.read(appIconBadgeServiceProvider).clear());
+        return;
+      }
       final pushService = ref.read(pushNotificationServiceProvider);
       unawaited(pushService.initialize(router: _appRouter.router));
       unawaited(pushService.registerCurrentDevice());
@@ -56,6 +65,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         spaceId: next?.spaceId,
         userId: next?.userId,
       );
+      _listenToConversationBadge(next?.spaceId);
       if (next != null && previous?.spaceId != next.spaceId) {
         final recovery = ChatStartupRecovery(
           store: ref.read(mediaLocalStoreProvider),
@@ -71,8 +81,40 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _authSubscription?.close();
     _spaceSubscription?.close();
+    _conversationBadgeSubscription?.close();
     AppErrorReporter.instance.stop();
     super.dispose();
+  }
+
+  void _listenToConversationBadge(String? spaceId) {
+    final normalizedSpaceId = spaceId?.trim();
+    if (_badgeSpaceId == normalizedSpaceId) return;
+    _conversationBadgeSubscription?.close();
+    _conversationBadgeSubscription = null;
+    _badgeSpaceId = normalizedSpaceId;
+    _lastSyncedBadgeCount = null;
+    if (normalizedSpaceId == null || normalizedSpaceId.isEmpty) {
+      unawaited(ref.read(appIconBadgeServiceProvider).clear());
+      return;
+    }
+    _conversationBadgeSubscription =
+        ref.listenManual<AsyncValue<List<Conversation>>>(
+      conversationsProvider(normalizedSpaceId),
+      (_, next) {
+        final conversations = next.valueOrNull;
+        if (conversations == null) return;
+        _syncAppIconBadge(calculateMessageBadgeCount(conversations));
+      },
+      fireImmediately: true,
+    );
+  }
+
+  void _syncAppIconBadge(int unreadCount) {
+    if (_lastSyncedBadgeCount == unreadCount) return;
+    _lastSyncedBadgeCount = unreadCount;
+    unawaited(
+      ref.read(appIconBadgeServiceProvider).updateUnreadCount(unreadCount),
+    );
   }
 
   @override
@@ -142,7 +184,6 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     final fontSizeScale = ref.watch(fontSizeScaleProvider);
     final isAuthenticated =
         ref.watch(authProvider).valueOrNull?.status == AuthStatus.authenticated;
-    final showStartupHandoffOverlay = ref.watch(startupHandoffOverlayProvider);
     final suppressStartupNetworkBanner =
         ref.watch(startupNetworkBannerSuppressedProvider);
     if (isAuthenticated) {
@@ -168,23 +209,6 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
             IncomingCallOverlay(router: _appRouter.router),
             ActiveCallMiniOverlay(router: _appRouter.router),
             if (!suppressStartupNetworkBanner) const NetworkStatusBanner(),
-            if (showStartupHandoffOverlay)
-              StartupHandoffOverlay(
-                onDismissed: () {
-                  unawaited(configureAppSystemUi());
-                  ref.read(startupHandoffOverlayProvider.notifier).state =
-                      false;
-                  unawaited(Future<void>.delayed(
-                    const Duration(milliseconds: 2500),
-                    () {
-                      if (ref.read(startupHandoffOverlayProvider)) return;
-                      ref
-                          .read(startupNetworkBannerSuppressedProvider.notifier)
-                          .state = false;
-                    },
-                  ));
-                },
-              ),
           ],
         );
       },

@@ -3,50 +3,33 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Android launcher hands off through the native full-screen loading page',
+  test('Android launcher uses MainActivity as the single native startup layer',
       () {
     final manifest = File('android/app/src/main/AndroidManifest.xml');
+    final mainActivity =
+        File('android/app/src/main/kotlin/com/startlink/lite/MainActivity.kt');
     final splashActivity = File(
-      'android/app/src/main/kotlin/com/startlink/lite/SplashActivity.kt',
-    );
+        'android/app/src/main/kotlin/com/startlink/lite/SplashActivity.kt');
 
     expect(manifest.existsSync(), isTrue);
-    expect(splashActivity.existsSync(), isTrue);
+    expect(mainActivity.existsSync(), isTrue);
+    expect(splashActivity.existsSync(), isFalse);
 
     final manifestSource = manifest.readAsStringSync();
-    final splashSource = splashActivity.readAsStringSync();
+    final mainSource = mainActivity.readAsStringSync();
 
-    expect(manifestSource, contains('android:name=".SplashActivity"'));
-    expect(manifestSource, contains('android:theme="@style/LaunchTheme"'));
+    expect(manifestSource, isNot(contains('android:name=".SplashActivity"')));
     expect(manifestSource, contains('android:name=".MainActivity"'));
-    expect(
-        manifestSource, contains('android:theme="@style/FlutterLaunchTheme"'));
+    expect(manifestSource, contains('android:theme="@style/LaunchTheme"'));
 
-    final splashBlock = _activityBlock(manifestSource, '.SplashActivity');
     final mainBlock = _activityBlock(manifestSource, '.MainActivity');
 
-    expect(splashBlock, contains('android.intent.action.MAIN'));
-    expect(splashBlock, contains('android.intent.category.LAUNCHER'));
-    expect(mainBlock, isNot(contains('android.intent.action.MAIN')));
-    expect(mainBlock, isNot(contains('android.intent.category.LAUNCHER')));
-
-    expect(splashSource, contains('R.drawable.startlink_loading'));
-    expect(splashSource, contains('ImageView.ScaleType.CENTER_CROP'));
-    expect(
-      splashSource.indexOf('prepareFullScreenWindow(window)'),
-      lessThan(splashSource.indexOf('setContentView(loadingView)')),
-    );
-    expect(
-      splashSource.indexOf('setContentView(loadingView)'),
-      lessThan(splashSource.indexOf('hideSystemBars(window)')),
-    );
-    expect(splashSource, contains('Intent(this, MainActivity::class.java)'));
-    expect(splashSource, contains('overridePendingTransition(0, 0)'));
-    expect(
-      splashSource,
-      isNot(contains('\n        finish()\n')),
-    );
-    expect(splashBlock, contains('android:noHistory="true"'));
+    expect(mainBlock, contains('android.intent.action.MAIN'));
+    expect(mainBlock, contains('android.intent.category.LAUNCHER'));
+    expect(mainBlock, contains('android:exported="true"'));
+    expect(mainSource, contains('prepareFullScreenWindow(window)'));
+    expect(mainSource, contains('hideSystemBars(window)'));
+    expect(mainSource, isNot(contains('startActivity(')));
   });
 
   test('Android 12 system splash is neutral before native loading takes over',
@@ -65,7 +48,6 @@ void main() {
       expect(source, contains('android:windowSplashScreenAnimatedIcon'));
       expect(source, contains('@drawable/splash_transparent_icon'));
       expect(source, isNot(contains('@drawable/ic_launcher_foreground')));
-      expect(source, contains('FlutterLaunchTheme'));
       expect(source, contains('android:windowDisablePreview'));
       expect(source, contains('@drawable/launch_background'));
       expect(source, isNot(contains('postSplashScreenTheme')));
@@ -84,9 +66,9 @@ void main() {
       expect(styles.existsSync(), isTrue);
 
       final source = styles.readAsStringSync();
-      final flutterLaunchTheme = _styleBlock(source, 'FlutterLaunchTheme');
-      expect(flutterLaunchTheme, contains('android:windowDisablePreview'));
-      expect(flutterLaunchTheme, contains('true'));
+      final launchTheme = _styleBlock(source, 'LaunchTheme');
+      expect(launchTheme, contains('android:windowDisablePreview'));
+      expect(launchTheme, contains('true'));
     }
   });
 
@@ -102,12 +84,10 @@ void main() {
       expect(styles.existsSync(), isTrue);
 
       final source = styles.readAsStringSync();
-      for (final styleName in ['LaunchTheme', 'FlutterLaunchTheme']) {
-        final theme = _styleBlock(source, styleName);
-        expect(theme, contains('android:windowFullscreen'));
-        expect(theme, contains('android:windowNoTitle'));
-        expect(theme, contains('android:windowActionBar'));
-      }
+      final theme = _styleBlock(source, 'LaunchTheme');
+      expect(theme, contains('android:windowFullscreen'));
+      expect(theme, contains('android:windowNoTitle'));
+      expect(theme, contains('android:windowActionBar'));
     }
   });
 }

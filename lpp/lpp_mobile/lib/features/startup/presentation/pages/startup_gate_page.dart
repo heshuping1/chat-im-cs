@@ -23,7 +23,6 @@ const _avatarLookupBudget = Duration(seconds: 1);
 @visibleForTesting
 const minimumStartupBrandDisplay = Duration(milliseconds: 1200);
 
-final startupHandoffOverlayProvider = StateProvider<bool>((ref) => false);
 final startupNetworkBannerSuppressedProvider =
     StateProvider<bool>((ref) => true);
 
@@ -85,6 +84,26 @@ bool shouldWarmAuthenticatedHomeFirstScreen({
 }) {
   if (authStatus != AuthStatus.authenticated) return false;
   return space != null && space.accessToken.isNotEmpty;
+}
+
+VoidCallback _startupNetworkBannerReleaseCallback(WidgetRef ref) {
+  final notifier = ref.read(startupNetworkBannerSuppressedProvider.notifier);
+  return () {
+    unawaited(Future<void>.delayed(
+      const Duration(milliseconds: 2500),
+      () => notifier.state = false,
+    ));
+  };
+}
+
+void _scheduleStartupUiReleaseAfterDestinationFrame(
+  VoidCallback releaseNetworkBanner,
+) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.allowFirstFrame();
+    unawaited(configureAppSystemUi());
+    releaseNetworkBanner();
+  });
 }
 
 Future<void> _warmHomeFirstScreen(Ref ref, SpaceContext space) async {
@@ -152,6 +171,7 @@ class StartupGatePage extends ConsumerStatefulWidget {
 
 class _StartupGatePageState extends ConsumerState<StartupGatePage> {
   var _hasNavigated = false;
+  var _hasScheduledStartupUiRelease = false;
 
   @override
   void initState() {
@@ -164,10 +184,19 @@ class _StartupGatePageState extends ConsumerState<StartupGatePage> {
 
   @override
   void dispose() {
-    if (!ref.read(startupHandoffOverlayProvider)) {
+    if (!_hasScheduledStartupUiRelease) {
+      WidgetsBinding.instance.allowFirstFrame();
       unawaited(configureAppSystemUi());
     }
     super.dispose();
+  }
+
+  void _scheduleStartupUiRelease() {
+    if (_hasScheduledStartupUiRelease) return;
+    _hasScheduledStartupUiRelease = true;
+    _scheduleStartupUiReleaseAfterDestinationFrame(
+      _startupNetworkBannerReleaseCallback(ref),
+    );
   }
 
   @override
@@ -177,8 +206,8 @@ class _StartupGatePageState extends ConsumerState<StartupGatePage> {
       _hasNavigated = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
-        ref.read(startupHandoffOverlayProvider.notifier).state = true;
         context.go(destination);
+        _scheduleStartupUiRelease();
       });
     }
 

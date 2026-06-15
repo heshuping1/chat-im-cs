@@ -4,7 +4,8 @@ import 'package:lpp_mobile/core/platform/platform_capabilities.dart';
 /// Push provider channel used by the server notification module.
 enum PushChannel {
   fcm(1),
-  jpush(2);
+  jpush(2),
+  oppo(3);
 
   final int wireValue;
   const PushChannel(this.wireValue);
@@ -75,15 +76,22 @@ class RegisteredPushDevice {
   }
 }
 
+abstract interface class PushDeviceRegistrar {
+  Future<void> registerOrUpdate(PushDeviceRegistration registration);
+
+  Future<void> unregister(String deviceId);
+}
+
 /// Thin API wrapper for server push device registration.
 ///
 /// This does not acquire FCM/JPush tokens by itself. Platform integrations should
 /// obtain the native push token, then call [registerOrUpdate].
-class PushDeviceRegistrationService {
+class PushDeviceRegistrationService implements PushDeviceRegistrar {
   final Dio _dio;
 
   const PushDeviceRegistrationService(this._dio);
 
+  @override
   Future<void> registerOrUpdate(PushDeviceRegistration registration) async {
     await _dio.post<void>(
       '/api/v1/notifications/devices',
@@ -91,6 +99,7 @@ class PushDeviceRegistrationService {
     );
   }
 
+  @override
   Future<void> unregister(String deviceId) async {
     await _dio.delete<void>('/api/v1/notifications/devices/$deviceId');
   }

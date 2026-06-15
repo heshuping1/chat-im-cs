@@ -26,6 +26,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        AndroidLauncherBadgeBridge.register(applicationContext, flutterEngine)
+        AndroidVendorPushBridge.register(applicationContext, flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "lpp_mobile/gallery"

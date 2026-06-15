@@ -10,6 +10,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/admin/admin_http_client.dart';
 import 'package:lpp_mobile/core/network/http_client.dart';
+import 'package:lpp_mobile/core/notifications/app_icon_badge_service.dart';
+import 'package:lpp_mobile/core/notifications/mobile_push_token_provider.dart';
 import 'package:lpp_mobile/core/notifications/push_device_registration_service.dart';
 import 'package:lpp_mobile/core/notifications/push_notification_service.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
@@ -75,6 +77,14 @@ final adminDioProvider = Provider<Dio>((ref) {
   ).dio;
 });
 
+/// App launcher icon badge runtime.
+///
+/// Only mirrors existing unread counts to the OS launcher. It does not own or
+/// compute unread state.
+final appIconBadgeServiceProvider = Provider<AppIconBadgeService>((ref) {
+  return AppIconBadgeService(adapter: AppBadgePlusAdapter());
+});
+
 /// Push device registration API wrapper.
 ///
 /// Native FCM/JPush token acquisition is platform-specific; once a token is
@@ -82,6 +92,14 @@ final adminDioProvider = Provider<Dio>((ref) {
 final pushDeviceRegistrationServiceProvider =
     Provider<PushDeviceRegistrationService>((ref) {
   return PushDeviceRegistrationService(ref.watch(dioProvider));
+});
+
+/// Mobile vendor push token provider.
+///
+/// Disabled by default. Enable with dart defines only after vendor SDK keys and
+/// server-side token registration are ready.
+final mobilePushTokenProvider = Provider<MobilePushTokenProvider>((ref) {
+  return MethodChannelMobilePushTokenProvider.fromEnvironment();
 });
 
 /// FCM/local notification coordinator.
@@ -94,6 +112,7 @@ final pushNotificationServiceProvider =
   final service = PushNotificationService(
     registrationService: ref.watch(pushDeviceRegistrationServiceProvider),
     storage: ref.watch(secureStorageProvider),
+    mobilePushTokenProvider: ref.watch(mobilePushTokenProvider),
   );
   ref.listen(currentSpaceProvider, (previous, next) {
     if (next != null) {
