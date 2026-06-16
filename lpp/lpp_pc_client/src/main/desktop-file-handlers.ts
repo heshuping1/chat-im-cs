@@ -10,6 +10,7 @@ import type {
   ChatArchiveFileResult,
   DesktopApiMethod,
   LocalMediaCacheSource,
+  SaveAndRevealFilePayload,
   VideoPlayerPayload,
 } from '../shared/desktop-api.js';
 import {
@@ -192,6 +193,17 @@ export function registerDesktopFileHandlers({
     return result.filePath;
   });
 
+  register('saveAndRevealFile', async (_event, payload: SaveAndRevealFilePayload) => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: payload.defaultName,
+      filters: payload.filters,
+    });
+    if (result.canceled || !result.filePath) return null;
+    await writeFile(result.filePath, bufferFromSavedBytes(payload.bytes));
+    shell.showItemInFolder(result.filePath);
+    return result.filePath;
+  });
+
   register('saveChatArchiveFile', async (_event, payload: ChatArchiveFilePayload) => {
     const result = await dialog.showSaveDialog({
       defaultPath: payload.defaultName,
@@ -284,6 +296,12 @@ async function copyFileToClipboard(filePath: string) {
     return;
   }
   clipboard.writeText(filePath);
+}
+
+function bufferFromSavedBytes(bytes: SaveAndRevealFilePayload['bytes']) {
+  return bytes instanceof ArrayBuffer
+    ? Buffer.from(bytes)
+    : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 }
 
 function escapeAppleScriptString(value: string) {

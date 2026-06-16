@@ -12,7 +12,15 @@ export interface CustomerServiceThreadActionClient {
     threadType: CustomerServiceThreadType,
     threadId: string,
   ) => Promise<{ status?: string; closed?: boolean }>;
+  claimCustomerServiceThreadAsManager: (
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) => Promise<{ status?: string; closed?: boolean }>;
   takeoverCustomerServiceThread: (
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) => Promise<{ status?: string; closed?: boolean }>;
+  takeoverCustomerServiceThreadAsManager: (
     threadType: CustomerServiceThreadType,
     threadId: string,
   ) => Promise<{ status?: string; closed?: boolean }>;
@@ -58,9 +66,15 @@ export async function executeCustomerServiceThreadAction({
   thread,
 }: ExecuteCustomerServiceThreadActionInput) {
   if (action === "claim") {
+    if (mode === "management") {
+      return client.claimCustomerServiceThreadAsManager(thread.threadType, thread.threadId);
+    }
     return client.claimCustomerServiceThread(thread.threadType, thread.threadId);
   }
   if (action === "takeover") {
+    if (mode === "management") {
+      return client.takeoverCustomerServiceThreadAsManager(thread.threadType, thread.threadId);
+    }
     return client.takeoverCustomerServiceThread(thread.threadType, thread.threadId);
   }
   if (mode === "management") {

@@ -59,6 +59,7 @@ describe("desktop api validation", () => {
     expect(methods).toContain("localDataUpsertMessages");
     expect(methods).toContain("localDataUpsertOutbox");
     expect(methods).toContain("saveChatArchiveFile");
+    expect(methods).toContain("saveAndRevealFile");
     expect(methods).toContain("openChatArchiveFile");
     expect(desktopIpcChannelByMethod.cacheLocalMediaFile).toBe("desktop:cache-local-media-file");
     expect(desktopIpcChannelByMethod.readMediaFileAsDataUrl).toBe(
@@ -66,6 +67,9 @@ describe("desktop api validation", () => {
     );
     expect(desktopIpcChannelByMethod.saveChatArchiveFile).toBe(
       "desktop:save-chat-archive-file",
+    );
+    expect(desktopIpcChannelByMethod.saveAndRevealFile).toBe(
+      "desktop:save-and-reveal-file",
     );
     expect(desktopIpcChannelByMethod.openChatArchiveFile).toBe(
       "desktop:open-chat-archive-file",
@@ -116,6 +120,36 @@ describe("desktop api validation", () => {
     );
     expect(channels.every((channel) => channel.startsWith("desktop:"))).toBe(true);
     expect(new Set(channels).size).toBe(channels.length);
+  });
+
+  it("validates binary save-and-reveal files", () => {
+    expect(
+      validateDesktopApiCall("saveAndRevealFile", [
+        {
+          bytes: new Uint8Array([1, 2, 3]),
+          defaultName: "report.csv",
+          filters: [{ name: "CSV", extensions: ["csv"] }],
+        },
+      ]),
+    ).toEqual([
+      {
+        bytes: new Uint8Array([1, 2, 3]),
+        defaultName: "report.csv",
+        filters: [{ name: "CSV", extensions: ["csv"] }],
+      },
+    ]);
+
+    expect(() =>
+      validateDesktopApiCall("saveAndRevealFile", [
+        { bytes: new Uint8Array([1]), defaultName: "../report.csv" },
+      ]),
+    ).toThrow("saveAndRevealFile.defaultName must be a safe file name");
+
+    expect(() =>
+      validateDesktopApiCall("saveAndRevealFile", [
+        { bytes: new Uint8Array(), defaultName: "report.csv" },
+      ]),
+    ).toThrow("media.sourceBytes must be non-empty");
   });
 
   it("validates notification, tray and no-argument calls", () => {

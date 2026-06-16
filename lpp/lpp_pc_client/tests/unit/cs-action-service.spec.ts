@@ -11,7 +11,9 @@ describe("executeCustomerServiceThreadAction", () => {
     const client: CustomerServiceThreadActionClient = {
       assignCustomerServiceThread: vi.fn(async () => ({ assignedStaffUserId: "staff-2" })),
       claimCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      claimCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       takeoverCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      takeoverCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       closeCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       forceCloseCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       transferCustomerServiceThread: vi.fn(async () => ({ transferred: true })),
@@ -31,7 +33,9 @@ describe("executeCustomerServiceThreadAction", () => {
     const client: CustomerServiceThreadActionClient = {
       assignCustomerServiceThread: vi.fn(async () => ({ assignedStaffUserId: "staff-2" })),
       claimCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      claimCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       takeoverCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      takeoverCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       closeCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       forceCloseCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       transferCustomerServiceThread: vi.fn(async () => ({ transferred: true })),
@@ -44,11 +48,36 @@ describe("executeCustomerServiceThreadAction", () => {
     expect(client.closeCustomerServiceThread).not.toHaveBeenCalled();
   });
 
+  it("routes management claim and takeover to admin access clients", async () => {
+    const client: CustomerServiceThreadActionClient = {
+      assignCustomerServiceThread: vi.fn(async () => ({ assignedStaffUserId: "staff-2" })),
+      claimCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      claimCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
+      takeoverCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      takeoverCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
+      closeCustomerServiceThread: vi.fn(async () => ({ closed: true })),
+      forceCloseCustomerServiceThread: vi.fn(async () => ({ closed: true })),
+      transferCustomerServiceThread: vi.fn(async () => ({ transferred: true })),
+    };
+    const thread = { threadId: "thread-1", threadType: "temp_session" as const };
+
+    await executeCustomerServiceThreadAction({ action: "claim", client, mode: "management", thread });
+    await executeCustomerServiceThreadAction({ action: "takeover", client, mode: "management", thread });
+
+    expect(client.claimCustomerServiceThreadAsManager).toHaveBeenCalledWith("temp_session", "thread-1");
+    expect(client.takeoverCustomerServiceThreadAsManager).toHaveBeenCalledWith("temp_session", "thread-1");
+    expect(client.assignCustomerServiceThread).not.toHaveBeenCalled();
+    expect(client.claimCustomerServiceThread).not.toHaveBeenCalled();
+    expect(client.takeoverCustomerServiceThread).not.toHaveBeenCalled();
+  });
+
   it("routes transfer payload to the customer service client", async () => {
     const client: CustomerServiceThreadActionClient = {
       assignCustomerServiceThread: vi.fn(async () => ({ assignedStaffUserId: "staff-2" })),
       claimCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      claimCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       takeoverCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      takeoverCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       closeCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       forceCloseCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       transferCustomerServiceThread: vi.fn(async () => ({ transferred: true })),
@@ -69,7 +98,9 @@ describe("executeCustomerServiceThreadAction", () => {
     const client: CustomerServiceThreadActionClient = {
       assignCustomerServiceThread: vi.fn(async () => ({ assignedStaffUserId: "staff-2" })),
       claimCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      claimCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       takeoverCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
+      takeoverCustomerServiceThreadAsManager: vi.fn(async () => ({ status: "serving" })),
       closeCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       forceCloseCustomerServiceThread: vi.fn(async () => ({ closed: true })),
       transferCustomerServiceThread: vi.fn(async () => ({ transferred: true })),

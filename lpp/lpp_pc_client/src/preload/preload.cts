@@ -101,6 +101,8 @@ const desktopApi: DesktopApi = {
     validatedInvoke('copyImageFromUrl', 'desktop:copy-image-from-url', payload),
   saveFile: (defaultName: string, content: string) =>
     validatedInvoke('saveFile', 'desktop:save-file', defaultName, content),
+  saveAndRevealFile: (payload) =>
+    validatedInvoke('saveAndRevealFile', 'desktop:save-and-reveal-file', payload),
   saveChatArchiveFile: (payload) =>
     validatedInvoke('saveChatArchiveFile', 'desktop:save-chat-archive-file', payload),
   openChatArchiveFile: () =>

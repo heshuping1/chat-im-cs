@@ -167,6 +167,7 @@ export function ChatWorkspace({
   const dismissRealtimeRemindersForTarget = useDismissRealtimeRemindersForTarget();
   const {
     client,
+    canUseManagementActions,
     canUseStaffEndpoints,
     detail,
     detailLoading,
@@ -613,7 +614,10 @@ export function ChatWorkspace({
           setNotice(t("customerService.transfer.unavailable"));
           return;
         }
-      } else if (!canUseStaffEndpoints) {
+      } else if (
+        !canUseStaffEndpoints &&
+        !(canUseManagementActions && selectedThread?.threadType === "temp_session")
+      ) {
         setNotice(t("customerService.transfer.unavailable"));
         return;
       }
@@ -634,7 +638,16 @@ export function ChatWorkspace({
         threadId: selectedThread.threadId,
       });
     },
-    [canCloseThread, canUseStaffEndpoints, displayMessages, selectedThread, threadActionMutation, translatedTitle, t],
+    [
+      canCloseThread,
+      canUseManagementActions,
+      canUseStaffEndpoints,
+      displayMessages,
+      selectedThread,
+      threadActionMutation,
+      translatedTitle,
+      t,
+    ],
   );
 
   const confirmCloseThread = useCallback(() => {
@@ -745,7 +758,10 @@ export function ChatWorkspace({
       />
 
       <CustomerServiceReceptionStrip
-        canUseStaffActions={canUseStaffEndpoints}
+        canUseStaffActions={
+          canUseStaffEndpoints ||
+          (canUseManagementActions && selectedThread.threadType === "temp_session")
+        }
         pending={threadActionMutation.isPending}
         readOnly={readOnly}
         receptionText={translatedReceptionText}

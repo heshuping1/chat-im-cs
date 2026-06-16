@@ -671,6 +671,20 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     return this.customerServiceThreadAction(threadType, threadId, "takeover");
   }
 
+  claimCustomerServiceThreadAsManager(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) {
+    return this.adminTempSessionThreadAction(threadType, threadId, "claim");
+  }
+
+  takeoverCustomerServiceThreadAsManager(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+  ) {
+    return this.adminTempSessionThreadAction(threadType, threadId, "takeover");
+  }
+
   closeCustomerServiceThread(
     threadType: CustomerServiceThreadType,
     threadId: string,
@@ -902,6 +916,31 @@ export class CustomerServiceApiClient extends MessagesApiClient {
         .replace("{threadId}", threadId)
         .replace("{action}", action),
       { method: "POST" },
+    );
+  }
+
+  private async adminTempSessionThreadAction(
+    threadType: CustomerServiceThreadType,
+    threadId: string,
+    action: "claim" | "takeover",
+  ) {
+    if (threadType !== "temp_session") {
+      throw new Error("管理员接入当前仅支持访客临时会话。");
+    }
+    const adminToken = await this.issueAdminToken();
+    this.options.adminToken = adminToken;
+    const endpoint =
+      action === "claim"
+        ? endpointPlan.adminCustomerServiceTempSessionClaim
+        : endpointPlan.adminCustomerServiceTempSessionTakeover;
+    return this.request<{
+      status?: string;
+      currentOwnerStaffUserId?: string | null;
+      currentOwnerStaffDisplayName?: string | null;
+    }>(
+      endpoint.replace("{sessionId}", encodeURIComponent(threadId)),
+      { method: "POST" },
+      true,
     );
   }
 

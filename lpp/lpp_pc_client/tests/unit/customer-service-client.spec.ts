@@ -822,6 +822,53 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("claims and takes over temp sessions through dedicated admin access endpoints", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-access-session",
+      response: { currentOwnerStaffUserId: "staff-owner", status: "serving" },
+    });
+
+    await expect(
+      client.claimCustomerServiceThreadAsManager("temp_session", "session-1"),
+    ).resolves.toMatchObject({ currentOwnerStaffUserId: "staff-owner" });
+    await expect(
+      client.takeoverCustomerServiceThreadAsManager("temp_session", "session-1"),
+    ).resolves.toMatchObject({ currentOwnerStaffUserId: "staff-owner" });
+
+    expect(client.platformRequests).toEqual([
+      {
+        body: { tenantId: "tenant-access-session" },
+        path: "/api/platform/v1/auth/admin-token",
+      },
+    ]);
+    expect(client.requests).toEqual([
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/temp-sessions/session-1/claim",
+      },
+      {
+        admin: true,
+        path: "/api/admin/v1/customer-service/temp-sessions/session-1/takeover",
+      },
+    ]);
+  });
+
+  it("does not treat direct-customer assignment as manager access", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 4,
+      tenantId: "tenant-access-session",
+      response: { status: "serving" },
+    });
+
+    await expect(
+      client.claimCustomerServiceThreadAsManager("im_direct", "direct-1"),
+    ).rejects.toThrow("管理员接入当前仅支持访客临时会话。");
+
+    expect(client.platformRequests).toEqual([]);
+    expect(client.requests).toEqual([]);
+  });
+
   it("assigns customer service threads through the admin center endpoint", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,

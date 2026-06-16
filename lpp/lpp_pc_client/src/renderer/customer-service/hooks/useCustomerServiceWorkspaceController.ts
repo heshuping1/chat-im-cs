@@ -16,6 +16,7 @@ import {
   canReadCustomerServiceHistory,
   canSuperviseCustomerServiceClose,
   canSuperviseCustomerServiceTransfer,
+  canUseCustomerServiceManagementReadonly,
   canUseCustomerServiceStaffEndpoints,
 } from "../../data/customer-service/cs-role-capabilities";
 import {
@@ -70,6 +71,7 @@ export function useCustomerServiceWorkspaceController({
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
+  const canUseManagementActions = canUseCustomerServiceManagementReadonly(session);
   const canReadHistory = canReadCustomerServiceHistory(session);
   const canSuperviseClose = canSuperviseCustomerServiceClose(session);
   const canSuperviseTransfer = canSuperviseCustomerServiceTransfer(session);
@@ -272,13 +274,21 @@ export function useCustomerServiceWorkspaceController({
         if (!canUseStaffEndpoints && !canSuperviseClose) {
           throw new Error("Only customer service staff, administrators, or owners can close this conversation.");
         }
-      } else if (!canUseStaffEndpoints) {
-        throw new Error("Only customer service staff can perform this action.");
+      } else if (!canUseStaffEndpoints && !canUseManagementActions) {
+        throw new Error("Only customer service staff, administrators, or owners can perform this action.");
       }
+      const managementAction =
+        !canUseStaffEndpoints &&
+        canUseManagementActions &&
+        (action === "claim" || action === "takeover");
       return executeCustomerServiceThreadAction({
         action,
         client,
-        mode: action === "close" && !canUseStaffEndpoints && canSuperviseClose ? "management" : "staff",
+        mode:
+          managementAction ||
+          (action === "close" && !canUseStaffEndpoints && canSuperviseClose)
+            ? "management"
+            : "staff",
         thread: selectedThread,
       });
     },
@@ -331,6 +341,7 @@ export function useCustomerServiceWorkspaceController({
     selectedThread,
     selectableThreads,
     session,
+    canUseManagementActions,
     canUseStaffEndpoints,
     threadActionMutation,
     typingPreview: typingPreviewQuery.data ?? null,

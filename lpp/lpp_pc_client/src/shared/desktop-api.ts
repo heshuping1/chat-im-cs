@@ -225,6 +225,15 @@ export interface ChatArchiveFileResult {
   content: string;
 }
 
+export interface SaveAndRevealFilePayload {
+  defaultName: string;
+  bytes: ArrayBuffer | Uint8Array;
+  filters?: Array<{
+    name: string;
+    extensions: string[];
+  }>;
+}
+
 export type ClientUpdateChannel = 'stable' | 'beta';
 export type UpdateDownloadMode = 'differential-first';
 export type ClientUpdateKind = 'delta' | 'full';
@@ -301,6 +310,7 @@ export interface DesktopApi {
     accountId?: string;
     conversationId?: string;
   }): Promise<void>;
+  saveAndRevealFile(payload: SaveAndRevealFilePayload): Promise<string | null>;
   saveFile(defaultName: string, content: string): Promise<string | null>;
   saveChatArchiveFile(payload: ChatArchiveFilePayload): Promise<string | null>;
   openChatArchiveFile(): Promise<ChatArchiveFileResult | null>;
@@ -406,6 +416,7 @@ export const desktopIpcChannelByMethod = {
   recordCsRoutingDiagnostic: 'desktop:record-cs-routing-diagnostic',
   recordMessageReminderDiagnostic: 'desktop:record-message-reminder-diagnostic',
   revealMediaInFolder: 'desktop:reveal-media-in-folder',
+  saveAndRevealFile: 'desktop:save-and-reveal-file',
   saveAuthSession: 'desktop:save-auth-session',
   saveChatArchiveFile: 'desktop:save-chat-archive-file',
   saveFile: 'desktop:save-file',

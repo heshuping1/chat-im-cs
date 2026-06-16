@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, RefreshCw, X } from "lucide-react";
+import { Download, RefreshCw } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
@@ -14,6 +14,7 @@ import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { resolveServicePerformanceStaff } from "../customer-service/models/servicePerformanceModel";
 import { formatError } from "../lib/format";
+import { CustomerServiceExportTaskDialog } from "./CustomerServiceExportTaskDialog";
 import { PanelState } from "./PanelState";
 import type {
   DataCenterReportComponentProps,
@@ -37,6 +38,8 @@ type ExportRange = {
   preset: ExportPreset;
   to: string;
 };
+
+type ExportTaskFilters = Record<string, unknown>;
 
 const exportPresets: Array<{ label: string; value: ExportPreset }> = [
   { label: "全部", value: "all" },
@@ -63,10 +66,12 @@ export function CustomerServiceConversationStatsReport({
   const [statsRange, setStatsRange] = useState<ExportRange>(() => presetRange("today"));
   const [exportRange, setExportRange] = useState<ExportRange>(() => presetRange("today"));
   const [customDatePickerOpen, setCustomDatePickerOpen] = useState(false);
+  const [exportDatePickerOpen, setExportDatePickerOpen] = useState(false);
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState("");
   const exportType = statsExportType(report);
   const statsParams = useMemo(() => statsExportFilters(statsRange), [statsRange]);
+  const exportParams = useMemo(() => statsExportFilters(exportRange), [exportRange]);
   const exportTasksKey = useMemo(
     () => [
       ...pcQueryKeys.customerServiceExportTasks(
@@ -90,6 +95,40 @@ export function CustomerServiceConversationStatsReport({
     queryFn: () => client!.getTempSessionStats(statsParams),
     staleTime: 60_000,
   });
+  const exportStatsQuery = useQuery({
+    queryKey: [
+      ...pcQueryKeys.customerServiceTempSessionStats(
+        session?.apiBaseUrl,
+        session?.tenantToken,
+      ),
+      exportParams,
+      "export-preview",
+    ],
+    enabled: Boolean(client && canReadTeamStats && exportDialogOpen),
+    queryFn: () => client!.getTempSessionStats(exportParams),
+    staleTime: 10_000,
+  });
+  const exportSessionCount = safeNumber(exportStatsQuery.data?.totalSessions);
+  const exportPreviewChecking =
+    exportDialogOpen && (exportStatsQuery.isLoading || exportStatsQuery.isFetching);
+  const exportCreateDisabledReason = !canReadTeamStats
+    ? "当前账号无权导出"
+    : !isExportRangeSubmittable(exportRange)
+      ? "请选择有效的导出时间范围"
+      : exportPreviewChecking
+        ? "正在检查当前条件是否有数据"
+        : exportStatsQuery.isError
+          ? "当前条件数据检查失败"
+          : exportSessionCount <= 0
+            ? "当前条件没有可导出的数据"
+            : undefined;
+  const exportCreateText = exportPreviewChecking
+    ? "检查数据中"
+    : exportStatsQuery.isError
+      ? "无法检查数据"
+      : exportSessionCount <= 0
+        ? "无数据可导出"
+        : "创建导出任务";
 
   const exportTasksQuery = useQuery({
     queryKey: exportTasksKey,
@@ -101,16 +140,17 @@ export function CustomerServiceConversationStatsReport({
   });
 
   const exportMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (exportFilters: ExportTaskFilters) => {
       if (!client) throw new Error("API client is not ready");
       if (!canReadTeamStats) throw new Error("当前账号无权查看团队统计数据");
+      if (exportSessionCount <= 0) throw new Error("当前条件没有可导出的数据");
       return client.createCustomerServiceExportTask({
         exportType,
-        filters: statsExportFilters(exportRange),
+        filters: exportFilters,
       });
     },
     onSuccess: (task) => {
-      const taskId = task.taskId || task.id || "";
+      const taskId = task.taskId || "";
       setExportNotice(taskId ? `报表导出任务已创建：${taskId}` : "报表导出任务已创建");
       void queryClient.invalidateQueries({ queryKey: exportTasksKey });
     },
@@ -125,11 +165,12 @@ export function CustomerServiceConversationStatsReport({
       const taskId = exportTaskId(task);
       if (!taskId) throw new Error("导出任务缺少 taskId");
       const file = await client.downloadCustomerServiceExportTask(taskId);
-      triggerBrowserDownload(file.blob, file.fileName || task.fileName || `${taskId}.csv`);
-      return taskId;
+      const fileName = file.fileName || task.fileName || `${taskId}.csv`;
+      const savedPath = await saveExportFile(file.blob, fileName);
+      return { savedPath, taskId };
     },
-    onSuccess: (taskId) => {
-      setExportNotice(`导出文件已开始下载：${taskId}`);
+    onSuccess: ({ savedPath, taskId }) => {
+      setExportNotice(savedPath ? `导出文件已保存并打开目录：${savedPath}` : `导出文件已开始下载：${taskId}`);
     },
     onError: (error) => {
       setExportNotice(`导出文件下载失败：${formatError(error)}`);
@@ -145,16 +186,58 @@ export function CustomerServiceConversationStatsReport({
     }),
     [statsRange.from, statsRange.to],
   );
+  const selectedExportDateRange = useMemo<DateRange>(
+    () => ({
+      from: parseStatsDate(exportRange.from),
+      to: parseStatsDate(exportRange.to),
+    }),
+    [exportRange.from, exportRange.to],
+  );
+  const customStatsFromTime = statsTimePart(statsRange.from, "00:00:00");
+  const customStatsToTime = statsTimePart(statsRange.to, "23:59:59");
+  const customExportFromTime = statsTimePart(exportRange.from, "00:00:00");
+  const customExportToTime = statsTimePart(exportRange.to, "23:59:59");
   const applyStatsPreset = (preset: ExportPreset) => {
     setCustomDatePickerOpen(preset === "custom");
     setStatsRange(presetRange(preset, statsRange));
   };
   const applyCustomStatsDateRange = (range: DateRange | undefined) => {
     setStatsRange((current) => ({
-      from: dateInputValue(range?.from ?? new Date()),
+      from: formatStatsDateTime(range?.from, statsTimePart(current.from, "00:00:00")),
       preset: "custom",
-      to: dateInputValue(range?.to ?? range?.from ?? new Date()),
+      to: formatStatsDateTime(range?.to, statsTimePart(current.to, "23:59:59")),
     }));
+  };
+  const updateCustomStatsDateTime = (side: "from" | "to", time: string) => {
+    setStatsRange((current) => {
+      const date = parseStatsDate(current[side]);
+      return {
+        ...current,
+        preset: "custom",
+        [side]: formatStatsDateTime(date, normalizeStatsTime(time, side === "from" ? "00:00:00" : "23:59:59")),
+      };
+    });
+  };
+  const applyExportPreset = (preset: ExportPreset) => {
+    setExportDatePickerOpen(preset === "custom");
+    setExportRange(presetRange(preset, exportRange));
+  };
+  const applyCustomExportDateRange = (range: DateRange | undefined) => {
+    setExportRange((current) => ({
+      from: formatStatsDateTime(range?.from, statsTimePart(current.from, "00:00:00")),
+      preset: "custom",
+      to: formatStatsDateTime(range?.to, statsTimePart(current.to, "23:59:59")),
+    }));
+  };
+  const updateCustomExportDateTime = (side: "from" | "to", time: string) => {
+    setExportRange((current) => {
+      const date = parseStatsDate(current[side]);
+      return {
+        ...current,
+        preset: "custom",
+        [side]: formatStatsDateTime(date, normalizeStatsTime(time, side === "from" ? "00:00:00" : "23:59:59")),
+      };
+    });
   };
 
   return (
@@ -168,9 +251,12 @@ export function CustomerServiceConversationStatsReport({
             pickerOpen={customDatePickerOpen}
             preset={statsRange.preset}
             range={selectedStatsDateRange}
+            fromTime={customStatsFromTime}
+            toTime={customStatsToTime}
             onPickerOpenChange={setCustomDatePickerOpen}
             onPresetChange={applyStatsPreset}
             onRangeChange={applyCustomStatsDateRange}
+            onTimeChange={updateCustomStatsDateTime}
           />
         </div>
         <div className="cs-stats-actions">
@@ -185,14 +271,17 @@ export function CustomerServiceConversationStatsReport({
           <button
             type="button"
             className="primary"
-            onClick={() => setExportDialogOpen(true)}
+            onClick={() => {
+              setExportRange(statsRange);
+              setExportDatePickerOpen(false);
+              setExportDialogOpen(true);
+            }}
             disabled={isExportDisabled}
           >
             <Download size={15} />
             导出
           </button>
         </div>
-        {exportNotice && <p className="cs-stats-export-notice">{exportNotice}</p>}
       </header>
 
       {!canReadTeamStats && <PanelState text="当前账号无权查看团队统计数据。" />}
@@ -309,133 +398,57 @@ export function CustomerServiceConversationStatsReport({
       )}
 
       {exportDialogOpen && (
-        <section className="cs-stats-export-dialog" role="dialog" aria-modal="true" aria-label="导出统计报表">
-          <div className="cs-stats-export-backdrop" onClick={() => setExportDialogOpen(false)} />
-          <div className="cs-stats-export-modal">
-            <header>
-              <div>
-                <h2>导出统计报表</h2>
-                <p>创建 `cs_staff_daily_stats` 导出任务，完成后可在任务列表下载 CSV 文件。</p>
-                <p>日期范围会作为 from/to 提交；导出结果按所选时间范围生成。</p>
+        <CustomerServiceExportTaskDialog
+          title="导出统计对话"
+          conditionEditor={(createAction) => (
+            <div className="cs-stats-export-condition-editor stats">
+              <StatsDateRangeFilter
+                pickerOpen={exportDatePickerOpen}
+                preset={exportRange.preset}
+                range={selectedExportDateRange}
+                fromTime={customExportFromTime}
+                toTime={customExportToTime}
+                onPickerOpenChange={setExportDatePickerOpen}
+                onPresetChange={applyExportPreset}
+                onRangeChange={applyCustomExportDateRange}
+                onTimeChange={updateCustomExportDateTime}
+              />
+              <div className="cs-stats-export-form-actions inline">
+                {createAction}
               </div>
-              <button type="button" aria-label="关闭" onClick={() => setExportDialogOpen(false)}>
-                <X size={18} />
-              </button>
-            </header>
-            <div className="cs-stats-export-presets">
-              {exportPresets.map((preset) => (
-                <button
-                  type="button"
-                  className={exportRange.preset === preset.value ? "active" : ""}
-                  key={preset.value}
-                  onClick={() => setExportRange(presetRange(preset.value, exportRange))}
-                >
-                  {preset.label}
-                </button>
-              ))}
             </div>
-            <div className="cs-stats-export-dates">
-              <label>
-                <span>开始日期</span>
-                <input
-                  type="date"
-                  value={exportRange.from}
-                  onChange={(event) =>
-                    setExportRange((current) => ({
-                      ...current,
-                      from: event.target.value,
-                      preset: "custom",
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                <span>结束日期</span>
-                <input
-                  type="date"
-                  value={exportRange.to}
-                  onChange={(event) =>
-                    setExportRange((current) => ({
-                      ...current,
-                      preset: "custom",
-                      to: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-            </div>
-            <section className="cs-stats-export-tasks">
-              <header>
-                <div>
-                  <h3>导出任务</h3>
-                  <p>来自 GET /api/admin/v1/export-tasks，仅显示统计对话报表任务。</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportTasksQuery.refetch()}
-                  disabled={exportTasksQuery.isFetching}
-                >
-                  <RefreshCw size={14} />
-                  {exportTasksQuery.isFetching ? "刷新中" : "刷新状态"}
-                </button>
-              </header>
-              {exportTasksQuery.isError && (
-                <PanelState tone="error" text={`导出任务加载失败：${formatError(exportTasksQuery.error)}`} />
-              )}
-              {!exportTasksQuery.isError && exportTasksQuery.isLoading && (
-                <PanelState text="正在加载导出任务..." />
-              )}
-              {!exportTasksQuery.isLoading && !exportTasksQuery.isError && (
-                <div className="cs-stats-export-task-list">
-                  {(exportTasksQuery.data ?? []).length === 0 ? (
-                    <PanelState text="暂无导出任务。" />
-                  ) : (
-                    (exportTasksQuery.data ?? []).map((task) => {
-                      const taskId = exportTaskId(task);
-                      const status = task.status || "--";
-                      const canDownload = isExportTaskCompleted(status) && Boolean(taskId);
-                      return (
-                        <article key={taskId || `${task.exportType}-${task.createdAt}`}>
-                          <div>
-                            <strong>{task.fileName || exportTaskTitle(task)}</strong>
-                            <span>
-                              {exportTaskStatusLabel(status)} · {exportTaskRecordLabel(task.recordCount)} ·{" "}
-                              {dateTimeLabel(task.createdAt)}
-                            </span>
-                            {(task.errorMessage || task.message) && (
-                              <em>{task.errorMessage || task.message}</em>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            disabled={!canDownload || downloadMutation.isPending}
-                            onClick={() => downloadMutation.mutate(task)}
-                          >
-                            <Download size={14} />
-                            下载
-                          </button>
-                        </article>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </section>
-            <footer>
-              <button type="button" onClick={() => setExportDialogOpen(false)}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="primary"
-                disabled={exportMutation.isPending || !isExportRangeSubmittable(exportRange)}
-                onClick={() => exportMutation.mutate()}
-              >
-                {exportMutation.isPending ? "正在创建" : "确认导出"}
-              </button>
-            </footer>
-          </div>
-        </section>
+          )}
+          notice={exportNotice}
+          tasks={sortExportTasks(exportTasksQuery.data ?? []).map((task) => {
+            const taskId = exportTaskId(task);
+            const status = task.status || "--";
+            return {
+              canDownload: isExportTaskCompleted(status) && Boolean(taskId),
+              completedAtLabel: task.completedAt ? dateTimeLabel(task.completedAt) : undefined,
+              createdAtLabel: dateTimeLabel(task.createdAt),
+              key: taskId || `${task.exportType}-${task.createdAt}`,
+              payload: task,
+              recordCountLabel: exportRecordCountLabel(task.recordCount),
+              status,
+              statusLabel: exportTaskStatusLabel(status),
+              title: task.fileName || exportTaskTitle(task),
+            };
+          })}
+          loading={exportTasksQuery.isLoading}
+          errorText={
+            exportTasksQuery.isError
+              ? `导出任务加载失败：${formatError(exportTasksQuery.error)}`
+              : undefined
+          }
+          downloadPending={downloadMutation.isPending}
+          createPending={exportMutation.isPending}
+          createText={exportCreateText}
+          createDisabled={Boolean(exportCreateDisabledReason)}
+          createDisabledReason={exportCreateDisabledReason}
+          onClose={() => setExportDialogOpen(false)}
+          onCreate={() => exportMutation.mutate(exportParams)}
+          onDownload={(task) => downloadMutation.mutate(task.payload as ExportTaskDto)}
+        />
       )}
     </section>
   );
@@ -726,19 +739,25 @@ function DistributionPieChart({ items }: { items: TempDistributionPointDto[] }) 
 }
 
 function StatsDateRangeFilter({
+  fromTime,
   onPickerOpenChange,
   onPresetChange,
   onRangeChange,
+  onTimeChange,
   pickerOpen,
   preset,
   range,
+  toTime,
 }: {
+  fromTime: string;
   onPickerOpenChange: (open: boolean) => void;
   onPresetChange: (preset: ExportPreset) => void;
   onRangeChange: (range: DateRange | undefined) => void;
+  onTimeChange: (side: "from" | "to", time: string) => void;
   pickerOpen: boolean;
   preset: ExportPreset;
   range: DateRange;
+  toTime: string;
 }) {
   return (
     <div className="cs-history-date-filter cs-stats-date-filter">
@@ -761,7 +780,7 @@ function StatsDateRangeFilter({
             className="cs-history-date-trigger"
             onClick={() => onPickerOpenChange(true)}
           >
-            {statsDateRangeLabel(range)}
+            {statsDateRangeLabel(range, fromTime, toTime)}
           </button>
           {pickerOpen && (
             <div className="cs-history-date-popover">
@@ -773,6 +792,28 @@ function StatsDateRangeFilter({
                 weekStartsOn={1}
                 onSelect={onRangeChange}
               />
+              <div className="cs-history-time-grid">
+                <label>
+                  <input
+                    aria-label="开始时间"
+                    type="time"
+                    step={1}
+                    value={fromTime}
+                    disabled={!range.from}
+                    onChange={(event) => onTimeChange("from", event.target.value)}
+                  />
+                </label>
+                <label>
+                  <input
+                    aria-label="结束时间"
+                    type="time"
+                    step={1}
+                    value={toTime}
+                    disabled={!range.to}
+                    onChange={(event) => onTimeChange("to", event.target.value)}
+                  />
+                </label>
+              </div>
               <footer>
                 <button type="button" onClick={() => onRangeChange(undefined)}>
                   清空
@@ -873,11 +914,23 @@ function statsExportType(report: DataCenterReportDefinition): "cs_staff_daily_st
 }
 
 function exportTaskId(task: ExportTaskDto) {
-  return task.taskId || task.id || "";
+  return task.taskId || "";
 }
 
 function exportTaskTitle(task: ExportTaskDto) {
   return task.exportType === "cs_staff_daily_stats" ? "坐席日报统计" : task.exportType || "导出任务";
+}
+
+function exportRecordCountLabel(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value} 条` : undefined;
+}
+
+function sortExportTasks(tasks: ExportTaskDto[]) {
+  return [...tasks].sort((left, right) => {
+    const leftTime = new Date(left.createdAt || "").getTime();
+    const rightTime = new Date(right.createdAt || "").getTime();
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  });
 }
 
 function isExportTaskRunning(status?: string | null) {
@@ -898,17 +951,24 @@ function exportTaskStatusLabel(status?: string | null) {
   return status || "--";
 }
 
-function exportTaskRecordLabel(value?: number | null) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? `${numberLabel(value)} 条`
-    : "记录数待返回";
-}
-
 function dateTimeLabel(value?: string | null) {
   if (!value) return "--";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+async function saveExportFile(blob: Blob, fileName: string) {
+  const desktopApi = typeof window !== "undefined" ? window.desktopApi : undefined;
+  if (desktopApi?.saveAndRevealFile) {
+    return desktopApi.saveAndRevealFile({
+      bytes: await blob.arrayBuffer(),
+      defaultName: fileName,
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+    });
+  }
+  triggerBrowserDownload(blob, fileName);
+  return null;
 }
 
 function triggerBrowserDownload(blob: Blob, fileName: string) {
@@ -1083,9 +1143,9 @@ function presetRange(preset: ExportPreset, current?: ExportRange): ExportRange {
 
 function range(preset: ExportPreset, from: Date, to: Date): ExportRange {
   return {
-    from: dateInputValue(from),
+    from: formatStatsDateTime(from, "00:00:00"),
     preset,
-    to: dateInputValue(to),
+    to: formatStatsDateTime(to, "23:59:59"),
   };
 }
 
@@ -1117,7 +1177,8 @@ function dateInputValue(date: Date) {
 
 function parseStatsDate(value: string) {
   if (!value) return undefined;
-  const [yearText, monthText, dayText] = value.trim().split("-");
+  const [dateText] = value.trim().split(/[T ]/);
+  const [yearText, monthText, dayText] = dateText.split("-");
   const year = Number(yearText);
   const month = Number(monthText);
   const day = Number(dayText);
@@ -1125,11 +1186,36 @@ function parseStatsDate(value: string) {
   return new Date(year, month - 1, day);
 }
 
-function statsDateRangeLabel(range: DateRange) {
-  const from = range.from ? dateInputValue(range.from) : "";
-  const to = range.to ? dateInputValue(range.to) : "";
-  if (from && to) return `${from} 至 ${to}`;
-  if (from) return `${from} 至 结束日期`;
+function formatStatsDateTime(date: Date | undefined, time: string) {
+  if (!date) return "";
+  return `${dateInputValue(date)}T${normalizeStatsTime(time, "00:00:00")}`;
+}
+
+function statsTimePart(value: string, fallback: string) {
+  const time = value.includes("T") ? value.split("T")[1] : value.split(" ")[1];
+  return normalizeStatsTime(time || "", fallback);
+}
+
+function normalizeStatsTime(value: string, fallback: string) {
+  const [hour = "", minute = "", second = ""] = value.split(":");
+  const h = normalizeStatsTimeUnit(hour, 23);
+  const m = normalizeStatsTimeUnit(minute, 59);
+  const s = normalizeStatsTimeUnit(second, 59);
+  if (h === null || m === null || s === null) return fallback;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function normalizeStatsTimeUnit(value: string, max: number) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0 || number > max) return null;
+  return number;
+}
+
+function statsDateRangeLabel(range: DateRange, fromTime: string, toTime: string) {
+  const from = range.from ? formatStatsDateTime(range.from, fromTime).replace("T", " ") : "";
+  const to = range.to ? formatStatsDateTime(range.to, toTime).replace("T", " ") : "";
+  if (from && to) return `${from} ~ ${to}`;
+  if (from) return `${from} ~ 结束时间`;
   return "选择日期范围";
 }
 

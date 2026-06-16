@@ -113,6 +113,10 @@ export const endpointPlan = {
     "/api/admin/v1/customer-service/temp-sessions",
   adminCustomerServiceTempSession:
     "/api/admin/v1/customer-service/temp-sessions/{sessionId}",
+  adminCustomerServiceTempSessionClaim:
+    "/api/admin/v1/customer-service/temp-sessions/{sessionId}/claim",
+  adminCustomerServiceTempSessionTakeover:
+    "/api/admin/v1/customer-service/temp-sessions/{sessionId}/takeover",
   adminCustomerServiceTempSessionStats:
     "/api/admin/v1/customer-service/temp-sessions/stats",
   adminCustomerServiceCenterDashboard:

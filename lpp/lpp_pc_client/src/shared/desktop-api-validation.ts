@@ -22,6 +22,7 @@ import type {
   LocalMediaCacheSource,
   MessageReminderDiagnosticPayload,
   NotifyPayload,
+  SaveAndRevealFilePayload,
   TaskbarBadgePayload,
   TrayStatus,
   VideoPlayerPayload,
@@ -46,6 +47,7 @@ import {
 
 const maxShortTextLength = 4_096;
 const maxSavedContentLength = 5 * 1024 * 1024;
+const maxSavedBinaryLength = 50 * 1024 * 1024;
 const maxChatArchiveContentLength = 25 * 1024 * 1024;
 const maxNotificationIconDataUrlLength = 512 * 1024;
 const maxDiagnosticsItems = 200;
@@ -126,6 +128,8 @@ export function validateDesktopApiCall(
         safeString(args[0], 'saveFile.defaultName'),
         safeString(args[1], 'saveFile.content', maxSavedContentLength),
       ];
+    case 'saveAndRevealFile':
+      return [validateSaveAndRevealFilePayload(args[0])];
     case 'saveChatArchiveFile':
       return [validateChatArchiveFilePayload(args[0])];
     case 'openChatArchiveFile':
@@ -466,6 +470,58 @@ export function validateChatArchiveFilePayload(value: unknown): ChatArchiveFileP
     defaultName,
     kind,
   };
+}
+
+export function validateSaveAndRevealFilePayload(value: unknown): SaveAndRevealFilePayload {
+  const record = objectValue(value, 'saveAndRevealFile.payload');
+  const defaultName = safeString(record.defaultName, 'saveAndRevealFile.defaultName', 180).trim();
+  if (!defaultName || defaultName.includes('/') || defaultName.includes('\\')) {
+    throw new Error('saveAndRevealFile.defaultName must be a safe file name');
+  }
+  const bytes = validateSavedFileBytes(record.bytes);
+  return {
+    bytes,
+    defaultName,
+    filters: validateSaveDialogFilters(record.filters),
+  };
+}
+
+function validateSavedFileBytes(value: unknown) {
+  const bytes = validateSourceBytes(value);
+  if (bytes.byteLength > maxSavedBinaryLength) {
+    throw new Error('saveAndRevealFile.bytes is too large');
+  }
+  return bytes;
+}
+
+function validateSaveDialogFilters(value: unknown): SaveAndRevealFilePayload['filters'] {
+  if (value === undefined || value === null) return undefined;
+  const filters = arrayValue(value, 'saveAndRevealFile.filters', 8);
+  return filters.map((item, index) => {
+    const record = objectValue(item, `saveAndRevealFile.filters.${index}`);
+    const extensions = arrayValue(
+      record.extensions,
+      `saveAndRevealFile.filters.${index}.extensions`,
+      8,
+    ).map((extension, extensionIndex) => {
+      const safeExtension = safeString(
+        extension,
+        `saveAndRevealFile.filters.${index}.extensions.${extensionIndex}`,
+        16,
+      ).trim();
+      if (!/^[A-Za-z0-9]+$/.test(safeExtension)) {
+        throw new Error(`saveAndRevealFile.filters.${index}.extensions.${extensionIndex} is invalid`);
+      }
+      return safeExtension;
+    });
+    if (extensions.length === 0) {
+      throw new Error(`saveAndRevealFile.filters.${index}.extensions must be non-empty`);
+    }
+    return {
+      extensions,
+      name: safeString(record.name, `saveAndRevealFile.filters.${index}.name`, 80),
+    };
+  });
 }
 
 export function validateClientUpdatePreferences(value: unknown): ClientUpdatePreferences {

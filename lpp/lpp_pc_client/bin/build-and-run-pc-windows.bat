@@ -4,6 +4,7 @@ setlocal
 
 pushd "%~dp0.."
 
+echo [LPP PC] Project root: %CD%
 set "VITE_DEV_SERVER_URL="
 call :stop_running_client
 
@@ -11,6 +12,15 @@ call :ensure_dependencies
 if not "%ERRORLEVEL%"=="0" (
   echo.
   echo [LPP PC] Dependency check failed.
+  pause
+  popd
+  exit /b 1
+)
+
+call :clean_build_output
+if not "%ERRORLEVEL%"=="0" (
+  echo.
+  echo [LPP PC] Could not clean old build output.
   pause
   popd
   exit /b 1
@@ -43,8 +53,13 @@ popd
 exit /b 0
 
 :stop_running_client
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$root=(Resolve-Path '.').Path; Get-CimInstance Win32_Process -Filter \"name = 'electron.exe' or name = 'node.exe'\" | Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*' + $root + '*') -or $_.CommandLine -like '*127.0.0.1:5173*') } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; Write-Host ('[LPP PC] Stopped old process PID ' + $_.ProcessId) } catch { Write-Host ('[LPP PC] Could not stop old process PID ' + $_.ProcessId + ': ' + $_.Exception.Message) } }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$root=(Resolve-Path '.').Path; $installed=@((Join-Path $env:ProgramFiles 'StartLink\StartLink.exe'), (Join-Path $env:ProgramFiles 'StartLink\startlink.exe'), (Join-Path ${env:ProgramFiles(x86)} 'StartLink\StartLink.exe'), (Join-Path ${env:ProgramFiles(x86)} 'StartLink\startlink.exe')) | Where-Object { $_ }; Get-CimInstance Win32_Process -Filter \"name = 'electron.exe' or name = 'node.exe' or name = 'StartLink.exe' or name = 'startlink.exe'\" | Where-Object { $cmd=$_.CommandLine; $exe=$_.ExecutablePath; ($cmd -and ($cmd -like ('*' + $root + '*') -or $cmd -like '*127.0.0.1:5173*')) -or ($exe -and (($installed -contains $exe) -or ($exe -like ($root + '*')))) } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; Write-Host ('[LPP PC] Stopped old process PID ' + $_.ProcessId + ' (' + $_.Name + ')') } catch { Write-Host ('[LPP PC] Could not stop old process PID ' + $_.ProcessId + ': ' + $_.Exception.Message) } }"
 exit /b 0
+
+:clean_build_output
+echo [LPP PC] Cleaning old build output...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$root=(Resolve-Path '.').Path; $dist=Join-Path $root 'dist'; if (Test-Path -LiteralPath $dist) { $resolved=(Resolve-Path -LiteralPath $dist).Path; if (-not $resolved.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw ('Refusing to clean outside project: ' + $resolved) }; Remove-Item -LiteralPath $resolved -Recurse -Force; Write-Host ('[LPP PC] Removed ' + $resolved) } else { Write-Host '[LPP PC] No dist directory to clean.' }"
+exit /b %ERRORLEVEL%
 
 :ensure_dependencies
 set "NEEDS_INSTALL=0"

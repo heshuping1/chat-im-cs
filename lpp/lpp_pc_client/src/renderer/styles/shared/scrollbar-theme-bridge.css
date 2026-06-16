@@ -287,3 +287,40 @@
 .app-shell .cs-history-field-table-scroll::-webkit-scrollbar-corner {
   background: transparent !important;
 }
+
+.app-shell .cs-stats-export-task-list {
+  scrollbar-color: transparent transparent !important;
+  scrollbar-gutter: stable both-edges !important;
+  scrollbar-width: thin !important;
+}
+
+.app-shell .cs-stats-export-task-list.is-scrolling {
+  scrollbar-color: rgba(156, 163, 175, 0.42) transparent !important;
+}
+
+.app-shell .cs-stats-export-task-list::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.app-shell .cs-stats-export-task-list::-webkit-scrollbar-thumb {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .cs-stats-export-task-list.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.42) !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .cs-stats-export-task-list.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.56) !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .cs-stats-export-task-list::-webkit-scrollbar-track,
+.app-shell .cs-stats-export-task-list::-webkit-scrollbar-corner {
+  background: transparent !important;
+}

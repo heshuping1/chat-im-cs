@@ -5,6 +5,12 @@ const cacheLocalMediaFile = vi.fn(async () => ({
   fileUrl: "file:///app-cache/clip.mp4",
 }));
 
+const fileSystemMocks = vi.hoisted(() => ({
+  copyFile: vi.fn(),
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+}));
+
 vi.mock("electron", () => ({
   clipboard: {
     writeBuffer: vi.fn(),
@@ -21,6 +27,8 @@ vi.mock("electron", () => ({
     showItemInFolder: vi.fn(),
   },
 }));
+
+vi.mock("node:fs/promises", () => fileSystemMocks);
 
 vi.mock("../../src/main/media-storage", () => ({
   assertAllowedLocalMediaFilePath: vi.fn((path: string) => path),
@@ -70,5 +78,40 @@ describe("desktop file handlers", () => {
       }),
       source,
     );
+  });
+
+  it("saves downloaded bytes and reveals the saved file", async () => {
+    const { dialog, shell } = await import("electron");
+    vi.mocked(dialog.showSaveDialog).mockResolvedValue({
+      canceled: false,
+      filePath: "/Users/eric/Downloads/report.csv",
+    });
+    const { registerDesktopFileHandlers } = await import("../../src/main/desktop-file-handlers");
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+
+    registerDesktopFileHandlers({
+      appIconPath: "/app/icon.ico",
+      preloadPath: "/app/preload.cjs",
+      register: (method, handler) => {
+        handlers.set(method, handler as (...args: unknown[]) => unknown);
+      },
+    });
+
+    await expect(
+      handlers.get("saveAndRevealFile")?.(
+        {},
+        {
+          bytes: new Uint8Array([97, 44, 98]),
+          defaultName: "report.csv",
+          filters: [{ name: "CSV", extensions: ["csv"] }],
+        },
+      ),
+    ).resolves.toBe("/Users/eric/Downloads/report.csv");
+
+    expect(fileSystemMocks.writeFile).toHaveBeenCalledWith(
+      "/Users/eric/Downloads/report.csv",
+      Buffer.from([97, 44, 98]),
+    );
+    expect(shell.showItemInFolder).toHaveBeenCalledWith("/Users/eric/Downloads/report.csv");
   });
 });

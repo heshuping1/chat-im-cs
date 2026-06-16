@@ -15,6 +15,10 @@ describe("customer-service history and lookup surfaces", () => {
     resolve(process.cwd(), "src/renderer/components/CustomerServiceConversationStatsReport.tsx"),
     "utf8",
   );
+  const customerServiceExportTaskDialog = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/CustomerServiceExportTaskDialog.tsx"),
+    "utf8",
+  );
   const dataCenterReportRegistry = readFileSync(
     resolve(process.cwd(), "src/renderer/components/data-center/dataCenterReportRegistry.tsx"),
     "utf8",
@@ -118,7 +122,21 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("historySummary");
     expect(customerServiceHistoryReport).toContain("getWorkbenchThreadDetail(");
     expect(customerServiceHistoryReport).toContain("createCustomerServiceExportTask");
+    expect(customerServiceHistoryReport).toContain("getCustomerServiceExportTasks");
+    expect(customerServiceHistoryReport).toContain("downloadCustomerServiceExportTask");
+    expect(customerServiceHistoryReport).toContain("isHistoryExportTaskCompleted");
     expect(customerServiceHistoryReport).toContain("historyExportType(report)");
+    expect(customerServiceHistoryReport).toContain("CustomerServiceExportTaskDialog");
+    expect(customerServiceHistoryReport).not.toContain("cs-history-export-tasks");
+    expect(customerServiceHistoryReport).toContain("currentHistoryExportFilters");
+    expect(customerServiceHistoryReport).not.toContain("currentHistoryExportFilterKey");
+    expect(customerServiceHistoryReport).not.toContain("historyExportFilterChips(currentHistoryExportFilters)");
+    expect(customerServiceHistoryReport).toContain("sortHistoryExportTasks(exportTasksQuery.data ?? [])");
+    expect(customerServiceHistoryReport).not.toContain("mergeHistoryExportTasks(localExportTask");
+    expect(customerServiceHistoryReport).toContain("recordCountLabel: historyExportRecordCountLabel(task.recordCount)");
+    expect(customerServiceHistoryReport).toContain("completedAtLabel: task.completedAt");
+    expect(customerServiceHistoryReport).toContain("conversationId: filters.conversationId");
+    expect(customerServiceHistoryReport).toContain("assignedStaffUserId: filters.assignedStaffUserId");
     expect(customerServiceHistoryReport).toContain("HistoryStaffPicker");
     expect(customerServiceHistoryReport).toContain("createHistoryStaffPickerMembers");
     expect(customerServiceHistoryReport).toContain("filterHistoryStaffPickerMembers");
@@ -222,14 +240,20 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerContextPanel).toContain("canReadCustomerServiceHistory");
     expect(customerContextPanel).toContain("getCustomerServiceHistoryThreads({");
     expect(customerContextPanel).not.toContain("getStaffServiceHistory({");
-    expect(threadList).toContain("queued && canUseStaffEndpoints");
+    expect(threadList).toContain("canUseCustomerServiceManagementReadonly");
+    expect(threadList).toContain("canClaimQueuedThread");
+    expect(threadList).toContain('canUseManagementActions && thread.threadType === "temp_session"');
+    expect(threadList).toContain("executeCustomerServiceThreadAction({");
+    expect(threadList).toContain('mode: canUseStaffEndpoints ? "staff" : "management"');
     expect(workspaceController).toContain("canSuperviseCustomerServiceClose");
     expect(workspaceController).toContain("canSuperviseCustomerServiceTransfer");
+    expect(workspaceController).toContain("canUseCustomerServiceManagementReadonly");
     expect(workspaceController).toContain('if (action === "close")');
     expect(workspaceController).toContain("!canUseStaffEndpoints && !canSuperviseClose");
-    expect(workspaceController).toContain('mode: action === "close" && !canUseStaffEndpoints && canSuperviseClose ? "management" : "staff"');
+    expect(workspaceController).toContain('action === "claim" || action === "takeover"');
+    expect(workspaceController).toContain("managementAction ||");
     expect(workspaceController).toContain('mode: !canUseStaffEndpoints && canSuperviseTransfer ? "management" : "staff"');
-    expect(chatWorkspace).toContain("canUseStaffActions={canUseStaffEndpoints}");
+    expect(chatWorkspace).toContain('canUseManagementActions && selectedThread.threadType === "temp_session"');
     expect(chatWorkspace).toContain("canClose={canCloseThread}");
     expect(threadActionButton).toContain("if (!canUseStaffActions) return null;");
   });
@@ -304,7 +328,8 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceConversationStatsReport).not.toContain("语言分布");
     expect(customerServiceConversationStatsReport).toContain("坐席效率");
     expect(customerServiceConversationStatsReport).not.toContain("AI 辅助");
-    expect(customerServiceConversationStatsReport).toContain("导出统计报表");
+    expect(customerServiceConversationStatsReport).toContain("CustomerServiceExportTaskDialog");
+    expect(customerServiceConversationStatsReport).toContain("导出统计对话");
     expect(customerServiceConversationStatsReport).toContain("暂无坐席效率数据");
     expect(customerServiceConversationStatsReport).toContain("resolveServicePerformanceStaff(stats)");
     expect(customerServiceConversationStatsReport).not.toContain("接口未返回 staffPerformance");
@@ -324,13 +349,34 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceConversationStatsReport).toContain('dataCenterView !== "self-service"');
     expect(customerServiceConversationStatsReport).toContain("当前账号无权查看团队统计数据");
     expect(customerServiceConversationStatsReport).toContain("createCustomerServiceExportTask");
+    expect(customerServiceConversationStatsReport).toContain("filters: exportFilters");
+    expect(customerServiceConversationStatsReport).not.toContain("statsExportFilterKey");
+    expect(customerServiceConversationStatsReport).not.toContain("exportTaskFilterChips(exportParams)");
+    expect(customerServiceConversationStatsReport).toContain("sortExportTasks(exportTasksQuery.data ?? [])");
+    expect(customerServiceConversationStatsReport).not.toContain("mergeExportTasks(localExportTask");
+    expect(customerServiceExportTaskDialog).toContain("cs-stats-export-current-filter");
+    expect(customerServiceConversationStatsReport).not.toContain("exportTaskFilterLabel");
+    expect(customerServiceConversationStatsReport).not.toContain("exportTaskFilters(task, exportTaskFiltersById)");
+    expect(customerServiceConversationStatsReport).toContain("recordCountLabel: exportRecordCountLabel(task.recordCount)");
+    expect(customerServiceConversationStatsReport).toContain("completedAtLabel: task.completedAt");
+    expect(customerServiceConversationStatsReport).toContain("statsExportFilters(exportRange)");
+    expect(customerServiceConversationStatsReport).toContain("setExportRange");
     expect(customerServiceConversationStatsReport).toContain("getCustomerServiceExportTasks");
     expect(customerServiceConversationStatsReport).toContain("downloadCustomerServiceExportTask");
-    expect(customerServiceConversationStatsReport).toContain("创建 `cs_staff_daily_stats` 导出任务");
-    expect(customerServiceConversationStatsReport).toContain("导出结果按所选时间范围生成");
-    expect(customerServiceConversationStatsReport).toContain("导出任务");
-    expect(customerServiceConversationStatsReport).toContain("刷新状态");
-    expect(customerServiceConversationStatsReport).toContain("下载");
+    expect(customerServiceConversationStatsReport).not.toContain("创建统计对话异步导出任务");
+    expect(customerServiceConversationStatsReport).not.toContain("默认带入当前统计日期条件");
+    expect(customerServiceExportTaskDialog).not.toContain("导出条件");
+    expect(customerServiceExportTaskDialog).toContain("<span>文件名</span>");
+    expect(customerServiceExportTaskDialog).toContain("<span>记录数</span>");
+    expect(customerServiceExportTaskDialog).toContain("<span>创建时间</span>");
+    expect(customerServiceExportTaskDialog).toContain("<span>完成时间</span>");
+    expect(customerServiceExportTaskDialog).not.toContain("cs-stats-export-task-size");
+    expect(customerServiceExportTaskDialog).not.toContain("文件 / 条件");
+    expect(customerServiceExportTaskDialog).not.toContain("未返回查询条件");
+    expect(customerServiceExportTaskDialog).not.toContain("<h3>导出任务</h3>");
+    expect(customerServiceExportTaskDialog).not.toContain("onRefresh");
+    expect(customerServiceExportTaskDialog).not.toContain("onRetry");
+    expect(customerServiceExportTaskDialog).toContain("下载");
     expect(customerServiceConversationStatsReport).toContain('"cs_staff_daily_stats"');
     expect(customerServiceConversationStatsReport).not.toContain("导出 cs_staff_daily_stats");
     expect(customerServiceConversationStatsReport).not.toContain("StatsGrain");

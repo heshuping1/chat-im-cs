@@ -27,8 +27,10 @@ import {
 } from "../data/customer-service/cs-thread-preview";
 import {
   canReadCustomerServiceHistory,
+  canUseCustomerServiceManagementReadonly,
   canUseCustomerServiceStaffEndpoints,
 } from "../data/customer-service/cs-role-capabilities";
+import { executeCustomerServiceThreadAction } from "../data/customer-service/cs-action-service";
 import { chatConversationEntityFromCustomerServiceThread } from "../data/conversation/conversation-domain";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
@@ -86,6 +88,7 @@ export function ThreadList() {
   );
   const queryBaseKey = [authSession?.apiBaseUrl, authSession?.tenantToken];
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(authSession);
+  const canUseManagementActions = canUseCustomerServiceManagementReadonly(authSession);
   const canReadHistory = canReadCustomerServiceHistory(authSession);
 
   const threadsQuery = useQuery({
@@ -112,8 +115,15 @@ export function ThreadList() {
   const claimThreadMutation = useMutation({
     mutationFn: async (thread: CustomerServiceThread) => {
       if (!client) throw new Error("Customer service API is not ready");
-      if (!canUseStaffEndpoints) throw new Error("Only customer service staff can claim conversations.");
-      return client.claimCustomerServiceThread(thread.threadType, thread.threadId);
+      if (!canUseStaffEndpoints && !canUseManagementActions) {
+        throw new Error("Only customer service staff, administrators, or owners can claim conversations.");
+      }
+      return executeCustomerServiceThreadAction({
+        action: "claim",
+        client,
+        mode: canUseStaffEndpoints ? "staff" : "management",
+        thread,
+      });
     },
     onSuccess: (result, thread) => {
       applyClaimedCustomerServiceThread(queryClient, thread, result);
@@ -361,6 +371,10 @@ export function ThreadList() {
               thread,
             });
             const queued = mode === "current" && isQueuedCustomerServiceThread(thread);
+            const canClaimQueuedThread =
+              queued &&
+              (canUseStaffEndpoints ||
+                (canUseManagementActions && thread.threadType === "temp_session"));
             const risky = isRiskyCustomerServiceThread(thread);
             const claiming =
               claimThreadMutation.isPending &&
@@ -410,7 +424,7 @@ export function ThreadList() {
                   <p>{lastMessagePreview || (mode === "history" ? t("customerService.threadList.historyThread") : t("customerService.threadList.noMessage"))}</p>
                 </span>
                 <span className="h-thread-sla">
-                  {queued && canUseStaffEndpoints ? (
+                  {canClaimQueuedThread ? (
                     <button
                       className="h-thread-claim"
                       type="button"

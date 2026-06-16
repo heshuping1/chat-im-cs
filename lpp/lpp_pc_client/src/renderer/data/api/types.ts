@@ -949,7 +949,6 @@ export type CustomerServiceExportType = "cs_sessions" | "cs_staff_daily_stats";
 
 export interface ExportTaskDto {
   taskId?: string;
-  id?: string;
   tenantId?: string;
   exportType?: CustomerServiceExportType | string;
   status?: "pending" | "processing" | "completed" | "failed" | string;
@@ -958,8 +957,6 @@ export interface ExportTaskDto {
   recordCount?: number | null;
   createdAt?: string | null;
   completedAt?: string | null;
-  errorMessage?: string | null;
-  message?: string | null;
 }
 
 export interface ExportTaskDownloadResult {

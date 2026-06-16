@@ -1,4 +1,4 @@
-﻿import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+﻿import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DayPicker, type DateRange } from "react-day-picker";
 import "react-day-picker/style.css";
 import {
@@ -15,6 +15,7 @@ import type {
   ConversationListItem,
   CustomerServiceThread,
   CustomerServiceThreadType,
+  ExportTaskDto,
   MessageItemDto,
   CustomerServiceHistorySummary,
   TenantMemberDto,
@@ -32,6 +33,7 @@ import {
   type HistoryFilterKey,
 } from "../messages/models/messageListModel";
 import { channelLabel } from "./ChannelBadge";
+import { CustomerServiceExportTaskDialog } from "./CustomerServiceExportTaskDialog";
 import type { DataCenterReportDefinition } from "./data-center/dataCenterReportTypes";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
@@ -134,12 +136,34 @@ export function CustomerServiceHistoryReport({
   const [partyProfile, setPartyProfile] = useState<HistoryPartyProfile | null>(null);
   const [lookupHistoryFilter, setLookupHistoryFilter] =
     useState<HistoryFilterKey>("all");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportFilters, setExportFilters] = useState<HistoryFilters>(defaultFilters);
+  const [exportDatePreset, setExportDatePreset] = useState<HistoryDatePreset>("all");
+  const [exportCustomDatePickerOpen, setExportCustomDatePickerOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState("");
+  const queryClient = useQueryClient();
   const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
+  const historyExportTypeValue = useMemo(() => historyExportType(report), [report]);
+  const exportTasksKey = useMemo(
+    () => [
+      ...pcQueryKeys.customerServiceExportTasks(
+        session?.apiBaseUrl,
+        session?.tenantToken,
+      ),
+      historyExportTypeValue,
+      "history",
+    ],
+    [historyExportTypeValue, session?.apiBaseUrl, session?.tenantToken],
+  );
   const historyParams = useMemo(
     () => historyQueryParams(filters, historyPageSize),
     [filters, historyPageSize],
   );
+  const exportPreviewParams = useMemo(
+    () => historyQueryParams(exportFilters, 1),
+    [exportFilters],
+  );
+  const currentHistoryExportFilters = useMemo(() => historyExportFilters(exportFilters), [exportFilters]);
   const lookupScope = useMemo(() => createMessageLookupScope("server"), []);
 
   useEffect(() => {
@@ -237,23 +261,90 @@ export function CustomerServiceHistoryReport({
     [detailThread],
   );
 
+  const canExportHistory = Boolean(client) && dataCenterView !== "self-service";
+  const exportPreviewQuery = useQuery({
+    queryKey: [
+      ...pcQueryKeys.customerServiceHistory(
+        session?.apiBaseUrl,
+        session?.tenantToken,
+        1,
+      ),
+      exportPreviewParams,
+      dataCenterView,
+      "export-preview",
+    ],
+    enabled: Boolean(client && canExportHistory && exportDialogOpen),
+    queryFn: () =>
+      client!.getCustomerServiceHistoryThreads({
+        ...exportPreviewParams,
+        cursor: null,
+      }),
+    staleTime: 10_000,
+  });
+  const exportPreviewCount = historyPreviewCount(exportPreviewQuery.data);
+  const exportPreviewChecking =
+    exportDialogOpen && (exportPreviewQuery.isLoading || exportPreviewQuery.isFetching);
+  const exportCreateDisabledReason = !canExportHistory
+    ? "当前账号无权导出"
+    : exportPreviewChecking
+      ? "正在检查当前条件是否有数据"
+      : exportPreviewQuery.isError
+        ? "当前条件数据检查失败"
+        : exportPreviewCount <= 0
+          ? "当前条件没有可导出的数据"
+          : undefined;
+  const exportCreateText = exportPreviewChecking
+    ? "检查数据中"
+    : exportPreviewQuery.isError
+      ? "无法检查数据"
+      : exportPreviewCount <= 0
+        ? "无数据可导出"
+        : "创建导出任务";
+
   const exportMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (exportFilters: Record<string, unknown>) => {
       if (!client) throw new Error("API client is not ready");
+      if (exportPreviewCount <= 0) throw new Error("当前条件没有可导出的数据");
       return client.createCustomerServiceExportTask({
-        exportType: historyExportType(report),
-        filters: historyExportFilters(filters),
+        exportType: historyExportTypeValue,
+        filters: exportFilters,
       });
     },
     onSuccess: (task) => {
-      const taskId = task.taskId || task.id || "";
+      const taskId = task.taskId || "";
       setExportNotice(taskId ? `已创建导出任务：${taskId}` : "已创建导出任务");
+      setExportDialogOpen(true);
+      void queryClient.invalidateQueries({ queryKey: exportTasksKey });
     },
     onError: (error) => {
       setExportNotice(`导出任务创建失败：${formatError(error)}`);
     },
   });
-  const canExportHistory = Boolean(client) && dataCenterView !== "self-service";
+  const exportTasksQuery = useQuery({
+    queryKey: exportTasksKey,
+    enabled: Boolean(client && canExportHistory && exportDialogOpen),
+    queryFn: () => client!.getCustomerServiceExportTasks({ exportType: historyExportTypeValue }),
+    refetchInterval: (query) =>
+      query.state.data?.some((task) => isHistoryExportTaskRunning(task.status)) ? 5000 : false,
+    staleTime: 15_000,
+  });
+  const downloadMutation = useMutation({
+    mutationFn: async (task: ExportTaskDto) => {
+      if (!client) throw new Error("API client is not ready");
+      const taskId = historyExportTaskId(task);
+      if (!taskId) throw new Error("导出任务缺少 taskId");
+      const file = await client.downloadCustomerServiceExportTask(taskId);
+      const fileName = file.fileName || task.fileName || `${taskId}.csv`;
+      const savedPath = await saveHistoryExportFile(file.blob, fileName);
+      return { savedPath, taskId };
+    },
+    onSuccess: ({ savedPath, taskId }) => {
+      setExportNotice(savedPath ? `导出文件已保存并打开目录：${savedPath}` : `导出文件已开始下载：${taskId}`);
+    },
+    onError: (error) => {
+      setExportNotice(`导出文件下载失败：${formatError(error)}`);
+    },
+  });
   const selectedDateRange = useMemo<DateRange>(
     () => ({
       from: parseHistoryDate(filters.from),
@@ -261,8 +352,17 @@ export function CustomerServiceHistoryReport({
     }),
     [filters.from, filters.to],
   );
+  const selectedExportDateRange = useMemo<DateRange>(
+    () => ({
+      from: parseHistoryDate(exportFilters.from),
+      to: parseHistoryDate(exportFilters.to),
+    }),
+    [exportFilters.from, exportFilters.to],
+  );
   const customFromTime = historyTimePart(filters.from, "00:00:00");
   const customToTime = historyTimePart(filters.to, "23:59:59");
+  const exportCustomFromTime = historyTimePart(exportFilters.from, "00:00:00");
+  const exportCustomToTime = historyTimePart(exportFilters.to, "23:59:59");
 
   const applyDatePreset = (preset: HistoryDatePreset) => {
     setDatePreset(preset);
@@ -294,6 +394,40 @@ export function CustomerServiceHistoryReport({
     setDatePreset("custom");
     setHistoryPageIndex(0);
     setFilters((current) => {
+      const date = parseHistoryDate(current[side]);
+      return {
+        ...current,
+        [side]: formatHistoryDateTime(date, normalizeHistoryTime(time, side === "from" ? "00:00:00" : "23:59:59")),
+      };
+    });
+  };
+  const applyExportDatePreset = (preset: HistoryDatePreset) => {
+    setExportDatePreset(preset);
+    if (preset === "custom") {
+      setExportCustomDatePickerOpen(true);
+      return;
+    }
+    const range = historyDatePresetRange(preset);
+    setExportCustomDatePickerOpen(false);
+    setExportFilters((current) => ({
+      ...current,
+      from: range.from,
+      to: range.to,
+    }));
+  };
+
+  const applyCustomExportDateRange = (range: DateRange | undefined) => {
+    setExportDatePreset("custom");
+    setExportFilters((current) => ({
+      ...current,
+      from: formatHistoryDateTime(range?.from, historyTimePart(current.from, "00:00:00")),
+      to: formatHistoryDateTime(range?.to, historyTimePart(current.to, "23:59:59")),
+    }));
+  };
+
+  const updateCustomExportDateTime = (side: "from" | "to", time: string) => {
+    setExportDatePreset("custom");
+    setExportFilters((current) => {
       const date = parseHistoryDate(current[side]);
       return {
         ...current,
@@ -401,16 +535,22 @@ export function CustomerServiceHistoryReport({
               <RefreshCw size={15} />
               查询
             </button>
+            <button type="button" onClick={() => setAdvancedOpen((current) => !current)}>
+              {advancedOpen ? "收起更多条件" : "更多条件"}
+            </button>
             <button
               type="button"
-              onClick={() => exportMutation.mutate()}
+              className="primary"
+              onClick={() => {
+                setExportFilters(filters);
+                setExportDatePreset(datePreset);
+                setExportCustomDatePickerOpen(false);
+                setExportDialogOpen(true);
+              }}
               disabled={!canExportHistory || exportMutation.isPending}
             >
               <Download size={15} />
-              {exportMutation.isPending ? "正在创建导出" : "导出报表"}
-            </button>
-            <button type="button" onClick={() => setAdvancedOpen((current) => !current)}>
-              {advancedOpen ? "收起更多条件" : "更多条件"}
+              导出
             </button>
           </div>
         </div>
@@ -466,7 +606,6 @@ export function CustomerServiceHistoryReport({
           </div>
         )}
 
-        {exportNotice && <p className="cs-history-export-notice">{exportNotice}</p>}
       </section>
 
       <section className="cs-history-results-panel">
@@ -604,12 +743,192 @@ export function CustomerServiceHistoryReport({
           thread={infoThread}
         />
       )}
+
+      {exportDialogOpen && (
+        <CustomerServiceExportTaskDialog
+          title="导出历史对话"
+          conditionEditor={(createAction) => (
+            <div className="cs-stats-export-condition-editor history">
+              <div className="cs-stats-export-compact-search">
+                <HistoryInput
+                  className="search-field"
+                  label="客户关键词"
+                  value={exportFilters.keyword}
+                  placeholder="客户名称、客户 ID、手机号、邮箱..."
+                  onChange={(keyword) => setExportFilters((current) => ({ ...current, keyword }))}
+                />
+                <HistoryInput label="客户 ID" value={exportFilters.customerId} onChange={(customerId) => setExportFilters((current) => ({ ...current, customerId }))} />
+                <HistoryInput label="客服 ID" value={exportFilters.staffUserId} onChange={(staffUserId) => setExportFilters((current) => ({ ...current, staffUserId }))} />
+                <div className="cs-stats-export-form-actions inline">
+                  {createAction}
+                </div>
+              </div>
+              <div className="cs-history-filter-grid cs-history-filter-lines cs-stats-export-filter-lines">
+                <div className="cs-history-filter-line paired">
+                  <HistoryFilterOptionRow
+                    label="会话类型"
+                    value={exportFilters.threadType}
+                    options={[
+                      ["all", "全部"],
+                      ["temp_session", "访客会话"],
+                      ["im_direct", "IM 直聊"],
+                    ]}
+                    onChange={(threadType) =>
+                      setExportFilters((current) => ({
+                        ...current,
+                        threadType: threadType as HistoryFilters["threadType"],
+                      }))
+                    }
+                  />
+                  <div className="cs-history-filter-row cs-stats-export-row-input">
+                    <span className="cs-history-filter-row-label">会话 ID：</span>
+                    <input
+                      value={exportFilters.conversationId}
+                      onChange={(event) =>
+                        setExportFilters((current) => ({
+                          ...current,
+                          conversationId: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="cs-history-filter-line full">
+                  <div className="cs-history-filter-row">
+                    <span className="cs-history-filter-row-label">创建时间：</span>
+                    <HistoryDateRangeFilter
+                      pickerOpen={exportCustomDatePickerOpen}
+                      preset={exportDatePreset}
+                      range={selectedExportDateRange}
+                      fromTime={exportCustomFromTime}
+                      toTime={exportCustomToTime}
+                      onPickerOpenChange={setExportCustomDatePickerOpen}
+                      onPresetChange={applyExportDatePreset}
+                      onRangeChange={applyCustomExportDateRange}
+                      onTimeChange={updateCustomExportDateTime}
+                    />
+                  </div>
+                </div>
+              </div>
+              <details className="cs-stats-export-more-conditions">
+                <summary>更多导出条件</summary>
+                <div className="cs-stats-export-condition-grid advanced">
+                  <HistoryInput label="注册用户 ID" value={exportFilters.customerUserId} onChange={(customerUserId) => setExportFilters((current) => ({ ...current, customerUserId }))} />
+                  <HistoryInput label="访客用户 ID" value={exportFilters.visitorUserId} onChange={(visitorUserId) => setExportFilters((current) => ({ ...current, visitorUserId }))} />
+                  <HistoryInput label="发送人 ID" value={exportFilters.senderUserId} onChange={(senderUserId) => setExportFilters((current) => ({ ...current, senderUserId }))} />
+                  <HistoryInput label="指派客服 ID" value={exportFilters.assignedStaffUserId} onChange={(assignedStaffUserId) => setExportFilters((current) => ({ ...current, assignedStaffUserId }))} />
+                  <HistoryInput label="语言" value={exportFilters.locale} placeholder="zh-CN / en-US" onChange={(locale) => setExportFilters((current) => ({ ...current, locale }))} />
+                  <HistoryInput label="来源平台" value={exportFilters.sourcePlatform} placeholder="web / app" onChange={(sourcePlatform) => setExportFilters((current) => ({ ...current, sourcePlatform }))} />
+                  <HistoryInput label="国家" value={exportFilters.country} onChange={(country) => setExportFilters((current) => ({ ...current, country }))} />
+                  <HistoryInput label="地区" value={exportFilters.region} onChange={(region) => setExportFilters((current) => ({ ...current, region }))} />
+                </div>
+              </details>
+            </div>
+          )}
+          notice={exportNotice}
+          tasks={sortHistoryExportTasks(exportTasksQuery.data ?? []).map((task) => {
+            const taskId = historyExportTaskId(task);
+            const status = task.status || "--";
+            return {
+              canDownload: isHistoryExportTaskCompleted(status) && Boolean(taskId),
+              completedAtLabel: task.completedAt ? historyDateTimeLabel(task.completedAt) : undefined,
+              createdAtLabel: historyDateTimeLabel(task.createdAt),
+              key: taskId || `${task.exportType}-${task.createdAt}`,
+              payload: task,
+              recordCountLabel: historyExportRecordCountLabel(task.recordCount),
+              status,
+              statusLabel: historyExportTaskStatusLabel(status),
+              title: task.fileName || historyExportTaskTitle(task),
+            };
+          })}
+          loading={exportTasksQuery.isLoading}
+          errorText={
+            exportTasksQuery.isError
+              ? `导出任务加载失败：${formatError(exportTasksQuery.error)}`
+              : undefined
+          }
+          downloadPending={downloadMutation.isPending}
+          createPending={exportMutation.isPending}
+          createText={exportCreateText}
+          createDisabled={Boolean(exportCreateDisabledReason)}
+          createDisabledReason={exportCreateDisabledReason}
+          onClose={() => setExportDialogOpen(false)}
+          onCreate={() => exportMutation.mutate(currentHistoryExportFilters)}
+          onDownload={(task) => downloadMutation.mutate(task.payload as ExportTaskDto)}
+        />
+      )}
     </section>
   );
 }
 
 function historyExportType(report: DataCenterReportDefinition): "cs_sessions" {
   return report.exportTypes.includes("cs_sessions") ? "cs_sessions" : "cs_sessions";
+}
+
+function historyExportTaskId(task: ExportTaskDto) {
+  return task.taskId || "";
+}
+
+function historyExportTaskTitle(task: ExportTaskDto) {
+  return task.exportType === "cs_sessions" ? "历史对话明细" : task.exportType || "导出任务";
+}
+
+function historyExportRecordCountLabel(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value} 条` : undefined;
+}
+
+function historyPreviewCount(page?: HistoryThreadsPage) {
+  if (!page) return 0;
+  return page.summary?.totalSessions ?? page.items.length;
+}
+
+function isHistoryExportTaskRunning(status?: string | null) {
+  const normalized = (status || "").toLowerCase();
+  return normalized === "pending" || normalized === "processing";
+}
+
+function isHistoryExportTaskCompleted(status?: string | null) {
+  return (status || "").toLowerCase() === "completed";
+}
+
+function historyExportTaskStatusLabel(status?: string | null) {
+  const normalized = (status || "").toLowerCase();
+  if (normalized === "pending") return "排队中";
+  if (normalized === "processing") return "生成中";
+  if (normalized === "completed") return "已完成";
+  if (normalized === "failed") return "失败";
+  return status || "--";
+}
+
+function historyDateTimeLabel(value?: string | null) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+async function saveHistoryExportFile(blob: Blob, fileName: string) {
+  const desktopApi = typeof window !== "undefined" ? window.desktopApi : undefined;
+  if (desktopApi?.saveAndRevealFile) {
+    return desktopApi.saveAndRevealFile({
+      bytes: await blob.arrayBuffer(),
+      defaultName: fileName,
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+    });
+  }
+  triggerHistoryBrowserDownload(blob, fileName);
+  return null;
+}
+
+function triggerHistoryBrowserDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 type HistoryFieldColumn = {
@@ -1475,8 +1794,8 @@ function HistoryDateRangeFilter({
               />
               <div className="cs-history-time-grid">
                 <label>
-                  <span>开始时间</span>
                   <input
+                    aria-label="开始时间"
                     type="time"
                     step={1}
                     value={fromTime}
@@ -1485,8 +1804,8 @@ function HistoryDateRangeFilter({
                   />
                 </label>
                 <label>
-                  <span>结束时间</span>
                   <input
+                    aria-label="结束时间"
                     type="time"
                     step={1}
                     value={toTime}
@@ -1541,10 +1860,10 @@ function historyDatePresetRange(preset: HistoryDatePreset) {
 }
 
 function historyDateRangeLabel(range: DateRange, fromTime: string, toTime: string) {
-  const from = formatHistoryDateTime(range.from, fromTime);
-  const to = formatHistoryDateTime(range.to, toTime);
-  if (from && to) return `${from} 至 ${to}`;
-  if (from) return `${from} 至 结束时间`;
+  const from = formatHistoryDateTime(range.from, fromTime).replace("T", " ");
+  const to = formatHistoryDateTime(range.to, toTime).replace("T", " ");
+  if (from && to) return `${from} ~ ${to}`;
+  if (from) return `${from} ~ 结束时间`;
   return "选择日期范围";
 }
 
@@ -1669,11 +1988,14 @@ function historyQueryParams(filters: HistoryFilters, limit: number) {
     ...(filters.threadType !== "all" ? { threadType: filters.threadType } : {}),
     ...(filters.from ? { from: filters.from } : {}),
     ...(filters.to ? { to: filters.to } : {}),
+    ...(filters.conversationId ? { conversationId: filters.conversationId } : {}),
     ...(filters.customerId ? { customerId: filters.customerId } : {}),
     ...(filters.customerUserId ? { customerUserId: filters.customerUserId } : {}),
     ...(filters.visitorUserId ? { visitorUserId: filters.visitorUserId } : {}),
+    ...(filters.senderUserId ? { senderUserId: filters.senderUserId } : {}),
     ...(filters.keyword ? { keyword: filters.keyword } : {}),
     ...(filters.staffUserId ? { staffUserId: filters.staffUserId } : {}),
+    ...(filters.assignedStaffUserId ? { assignedStaffUserId: filters.assignedStaffUserId } : {}),
     ...(filters.locale ? { locale: filters.locale } : {}),
     ...(filters.sourcePlatform ? { sourcePlatform: filters.sourcePlatform } : {}),
     ...(filters.country ? { country: filters.country } : {}),
@@ -1693,10 +2015,35 @@ function historyEmptyText(isLoading: boolean, keyword: string) {
 }
 
 function historyExportFilters(filters: HistoryFilters) {
+  const rating = filters.rating.trim();
+  const minRiskLevel = filters.slaRisk.trim();
   return {
+    ...(filters.threadType !== "all" ? { threadType: filters.threadType } : {}),
     ...(filters.from ? { from: filters.from } : {}),
     ...(filters.to ? { to: filters.to } : {}),
+    ...(filters.conversationId ? { conversationId: filters.conversationId } : {}),
+    ...(filters.customerId ? { customerId: filters.customerId } : {}),
+    ...(filters.customerUserId ? { customerUserId: filters.customerUserId } : {}),
+    ...(filters.visitorUserId ? { visitorUserId: filters.visitorUserId } : {}),
+    ...(filters.senderUserId ? { senderUserId: filters.senderUserId } : {}),
+    ...(filters.keyword ? { keyword: filters.keyword } : {}),
+    ...(filters.staffUserId ? { staffUserId: filters.staffUserId } : {}),
+    ...(filters.assignedStaffUserId ? { assignedStaffUserId: filters.assignedStaffUserId } : {}),
+    ...(filters.locale ? { locale: filters.locale } : {}),
+    ...(filters.sourcePlatform ? { sourcePlatform: filters.sourcePlatform } : {}),
+    ...(filters.country ? { country: filters.country } : {}),
+    ...(filters.region ? { region: filters.region } : {}),
+    ...(rating ? { minRating: rating, maxRating: rating } : {}),
+    ...(minRiskLevel ? { minRiskLevel } : {}),
   };
+}
+
+function sortHistoryExportTasks(tasks: ExportTaskDto[]) {
+  return [...tasks].sort((left, right) => {
+    const leftTime = new Date(left.createdAt || "").getTime();
+    const rightTime = new Date(right.createdAt || "").getTime();
+    return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0);
+  });
 }
 
 function sourceChannelFilterLabel(value: string) {
