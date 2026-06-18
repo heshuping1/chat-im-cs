@@ -436,6 +436,7 @@ async function materializeMediaCandidate({
       kind: candidate.kind,
       url: candidate.url,
     });
+    if (result.status === "failed" || !result.fileUrl) return;
     registerMaterializedMediaFileUrl(candidate.cacheKey, result.fileUrl);
     void window.desktopApi.localDataUpsertMedia?.({
       asset: {

@@ -11,6 +11,7 @@ import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } f
 import {
   isTerminalCustomerServiceThreadStatus,
   normalizeCustomerServiceThreadType,
+  type StaffServiceHistoryItem,
   type CustomerServiceThread,
 } from "../data/api-client";
 import { useAuthSession } from "../data/auth/auth-store";
@@ -18,6 +19,8 @@ import {
   createCustomerServiceThreadStatusDescriptor,
   isQueuedCustomerServiceThread,
 } from "../data/customer-service-display";
+import { createCustomerServiceThreadState } from "../data/customer-service/cs-thread-state";
+import { resolveCustomerServiceThreadActionPolicy } from "../data/customer-service/cs-thread-action-policy";
 import { createCustomerServiceIdentityViewModel } from "../data/customer-service/cs-identity-view-model";
 import { dedupeCustomerServiceThreads } from "../data/customer-service/customer-service-live-counters";
 import {
@@ -27,10 +30,10 @@ import {
 } from "../data/customer-service/cs-thread-preview";
 import {
   canReadCustomerServiceHistory,
-  canUseCustomerServiceManagementReadonly,
   canUseCustomerServiceStaffEndpoints,
 } from "../data/customer-service/cs-role-capabilities";
 import { executeCustomerServiceThreadAction } from "../data/customer-service/cs-action-service";
+import { recordCsRoutingDiagnostic } from "../data/customer-service/cs-routing-diagnostics";
 import { chatConversationEntityFromCustomerServiceThread } from "../data/conversation/conversation-domain";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
@@ -86,9 +89,11 @@ export function ThreadList() {
     () => (authSession ? createApiClient(authSession) : null),
     [authSession],
   );
-  const queryBaseKey = [authSession?.apiBaseUrl, authSession?.tenantToken];
+  const queryBaseKey = useMemo(
+    () => [authSession?.apiBaseUrl, authSession?.tenantToken] as const,
+    [authSession?.apiBaseUrl, authSession?.tenantToken],
+  );
   const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(authSession);
-  const canUseManagementActions = canUseCustomerServiceManagementReadonly(authSession);
   const canReadHistory = canReadCustomerServiceHistory(authSession);
 
   const threadsQuery = useQuery({
@@ -115,13 +120,13 @@ export function ThreadList() {
   const claimThreadMutation = useMutation({
     mutationFn: async (thread: CustomerServiceThread) => {
       if (!client) throw new Error("Customer service API is not ready");
-      if (!canUseStaffEndpoints && !canUseManagementActions) {
-        throw new Error("Only customer service staff, administrators, or owners can claim conversations.");
+      if (!canUseStaffEndpoints) {
+        throw new Error("Only customer service staff can claim conversations.");
       }
       return executeCustomerServiceThreadAction({
         action: "claim",
         client,
-        mode: canUseStaffEndpoints ? "staff" : "management",
+        mode: "staff",
         thread,
       });
     },
@@ -169,6 +174,96 @@ export function ThreadList() {
     [historyThreads, threadsQuery.data],
   );
   const { counts: currentCounts, currentThreads } = listViewModel;
+  const sourceProbeSignature = useMemo(
+    () =>
+      [
+        mode,
+        filter,
+        threadsQuery.status,
+        threadsQuery.fetchStatus,
+        threadsQuery.dataUpdatedAt,
+        currentThreads
+          .slice(0, 5)
+          .map((thread) =>
+            [
+              thread.threadId,
+              thread.conversationId,
+              thread.sourcePlatform,
+              thread.source,
+              thread.sourceChannel,
+              thread.channel,
+              thread.entryChannel,
+            ].join("|"),
+          )
+          .join(";"),
+        historyItems
+          .slice(0, 20)
+          .map((item) =>
+            [item.threadId, item.conversationId, item.sourcePlatform, item.sourceChannel, item.source].join("|"),
+          )
+          .join(";"),
+      ].join("::"),
+    [
+      currentThreads,
+      filter,
+      historyItems,
+      mode,
+      threadsQuery.dataUpdatedAt,
+      threadsQuery.fetchStatus,
+      threadsQuery.status,
+    ],
+  );
+  useEffect(() => {
+    if (mode !== "current") return;
+    const queryState = queryClient.getQueryState(pcQueryKeys.customerServiceThreads(...queryBaseKey));
+    recordCsRoutingDiagnostic({
+      event: "cs.thread-list.source-probe",
+      source: "thread-list",
+      phase: threadsQuery.fetchStatus === "fetching" ? "fetching" : "resolved",
+      route: "onlineService.current",
+      classification: {
+        dataUpdatedAt: threadsQuery.dataUpdatedAt || queryState?.dataUpdatedAt || 0,
+        fetchStatus: threadsQuery.fetchStatus,
+        filter,
+        historyItems: historyItems.length,
+        isFetched: threadsQuery.isFetched,
+        isFetchedAfterMount: threadsQuery.isFetchedAfterMount,
+        isFetching: threadsQuery.isFetching,
+        isStale: threadsQuery.isStale,
+        queryStatus: threadsQuery.status,
+        renderedCurrentThreads: currentThreads.length,
+        servedFromCacheBeforeMountFetch:
+          threadsQuery.isFetched &&
+          !threadsQuery.isFetchedAfterMount &&
+          threadsQuery.fetchStatus !== "fetching",
+        source: threadsQuery.fetchStatus === "fetching" ? "query-fetching" : "query-cache-or-latest",
+      },
+      summary: {
+        activeItems: (threadsQuery.data?.activeItems ?? []).slice(0, 5).map((thread) =>
+          createThreadSourceProbeItem(thread, historyItems),
+        ),
+        queueItems: (threadsQuery.data?.queueItems ?? []).slice(0, 5).map((thread) =>
+          createThreadSourceProbeItem(thread, historyItems),
+        ),
+      },
+    });
+  }, [
+    currentThreads.length,
+    filter,
+    historyItems,
+    mode,
+    queryBaseKey,
+    queryClient,
+    sourceProbeSignature,
+    threadsQuery.data,
+    threadsQuery.dataUpdatedAt,
+    threadsQuery.fetchStatus,
+    threadsQuery.isFetched,
+    threadsQuery.isFetchedAfterMount,
+    threadsQuery.isFetching,
+    threadsQuery.isStale,
+    threadsQuery.status,
+  ]);
   const historyTabBadge = useMemo(
     () => createServiceHistoryTabBadge(listViewModel.historyThreads),
     [listViewModel.historyThreads],
@@ -371,10 +466,12 @@ export function ThreadList() {
               thread,
             });
             const queued = mode === "current" && isQueuedCustomerServiceThread(thread);
-            const canClaimQueuedThread =
-              queued &&
-              (canUseStaffEndpoints ||
-                (canUseManagementActions && thread.threadType === "temp_session"));
+            const threadActionPolicy = resolveCustomerServiceThreadActionPolicy({
+              hasThread: true,
+              session: authSession,
+              state: createCustomerServiceThreadState(thread.status),
+            });
+            const canClaimQueuedThread = queued && threadActionPolicy.claim.enabled;
             const risky = isRiskyCustomerServiceThread(thread);
             const claiming =
               claimThreadMutation.isPending &&
@@ -419,7 +516,10 @@ export function ThreadList() {
                     {mode === "history"
                       ? formatServiceText(createServiceHistoryThreadStatusDescriptor(thread), t)
                       : formatServiceText(createCustomerServiceThreadStatusDescriptor(thread), t)}
-                    <ChannelBadge source={thread.source ?? thread.sourceChannel} compact />
+                    <ChannelBadge
+                      source={thread.sourcePlatform || thread.sourceChannel || thread.source}
+                      compact
+                    />
                   </small>
                   <p>{lastMessagePreview || (mode === "history" ? t("customerService.threadList.historyThread") : t("customerService.threadList.noMessage"))}</p>
                 </span>
@@ -603,6 +703,71 @@ function createThreadListEmptyStateView({
   return {
     description: t("customerService.threadList.empty.filteredDescription"),
     title: t("customerService.threadList.empty.filteredTitle"),
+  };
+}
+
+function createThreadSourceProbeItem(
+  thread: CustomerServiceThread,
+  historyItems: StaffServiceHistoryItem[],
+) {
+  const historyFallback = findMatchingHistorySource(thread, historyItems);
+  const renderedSource = thread.sourcePlatform || thread.sourceChannel || thread.source;
+  return {
+    conversationId: thread.conversationId,
+    displayedSourceInput: renderedSource,
+    hasHistoryFallbackSource: Boolean(
+      historyFallback?.sourcePlatform || historyFallback?.source || historyFallback?.sourceChannel,
+    ),
+    hasTopLevelSource: Boolean(
+      thread.source ||
+        thread.sourcePlatform ||
+        thread.sourceChannel ||
+        thread.channel ||
+        thread.entryChannel ||
+        thread.platform ||
+        thread.provider,
+    ),
+    historyFallback,
+    threadId: thread.threadId,
+    topLevel: {
+      channel: thread.channel,
+      entryChannel: thread.entryChannel,
+      from: thread.from,
+      platform: thread.platform,
+      provider: thread.provider,
+      source: thread.source,
+      sourceChannel: thread.sourceChannel,
+      sourcePlatform: thread.sourcePlatform,
+    },
+    wouldDisplayUnknown: !renderedSource,
+  };
+}
+
+function findMatchingHistorySource(
+  thread: CustomerServiceThread,
+  historyItems: StaffServiceHistoryItem[],
+) {
+  const match = historyItems.find((item) => {
+    const itemThreadId = item.threadId;
+    const itemConversationId = item.conversationId || item.threadId;
+    return (
+      itemThreadId === thread.threadId ||
+      itemThreadId === thread.conversationId ||
+      itemConversationId === thread.conversationId ||
+      itemConversationId === thread.threadId
+    );
+  });
+  if (!match) return undefined;
+  return {
+    channel: match.channel,
+    entryChannel: match.entryChannel,
+    from: match.from,
+    platform: match.platform,
+    provider: match.provider,
+    source: match.source,
+    sourceChannel: match.sourceChannel,
+    sourcePlatform: match.sourcePlatform,
+    threadId: match.threadId,
   };
 }
 

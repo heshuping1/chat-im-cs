@@ -98,6 +98,7 @@ export function userMessageKeyForApiError(
   if (code.includes("MSG_GROUP_MUTED")) return "apiError.messageGroupMuted";
   if (code.includes("MSG_MEMBER_MUTED")) return "apiError.messageMemberMuted";
   if (code.includes("MSG_USER_MUTED")) return "apiError.messageUserMuted";
+  if (code.includes("TEMP_SESSION_STAFF_NOT_FOUND")) return "apiError.tempSessionStaffNotFound";
   if (kind === "unauthorized") return "error.unauthorized";
   if (kind === "forbidden") return "error.forbidden";
   if (kind === "not_found") return "apiError.notFound";
@@ -135,6 +136,8 @@ function userMessageFallbackForApiError(
       return "你已被禁言，暂时无法发言";
     case "apiError.messageUserMuted":
       return "当前账号已被禁言，暂时无法发送消息";
+    case "apiError.tempSessionStaffNotFound":
+      return "当前账号不是客服坐席，不能直接接入会话。请指派给在线客服。";
     case "error.unauthorized":
       return "登录状态已失效，请重新登录";
     case "error.forbidden":

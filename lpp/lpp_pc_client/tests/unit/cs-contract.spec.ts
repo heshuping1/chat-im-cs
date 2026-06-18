@@ -15,6 +15,7 @@ describe("customer service contract", () => {
       status: "queued",
       customerDisplayName: "访客 A",
       sourceChannel: "web",
+      sourcePlatform: "h5",
       unreadCount: 2,
       tags: ["vip"],
     });
@@ -27,6 +28,7 @@ describe("customer service contract", () => {
       normalizedStatus: "queued",
       title: "访客 A",
       sourceChannel: "web",
+      sourcePlatform: "h5",
       unreadCount: 2,
       tags: ["vip"],
       isTerminal: false,
@@ -54,6 +56,21 @@ describe("customer service contract", () => {
       unreadCount: 3,
     });
     expect(result.data?.isTerminal).toBe(true);
+  });
+
+  it("maps sourcePlatform back to CustomerServiceThread", () => {
+    const result = normalizeCustomerServiceThreadDto({
+      threadId: "t-source",
+      status: "active",
+      title: "访客 C",
+      sourceChannel: "website",
+      sourcePlatform: "miniprogram",
+    });
+
+    expect(customerServiceThreadEntityToDto(result.data!)).toMatchObject({
+      sourceChannel: "website",
+      sourcePlatform: "miniprogram",
+    });
   });
 
   it("marks missing thread id as invalid and missing title/status as degraded", () => {

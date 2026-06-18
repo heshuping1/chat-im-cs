@@ -3868,6 +3868,12 @@ Base URL：`/api/client/v1/customer-service/workbench`
 | `assignedAt` | DateTimeOffset? | 当前归属建立时间 |
 | `queuePosition` | int? | 排队位置 |
 | `estimatedWaitSeconds` | int? | 预计等待秒数 |
+| `isVip` | bool | 服务端统一判定的 VIP 标识(客户端无需再各自推断) |
+| `priority` | string? | 优先级语义值(普通 / 高 / 紧急) |
+| `sourceChannel` | string | 🆕 2026-06-16 **来源渠道**(会话池「来源」徽标)。`temp_session` 为访客接入渠道(`widget` / `website` / …,缺省 `website`);`direct_customer` 为 IM 入口(`im_brand_inbound` / `im_staff_outbound` / `im_takeover` / `im_admin_assignment`,缺省 `im`)。**非空** —— 之前该 DTO 完全不带来源字段,客户端只能渲染「来源未知」,此次补齐后请直接据此显示来源。|
+| `sourcePlatform` | string? | 🆕 2026-06-16 **来源平台**。仅 `temp_session` 有意义(`web` / `h5` / `app` / `miniprogram`,宽松归一;老数据无获客字段时为 `null`);`direct_customer`(IM 直聊)恒为 `null`(其形态本身即 IM,无平台细分)。|
+
+> **来源徽标渲染建议**:优先用 `sourcePlatform` 显示更细的平台(如「APP」「网页」),为空时回退到 `sourceChannel`;二者都建议按 [field-enum-reference.md](./field-enum-reference.md) 映射成中文标签。`sourceChannel` 现在保证非空,客户端不应再出现「来源未知」。同字段也出现在 admin 管理中心 `GET /api/admin/v1/customer-service/center/threads` 的 `queueItems` / `activeItems`。
 
 ### 12.3 `GET /threads/{threadType}/{threadId}`
 

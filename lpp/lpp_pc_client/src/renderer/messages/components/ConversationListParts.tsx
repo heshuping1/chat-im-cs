@@ -1,5 +1,5 @@
 import { BellOff } from "lucide-react";
-import type { MouseEvent } from "react";
+import { memo } from "react";
 
 import { PcAvatar } from "../../components/PcAvatar";
 import type { ConversationListItem } from "../../data/api-client";
@@ -9,7 +9,7 @@ import { renderWechatEmojiText } from "../../lib/wechatEmoji";
 import type { ConversationListIdentityView } from "../models/conversationListIdentityModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 
-export function ConversationAvatar({
+export const ConversationAvatar = memo(function ConversationAvatar({
   avatarUrl,
   badge = false,
   groupAvatar,
@@ -55,20 +55,9 @@ export function ConversationAvatar({
       {badge && unread > 0 && <em className="e-avatar-unread">{formatBadgeCount(unread)}</em>}
     </span>
   );
-}
+});
 
-export function ConversationRow({
-  active,
-  avatarUrl,
-  conversation,
-  draft,
-  groupAvatar,
-  identity,
-  isGroup,
-  onClick,
-  onContextMenu,
-  unread,
-}: {
+export interface ConversationRowProps {
   active: boolean;
   avatarUrl?: string | null;
   conversation: ConversationListItem;
@@ -76,10 +65,19 @@ export function ConversationRow({
   groupAvatar?: GroupConversationAvatar;
   identity?: ConversationListIdentityView;
   isGroup: boolean;
-  onClick: () => void;
-  onContextMenu: (event: MouseEvent<HTMLElement>) => void;
   unread: number;
-}) {
+}
+
+export const ConversationRow = memo(function ConversationRow({
+  active,
+  avatarUrl,
+  conversation,
+  draft,
+  groupAvatar,
+  identity,
+  isGroup,
+  unread,
+}: ConversationRowProps) {
   const { t } = useI18n();
   const draftText = draft?.trim();
   const title = conversation.title || t("messages.conversationRow.unnamed");
@@ -87,9 +85,8 @@ export function ConversationRow({
   return (
     <button
       className={`e-conversation-row ${active ? "active" : ""}`}
+      data-conversation-id={conversation.conversationId}
       type="button"
-      onClick={onClick}
-      onContextMenu={onContextMenu}
     >
       <ConversationAvatar
         avatarUrl={avatarUrl ?? conversation.avatarUrl}
@@ -131,5 +128,48 @@ export function ConversationRow({
         {conversation.isMuted && <BellOff className="e-muted-icon" size={15} />}
       </span>
     </button>
+  );
+}, areConversationRowsEqual);
+
+function areConversationRowsEqual(
+  previous: ConversationRowProps,
+  next: ConversationRowProps,
+) {
+  return (
+    previous.active === next.active &&
+    previous.avatarUrl === next.avatarUrl &&
+    previous.conversation === next.conversation &&
+    previous.draft === next.draft &&
+    previous.isGroup === next.isGroup &&
+    previous.unread === next.unread &&
+    sameIdentity(previous.identity, next.identity) &&
+    sameGroupAvatar(previous.groupAvatar, next.groupAvatar)
+  );
+}
+
+function sameIdentity(
+  previous?: ConversationListIdentityView,
+  next?: ConversationListIdentityView,
+) {
+  return (
+    previous?.identityText === next?.identityText &&
+    previous?.kind === next?.kind &&
+    previous?.sourceText === next?.sourceText
+  );
+}
+
+function sameGroupAvatar(
+  previous?: GroupConversationAvatar,
+  next?: GroupConversationAvatar,
+) {
+  if (previous === next) return true;
+  if (!previous || !next || previous.kind !== next.kind) return false;
+  if (previous.kind === "image" && next.kind === "image") return previous.url === next.url;
+  if (previous.kind !== "grid" || next.kind !== "grid") return false;
+  if (previous.cells.length !== next.cells.length) return false;
+  return previous.cells.every(
+    (cell, index) =>
+      cell.avatarUrl === next.cells[index]?.avatarUrl &&
+      cell.name === next.cells[index]?.name,
   );
 }

@@ -79,4 +79,44 @@ describe("app instance api integration", () => {
     );
     expect(vi.mocked(globalThis.fetch).mock.calls[1][1]?.method).toBe("DELETE");
   });
+
+  it("normalizes account device fields from the platform API", async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: "OK",
+          data: [
+            {
+              device_id: "device-1",
+              device_name: "unknown",
+              device_type: "pc",
+              is_current: true,
+              last_active_at: "2026-06-17T01:00:00Z",
+              active_session_count: "3",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const { ApiClient } = await import("../../src/renderer/data/api-client");
+    const client = new ApiClient({
+      baseUrl: "https://api.example.com",
+      platformToken: "platform-token",
+      traceId: "trace-1",
+    });
+
+    await expect(client.getAccountDevices()).resolves.toEqual([
+      {
+        activeSessionCount: 3,
+        deviceId: "device-1",
+        deviceName: "unknown",
+        deviceType: "pc",
+        isCurrent: true,
+        lastActiveAt: "2026-06-17T01:00:00Z",
+        tenantId: null,
+        tenantName: null,
+      },
+    ]);
+  });
 });

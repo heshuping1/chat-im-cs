@@ -41,6 +41,7 @@ import { recordGatewayReminderDiagnostic } from "./gateway-message-reminder-diag
 import { createMessageDeliveryService } from "./message-delivery-service";
 import { pcQueryKeys } from "../query-keys";
 import {
+  mergeCustomerServiceTransferRecordFromGateway,
   reopenCustomerServiceThreadFromGateway,
   removeSilentCustomerServiceRecall,
 } from "./gateway-cs-side-effects";
@@ -128,6 +129,16 @@ export function createGatewayEventRouter(options: {
               threadId: event.threadId,
               threadType: event.threadType,
               unreadCount: numberField(event.rawPayload, "unreadCount", "unread_count"),
+            });
+          }
+          if (
+            event.changeKind === "thread_transferred" &&
+            event.threadId &&
+            event.transferRecord
+          ) {
+            mergeCustomerServiceTransferRecordFromGateway(queryClient, {
+              threadId: event.threadId,
+              transferRecord: event.transferRecord,
             });
           }
           invalidateCustomerService(event.threadId);

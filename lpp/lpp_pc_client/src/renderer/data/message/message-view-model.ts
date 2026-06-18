@@ -70,6 +70,7 @@ export interface CreateChatMessageViewModelInput {
   senderFallback: string;
   senderAvatarUrl?: string | null;
   mineAvatarUrl?: string | null;
+  mineSenderName?: string | null;
   timeText: string;
   statusText?: string;
   readReceiptText?: string;
@@ -78,6 +79,7 @@ export interface CreateChatMessageViewModelInput {
   contextMenuEnabled?: boolean;
   groupReadReceiptTotal?: number;
   nowMs?: number;
+  suppressMissingSenderNameFallback?: boolean;
 }
 
 type LocalMessageRecord = MessageItemDto & {
@@ -90,7 +92,10 @@ export function createChatMessageViewModel(
 ): ChatMessageViewModel {
   const message = input.message as LocalMessageRecord;
   const type = normalizeMessageType(message) || "text";
-  const delivery = normalizeChatMessageDeliveryState(message.status, message.isRecalled);
+  const delivery = normalizeChatMessageDeliveryState(
+    message.status,
+    message.isRecalled,
+  );
   const status = deriveChatMessageStatus({
     conversationType: input.conversationType,
     groupReadReceiptTotal: input.groupReadReceiptTotal,
@@ -98,9 +103,7 @@ export function createChatMessageViewModel(
     mine: input.mine,
     nowMs: input.nowMs,
   });
-  const senderName = input.mine
-    ? "我"
-    : input.senderFallback || message.senderDisplayName || "联系人";
+  const senderName = chatMessageSenderName(input, message);
 
   return {
     id: message.messageId,
@@ -110,7 +113,12 @@ export function createChatMessageViewModel(
       avatarUrl: input.mine
         ? input.mineAvatarUrl
         : input.senderAvatarUrl || message.senderAvatarUrl || message.avatarUrl,
-      fallbackName: input.mine ? senderName : senderName || input.conversationFallbackName,
+      fallbackName: input.mine
+        ? senderName
+        : senderName ||
+          (input.suppressMissingSenderNameFallback
+            ? ""
+            : input.conversationFallbackName),
       mine: input.mine,
     },
     bubble: {
@@ -119,7 +127,10 @@ export function createChatMessageViewModel(
     },
     content: {
       type,
-      preview: message.preview || messagePreviewFromBody(message.body ?? {}, type) || "[消息]",
+      preview:
+        message.preview ||
+        messagePreviewFromBody(message.body ?? {}, type) ||
+        "[娑堟伅]",
       translationText: input.translationText,
     },
     status: {
@@ -133,7 +144,9 @@ export function createChatMessageViewModel(
       showSendingIndicator: status.showSendingIndicator,
       readReceiptText: undefined,
       statusText: visibleStatusText({
-        allowReceiptStatusText: isCustomerServiceConversation(input.conversationType) && Boolean(input.statusText),
+        allowReceiptStatusText:
+          isCustomerServiceConversation(input.conversationType) &&
+          Boolean(input.statusText),
         mine: input.mine,
         receipt: status.receiptState,
         statusText: input.statusText ?? status.statusLabel,
@@ -148,22 +161,39 @@ export function createChatMessageViewModel(
   };
 }
 
+
+function chatMessageSenderName(
+  input: CreateChatMessageViewModelInput,
+  message: LocalMessageRecord,
+) {
+  if (input.mine) {
+    if (input.mineSenderName?.trim()) return input.mineSenderName.trim();
+    if (input.suppressMissingSenderNameFallback) return "";
+    return "我";
+  }
+  if (message.senderDisplayName) return message.senderDisplayName;
+  if (input.suppressMissingSenderNameFallback) return "";
+  return input.senderFallback || "联系人";
+}
+
 export function replyViewModelFromMessage(
   message: MessageItemDto,
 ): ChatMessageReplyViewModel | undefined {
   const body = message.body ?? {};
-  const record = (
-    body.reply ||
+  const record = (body.reply ||
     body.replyTo ||
     body.quotedMessage ||
     body.quote ||
-    (message as unknown as Record<string, unknown>).reply
-  ) as Record<string, unknown> | undefined;
+    (message as unknown as Record<string, unknown>).reply) as
+    | Record<string, unknown>
+    | undefined;
   if (!record || typeof record !== "object") return undefined;
   const preview = stringField(record, "preview", "text", "content", "message");
   if (!preview) return undefined;
   return {
-    sender: stringField(record, "sender", "senderDisplayName", "name") || "Referenced message",
+    sender:
+      stringField(record, "sender", "senderDisplayName", "name") ||
+      "Referenced message",
     preview,
   };
 }
@@ -201,7 +231,10 @@ function visibleStatusText({
 }
 
 function isCustomerServiceConversation(conversationType?: string | null) {
-  const normalized = String(conversationType ?? "").trim().toLowerCase().replace(/-/g, "_");
+  const normalized = String(conversationType ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
   return normalized === "temp_session" || normalized === "im_direct";
 }
 

@@ -1,55 +1,52 @@
-import {
-  createCustomerServiceThreadState,
-} from "../../data/customer-service/cs-thread-state";
-import { getCustomerServiceActionPermission } from "../../data/customer-service/cs-action-permissions";
 import type { CustomerServiceThreadAction } from "../../data/customer-service/cs-action-service";
+import type { CustomerServiceThreadActionPolicy } from "../../data/customer-service/cs-thread-action-policy";
 import { useI18n } from "../../i18n/useI18n";
 
 export function CustomerServiceThreadActionButton({
-  canUseStaffActions = true,
+  onAssign,
   onAction,
   pending,
-  selectedStatus,
-  status,
+  policy,
 }: {
-  canUseStaffActions?: boolean;
+  policy: CustomerServiceThreadActionPolicy;
+  onAssign?: () => void;
   onAction: (action: CustomerServiceThreadAction) => void;
   pending: boolean;
-  selectedStatus?: string;
-  status?: string;
 }) {
   const { t } = useI18n();
-  if (!canUseStaffActions) return null;
+  const showAssignForClaimGate = policy.assign.visible && policy.claim.visible;
+  if (!policy.claim.visible && !showAssignForClaimGate && !policy.takeover.visible) return null;
 
-  const threadState = createCustomerServiceThreadState(status);
-  const selectedThreadState = createCustomerServiceThreadState(selectedStatus);
-  const hasThread = Boolean(status || selectedStatus);
-  const claimPermission = getCustomerServiceActionPermission("claim", {
-    hasThread,
-    selectedState: selectedThreadState,
-    state: threadState,
-  });
-  if (claimPermission.visible) {
+  if (policy.claim.visible || showAssignForClaimGate) {
     return (
-      <button
-        type="button"
-        disabled={pending || !claimPermission.enabled}
-        onClick={() => onAction("claim")}
-      >
-        {t("customerService.action.claim")}
-      </button>
+      <>
+        {policy.claim.visible && (
+          <button
+            type="button"
+            disabled={pending || !policy.claim.enabled}
+            onClick={() => onAction("claim")}
+          >
+            {t("customerService.action.claim")}
+          </button>
+        )}
+        {showAssignForClaimGate && onAssign && (
+          <button
+            type="button"
+            disabled={pending || !policy.assign.enabled}
+            onClick={onAssign}
+          >
+            {t("customerService.transfer.assignShort")}
+          </button>
+        )}
+      </>
     );
   }
-  const takeoverPermission = getCustomerServiceActionPermission("takeover", {
-    hasThread,
-    selectedState: selectedThreadState,
-    state: threadState,
-  });
-  if (takeoverPermission.visible) {
+
+  if (policy.takeover.visible) {
     return (
       <button
         type="button"
-        disabled={pending || !takeoverPermission.enabled}
+        disabled={pending || !policy.takeover.enabled}
         onClick={() => onAction("takeover")}
       >
         {t("customerService.action.takeover")}

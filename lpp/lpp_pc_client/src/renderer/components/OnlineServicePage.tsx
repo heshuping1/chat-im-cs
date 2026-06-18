@@ -9,6 +9,7 @@ import { isRiskyThread, ThreadList } from "./ThreadList";
 import { CustomerServiceKnowledgePanel } from "../customer-service/components/CustomerServiceKnowledgeDrawer";
 import { CustomerServiceQuickReplyPanel } from "../customer-service/components/CustomerServiceQuickReplyDrawer";
 import { ServiceReceptionControl } from "../customer-service/components/ServiceReceptionControl";
+import { CustomerServiceSessionInfoPanel } from "../customer-service/components/CustomerServiceSessionInfoPanel";
 import {
   createServiceCommandMetrics,
   createServiceThreadListViewModel,
@@ -202,6 +203,7 @@ function serviceAssistantPaneLabel(
 ) {
   if (pane === "quickReply") return t("composer.quickReply");
   if (pane === "aiDraft") return t("composer.aiDraft");
+  if (pane === "sessionInfo") return t("customerService.contextPanel.sessionInfo");
   return t("knowledge.title");
 }
 
@@ -992,6 +994,7 @@ function ServiceAssistantShell({
   const { t } = useI18n();
   const isAiDraft = pane === "aiDraft";
   const isQuickReply = pane === "quickReply";
+  const isSessionInfo = pane === "sessionInfo";
   const session = useAuthSession();
   const [notice, setNotice] = useState<string | null>(null);
   return (
@@ -1042,6 +1045,12 @@ function ServiceAssistantShell({
               emitCustomerServiceAssistantInsert(payload.text);
             }}
             onNotice={setNotice}
+          />
+        ) : isSessionInfo ? (
+          <CustomerServiceSessionInfoPanel
+            threadId={aiReplyTarget.threadId}
+            threadTitle={aiReplyTarget.threadTitle}
+            threadType={aiReplyTarget.threadType}
           />
         ) : (
           <CustomerServiceKnowledgePanel

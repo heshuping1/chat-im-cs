@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { CustomerServiceThreadType } from "../api-client";
+import type { CustomerServiceTransferRecordDto } from "../api/types";
 import type { MessageItemDto } from "../api-client";
 import { getAuthSessionSnapshot } from "../auth/auth-store";
 import { applyCustomerServiceGatewayMessageCache } from "../customer-service/cs-cache-adapter";
@@ -44,6 +45,7 @@ import {
 } from "./gateway-payload-utils";
 import {
   markCustomerServiceThreadReopened,
+  mergeCustomerServiceTransferRecord,
   removeCustomerServiceMessageByThreadId,
 } from "../customer-service/cs-cache-adapter";
 
@@ -138,6 +140,16 @@ export function mergeCustomerServiceGatewayMessage(
       targetId: threadId,
     });
   }
+}
+
+export function mergeCustomerServiceTransferRecordFromGateway(
+  queryClient: QueryClient,
+  input: {
+    threadId: string;
+    transferRecord: CustomerServiceTransferRecordDto;
+  },
+) {
+  mergeCustomerServiceTransferRecord(queryClient, input);
 }
 
 export function mergeCustomerServiceReadEvent(

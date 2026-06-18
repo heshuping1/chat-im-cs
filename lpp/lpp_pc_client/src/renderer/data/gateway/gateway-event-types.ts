@@ -1,5 +1,9 @@
 import type { NormalizedImMessage } from "../im-api-contract";
-import type { CustomerServiceThreadType, MessageItemDto } from "../api/types";
+import type {
+  CustomerServiceThreadType,
+  CustomerServiceTransferRecordDto,
+  MessageItemDto,
+} from "../api/types";
 import type { ImConversationType, ImIdentity } from "../im-read-model";
 
 export type GatewayEventKind =
@@ -92,6 +96,13 @@ export interface GatewayCustomerServiceThreadChangedEvent extends GatewayEventEn
   serviceStatus?: string;
   threadStatus?: string;
   shouldNotifyQueue?: boolean;
+  fromStaffDisplayName?: string;
+  fromStaffUserId?: string;
+  reason?: string;
+  toStaffDisplayName?: string;
+  toStaffUserId?: string;
+  transferRecord?: CustomerServiceTransferRecordDto | null;
+  transferredAt?: string;
 }
 
 export interface GatewayCustomerServiceTypingPreviewEvent extends GatewayEventEnvelope {

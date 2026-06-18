@@ -800,6 +800,10 @@ describe("settings catalog", () => {
       join(process.cwd(), "src/renderer/styles/settings/settings.css"),
       "utf8",
     );
+    const scrollbarBridgeSource = readFileSync(
+      join(process.cwd(), "src/renderer/styles/shared/scrollbar-theme-bridge.css"),
+      "utf8",
+    );
 
     expect(pageSource).toContain('className="settings-nav-header"');
     expect(pageSource).toContain('className="settings-nav-list"');
@@ -818,7 +822,16 @@ describe("settings catalog", () => {
       /\.settings-detail-card\s*\{[^}]*min-height:\s*0;[^}]*height:\s*calc\(100% - 14px\);[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\);/s,
     );
     expect(cssSource).toMatch(
-      /\.settings-detail-body\s*\{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*overflow-y:\s*auto;[^}]*scrollbar-gutter:\s*stable;/s,
+      /\.settings-page-v2 \.settings-nav-list\s*\{[^}]*overflow-y:\s*scroll;[^}]*scrollbar-gutter:\s*stable;/s,
+    );
+    expect(cssSource).toMatch(
+      /\.settings-detail-body\s*\{[^}]*min-height:\s*0;[^}]*align-content:\s*start;[^}]*overflow-y:\s*scroll;[^}]*scrollbar-gutter:\s*stable;/s,
+    );
+    expect(scrollbarBridgeSource).toMatch(
+      /\.app-shell \.settings-page-v2 \.settings-nav-list,\s*\.app-shell \.settings-page-v2 \.settings-detail-body,\s*\.app-shell \.diagnostics-records-log-view pre\s*\{[^}]*overflow-y:\s*scroll !important;[^}]*scrollbar-color:\s*transparent transparent !important;/s,
+    );
+    expect(scrollbarBridgeSource).toContain(
+      ".app-shell .settings-page-v2 .settings-detail-body.is-scrolling::-webkit-scrollbar-thumb",
     );
     expect(cssSource).not.toMatch(
       /\.settings-page-v2 \.settings-nav button\s*\{[^}]*min-height:/s,

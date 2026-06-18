@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Languages, Mail, Search, ShieldAlert, XCircle } from "lucide-react";
+import { ArrowRightLeft, Languages, Mail, NotebookText, Search, ShieldAlert, XCircle } from "lucide-react";
 import { ChannelBadge } from "../../components/ChannelBadge";
 import { PcAvatar } from "../../components/PcAvatar";
 import type { CustomerServiceIdentityViewModel } from "../../data/customer-service/cs-identity-view-model";
@@ -19,11 +19,13 @@ export function CustomerServiceWorkspaceHeader({
   autoTranslateMode,
   canClose,
   canTransfer,
+  transferMode = "transfer",
   unreadCount = 0,
   onCycleAutoTranslateMode,
   onCloseThread,
   onOpenLookup,
   onOpenTransfer,
+  onOpenTransferRemarks,
   onOpenCustomerContext,
 }: {
   identity: CustomerServiceIdentityViewModel;
@@ -39,10 +41,12 @@ export function CustomerServiceWorkspaceHeader({
   canClose?: boolean;
   unreadCount?: number;
   canTransfer?: boolean;
+  transferMode?: "assign" | "transfer";
   onCycleAutoTranslateMode: () => void;
   onCloseThread?: () => void;
   onOpenLookup: () => void;
   onOpenTransfer?: () => void;
+  onOpenTransferRemarks?: () => void;
   onOpenCustomerContext?: () => void;
 }) {
   const { t } = useI18n();
@@ -107,12 +111,12 @@ export function CustomerServiceWorkspaceHeader({
         <button
           type="button"
           disabled={!canTransfer || !onOpenTransfer}
-          aria-label={t("customerService.transfer.open")}
-          title={t("customerService.transfer.open")}
+          aria-label={t(transferMode === "assign" ? "customerService.transfer.assign.open" : "customerService.transfer.open")}
+          title={t(transferMode === "assign" ? "customerService.transfer.assign.open" : "customerService.transfer.open")}
           onClick={onOpenTransfer}
         >
           <ArrowRightLeft size={14} />
-          {t("customerService.transfer.openShort")}
+          {t(transferMode === "assign" ? "customerService.transfer.assignShort" : "customerService.transfer.openShort")}
         </button>
         <button
           type="button"
@@ -123,6 +127,16 @@ export function CustomerServiceWorkspaceHeader({
         >
           <XCircle size={14} />
           {t("common.close")}
+        </button>
+        <button
+          type="button"
+          disabled={!onOpenTransferRemarks}
+          aria-label={t("customerService.transferRemarks.open")}
+          title={t("customerService.transferRemarks.open")}
+          onClick={onOpenTransferRemarks}
+        >
+          <NotebookText size={14} />
+          {t("customerService.transferRemarks.openShort")}
         </button>
         <button
           type="button"

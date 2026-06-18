@@ -3,7 +3,6 @@ import type { MouseEvent } from "react";
 import { ChatMessageBubble } from "../../components/ChatMessageBubble";
 import type { MessageItemDto } from "../../data/api-client";
 import { createChatMessageViewModel } from "../../data/message/message-view-model";
-import { useI18n } from "../../i18n/useI18n";
 import { formatFullDateTime } from "../../lib/format";
 
 export function ServiceMessageBubble({
@@ -17,8 +16,8 @@ export function ServiceMessageBubble({
   onContextMenu,
   onAvatarClick,
   onUploadAction,
-  senderFallback,
   senderAvatarUrl,
+  senderFallbackName,
   translationText,
   threadType,
 }: {
@@ -35,13 +34,11 @@ export function ServiceMessageBubble({
   onContextMenu?: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
   onAvatarClick?: (event: MouseEvent<HTMLButtonElement>, message: MessageItemDto, mine: boolean) => void;
   onUploadAction?: (localTaskId: string, action: "pause" | "resume" | "cancel" | "retry") => void;
-  senderFallback: string;
   senderAvatarUrl?: string | null;
+  senderFallbackName?: string | null;
   translationText?: string;
   threadType?: string;
 }) {
-  const { t } = useI18n();
-  const fallbackSender = senderFallback || t("customerService.visitor");
   const timeText = formatFullDateTime(message.sentAt);
   const messageViewModel = createChatMessageViewModel({
     conversationFallbackName,
@@ -49,8 +46,10 @@ export function ServiceMessageBubble({
     message,
     mine,
     mineAvatarUrl,
+    mineSenderName: mine ? senderFallbackName : undefined,
     senderAvatarUrl,
-    senderFallback: fallbackSender,
+    senderFallback: "",
+    suppressMissingSenderNameFallback: true,
     timeText,
     translationText,
   });
@@ -68,7 +67,8 @@ export function ServiceMessageBubble({
       onContextMenu={onContextMenu}
       onAvatarClick={onAvatarClick}
       onUploadAction={onUploadAction}
-      senderFallback={fallbackSender}
+      senderFallback=""
+      showSenderName={Boolean(message.senderDisplayName)}
       timeText={timeText}
       translationText={translationText}
       viewModel={messageViewModel}

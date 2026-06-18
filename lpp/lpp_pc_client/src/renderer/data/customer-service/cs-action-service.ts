@@ -67,13 +67,13 @@ export async function executeCustomerServiceThreadAction({
 }: ExecuteCustomerServiceThreadActionInput) {
   if (action === "claim") {
     if (mode === "management") {
-      return client.claimCustomerServiceThreadAsManager(thread.threadType, thread.threadId);
+      throw new Error("Management claim is not supported. Assign the conversation to an agent instead.");
     }
     return client.claimCustomerServiceThread(thread.threadType, thread.threadId);
   }
   if (action === "takeover") {
     if (mode === "management") {
-      return client.takeoverCustomerServiceThreadAsManager(thread.threadType, thread.threadId);
+      throw new Error("Management takeover is not supported. Assign the conversation to an agent instead.");
     }
     return client.takeoverCustomerServiceThread(thread.threadType, thread.threadId);
   }

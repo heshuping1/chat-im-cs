@@ -255,7 +255,7 @@
   flex-direction: column;
   gap: 4px;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: scroll;
   padding-right: 2px;
   scrollbar-gutter: stable;
 }
@@ -398,7 +398,7 @@
   align-content: start;
   gap: 4px;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: scroll;
   padding: 8px 18px 14px;
   scrollbar-gutter: stable;
 }
@@ -1133,6 +1133,7 @@
   margin: 0;
   padding: 10px;
   overflow: auto;
+  overflow-y: scroll;
   border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: 8px;
   background: rgba(248, 250, 252, 0.88);

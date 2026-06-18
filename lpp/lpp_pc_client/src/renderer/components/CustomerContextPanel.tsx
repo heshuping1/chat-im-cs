@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { DragEvent, ReactNode } from "react";
 import {
+  ClipboardList,
   GripVertical,
   LibraryBig,
   MessageSquareText,
@@ -20,9 +21,11 @@ import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { canReadCustomerServiceHistory } from "../data/customer-service/cs-role-capabilities";
-import { useActiveThreadId } from "../data/workspace-ui/workspace-ui-store";
+import {
+  useActiveThreadId,
+  type ServiceAssistantPane,
+} from "../data/workspace-ui/workspace-ui-store";
 import { useI18n } from "../i18n/useI18n";
-import { CustomerServiceSessionNotesPanel } from "../customer-service/components/CustomerServiceSessionNotesPanel";
 import { CustomerProfileWorkspace } from "./CustomerProfileWorkspace";
 import { PcAvatar } from "./PcAvatar";
 
@@ -179,11 +182,6 @@ export function CustomerContextPanel({
       onDragOver={onDragOverContextPane}
       onDrop={(event) => onDropContextPane?.(event, "customer")}
       profile={profileForPanel}
-      profileActions={
-        normalizeCustomerServiceThreadType(selectedThread.threadType) === "temp_session"
-          ? <CustomerServiceSessionNotesPanel sessionId={selectedThread.threadId} />
-          : undefined
-      }
       title={t("customerService.contextPanel.title")}
     />
   );
@@ -195,10 +193,10 @@ export function CustomerContextRail({
   onToggleCustomerPane,
   onToggleAssistantPane,
 }: {
-  activeAssistantPane: "aiDraft" | "knowledge" | "quickReply" | null;
+  activeAssistantPane: ServiceAssistantPane;
   customerPaneCollapsed: boolean;
   onToggleCustomerPane: () => void;
-  onToggleAssistantPane: (pane: "aiDraft" | "knowledge" | "quickReply") => void;
+  onToggleAssistantPane: (pane: Exclude<ServiceAssistantPane, null>) => void;
 }) {
   const { t } = useI18n();
   const { selectedThread } = useCustomerContextPanelModel();
@@ -238,6 +236,13 @@ export function CustomerContextRail({
         className="service-customer-rail-actions"
         aria-label={t("customerService.contextPanel.toolsAria")}
       >
+        <CustomerContextRailButton
+          active={activeAssistantPane === "sessionInfo"}
+          label={t("customerService.contextPanel.sessionInfo")}
+          onClick={() => onToggleAssistantPane("sessionInfo")}
+        >
+          <ClipboardList size={18} />
+        </CustomerContextRailButton>
         <CustomerContextRailButton
           active={activeAssistantPane === "quickReply"}
           label={t("customerService.contextPanel.quickReply")}

@@ -38,6 +38,7 @@ import { customerServiceHistoryStatusKey } from "../../data/customer-service-dis
 import { pcQueryKeys } from "../../data/query-keys";
 import { applyCustomerServiceReadStatusToMessages } from "../../data/customer-service/cs-message-read-status";
 import { createCustomerServiceIdentityViewModel } from "../../data/customer-service/cs-identity-view-model";
+import { isCustomerServiceStaffSideMessage } from "../../data/customer-service/message-domain";
 import {
   createCustomerServiceStaffProfileViewModel,
   type CustomerServiceStaffProfileViewModel,
@@ -1075,7 +1076,7 @@ function MonitorWindow({
   detailQuery,
   expanded,
   focused,
-  layoutMode,
+  layoutMode: _layoutMode,
   onFocus,
   onDropThread,
   onManagementAction,
@@ -1144,7 +1145,6 @@ function MonitorWindow({
     fallbackName: threadCustomerName(thread, t),
     thread,
   });
-  const customerName = customerIdentity.displayName;
   const staffProfile = threadStaffProfile(
     monitorThreadForProfile(thread, detailData),
     staffItems,
@@ -1755,6 +1755,7 @@ function monitorThreadSearchText(
     thread.threadId,
     thread.conversationId,
     thread.source,
+    thread.sourcePlatform,
     thread.sourceChannel,
     thread.channel,
     thread.provider,
@@ -1845,7 +1846,15 @@ function threadCustomerName(thread: CustomerServiceThread, t: Translate) {
 
 function threadChannel(thread: CustomerServiceThread) {
   return (
-    usefulSourceLabel(channelLabel(thread.sourceChannel || thread.channel || thread.source || thread.provider)) ||
+    usefulSourceLabel(
+      channelLabel(
+        thread.sourcePlatform ||
+          thread.sourceChannel ||
+          thread.channel ||
+          thread.source ||
+          thread.provider,
+      ),
+    ) ||
     (thread.threadType === "temp_session" ? "Widget" : "IM Direct")
   );
 }
@@ -1906,13 +1915,6 @@ function isClosedMonitorThreadStatus(status: string | undefined) {
 
 function isMonitorHistoryThread(thread: CustomerServiceThread) {
   return Boolean(thread.historyItem) || isClosedMonitorThreadStatus(thread.status);
-}
-
-function threadStaffName(
-  thread: CustomerServiceThread,
-  staffItems: CustomerServiceStaffStatusDto[],
-) {
-  return threadStaffProfile(thread, staffItems).displayName;
 }
 
 function threadStaffProfile(
@@ -2200,26 +2202,16 @@ function sameStringList(left: string[], right: string[]) {
 }
 
 function isStaffMessage(message: MessageItemDto) {
-  const record = message as MessageItemDto & Record<string, unknown>;
-  const role = String(
-    record.senderRole ?? record.senderType ?? record.fromRole ?? record.role ?? "",
-  )
-    .trim()
-    .toLowerCase()
-    .replace(/-/g, "_");
-  if (
-    ["staff", "agent", "operator", "customer_service", "service_staff", "kefu"].some(
-      (item) => role.includes(item),
-    )
-  ) {
-    return true;
-  }
-  const direction = String(record.direction ?? record.messageDirection ?? "")
-    .trim()
-    .toLowerCase();
-  return ["out", "outbound", "sent", "send", "mine"].some((item) =>
-    direction.includes(item),
-  );
+  return isCustomerServiceStaffSideMessage({
+    direction: message.direction,
+    fromRole: message.fromRole,
+    isMine: message.isMine,
+    isSelf: message.isSelf,
+    messageType: message.messageType,
+    senderDisplayName: message.senderDisplayName,
+    senderRole: message.senderRole,
+    senderType: message.senderType,
+  });
 }
 
 function monitorMessageKey(message: MessageItemDto) {

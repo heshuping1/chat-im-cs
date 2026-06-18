@@ -115,6 +115,23 @@ describe("customer service workspace view model", () => {
     expect(vm.messages).toHaveLength(1);
   });
 
+  it("prefers sourcePlatform over sourceChannel for workspace source badges", () => {
+    const vm = createCustomerServiceWorkspaceViewModel({
+      detail: {
+        sourceChannel: "website",
+        sourcePlatform: "miniprogram",
+        status: "serving",
+      },
+      selectedThread: thread({
+        sourceChannel: "im_brand_inbound",
+        sourcePlatform: null,
+        status: "serving",
+      }),
+    });
+
+    expect(vm.source).toBe("miniprogram");
+  });
+
   it("keeps recalled customer-service messages invisible in the agent workspace", () => {
     const vm = createCustomerServiceWorkspaceViewModel({
       detail: {

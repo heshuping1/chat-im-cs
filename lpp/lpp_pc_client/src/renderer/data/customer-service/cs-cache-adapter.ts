@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import type {
   CustomerServiceThread,
+  CustomerServiceTransferRecordDto,
   MessageItemDto,
   StaffServiceHistoryItem,
 } from "../api/types";
@@ -365,6 +366,7 @@ export function mergeLoadedCustomerServiceThreadDetail(
     from?: string;
     channel?: string;
     sourceChannel?: string;
+    sourcePlatform?: string | null;
     entryChannel?: string;
     platform?: string;
     provider?: string;
@@ -792,7 +794,12 @@ export function markCustomerServiceThreadReopened(
 export function markCustomerServiceThreadTransferred(
   queryClient: QueryClient,
   thread: CustomerServiceThread,
-  result: { status?: string; transferred?: boolean; transferredAt?: string },
+  result: {
+    status?: string;
+    transferRecord?: CustomerServiceTransferRecordDto | null;
+    transferred?: boolean;
+    transferredAt?: string;
+  },
 ) {
   const status = transferredAwayStatus(result.status);
   const transferredAt = result.transferredAt || new Date().toISOString();
@@ -817,13 +824,28 @@ export function markCustomerServiceThreadTransferred(
       return changed ? { ...old, queueItems, activeItems } : old;
     },
   );
-  queryClient.setQueriesData<{ status?: string; messages?: MessageItemDto[] }>(
+  queryClient.setQueriesData<{
+    status?: string;
+    messages?: MessageItemDto[];
+    transferRecords?: CustomerServiceTransferRecordDto[];
+  }>(
     {
       predicate: (query) =>
         query.queryKey[0] === "pc-cs-thread-detail" &&
         query.queryKey.includes(thread.threadId),
     },
-    (old) => (old ? { ...old, status } : old),
+    (old) => old
+      ? {
+          ...old,
+          status,
+          transferRecords: result.transferRecord
+            ? upsertCustomerServiceTransferRecord(
+                old.transferRecords,
+                result.transferRecord,
+              )
+            : old.transferRecords,
+        }
+      : old,
   );
   clearCustomerServiceConversationUnread(thread.threadId);
   if (thread.conversationId && thread.conversationId !== thread.threadId) {
@@ -850,6 +872,45 @@ export function markCustomerServiceThreadTransferred(
       transferredAt,
     },
   });
+}
+
+export function mergeCustomerServiceTransferRecord(
+  queryClient: QueryClient,
+  input: {
+    threadId: string;
+    transferRecord: CustomerServiceTransferRecordDto;
+  },
+) {
+  queryClient.setQueriesData<{
+    transferRecords?: CustomerServiceTransferRecordDto[];
+  }>(
+    {
+      predicate: (query) =>
+        query.queryKey[0] === "pc-cs-thread-detail" &&
+        query.queryKey.includes(input.threadId),
+    },
+    (old) => old
+      ? {
+          ...old,
+          transferRecords: upsertCustomerServiceTransferRecord(
+            old.transferRecords,
+            input.transferRecord,
+          ),
+        }
+      : old,
+  );
+}
+
+function upsertCustomerServiceTransferRecord(
+  records: CustomerServiceTransferRecordDto[] | undefined,
+  record: CustomerServiceTransferRecordDto,
+) {
+  const current = records ?? [];
+  const index = current.findIndex((item) => item.recordId === record.recordId);
+  if (index < 0) return [...current, record];
+  return current.map((item, itemIndex) =>
+    itemIndex === index ? { ...item, ...record } : item,
+  );
 }
 
 function transferredAwayStatus(status?: string) {
@@ -1264,6 +1325,7 @@ function mergeThreadDetailIntoListItem(
     from?: string;
     channel?: string;
     sourceChannel?: string;
+    sourcePlatform?: string | null;
     entryChannel?: string;
     platform?: string;
     provider?: string;
@@ -1281,6 +1343,7 @@ function mergeThreadDetailIntoListItem(
     from: detail.from || item.from,
     channel: detail.channel || item.channel,
     sourceChannel: detail.sourceChannel || item.sourceChannel,
+    sourcePlatform: detail.sourcePlatform || item.sourcePlatform,
     entryChannel: detail.entryChannel || item.entryChannel,
     platform: detail.platform || item.platform,
     provider: detail.provider || item.provider,

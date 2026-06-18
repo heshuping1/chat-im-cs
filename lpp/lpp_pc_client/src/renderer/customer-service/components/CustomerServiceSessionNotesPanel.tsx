@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Pin, PinOff, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import type { CustomerServiceSessionNoteDto } from "../../data/api-client";
+import type { CustomerServiceSessionNoteViewModel } from "../../data/customer-service/cs-session-note-view-model";
+import { createCustomerServiceSessionNotesViewModel } from "../../data/customer-service/cs-session-note-view-model";
 import { useAuthSession } from "../../data/auth/auth-store";
 import { pcQueryKeys } from "../../data/query-keys";
 import { createApiClient } from "../../data/runtime";
@@ -15,8 +16,10 @@ import { PanelState } from "../../components/PanelState";
 const maxSessionNoteLength = 2000;
 
 export function CustomerServiceSessionNotesPanel({
+  embedded = false,
   sessionId,
 }: {
+  embedded?: boolean;
   sessionId: string;
 }) {
   const { t } = useI18n();
@@ -80,7 +83,7 @@ export function CustomerServiceSessionNotesPanel({
   });
 
   const pinMutation = useMutation({
-    mutationFn: async (note: CustomerServiceSessionNoteDto) => {
+    mutationFn: async (note: CustomerServiceSessionNoteViewModel) => {
       if (!client) throw new Error(t("auth.login"));
       return client.setTempSessionNotePinned(sessionId, note.noteId, !note.isPinned);
     },
@@ -96,7 +99,7 @@ export function CustomerServiceSessionNotesPanel({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (note: CustomerServiceSessionNoteDto) => {
+    mutationFn: async (note: CustomerServiceSessionNoteViewModel) => {
       if (!client) throw new Error(t("auth.login"));
       await client.deleteTempSessionNote(sessionId, note.noteId);
       return note;
@@ -112,14 +115,21 @@ export function CustomerServiceSessionNotesPanel({
     },
   });
 
-  const notes = notesQuery.data ?? [];
+  const notes = useMemo(
+    () =>
+      createCustomerServiceSessionNotesViewModel({
+        notes: notesQuery.data ?? [],
+        formatCreatedAt: formatMonthDayTime,
+      }),
+    [notesQuery.data],
+  );
   const pending =
     createMutation.isPending ||
     pinMutation.isPending ||
     deleteMutation.isPending;
 
   return (
-    <section className="customer-profile-block cs-session-notes-panel">
+    <section className={embedded ? "cs-session-notes-panel embedded" : "customer-profile-block cs-session-notes-panel"}>
       <header className="cs-session-notes-head">
         <h3>
           <span>
@@ -203,20 +213,18 @@ export function CustomerServiceSessionNotesPanel({
           {notes.map((note) => (
             <article
               className="cs-session-note-item"
+              data-contract-issues={note.contractIssues
+                .map((issue) => issue.code)
+                .join(" ")}
               data-pinned={Boolean(note.isPinned)}
               key={note.noteId}
             >
-              <header>
-                <strong>
-                  {note.staffDisplayName ||
-                    t("customerService.sessionNotes.unknownStaff")}
-                </strong>
-                <span>
-                  {note.createdAt
-                    ? formatMonthDayTime(note.createdAt)
-                    : t("customerService.sessionNotes.unknownTime")}
-                </span>
-              </header>
+              {(note.authorName || note.createdAtText) && (
+                <header>
+                  {note.authorName && <strong>{note.authorName}</strong>}
+                  {note.createdAtText && <span>{note.createdAtText}</span>}
+                </header>
+              )}
               <p>{note.content}</p>
               <footer>
                 <button

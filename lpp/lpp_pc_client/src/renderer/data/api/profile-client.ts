@@ -87,8 +87,9 @@ export class ProfileApiClient extends AuthApiClient {
     );
   }
 
-  getAccountDevices() {
-    return this.platformRequest<AccountDeviceDto[]>(endpointPlan.accountDevices);
+  async getAccountDevices() {
+    const response = await this.platformRequest<unknown>(endpointPlan.accountDevices);
+    return normalizeAccountDevicesResponse(response);
   }
 
   revokeAccountDevice(deviceId: string) {
@@ -309,4 +310,70 @@ export class ProfileApiClient extends AuthApiClient {
       `${endpointPlan.knowledgeSearch}?${search.toString()}`,
     ).then((payload) => ({ items: normalizeKnowledgeSearchResponse(payload) }));
   }
+}
+
+function normalizeAccountDevicesResponse(response: unknown): AccountDeviceDto[] {
+  const items = Array.isArray(response)
+    ? response
+    : isRecord(response) && Array.isArray(response.items)
+      ? response.items
+      : [];
+  return items.map(normalizeAccountDevice).filter((device): device is AccountDeviceDto =>
+    Boolean(device?.deviceId),
+  );
+}
+
+function normalizeAccountDevice(input: unknown): AccountDeviceDto | null {
+  if (!isRecord(input)) return null;
+  const deviceId = stringField(input, "deviceId", "device_id", "id");
+  if (!deviceId) return null;
+  return {
+    deviceId,
+    tenantId: stringField(input, "tenantId", "tenant_id") ?? null,
+    tenantName: stringField(input, "tenantName", "tenant_name") ?? null,
+    deviceName: stringField(input, "deviceName", "device_name", "name") ?? null,
+    deviceType: stringField(input, "deviceType", "device_type", "platform") ?? null,
+    lastActiveAt: stringField(input, "lastActiveAt", "last_active_at", "updatedAt", "updated_at") ?? null,
+    isCurrent: booleanField(input, "isCurrent", "is_current", "current"),
+    activeSessionCount: numberField(input, "activeSessionCount", "active_session_count", "sessionCount", "session_count"),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function stringField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
+function booleanField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value === 1;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["1", "true", "yes", "current"].includes(normalized)) return true;
+      if (["0", "false", "no"].includes(normalized)) return false;
+    }
+  }
+  return false;
+}
+
+function numberField(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return undefined;
 }

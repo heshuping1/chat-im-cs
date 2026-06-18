@@ -25,6 +25,7 @@ export interface CustomerServiceThreadEntity {
   from?: string;
   channel?: string;
   sourceChannel?: string;
+  sourcePlatform?: string | null;
   entryChannel?: string;
   platform?: string;
   provider?: string;
@@ -196,6 +197,7 @@ export function normalizeCustomerServiceThreadDto(
       from: stringField(record, "from"),
       channel: stringField(record, "channel"),
       sourceChannel: stringField(record, "sourceChannel", "source_channel"),
+      sourcePlatform: nullableStringField(record, "sourcePlatform", "source_platform"),
       entryChannel: stringField(record, "entryChannel", "entry_channel"),
       platform: stringField(record, "platform"),
       provider: stringField(record, "provider"),
@@ -247,6 +249,7 @@ export function customerServiceThreadEntityToDto(
     from: entity.from,
     channel: entity.channel,
     sourceChannel: entity.sourceChannel,
+    sourcePlatform: entity.sourcePlatform,
     entryChannel: entity.entryChannel,
     platform: entity.platform,
     provider: entity.provider,

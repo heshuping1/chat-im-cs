@@ -1,13 +1,19 @@
 import type { CSSProperties, MouseEvent, Ref } from "react";
 import { useEffect, useRef } from "react";
 
-import { PanelState } from "../../components/PanelState";
 import type { CustomerServiceThread } from "../../data/api-client";
 import type { MessageItemDto } from "../../data/api-client";
+import type { CustomerServiceTransferRecordViewModel } from "../../data/customer-service/cs-transfer-records";
 import {
   auditCustomerServiceMessage,
   customerServiceMessagePreviewKind,
 } from "../../data/customer-service/cs-message-audit-diagnostics";
+import {
+  isCustomerServiceStaffSideMessage,
+  isCustomerServiceSystemMessage,
+  resolveCustomerServiceMessageAvatarFallbackName,
+  resolveCustomerServiceMessageAvatarUrl,
+} from "../../data/customer-service/message-domain";
 import { useI18n } from "../../i18n/useI18n";
 import { formatFullDateTime } from "../../lib/format";
 import { chatMessageRenderKey } from "../../messages/models/messageRenderKey";
@@ -45,9 +51,11 @@ export function CustomerServiceMessageStage({
   messageStageState,
   pendingNewMessageCount,
   peerAvatarUrl,
+  resolveSenderAvatarUrl,
   selectedThread,
   stageRef,
   title,
+  transferRemarks = [],
   onContextMenu,
   onAvatarClick,
   onMenuAction,
@@ -67,9 +75,11 @@ export function CustomerServiceMessageStage({
   messageStageState?: TranslatedWorkspaceInlineState;
   pendingNewMessageCount: number;
   peerAvatarUrl?: string | null;
+  resolveSenderAvatarUrl?: (message: MessageItemDto) => string | null | undefined;
   selectedThread: CustomerServiceThread;
   stageRef: Ref<HTMLElement>;
   title: string;
+  transferRemarks?: CustomerServiceTransferRecordViewModel[];
   onContextMenu: (event: MouseEvent<HTMLElement>, message: MessageItemDto) => void;
   onAvatarClick?: (event: MouseEvent<HTMLButtonElement>, message: MessageItemDto, mine: boolean) => void;
   onMenuAction: (action: ServiceMessageContextAction, message: MessageItemDto) => void;
@@ -78,6 +88,10 @@ export function CustomerServiceMessageStage({
 }) {
   const { t } = useI18n();
   const renderedAuditKeysRef = useRef(new Set<string>());
+  const timelineItems = createCustomerServiceMessageTimelineItems({
+    messages,
+    transferRemarks,
+  });
   useEffect(() => {
     const duplicateMessageIds = countMessageValues(messages, (message) => message.messageId);
     const duplicateClientIds = countMessageValues(messages, customerServiceClientMessageId);
@@ -138,14 +152,40 @@ export function CustomerServiceMessageStage({
               {t("customerService.messageStage.newMessages", { count: pendingNewMessageCount })}
             </button>
           )}
-          {messageStageState && (
-            <PanelState text={messageStageState.text} tone={messageStageState.tone} />
-          )}
+          {messageStageState && <MessageStageInlineState state={messageStageState} />}
           {messageStageState?.kind !== "loading" &&
             messageStageState?.kind !== "error" &&
-            messages.map((message) => {
+            timelineItems.map((item) => {
+              if (item.kind === "transfer_remark") {
+                return (
+                  <div
+                    key={`transfer-remark:${item.record.recordId}`}
+                    className="cs-message-row system internal-transfer-remark"
+                    data-transfer-record-id={item.record.recordId}
+                  >
+                    <div className="cs-transfer-remark-event" role="note">
+                      <span>
+                        {t("customerService.transferRemarks.inlineLabel", {
+                          reason: item.record.reason,
+                        })}
+                      </span>
+                      {item.record.transferredAtText && (
+                        <time>{item.record.transferredAtText}</time>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              const message = item.message;
               const system = isSystemServiceMessage(message);
-              const mine = !system && isMineMessage(message);
+              const mine = !system && isCustomerServiceMineMessage(message, isMineMessage);
+              const senderAvatarUrl = resolveMessageAvatarUrl({
+                currentStaffAvatarUrl: mineAvatarUrl,
+                customerAvatarUrl: peerAvatarUrl,
+                message,
+                senderProfileAvatarUrl: resolveSenderAvatarUrl?.(message),
+              });
+              const senderFallbackName = resolveMessageAvatarFallbackName(message);
               const renderKey = chatMessageRenderKey(message);
               return (
                 <div
@@ -170,13 +210,13 @@ export function CustomerServiceMessageStage({
                         accountId,
                         conversationId: selectedThread.threadId || selectedThread.conversationId,
                       }}
-                      mineAvatarUrl={mineAvatarUrl}
                       conversationFallbackName={title || t("customerService.messageStage.customerFallback")}
-                      senderFallback={title}
                       onContextMenu={onContextMenu}
                       onAvatarClick={onAvatarClick}
                       onUploadAction={onUploadAction}
-                      senderAvatarUrl={!mine ? message.senderAvatarUrl || message.avatarUrl || peerAvatarUrl : undefined}
+                      senderFallbackName={senderFallbackName}
+                      senderAvatarUrl={!mine ? senderAvatarUrl : undefined}
+                      mineAvatarUrl={mine ? senderAvatarUrl : undefined}
                       threadType={selectedThread.threadType}
                     />
                   )}
@@ -189,7 +229,7 @@ export function CustomerServiceMessageStage({
       {messageMenu && (
         <ServiceMessageContextMenu
           canAiDraft={messageMenu.canAiDraft}
-          mine={isMineMessage(messageMenu.message)}
+          mine={isCustomerServiceMineMessage(messageMenu.message, isMineMessage)}
           message={messageMenu.message}
           onAction={(action) => onMenuAction(action, messageMenu.message)}
           position={{ x: messageMenu.x, y: messageMenu.y }}
@@ -199,14 +239,129 @@ export function CustomerServiceMessageStage({
   );
 }
 
+function resolveMessageAvatarUrl({
+  currentStaffAvatarUrl,
+  customerAvatarUrl,
+  message,
+  senderProfileAvatarUrl,
+}: {
+  currentStaffAvatarUrl?: string | null;
+  customerAvatarUrl?: string | null;
+  message: MessageItemDto;
+  senderProfileAvatarUrl?: string | null;
+}) {
+  return resolveCustomerServiceMessageAvatarUrl({
+    avatarUrl: message.avatarUrl,
+    currentStaffAvatarUrl,
+    customerAvatarUrl,
+    direction: message.direction,
+    fromRole: message.fromRole,
+    isMine: message.isMine,
+    isSelf: message.isSelf,
+    messageType: message.messageType,
+    senderAvatarUrl: message.senderAvatarUrl,
+    senderDisplayName: message.senderDisplayName,
+    senderProfileAvatarUrl,
+    senderRole: message.senderRole,
+    senderType: message.senderType,
+    staffAvatarUrl: message.staffAvatarUrl,
+  });
+}
+
+type CustomerServiceMessageTimelineItem =
+  | { kind: "message"; message: MessageItemDto; order: number; time: number }
+  | {
+      kind: "transfer_remark";
+      order: number;
+      record: CustomerServiceTransferRecordViewModel & { reason: string };
+      time: number;
+    };
+
+function createCustomerServiceMessageTimelineItems({
+  messages,
+  transferRemarks,
+}: {
+  messages: MessageItemDto[];
+  transferRemarks: CustomerServiceTransferRecordViewModel[];
+}): CustomerServiceMessageTimelineItem[] {
+  return [
+    ...messages.map((message, index) => ({
+      kind: "message" as const,
+      message,
+      order: index * 2,
+      time: timelineTime(message.sentAt),
+    })),
+    ...transferRemarks.flatMap((record, index) => {
+      if (!record.reason) return [];
+      return [{
+        kind: "transfer_remark" as const,
+        order: index * 2 + 1,
+        record: record as CustomerServiceTransferRecordViewModel & { reason: string },
+        time: timelineTime(record.transferredAt),
+      }];
+    }),
+  ].sort((left, right) => left.time - right.time || left.order - right.order);
+}
+
+function timelineTime(value?: string | null) {
+  const parsed = Date.parse(value ?? "");
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function resolveMessageAvatarFallbackName(message: MessageItemDto) {
+  return resolveCustomerServiceMessageAvatarFallbackName({
+    direction: message.direction,
+    fromRole: message.fromRole,
+    isMine: message.isMine,
+    isSelf: message.isSelf,
+    messageType: message.messageType,
+    senderDisplayName: message.senderDisplayName,
+    senderRole: message.senderRole,
+    senderType: message.senderType,
+  });
+}
+
 function isSystemServiceMessage(message: MessageItemDto) {
-  const type = String(message.messageType ?? "").trim().toLowerCase();
-  const direction = String(message.direction ?? "").trim().toLowerCase();
+  return isCustomerServiceSystemMessage({
+    direction: message.direction,
+    fromRole: message.fromRole,
+    messageType: message.messageType,
+    senderDisplayName: message.senderDisplayName,
+    senderRole: message.senderRole,
+    senderType: message.senderType,
+  });
+}
+
+function MessageStageInlineState({
+  state,
+}: {
+  state: TranslatedWorkspaceInlineState;
+}) {
   return (
-    direction === "system" ||
-    type === "event" ||
-    type === "system" ||
-    type === "notice"
+    <div
+      className={`cs-message-stage-inline-state ${state.tone}`}
+      role={state.kind === "error" ? "alert" : "status"}
+    >
+      {state.text}
+    </div>
+  );
+}
+
+function isCustomerServiceMineMessage(
+  message: MessageItemDto,
+  fallback: (message: MessageItemDto) => boolean,
+) {
+  return (
+    isCustomerServiceStaffSideMessage({
+      direction: message.direction,
+      fromRole: message.fromRole,
+      isMine: message.isMine,
+      isSelf: message.isSelf,
+      messageType: message.messageType,
+      senderDisplayName: message.senderDisplayName,
+      senderRole: message.senderRole,
+      senderType: message.senderType,
+    }) || fallback(message)
   );
 }
 

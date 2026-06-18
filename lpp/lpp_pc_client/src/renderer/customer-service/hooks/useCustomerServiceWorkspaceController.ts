@@ -14,10 +14,6 @@ import {
 } from "../../data/customer-service/cs-cache-adapter";
 import {
   canReadCustomerServiceHistory,
-  canSuperviseCustomerServiceClose,
-  canSuperviseCustomerServiceTransfer,
-  canUseCustomerServiceManagementReadonly,
-  canUseCustomerServiceStaffEndpoints,
 } from "../../data/customer-service/cs-role-capabilities";
 import {
   listLocalCustomerServiceThreadSnapshots,
@@ -34,6 +30,10 @@ import {
   mergeCustomerServiceThreadDetailReadStatus,
 } from "../../data/customer-service/cs-message-read-status";
 import { createCustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
+import {
+  isCustomerServiceThreadActionEnabled,
+  resolveCustomerServiceThreadActionPolicy,
+} from "../../data/customer-service/cs-thread-action-policy";
 import {
   createCustomerServiceWorkspaceViewModel,
   isCustomerServiceThreadAssignedAwayFromCurrentStaff,
@@ -70,11 +70,7 @@ export function useCustomerServiceWorkspaceController({
     [session],
   );
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken] as const;
-  const canUseStaffEndpoints = canUseCustomerServiceStaffEndpoints(session);
-  const canUseManagementActions = canUseCustomerServiceManagementReadonly(session);
   const canReadHistory = canReadCustomerServiceHistory(session);
-  const canSuperviseClose = canSuperviseCustomerServiceClose(session);
-  const canSuperviseTransfer = canSuperviseCustomerServiceTransfer(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -270,25 +266,20 @@ export function useCustomerServiceWorkspaceController({
   const threadActionMutation = useMutation({
     mutationFn: async (action: CustomerServiceThreadAction) => {
       if (!client || !selectedThread) throw new Error("Select a customer service conversation.");
-      if (action === "close") {
-        if (!canUseStaffEndpoints && !canSuperviseClose) {
-          throw new Error("Only customer service staff, administrators, or owners can close this conversation.");
-        }
-      } else if (!canUseStaffEndpoints && !canUseManagementActions) {
-        throw new Error("Only customer service staff, administrators, or owners can perform this action.");
+      const actionPolicy = resolveCustomerServiceThreadActionPolicy({
+        hasThread: true,
+        session,
+        state: createCustomerServiceThreadState(selectedThread.status),
+      });
+      if (!isCustomerServiceThreadActionEnabled(actionPolicy, action)) {
+        throw new Error(action === "close"
+          ? "Only customer service staff, administrators, or owners can close this conversation."
+          : "Only customer service staff can perform this action.");
       }
-      const managementAction =
-        !canUseStaffEndpoints &&
-        canUseManagementActions &&
-        (action === "claim" || action === "takeover");
       return executeCustomerServiceThreadAction({
         action,
         client,
-        mode:
-          managementAction ||
-          (action === "close" && !canUseStaffEndpoints && canSuperviseClose)
-            ? "management"
-            : "staff",
+        mode: action === "close" ? actionPolicy.close.mode ?? "staff" : "staff",
         thread: selectedThread,
       });
     },
@@ -303,19 +294,24 @@ export function useCustomerServiceWorkspaceController({
       await invalidateCustomerServiceQueries(queryClient);
     },
     onError: (error) => {
-      setNotice(formatError(error));
+      setNotice(formatCustomerServiceActionError(error));
       void invalidateCustomerServiceQueries(queryClient);
     },
   });
   const transferThreadMutation = useMutation({
     mutationFn: async (payload: CustomerServiceThreadTransferPayload) => {
       if (!client || !selectedThread) throw new Error("Select a customer service conversation.");
-      if (!canUseStaffEndpoints && !canSuperviseTransfer) {
+      const actionPolicy = resolveCustomerServiceThreadActionPolicy({
+        hasThread: true,
+        session,
+        state: createCustomerServiceThreadState(selectedThread.status),
+      });
+      if (!actionPolicy.transferDialog.enabled) {
         throw new Error("Only customer service staff, administrators, or owners can transfer this conversation.");
       }
       return executeCustomerServiceThreadTransfer({
         client,
-        mode: !canUseStaffEndpoints && canSuperviseTransfer ? "management" : "staff",
+        mode: actionPolicy.transferDialog.mode === "assign" ? "management" : "staff",
         payload,
         thread: selectedThread,
       });
@@ -328,7 +324,7 @@ export function useCustomerServiceWorkspaceController({
       await invalidateCustomerServiceQueries(queryClient);
     },
     onError: (error) => {
-      setNotice(formatError(error));
+      setNotice(formatCustomerServiceActionError(error));
       void invalidateCustomerServiceQueries(queryClient);
     },
   });
@@ -341,8 +337,6 @@ export function useCustomerServiceWorkspaceController({
     selectedThread,
     selectableThreads,
     session,
-    canUseManagementActions,
-    canUseStaffEndpoints,
     threadActionMutation,
     typingPreview: typingPreviewQuery.data ?? null,
     transferTargetsQuery,
@@ -356,4 +350,16 @@ function actionSuccessText(action: CustomerServiceThreadAction) {
   if (action === "claim") return "Conversation claimed.";
   if (action === "takeover") return "Conversation taken over.";
   return "Conversation closed.";
+}
+
+function formatCustomerServiceActionError(error: unknown) {
+  if (apiErrorCode(error) === "TEMP_SESSION_STAFF_NOT_FOUND") {
+    return "当前账号不是客服坐席，不能直接接入会话。请指派给在线客服。";
+  }
+  return formatError(error);
+}
+
+function apiErrorCode(error: unknown) {
+  const value = error && typeof error === "object" ? (error as { code?: unknown }) : null;
+  return typeof value?.code === "string" ? value.code : undefined;
 }

@@ -10,6 +10,7 @@ export function CustomerServiceTransferDialog({
   disabled,
   errorText,
   loading,
+  mode = "transfer",
   reason,
   selectedTargetId,
   targets,
@@ -23,6 +24,7 @@ export function CustomerServiceTransferDialog({
   disabled?: boolean;
   errorText?: string | null;
   loading?: boolean;
+  mode?: "assign" | "transfer";
   reason: string;
   selectedTargetId: string;
   targets: CustomerServiceTransferTarget[];
@@ -34,6 +36,7 @@ export function CustomerServiceTransferDialog({
 }) {
   const { t } = useI18n();
   const [keyword, setKeyword] = useState("");
+  const copyPrefix = mode === "assign" ? "customerService.transfer.assign" : "customerService.transfer";
   const filteredTargets = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
     if (!normalized) return targets;
@@ -61,8 +64,8 @@ export function CustomerServiceTransferDialog({
             <UserRoundCheck size={22} />
           </span>
           <div>
-            <h3 id="cs-transfer-title">{t("customerService.transfer.title")}</h3>
-            <p>{t("customerService.transfer.detail", { customer: threadTitle })}</p>
+            <h3 id="cs-transfer-title">{t(`${copyPrefix}.title`)}</h3>
+            <p>{t(`${copyPrefix}.detail`, { customer: threadTitle })}</p>
             {currentStaffName && (
               <div className="cs-transfer-current-staff">
                 <span>{t("customerService.transfer.currentStaff")}</span>
@@ -76,20 +79,20 @@ export function CustomerServiceTransferDialog({
           <Search size={16} />
           <input
             value={keyword}
-            placeholder={t("customerService.transfer.searchPlaceholder")}
+            placeholder={t(`${copyPrefix}.searchPlaceholder`)}
             onChange={(event) => setKeyword(event.target.value)}
           />
         </label>
 
         <div className="cs-transfer-target-list" role="listbox">
           {loading && (
-            <p className="cs-transfer-empty">{t("customerService.transfer.loading")}</p>
+            <p className="cs-transfer-empty">{t(`${copyPrefix}.loading`)}</p>
           )}
           {!loading && errorText && (
             <p className="cs-transfer-empty error">{errorText}</p>
           )}
           {!loading && !errorText && filteredTargets.length === 0 && (
-            <p className="cs-transfer-empty">{t("customerService.transfer.empty")}</p>
+            <p className="cs-transfer-empty">{t(`${copyPrefix}.empty`)}</p>
           )}
           {!loading && !errorText && filteredTargets.map((target) => (
             <button
@@ -114,11 +117,11 @@ export function CustomerServiceTransferDialog({
         </div>
 
         <label className="cs-transfer-reason">
-          <span>{t("customerService.transfer.reasonLabel")}</span>
+          <span>{t(`${copyPrefix}.reasonLabel`)}</span>
           <textarea
             value={reason}
             maxLength={120}
-            placeholder={t("customerService.transfer.reasonPlaceholder")}
+            placeholder={t(`${copyPrefix}.reasonPlaceholder`)}
             onChange={(event) => onReasonChange(event.target.value)}
           />
         </label>
@@ -134,8 +137,8 @@ export function CustomerServiceTransferDialog({
             onClick={onConfirm}
           >
             {disabled
-              ? t("customerService.transfer.transferring")
-              : t("customerService.transfer.confirm")}
+              ? t(`${copyPrefix}.transferring`)
+              : t(`${copyPrefix}.confirm`)}
           </button>
         </footer>
       </section>

@@ -22,14 +22,26 @@ describe("customer-service message avatars", () => {
     "utf8",
   );
 
-  it("passes the current staff avatar into online-service outgoing bubbles", () => {
+  it("passes domain-resolved avatars into online-service customer-service bubbles", () => {
     expect(chatWorkspaceSource).toContain("mineAvatarUrl={session?.avatarUrl}");
     expect(chatWorkspaceSource).toContain("peerAvatarUrl={selectedThread.customerAvatarUrl || selectedThread.avatarUrl}");
+    expect(chatWorkspaceSource).toContain("customerServiceStaffSenderProfileTargetIds");
+    expect(chatWorkspaceSource).toContain("getTenantMemberProfile(userId)");
+    expect(chatWorkspaceSource).toContain("buildUserAvatarRegistry");
+    expect(chatWorkspaceSource).toContain("resolveSenderAvatarUrl={resolveServiceSenderAvatarUrl}");
     expect(messageStageSource).toContain("mineAvatarUrl?: string | null");
-    expect(messageStageSource).toContain("mineAvatarUrl={mineAvatarUrl}");
+    expect(messageStageSource).toContain("resolveCustomerServiceMessageAvatarUrl");
+    expect(messageStageSource).toContain("resolveCustomerServiceMessageAvatarFallbackName");
+    expect(messageStageSource).toContain("currentStaffAvatarUrl: mineAvatarUrl");
+    expect(messageStageSource).toContain("senderProfileAvatarUrl: resolveSenderAvatarUrl?.(message)");
+    expect(messageStageSource).toContain("staffAvatarUrl: message.staffAvatarUrl");
+    expect(messageStageSource).toContain("senderFallbackName={senderFallbackName}");
+    expect(messageStageSource).toContain("mineAvatarUrl={mine ? senderAvatarUrl : undefined}");
     expect(messageStageSource).toContain("peerAvatarUrl?: string | null");
-    expect(messageStageSource).toContain("message.senderAvatarUrl || message.avatarUrl || peerAvatarUrl");
+    expect(messageStageSource).toContain("senderAvatarUrl={!mine ? senderAvatarUrl : undefined}");
     expect(serviceMessageBubbleSource).toContain("mineAvatarUrl?: string | null");
+    expect(serviceMessageBubbleSource).toContain("senderFallbackName?: string | null");
+    expect(serviceMessageBubbleSource).toContain("mineSenderName: mine ? senderFallbackName : undefined");
     expect(serviceMessageBubbleSource).toContain("mineAvatarUrl,");
     expect(serviceMessageBubbleSource).toContain("mineAvatarUrl={mineAvatarUrl}");
   });

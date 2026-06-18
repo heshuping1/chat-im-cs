@@ -97,7 +97,7 @@ export type ServiceLayoutMode =
   | 'no-sidebar'
   | 'queue-focus'
   | 'chat-focus';
-export type ServiceAssistantPane = 'aiDraft' | 'knowledge' | 'quickReply' | null;
+export type ServiceAssistantPane = 'aiDraft' | 'knowledge' | 'quickReply' | 'sessionInfo' | null;
 export type CustomerServiceThreadOpenSource = 'none' | 'auto' | 'user' | 'reminder' | 'claim';
 export type GatewayRealtimeStatus =
   | 'idle'
@@ -140,7 +140,8 @@ function readStoredServiceLayout(): StoredServiceLayout {
       assistantPane:
         parsed.assistantPane === 'aiDraft' ||
         parsed.assistantPane === 'knowledge' ||
-        parsed.assistantPane === 'quickReply'
+        parsed.assistantPane === 'quickReply' ||
+        parsed.assistantPane === 'sessionInfo'
           ? parsed.assistantPane
           : null,
       assistantPaneWidth:

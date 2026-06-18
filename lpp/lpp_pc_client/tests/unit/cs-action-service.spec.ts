@@ -48,7 +48,7 @@ describe("executeCustomerServiceThreadAction", () => {
     expect(client.closeCustomerServiceThread).not.toHaveBeenCalled();
   });
 
-  it("routes management claim and takeover to admin access clients", async () => {
+  it("rejects management claim and takeover because managers should assign instead", async () => {
     const client: CustomerServiceThreadActionClient = {
       assignCustomerServiceThread: vi.fn(async () => ({ assignedStaffUserId: "staff-2" })),
       claimCustomerServiceThread: vi.fn(async () => ({ status: "serving" })),
@@ -61,11 +61,15 @@ describe("executeCustomerServiceThreadAction", () => {
     };
     const thread = { threadId: "thread-1", threadType: "temp_session" as const };
 
-    await executeCustomerServiceThreadAction({ action: "claim", client, mode: "management", thread });
-    await executeCustomerServiceThreadAction({ action: "takeover", client, mode: "management", thread });
+    await expect(
+      executeCustomerServiceThreadAction({ action: "claim", client, mode: "management", thread }),
+    ).rejects.toThrow("Management claim is not supported");
+    await expect(
+      executeCustomerServiceThreadAction({ action: "takeover", client, mode: "management", thread }),
+    ).rejects.toThrow("Management takeover is not supported");
 
-    expect(client.claimCustomerServiceThreadAsManager).toHaveBeenCalledWith("temp_session", "thread-1");
-    expect(client.takeoverCustomerServiceThreadAsManager).toHaveBeenCalledWith("temp_session", "thread-1");
+    expect(client.claimCustomerServiceThreadAsManager).not.toHaveBeenCalled();
+    expect(client.takeoverCustomerServiceThreadAsManager).not.toHaveBeenCalled();
     expect(client.assignCustomerServiceThread).not.toHaveBeenCalled();
     expect(client.claimCustomerServiceThread).not.toHaveBeenCalled();
     expect(client.takeoverCustomerServiceThread).not.toHaveBeenCalled();

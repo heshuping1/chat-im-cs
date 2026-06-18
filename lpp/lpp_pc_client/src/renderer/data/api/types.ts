@@ -752,6 +752,9 @@ export interface MessageItemDto {
   senderUserId?: string;
   senderId?: string;
   fromUserId?: string;
+  senderRole?: string;
+  senderType?: string;
+  fromRole?: string;
   senderPlatformUserId?: string;
   platformUserId?: string;
   senderLppId?: string;
@@ -759,6 +762,11 @@ export interface MessageItemDto {
   senderDisplayName?: string;
   senderAvatarUrl?: string | null;
   avatarUrl?: string | null;
+  staffAvatarUrl?: string | null;
+  staffDisplayName?: string | null;
+  staffName?: string | null;
+  staffUserId?: string | null;
+  serviceStaffUserId?: string | null;
   messageType?: string;
   body?: Record<string, unknown>;
   preview?: string;
@@ -833,6 +841,7 @@ export interface CustomerServiceThread {
   from?: string;
   channel?: string;
   sourceChannel?: string;
+  sourcePlatform?: string | null;
   entryChannel?: string;
   platform?: string;
   provider?: string;
@@ -859,6 +868,7 @@ export interface CustomerServiceThread {
   unreadCount?: number;
   accessMode?: "workbench" | "management_readonly";
   readStatus?: CustomerServiceReadStatusDto | null;
+  transferRecords?: CustomerServiceTransferRecordDto[];
   historyItem?: StaffServiceHistoryItem & Record<string, unknown>;
 }
 
@@ -866,6 +876,19 @@ export interface CustomerServiceThreadsResponse {
   queueItems: CustomerServiceThread[];
   activeItems: CustomerServiceThread[];
   summary?: WorkbenchSummary;
+}
+
+export interface CustomerServiceTransferRecordDto {
+  recordId: string;
+  threadType?: CustomerServiceThreadType;
+  threadId?: string;
+  conversationId?: string | null;
+  fromStaffUserId?: string | null;
+  fromStaffDisplayName?: string | null;
+  toStaffUserId?: string | null;
+  toStaffDisplayName?: string | null;
+  reason?: string | null;
+  transferredAt?: string | null;
 }
 
 export interface CustomerServiceSessionNoteDto {

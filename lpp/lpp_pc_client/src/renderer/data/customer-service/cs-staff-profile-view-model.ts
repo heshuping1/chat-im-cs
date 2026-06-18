@@ -3,6 +3,7 @@ import type {
   CustomerServiceThread,
   MessageItemDto,
 } from "../api/types";
+import { isCustomerServiceStaffSideMessage } from "./message-domain";
 
 export interface CustomerServiceStaffProfileViewModel {
   activeSessionCount?: number | null;
@@ -96,24 +97,16 @@ function latestStaffMessageProfile(messages: MessageItemDto[]) {
 }
 
 function isStaffMessage(message: MessageItemDto) {
-  const record = message as MessageItemDto & Record<string, unknown>;
-  const role = String(
-    record.senderRole ?? record.senderType ?? record.fromRole ?? record.role ?? "",
-  )
-    .trim()
-    .toLowerCase()
-    .replace(/-/g, "_");
-  return (
-    ["staff", "agent", "operator", "customer_service", "service_staff", "kefu"].some(
-      (item) => role.includes(item),
-    ) ||
-    ["out", "outbound", "sent", "send", "mine"].some((item) =>
-      String(record.direction ?? record.messageDirection ?? "")
-        .trim()
-        .toLowerCase()
-        .includes(item),
-    )
-  );
+  return isCustomerServiceStaffSideMessage({
+    direction: message.direction,
+    fromRole: message.fromRole,
+    isMine: message.isMine,
+    isSelf: message.isSelf,
+    messageType: message.messageType,
+    senderDisplayName: message.senderDisplayName,
+    senderRole: message.senderRole,
+    senderType: message.senderType,
+  });
 }
 
 function readStringField(record: Record<string, unknown>, keys: string[]) {

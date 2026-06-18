@@ -177,6 +177,33 @@ describe("media materialization", () => {
     );
   });
 
+  it("does not register a materialized media url when desktop cache reports failure", async () => {
+    vi.mocked(window.desktopApi?.cacheMediaFile).mockResolvedValueOnce({
+      errorMessage: "media asset is not accessible",
+      filePath: "",
+      fileUrl: "",
+      status: "failed",
+    });
+
+    await materializeReceivedMediaMessage({
+      accountId: "staff-1",
+      assetBaseUrl: "https://api.example.test",
+      authToken: "tenant-token",
+      conversationId: "direct-1",
+      message: mediaMessage("image", {
+        image: {
+          fileName: "photo.png",
+          mediaId: "media-1",
+          signedUrl: "/media/media-1?sig=expired",
+        },
+      }, "image-failed"),
+    });
+
+    expect(getPrefetchedImageFileUrl("image:media:media-1")).toBeUndefined();
+    expect(getMaterializedMediaFileUrl("image:media:media-1")).toBeUndefined();
+    expect(window.desktopApi?.localDataUpsertMedia).not.toHaveBeenCalled();
+  });
+
   it("links received messages to an existing local media variant without refetching", async () => {
     vi.mocked(window.desktopApi?.localDataGetMediaVariant).mockResolvedValueOnce({
       fileUrl: "file:///cache/images/existing.png",

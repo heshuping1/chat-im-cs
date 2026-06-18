@@ -4,6 +4,10 @@ const cacheLocalMediaFile = vi.fn(async () => ({
   filePath: "/app-cache/clip.mp4",
   fileUrl: "file:///app-cache/clip.mp4",
 }));
+const ensureLocalMediaFile = vi.fn(async () => ({
+  filePath: "/app-cache/remote.png",
+  fileUrl: "file:///app-cache/remote.png",
+}));
 
 const fileSystemMocks = vi.hoisted(() => ({
   copyFile: vi.fn(),
@@ -34,7 +38,7 @@ vi.mock("../../src/main/media-storage", () => ({
   assertAllowedLocalMediaFilePath: vi.fn((path: string) => path),
   cacheLocalMediaFile,
   cacheMediaPosterFile: vi.fn(),
-  ensureLocalMediaFile: vi.fn(),
+  ensureLocalMediaFile,
   getLocalMediaStatus: vi.fn(),
   readLocalOrRemoteImageBuffer: vi.fn(),
 }));
@@ -44,6 +48,61 @@ vi.mock("../../src/main/video-player-window", () => ({
 }));
 
 describe("desktop file handlers", () => {
+  it("returns a failed cache result for background media cache misses without rejecting IPC", async () => {
+    ensureLocalMediaFile.mockRejectedValueOnce(new Error("media asset is not accessible"));
+    const { registerDesktopFileHandlers } = await import("../../src/main/desktop-file-handlers");
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+
+    registerDesktopFileHandlers({
+      appIconPath: "/app/icon.ico",
+      preloadPath: "/app/preload.cjs",
+      register: (method, handler) => {
+        handlers.set(method, handler as (...args: unknown[]) => unknown);
+      },
+    });
+
+    await expect(
+      handlers.get("cacheMediaFile")?.(
+        {},
+        {
+          fileName: "remote.png",
+          kind: "image",
+          url: "https://cdn.example.test/missing.png",
+        },
+      ),
+    ).resolves.toEqual({
+      errorMessage: "media asset is not accessible",
+      filePath: "",
+      fileUrl: "",
+      status: "failed",
+    });
+  });
+
+  it("keeps explicit media open actions rejectable when media cache fails", async () => {
+    ensureLocalMediaFile.mockRejectedValueOnce(new Error("media asset is not accessible"));
+    const { registerDesktopFileHandlers } = await import("../../src/main/desktop-file-handlers");
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+
+    registerDesktopFileHandlers({
+      appIconPath: "/app/icon.ico",
+      preloadPath: "/app/preload.cjs",
+      register: (method, handler) => {
+        handlers.set(method, handler as (...args: unknown[]) => unknown);
+      },
+    });
+
+    await expect(
+      handlers.get("openMediaFile")?.(
+        {},
+        {
+          fileName: "remote.png",
+          kind: "image",
+          url: "https://cdn.example.test/missing.png",
+        },
+      ),
+    ).rejects.toThrow("media asset is not accessible");
+  });
+
   it("passes the preload-derived source path through the local media cache handler", async () => {
     const { registerDesktopFileHandlers } = await import("../../src/main/desktop-file-handlers");
     const handlers = new Map<string, (...args: unknown[]) => unknown>();

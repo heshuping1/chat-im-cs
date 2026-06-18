@@ -110,6 +110,31 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(event.message.preview).toBe("gateway top-level text");
   });
 
+  it("preserves staff sender metadata from customer service gateway messages", () => {
+    const event = adaptCustomerServiceGatewayEvent({
+      eventName: "customer_service.message.new",
+      receivedAt: 15,
+      args: [
+        {
+          threadId: "thread-transfer-message",
+          threadType: "temp_session",
+          messageId: "m-transfer-message",
+          messageType: "text",
+        body: { text: "transferred to Customer Service 10" },
+          senderRole: "staff_reply",
+          senderDisplayName: "Customer Service 10",
+          staffDisplayName: "瀹㈡湇10",
+        },
+      ],
+    });
+
+    expect(event.kind).toBe("cs.message.received");
+    if (event.kind !== "cs.message.received") return;
+    expect(event.message.senderDisplayName).toBe("Customer Service 10");
+    expect(event.message.senderRole).toBe("staff_reply");
+    expect(event.message.staffDisplayName).toBe("瀹㈡湇10");
+  });
+
   it("adapts queue and status events as thread changes", () => {
     const queueEvent = adaptCustomerServiceGatewayEvent({
       eventName: "customer_service.queue.created",
@@ -158,7 +183,9 @@ describe("adaptCustomerServiceGatewayEvent", () => {
       receivedAt: 9,
       args: [
         {
+          fromStaffUserId: "staff-1",
           assignedStaffUserId: "staff-2",
+          reason: "needs senior support",
           sessionId: "temp-session-transferred-1",
           status: "transferred_out",
           transferredAt: "2026-06-12T10:00:00.000Z",
@@ -171,15 +198,28 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(tempSessionEvent.changeKind).toBe("thread_transferred");
     expect(tempSessionEvent.threadId).toBe("temp-session-transferred-1");
     expect(tempSessionEvent.threadStatus).toBe("transferred_out");
+    expect(tempSessionEvent.reason).toBe("needs senior support");
+    expect(tempSessionEvent.fromStaffUserId).toBe("staff-1");
+    expect(tempSessionEvent.toStaffUserId).toBe("staff-2");
+    expect(tempSessionEvent.transferredAt).toBe("2026-06-12T10:00:00.000Z");
+    expect(tempSessionEvent.transferRecord).toMatchObject({
+      fromStaffUserId: "staff-1",
+      reason: "needs senior support",
+      threadId: "temp-session-transferred-1",
+      toStaffUserId: "staff-2",
+      transferredAt: "2026-06-12T10:00:00.000Z",
+    });
 
     const directEvent = adaptCustomerServiceGatewayEvent({
       eventName: "customer_service.thread.transferred",
       receivedAt: 10,
       args: [
         {
-          assignedStaffUserId: "staff-2",
+          fromStaffUserId: "staff-1",
+          reason: "handoff note",
           threadId: "direct-transferred-1",
           threadType: "im_direct",
+          toStaffUserId: "staff-2",
           status: "assigned_away",
         },
       ],
@@ -191,6 +231,13 @@ describe("adaptCustomerServiceGatewayEvent", () => {
     expect(directEvent.threadId).toBe("direct-transferred-1");
     expect(directEvent.threadStatus).toBe("assigned_away");
     expect(directEvent.threadType).toBe("im_direct");
+    expect(directEvent.transferRecord).toMatchObject({
+      fromStaffUserId: "staff-1",
+      reason: "handoff note",
+      threadId: "direct-transferred-1",
+      threadType: "im_direct",
+      toStaffUserId: "staff-2",
+    });
   });
 
   it("adapts temp-session reopened events for continue-chat state recovery", () => {

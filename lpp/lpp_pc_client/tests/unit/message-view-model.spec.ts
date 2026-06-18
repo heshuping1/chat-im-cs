@@ -193,6 +193,59 @@ describe("message view model", () => {
     });
   });
 
+  it("prefers explicit sender display name over a customer-service fallback", () => {
+    const message = {
+      body: { text: "handoff notice" },
+      direction: "in",
+      isMine: false,
+      messageId: "m-cs-staff-sender",
+      messageType: "text",
+      senderDisplayName: "客服10",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "访客",
+        conversationType: "temp_session",
+        message,
+        mine: false,
+        senderFallback: "访客",
+        timeText: "17:20",
+      }),
+    ).toMatchObject({
+      sender: {
+        name: "客服10",
+      },
+    });
+  });
+
+  it("can suppress customer-service sender fallback when API sender name is missing", () => {
+    const message = {
+      body: { text: "handoff notice" },
+      direction: "in",
+      isMine: false,
+      messageId: "m-cs-missing-sender",
+      messageType: "text",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Visitor",
+        conversationType: "temp_session",
+        message,
+        mine: false,
+        senderFallback: "Visitor",
+        suppressMissingSenderNameFallback: true,
+        timeText: "17:20",
+      }),
+    ).toMatchObject({
+      sender: {
+        name: "",
+        fallbackName: "",
+      },
+    });
+  });
+
   it("exposes clickable group read receipt status for sent own group messages", () => {
     const message = {
       body: { text: "hello" },
@@ -496,6 +549,33 @@ describe("message view model", () => {
     ).toMatchObject({
       sender: {
         avatarUrl: "current.png",
+      },
+    });
+  });
+
+  it("allows customer-service mine-side bubbles to use API sender names for avatar fallback", () => {
+    const message = {
+      messageId: "cs-staff-transfer-1",
+      senderDisplayName: "mouse客服123",
+      senderRole: "staff_reply",
+    } as MessageItemDto;
+
+    expect(
+      createChatMessageViewModel({
+        conversationFallbackName: "Visitor",
+        conversationType: "temp_session",
+        message,
+        mine: true,
+        mineSenderName: "mouse客服123",
+        senderFallback: "",
+        suppressMissingSenderNameFallback: true,
+        timeText: "12:00",
+      }),
+    ).toMatchObject({
+      ownership: "mine",
+      sender: {
+        fallbackName: "mouse客服123",
+        name: "mouse客服123",
       },
     });
   });

@@ -10,9 +10,10 @@ import type {
 } from "../../data/api-client";
 
 type AvatarProfile =
-  | CustomerProfileCard
-  | FriendProfileExtraDto
-  | UserProfileDto
+  | ((CustomerProfileCard | FriendProfileExtraDto | UserProfileDto) & {
+      avatarUrl?: string | null;
+    })
+  | ({ userId?: string | null; avatarUrl?: string | null } & AvatarIdentity)
   | null
   | undefined;
 

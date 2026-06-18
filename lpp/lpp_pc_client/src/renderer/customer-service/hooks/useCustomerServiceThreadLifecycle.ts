@@ -41,12 +41,13 @@ export function resolveCustomerServiceReadReportTarget({
 }: {
   detailLoaded: boolean;
   messages: MessageItemDto[];
-  selectedThread?: Pick<CustomerServiceThread, "conversationId">;
+  selectedThread?: Pick<CustomerServiceThread, "conversationId" | "threadType">;
   visibility: CustomerServiceThreadReadVisibility;
 }): CustomerServiceReadReportTarget | null {
   if (
     !detailLoaded ||
     !selectedThread?.conversationId ||
+    selectedThread.threadType !== "im_direct" ||
     !canMarkCustomerServiceThreadRead({ visibility })
   ) {
     return null;

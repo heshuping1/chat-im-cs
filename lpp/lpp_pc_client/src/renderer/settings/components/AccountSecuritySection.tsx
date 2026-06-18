@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MonitorSmartphone, RefreshCw, ShieldX, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { formatAppInstanceLabel, getAppInstanceProfile } from "../../data/app-instance/app-instance";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import { useI18n } from "../../i18n/useI18n";
@@ -61,6 +62,12 @@ export function AccountSecuritySection({
     enabled: Boolean(authSession?.platformToken),
     staleTime: 60_000,
     queryFn: async () => requireApiClient(authSession).getAccountDevices(),
+  });
+  const appInstanceQuery = useQuery({
+    queryKey: ["pc-app-instance-profile"],
+    enabled: Boolean(authSession?.platformToken),
+    staleTime: Infinity,
+    queryFn: getAppInstanceProfile,
   });
   const revokeDevice = useMutation({
     mutationFn: async (deviceId: string) =>
@@ -144,13 +151,20 @@ export function AccountSecuritySection({
         )}
         <div className="settings-device-list">
           {(devicesQuery.data ?? []).map((device) => {
+            const isCurrentDevice =
+              Boolean(device.isCurrent) ||
+              Boolean(appInstanceQuery.data?.deviceId && device.deviceId === appInstanceQuery.data.deviceId);
             const deviceName =
-              device.deviceName ||
-              device.deviceType ||
+              accountDeviceDisplayName({
+                deviceName: device.deviceName,
+                deviceType: device.deviceType,
+                isCurrentDevice,
+                profile: appInstanceQuery.data,
+              }) ||
               t("settings.accountSecurity.deviceFallback", { id: device.deviceId.slice(0, 8) });
             return (
               <article
-                className={`settings-device-row ${device.isCurrent ? "current" : ""}`}
+                className={`settings-device-row ${isCurrentDevice ? "current" : ""}`}
                 key={device.deviceId}
               >
                 <span className="settings-device-icon">
@@ -159,7 +173,7 @@ export function AccountSecuritySection({
                 <span>
                   <strong>
                     {deviceName}
-                    {device.isCurrent ? t("settings.accountSecurity.currentDeviceSuffix") : ""}
+                    {isCurrentDevice ? t("settings.accountSecurity.currentDeviceSuffix") : ""}
                   </strong>
                   <em>{device.tenantName || authSession?.tenantName || t("settings.accountSecurity.currentTenant")}</em>
                   <small>
@@ -171,7 +185,7 @@ export function AccountSecuritySection({
                 </span>
                 <button
                   type="button"
-                  disabled={device.isCurrent || revokeDevice.isPending}
+                  disabled={isCurrentDevice || revokeDevice.isPending}
                   onClick={() => revokeDevice.mutate(device.deviceId)}
                 >
                   <ShieldX size={14} />
@@ -221,4 +235,32 @@ export function AccountSecuritySection({
       </div>
     </>
   );
+}
+
+function accountDeviceDisplayName({
+  deviceName,
+  deviceType,
+  isCurrentDevice,
+  profile,
+}: {
+  deviceName?: string | null;
+  deviceType?: string | null;
+  isCurrentDevice: boolean;
+  profile?: { profileName: string } | null;
+}) {
+  const normalizedName = usableDeviceName(deviceName);
+  if (normalizedName) return normalizedName;
+  if (isCurrentDevice && profile) {
+    return `StartLink PC Client (${formatAppInstanceLabel(profile)})`;
+  }
+  return usableDeviceName(deviceType);
+}
+
+function usableDeviceName(value?: string | null) {
+  const normalized = value?.trim();
+  if (!normalized) return "";
+  if (["unknown", "unknown device", "null", "undefined"].includes(normalized.toLowerCase())) {
+    return "";
+  }
+  return normalized;
 }

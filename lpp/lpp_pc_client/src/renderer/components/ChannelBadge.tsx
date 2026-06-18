@@ -34,6 +34,10 @@ export function channelLabel(source?: string | null) {
   const value = source?.trim();
   if (!value) return "Unknown source";
   const normalized = normalizeChannelSource(value);
+  if (normalized === "h5") return "H5";
+  if (isMiniProgramSource(value, normalized)) {
+    return "Mini Program";
+  }
   if (hasDouyin(value)) return "Douyin";
   if (hasWechat(value)) return "WeChat";
   if (hasWeb(value)) return "Web";
@@ -73,6 +77,8 @@ export function channelLabelKey(source?: string | null) {
   if (hasWechat(value) || normalized.includes("wechat") || normalized.includes("weixin")) {
     return "channel.wechat";
   }
+  if (normalized === "h5") return "channel.h5";
+  if (isMiniProgramSource(value, normalized)) return "channel.miniprogram";
   if (normalized.includes("whatsapp") || normalized.includes("wathsup")) return "channel.whatsapp";
   if (normalized.includes("telegram") || normalized === "tg") return "channel.telegram";
   if (
@@ -88,6 +94,7 @@ export function channelLabelKey(source?: string | null) {
   }
   if (
     hasWeb(value) ||
+    normalized === "h5" ||
     normalized.includes("widget") ||
     normalized.includes("website") ||
     normalized.includes("web") ||
@@ -103,6 +110,7 @@ export function channelTone(source?: string | null) {
   const raw = source?.trim() ?? "";
   if (hasDouyin(raw)) return "douyin";
   if (hasWeb(raw)) return "web";
+  if (isMiniProgramSource(raw, normalized)) return "web";
   if (hasWechat(raw)) return "web";
   if (hasOwnApp(raw)) return "own-app";
   if (normalized.includes("douyin") || normalized.includes("tiktok")) return "douyin";
@@ -117,6 +125,7 @@ export function channelTone(source?: string | null) {
     return "own-app";
   }
   if (
+    normalized === "h5" ||
     normalized.includes("widget") ||
     normalized.includes("website") ||
     normalized.includes("web") ||
@@ -133,6 +142,7 @@ function channelIcon(source?: string | null): LucideIcon {
   if (hasDouyin(raw)) return Music2;
   if (hasWechat(raw)) return MessageCircle;
   if (hasWeb(raw)) return Globe2;
+  if (isMiniProgramSource(raw, normalized)) return Globe2;
   if (hasOwnApp(raw)) return AppWindow;
   if (normalized.includes("douyin") || normalized.includes("tiktok")) return Music2;
   if (normalized.includes("wechat") || normalized.includes("weixin")) return MessageCircle;
@@ -147,6 +157,7 @@ function channelIcon(source?: string | null): LucideIcon {
     return AppWindow;
   }
   if (
+    normalized === "h5" ||
     normalized.includes("widget") ||
     normalized.includes("website") ||
     normalized.includes("web") ||
@@ -175,4 +186,8 @@ function hasWeb(value: string) {
 
 function hasOwnApp(value: string) {
   return value.includes("\u81ea\u6709");
+}
+
+function isMiniProgramSource(value: string, normalized = normalizeChannelSource(value)) {
+  return normalized === "miniprogram" || normalized === "mini_program" || value.includes("小程序");
 }

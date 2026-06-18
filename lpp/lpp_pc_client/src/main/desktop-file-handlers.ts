@@ -46,7 +46,7 @@ export function registerDesktopFileHandlers({
 
   register(
     'cacheMediaFile',
-    async (_event, payload: CacheMediaFilePayload) => ensureLocalMediaFile(payload),
+    async (_event, payload: CacheMediaFilePayload) => safeCacheMediaFile(payload),
   );
 
   register(
@@ -240,6 +240,24 @@ export function registerDesktopFileHandlers({
       kind: 'backup',
     };
   });
+}
+
+async function safeCacheMediaFile(payload: CacheMediaFilePayload) {
+  try {
+    const result = await ensureLocalMediaFile(payload);
+    return { ...result, status: 'cached' as const };
+  } catch (error) {
+    return {
+      errorMessage: mediaCacheErrorMessage(error),
+      filePath: '',
+      fileUrl: '',
+      status: 'failed' as const,
+    };
+  }
+}
+
+function mediaCacheErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function mediaMimeType(filePath: string, kind: CacheMediaFilePayload['kind']) {

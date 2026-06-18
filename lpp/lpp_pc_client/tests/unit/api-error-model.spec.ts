@@ -30,6 +30,15 @@ describe("api error model", () => {
     ).toBe("你已被禁言，暂时无法发言");
   });
 
+  it("maps temp-session claim without staff identity to assignment guidance", () => {
+    const normalized = normalizeApiError(
+      new ApiError("staff user not found", "TEMP_SESSION_STAFF_NOT_FOUND", "r8", 404),
+    );
+
+    expect(normalized.userMessageKey).toBe("apiError.tempSessionStaffNotFound");
+    expect(normalized.userMessage).not.toContain("staff user not found");
+  });
+
   it("maps tenant join pending errors to product copy", () => {
     expect(
       formatApiErrorForUser(

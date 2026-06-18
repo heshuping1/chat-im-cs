@@ -1,23 +1,22 @@
 import type { CustomerServiceThreadAction } from "../../data/customer-service/cs-action-service";
+import type { CustomerServiceThreadActionPolicy } from "../../data/customer-service/cs-thread-action-policy";
 import type { CustomerServiceThreadState } from "../../data/customer-service/cs-thread-state";
 import { CustomerServiceThreadActionButton } from "./CustomerServiceThreadActionButton";
 
 export function CustomerServiceReceptionStrip({
-  canUseStaffActions,
+  onAssign,
   pending,
+  policy,
   readOnly,
   receptionText,
-  selectedStatus,
-  status,
   threadState,
   onAction,
 }: {
-  canUseStaffActions?: boolean;
+  onAssign?: () => void;
   pending: boolean;
+  policy: CustomerServiceThreadActionPolicy;
   readOnly: boolean;
   receptionText: string;
-  selectedStatus?: string;
-  status?: string;
   threadState: CustomerServiceThreadState;
   onAction: (action: CustomerServiceThreadAction) => void;
 }) {
@@ -28,10 +27,9 @@ export function CustomerServiceReceptionStrip({
       <span>{receptionText}</span>
       {!readOnly && (
         <CustomerServiceThreadActionButton
-          canUseStaffActions={canUseStaffActions}
-          status={status}
-          selectedStatus={selectedStatus}
           pending={pending}
+          policy={policy}
+          onAssign={onAssign}
           onAction={onAction}
         />
       )}

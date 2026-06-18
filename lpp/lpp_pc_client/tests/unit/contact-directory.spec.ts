@@ -146,11 +146,14 @@ describe("contact directory model", () => {
   it("normalizes tenant member profile startlink fields at the contacts anti-corruption boundary", () => {
     expect(
       normalizeTenantMemberProfileDto({
+        avatarUrl: "profile.png",
         userId: "u1",
         displayName: "staff",
         lppId: "lpp-profile",
       }),
     ).toEqual({
+      avatarUrl: "profile.png",
+      displayName: "staff",
       userId: "u1",
       greenBubbleNo: "lpp-profile",
     });

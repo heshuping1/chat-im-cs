@@ -14,6 +14,7 @@ describe("resolveCustomerServiceReadReportTarget", () => {
         ],
         selectedThread: {
           conversationId: "conversation-1",
+          threadType: "im_direct",
         },
         visibility: "detailVisible",
       }),
@@ -30,6 +31,7 @@ describe("resolveCustomerServiceReadReportTarget", () => {
         messages: [{ messageId: "m1", conversationSeq: 4 }],
         selectedThread: {
           conversationId: "conversation-1",
+          threadType: "im_direct",
         },
         visibility: "detailVisible",
       }),
@@ -41,6 +43,7 @@ describe("resolveCustomerServiceReadReportTarget", () => {
         messages: [{ messageId: "m1" }],
         selectedThread: {
           conversationId: "conversation-1",
+          threadType: "im_direct",
         },
         visibility: "detailVisible",
       }),
@@ -52,8 +55,23 @@ describe("resolveCustomerServiceReadReportTarget", () => {
         messages: [{ messageId: "m1", conversationSeq: 4 }],
         selectedThread: {
           conversationId: "conversation-1",
+          threadType: "im_direct",
         },
         visibility: "listOnly",
+      }),
+    ).toBeNull();
+  });
+
+  it("does not report temp-session reads through the direct-chat read API", () => {
+    expect(
+      resolveCustomerServiceReadReportTarget({
+        detailLoaded: true,
+        messages: [{ messageId: "m1", conversationSeq: 4 }],
+        selectedThread: {
+          conversationId: "conversation-1",
+          threadType: "temp_session",
+        },
+        visibility: "detailVisible",
       }),
     ).toBeNull();
   });

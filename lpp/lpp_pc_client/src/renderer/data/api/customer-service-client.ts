@@ -15,6 +15,7 @@ import type {
   CustomerServiceThread,
   CustomerServiceThreadType,
   CustomerServiceThreadsResponse,
+  CustomerServiceTransferRecordDto,
   ExportTaskDownloadResult,
   ExportTaskDto,
   MediaResourceDto,
@@ -52,6 +53,7 @@ import {
   normalizeCustomerServiceMessageDto,
 } from "../customer-service/cs-message-contract";
 import { customerServiceDirectPeerReaderId } from "../customer-service/cs-message-read-status";
+import { normalizeCustomerServiceTransferRecordsFromDetail } from "../customer-service/cs-transfer-records";
 
 export class CustomerServiceApiClient extends MessagesApiClient {
   getWorkbenchThreads() {
@@ -955,9 +957,13 @@ function emptyAiSuggestion(suggestionId = ""): AiSuggestionDto {
 }
 
 type NestedThreadPayload = {
+  events?: unknown;
   messages?: MessageItemDto[];
   notes?: unknown;
   readStatus?: unknown;
+  timeline?: unknown;
+  transferHistory?: unknown;
+  transfer_history?: unknown;
   lastMessagePreview?: string | null;
   lastMessageAt?: string | null;
   updatedAt?: string | null;
@@ -965,6 +971,7 @@ type NestedThreadPayload = {
   from?: string | null;
   channel?: string | null;
   sourceChannel?: string | null;
+  sourcePlatform?: string | null;
   entryChannel?: string | null;
   platform?: string | null;
   provider?: string | null;
@@ -988,6 +995,7 @@ type CustomerServiceThreadDetailResponse = NestedThreadPayload & {
   from?: string;
   channel?: string;
   sourceChannel?: string;
+  sourcePlatform?: string | null;
   entryChannel?: string;
   platform?: string;
   provider?: string;
@@ -998,6 +1006,10 @@ type CustomerServiceThreadDetailResponse = NestedThreadPayload & {
   direct_chat?: NestedThreadPayload | null;
   notes?: unknown;
   readStatus?: unknown;
+  events?: unknown;
+  timeline?: unknown;
+  transferHistory?: unknown;
+  transfer_history?: unknown;
 };
 
 type AdminTokenIssueResponse = {
@@ -1198,6 +1210,7 @@ function adminTempSessionItemToCustomerServiceThread(
     priority: readString(item.priority),
     source: readString(item.source),
     sourceChannel: readString(item.sourceChannel) || readString(item.channel),
+    sourcePlatform: readString(item.sourcePlatform) || null,
     status: readString(item.status) || "closed_timeout",
     threadId,
     threadType: "temp_session",
@@ -1281,6 +1294,7 @@ function adminCenterThreadItemToCustomerServiceThread(
       readString(item.sourceChannel) ||
       readString(item.channel) ||
       readString(item.entryChannel),
+    sourcePlatform: readString(item.sourcePlatform) || null,
     status: readString(item.status) || "active",
     staffAvatarUrl: readStaffAvatarUrl(item) || null,
     staffDisplayName: readString(item.staffDisplayName) || readString(item.staff_display_name) || null,
@@ -1743,6 +1757,12 @@ function normalizeWorkbenchThreadDetail(
     threadId,
     threadType,
   });
+  const transferRecords: CustomerServiceTransferRecordDto[] =
+    normalizeCustomerServiceTransferRecordsFromDetail(detail, {
+      conversationId,
+      threadId,
+      threadType,
+    });
   const latest = latestMessage(messages);
 
   const normalizedDetail = {
@@ -1820,6 +1840,10 @@ function normalizeWorkbenchThreadDetail(
       readString(sourceRecord.sourceChannel) ||
       readString(sourceRecord.channel) ||
       undefined,
+    sourcePlatform:
+      readString(detail.sourcePlatform) ||
+      readString(sourceRecord.sourcePlatform) ||
+      null,
     entryChannel:
       readString(detail.entryChannel) ||
       readString(sourceRecord.entryChannel) ||
@@ -1847,6 +1871,7 @@ function normalizeWorkbenchThreadDetail(
     messages,
     notes,
     readStatus,
+    transferRecords,
   };
   const result = normalizeCustomerServiceThreadDto(normalizedDetail);
   logApiContractDiagnostic({

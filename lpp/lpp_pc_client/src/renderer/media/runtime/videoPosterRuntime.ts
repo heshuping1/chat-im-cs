@@ -186,13 +186,15 @@ export async function ensureLocalVideoPoster({
           conversationId: mediaCacheContext?.conversationId,
         })
       : undefined;
+    const cachedVideoUrl =
+      cachedVideo?.status === "failed" ? undefined : cachedVideo?.fileUrl;
     const cachedPoster = await window.desktopApi.cacheMediaPoster({
-      url: cachedVideo?.fileUrl || src,
+      url: cachedVideoUrl || src,
       fileName: videoPosterFileName(fileName),
       kind: "video",
       dataUrl: posterFromMemory,
       authToken,
-      cacheIdentity: `video-poster:${mediaStableCacheIdentity(media, cachedVideo?.fileUrl || src) || cachedVideo?.fileUrl || src}`,
+      cacheIdentity: `video-poster:${mediaStableCacheIdentity(media, cachedVideoUrl || src) || cachedVideoUrl || src}`,
       accountId: mediaCacheContext?.accountId,
       conversationId: mediaCacheContext?.conversationId,
     });

@@ -79,6 +79,10 @@ describe("customer-service history and lookup surfaces", () => {
     resolve(process.cwd(), "src/renderer/customer-service/hooks/useCustomerServiceWorkspaceController.ts"),
     "utf8",
   );
+  const threadActionPolicy = readFileSync(
+    resolve(process.cwd(), "src/renderer/data/customer-service/cs-thread-action-policy.ts"),
+    "utf8",
+  );
   const customerServiceClient = readFileSync(
     resolve(process.cwd(), "src/renderer/data/api/customer-service-client.ts"),
     "utf8",
@@ -240,22 +244,23 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerContextPanel).toContain("canReadCustomerServiceHistory");
     expect(customerContextPanel).toContain("getCustomerServiceHistoryThreads({");
     expect(customerContextPanel).not.toContain("getStaffServiceHistory({");
-    expect(threadList).toContain("canUseCustomerServiceManagementReadonly");
+    expect(threadList).not.toContain("canUseCustomerServiceManagementReadonly");
     expect(threadList).toContain("canClaimQueuedThread");
-    expect(threadList).toContain('canUseManagementActions && thread.threadType === "temp_session"');
+    expect(threadList).toContain("resolveCustomerServiceThreadActionPolicy");
+    expect(threadList).toContain("queued && threadActionPolicy.claim.enabled");
     expect(threadList).toContain("executeCustomerServiceThreadAction({");
-    expect(threadList).toContain('mode: canUseStaffEndpoints ? "staff" : "management"');
-    expect(workspaceController).toContain("canSuperviseCustomerServiceClose");
-    expect(workspaceController).toContain("canSuperviseCustomerServiceTransfer");
-    expect(workspaceController).toContain("canUseCustomerServiceManagementReadonly");
+    expect(threadList).toContain('mode: "staff"');
+    expect(threadActionPolicy).toContain("canSuperviseCustomerServiceClose");
+    expect(threadActionPolicy).toContain("canSuperviseCustomerServiceTransfer");
     expect(workspaceController).toContain('if (action === "close")');
-    expect(workspaceController).toContain("!canUseStaffEndpoints && !canSuperviseClose");
-    expect(workspaceController).toContain('action === "claim" || action === "takeover"');
-    expect(workspaceController).toContain("managementAction ||");
-    expect(workspaceController).toContain('mode: !canUseStaffEndpoints && canSuperviseTransfer ? "management" : "staff"');
-    expect(chatWorkspace).toContain('canUseManagementActions && selectedThread.threadType === "temp_session"');
-    expect(chatWorkspace).toContain("canClose={canCloseThread}");
-    expect(threadActionButton).toContain("if (!canUseStaffActions) return null;");
+    expect(workspaceController).toContain("resolveCustomerServiceThreadActionPolicy");
+    expect(workspaceController).toContain("Only customer service staff can perform this action.");
+    expect(workspaceController).toContain('actionPolicy.transferDialog.mode === "assign" ? "management" : "staff"');
+    expect(chatWorkspace).toContain("const threadActionPolicy = useMemo");
+    expect(chatWorkspace).toContain("policy={threadActionPolicy}");
+    expect(chatWorkspace).toContain("transferMode={threadActionPolicy.transferDialog.mode}");
+    expect(chatWorkspace).toContain("canClose={threadActionPolicy.close.enabled}");
+    expect(threadActionButton).toContain("policy: CustomerServiceThreadActionPolicy");
   });
 
   it("keeps Data Center extensible through domain and report registration", () => {
@@ -512,18 +517,19 @@ describe("customer-service history and lookup surfaces", () => {
   it("keeps customer-service conversation actions in the chat header", () => {
     expect(workspaceHeader).toContain('className="h-chat-head-actions"');
     expect(workspaceHeader).toContain('t("composer.translate")');
-    expect(workspaceHeader).toContain('t("customerService.transfer.openShort")');
+    expect(workspaceHeader).toContain("transferMode === \"assign\"");
+    expect(workspaceHeader).toContain("customerService.transfer.assignShort");
+    expect(workspaceHeader).toContain("customerService.transfer.openShort");
     expect(workspaceHeader).toContain('t("common.close")');
     expect(workspaceHeader).toContain('t("messages.chatHeader.searchMessages")');
     expect(workspaceHeader).toContain("onCloseThread");
-    expect(chatWorkspace).toContain("const canCloseThread = useMemo");
-    expect(chatWorkspace).toContain("canSuperviseCustomerServiceClose");
-    expect(chatWorkspace).toContain("canClose={canCloseThread}");
+    expect(chatWorkspace).toContain("const threadActionPolicy = useMemo");
+    expect(threadActionPolicy).toContain("canSuperviseCustomerServiceClose");
+    expect(chatWorkspace).toContain("canClose={threadActionPolicy.close.enabled}");
     expect(chatWorkspace).toContain('onCloseThread={() => handleThreadAction("close")}');
-    expect(chatWorkspace).toContain("const canTransferThread = useMemo");
-    expect(chatWorkspace).toContain("canSuperviseCustomerServiceTransfer");
-    expect(chatWorkspace).toContain("!createCustomerServiceThreadState(status || selectedThread.status).readOnly");
-    expect(chatWorkspace).toContain("canTransfer={canTransferThread}");
+    expect(threadActionPolicy).toContain("canSuperviseCustomerServiceTransfer");
+    expect(threadActionPolicy).toContain("liveThread && canSuperviseTransfer");
+    expect(chatWorkspace).toContain("canTransfer={threadActionPolicy.transferDialog.enabled}");
     expect(chatWorkspace).toContain("currentCustomerServiceStaffName");
     expect(chatWorkspace).toContain("currentStaffName={currentTransferStaffName}");
     expect(transferDialog).toContain("currentStaffName");
@@ -540,7 +546,7 @@ describe("customer-service history and lookup surfaces", () => {
     expect(serviceMessageContextMenu).toContain("availability.save_media_as");
     expect(chatWorkspace).toContain("canSilentRecallMessage");
     expect(chatWorkspace).toContain("isServiceSilentRecallableMessage(message, mine)");
-    expect(messageStage).toContain("mine={isMineMessage(messageMenu.message)}");
+    expect(messageStage).toContain("mine={isCustomerServiceMineMessage(messageMenu.message, isMineMessage)}");
     expect(chatWorkspace).toContain("recallCustomerServiceMessage");
     expect(chatWorkspace).toContain("removeCustomerServiceMessage");
     expect(chatWorkspace).toContain("requestMessageDangerConfirmation");

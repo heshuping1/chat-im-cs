@@ -71,6 +71,8 @@ interface RawTenantMemberProfileDto extends UserProfileDto {
 
 export interface TenantMemberProfileDto {
   userId: string;
+  avatarUrl?: string | null;
+  displayName?: string | null;
   greenBubbleNo: string | null;
 }
 
@@ -405,6 +407,8 @@ export function normalizeTenantMemberProfileDto(
 ): TenantMemberProfileDto {
   return {
     userId: profile.userId,
+    avatarUrl: publicAvatarUrl(profile),
+    displayName: profile.displayName ?? null,
     greenBubbleNo: publicGreenBubbleNo(profile),
   };
 }

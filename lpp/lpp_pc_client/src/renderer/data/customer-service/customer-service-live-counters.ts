@@ -124,6 +124,7 @@ function mergeCustomerServiceThreadSummary(
     provider: preferred.provider || fallback.provider,
     source: preferred.source || fallback.source,
     sourceChannel: preferred.sourceChannel || fallback.sourceChannel,
+    sourcePlatform: preferred.sourcePlatform || fallback.sourcePlatform,
     title: preferred.title || fallback.title,
     unreadCount: Math.max(
       0,

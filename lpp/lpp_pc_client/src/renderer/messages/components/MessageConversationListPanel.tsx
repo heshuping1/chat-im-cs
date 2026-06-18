@@ -1,5 +1,6 @@
 import { Plus, Search } from "lucide-react";
 import type { MouseEvent } from "react";
+import { useCallback, useMemo } from "react";
 
 import type {
   ConversationListItem,
@@ -88,6 +89,26 @@ export function MessageConversationListPanel({
   resolveConversationUnread,
 }: MessageConversationListPanelProps) {
   const { t } = useI18n();
+  const conversationsById = useMemo(
+    () => new Map(conversations.map((item) => [item.conversationId, item])),
+    [conversations],
+  );
+  const handleConversationListClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const conversation = conversationFromListEvent(event, conversationsById);
+      if (!conversation) return;
+      onConversationClick(conversation);
+    },
+    [conversationsById, onConversationClick],
+  );
+  const handleConversationListContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      const conversation = conversationFromListEvent(event, conversationsById);
+      if (!conversation) return;
+      onConversationContextMenu(event, conversation);
+    },
+    [conversationsById, onConversationContextMenu],
+  );
 
   return (
     <section className={`e-panel e-conversation-panel ${conversationDrawerOpen ? "drawer-open" : ""}`}>
@@ -149,7 +170,12 @@ export function MessageConversationListPanel({
 
       {errorText && <p className="message-notice error">{errorText}</p>}
 
-      <div className="e-conversation-list" aria-label={t("messages.conversationList.listAria")}>
+      <div
+        className="e-conversation-list"
+        aria-label={t("messages.conversationList.listAria")}
+        onClick={handleConversationListClick}
+        onContextMenu={handleConversationListContextMenu}
+      >
         {loading && <PanelState text={t("messages.conversationList.loading")} />}
         {!loading &&
           conversations.map((item) => {
@@ -169,8 +195,6 @@ export function MessageConversationListPanel({
                 })}
                 isGroup={isGroup}
                 key={item.conversationId}
-                onClick={() => onConversationClick(item)}
-                onContextMenu={(event) => onConversationContextMenu(event, item)}
                 unread={resolveConversationUnread(item)}
               />
             );
@@ -181,4 +205,15 @@ export function MessageConversationListPanel({
       </div>
     </section>
   );
+}
+
+function conversationFromListEvent(
+  event: MouseEvent<HTMLElement>,
+  conversationsById: Map<string, ConversationListItem>,
+) {
+  const target = event.target;
+  if (!(target instanceof Element)) return undefined;
+  const row = target.closest<HTMLElement>("[data-conversation-id]");
+  const conversationId = row?.dataset.conversationId;
+  return conversationId ? conversationsById.get(conversationId) : undefined;
 }

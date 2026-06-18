@@ -264,7 +264,12 @@ export const apiContractFixtures: ApiContractFixture[] = [
         type: "file",
         preview: "[文件]",
       },
-      issues: ["cs.message.generated_id", "cs.message.missing_seq"],
+      issues: [
+        "cs.message.generated_id",
+        "cs.message.missing_seq",
+        "cs.message.sender_role_missing",
+        "cs.message.sender_display_name_missing",
+      ],
     },
   },
 ];

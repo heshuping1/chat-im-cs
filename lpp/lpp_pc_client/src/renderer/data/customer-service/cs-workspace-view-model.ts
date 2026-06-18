@@ -3,6 +3,7 @@ import {
   type CustomerProfileCard,
   type CustomerServiceThread,
   type CustomerServiceThreadType,
+  type CustomerServiceTransferRecordDto,
   type MessageItemDto,
   type StaffServiceHistoryItem,
 } from "../api/types";
@@ -39,8 +40,10 @@ export interface CustomerServiceThreadDetailView {
   readStatus?: CustomerServiceReadStatusDto | null;
   source?: string;
   sourceChannel?: string;
+  sourcePlatform?: string | null;
   status?: string;
   title?: string;
+  transferRecords?: CustomerServiceTransferRecordDto[];
 }
 
 export interface CustomerServiceWorkspaceViewModelInput {
@@ -157,12 +160,14 @@ export function createCustomerServiceWorkspaceViewModel(
     usableThreadTitle(selectedThread?.title) ||
     (readOnly ? "customerService.visitor" : "customerService.threadList.unknownCustomer");
   const source =
-    input.detail?.sourceChannel ??
-    input.detail?.source ??
-    input.detail?.channel ??
-    input.detail?.from ??
-    selectedThread?.sourceChannel ??
-    selectedThread?.source ??
+    input.detail?.sourcePlatform ||
+    input.detail?.sourceChannel ||
+    input.detail?.source ||
+    input.detail?.channel ||
+    input.detail?.from ||
+    selectedThread?.sourcePlatform ||
+    selectedThread?.sourceChannel ||
+    selectedThread?.source ||
     selectedThread?.channel;
   const sourceLabel = input.formatSourceLabel?.(source) ?? source ?? "customerService.workspace.unknownSource";
   const identity = createCustomerServiceIdentityViewModel({

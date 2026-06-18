@@ -1,3 +1,5 @@
+import type { CachedMediaFileResult } from "../../../shared/desktop-api";
+
 export type DesktopMediaKind = "image" | "video" | "file";
 
 export type DesktopMediaActionPayload = {
@@ -12,8 +14,8 @@ export type DesktopMediaActionPayload = {
 export async function downloadDesktopMedia(payload: DesktopMediaActionPayload) {
   const fileName = safeDesktopMediaFileName(payload.fileName);
   if (!/^(blob:|file:)/i.test(payload.url) && window.desktopApi?.cacheMediaFile) {
-    await window.desktopApi.cacheMediaFile({ ...payload, fileName });
-    return;
+    const cached = await window.desktopApi.cacheMediaFile({ ...payload, fileName });
+    if (isCachedMediaReady(cached)) return;
   }
   if (/^(blob:|data:|file:)/i.test(payload.url)) {
     triggerDownload(payload.url, fileName);
@@ -44,6 +46,7 @@ export async function revealDesktopMediaInFolder(payload: DesktopMediaActionPayl
   }
   if (window.desktopApi?.cacheMediaFile && window.desktopApi?.openFile) {
     const cached = await window.desktopApi.cacheMediaFile({ ...payload, fileName });
+    assertCachedMediaReady(cached);
     await window.desktopApi.openFile(parentDirectory(cached.filePath));
     return cached.filePath;
   }
@@ -59,6 +62,7 @@ export async function copyDesktopMediaFile(payload: DesktopMediaActionPayload) {
   }
   if (window.desktopApi?.cacheMediaFile) {
     const cached = await window.desktopApi.cacheMediaFile(nextPayload);
+    assertCachedMediaReady(cached);
     if (window.desktopApi?.copyFilePath) {
       await window.desktopApi.copyFilePath(cached.filePath);
     } else {
@@ -78,6 +82,7 @@ export async function openDesktopMediaFile(payload: DesktopMediaActionPayload) {
   }
   if (window.desktopApi?.cacheMediaFile && window.desktopApi?.openFile) {
     const cached = await window.desktopApi.cacheMediaFile(nextPayload);
+    assertCachedMediaReady(cached);
     await window.desktopApi.openFile(cached.filePath);
     return cached.filePath;
   }
@@ -132,6 +137,15 @@ function parentDirectory(filePath: string) {
   const normalized = filePath.trim();
   const parent = normalized.replace(/[\\/][^\\/]*$/, "");
   return parent || normalized;
+}
+
+function isCachedMediaReady(result: CachedMediaFileResult) {
+  return result.status !== "failed" && Boolean(result.filePath && result.fileUrl);
+}
+
+function assertCachedMediaReady(result: CachedMediaFileResult) {
+  if (isCachedMediaReady(result)) return;
+  throw new Error(result.errorMessage || "媒体文件缓存失败");
 }
 
 async function downloadAuthenticatedMediaBlob(

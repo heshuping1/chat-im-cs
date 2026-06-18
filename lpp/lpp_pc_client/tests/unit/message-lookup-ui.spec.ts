@@ -202,6 +202,18 @@ describe("message lookup UI", () => {
     expect(messageCenterCss).toContain("z-index: 240");
   });
 
+  it("keeps conversation row clicks delegated and rows memoized for fast switching", () => {
+    expect(conversationListPanel).toContain("const conversationsById = useMemo");
+    expect(conversationListPanel).toContain("conversationFromListEvent");
+    expect(conversationListPanel).toContain("onClick={handleConversationListClick}");
+    expect(conversationListPanel).toContain("onContextMenu={handleConversationListContextMenu}");
+    expect(conversationListPanel).not.toContain("onClick={() => onConversationClick(item)}");
+    expect(conversationListPanel).not.toContain("onContextMenu={(event) => onConversationContextMenu(event, item)}");
+    expect(conversationListParts).toContain("export const ConversationRow = memo");
+    expect(conversationListParts).toContain("areConversationRowsEqual");
+    expect(conversationListParts).toContain("data-conversation-id={conversation.conversationId}");
+  });
+
   it("keeps chat history filters scoped to the lookup dialog", () => {
     expect(messageListData).toContain("const visibleMessages = useMemo(");
     expect(messageListData).toContain('filterVisibleMessages(messages, "")');

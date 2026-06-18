@@ -11,7 +11,8 @@ describe("customer service message contract", () => {
         messageId: "cs-m1",
         conversationId: "cs-conv-1",
         conversationSeq: 5,
-        senderDisplayName: "访客",
+        senderRole: "visitor",
+        senderDisplayName: "璁垮",
         messageType: "text",
         body: { text: "hello" },
         direction: "incoming",
@@ -46,6 +47,8 @@ describe("customer service message contract", () => {
         messageId: "cs-preview-1",
         conversationId: "cs-conv-preview",
         conversationSeq: 6,
+        senderDisplayName: "Visitor",
+        senderRole: "visitor",
         messageType: "text",
         preview: "server says hello",
         body: {},
@@ -60,12 +63,70 @@ describe("customer service message contract", () => {
     expect(result.data?.preview).toBe("server says hello");
   });
 
+  it("keeps staff sender role and avoids visitor fallback for transfer notices", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-transfer-notice-1",
+        conversationId: "cs-conv-transfer",
+        conversationSeq: 10,
+        senderDisplayName: "Customer Service 10",
+        displayName: "璁垮",
+        senderRole: "staff_reply",
+        staffDisplayName: "瀹㈡湇10",
+        messageType: "text",
+        body: { text: "transferred to Customer Service 10" },
+        direction: "incoming",
+      },
+      {
+        threadId: "thread-transfer",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(result.status).toBe("ok");
+    expect(customerServiceMessageEntityToDto(result.data!)).toMatchObject({
+      messageId: "cs-transfer-notice-1",
+      senderDisplayName: "Customer Service 10",
+      senderRole: "staff_reply",
+      staffDisplayName: "瀹㈡湇10",
+    });
+  });
+
+  it("does not fabricate a sender label when a staff message has no display name", () => {
+    const result = normalizeCustomerServiceMessageDto(
+      {
+        messageId: "cs-staff-no-name",
+        conversationId: "cs-conv-staff",
+        conversationSeq: 11,
+        senderRole: "customer_service",
+        messageType: "text",
+        body: { text: "staff continues handling" },
+      },
+      {
+        threadId: "thread-staff",
+        threadType: "temp_session",
+      },
+    );
+
+    expect(result.status).toBe("degraded");
+    expect(customerServiceMessageEntityToDto(result.data!)).toMatchObject({
+      messageId: "cs-staff-no-name",
+      senderRole: "customer_service",
+    });
+    expect(customerServiceMessageEntityToDto(result.data!).senderDisplayName).toBeUndefined();
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      "cs.message.sender_display_name_missing",
+    );
+  });
+
   it("normalizes top-level text content into a renderable text body", () => {
     const result = normalizeCustomerServiceMessageDto(
       {
         messageId: "cs-content-1",
         conversationId: "cs-conv-content",
         conversationSeq: 8,
+        senderDisplayName: "Visitor",
+        senderRole: "visitor",
         messageType: "text",
         content: "top level content",
       },
@@ -90,6 +151,8 @@ describe("customer service message contract", () => {
         messageId: "cs-empty-preview",
         conversationId: "cs-conv-empty-preview",
         conversationSeq: 7,
+        senderDisplayName: "Visitor",
+        senderRole: "visitor",
         messageType: "text",
         body: {},
       },
@@ -127,10 +190,14 @@ describe("customer service message contract", () => {
       type: "file",
       preview: "[文件]",
     });
-    expect(result.issues.map((issue) => issue.code)).toEqual([
-      "cs.message.generated_id",
-      "cs.message.missing_seq",
-    ]);
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "cs.message.generated_id",
+        "cs.message.missing_seq",
+        "cs.message.sender_role_missing",
+        "cs.message.sender_display_name_missing",
+      ]),
+    );
   });
 
   it("maps shared entity back to compatible MessageItemDto", () => {
@@ -170,6 +237,8 @@ describe("customer service message contract", () => {
         messageId: "cs-read-1",
         conversationId: "cs-conv-read",
         conversationSeq: 12,
+        senderDisplayName: "Visitor",
+        senderRole: "visitor",
         messageType: "text",
         body: { text: "receipt" },
         customerReadAt: "2026-06-11T09:20:00.000Z",

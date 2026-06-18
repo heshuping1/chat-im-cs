@@ -2,6 +2,7 @@ import {
   customerServiceMessageEntityToDto,
   normalizeCustomerServiceMessageDto,
 } from "../customer-service/cs-message-contract";
+import { normalizeCustomerServiceTransferRecordFromGateway } from "../customer-service/cs-transfer-records";
 import { createGatewayTraceId } from "./gateway-diagnostics";
 import { auditCustomerServiceMessage } from "../customer-service/cs-message-audit-diagnostics";
 import type { MessageItemDto } from "../api/types";
@@ -29,9 +30,14 @@ import {
   isCustomerServiceTypingEventName,
 } from "./gateway-event-registry";
 
-type GatewayEnvelope = Pick<GatewayTypedEvent, "eventName" | "receivedAt" | "traceId" | "rawPayload">;
+type GatewayEnvelope = Pick<
+  GatewayTypedEvent,
+  "eventName" | "receivedAt" | "traceId" | "rawPayload"
+>;
 
-export function adaptCustomerServiceGatewayEvent(input: GatewayRawEventInput): GatewayTypedEvent {
+export function adaptCustomerServiceGatewayEvent(
+  input: GatewayRawEventInput,
+): GatewayTypedEvent {
   const payload = eventPayload(input.args);
   const receivedAt = input.receivedAt ?? Date.now();
   const envelope = {
@@ -43,13 +49,19 @@ export function adaptCustomerServiceGatewayEvent(input: GatewayRawEventInput): G
 
   if (
     isCustomerServiceTypingEventName(input.eventName) ||
-    (input.eventName === "msg.typing" && isCustomerServiceGatewayPayload(payload, input.scopeKey))
+    (input.eventName === "msg.typing" &&
+      isCustomerServiceGatewayPayload(payload, input.scopeKey))
   ) {
     return adaptCustomerServiceTypingPreviewEvent(envelope, input.scopeKey);
   }
 
   const changeKind = customerServiceThreadEventKinds.get(input.eventName);
-  if (changeKind) return adaptCustomerServiceThreadChangedEvent(envelope, changeKind, input.scopeKey);
+  if (changeKind)
+    return adaptCustomerServiceThreadChangedEvent(
+      envelope,
+      changeKind,
+      input.scopeKey,
+    );
 
   if (
     isCustomerServiceMessageEventName(input.eventName) ||
@@ -69,7 +81,9 @@ function adaptCustomerServiceMessageEvent(
   const payload = envelope.rawPayload;
   const threadId = customerServiceGatewayThreadId(payload, scopeKey);
   if (!threadId) {
-    return invalid(envelope, "missing_thread_id", ["gateway.cs.missing_thread_id"]);
+    return invalid(envelope, "missing_thread_id", [
+      "gateway.cs.missing_thread_id",
+    ]);
   }
   const threadType = customerServiceThreadType(payload);
   const rawMessage = customerServiceGatewayMessageInput(payload);
@@ -90,7 +104,11 @@ function adaptCustomerServiceMessageEvent(
     fallbackConversationId: threadId,
     fallbackMessageId: `${threadId}:${envelope.receivedAt}`,
   });
-  if (!normalized.data || normalized.status === "failed" || normalized.status === "invalid") {
+  if (
+    !normalized.data ||
+    normalized.status === "failed" ||
+    normalized.status === "invalid"
+  ) {
     return invalid(
       envelope,
       "blocking_contract",
@@ -103,9 +121,14 @@ function adaptCustomerServiceMessageEvent(
     kind: "cs.message.received",
     threadId,
     threadType,
-    message: customerServiceMessageEntityToDto(normalized.data),
+    message: customerServiceMessageEntityToDto(
+      normalized.data,
+      rawMessage as Partial<MessageItemDto>,
+    ),
     contractStatus: normalized.status === "degraded" ? "degraded" : "ok",
-    diagnostics: normalized.issues.length ? normalized.issues.map((issue) => issue.code) : undefined,
+    diagnostics: normalized.issues.length
+      ? normalized.issues.map((issue) => issue.code)
+      : undefined,
   };
 }
 
@@ -115,15 +138,68 @@ function adaptCustomerServiceThreadChangedEvent(
   scopeKey?: string,
 ): GatewayTypedEvent {
   const payload = envelope.rawPayload;
+  const threadId = customerServiceGatewayThreadId(payload, scopeKey);
+  const threadType = customerServiceThreadType(payload);
+  const conversationId = customerServiceGatewayConversationId(payload);
+  const transferRecord =
+    changeKind === "thread_transferred"
+      ? normalizeCustomerServiceTransferRecordFromGateway(payload, {
+          conversationId,
+          threadId,
+          threadType,
+        })
+      : undefined;
   return {
     ...envelope,
     kind: "cs.thread.changed",
     changeKind,
-    conversationId: customerServiceGatewayConversationId(payload),
-    threadId: customerServiceGatewayThreadId(payload, scopeKey),
-    threadType: customerServiceThreadType(payload),
-    serviceStatus: stringField(payload, "serviceStatus", "staffStatus", "status"),
+    conversationId,
+    threadId,
+    threadType,
+    serviceStatus: stringField(
+      payload,
+      "serviceStatus",
+      "staffStatus",
+      "status",
+    ),
     threadStatus: stringField(payload, "threadStatus", "status"),
+    fromStaffDisplayName:
+      changeKind === "thread_transferred"
+        ? stringField(payload, "fromStaffDisplayName", "from_staff_display_name")
+        : undefined,
+    fromStaffUserId:
+      changeKind === "thread_transferred"
+        ? stringField(payload, "fromStaffUserId", "from_staff_user_id")
+        : undefined,
+    reason:
+      changeKind === "thread_transferred"
+        ? stringField(payload, "reason", "transferReason", "transfer_reason")
+        : undefined,
+    toStaffDisplayName:
+      changeKind === "thread_transferred"
+        ? stringField(
+            payload,
+            "toStaffDisplayName",
+            "to_staff_display_name",
+            "assignedStaffDisplayName",
+            "assigned_staff_display_name",
+          )
+        : undefined,
+    toStaffUserId:
+      changeKind === "thread_transferred"
+        ? stringField(
+            payload,
+            "toStaffUserId",
+            "to_staff_user_id",
+            "assignedStaffUserId",
+            "assigned_staff_user_id",
+          )
+        : undefined,
+    transferredAt:
+      changeKind === "thread_transferred"
+        ? stringField(payload, "transferredAt", "transferred_at", "createdAt", "created_at")
+        : undefined,
+    transferRecord,
     shouldNotifyQueue:
       changeKind === "queue_created" ||
       changeKind === "thread_created" ||
@@ -140,11 +216,17 @@ function adaptCustomerServiceTypingPreviewEvent(
   const payload = envelope.rawPayload;
   const threadId = customerServiceGatewayThreadId(payload, scopeKey);
   if (!threadId) {
-    return invalid(envelope, "missing_thread_id", ["gateway.cs.typing.missing_thread_id"]);
+    return invalid(envelope, "missing_thread_id", [
+      "gateway.cs.typing.missing_thread_id",
+    ]);
   }
   const typing = asRecord(payload.typing);
   const message = customerServiceMessageRecord(payload);
-  const conversationId = customerServiceGatewayTypingConversationId(payload, typing, message);
+  const conversationId = customerServiceGatewayTypingConversationId(
+    payload,
+    typing,
+    message,
+  );
   const previewTextKeys = [
     "content",
     "text",
@@ -173,9 +255,30 @@ function adaptCustomerServiceTypingPreviewEvent(
       stringField(typing, ...previewTextKeys) ||
       stringField(message, ...previewTextKeys),
     senderRole:
-      stringField(payload, "senderRole", "senderType", "authorType", "fromType", "role") ||
-      stringField(typing, "senderRole", "senderType", "authorType", "fromType", "role") ||
-      stringField(message, "senderRole", "senderType", "authorType", "fromType", "role"),
+      stringField(
+        payload,
+        "senderRole",
+        "senderType",
+        "authorType",
+        "fromType",
+        "role",
+      ) ||
+      stringField(
+        typing,
+        "senderRole",
+        "senderType",
+        "authorType",
+        "fromType",
+        "role",
+      ) ||
+      stringField(
+        message,
+        "senderRole",
+        "senderType",
+        "authorType",
+        "fromType",
+        "role",
+      ),
     senderUserId:
       stringField(payload, "senderUserId", "userId", "senderId") ||
       stringField(typing, "senderUserId", "userId", "senderId") ||
@@ -219,7 +322,9 @@ function uniqueNonEmptyStrings(values: string[]) {
 
 function eventPayload(args: unknown[]) {
   const first = asRecord(args[0]);
-  const nested = asRecord(first.data ?? first.Data ?? first.payload ?? first.Payload);
+  const nested = asRecord(
+    first.data ?? first.Data ?? first.payload ?? first.Payload,
+  );
   return Object.keys(nested).length ? nested : first;
 }
 

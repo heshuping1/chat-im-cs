@@ -32,7 +32,8 @@ export function isCustomerServiceGatewayPayload(
   payload: Record<string, unknown>,
   scopeKey?: string,
 ) {
-  return classifyCustomerServiceGatewayPayload(payload, scopeKey).isCustomerService;
+  return classifyCustomerServiceGatewayPayload(payload, scopeKey)
+    .isCustomerService;
 }
 
 export function classifyCustomerServiceGatewayPayload(
@@ -49,7 +50,9 @@ export function classifyCustomerServiceGatewayPayload(
     reason: ownership.reason,
     threadId:
       ownership.threadId ||
-      (ownership.owner === "customerService" ? customerServiceThreadId(payload, scopeKey) : ""),
+      (ownership.owner === "customerService"
+        ? customerServiceThreadId(payload, scopeKey)
+        : ""),
     threadType: ownership.threadType,
     owner: ownership.owner,
     confidence: ownership.confidence,
@@ -57,7 +60,10 @@ export function classifyCustomerServiceGatewayPayload(
   };
 }
 
-export function customerServiceThreadId(payload: Record<string, unknown>, scopeKey?: string) {
+export function customerServiceThreadId(
+  payload: Record<string, unknown>,
+  scopeKey?: string,
+) {
   const message = customerServiceMessageRecord(payload);
   const ownership = resolveConversationOwnership({
     payload,
@@ -66,19 +72,67 @@ export function customerServiceThreadId(payload: Record<string, unknown>, scopeK
   });
   return (
     ownership.threadId ||
-    stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||
-    stringField(message, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||
-    stringField(asRecord(payload.thread), "threadId", "thread_id", "sessionId", "session_id") ||
-    stringField(asRecord(payload.tempSession), "sessionId", "session_id", "threadId", "thread_id") ||
-    stringField(asRecord(payload.temp_session), "sessionId", "session_id", "threadId", "thread_id") ||
-    stringField(message, "conversationId", "conversation_id", "chatId", "chat_id") ||
-    stringField(asRecord(payload.thread), "conversationId", "conversation_id", "chatId", "chat_id") ||
+    stringField(
+      payload,
+      "threadId",
+      "thread_id",
+      "sessionId",
+      "session_id",
+      "visitorSessionId",
+      "tempSessionId",
+    ) ||
+    stringField(
+      message,
+      "threadId",
+      "thread_id",
+      "sessionId",
+      "session_id",
+      "visitorSessionId",
+      "tempSessionId",
+    ) ||
+    stringField(
+      asRecord(payload.thread),
+      "threadId",
+      "thread_id",
+      "sessionId",
+      "session_id",
+    ) ||
+    stringField(
+      asRecord(payload.tempSession),
+      "sessionId",
+      "session_id",
+      "threadId",
+      "thread_id",
+    ) ||
+    stringField(
+      asRecord(payload.temp_session),
+      "sessionId",
+      "session_id",
+      "threadId",
+      "thread_id",
+    ) ||
+    stringField(
+      message,
+      "conversationId",
+      "conversation_id",
+      "chatId",
+      "chat_id",
+    ) ||
+    stringField(
+      asRecord(payload.thread),
+      "conversationId",
+      "conversation_id",
+      "chatId",
+      "chat_id",
+    ) ||
     ""
   );
 }
 
 export function normalizeThreadType(value: string): CustomerServiceThreadType {
-  return ["im", "direct_customer", "customer_direct", "im_direct"].includes(normalizeType(value))
+  return ["im", "direct_customer", "customer_direct", "im_direct"].includes(
+    normalizeType(value),
+  )
     ? "im_direct"
     : "temp_session";
 }
@@ -91,9 +145,29 @@ export function isSelfCustomerServiceGatewayMessage(
   const messageRecord = customerServiceMessageRecord(payload);
   const raw = Object.keys(messageRecord).length ? messageRecord : payload;
   const roleText = [
-    stringField(raw, "senderRole", "senderType", "authorType", "fromType", "role"),
-    stringField(payload, "senderRole", "senderType", "authorType", "fromType", "role"),
-    stringField(asRecord(payload.thread), "senderRole", "senderType", "authorType", "fromType"),
+    stringField(
+      raw,
+      "senderRole",
+      "senderType",
+      "authorType",
+      "fromType",
+      "role",
+    ),
+    stringField(
+      payload,
+      "senderRole",
+      "senderType",
+      "authorType",
+      "fromType",
+      "role",
+    ),
+    stringField(
+      asRecord(payload.thread),
+      "senderRole",
+      "senderType",
+      "authorType",
+      "fromType",
+    ),
   ]
     .map(normalizeType)
     .join("|");
@@ -111,29 +185,38 @@ export function isSelfCustomerServiceGatewayMessage(
     return false;
   }
   if (
-    ["staff", "agent", "operator", "customer_service", "service_staff", "kefu"].some(
-      (marker) => roleText.includes(marker),
-    )
+    [
+      "staff",
+      "agent",
+      "operator",
+      "customer_service",
+      "service_staff",
+      "kefu",
+    ].some((marker) => roleText.includes(marker))
   ) {
     return isSelfGatewayMessage(message, identity);
   }
   const direction = normalizeType(message.direction ?? "");
-  if (["in", "incoming", "inbound", "received", "receive"].includes(direction)) {
+  if (
+    ["in", "incoming", "inbound", "received", "receive"].includes(direction)
+  ) {
     return false;
   }
-  if (isSelfSenderAny(
-    [
-      message.senderUserId,
-      message.senderId,
-      message.fromUserId,
-      message.senderPlatformUserId,
-      message.platformUserId,
-      message.senderLppId,
-      message.lppId,
-    ],
-    message.senderDisplayName,
-    identity,
-  )) {
+  if (
+    isSelfSenderAny(
+      [
+        message.senderUserId,
+        message.senderId,
+        message.fromUserId,
+        message.senderPlatformUserId,
+        message.platformUserId,
+        message.senderLppId,
+        message.lppId,
+      ],
+      message.senderDisplayName,
+      identity,
+    )
+  ) {
     return true;
   }
   return Boolean(message.isSelf || message.isMine);
@@ -143,7 +226,9 @@ export function customerServiceMessageRecord(payload: Record<string, unknown>) {
   return ownershipMessageRecord(payload);
 }
 
-export function customerServiceConversationRecord(payload: Record<string, unknown>) {
+export function customerServiceConversationRecord(
+  payload: Record<string, unknown>,
+) {
   return firstRecord(
     ownershipConversationRecord(payload),
     payload.conversation,
@@ -154,9 +239,17 @@ export function customerServiceConversationRecord(payload: Record<string, unknow
   );
 }
 
-export function customerServiceGatewayConversationId(payload: Record<string, unknown>) {
+export function customerServiceGatewayConversationId(
+  payload: Record<string, unknown>,
+) {
   return (
-    stringField(payload, "conversationId", "conversation_id", "chatId", "chat_id") ||
+    stringField(
+      payload,
+      "conversationId",
+      "conversation_id",
+      "chatId",
+      "chat_id",
+    ) ||
     stringField(
       asRecord(payload.thread),
       "conversationId",
@@ -174,8 +267,20 @@ export function customerServiceGatewayTypingConversationId(
 ) {
   return (
     customerServiceGatewayConversationId(payload) ||
-    stringField(typing, "conversationId", "conversation_id", "chatId", "chat_id") ||
-    stringField(message, "conversationId", "conversation_id", "chatId", "chat_id")
+    stringField(
+      typing,
+      "conversationId",
+      "conversation_id",
+      "chatId",
+      "chat_id",
+    ) ||
+    stringField(
+      message,
+      "conversationId",
+      "conversation_id",
+      "chatId",
+      "chat_id",
+    )
   );
 }
 
@@ -188,17 +293,41 @@ export function customerServiceGatewayThreadId(
   const thread = asRecord(payload.thread);
   const tempSession = firstRecord(payload.tempSession, payload.temp_session);
   return (
-    stringField(payload, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||
-    stringField(message, "threadId", "thread_id", "sessionId", "session_id", "visitorSessionId", "tempSessionId") ||
+    stringField(
+      payload,
+      "threadId",
+      "thread_id",
+      "sessionId",
+      "session_id",
+      "visitorSessionId",
+      "tempSessionId",
+    ) ||
+    stringField(
+      message,
+      "threadId",
+      "thread_id",
+      "sessionId",
+      "session_id",
+      "visitorSessionId",
+      "tempSessionId",
+    ) ||
     stringField(thread, "threadId", "thread_id", "sessionId", "session_id") ||
     stringField(conversation, "threadId", "thread_id") ||
-    stringField(tempSession, "sessionId", "session_id", "threadId", "thread_id") ||
+    stringField(
+      tempSession,
+      "sessionId",
+      "session_id",
+      "threadId",
+      "thread_id",
+    ) ||
     customerServiceThreadId(payload, scopeKey) ||
     indexedCustomerServiceThreadId(payload, scopeKey)
   );
 }
 
-export function customerServiceGatewayMessageInput(payload: Record<string, unknown>) {
+export function customerServiceGatewayMessageInput(
+  payload: Record<string, unknown>,
+) {
   const message = customerServiceMessageRecord(payload);
   return {
     conversationId:
@@ -208,14 +337,12 @@ export function customerServiceGatewayMessageInput(payload: Record<string, unkno
       numberField(message, "conversationSeq", "seq") ??
       numberField(payload, "conversationSeq", "seq"),
     messageId:
-      stringField(message, "messageId") ||
-      stringField(payload, "messageId"),
+      stringField(message, "messageId") || stringField(payload, "messageId"),
     senderUserId:
       stringField(message, "senderUserId", "userId") ||
       stringField(payload, "senderUserId", "userId"),
     senderId:
-      stringField(message, "senderId") ||
-      stringField(payload, "senderId"),
+      stringField(message, "senderId") || stringField(payload, "senderId"),
     senderPlatformUserId:
       stringField(message, "senderPlatformUserId", "platformUserId") ||
       stringField(payload, "senderPlatformUserId", "platformUserId"),
@@ -223,17 +350,126 @@ export function customerServiceGatewayMessageInput(payload: Record<string, unkno
       stringField(message, "senderLppId", "lppId") ||
       stringField(payload, "senderLppId", "lppId"),
     senderRole:
-      stringField(message, "senderRole") ||
-      stringField(payload, "senderRole"),
+      stringField(
+        message,
+        "senderRole",
+        "sender_role",
+        "authorRole",
+        "author_role",
+      ) ||
+      stringField(
+        payload,
+        "senderRole",
+        "sender_role",
+        "authorRole",
+        "author_role",
+      ),
+    senderType:
+      stringField(
+        message,
+        "senderType",
+        "sender_type",
+        "authorType",
+        "author_type",
+        "fromType",
+        "from_type",
+      ) ||
+      stringField(
+        payload,
+        "senderType",
+        "sender_type",
+        "authorType",
+        "author_type",
+        "fromType",
+        "from_type",
+      ),
+    fromRole:
+      stringField(message, "fromRole", "from_role", "role") ||
+      stringField(payload, "fromRole", "from_role", "role"),
+    senderDisplayName:
+      stringField(
+        message,
+        "senderDisplayName",
+        "senderName",
+        "fromName",
+        "displayName",
+      ) ||
+      stringField(
+        payload,
+        "senderDisplayName",
+        "senderName",
+        "fromName",
+        "displayName",
+      ),
+    staffAvatarUrl:
+      stringField(
+        message,
+        "staffAvatarUrl",
+        "staff_avatar_url",
+        "agentAvatarUrl",
+        "agent_avatar_url",
+      ) ||
+      stringField(
+        payload,
+        "staffAvatarUrl",
+        "staff_avatar_url",
+        "agentAvatarUrl",
+        "agent_avatar_url",
+      ),
+    staffDisplayName:
+      stringField(
+        message,
+        "staffDisplayName",
+        "staff_display_name",
+        "agentDisplayName",
+        "agent_display_name",
+      ) ||
+      stringField(
+        payload,
+        "staffDisplayName",
+        "staff_display_name",
+        "agentDisplayName",
+        "agent_display_name",
+      ),
+    staffName:
+      stringField(
+        message,
+        "staffName",
+        "staff_name",
+        "agentName",
+        "agent_name",
+      ) ||
+      stringField(
+        payload,
+        "staffName",
+        "staff_name",
+        "agentName",
+        "agent_name",
+      ),
+    staffUserId:
+      stringField(
+        message,
+        "staffUserId",
+        "staff_user_id",
+        "agentUserId",
+        "agent_user_id",
+      ) ||
+      stringField(
+        payload,
+        "staffUserId",
+        "staff_user_id",
+        "agentUserId",
+        "agent_user_id",
+      ),
+    serviceStaffUserId:
+      stringField(message, "serviceStaffUserId", "service_staff_user_id") ||
+      stringField(payload, "serviceStaffUserId", "service_staff_user_id"),
     direction:
-      stringField(message, "direction") ||
-      stringField(payload, "direction"),
+      stringField(message, "direction") || stringField(payload, "direction"),
     isSelf:
       booleanField(message, "isSelf", "isMine") ??
       booleanField(payload, "isSelf", "isMine"),
-    isMine:
-      booleanField(message, "isMine") ??
-      booleanField(payload, "isMine"),
+    isMine: booleanField(message, "isMine") ?? booleanField(payload, "isMine"),
     messageType:
       stringField(message, "messageType", "type") ||
       stringField(payload, "messageType", "type"),
@@ -254,7 +490,10 @@ export function customerServiceGatewayMessageInput(payload: Record<string, unkno
   } as Record<string, unknown>;
 }
 
-function isSelfGatewayMessage(message: MessageItemDto, identity: GatewayIdentity) {
+function isSelfGatewayMessage(
+  message: MessageItemDto,
+  identity: GatewayIdentity,
+) {
   const senderIds = [
     message.senderUserId,
     message.senderId,
@@ -265,7 +504,11 @@ function isSelfGatewayMessage(message: MessageItemDto, identity: GatewayIdentity
     message.lppId,
   ];
   if (message.isSelf || message.isMine) return true;
-  if (["out", "outgoing", "sent", "self"].includes(normalizeType(message.direction ?? ""))) {
+  if (
+    ["out", "outgoing", "sent", "self"].includes(
+      normalizeType(message.direction ?? ""),
+    )
+  ) {
     return true;
   }
   if (hasAnyIdentityValue(senderIds)) {
@@ -278,17 +521,26 @@ function hasAnyIdentityValue(values: Array<string | null | undefined>) {
   return values.some((value) => typeof value === "string" && value.trim());
 }
 
-function indexedCustomerServiceThreadId(payload: Record<string, unknown>, scopeKey?: string) {
+function indexedCustomerServiceThreadId(
+  payload: Record<string, unknown>,
+  scopeKey?: string,
+) {
   if (!scopeKey) return "";
   const conversationId =
     stringField(payload, "conversationId") ||
     stringField(customerServiceMessageRecord(payload), "conversationId");
-  if (!conversationId || !isCustomerServiceGatewayPayload(payload, scopeKey)) return "";
-  return getCustomerServiceConversationIndex(conversationId, scopeKey)?.threadId ?? "";
+  if (!conversationId || !isCustomerServiceGatewayPayload(payload, scopeKey))
+    return "";
+  return (
+    getCustomerServiceConversationIndex(conversationId, scopeKey)?.threadId ??
+    ""
+  );
 }
 
 function customerServiceGatewayTextBody(record: Record<string, unknown>) {
-  const type = normalizeType(stringField(record, "messageType", "message_type", "type"));
+  const type = normalizeType(
+    stringField(record, "messageType", "message_type", "type"),
+  );
   if (type && type !== "text") return undefined;
   const text = stringField(record, "text", "message", "content");
   return text ? { text } : undefined;

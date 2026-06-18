@@ -179,6 +179,8 @@ export interface ScreenshotCaptureResult {
 export interface CachedMediaFileResult {
   filePath: string;
   fileUrl: string;
+  status?: 'cached' | 'failed';
+  errorMessage?: string;
 }
 
 export interface CacheMediaFilePayload {

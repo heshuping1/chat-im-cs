@@ -20,9 +20,25 @@ describe("online service responsive layout", () => {
     serviceProfilePaneWidth: 400,
     sidebarCollapsed: false,
   };
+  const scrollbarBridgeCss = readFileSync(
+    new URL(
+      "../../src/renderer/styles/shared/scrollbar-theme-bridge.css",
+      import.meta.url,
+    ),
+    "utf8",
+  );
 
   it("keeps the online service chat width aligned with IM", () => {
     expect(serviceLayoutMetrics.chatMin).toBe(420);
+  });
+
+  it("keeps the online service thread pool scrollbar from changing list width", () => {
+    expect(scrollbarBridgeCss).toContain(".app-shell .h-thread-list");
+    expect(scrollbarBridgeCss).toMatch(
+      /\.app-shell \.e-message-stage,\s*\.app-shell \.h-message-stage,\s*\.app-shell \.h-thread-list,\s*\.app-shell \.customer-info-panel[\s\S]*overflow-y: scroll !important;[\s\S]*scrollbar-gutter: stable !important;[\s\S]*scrollbar-color: transparent transparent !important;/,
+    );
+    expect(scrollbarBridgeCss).toContain(".app-shell .h-thread-list.is-scrolling");
+    expect(scrollbarBridgeCss).toContain(".app-shell .h-thread-list.is-scrolling::-webkit-scrollbar-thumb");
   });
 
   it("calculates required width from the rendered grid columns", () => {
@@ -341,8 +357,11 @@ describe("online service responsive layout", () => {
 
     expect(css).toContain("Keep the online-service thread pool dense enough");
     expect(css).toContain(".h-flagship-grid .h-service-head");
-    expect(css).toContain("min-height: 0 !important;");
-    expect(css).toContain("padding: 0 2px 1px !important;");
+    expect(css).toContain("min-height: 40px !important;");
+    expect(css).toContain("overflow: visible !important;");
+    expect(css).toContain(".h-flagship-grid .h-service-head > div");
+    expect(css).toContain("display: grid !important;");
+    expect(css).toContain("padding: 2px 2px 0 !important;");
     expect(css).toContain("flex: 0 0 36px !important;");
     expect(css).toContain("min-height: 34px !important;");
   });
@@ -392,6 +411,30 @@ describe("online service responsive layout", () => {
     expect(css).toContain("justify-content: flex-start;");
     expect(css).toContain(".h-message-stage .cs-message-row.system");
     expect(css).toContain(".cs-system-message");
+  });
+
+  it("renders customer-service stage notices as lightweight inline states", () => {
+    const stage = readFileSync(
+      new URL(
+        "../../src/renderer/customer-service/components/CustomerServiceMessageStage.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const css = readFileSync(
+      new URL(
+        "../../src/renderer/styles/customer-service/customer-service.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(stage).toContain("MessageStageInlineState");
+    expect(stage).toContain("cs-message-stage-inline-state");
+    expect(stage).not.toContain("<PanelState");
+    expect(css).toContain(".cs-message-stage-inline-state");
+    expect(css).toContain("border-radius: 999px;");
+    expect(css).not.toContain(".cs-message-stage-inline-state {\n  display: flex;");
   });
 
   it("keeps customer typing preview above the composer without overlaying messages", () => {

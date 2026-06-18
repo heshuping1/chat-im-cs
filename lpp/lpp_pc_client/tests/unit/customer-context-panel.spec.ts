@@ -31,13 +31,8 @@ describe("customer context panel empty state", () => {
     expect(source).not.toContain('src="/ai-draft-entry.svg"');
   });
 
-  it("renders session notes only for temp-session customer-service threads", () => {
-    expect(source).toContain("CustomerServiceSessionNotesPanel");
-    expect(source).toContain(
-      'normalizeCustomerServiceThreadType(selectedThread.threadType) === "temp_session"',
-    );
-    expect(source).toContain(
-      "<CustomerServiceSessionNotesPanel sessionId={selectedThread.threadId} />",
-    );
+  it("keeps session notes out of the visitor information panel", () => {
+    expect(source).not.toContain("CustomerServiceSessionNotesPanel");
+    expect(source).not.toContain("profileActions=");
   });
 });

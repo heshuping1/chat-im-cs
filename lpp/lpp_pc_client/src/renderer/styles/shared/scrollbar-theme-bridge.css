@@ -1,6 +1,7 @@
 /* WeChat-style scroll containers: reserve the rail so content never shifts horizontally. */
 .app-shell .e-message-stage,
 .app-shell .h-message-stage,
+.app-shell .h-thread-list,
 .app-shell .customer-info-panel,
 .app-shell .message-history-lookup-dialog .chat-history-results,
 .app-shell .pc-forward-targets,
@@ -29,6 +30,7 @@
 
 .app-shell .e-message-stage::-webkit-scrollbar,
 .app-shell .h-message-stage::-webkit-scrollbar,
+.app-shell .h-thread-list::-webkit-scrollbar,
 .app-shell .customer-info-panel::-webkit-scrollbar,
 .app-shell .message-history-lookup-dialog .chat-history-results::-webkit-scrollbar,
 .app-shell .pc-forward-targets::-webkit-scrollbar,
@@ -51,6 +53,7 @@
 .app-shell .cs-ai-suggestion-list::-webkit-scrollbar,
 .app-shell .e-message-stage:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .h-message-stage:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .h-thread-list:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .customer-info-panel:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .message-history-lookup-dialog .chat-history-results:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .pc-forward-targets:not(.is-scrolling)::-webkit-scrollbar,
@@ -73,6 +76,7 @@
 .app-shell .cs-ai-suggestion-list:not(.is-scrolling)::-webkit-scrollbar,
 .app-shell .e-message-stage.is-scrolling::-webkit-scrollbar,
 .app-shell .h-message-stage.is-scrolling::-webkit-scrollbar,
+.app-shell .h-thread-list.is-scrolling::-webkit-scrollbar,
 .app-shell .customer-info-panel.is-scrolling::-webkit-scrollbar,
 .app-shell .message-history-lookup-dialog .chat-history-results.is-scrolling::-webkit-scrollbar,
 .app-shell .pc-forward-targets.is-scrolling::-webkit-scrollbar,
@@ -99,6 +103,7 @@
 
 .app-shell .e-message-stage::-webkit-scrollbar-thumb,
 .app-shell .h-message-stage::-webkit-scrollbar-thumb,
+.app-shell .h-thread-list::-webkit-scrollbar-thumb,
 .app-shell .customer-info-panel::-webkit-scrollbar-thumb,
 .app-shell .message-history-lookup-dialog .chat-history-results::-webkit-scrollbar-thumb,
 .app-shell .pc-forward-targets::-webkit-scrollbar-thumb,
@@ -127,6 +132,7 @@
 
 .app-shell .e-message-stage.is-scrolling,
 .app-shell .h-message-stage.is-scrolling,
+.app-shell .h-thread-list.is-scrolling,
 .app-shell .customer-info-panel.is-scrolling,
 .app-shell .message-history-lookup-dialog .chat-history-results.is-scrolling,
 .app-shell .pc-forward-targets.is-scrolling,
@@ -152,6 +158,7 @@
 
 .app-shell .e-message-stage.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .h-message-stage.is-scrolling::-webkit-scrollbar-thumb,
+.app-shell .h-thread-list.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .customer-info-panel.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .message-history-lookup-dialog .chat-history-results.is-scrolling::-webkit-scrollbar-thumb,
 .app-shell .pc-forward-targets.is-scrolling::-webkit-scrollbar-thumb,
@@ -180,6 +187,7 @@
 
 .app-shell .e-message-stage.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .h-message-stage.is-scrolling::-webkit-scrollbar-thumb:hover,
+.app-shell .h-thread-list.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .customer-info-panel.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .message-history-lookup-dialog .chat-history-results.is-scrolling::-webkit-scrollbar-thumb:hover,
 .app-shell .pc-forward-targets.is-scrolling::-webkit-scrollbar-thumb:hover,
@@ -205,6 +213,7 @@
 
 .app-shell .e-message-stage::-webkit-scrollbar-track,
 .app-shell .h-message-stage::-webkit-scrollbar-track,
+.app-shell .h-thread-list::-webkit-scrollbar-track,
 .app-shell .customer-info-panel::-webkit-scrollbar-track,
 .app-shell .message-history-lookup-dialog .chat-history-results::-webkit-scrollbar-track,
 .app-shell .pc-forward-targets::-webkit-scrollbar-track,
@@ -225,6 +234,65 @@
 .app-shell .cs-quick-reply-preview p::-webkit-scrollbar-track,
 .app-shell .cs-ai-preview p::-webkit-scrollbar-track,
 .app-shell .cs-ai-suggestion-list::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* Settings uses the same stable rail behavior as the message scroll areas. */
+.app-shell .settings-page-v2 .settings-nav-list,
+.app-shell .settings-page-v2 .settings-detail-body,
+.app-shell .diagnostics-records-log-view pre {
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: transparent transparent !important;
+}
+
+.app-shell .settings-page-v2 .settings-nav-list::-webkit-scrollbar,
+.app-shell .settings-page-v2 .settings-detail-body::-webkit-scrollbar,
+.app-shell .diagnostics-records-log-view pre::-webkit-scrollbar,
+.app-shell .settings-page-v2 .settings-nav-list:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .settings-page-v2 .settings-detail-body:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .diagnostics-records-log-view pre:not(.is-scrolling)::-webkit-scrollbar,
+.app-shell .settings-page-v2 .settings-nav-list.is-scrolling::-webkit-scrollbar,
+.app-shell .settings-page-v2 .settings-detail-body.is-scrolling::-webkit-scrollbar,
+.app-shell .diagnostics-records-log-view pre.is-scrolling::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.app-shell .settings-page-v2 .settings-nav-list::-webkit-scrollbar-thumb,
+.app-shell .settings-page-v2 .settings-detail-body::-webkit-scrollbar-thumb,
+.app-shell .diagnostics-records-log-view pre::-webkit-scrollbar-thumb {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .settings-page-v2 .settings-nav-list.is-scrolling,
+.app-shell .settings-page-v2 .settings-detail-body.is-scrolling,
+.app-shell .diagnostics-records-log-view pre.is-scrolling {
+  scrollbar-color: rgba(156, 163, 175, 0.42) transparent !important;
+}
+
+.app-shell .settings-page-v2 .settings-nav-list.is-scrolling::-webkit-scrollbar-thumb,
+.app-shell .settings-page-v2 .settings-detail-body.is-scrolling::-webkit-scrollbar-thumb,
+.app-shell .diagnostics-records-log-view pre.is-scrolling::-webkit-scrollbar-thumb {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(156, 163, 175, 0.42) !important;
+  background-clip: padding-box !important;
+}
+
+.app-shell .settings-page-v2 .settings-nav-list.is-scrolling::-webkit-scrollbar-thumb:hover,
+.app-shell .settings-page-v2 .settings-detail-body.is-scrolling::-webkit-scrollbar-thumb:hover,
+.app-shell .diagnostics-records-log-view pre.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.58) !important;
+}
+
+.app-shell .settings-page-v2 .settings-nav-list::-webkit-scrollbar-track,
+.app-shell .settings-page-v2 .settings-detail-body::-webkit-scrollbar-track,
+.app-shell .diagnostics-records-log-view pre::-webkit-scrollbar-track {
   background: transparent !important;
 }
 
