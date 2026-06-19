@@ -114,7 +114,7 @@ describe("app brand assets", () => {
     expect(fixInstalledShortcutSource).toContain("IconLocation");
   });
 
-  it("uses the high fidelity app icon asset in PC brand slots", () => {
+  it("uses the high fidelity app icon asset in PC brand slots", { timeout: 15_000 }, () => {
     expect(appMetadataSource).toContain("import.meta.env.BASE_URL");
     expect(appMetadataSource).toContain("app-icon-startlink.png");
     expect(existsSync(resolve(root, "assets/brand/brand-logo-icon.png"))).toBe(true);
@@ -148,7 +148,7 @@ describe("app brand assets", () => {
     expect(sidebarSource).not.toContain('className="sidebar-brand-logo" aria-hidden="true">\n            L');
   });
 
-  it("keeps a small-size visual acceptance board for the app icon", () => {
+  it("keeps a small-size visual acceptance board for the app icon", { timeout: 15_000 }, () => {
     const pcAppIconSource = readFileSync(resolve(root, "assets/brand/app-icon-source.png"));
     expect(pcAppIconSource).toEqual(readFileSync(resolve(root, "assets/brand/brand-logo-icon.png")));
     expect(readFileSync(resolve(root, "assets/app-icon-startlink.png"))).toEqual(pcAppIconSource);

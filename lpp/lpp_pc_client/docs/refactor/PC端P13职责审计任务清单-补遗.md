@@ -1,0 +1,8 @@
+# PC端 P13 职责审计任务清单补遗
+
+## 9. 职责例外清单
+
+| 文件 | owner | 保留理由 | 触发条件 | 验证命令 |
+| --- | --- | --- | --- | --- |
+| `src/renderer/data/customer-service/cs-message-contract.ts` | Customer service message contract normalizer owner | Customer service message entity normalization, body/media coercion, compatibility fallback, and contract diagnostics still form one anti-corruption boundary before cache/message owners consume normalized payloads. | Do not add page presentation, Gateway routing state, cache writes, or workspace read rules here; if message body/media normalizers continue growing independently, split dedicated message-part normalizers behind the same facade. | `npx vitest run tests/unit/cs-message-contract.spec.ts tests/unit/architecture-boundaries.spec.ts` |
+| `src/renderer/data/gateway/gateway-cs-payload-utils.ts` | Customer service Gateway payload adapter owner | Customer service Gateway raw payload compatibility, participant/message field extraction, contract fallback, and adapter helper composition remain one first-stage anti-corruption owner before event routing and side effects. | Do not add UI presentation, cache-owner writes, unread/read state, or direct delivery side effects here; if widget/im-direct branches keep growing, split per-thread-type payload helpers behind the same adapter facade. | `npx vitest run tests/unit/cs-gateway-event-adapter.spec.ts tests/unit/architecture-boundaries.spec.ts` |

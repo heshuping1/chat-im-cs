@@ -48,8 +48,10 @@ function buildCommandPlans(targetSuite) {
     command('typecheck', ['run', 'typecheck'], { stopOnFailure: true }),
     command('build', ['run', 'build'], { stopOnFailure: true }),
     command('lint:boundaries', ['run', 'lint:boundaries'], { stopOnFailure: true }),
+    command('rebuild:native:node', ['rebuild', 'better-sqlite3'], { stopOnFailure: true }),
     command('test:core', ['run', 'test:core'], { stopOnFailure: true }),
     command('test:browser', ['run', 'test:browser'], { stopOnFailure: false }),
+    command('rebuild:native:electron', ['run', 'rebuild:native'], { stopOnFailure: true }),
     command('test:electron:chat', ['run', 'test:electron:chat'], { stopOnFailure: false }),
     command('test:electron:group-chat:smoke', ['run', 'test:electron:group-chat:smoke'], { stopOnFailure: false }),
     command('test:electron:regression', ['run', 'test:electron:regression'], { stopOnFailure: false }),
@@ -60,7 +62,9 @@ function buildCommandPlans(targetSuite) {
     command('lint:hooks', ['run', 'lint:hooks'], { stopOnFailure: false }),
     command('lint:shape', ['run', 'lint:shape'], { stopOnFailure: false }),
     command('docs:check', ['run', 'docs:check'], { stopOnFailure: false }),
+    command('rebuild:native:node:coverage', ['rebuild', 'better-sqlite3'], { stopOnFailure: false }),
     command('test:coverage:core', ['run', 'test:coverage:core'], { stopOnFailure: false }),
+    command('rebuild:native:electron:full', ['run', 'rebuild:native'], { stopOnFailure: false }),
     command('test:electron:group-chat:full', ['run', 'test:electron:group-chat:full'], { stopOnFailure: false }),
   ];
   return targetSuite === 'daily' ? daily : weekly;
@@ -91,6 +95,7 @@ function npmInvocation(args) {
 }
 
 function defaultTimeoutFor(name) {
+  if (name.startsWith('rebuild:native')) return 10 * 60_000;
   if (name === 'test:electron:regression') return 8 * 60_000;
   if (name.startsWith('test:electron')) return 3 * 60_000;
   if (name === 'test:browser') return 10 * 60_000;

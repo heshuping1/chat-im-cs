@@ -44,6 +44,8 @@ export class FileLocalDataDriver implements LocalDataDriver {
     this.filePath = join(options.rootDir, "local-data-v1.json");
   }
 
+  async close() {}
+
   async clearScope(input: Parameters<LocalDataDriver["clearScope"]>[0]) {
     await this.enqueueWrite(async () => {
       const state = await this.readState();

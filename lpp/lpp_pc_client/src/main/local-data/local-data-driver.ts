@@ -36,6 +36,7 @@ export interface LocalDataUpsertMessagesInput {
 }
 
 export interface LocalDataDriver {
+  close(): Promise<void>;
   clearScope(input: LocalDataClearScopePayload): Promise<void>;
   cleanup(input: LocalDataCleanupPayload): Promise<LocalDataCleanupResult>;
   deleteMessage(input: LocalDataDeleteMessagePayload): Promise<void>;

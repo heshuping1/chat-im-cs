@@ -6,6 +6,7 @@ interface LocalDataServiceOptions {
 
 export function createLocalDataService(options: LocalDataServiceOptions) {
   return {
+    close: options.driver.close.bind(options.driver),
     clearScope: options.driver.clearScope.bind(options.driver),
     cleanup: options.driver.cleanup.bind(options.driver),
     deleteMessage: options.driver.deleteMessage.bind(options.driver),

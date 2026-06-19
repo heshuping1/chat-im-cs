@@ -123,6 +123,8 @@ describe("local data sqlite driver", () => {
           ]),
         );
       } finally {
+        await first.close();
+        await second.close();
         db.close();
       }
     } finally {
@@ -203,6 +205,7 @@ describe("local data sqlite driver", () => {
         dbIntegrity: "ok",
         ftsRebuilt: true,
       });
+      await service.close();
     } finally {
       await rm(root, { force: true, recursive: true });
     }

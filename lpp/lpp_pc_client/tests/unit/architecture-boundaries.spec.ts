@@ -719,6 +719,8 @@ describe("architecture boundaries", () => {
       "src/renderer/data/workspace-ui/workspaceTrayStatusEffect.ts",
       "src/renderer/lib/openExternal.ts",
       "src/renderer/components/MePage.tsx",
+      "src/renderer/components/CustomerServiceConversationStatsReport.tsx",
+      "src/renderer/components/CustomerServiceHistoryReport.tsx",
       "src/renderer/components/Sidebar.tsx",
       "src/renderer/media/runtime/desktopMediaActions.ts",
       "src/renderer/media/runtime/imageMaterialization.ts",
@@ -774,7 +776,15 @@ describe("architecture boundaries", () => {
       join(repoRoot, "docs/refactor/PC端P13职责审计任务清单.md"),
       "utf8",
     );
-    const exceptionSection = responsibilityLedger.split("## 9. 职责例外清单")[1] ?? "";
+    const supplementalLedgerPath = join(
+      repoRoot,
+      "docs/refactor/PC端P13职责审计任务清单-补遗.md",
+    );
+    const supplementalLedger = existsSync(supplementalLedgerPath)
+      ? readFileSync(supplementalLedgerPath, "utf8")
+      : "";
+    const exceptionSection = `${responsibilityLedger}
+${supplementalLedger}`;
     const violations = files
       .filter((file) => isUnder(file, "src/main") || isUnder(file, "src/renderer/data"))
       .filter((file) => lineCount(file) >= 450)

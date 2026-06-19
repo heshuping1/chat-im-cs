@@ -82,6 +82,7 @@ export class SqliteLocalDataDriver implements LocalDataDriver {
   private readonly db: Database.Database;
   private readonly dbPath: string;
   private readonly recordDiagnostic?: (record: SqliteLocalDataDiagnostic) => void;
+  private closed = false;
 
   constructor(options: SqliteLocalDataDriverOptions) {
     mkdirSync(dirname(options.dbPath), { recursive: true });
@@ -108,6 +109,12 @@ export class SqliteLocalDataDriver implements LocalDataDriver {
       });
       throw error;
     }
+  }
+
+  async close() {
+    if (this.closed) return;
+    this.db.close();
+    this.closed = true;
   }
 
   async clearScope(input: Parameters<LocalDataDriver["clearScope"]>[0]) {
