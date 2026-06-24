@@ -19,10 +19,7 @@ import type {
   WheelEvent,
 } from "react";
 import { useI18n } from "../../i18n/useI18n";
-import {
-  imagePreviewBoxFromSize,
-  type MediaPreviewPresentation,
-} from "../domain/mediaPreviewPresentation";
+import type { MediaPreviewPresentation } from "../domain/mediaPreviewPresentation";
 
 const minViewerScale = 0.25;
 const maxViewerScale = 4;
@@ -64,10 +61,8 @@ export function ImageMessageFrame({
   sourceAvailable: boolean;
 }) {
   const { t } = useI18n();
-  const [naturalPreviewBox, setNaturalPreviewBox] =
-    useState<MediaPreviewPresentation["previewBox"] | null>(null);
   const canRenderImage = sourceAvailable && Boolean(src);
-  const effectivePreviewBox = naturalPreviewBox ?? presentation?.previewBox;
+  const effectivePreviewBox = presentation?.previewBox;
   const mediaPreviewFrameStyle = effectivePreviewBox
       ? ({
           "--media-preview-width": `${effectivePreviewBox.width}px`,
@@ -77,26 +72,7 @@ export function ImageMessageFrame({
     : undefined;
   const presentationClassName = effectivePreviewBox?.className ?? "";
 
-  useEffect(() => {
-    setNaturalPreviewBox(null);
-  }, [src]);
-
-  const handleInlineImageLoad = (event: SyntheticEvent<HTMLImageElement>) => {
-    const image = event.currentTarget;
-    const nextPreviewBox = imagePreviewBoxFromSize({
-      width: image.naturalWidth,
-      height: image.naturalHeight,
-    });
-    if (nextPreviewBox) {
-      setNaturalPreviewBox((current) =>
-        current &&
-        current.width === nextPreviewBox.width &&
-        current.height === nextPreviewBox.height &&
-        current.className === nextPreviewBox.className
-          ? current
-          : nextPreviewBox,
-      );
-    }
+  const handleInlineImageLoad = () => {
     onImageLoad();
   };
 

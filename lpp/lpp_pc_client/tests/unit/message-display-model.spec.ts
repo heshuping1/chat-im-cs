@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PUBLIC_ID_LABEL } from "../../src/renderer/brand/public-brand";
 import type { ConversationListItem, MessageItemDto } from "../../src/renderer/data/api-client";
 import {
   buildContactCardProfilePopover,
@@ -115,7 +116,7 @@ describe("messageDisplayModel", () => {
     expect(popover.rows).toEqual([
       { label: "昵称", value: "资料昵称" },
       { label: "备注", value: "重点跟进" },
-      { label: "星络号", value: "profile-lpp" },
+      { label: PUBLIC_ID_LABEL, value: "profile-lpp" },
       { label: "渠道应用", value: "渠道应用 A" },
       { label: "来源渠道", value: "小程序" },
     ]);
@@ -151,7 +152,7 @@ describe("messageDisplayModel", () => {
 
     expect(popover.rows).toEqual([
       { label: "昵称", value: "当前账号" },
-      { label: "星络号", value: "me-lpp" },
+      { label: PUBLIC_ID_LABEL, value: "me-lpp" },
     ]);
     expect(popover.rows.map((row) => row.label)).not.toEqual(
       expect.arrayContaining(["用户 ID", "平台 ID", "角色", "会话", "身份"]),

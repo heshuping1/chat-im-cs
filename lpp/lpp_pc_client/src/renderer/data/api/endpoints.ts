@@ -109,6 +109,8 @@ export const endpointPlan = {
     "/api/client/v1/customer-service/temp-sessions/{sessionId}/notes/{noteId}/pin",
   customerServiceTempSessionNote:
     "/api/client/v1/customer-service/temp-sessions/{sessionId}/notes/{noteId}",
+  customerServiceTempSessionVisitorRemark:
+    "/api/client/v1/customer-service/temp-sessions/{sessionId}/visitor-remark",
   adminCustomerServiceTempSessions:
     "/api/admin/v1/customer-service/temp-sessions",
   adminCustomerServiceTempSession:

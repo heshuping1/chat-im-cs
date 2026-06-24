@@ -2434,26 +2434,6 @@
   color: #b91c1c;
 }
 
-*:not(.is-scrolling)::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-}
-
-*.is-scrolling::-webkit-scrollbar {
-  width: 8px !important;
-  height: 8px !important;
-}
-
-*:not(.is-scrolling) {
-  scrollbar-width: none !important;
-  scrollbar-gutter: auto !important;
-}
-
-*.is-scrolling {
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(113, 131, 155, 0.34) transparent !important;
-}
-
 .cs-monitor-thread-list,
 .cs-monitor-wall-grid,
 .cs-monitor-window .h-message-stage {

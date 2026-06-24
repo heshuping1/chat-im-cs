@@ -35,4 +35,15 @@ describe("customer context panel empty state", () => {
     expect(source).not.toContain("CustomerServiceSessionNotesPanel");
     expect(source).not.toContain("profileActions=");
   });
+
+  it("wires visitor customer remarks to the customer-service visitor remark API", () => {
+    expect(source).toContain("canUseCustomerServiceStaffEndpoints");
+    expect(source).toContain("const canEditVisitorRemark = canUseCustomerServiceStaffEndpoints(session)");
+    expect(source).toContain("updateTempSessionVisitorRemark");
+    expect(source).toContain("Customer service staff role required.");
+    expect(source).toContain("updateVisitorRemark: canEditVisitorRemark");
+    expect(source).toContain("onUpdateRemark={updateVisitorRemark}");
+    expect(source).toContain("profileActionPending={profileActionPending}");
+    expect(source).toContain("visitorRemark: result.remark");
+  });
 });

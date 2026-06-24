@@ -7,6 +7,7 @@ import {
   imConversationEffectiveUnreadCount,
   resolveImConversationReadView,
 } from "../../data/im-read/im-conversation-read-view";
+import type { ContactMessageOpenTrace } from "../../data/diagnostics/contact-message-open-diagnostics";
 import type { CurrentUserIdentity } from "../../data/message-display";
 import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
 import { useI18n } from "../../i18n/useI18n";
@@ -14,6 +15,10 @@ import {
   findFirstUnreadLoadedMessage,
   type UnreadJumpState,
 } from "../models/messageDisplayModel";
+import {
+  conversationSelectionOpenTraceFor,
+  recordConversationSelectionStep,
+} from "../diagnostics/message-selection-performance";
 
 export type ActiveImConversationSource = "user" | "auto" | "none";
 
@@ -41,7 +46,10 @@ export function useMessageUnreadJumpController({
   messageSearchOpen: boolean;
   messages: MessageItemDto[];
   session: AuthSession | null;
-  setActiveConversation: (conversationId: string) => void;
+  setActiveConversation: (
+    conversationId: string,
+    trace?: ContactMessageOpenTrace,
+  ) => void;
   setConversationDrawerOpen: Dispatch<SetStateAction<boolean>>;
   setMessageSearchKeyword: Dispatch<SetStateAction<string>>;
   setMessageSearchOpen: Dispatch<SetStateAction<boolean>>;
@@ -109,6 +117,12 @@ export function useMessageUnreadJumpController({
         identity: unreadIdentity,
         visibility: "listOnly",
       });
+      recordConversationSelectionStep(conversation.conversationId, "selection.handler.enter", {
+        activeConversationId,
+        effectiveUnread: readView.effectiveUnread,
+        lastMessageSeq: conversation.lastMessageSeq,
+        readViewReason: readView.reason,
+      });
       setSelectionSources((current) => ({
         ...current,
         [conversation.conversationId]: "user",
@@ -132,7 +146,13 @@ export function useMessageUnreadJumpController({
         },
       });
       setConversationDrawerOpen(false);
-      setActiveConversation(conversation.conversationId);
+      setActiveConversation(
+        conversation.conversationId,
+        conversationSelectionOpenTraceFor(conversation.conversationId),
+      );
+      recordConversationSelectionStep(conversation.conversationId, "selection.handler.after-set-active", {
+        activeConversationId,
+      });
 
       const unread = imConversationEffectiveUnreadCount(conversation, unreadIdentity);
       if (unread <= 0) {

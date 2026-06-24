@@ -241,6 +241,10 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     sourceChannel?: string;
     country?: string;
     region?: string;
+    category?: string;
+    conversationCategory?: string;
+    customerRemark?: string;
+    isValid?: string | boolean;
     rating?: string | number;
     minRating?: string | number;
     maxRating?: string | number;
@@ -268,6 +272,10 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       "sourceChannel",
       "country",
       "region",
+      "category",
+      "conversationCategory",
+      "customerRemark",
+      "isValid",
       "minRating",
       "maxRating",
       "minRiskLevel",
@@ -304,6 +312,10 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     sourceChannel?: string;
     country?: string;
     region?: string;
+    category?: string;
+    conversationCategory?: string;
+    customerRemark?: string;
+    isValid?: string | boolean;
     rating?: string | number;
     minRating?: string | number;
     maxRating?: string | number;
@@ -348,6 +360,10 @@ export class CustomerServiceApiClient extends MessagesApiClient {
     sourceChannel?: string;
     country?: string;
     region?: string;
+    category?: string;
+    conversationCategory?: string;
+    customerRemark?: string;
+    isValid?: string | boolean;
     rating?: string | number;
     minRating?: string | number;
     maxRating?: string | number;
@@ -378,6 +394,10 @@ export class CustomerServiceApiClient extends MessagesApiClient {
       "sourceChannel",
       "country",
       "region",
+      "category",
+      "conversationCategory",
+      "customerRemark",
+      "isValid",
       "rating",
       "minRating",
       "maxRating",
@@ -861,6 +881,22 @@ export class CustomerServiceApiClient extends MessagesApiClient {
         .replace("{sessionId}", encodeURIComponent(sessionId))
         .replace("{noteId}", encodeURIComponent(noteId)),
       { method: "DELETE" },
+    );
+  }
+
+  updateTempSessionVisitorRemark(sessionId: string, remark: string) {
+    const normalizedRemark = normalizeVisitorRemarkContent(remark);
+    return this.request<unknown>(
+      endpointPlan.customerServiceTempSessionVisitorRemark.replace(
+        "{sessionId}",
+        encodeURIComponent(sessionId),
+      ),
+      {
+        method: "PUT",
+        body: JSON.stringify({ remark: normalizedRemark }),
+      },
+    ).then((payload) =>
+      normalizeTempSessionVisitorRemarkResponse(payload, sessionId, normalizedRemark),
     );
   }
 
@@ -1440,17 +1476,6 @@ function readAdminConversationItems(response: AdminConversationManagementRespons
   return [];
 }
 
-function readResponseCursor(response: unknown) {
-  const record = asRecord(response);
-  if (!record) return null;
-  return (
-    readString(record.nextCursor) ||
-    readString(record.next_cursor) ||
-    readString(record.cursor) ||
-    null
-  );
-}
-
 function normalizeCustomerServiceThreadFromContract(
   item: CustomerServiceThread,
   api: string,
@@ -1703,6 +1728,37 @@ function normalizeSessionNoteContent(content: string) {
   return normalized;
 }
 
+function normalizeVisitorRemarkContent(content: string) {
+  const normalized = content.trim();
+  if (normalized.length > 1000) {
+    throw new Error("Customer service visitor remark cannot exceed 1000 characters.");
+  }
+  return normalized;
+}
+
+function normalizeTempSessionVisitorRemarkResponse(
+  payload: unknown,
+  fallbackSessionId: string,
+  fallbackRemark: string,
+) {
+  const record = asRecord(payload) ?? {};
+  const sessionId =
+    readString(record.sessionId) ||
+    readString(record.session_id) ||
+    fallbackSessionId;
+  const rawRemark = Object.prototype.hasOwnProperty.call(record, "remark")
+    ? record.remark
+    : Object.prototype.hasOwnProperty.call(record, "visitorRemark")
+      ? record.visitorRemark
+      : Object.prototype.hasOwnProperty.call(record, "visitor_remark")
+        ? record.visitor_remark
+        : undefined;
+  return {
+    sessionId,
+    remark: typeof rawRemark === "string" ? rawRemark.trim() : fallbackRemark,
+  };
+}
+
 function compareCustomerServiceSessionNotes(
   left: CustomerServiceSessionNoteDto,
   right: CustomerServiceSessionNoteDto,
@@ -1933,33 +1989,6 @@ function normalizeCustomerServiceMessagesFromContract(
 
 function threadRoutePathType(threadType: CustomerServiceThreadType) {
   return threadType === "temp_session" ? "temp-session" : "direct-customer";
-}
-
-function normalizeCustomerServiceHistoryStatusParam(
-  status?: string | number,
-): "queued" | "active" | null {
-  const normalized = String(status ?? "").trim().toLowerCase().replace(/-/g, "_");
-  if (normalized === "queued" || normalized === "queue") return "queued";
-  if (normalized === "active" || normalized === "open" || normalized === "serving") {
-    return "active";
-  }
-  return null;
-}
-
-function hasAdminCustomerServiceHistoryScope(params: {
-  conversationId?: string;
-  customerId?: string;
-  customerUserId?: string;
-  senderUserId?: string;
-  visitorUserId?: string;
-}) {
-  return [
-    params.conversationId,
-    params.customerId,
-    params.customerUserId,
-    params.senderUserId,
-    params.visitorUserId,
-  ].some((value) => String(value ?? "").trim());
 }
 
 function aiSuggestionPathType(threadType: CustomerServiceThreadType) {

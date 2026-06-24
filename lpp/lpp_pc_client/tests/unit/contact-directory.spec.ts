@@ -210,6 +210,21 @@ describe("contact directory model", () => {
     expect(pageSource).not.toContain("lppId");
   });
 
+  it("enriches selected customer and friend contacts from profile-extra when the list omits the public id", () => {
+    const controllerSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/contacts/hooks/useContactsDirectoryController.ts"),
+      "utf8",
+    );
+
+    expect(controllerSource).toContain("activeFriendUserId");
+    expect(controllerSource).toContain('activeContact.kind === "customer"');
+    expect(controllerSource).toContain('activeContact.kind === "friend"');
+    expect(controllerSource).toContain("pcQueryKeys.friendProfileExtra");
+    expect(controllerSource).toContain("getFriendProfileExtra(activeFriendUserId)");
+    expect(controllerSource).toContain("publicContactIdFromSources");
+    expect(controllerSource).toContain("enrichContactWithPublicId");
+  });
+
   it("groups organization contacts by role for the organization list", () => {
     const contacts = mapContacts({
       conversations: [],

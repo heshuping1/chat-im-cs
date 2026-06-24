@@ -72,6 +72,32 @@ describe("customer profile model business ownership", () => {
     expect(model.remark).toBe("重点跟进客户");
   });
 
+  it("uses temp-session visitor remark from customer-service profile card", () => {
+    const model = buildCustomerModel({
+      profile: {
+        displayName: "Visitor A",
+        visitorRemark: "VIP old customer",
+      },
+    });
+
+    expect(model.remark).toBe("VIP old customer");
+  });
+
+  it("keeps IM profile extra note ahead of customer-service profile remark aliases", () => {
+    const model = buildCustomerModel({
+      profile: {
+        displayName: "Customer A",
+        visitorRemark: "profile remark",
+      },
+      profileExtra: {
+        friendUserId: "u2",
+        note: "friend private note",
+      },
+    });
+
+    expect(model.remark).toBe("friend private note");
+  });
+
   it("does not use contact remark fallback as private handling remark", () => {
     const model = buildCustomerModel({
       contact: {
@@ -98,6 +124,34 @@ describe("customer profile model business ownership", () => {
     });
 
     expect(model.friendUserId).toBe("u2");
+  });
+
+  it("uses ordinary IM friend profile lpp id in the customer identity header", () => {
+    const model = buildCustomerModel({
+      profileExtra: {
+        friendUserId: "u2",
+        lppId: "lpp-profile-extra",
+      },
+    });
+
+    expect(model.lppId).toBe("lpp-profile-extra");
+  });
+
+  it("uses contact green bubble number when ordinary IM conversation lacks peer lpp id", () => {
+    const model = buildCustomerModel({
+      contact: {
+        id: "friend-u2",
+        kind: "friend",
+        name: "Friend U2",
+        remark: "",
+        subtitle: "",
+        tags: [],
+        userId: "u2",
+        greenBubbleNo: "gb-u2",
+      },
+    });
+
+    expect(model.lppId).toBe("gb-u2");
   });
 
   it("uses real profile application and assigned staff fields when provided", () => {

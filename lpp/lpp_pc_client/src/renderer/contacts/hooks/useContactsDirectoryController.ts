@@ -17,6 +17,10 @@ import {
   resolveContactDirectoryFilter,
 } from "../../data/contact-directory";
 import { deriveContactDirectoryAccess } from "../../data/contact-directory-permissions";
+import {
+  enrichContactWithPublicId,
+  publicContactIdFromSources,
+} from "../../data/contact-public-id";
 import { pcQueryKeys } from "../../data/query-keys";
 import { requireApiClient } from "../../data/runtime";
 import type { ContactFilter, ContactItem } from "../../data/types";
@@ -296,6 +300,12 @@ export function useContactsDirectoryController({
     visibleContacts[0];
   const activeTenantMemberUserId =
     activeContact?.kind === "staff" && activeContact.userId ? activeContact.userId : "";
+  const activeFriendUserId =
+    activeContact &&
+    (activeContact.kind === "customer" || activeContact.kind === "friend") &&
+    activeContact.userId
+      ? activeContact.userId
+      : "";
   const tenantMemberProfileQuery = useQuery({
     queryKey: pcQueryKeys.tenantMemberProfile(
       session?.apiBaseUrl,
@@ -305,11 +315,34 @@ export function useContactsDirectoryController({
     enabled: Boolean(activeTenantMemberUserId && !activeContact?.greenBubbleNo && session),
     queryFn: async () => requireApiClient(session).getTenantMemberProfile(activeTenantMemberUserId),
   });
+  const friendProfileExtraQuery = useQuery({
+    queryKey: pcQueryKeys.friendProfileExtra(
+      session?.apiBaseUrl,
+      session?.tenantToken,
+      activeFriendUserId,
+    ),
+    enabled: Boolean(
+      activeFriendUserId &&
+        !activeContact?.greenBubbleNo &&
+        session &&
+        contactAccess.canReadSocialContacts,
+    ),
+    queryFn: async () => requireApiClient(session).getFriendProfileExtra(activeFriendUserId),
+  });
   const activeContactDetail = useMemo(() => {
-    const greenBubbleNo = tenantMemberProfileQuery.data?.greenBubbleNo;
-    if (!activeContact || activeContact.greenBubbleNo || !greenBubbleNo) return activeContact;
-    return { ...activeContact, greenBubbleNo };
-  }, [activeContact, tenantMemberProfileQuery.data?.greenBubbleNo]);
+    return enrichContactWithPublicId(
+      activeContact,
+      publicContactIdFromSources({
+        contact: activeContact,
+        profileExtra: friendProfileExtraQuery.data,
+        tenantMemberProfile: tenantMemberProfileQuery.data,
+      }),
+    );
+  }, [
+    activeContact,
+    friendProfileExtraQuery.data,
+    tenantMemberProfileQuery.data,
+  ]);
 
   const activeRequest =
     visibleRequests.find((item) => item.requestId === selectedRequestId) ??

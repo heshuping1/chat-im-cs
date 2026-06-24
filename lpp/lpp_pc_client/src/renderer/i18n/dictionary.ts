@@ -17,6 +17,20 @@ export const messages: Record<AppLocale, MessageDictionary> = {
 
 export type TranslationParams = Record<string, string | number>;
 
+export function createBrandTranslationParams(
+  localeMessages: MessageDictionary,
+  fallbackMessages: MessageDictionary,
+): TranslationParams {
+  const publicName = formatMessage(
+    resolveMessage(localeMessages, fallbackMessages, 'brand.publicName'),
+  );
+  const publicIdLabel = formatMessage(
+    resolveMessage(localeMessages, fallbackMessages, 'brand.publicIdLabel'),
+    { publicName },
+  );
+  return { publicName, publicIdLabel };
+}
+
 export function resolveMessage(
   localeMessages: MessageDictionary,
   fallbackMessages: MessageDictionary,

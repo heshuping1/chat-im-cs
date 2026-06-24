@@ -15,6 +15,10 @@ describe("customer-service history and lookup surfaces", () => {
     resolve(process.cwd(), "src/renderer/components/CustomerServiceConversationStatsReport.tsx"),
     "utf8",
   );
+  const customerServiceDateRangeFilter = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/CustomerServiceDateRangeFilter.tsx"),
+    "utf8",
+  );
   const customerServiceExportTaskDialog = readFileSync(
     resolve(process.cwd(), "src/renderer/components/CustomerServiceExportTaskDialog.tsx"),
     "utf8",
@@ -121,6 +125,15 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("创建时间：");
     expect(customerServiceHistoryReport).toContain("客户关键词");
     expect(customerServiceHistoryReport).toContain("客户名称、客户 ID、手机号、邮箱");
+    expect(customerServiceHistoryReport).toContain("客户备注");
+    expect(customerServiceHistoryReport).toContain("对话类别");
+    expect(customerServiceHistoryReport).toContain("对话评价");
+    expect(customerServiceHistoryReport).toContain("good,excellent");
+    expect(customerServiceHistoryReport).toContain("value={filters.ratingSegment}");
+    expect(customerServiceHistoryReport).toContain("value={exportFilters.ratingSegment}");
+    expect(customerServiceHistoryReport).toContain('label="地址"');
+    expect(customerServiceHistoryReport).toContain('placeholder="省/市/地区"');
+    expect(customerServiceHistoryReport).toContain("ratingSegmentRange");
     expect(customerServiceHistoryReport).toContain("historyEmptyText");
     expect(customerServiceHistoryReport).toContain("没有找到匹配客户身份的历史对话");
     expect(customerServiceHistoryReport).toContain("historySummary");
@@ -145,7 +158,7 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("createHistoryStaffPickerMembers");
     expect(customerServiceHistoryReport).toContain("filterHistoryStaffPickerMembers");
     expect(customerServiceHistoryReport).toContain("当前接口仅支持单个参与客服筛选");
-    expect(customerServiceHistoryReport).toContain("搜索员工姓名 / 绿泡号");
+    expect(customerServiceHistoryReport).toContain("搜索员工姓名 / ${PUBLIC_ID_LABEL}");
     expect(customerServiceHistoryReport).toContain("setFilters((current) => ({ ...current, staffUserId }))");
     expect(customerServiceHistoryReport).toContain("`${dateText}T${normalizeHistoryTime");
     expect(customerServiceHistoryReport).not.toContain('HistoryInput label="参与客服 ID"');
@@ -188,15 +201,47 @@ describe("customer-service history and lookup surfaces", () => {
 
     expect(primaryOrder).toContain('"staffIdentity"');
     expect(primaryOrder).toContain('"customerIdentity"');
-    expect(primaryOrder.indexOf('"lastMessageAt"')).toBeGreaterThan(primaryOrder.indexOf('"durationSeconds"'));
-    expect(primaryOrder.indexOf('"createdAt"')).toBeGreaterThan(primaryOrder.indexOf('"lastMessageAt"'));
+    expect(primaryOrder).toContain('"visitTime"');
+    expect(primaryOrder).toContain('"conversationTime"');
+    expect(primaryOrder).toContain('"conversationCategory"');
+    expect(primaryOrder).toContain('"responseSeconds"');
+    expect(primaryOrder.indexOf('"visitTime"')).toBeGreaterThan(primaryOrder.indexOf('"customerIdentity"'));
+    expect(primaryOrder.indexOf('"conversationTime"')).toBeGreaterThan(primaryOrder.indexOf('"visitTime"'));
+    expect(primaryOrder.indexOf('"staffIdentity"')).toBeGreaterThan(primaryOrder.indexOf('"responseSeconds"'));
+    expect(primaryOrder).not.toContain('"sourceIdentity"');
+    expect(primaryOrder).not.toContain('"rating"');
+    expect(primaryOrder).not.toContain('"riskLevel"');
+    expect(primaryOrder).not.toContain('"lastMessageAt"');
+    expect(primaryOrder).not.toContain('"createdAt"');
+    expect(primaryOrder).not.toContain('"durationSeconds"');
     expect(primaryOrder).not.toContain('"threadId"');
     expect(primaryOrder).not.toContain('"conversationId"');
     expect(customerServiceHistoryReport).toContain("historyFieldColumnClass");
     expect(customerServiceHistoryReport).toContain("HistoryPartyProfileDialog");
+    expect(customerServiceHistoryReport).toContain("HistoryVisitorSessionList");
+    expect(customerServiceHistoryReport).toContain("HistoryVisitorTrajectory");
+    expect(customerServiceHistoryReport).toContain("HistoryPartyProfileDetails");
+    expect(customerServiceHistoryReport).toContain("expandedThreadKeys");
+    expect(customerServiceHistoryReport).toContain("historySessionRangeLabel");
+    expect(customerServiceHistoryReport).toContain("historySessionSummaryLabel");
+    expect(customerServiceHistoryReport).toContain("dialogPosition");
+    expect(customerServiceHistoryReport).toContain("startDrag");
+    expect(customerServiceHistoryReport).toContain("HistoryVisitorSessionItem");
+    expect(customerServiceHistoryReport).toContain("HistoryVisitorMessageItem");
+    expect(customerServiceHistoryReport).toContain("getWorkbenchThreadDetail(thread.threadType, thread.threadId)");
+    expect(customerServiceHistoryReport).toContain("readDetailMessages(detailQuery.data).filter(isVisibleHistoryMessage)");
+    expect(customerServiceHistoryReport).toContain("historyMessageText");
+    expect(customerServiceHistoryReport).toContain("cs-history-visitor-session-toggle");
+    expect(customerServiceHistoryReport).toContain("cs-history-visitor-session-detail");
+    expect(customerServiceHistoryReport).toContain("historyRelatedVisitorThreads");
+    expect(customerServiceHistoryReport).toContain("compareHistoryThreadDesc");
     expect(customerServiceHistoryReport).toContain("HistoryThreadDetailDialog");
     expect(customerServiceHistoryReport).toContain("historyThreadDetailRows");
     expect(customerServiceHistoryReport).toContain("historyThreadDetailSections");
+    expect(customerServiceHistoryReport).toContain("shouldShowHistoryDetailField");
+    expect(customerServiceHistoryReport).toContain("Object.prototype.hasOwnProperty.call(record, key)");
+    expect(customerServiceHistoryReport).not.toContain("visibleKeys");
+    expect(customerServiceHistoryReport).not.toContain("hasHistoryDetailValue");
     expect(customerServiceHistoryReport).toContain("会话信息");
     expect(customerServiceHistoryReport).toContain("双方信息");
     expect(customerServiceHistoryReport).toContain("时间与效率");
@@ -207,17 +252,89 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("findTenantMemberByHistoryIdentity");
     expect(customerServiceHistoryReport).toContain("已关联通讯录");
     expect(customerServiceHistoryReport).toContain("未关联通讯录");
-    expect(customerServiceHistoryReport).toContain("星络号");
+    expect(customerServiceHistoryReport).toContain("PUBLIC_ID_LABEL");
     expect(customerServiceHistoryReport).toContain('staffIdentity: "客服"');
     expect(customerServiceHistoryReport).toContain("HistoryPartyInlineProfile");
     expect(customerServiceHistoryReport).toContain('className="cs-history-party-avatar"');
     expect(customerServiceHistoryReport).toContain("PcAvatar");
     expect(productPagesCss).toContain(".cs-history-party-mini-avatar");
-    expect(productPagesCss).toContain(".cs-history-field-lastMessageAt");
-    expect(productPagesCss).toContain(".cs-history-field-createdAt");
+    expect(productPagesCss).toContain(".cs-history-field-visitTime");
+    expect(productPagesCss).toContain(".cs-history-field-conversationTime");
+    expect(productPagesCss).toContain(".cs-history-field-responseSeconds");
+    expect(productPagesCss).toContain(".cs-history-stacked-cell");
+    expect(productPagesCss).toContain(".cs-history-compact-info-cell");
+    expect(productPagesCss).toContain("min-width: 100%");
+    expect(productPagesCss).toContain("width: max-content");
+    expect(productPagesCss).toContain("grid-template-columns: 22px minmax(0, 1fr)");
+    expect(productPagesCss).toContain(".cs-history-party-tabs");
+    expect(productPagesCss).toContain("resize: both");
+    expect(productPagesCss).toContain(".cs-history-party-dialog.dragging header");
+    expect(productPagesCss).toContain(".cs-history-visitor-session-list");
+    expect(productPagesCss).toContain(".cs-history-visitor-session-row");
+    expect(productPagesCss).toContain(".cs-history-visitor-session-summary");
+    expect(productPagesCss).toContain(".cs-history-visitor-session-detail");
+    expect(productPagesCss).toContain(".cs-history-visitor-message-list");
+    expect(productPagesCss).toContain(".cs-history-visitor-message");
+    expect(productPagesCss).toContain(".cs-history-visitor-trajectory");
+    expect(productPagesCss).toContain(".cs-history-party-tab-panel::-webkit-scrollbar");
+    expect(productPagesCss).toContain(".cs-history-party-dialog dl::-webkit-scrollbar");
+    expect(productPagesCss).toContain(".cs-history-visitor-session-list::-webkit-scrollbar");
+    expect(productPagesCss).toContain(".cs-history-visitor-trajectory::-webkit-scrollbar");
+    expect(productPagesCss).toContain("scrollbar-width: thin");
+    expect(productPagesCss).toContain("scrollbar-color: transparent transparent");
+    expect(productPagesCss).toContain(".cs-history-party-tab-panel:hover::-webkit-scrollbar-thumb");
+    expect(productPagesCss).toContain(".cs-history-party-dialog dl:hover::-webkit-scrollbar-thumb");
+    expect(productPagesCss).toContain(".cs-history-visitor-session-list:hover::-webkit-scrollbar-thumb");
+    expect(productPagesCss).toContain(".cs-history-visitor-trajectory:hover::-webkit-scrollbar-thumb");
+    expect(productPagesCss).toContain("display: flex");
+    expect(productPagesCss).toContain(".cs-history-date-filter .cs-history-filter-options");
+    expect(customerServiceHistoryReport).toContain("CustomerServiceDateRangeFilter");
+    expect(customerServiceConversationStatsReport).toContain("CustomerServiceDateRangeFilter");
+    expect(customerServiceDateRangeFilter).toContain('captionLayout="label"');
+    expect(customerServiceDateRangeFilter).toContain("formatWeekdayName");
+    expect(customerServiceDateRangeFilter).toContain("formatMonthDropdown");
+    expect(customerServiceDateRangeFilter).toContain("<span>开始</span>");
+    expect(customerServiceDateRangeFilter).toContain("<span>结束</span>");
+    expect(productPagesCss).toContain(".cs-history-date-popover .rdp-root");
+    expect(productPagesCss).not.toContain(".cs-history-date-popover .rdp {");
+    expect(productPagesCss).toContain("--rdp-day_button-height: 28px");
+    expect(productPagesCss).toContain(".cs-history-time-grid label span");
+    expect(productPagesCss).toContain("grid-template-columns: minmax(380px, 0.42fr) minmax(0, 1fr)");
+    expect(productPagesCss).toContain("white-space: nowrap");
     expect(customerServiceHistoryReport).toContain('if (type === "temp_session") return "临时会话"');
     expect(customerServiceHistoryReport).toContain('if (normalized.includes("temp-chat-widget")) return "网页小组件"');
     expect(customerServiceHistoryReport).toContain("function riskLevelLabel");
+    expect(customerServiceHistoryReport).toContain("function conversationCategoryLabel");
+    expect(customerServiceHistoryReport).toContain("HistoryStackedCell");
+    expect(customerServiceHistoryReport).toContain("HistoryCompactInfoCell");
+    expect(customerServiceHistoryReport).toContain("historyElapsedSeconds");
+    expect(customerServiceHistoryReport).toContain("historyDateTimePlusSeconds");
+    expect(customerServiceHistoryReport).toContain("historyTableDateTimeText");
+    expect(customerServiceHistoryReport).toContain("historyCustomerInlineLines");
+    const inlineLines = customerServiceHistoryReport.match(
+      /function historyCustomerInlineLines[\s\S]*?function responseSecondsLabel/,
+    )?.[0] ?? "";
+    expect(inlineLines).not.toContain("raw.visitorUserId");
+    expect(inlineLines).toContain("historyLocationLine(location, ip)");
+    expect(inlineLines).toContain("[sourceChannel, sourcePlatform].filter(Boolean).join");
+    expect(inlineLines).toContain("].filter(Boolean)");
+    expect(customerServiceHistoryReport).toContain("function historyLocationLine");
+    expect(inlineLines).toContain("raw.sourceChannel");
+    expect(inlineLines).toContain("raw.sourcePlatform");
+    const customerProfile = customerServiceHistoryReport.match(
+      /function historyCustomerProfile[\s\S]*?function historyStaffProfile/,
+    )?.[0] ?? "";
+    expect(customerProfile).toContain("raw.customerRemark");
+    expect(customerProfile).toContain("raw.visitorUserId");
+    expect(customerProfile).toContain("raw.customerId");
+    expect(customerProfile).toContain("raw.customerUserId");
+    expect(customerProfile).toContain("raw.ipMasked");
+    expect(customerProfile).toContain("raw.ipAddress");
+    expect(customerProfile).toContain("thread.sourceChannel");
+    expect(customerProfile).toContain("thread.platform");
+    expect(customerServiceHistoryReport).toContain("accessSeconds");
+    expect(customerServiceHistoryReport).toContain("totalResponseSeconds");
+    expect(customerServiceHistoryReport).toContain("customerRemark");
     expect(customerServiceHistoryReport).toContain("0\" || text === \"normal");
     expect(customerServiceHistoryReport).toContain("1分 · 极差");
     expect(customerServiceHistoryReport).toContain("5分 · 非常满意");
@@ -225,10 +342,17 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("客户用户 ID");
     expect(customerServiceHistoryReport).toContain("客服 ID");
     expect(productPagesCss).toContain(".cs-history-party-modal");
+    expect(customerServiceHistoryReport).not.toContain('className="cs-history-party-modal" role="presentation" onClick={onClose}');
+    expect(customerServiceHistoryReport).not.toContain('className="cs-history-info-modal" role="presentation" onClick={onClose}');
     expect(productPagesCss).toContain(".cs-history-party-avatar");
     expect(productPagesCss).toContain(".cs-history-info-dialog");
     expect(productPagesCss).toContain(".cs-history-info-sections");
     expect(productPagesCss).toContain(".cs-history-info-section");
+    expect(customerServiceHistoryReport).toContain("assignedStaffDisplayName:");
+    expect(customerServiceHistoryReport).toContain('className="cs-history-info-label"');
+    expect(customerServiceHistoryReport).toContain('className="cs-history-info-value"');
+    expect(productPagesCss).toContain("grid-template-columns: minmax(104px, 36%) minmax(0, 1fr)");
+    expect(productPagesCss).toContain("overflow-wrap: anywhere");
   });
 
   it("keeps owner readonly live conversations in the current service list", () => {
@@ -576,11 +700,17 @@ describe("customer-service history and lookup surfaces", () => {
     });
     expect(customerServiceHistoryReport).not.toContain("createSourceChannelOptionsFromThreads");
     expect(customerServiceHistoryReport).not.toContain("filters.sourceChannel");
+    expect(customerServiceHistoryReport).toContain("value={filters.region}");
+    expect(customerServiceHistoryReport).toContain("value={exportFilters.region}");
     expect(customerServiceHistoryReport).toContain('"sourcePlatform"');
     expect(customerServiceHistoryReport).toContain("sourcePlatformLabel(firstHistoryText(raw.sourcePlatform, thread.platform, thread.provider, thread.source))");
     expect(customerServiceHistoryReport).toContain("slaRisk");
     expect(customerServiceClient).toContain("minRating");
     expect(customerServiceClient).toContain("maxRating");
+    expect(customerServiceHistoryReport).toContain('if (segment === "negative") return { minRating: 1, maxRating: 2 }');
+    expect(customerServiceHistoryReport).toContain('if (segment === "neutral") return { minRating: 3, maxRating: 3 }');
+    expect(customerServiceHistoryReport).toContain('if (segment === "positive") return { minRating: 4, maxRating: 5 }');
+    expect(customerServiceHistoryReport).toContain("...(rating ? { minRating: rating, maxRating: rating } : ratingRange)");
     expect(customerServiceHistoryReport).toContain("rating");
   });
 

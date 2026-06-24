@@ -108,8 +108,13 @@ export function useMessageContactProfileController({
       session?.tenantToken,
       activeFriendUserId,
     ),
-    enabled: false,
-    queryFn: async () => undefined,
+    enabled: Boolean(
+      session &&
+        activeConversationType === "direct" &&
+        activeFriendUserId &&
+        activeFriend,
+    ),
+    queryFn: async () => requireApiClient(session).getFriendProfileExtra(activeFriendUserId),
     retry: false,
     staleTime: 60_000,
   });

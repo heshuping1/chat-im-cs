@@ -3,6 +3,7 @@ import type {
   CustomerProfileCard,
   FriendProfileExtraDto,
 } from "../data/api-client";
+import { publicContactIdFromSources } from "../data/contact-public-id";
 import type { ContactItem } from "../data/types";
 import { formatChatTime, formatShortDate } from "../lib/format";
 import { channelLabel } from "./ChannelBadge";
@@ -275,21 +276,12 @@ export function buildCustomerModel({
   const assetMix = buildAssetMix(profile, external);
   const level = textValue(firstKnownValue(profile?.customerLevel, profile?.level, profile?.grade, profile?.rank, profile?.isVip ? "VIP" : undefined));
   const lppId = firstKnownValue(
-    profileValue(profile, [
-      "lppId",
-      "lppNo",
-      "lppNumber",
-      "customerLppId",
-      "customerLppNo",
-      "greenBubbleId",
-      "greenBubbleNo",
-      "userNo",
-    ]),
-    conversation?.peerLppId,
-    conversation?.peerLppNo,
-    conversation?.peerLppNumber,
-    conversation?.peerUserNo,
-    contact?.lppId,
+    publicContactIdFromSources({
+      contact,
+      conversation,
+      profile,
+      profileExtra,
+    }),
     valueAt(external, ["identity", "profile", "customer", "\u5ba2\u6237", "\u6838\u5fc3\u8eab\u4efd"], [
       "\u7eff\u6ce1\u6ce1\u53f7",
       "lppId",
@@ -377,7 +369,10 @@ export function buildCustomerModel({
     recentTradeTime: shortDate(tradingSummary.recentTradeTime ?? tradingSummary.lastTradeAt),
     registeredAt: shortDate(registeredAtRaw),
     registrationStatus,
-    remark: textValue(profileExtra?.note),
+    remark: textValue(firstKnownValue(
+      profileExtra?.note,
+      profileValue(profile, ["visitorRemark", "visitor_remark", "customerRemark", "customer_remark", "remark", "note"]),
+    )),
     remoteLoginAlert: textValue(valueAt(external, ["device", "security", "\u8bbe\u5907"], ["\u5f02\u5730\u767b\u5f55\u63d0\u9192", "remoteLoginAlert"])),
     risk,
     sections: {
@@ -684,19 +679,6 @@ function normalizeVerificationStatus(value: unknown, copy: CustomerModelCopy) {
 function normalizeVipLevel(profile: CustomerProfileCard | undefined, level: string) {
   if (profile?.isVip) return isKnown(level) && level !== "\u666e\u901a\u5ba2\u6237" ? level : "VIP";
   return isVipLabel(level) ? level : "--";
-}
-
-function riskLabel(value: string) {
-  if (["\u9ad8", "\u9ad8\u98ce\u9669"].includes(value)) return "\u9ad8\u98ce\u9669";
-  return value;
-}
-
-function riskTone(value: string) {
-  const normalized = value.toLowerCase();
-  if (["\u9ad8", "\u9ad8\u98ce\u9669", "high", "red", "warning", "\u5f02\u5e38"].some((key) => normalized.includes(key))) {
-    return "risk";
-  }
-  return "muted";
 }
 
 function formatPercent(value: number) {

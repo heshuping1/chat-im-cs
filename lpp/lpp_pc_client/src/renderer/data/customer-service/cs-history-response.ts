@@ -12,7 +12,7 @@ export function normalizeStaffServiceHistoryResponse(
   response: StaffServiceHistoryResponse,
   scopeKey?: string,
 ): StaffServiceHistoryResponse {
-  const rawItems = response.items ?? [];
+  const rawItems = (response.items ?? []).map(normalizeStaffServiceHistoryServerItem);
   const historyItems = rawItems
     .filter(isCustomerServiceThreadSnapshot)
     .map((serverItem) => ({
@@ -138,11 +138,47 @@ function applyStaffServiceHistoryOverlay(
     scopeKey,
   );
   const hasServerUnreadCount = typeof item.unreadCount === "number";
+  const serverLastMessageAt = readString(item.lastMessageAt);
   return {
     ...item,
-    lastMessageAt: overlayed.lastMessageAt ?? item.lastMessageAt,
+    lastMessageAt: serverLastMessageAt ?? overlayed.lastMessageAt ?? item.lastMessageAt,
     lastMessagePreview: item.lastMessagePreview,
     unreadCount: hasServerUnreadCount ? item.unreadCount : overlayed.unreadCount,
+  };
+}
+
+function normalizeStaffServiceHistoryServerItem(
+  item: StaffServiceHistoryItem,
+): StaffServiceHistoryItem {
+  const record = item as StaffServiceHistoryItem & Record<string, unknown>;
+  const lastMessageRecord =
+    asRecord(record.lastMessage) ||
+    asRecord(record.last_message) ||
+    asRecord(record.latestMessage) ||
+    asRecord(record.latest_message);
+  const lastMessageAt =
+    readString(record.lastMessageAt) ||
+    readString(record.last_message_at) ||
+    readString(lastMessageRecord?.sentAt) ||
+    readString(lastMessageRecord?.sent_at) ||
+    readString(lastMessageRecord?.createdAt) ||
+    readString(lastMessageRecord?.created_at);
+  const lastMessagePreview =
+    readString(record.lastMessagePreview) ||
+    readString(record.last_message_preview) ||
+    readString(lastMessageRecord?.preview) ||
+    readString(lastMessageRecord?.text) ||
+    readString(lastMessageRecord?.content);
+  if (
+    lastMessageAt === item.lastMessageAt &&
+    lastMessagePreview === item.lastMessagePreview
+  ) {
+    return item;
+  }
+  return {
+    ...item,
+    lastMessageAt: lastMessageAt ?? item.lastMessageAt,
+    lastMessagePreview: lastMessagePreview ?? item.lastMessagePreview,
   };
 }
 

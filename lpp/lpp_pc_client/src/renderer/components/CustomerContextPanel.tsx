@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { DragEvent, ReactNode } from "react";
 import {
@@ -20,7 +20,10 @@ import {
 import { useAuthSession } from "../data/auth/auth-store";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
-import { canReadCustomerServiceHistory } from "../data/customer-service/cs-role-capabilities";
+import {
+  canReadCustomerServiceHistory,
+  canUseCustomerServiceStaffEndpoints,
+} from "../data/customer-service/cs-role-capabilities";
 import {
   useActiveThreadId,
   type ServiceAssistantPane,
@@ -35,9 +38,11 @@ const staffServiceHistoryPageSize = 50;
 export function useCustomerContextPanelModel() {
   const session = useAuthSession();
   const selectedThreadId = useActiveThreadId();
+  const queryClient = useQueryClient();
   const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
   const queryBaseKey = [session?.apiBaseUrl, session?.tenantToken];
   const canReadHistory = canReadCustomerServiceHistory(session);
+  const canEditVisitorRemark = canUseCustomerServiceStaffEndpoints(session);
 
   const threadsQuery = useQuery({
     queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
@@ -105,12 +110,69 @@ export function useCustomerContextPanelModel() {
           source: String(threadRecord.source ?? threadRecord.sourceChannel ?? ""),
         }
       : undefined);
+  const profileQueryKey = pcQueryKeys.customerServiceThreadProfile(
+    ...queryBaseKey,
+    selectedThread?.threadType,
+    selectedThread?.threadId,
+  );
+  const updateVisitorRemarkMutation = useMutation({
+    mutationFn: async (remark: string) => {
+      if (!client || !selectedThread) {
+        throw new Error("Select a customer service conversation.");
+      }
+      if (!canEditVisitorRemark) {
+        throw new Error("Customer service staff role required.");
+      }
+      if (selectedThread.threadType !== "temp_session") {
+        throw new Error("Visitor remarks are only available for temp-session visitors.");
+      }
+      return client.updateTempSessionVisitorRemark(selectedThread.threadId, remark);
+    },
+    onSuccess: async (result) => {
+      queryClient.setQueryData<CustomerProfileCard | undefined>(
+        profileQueryKey,
+        (current) =>
+          current
+            ? {
+                ...current,
+                customerRemark: result.remark,
+                remark: result.remark,
+                visitorRemark: result.remark,
+              }
+            : current,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: profileQueryKey,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: pcQueryKeys.customerServiceThreadDetail(
+            ...queryBaseKey,
+            selectedThread?.threadType,
+            selectedThread?.threadId,
+          ),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: pcQueryKeys.customerServiceThreads(...queryBaseKey),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: pcQueryKeys.customerServiceHistory(...queryBaseKey),
+        }),
+      ]);
+    },
+  });
 
   return {
     profileError: profileQuery.error,
     profileForPanel,
     profileLoading: profileQuery.isLoading,
+    profileActionPending: updateVisitorRemarkMutation.isPending,
     selectedThread,
+    updateVisitorRemark: canEditVisitorRemark
+      ? async (remark: string) => {
+          await updateVisitorRemarkMutation.mutateAsync(remark);
+        }
+      : undefined,
   };
 }
 
@@ -134,7 +196,14 @@ export function CustomerContextPanel({
   pinned?: boolean;
 }) {
   const { t } = useI18n();
-  const { profileError, profileForPanel, profileLoading, selectedThread } =
+  const {
+    profileActionPending,
+    profileError,
+    profileForPanel,
+    profileLoading,
+    selectedThread,
+    updateVisitorRemark,
+  } =
     useCustomerContextPanelModel();
 
   if (!selectedThread) {
@@ -179,9 +248,11 @@ export function CustomerContextPanel({
           : undefined
       }
       loading={profileLoading}
+      onUpdateRemark={updateVisitorRemark}
       onDragOver={onDragOverContextPane}
       onDrop={(event) => onDropContextPane?.(event, "customer")}
       profile={profileForPanel}
+      profileActionPending={profileActionPending}
       title={t("customerService.contextPanel.title")}
     />
   );

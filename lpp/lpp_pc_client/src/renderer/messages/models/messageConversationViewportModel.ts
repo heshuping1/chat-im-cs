@@ -2,6 +2,7 @@ export interface ConversationViewportState {
   atBottom: boolean;
   pendingNewMessageCount: number;
   scrollTop: number;
+  userControlled?: boolean;
 }
 
 export interface ConversationViewportAppendInput {
@@ -48,7 +49,9 @@ export function restoreConversationViewport(
   conversationId: string,
 ): ConversationViewportRestore {
   const state = registry.get(conversationId);
-  return state ? { kind: "restore", state } : { kind: "initial-bottom" };
+  if (!state) return { kind: "initial-bottom" };
+  if (!state.atBottom && !state.userControlled) return { kind: "initial-bottom" };
+  return { kind: "restore", state };
 }
 
 export function shouldKeepBottomPinnedAfterLayout({

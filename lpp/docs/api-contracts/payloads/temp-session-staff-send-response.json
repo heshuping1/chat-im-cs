@@ -1,20 +1,21 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNLVOL2JTIKE",
+  "requestId": "0HNMCAQPOOLQD",
   "data": {
-    "messageId": "019e82a5-19bb-7839-a850-cc6c94981c90",
-    "conversationId": "019e82a5-14a7-706a-b6e5-eb0fdd8ba5d9",
+    "messageId": "019ed503-5684-7d71-a70f-2e55e5208892",
+    "conversationId": "019ed503-4f60-7d33-9ea7-39273ef94f1f",
     "conversationSeq": 4,
-    "senderUserId": "019e82a5-141f-7352-bc77-54640b1ea83b",
+    "senderUserId": "019ed503-4ebe-7657-b21f-a7e319b1a621",
     "senderDisplayName": "Temp Staff",
     "senderType": "staff",
     "messageType": "text",
     "body": {
       "text": "\u53EF\u4EE5\u7684\uFF0C\u6211\u4EEC\u652F\u6301\u79C1\u6709\u90E8\u7F72\u548C\u7F51\u5173\u5185\u7F51\u63A5\u5165\u3002"
     },
-    "sentAt": "2026-06-01T10:05:18.6514263\u002B00:00",
+    "sentAt": "2026-06-17T09:57:06.3085562\u002B00:00",
     "replyToMessageId": null,
-    "senderRole": null
+    "senderRole": null,
+    "senderAvatarUrl": null
   }
 }

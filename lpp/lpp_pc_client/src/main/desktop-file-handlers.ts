@@ -63,9 +63,13 @@ export function registerDesktopFileHandlers({
   register(
     'readMediaFileAsDataUrl',
     async (_event, payload: CacheMediaFilePayload) => {
-      const { filePath } = await ensureLocalMediaFile(payload);
-      const bytes = await readFile(filePath);
-      return `data:${mediaMimeType(filePath, payload.kind)};base64,${bytes.toString('base64')}`;
+      try {
+        const { filePath } = await ensureLocalMediaFile(payload);
+        const bytes = await readFile(filePath);
+        return `data:${mediaMimeType(filePath, payload.kind)};base64,${bytes.toString('base64')}`;
+      } catch {
+        return undefined;
+      }
     },
   );
 

@@ -1,6 +1,5 @@
 ﻿import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DayPicker, type DateRange } from "react-day-picker";
-import "react-day-picker/style.css";
+import type { DateRange } from "react-day-picker";
 import {
   Download,
   Eye,
@@ -9,7 +8,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from "react";
 
 import type {
   ConversationListItem,
@@ -21,10 +20,11 @@ import type {
   TenantMemberDto,
 } from "../data/api-client";
 import { useAuthSession } from "../data/auth/auth-store";
+import { PUBLIC_ID_LABEL } from "../brand/public-brand";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import type { PcDataCenterView } from "../data/workspace-access";
-import { formatError, formatMonthDayTime } from "../lib/format";
+import { formatError } from "../lib/format";
 import { MessageHistoryLookupDialog } from "../messages/components/MessageHistoryLookupDialog";
 import {
   createMessageLookupScope,
@@ -33,6 +33,7 @@ import {
   type HistoryFilterKey,
 } from "../messages/models/messageListModel";
 import { channelLabel } from "./ChannelBadge";
+import { CustomerServiceDateRangeFilter } from "./CustomerServiceDateRangeFilter";
 import { CustomerServiceExportTaskDialog } from "./CustomerServiceExportTaskDialog";
 import type { DataCenterReportDefinition } from "./data-center/dataCenterReportTypes";
 import { PanelState } from "./PanelState";
@@ -50,14 +51,18 @@ type HistoryDatePreset =
 
 type HistoryFilters = {
   assignedStaffUserId: string;
+  category: string;
+  conversationCategory: string;
   conversationId: string;
   country: string;
   customerId: string;
+  customerRemark: string;
   customerUserId: string;
   from: string;
   keyword: string;
   locale: string;
   rating: string;
+  ratingSegment: "all" | "negative" | "neutral" | "positive";
   region: string;
   senderUserId: string;
   slaRisk: string;
@@ -72,14 +77,18 @@ const historyPageSizeOptions = [10, 20, 50, 100];
 
 const defaultFilters: HistoryFilters = {
   assignedStaffUserId: "",
+  category: "",
+  conversationCategory: "all",
   conversationId: "",
   country: "",
   customerId: "",
+  customerRemark: "",
   customerUserId: "",
   from: "",
   keyword: "",
   locale: "",
   rating: "",
+  ratingSegment: "all",
   region: "",
   senderUserId: "",
   slaRisk: "",
@@ -110,9 +119,14 @@ type HistoryThreadsPage = {
 type HistoryPartyProfile = {
   avatarUrl?: string | null;
   details: Array<[string, string]>;
+  relatedThreads?: CustomerServiceThread[];
+  thread?: CustomerServiceThread;
+  type?: "visitor" | "staff";
   name: string;
   title: string;
 };
+
+type HistoryApiClient = ReturnType<typeof createApiClient>;
 
 export function CustomerServiceHistoryReport({
   dataCenterView = "enterprise-owner",
@@ -493,11 +507,23 @@ export function CustomerServiceHistoryReport({
       <section className="cs-history-filter-card">
         <div className="cs-history-commerce-search">
           <HistoryInput
-            className="search-field"
+            className="search-field compact"
             label="客户关键词"
             value={filters.keyword}
             placeholder="客户名称、客户 ID、手机号、邮箱..."
             onChange={(keyword) => setFilters((current) => ({ ...current, keyword }))}
+          />
+          <HistoryInput
+            label="客户备注"
+            value={filters.customerRemark}
+            placeholder="备注关键词"
+            onChange={(customerRemark) => setFilters((current) => ({ ...current, customerRemark }))}
+          />
+          <HistoryInput
+            label="地址"
+            value={filters.region}
+            placeholder="省/市/地区"
+            onChange={(region) => setFilters((current) => ({ ...current, region }))}
           />
           <HistoryInput label="客户 ID" value={filters.customerId} onChange={(customerId) => setFilters((current) => ({ ...current, customerId }))} />
           <HistoryStaffPicker
@@ -556,7 +582,7 @@ export function CustomerServiceHistoryReport({
         </div>
 
         <div className="cs-history-filter-grid cs-history-filter-lines">
-          <div className="cs-history-filter-line">
+          <div className="cs-history-filter-line paired">
             <HistoryFilterOptionRow
               label="会话类型"
               value={filters.threadType}
@@ -572,8 +598,42 @@ export function CustomerServiceHistoryReport({
                 }))
               }
             />
+            <HistoryFilterOptionRow
+              label="对话类别"
+              value={filters.conversationCategory}
+              options={[
+                ["all", "全部"],
+                ["only_visit", "仅访问"],
+                ["invalid", "无效"],
+                ["normal", "一般"],
+                ["good,excellent", "较好/极佳"],
+              ]}
+              onChange={(conversationCategory) =>
+                setFilters((current) => ({
+                  ...current,
+                  conversationCategory,
+                }))
+              }
+            />
           </div>
-          <div className="cs-history-filter-line">
+          <div className="cs-history-filter-line paired">
+            <HistoryFilterOptionRow
+              label="对话评价"
+              value={filters.ratingSegment}
+              options={[
+                ["all", "全部"],
+                ["negative", "差评"],
+                ["neutral", "中评"],
+                ["positive", "好评"],
+              ]}
+              onChange={(ratingSegment) =>
+                setFilters((current) => ({
+                  ...current,
+                  rating: "",
+                  ratingSegment: ratingSegment as HistoryFilters["ratingSegment"],
+                }))
+              }
+            />
             <div className="cs-history-filter-row">
               <span className="cs-history-filter-row-label">创建时间：</span>
               <HistoryDateRangeFilter
@@ -599,9 +659,9 @@ export function CustomerServiceHistoryReport({
             <HistoryInput label="指派客服 ID" value={filters.assignedStaffUserId} onChange={(assignedStaffUserId) => setFilters((current) => ({ ...current, assignedStaffUserId }))} />
             <HistoryInput label="语言" value={filters.locale} placeholder="zh-CN / en-US" onChange={(locale) => setFilters((current) => ({ ...current, locale }))} />
             <HistoryInput label="来源平台" value={filters.sourcePlatform} placeholder="web / app" onChange={(sourcePlatform) => setFilters((current) => ({ ...current, sourcePlatform }))} />
+            <HistoryInput label="业务分类" value={filters.category} placeholder="billing / tech" onChange={(category) => setFilters((current) => ({ ...current, category }))} />
             <HistoryInput label="国家" value={filters.country} onChange={(country) => setFilters((current) => ({ ...current, country }))} />
-            <HistoryInput label="地区" value={filters.region} onChange={(region) => setFilters((current) => ({ ...current, region }))} />
-            <HistoryInput label="评分" value={filters.rating} placeholder="1-5" onChange={(rating) => setFilters((current) => ({ ...current, rating }))} />
+            <HistoryInput label="精确评分" value={filters.rating} placeholder="1-5" onChange={(rating) => setFilters((current) => ({ ...current, rating, ratingSegment: "all" }))} />
             <HistoryInput label="SLA 风险" value={filters.slaRisk} placeholder="1 / 2 / 3" onChange={(slaRisk) => setFilters((current) => ({ ...current, slaRisk }))} />
           </div>
         )}
@@ -640,6 +700,7 @@ export function CustomerServiceHistoryReport({
                           {renderHistoryFieldCell(
                             thread,
                             column.key,
+                            allLoadedThreads,
                             setPartyProfile,
                             tenantMemberByIdentity,
                           )}
@@ -731,14 +792,16 @@ export function CustomerServiceHistoryReport({
 
       {partyProfile && (
         <HistoryPartyProfileDialog
+          apiBaseUrl={session?.apiBaseUrl}
+          client={client}
           profile={partyProfile}
+          tenantToken={session?.tenantToken}
           onClose={() => setPartyProfile(null)}
         />
       )}
 
       {infoThread && (
         <HistoryThreadDetailDialog
-          columns={historyFieldColumns}
           onClose={() => setInfoThread(null)}
           thread={infoThread}
         />
@@ -757,6 +820,8 @@ export function CustomerServiceHistoryReport({
                   placeholder="客户名称、客户 ID、手机号、邮箱..."
                   onChange={(keyword) => setExportFilters((current) => ({ ...current, keyword }))}
                 />
+                <HistoryInput label="客户备注" value={exportFilters.customerRemark} onChange={(customerRemark) => setExportFilters((current) => ({ ...current, customerRemark }))} />
+                <HistoryInput label="地址" value={exportFilters.region} placeholder="省/市/地区" onChange={(region) => setExportFilters((current) => ({ ...current, region }))} />
                 <HistoryInput label="客户 ID" value={exportFilters.customerId} onChange={(customerId) => setExportFilters((current) => ({ ...current, customerId }))} />
                 <HistoryInput label="客服 ID" value={exportFilters.staffUserId} onChange={(staffUserId) => setExportFilters((current) => ({ ...current, staffUserId }))} />
                 <div className="cs-stats-export-form-actions inline">
@@ -780,6 +845,23 @@ export function CustomerServiceHistoryReport({
                       }))
                     }
                   />
+                  <HistoryFilterOptionRow
+                    label="对话类别"
+                    value={exportFilters.conversationCategory}
+                    options={[
+                      ["all", "全部"],
+                      ["only_visit", "仅访问"],
+                      ["invalid", "无效"],
+                      ["normal", "一般"],
+                      ["good,excellent", "较好/极佳"],
+                    ]}
+                    onChange={(conversationCategory) =>
+                      setExportFilters((current) => ({
+                        ...current,
+                        conversationCategory,
+                      }))
+                    }
+                  />
                   <div className="cs-history-filter-row cs-stats-export-row-input">
                     <span className="cs-history-filter-row-label">会话 ID：</span>
                     <input
@@ -794,6 +876,23 @@ export function CustomerServiceHistoryReport({
                   </div>
                 </div>
                 <div className="cs-history-filter-line full">
+                  <HistoryFilterOptionRow
+                    label="对话评价"
+                    value={exportFilters.ratingSegment}
+                    options={[
+                      ["all", "全部"],
+                      ["negative", "差评"],
+                      ["neutral", "中评"],
+                      ["positive", "好评"],
+                    ]}
+                    onChange={(ratingSegment) =>
+                      setExportFilters((current) => ({
+                        ...current,
+                        rating: "",
+                        ratingSegment: ratingSegment as HistoryFilters["ratingSegment"],
+                      }))
+                    }
+                  />
                   <div className="cs-history-filter-row">
                     <span className="cs-history-filter-row-label">创建时间：</span>
                     <HistoryDateRangeFilter
@@ -819,8 +918,9 @@ export function CustomerServiceHistoryReport({
                   <HistoryInput label="指派客服 ID" value={exportFilters.assignedStaffUserId} onChange={(assignedStaffUserId) => setExportFilters((current) => ({ ...current, assignedStaffUserId }))} />
                   <HistoryInput label="语言" value={exportFilters.locale} placeholder="zh-CN / en-US" onChange={(locale) => setExportFilters((current) => ({ ...current, locale }))} />
                   <HistoryInput label="来源平台" value={exportFilters.sourcePlatform} placeholder="web / app" onChange={(sourcePlatform) => setExportFilters((current) => ({ ...current, sourcePlatform }))} />
+                  <HistoryInput label="业务分类" value={exportFilters.category} onChange={(category) => setExportFilters((current) => ({ ...current, category }))} />
                   <HistoryInput label="国家" value={exportFilters.country} onChange={(country) => setExportFilters((current) => ({ ...current, country }))} />
-                  <HistoryInput label="地区" value={exportFilters.region} onChange={(region) => setExportFilters((current) => ({ ...current, region }))} />
+                  <HistoryInput label="精确评分" value={exportFilters.rating} placeholder="1-5" onChange={(rating) => setExportFilters((current) => ({ ...current, rating, ratingSegment: "all" }))} />
                 </div>
               </details>
             </div>
@@ -948,7 +1048,18 @@ type HistoryDetailSection = {
   rows: HistoryDetailRow[];
 };
 
+type HistoryVisitorProfileTab = "sessions" | "trajectory" | "info";
+
+type DialogDragState = {
+  offsetX: number;
+  offsetY: number;
+};
+
 const preferredHistoryFieldLabels: Record<string, string> = {
+  visitTime: "访问时间",
+  conversationTime: "对话时间",
+  responseSeconds: "响应时长",
+  sourceIdentity: "来源",
   threadType: "会话类型",
   threadId: "会话 ID",
   conversationId: "Conversation ID",
@@ -956,7 +1067,7 @@ const preferredHistoryFieldLabels: Record<string, string> = {
   status: "状态",
   statusCode: "状态码",
   title: "标题/客户",
-  customerIdentity: "客户名称",
+  customerIdentity: "访客信息",
   customerUserId: "客户用户 ID",
   visitorUserId: "访客用户 ID",
   customerId: "客户 ID",
@@ -967,8 +1078,12 @@ const preferredHistoryFieldLabels: Record<string, string> = {
   visitorName: "访客名称",
   visitorNickname: "访客昵称",
   peerDisplayName: "对端显示名",
+  staffDisplayName: "客服显示名",
+  staffName: "客服名称",
   staffUserId: "客服 ID",
   staffIdentity: "客服",
+  assignedStaffDisplayName: "归属客服",
+  assignedStaffName: "归属客服名称",
   assignedStaffUserId: "指派客服 ID",
   source: "来源",
   from: "From",
@@ -989,40 +1104,39 @@ const preferredHistoryFieldLabels: Record<string, string> = {
   customerAvatarUrl: "客户头像",
   lastMessagePreview: "最近消息",
   unreadCount: "未读",
+  accessSeconds: "接入耗时",
   durationSeconds: "会话时长",
   firstResponseSeconds: "首次响应耗时",
+  totalResponseSeconds: "平均响应耗时",
   transferCount: "转接次数",
-  rating: "满意度评分",
-  createdAt: "创建时间",
+  rating: "对话评价",
+  createdAt: "访问时间",
   startedAt: "开始时间",
   queueEnteredAt: "入队时间",
   acceptedAt: "接待时间",
   firstResponseAt: "首次响应时间",
   closedAt: "关闭时间",
-  lastMessageAt: "最近消息时间",
+  lastMessageAt: "对话时间",
   updatedAt: "更新时间",
   riskLevel: "风险等级",
   riskReasonsJson: "风险原因",
   locale: "语言",
-  category: "会话分类",
+  category: "业务分类",
+  conversationCategory: "对话类别",
+  customerRemark: "客户备注",
+  isValid: "有效对话",
   country: "国家",
   region: "地区",
   participation: "参与关系",
 };
 
 const primaryHistoryFieldOrder = [
-  "threadType",
-  "staffIdentity",
   "customerIdentity",
-  "status",
-  "riskLevel",
-  "sourceChannel",
-  "sourcePlatform",
-  "unreadCount",
-  "rating",
-  "durationSeconds",
-  "lastMessageAt",
-  "createdAt",
+  "visitTime",
+  "conversationTime",
+  "conversationCategory",
+  "responseSeconds",
+  "staffIdentity",
 ];
 const preferredHistoryFieldOrder = [
   ...primaryHistoryFieldOrder,
@@ -1031,6 +1145,12 @@ const preferredHistoryFieldOrder = [
   ),
 ];
 const fallbackHistoryFieldOrder = primaryHistoryFieldOrder;
+const durationHistoryFieldKeys = new Set([
+  "accessSeconds",
+  "durationSeconds",
+  "firstResponseSeconds",
+  "totalResponseSeconds",
+]);
 
 function createHistoryFieldColumns(threads: CustomerServiceThread[]): HistoryFieldColumn[] {
   const keys = new Set<string>();
@@ -1050,13 +1170,18 @@ function historyFieldValue(thread: CustomerServiceThread, key: string) {
   const raw = historyItemRecord(thread);
   if (key === "customerIdentity") return historyCustomerName(thread, raw);
   if (key === "staffIdentity") return historyStaffName(raw);
+  if (key === "visitTime") return historyDateTimeText(raw.createdAt);
+  if (key === "conversationTime") return historyDateTimeText(raw.lastMessageAt);
+  if (key === "responseSeconds") return responseSecondsLabel(raw);
+  if (key === "sourceIdentity") return historySourceLabel(thread, raw);
   if (key === "threadType") return threadTypeLabel(firstHistoryText(raw.threadType, thread.threadType));
   if (key === "status") return statusLabel(firstHistoryText(raw.status, thread.status));
   if (key === "riskLevel") return riskLevelLabel(raw.riskLevel);
+  if (key === "conversationCategory") return conversationCategoryLabel(raw.conversationCategory);
   if (key === "sourceChannel") return sourceChannelFilterLabel(firstHistoryText(raw.sourceChannel, thread.sourceChannel, thread.channel, thread.source, thread.provider));
   if (key === "sourcePlatform") return sourcePlatformLabel(firstHistoryText(raw.sourcePlatform, thread.platform, thread.provider, thread.source));
   if (key === "rating") return ratingLabel(raw.rating);
-  if (key === "durationSeconds") return durationLabel(historyNumber(raw.durationSeconds));
+  if (durationHistoryFieldKeys.has(key)) return durationLabel(historyNumber(raw[key]));
   if (Object.prototype.hasOwnProperty.call(raw, key)) return raw[key];
   if (key === "threadType") return threadTypeLabel(thread.threadType);
   if (key === "threadId") return thread.threadId;
@@ -1073,6 +1198,7 @@ function historyFieldValue(thread: CustomerServiceThread, key: string) {
 function renderHistoryFieldCell(
   thread: CustomerServiceThread,
   key: string,
+  allLoadedThreads: CustomerServiceThread[],
   onOpenProfile: (profile: HistoryPartyProfile) => void,
   tenantMemberByIdentity: Map<string, TenantMemberDto>,
 ) {
@@ -1081,6 +1207,7 @@ function renderHistoryFieldCell(
     const profile = historyCustomerProfile(
       thread,
       raw,
+      allLoadedThreads,
       findTenantMemberByHistoryIdentity(tenantMemberByIdentity, [
         raw.customerUserId,
         raw.visitorUserId,
@@ -1092,7 +1219,11 @@ function renderHistoryFieldCell(
         className="cs-history-party-trigger"
         onClick={() => onOpenProfile(profile)}
       >
-        <HistoryPartyInlineProfile profile={profile} />
+        <HistoryPartyInlineProfile
+          displayName={historyCustomerTitle(thread, raw)}
+          profile={profile}
+          lines={historyCustomerInlineLines(thread, raw)}
+        />
       </button>
     );
   }
@@ -1114,6 +1245,65 @@ function renderHistoryFieldCell(
       </button>
     );
   }
+  if (key === "visitTime") {
+    return (
+      <HistoryStackedCell
+        lines={[
+          ["进线", historyTableDateTimeText(raw.createdAt)],
+          ["出线", historyTableDateTimeText(raw.lastMessageAt)],
+          ["时长", durationLabel(historyElapsedSeconds(raw.createdAt, raw.lastMessageAt))],
+        ]}
+      />
+    );
+  }
+  if (key === "conversationTime") {
+    const conversationEndAt = historyDateTimePlusSeconds(
+      raw.createdAt,
+      historyNumber(raw.durationSeconds),
+    );
+    return (
+      <HistoryStackedCell
+        lines={[
+          ["进线", historyTableDateTimeText(raw.createdAt)],
+          ["出线", historyTableDateTimeText(conversationEndAt)],
+          ["时长", durationLabel(historyNumber(raw.durationSeconds))],
+        ]}
+      />
+    );
+  }
+  if (key === "conversationCategory") {
+    return (
+      <HistoryCompactInfoCell
+        primary={conversationCategoryLabel(raw.conversationCategory)}
+        lines={[
+          ["评价", ratingLabel(raw.rating)],
+          ["状态", statusLabel(firstHistoryText(raw.status, thread.status))],
+        ]}
+      />
+    );
+  }
+  if (key === "responseSeconds") {
+    return (
+      <HistoryStackedCell
+        lines={[
+          ["接入", durationLabel(historyNumber(raw.accessSeconds))],
+          ["首次", durationLabel(historyNumber(raw.firstResponseSeconds))],
+          ["平均", durationLabel(historyNumber(raw.totalResponseSeconds))],
+        ]}
+      />
+    );
+  }
+  if (key === "sourceIdentity") {
+    return (
+      <HistoryStackedCell
+        lines={[
+          ["渠道", sourceChannelFilterLabel(firstHistoryText(raw.sourceChannel, thread.sourceChannel, thread.channel, thread.source, thread.provider))],
+          ["平台", sourcePlatformLabel(firstHistoryText(raw.sourcePlatform, thread.platform, thread.provider, thread.source))],
+          ["类型", threadTypeLabel(firstHistoryText(raw.threadType, thread.threadType))],
+        ]}
+      />
+    );
+  }
   return formatHistoryFieldValue(historyFieldValue(thread, key));
 }
 
@@ -1126,24 +1316,41 @@ function historyItemRecord(thread: CustomerServiceThread): Record<string, unknow
 function historyCustomerProfile(
   thread: CustomerServiceThread,
   raw: Record<string, unknown>,
+  allLoadedThreads: CustomerServiceThread[],
   tenantMember?: TenantMemberDto,
 ): HistoryPartyProfile {
   const name = tenantMember?.displayName || historyCustomerName(thread, raw);
+  const address = [raw.country, raw.region]
+    .map((value) => firstHistoryText(value))
+    .filter(Boolean)
+    .join(" ");
+  const ip = firstHistoryText(raw.ipMasked, raw.ipAddress, raw.clientIp, raw.visitorIp);
+  const sourcePlatform = firstHistoryText(raw.sourcePlatform, thread.platform, thread.provider);
+  const sourceChannel = firstHistoryText(raw.sourceChannel, thread.sourceChannel, thread.channel, thread.source);
   const details = historyProfileDetails([
     ["通讯录", tenantMember ? "已关联通讯录" : "未关联通讯录"],
-    ["星络号", tenantMember?.greenBubbleNo || firstHistoryText(raw.lppId, raw.lppNo, raw.lppNumber, raw.customerLppId, raw.customerLppNo, raw.greenBubbleId, raw.greenBubbleNo)],
+    [PUBLIC_ID_LABEL, tenantMember?.greenBubbleNo || firstHistoryText(raw.lppId, raw.lppNo, raw.lppNumber, raw.customerLppId, raw.customerLppNo, raw.greenBubbleId, raw.greenBubbleNo)],
     ["通讯录角色", tenantMemberRoleLabel(tenantMember?.membershipRole)],
-    ["来源平台", raw.sourcePlatform],
-    ["来源渠道", raw.sourceChannel],
-    ["语言", raw.locale],
-    ["分类", raw.category],
-    ["地区", [raw.country, raw.region].filter(Boolean).join(" / ")],
+    ["客户备注", firstHistoryText(raw.customerRemark) || "--"],
+    ["Visitor User ID", firstHistoryText(raw.visitorUserId) || "--"],
+    ["客户 ID", firstHistoryText(raw.customerId) || "--"],
+    ["注册用户 ID", firstHistoryText(raw.customerUserId) || "--"],
+    ["地址", address || "--"],
+    ["IP", ip || "--"],
+    ["来源平台", sourcePlatform || "--"],
+    ["来源渠道", sourceChannel || "--"],
+    ["语言", firstHistoryText(raw.locale) || "--"],
+    ["对话类别", conversationCategoryLabel(raw.conversationCategory)],
+    ["业务分类", firstHistoryText(raw.category) || "--"],
   ]);
   return {
     avatarUrl: tenantMember?.avatarUrl || firstHistoryText(raw.customerAvatarUrl, raw.avatarUrl, thread.customerAvatarUrl, thread.avatarUrl),
     details,
     name,
+    relatedThreads: historyRelatedVisitorThreads(thread, allLoadedThreads),
+    thread,
     title: "客户信息",
+    type: "visitor",
   };
 }
 
@@ -1154,7 +1361,7 @@ function historyStaffProfile(
   const name = tenantMember?.displayName || historyStaffName(raw);
   const details = historyProfileDetails([
     ["通讯录", tenantMember ? "已关联通讯录" : "未关联通讯录"],
-    ["星络号", tenantMember?.greenBubbleNo || firstHistoryText(raw.staffLppId, raw.staffLppNo, raw.lppId, raw.lppNo)],
+    [PUBLIC_ID_LABEL, tenantMember?.greenBubbleNo || firstHistoryText(raw.staffLppId, raw.staffLppNo, raw.lppId, raw.lppNo)],
     ["通讯录角色", tenantMemberRoleLabel(tenantMember?.membershipRole)],
     ["参与关系", raw.participation],
   ]);
@@ -1163,7 +1370,58 @@ function historyStaffProfile(
     details,
     name,
     title: "客服信息",
+    type: "staff",
   };
+}
+
+function historyRelatedVisitorThreads(
+  currentThread: CustomerServiceThread,
+  allLoadedThreads: CustomerServiceThread[],
+) {
+  const currentKeys = historyVisitorIdentityKeys(currentThread);
+  const related = allLoadedThreads.filter((thread) => {
+    if (threadKey(thread) === threadKey(currentThread)) return true;
+    const keys = historyVisitorIdentityKeys(thread);
+    return Array.from(keys).some((key) => currentKeys.has(key));
+  });
+  const unique = new Map<string, CustomerServiceThread>();
+  related.forEach((thread) => unique.set(threadKey(thread), thread));
+  return Array.from(unique.values()).sort(compareHistoryThreadDesc);
+}
+
+function historyVisitorIdentityKeys(thread: CustomerServiceThread) {
+  const raw = historyItemRecord(thread);
+  return new Set(
+    [
+      raw.customerId ? `customerId:${firstHistoryText(raw.customerId)}` : "",
+      raw.customerUserId ? `customerUserId:${firstHistoryText(raw.customerUserId)}` : "",
+      raw.visitorUserId ? `visitorUserId:${firstHistoryText(raw.visitorUserId)}` : "",
+      raw.visitorId ? `visitorId:${firstHistoryText(raw.visitorId)}` : "",
+      thread.conversationId ? `conversation:${thread.conversationId}` : "",
+      thread.threadId ? `thread:${thread.threadId}` : "",
+    ].filter(Boolean),
+  );
+}
+
+function compareHistoryThreadDesc(left: CustomerServiceThread, right: CustomerServiceThread) {
+  return historyThreadTimeMs(right) - historyThreadTimeMs(left);
+}
+
+function historyThreadTimeMs(thread: CustomerServiceThread) {
+  const raw = historyItemRecord(thread);
+  return Math.max(
+    timestampMs(raw.createdAt),
+    timestampMs(raw.lastMessageAt),
+    timestampMs(thread.lastMessageAt),
+    timestampMs(thread.updatedAt),
+  );
+}
+
+function timestampMs(value: unknown) {
+  const text = firstHistoryText(value);
+  if (!text) return 0;
+  const time = new Date(text).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
 
 function historyCustomerName(
@@ -1182,12 +1440,74 @@ function historyCustomerName(
   );
 }
 
+function historyCustomerTitle(
+  thread: CustomerServiceThread,
+  raw: Record<string, unknown>,
+) {
+  const name = historyCustomerName(thread, raw);
+  const remark = firstHistoryText(raw.customerRemark);
+  return remark ? `${name}(${remark})` : name;
+}
+
 function historyStaffName(raw: Record<string, unknown>) {
   return firstHistoryText(
     raw.staffDisplayName,
+    raw.assignedStaffDisplayName,
     raw.assignedStaffName,
     raw.staffName,
   );
+}
+
+function historyCustomerInlineLines(
+  thread: CustomerServiceThread,
+  raw: Record<string, unknown>,
+) {
+  const location = [raw.country, raw.region]
+    .map((value) => firstHistoryText(value))
+    .filter(Boolean)
+    .join("");
+  const ip = firstHistoryText(raw.ipMasked, raw.ipAddress, raw.clientIp, raw.visitorIp);
+  const locationLine = historyLocationLine(location, ip);
+  const sourceChannel = firstHistoryText(
+    raw.sourceChannel,
+    thread.sourceChannel,
+    thread.channel,
+    thread.source,
+  );
+  const sourcePlatform = firstHistoryText(
+    raw.sourcePlatform,
+    thread.platform,
+    thread.provider,
+  );
+  const sourceLine = [sourceChannel, sourcePlatform].filter(Boolean).join("-");
+  return [
+    locationLine,
+    sourceLine,
+  ].filter(Boolean);
+}
+
+function historyLocationLine(location: string, ip: string) {
+  if (location && ip) return `${location}(${ip})`;
+  return location || ip;
+}
+
+function responseSecondsLabel(raw: Record<string, unknown>) {
+  return [
+    durationLabel(historyNumber(raw.accessSeconds)),
+    durationLabel(historyNumber(raw.firstResponseSeconds)),
+    durationLabel(historyNumber(raw.totalResponseSeconds)),
+  ].join(" / ");
+}
+
+function historySourceLabel(
+  thread: CustomerServiceThread,
+  raw: Record<string, unknown>,
+) {
+  return [
+    sourceChannelFilterLabel(firstHistoryText(raw.sourceChannel, thread.sourceChannel, thread.channel, thread.source, thread.provider)),
+    sourcePlatformLabel(firstHistoryText(raw.sourcePlatform, thread.platform, thread.provider, thread.source)),
+    threadTypeLabel(firstHistoryText(raw.threadType, thread.threadType)),
+  ].filter((value) => value && value !== "--").join(" / ");
 }
 
 function historyProfileDetails(items: Array<[string, unknown]>) {
@@ -1230,20 +1550,14 @@ function tenantMemberRoleLabel(role?: number) {
 
 function historyThreadDetailRows(
   thread: CustomerServiceThread,
-  columns: HistoryFieldColumn[],
 ): HistoryDetailRow[] {
-  const visibleKeys = new Set(columns.map((column) => column.key));
   const record = historyThreadDetailRecord(thread);
   const keys = new Set<string>();
   preferredHistoryFieldOrder.forEach((key) => {
-    if (!visibleKeys.has(key) && hasHistoryDetailValue(record[key])) keys.add(key);
+    if (shouldShowHistoryDetailField(record, key)) keys.add(key);
   });
   Object.keys(record).forEach((key) => {
-    if (
-      key !== "historyItem" &&
-      !visibleKeys.has(key) &&
-      hasHistoryDetailValue(record[key])
-    ) {
+    if (shouldShowHistoryDetailField(record, key)) {
       keys.add(key);
     }
   });
@@ -1268,8 +1582,10 @@ const historyDetailSectionDefinitions: Array<{
       "statusCode",
       "title",
       "category",
+      "conversationCategory",
       "rating",
       "riskLevel",
+      "customerRemark",
       "transferCount",
       "durationSeconds",
     ],
@@ -1289,6 +1605,9 @@ const historyDetailSectionDefinitions: Array<{
       "visitorUserId",
       "customerId",
       "staffDisplayName",
+      "staffName",
+      "assignedStaffDisplayName",
+      "assignedStaffName",
       "staffUserId",
       "assignedStaffUserId",
       "participation",
@@ -1306,7 +1625,9 @@ const historyDetailSectionDefinitions: Array<{
       "closedAt",
       "lastMessageAt",
       "updatedAt",
+      "accessSeconds",
       "firstResponseSeconds",
+      "totalResponseSeconds",
     ],
   },
   {
@@ -1377,12 +1698,11 @@ function historyThreadDetailRecord(thread: CustomerServiceThread) {
   return record;
 }
 
-function hasHistoryDetailValue(value: unknown) {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "string") return value.trim().length > 0;
-  if (Array.isArray(value)) return value.length > 0;
-  if (typeof value === "object") return Object.keys(value).length > 0;
-  return true;
+function shouldShowHistoryDetailField(
+  record: Record<string, unknown>,
+  key: string,
+) {
+  return key !== "historyItem" && Object.prototype.hasOwnProperty.call(record, key);
 }
 
 function formatHistoryDetailValue(key: string, value: unknown) {
@@ -1390,13 +1710,14 @@ function formatHistoryDetailValue(key: string, value: unknown) {
   if (key === "threadType") return threadTypeLabel(firstHistoryText(value));
   if (key === "riskLevel") return riskLevelLabel(value);
   if (key === "rating") return ratingLabel(value);
+  if (key === "conversationCategory") return conversationCategoryLabel(value);
   if (key === "sourceChannel") {
     return sourceChannelFilterLabel(firstHistoryText(value));
   }
   if (key === "sourcePlatform") {
     return sourcePlatformLabel(firstHistoryText(value));
   }
-  if (key === "durationSeconds" || key === "firstResponseSeconds") {
+  if (durationHistoryFieldKeys.has(key)) {
     return durationLabel(historyNumber(value));
   }
   if (key.endsWith("At")) return historyDateTimeText(value);
@@ -1409,6 +1730,121 @@ function historyDateTimeText(value: unknown) {
   const date = new Date(text);
   if (Number.isNaN(date.getTime())) return text;
   return date.toLocaleString();
+}
+
+function historyTableDateTimeText(value: unknown) {
+  const text = firstHistoryText(value);
+  if (!text) return "--";
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function historyMonthDayTime(...values: unknown[]) {
+  const text = firstHistoryText(...values);
+  if (!text) return "--";
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  return date.toLocaleString(undefined, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function historySessionRangeLabel(
+  raw: Record<string, unknown>,
+  thread: CustomerServiceThread,
+) {
+  const start = historyMonthDayTime(raw.createdAt, raw.startedAt, thread.lastMessageAt);
+  const end = historyMonthDayTime(raw.lastMessageAt, thread.lastMessageAt);
+  if (start === "--" && end === "--") return "--";
+  if (start === "--") return end;
+  if (end === "--" || end === start) return start;
+  return `${start} -> ${end}`;
+}
+
+function historySessionSummaryLabel(
+  raw: Record<string, unknown>,
+  thread: CustomerServiceThread,
+) {
+  const meta = [
+    durationLabel(historyNumber(raw.durationSeconds)),
+    statusLabel(firstHistoryText(raw.status, thread.status)),
+  ].filter((value) => value && value !== "--").join(" · ");
+  return [
+    historySessionRangeLabel(raw, thread),
+    meta,
+  ].filter((value) => value && value !== "--").join(" · ");
+}
+
+function historyVisitorMessageKey(message: MessageItemDto, index: number) {
+  return firstHistoryText(
+    message.messageId,
+    message.clientMsgId,
+    message.sentAt,
+    message.conversationSeq,
+  ) || `message-${index}`;
+}
+
+function historyMessageTime(message: MessageItemDto) {
+  const record = message as MessageItemDto & Record<string, unknown>;
+  return historyTimeText(message.sentAt || record.createdAt || record.created_at);
+}
+
+function historyTimeText(value: unknown) {
+  const text = firstHistoryText(value);
+  if (!text) return "--";
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function historyMessageSender(message: MessageItemDto) {
+  const record = message as MessageItemDto & Record<string, unknown>;
+  return firstHistoryText(
+    message.senderDisplayName,
+    record.senderName,
+    record.sender_name,
+    message.senderRole,
+    message.senderType,
+  ) || "系统";
+}
+
+function historyMessageText(message: MessageItemDto) {
+  return firstHistoryText(
+    message.preview,
+    typeof message.body?.text === "string" ? message.body.text : "",
+    typeof message.body?.content === "string" ? message.body.content : "",
+    typeof message.body?.caption === "string" ? message.body.caption : "",
+    message.messageType,
+  ) || "[消息]";
+}
+
+function historyElapsedSeconds(startValue: unknown, endValue: unknown) {
+  const startText = firstHistoryText(startValue);
+  const endText = firstHistoryText(endValue);
+  if (!startText || !endText) return undefined;
+  const start = new Date(startText).getTime();
+  const end = new Date(endText).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return undefined;
+  }
+  return (end - start) / 1000;
+}
+
+function historyDateTimePlusSeconds(value: unknown, seconds?: number) {
+  const text = firstHistoryText(value);
+  if (!text || seconds === undefined || seconds < 0) return "--";
+  const time = new Date(text).getTime();
+  if (!Number.isFinite(time)) return "--";
+  return historyDateTimeText(new Date(time + seconds * 1000).toISOString());
 }
 
 function firstHistoryText(...values: unknown[]) {
@@ -1544,7 +1980,7 @@ function HistoryStaffPicker({
               <Search size={14} aria-hidden="true" />
               <input
                 value={keyword}
-                placeholder="搜索员工姓名 / 绿泡号"
+                placeholder={`搜索员工姓名 / ${PUBLIC_ID_LABEL}`}
                 onChange={(event) => onKeywordChange(event.target.value)}
               />
             </label>
@@ -1590,36 +2026,128 @@ function HistoryStaffPicker({
   );
 }
 
-function HistoryPartyInlineProfile({ profile }: { profile: HistoryPartyProfile }) {
+function HistoryPartyInlineProfile({
+  displayName,
+  lines = [],
+  profile,
+}: {
+  displayName?: string;
+  lines?: string[];
+  profile: HistoryPartyProfile;
+}) {
+  const name = displayName || profile.name || "--";
   return (
     <>
       <PcAvatar
         avatarUrl={profile.avatarUrl}
         className="cs-history-party-mini-avatar"
-        name={profile.name || "--"}
+        name={profile.name || name}
       />
-      <span className="cs-history-party-name">{profile.name || "--"}</span>
+      <span className="cs-history-party-text">
+        <span className="cs-history-party-name">{name}</span>
+        {lines.map((line, index) => (
+          <small key={`${line}:${index}`}>{line}</small>
+        ))}
+      </span>
     </>
   );
 }
 
-function HistoryPartyProfileDialog({
-  onClose,
-  profile,
+function HistoryStackedCell({
+  lines,
 }: {
-  onClose: () => void;
-  profile: HistoryPartyProfile;
+  lines: Array<[string, string]>;
 }) {
   return (
-    <div className="cs-history-party-modal" role="presentation" onClick={onClose}>
+    <span className="cs-history-stacked-cell">
+      {lines.map(([label, value]) => (
+        <span key={label}>
+          <em>{label}</em>
+          <strong>{value || "--"}</strong>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function HistoryCompactInfoCell({
+  lines,
+  primary,
+}: {
+  lines: Array<[string, string]>;
+  primary: string;
+}) {
+  const visibleLines = lines.filter(([, value]) => value && value !== "--");
+  return (
+    <span className="cs-history-compact-info-cell">
+      <strong>{primary || "--"}</strong>
+      {visibleLines.length > 0 && (
+        <span>
+          {visibleLines.map(([label, value]) => (
+            <small key={label}>{label}:{value}</small>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function HistoryPartyProfileDialog({
+  apiBaseUrl,
+  client,
+  onClose,
+  profile,
+  tenantToken,
+}: {
+  apiBaseUrl?: string;
+  client: HistoryApiClient | null;
+  onClose: () => void;
+  profile: HistoryPartyProfile;
+  tenantToken?: string;
+}) {
+  const isVisitorProfile = profile.type === "visitor";
+  const [activeTab, setActiveTab] = useState<HistoryVisitorProfileTab>("sessions");
+  const [dialogPosition, setDialogPosition] = useState<{ x: number; y: number } | null>(null);
+  const [dragState, setDragState] = useState<DialogDragState | null>(null);
+  const relatedThreads = profile.relatedThreads ?? [];
+  useEffect(() => {
+    if (!dragState) return undefined;
+    const handleMouseMove = (event: MouseEvent) => {
+      setDialogPosition({
+        x: Math.max(8, Math.min(window.innerWidth - 80, event.clientX - dragState.offsetX)),
+        y: Math.max(8, Math.min(window.innerHeight - 80, event.clientY - dragState.offsetY)),
+      });
+    };
+    const handleMouseUp = () => setDragState(null);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [dragState]);
+  const startDrag = (event: ReactMouseEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest("button")) return;
+    const dialog = event.currentTarget.closest(".cs-history-party-dialog");
+    if (!dialog) return;
+    const rect = dialog.getBoundingClientRect();
+    setDialogPosition({ x: rect.left, y: rect.top });
+    setDragState({
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    });
+  };
+  return (
+    <div className="cs-history-party-modal" role="presentation">
       <section
-        className="cs-history-party-dialog"
+        className={`cs-history-party-dialog${dragState ? " dragging" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={profile.title}
+        style={dialogPosition ? { left: dialogPosition.x, position: "fixed", top: dialogPosition.y } : undefined}
         onClick={(event) => event.stopPropagation()}
       >
-        <header>
+        <header onMouseDown={startDrag}>
           <h2>{profile.title}</h2>
           <button type="button" onClick={onClose} aria-label="关闭">
             ×
@@ -1633,41 +2161,238 @@ function HistoryPartyProfileDialog({
           />
           <strong>{profile.name || "--"}</strong>
         </div>
-        <dl>
-          {profile.details.length > 0 ? (
-            profile.details.map(([label, value]) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))
-          ) : (
-            <div>
-              <dt>资料</dt>
-              <dd>接口未返回更多信息</dd>
+        {isVisitorProfile ? (
+          <>
+            <nav className="cs-history-party-tabs" aria-label="访客信息页签">
+              {([
+                ["sessions", "历史会话"],
+                ["trajectory", "历史轨迹"],
+                ["info", "信息"],
+              ] as Array<[HistoryVisitorProfileTab, string]>).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={activeTab === tab ? "active" : undefined}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+            <div className="cs-history-party-tab-panel">
+              {activeTab === "sessions" && (
+                <HistoryVisitorSessionList
+                  apiBaseUrl={apiBaseUrl}
+                  client={client}
+                  tenantToken={tenantToken}
+                  threads={relatedThreads}
+                />
+              )}
+              {activeTab === "trajectory" && (
+                <HistoryVisitorTrajectory threads={relatedThreads} />
+              )}
+              {activeTab === "info" && (
+                <HistoryPartyProfileDetails details={profile.details} />
+              )}
             </div>
-          )}
-        </dl>
+          </>
+        ) : (
+          <HistoryPartyProfileDetails details={profile.details} />
+        )}
       </section>
     </div>
   );
 }
 
+function HistoryPartyProfileDetails({
+  details,
+}: {
+  details: Array<[string, string]>;
+}) {
+  return (
+    <dl>
+      {details.length > 0 ? (
+        details.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))
+      ) : (
+        <div>
+          <dt>资料</dt>
+          <dd>接口未返回更多信息</dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+function HistoryVisitorSessionList({
+  apiBaseUrl,
+  client,
+  tenantToken,
+  threads,
+}: {
+  apiBaseUrl?: string;
+  client: HistoryApiClient | null;
+  tenantToken?: string;
+  threads: CustomerServiceThread[];
+}) {
+  const [expandedThreadKeys, setExpandedThreadKeys] = useState<Set<string>>(() => new Set());
+  if (threads.length === 0) {
+    return <PanelState text="当前已加载结果中没有该访客的历史会话。" />;
+  }
+  const toggleExpanded = (key: string) => {
+    setExpandedThreadKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+  return (
+    <div className="cs-history-visitor-session-list">
+      {threads.map((thread) => {
+        const key = threadKey(thread);
+        const expanded = expandedThreadKeys.has(key);
+        return (
+          <HistoryVisitorSessionItem
+            key={key}
+            apiBaseUrl={apiBaseUrl}
+            client={client}
+            expanded={expanded}
+            tenantToken={tenantToken}
+            thread={thread}
+            onToggle={() => toggleExpanded(key)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function HistoryVisitorSessionItem({
+  apiBaseUrl,
+  client,
+  expanded,
+  onToggle,
+  tenantToken,
+  thread,
+}: {
+  apiBaseUrl?: string;
+  client: HistoryApiClient | null;
+  expanded: boolean;
+  onToggle: () => void;
+  tenantToken?: string;
+  thread: CustomerServiceThread;
+}) {
+  const raw = historyItemRecord(thread);
+  const detailQuery = useQuery<unknown>({
+    queryKey: pcQueryKeys.customerServiceThreadDetail(
+      apiBaseUrl,
+      tenantToken,
+      thread.threadType,
+      thread.threadId,
+    ),
+    enabled: Boolean(expanded && client && thread.threadType && thread.threadId),
+    queryFn: () => client!.getWorkbenchThreadDetail(thread.threadType, thread.threadId),
+    staleTime: 20_000,
+  });
+  const messages = readDetailMessages(detailQuery.data).filter(isVisibleHistoryMessage);
+  return (
+    <article>
+      <button
+        type="button"
+        className="cs-history-visitor-session-row"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        <span className="cs-history-visitor-session-toggle">{expanded ? "−" : "+"}</span>
+        <span className="cs-history-visitor-session-summary">
+          <strong>{historySessionSummaryLabel(raw, thread)}</strong>
+        </span>
+        <span>{conversationCategoryLabel(raw.conversationCategory)}</span>
+      </button>
+      {expanded && (
+        <div className="cs-history-visitor-session-detail">
+          {detailQuery.isLoading || detailQuery.isFetching ? (
+            <p className="cs-history-visitor-session-state">正在加载聊天信息...</p>
+          ) : detailQuery.isError ? (
+            <p className="cs-history-visitor-session-state error">聊天信息加载失败。</p>
+          ) : messages.length > 0 ? (
+            <div className="cs-history-visitor-message-list">
+              {messages.map((message, index) => (
+                <HistoryVisitorMessageItem
+                  key={historyVisitorMessageKey(message, index)}
+                  message={message}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="cs-history-visitor-session-state">接口未返回聊天消息。</p>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function HistoryVisitorMessageItem({ message }: { message: MessageItemDto }) {
+  return (
+    <div className="cs-history-visitor-message">
+      <time>{historyMessageTime(message)}</time>
+      <strong>{historyMessageSender(message)}</strong>
+      <span>{historyMessageText(message)}</span>
+    </div>
+  );
+}
+
+function HistoryVisitorTrajectory({
+  threads,
+}: {
+  threads: CustomerServiceThread[];
+}) {
+  if (threads.length === 0) {
+    return <PanelState text="当前已加载结果中没有该访客的历史轨迹。" />;
+  }
+  return (
+    <div className="cs-history-visitor-trajectory">
+      {threads.map((thread) => {
+        const raw = historyItemRecord(thread);
+        const location = [raw.country, raw.region]
+          .map((value) => firstHistoryText(value))
+          .filter(Boolean)
+          .join(" ");
+        const source = historySourceLabel(thread, raw) || "--";
+        return (
+          <article key={threadKey(thread)}>
+            <time>{historyMonthDayTime(raw.createdAt, thread.lastMessageAt)}</time>
+            <span>进入：{source}</span>
+            {location && <small>{location}</small>}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 function HistoryThreadDetailDialog({
-  columns,
   onClose,
   thread,
 }: {
-  columns: HistoryFieldColumn[];
   onClose: () => void;
   thread: CustomerServiceThread;
 }) {
   const raw = historyItemRecord(thread);
-  const rows = historyThreadDetailRows(thread, columns);
+  const rows = historyThreadDetailRows(thread);
   const sections = historyThreadDetailSections(rows);
   const title = historyCustomerName(thread, raw) || historyStaffName(raw) || "会话详情";
   return (
-    <div className="cs-history-info-modal" role="presentation" onClick={onClose}>
+    <div className="cs-history-info-modal" role="presentation">
       <section
         className="cs-history-info-dialog"
         role="dialog"
@@ -1691,9 +2416,11 @@ function HistoryThreadDetailDialog({
                 <h3>{section.title}</h3>
                 <dl className="cs-history-info-grid">
                   {section.rows.map((row) => (
-                    <div key={row.key}>
-                      <dt>{row.label}</dt>
-                      <dd title={row.value}>{row.value}</dd>
+                    <div key={row.key} className="cs-history-info-field">
+                      <dt className="cs-history-info-label">{row.label}</dt>
+                      <dd className="cs-history-info-value" title={row.value}>
+                        {row.value}
+                      </dd>
                     </div>
                   ))}
                 </dl>
@@ -1738,17 +2465,7 @@ function HistoryFilterOptionRow({
   );
 }
 
-function HistoryDateRangeFilter({
-  fromTime,
-  onPickerOpenChange,
-  onPresetChange,
-  onRangeChange,
-  onTimeChange,
-  pickerOpen,
-  preset,
-  range,
-  toTime,
-}: {
+function HistoryDateRangeFilter(props: {
   fromTime: string;
   onPickerOpenChange: (open: boolean) => void;
   onPresetChange: (preset: HistoryDatePreset) => void;
@@ -1760,73 +2477,11 @@ function HistoryDateRangeFilter({
   toTime: string;
 }) {
   return (
-    <div className="cs-history-date-filter">
-      <div className="cs-history-filter-options">
-        {historyDatePresetOptions.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={preset === option.value ? "active" : undefined}
-            onClick={() => onPresetChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      {preset === "custom" && (
-        <div className="cs-history-date-custom">
-          <button
-            type="button"
-            className="cs-history-date-trigger"
-            onClick={() => onPickerOpenChange(true)}
-          >
-            {historyDateRangeLabel(range, fromTime, toTime)}
-          </button>
-          {pickerOpen && (
-            <div className="cs-history-date-popover">
-              <DayPicker
-                captionLayout="dropdown"
-                mode="range"
-                numberOfMonths={1}
-                selected={range}
-                weekStartsOn={1}
-                onSelect={onRangeChange}
-              />
-              <div className="cs-history-time-grid">
-                <label>
-                  <input
-                    aria-label="开始时间"
-                    type="time"
-                    step={1}
-                    value={fromTime}
-                    disabled={!range.from}
-                    onChange={(event) => onTimeChange("from", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <input
-                    aria-label="结束时间"
-                    type="time"
-                    step={1}
-                    value={toTime}
-                    disabled={!range.to}
-                    onChange={(event) => onTimeChange("to", event.target.value)}
-                  />
-                </label>
-              </div>
-              <footer>
-                <button type="button" onClick={() => onRangeChange(undefined)}>
-                  清空
-                </button>
-                <button type="button" className="primary" onClick={() => onPickerOpenChange(false)}>
-                  完成
-                </button>
-              </footer>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <CustomerServiceDateRangeFilter
+      {...props}
+      presetOptions={historyDatePresetOptions}
+      rangeLabel={historyDateRangeLabel}
+    />
   );
 }
 
@@ -1949,7 +2604,7 @@ function historyStaffPickerName(member: TenantMemberDto) {
 function historyStaffPickerMeta(member: TenantMemberDto) {
   return [
     historyStaffRoleLabel(member.membershipRole),
-    member.greenBubbleNo ? `绿泡号 ${member.greenBubbleNo}` : "",
+    member.greenBubbleNo ? `${PUBLIC_ID_LABEL} ${member.greenBubbleNo}` : "",
     member.userId ? `ID ${shortHistoryIdentity(member.userId)}` : "",
   ]
     .filter(Boolean)
@@ -1983,6 +2638,7 @@ function shortHistoryIdentity(value: string) {
 
 function historyQueryParams(filters: HistoryFilters, limit: number) {
   const rating = filters.rating.trim();
+  const ratingRange = ratingSegmentRange(filters.ratingSegment);
   const minRiskLevel = filters.slaRisk.trim();
   return {
     ...(filters.threadType !== "all" ? { threadType: filters.threadType } : {}),
@@ -1994,13 +2650,16 @@ function historyQueryParams(filters: HistoryFilters, limit: number) {
     ...(filters.visitorUserId ? { visitorUserId: filters.visitorUserId } : {}),
     ...(filters.senderUserId ? { senderUserId: filters.senderUserId } : {}),
     ...(filters.keyword ? { keyword: filters.keyword } : {}),
+    ...(filters.customerRemark ? { customerRemark: filters.customerRemark } : {}),
     ...(filters.staffUserId ? { staffUserId: filters.staffUserId } : {}),
     ...(filters.assignedStaffUserId ? { assignedStaffUserId: filters.assignedStaffUserId } : {}),
     ...(filters.locale ? { locale: filters.locale } : {}),
     ...(filters.sourcePlatform ? { sourcePlatform: filters.sourcePlatform } : {}),
+    ...(filters.category ? { category: filters.category } : {}),
+    ...(filters.conversationCategory !== "all" ? { conversationCategory: filters.conversationCategory } : {}),
     ...(filters.country ? { country: filters.country } : {}),
     ...(filters.region ? { region: filters.region } : {}),
-    ...(rating ? { minRating: rating, maxRating: rating } : {}),
+    ...(rating ? { minRating: rating, maxRating: rating } : ratingRange),
     ...(minRiskLevel ? { minRiskLevel } : {}),
     limit,
   };
@@ -2016,6 +2675,7 @@ function historyEmptyText(isLoading: boolean, keyword: string) {
 
 function historyExportFilters(filters: HistoryFilters) {
   const rating = filters.rating.trim();
+  const ratingRange = ratingSegmentRange(filters.ratingSegment);
   const minRiskLevel = filters.slaRisk.trim();
   return {
     ...(filters.threadType !== "all" ? { threadType: filters.threadType } : {}),
@@ -2027,15 +2687,25 @@ function historyExportFilters(filters: HistoryFilters) {
     ...(filters.visitorUserId ? { visitorUserId: filters.visitorUserId } : {}),
     ...(filters.senderUserId ? { senderUserId: filters.senderUserId } : {}),
     ...(filters.keyword ? { keyword: filters.keyword } : {}),
+    ...(filters.customerRemark ? { customerRemark: filters.customerRemark } : {}),
     ...(filters.staffUserId ? { staffUserId: filters.staffUserId } : {}),
     ...(filters.assignedStaffUserId ? { assignedStaffUserId: filters.assignedStaffUserId } : {}),
     ...(filters.locale ? { locale: filters.locale } : {}),
     ...(filters.sourcePlatform ? { sourcePlatform: filters.sourcePlatform } : {}),
+    ...(filters.category ? { category: filters.category } : {}),
+    ...(filters.conversationCategory !== "all" ? { conversationCategory: filters.conversationCategory } : {}),
     ...(filters.country ? { country: filters.country } : {}),
     ...(filters.region ? { region: filters.region } : {}),
-    ...(rating ? { minRating: rating, maxRating: rating } : {}),
+    ...(rating ? { minRating: rating, maxRating: rating } : ratingRange),
     ...(minRiskLevel ? { minRiskLevel } : {}),
   };
+}
+
+function ratingSegmentRange(segment: HistoryFilters["ratingSegment"]) {
+  if (segment === "negative") return { minRating: 1, maxRating: 2 };
+  if (segment === "neutral") return { minRating: 3, maxRating: 3 };
+  if (segment === "positive") return { minRating: 4, maxRating: 5 };
+  return {};
 }
 
 function sortHistoryExportTasks(tasks: ExportTaskDto[]) {
@@ -2184,6 +2854,17 @@ function ratingLabel(value: unknown) {
   return `${rating}分`;
 }
 
+function conversationCategoryLabel(value: unknown) {
+  const normalized = firstHistoryText(value).toLowerCase();
+  if (!normalized) return "--";
+  if (normalized === "only_visit") return "仅访问";
+  if (normalized === "invalid") return "无效对话";
+  if (normalized === "normal") return "一般";
+  if (normalized === "good") return "较好";
+  if (normalized === "excellent") return "极佳";
+  return firstHistoryText(value);
+}
+
 function statusLabel(status?: string) {
   const normalized = String(status ?? "").trim().toLowerCase();
   if (!normalized) return "--";
@@ -2196,15 +2877,6 @@ function statusLabel(status?: string) {
   if (normalized.includes("active") || normalized.includes("serving")) return "接待中";
   if (normalized.includes("open")) return "未结束";
   return status ?? "--";
-}
-
-function formatThreadTime(thread: CustomerServiceThread) {
-  return formatMonthDayTime(thread.updatedAt || thread.lastMessageAt || thread.assignedAt);
-}
-
-function shortThreadId(threadId: string) {
-  if (!threadId) return "--";
-  return threadId.length > 12 ? `${threadId.slice(0, 8)}...` : threadId;
 }
 
 function isMineHistoryMessage(message: MessageItemDto, session: ReturnType<typeof useAuthSession>) {
@@ -2226,7 +2898,9 @@ function isMineHistoryMessage(message: MessageItemDto, session: ReturnType<typeo
 }
 
 function durationLabel(seconds?: number | null) {
-  if (!seconds || seconds <= 0) return "--";
+  if (seconds === null || seconds === undefined || seconds < 0) return "--";
+  if (seconds > 0 && seconds < 1) return "小于1秒";
+  if (seconds === 0) return "0秒";
   const minutes = Math.floor(seconds / 60);
   const remain = Math.round(seconds % 60);
   if (minutes <= 0) return `${remain}秒`;

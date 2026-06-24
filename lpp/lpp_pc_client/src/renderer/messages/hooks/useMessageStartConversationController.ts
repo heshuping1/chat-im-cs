@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { AuthSession } from "../../data/auth/auth-session";
+import type { ContactMessageOpenTrace } from "../../data/diagnostics/contact-message-open-diagnostics";
 import { requireApiClient } from "../../data/runtime";
 import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
@@ -21,6 +22,18 @@ import {
 } from "../models/startConversationModel";
 
 type ComposerDialogKind = "direct" | "group" | "qr" | "card" | null;
+type CreateDirectChatVariables =
+  | string
+  | {
+      peerUserId: string;
+      trace?: ContactMessageOpenTrace;
+    };
+type CreateGroupChatVariables =
+  | CreateGroupChatPayload
+  | {
+      payload: CreateGroupChatPayload;
+      trace?: ContactMessageOpenTrace;
+    };
 
 export function useMessageStartConversationController({
   queryClient,
@@ -31,16 +44,22 @@ export function useMessageStartConversationController({
 }: {
   queryClient: QueryClient;
   session: AuthSession | null;
-  setActiveConversation: (conversationId: string) => void;
+  setActiveConversation: (
+    conversationId: string,
+    trace?: ContactMessageOpenTrace,
+  ) => void;
   setComposerDialog: Dispatch<SetStateAction<ComposerDialogKind>>;
   setNotice: Dispatch<SetStateAction<string | null>>;
 }) {
   const { t } = useI18n();
   const groupCreateAccess = deriveGroupCreateAccess(session);
   const createDirectChatMutation = useMutation({
-    mutationFn: async (peerUserId: string) =>
-      requireApiClient(session).createDirectChat(peerUserId),
-    onSuccess: (chat, peerUserId) => {
+    mutationFn: async (variables: CreateDirectChatVariables) =>
+      requireApiClient(session).createDirectChat(
+        normalizeCreateDirectChatVariables(variables).peerUserId,
+      ),
+    onSuccess: (chat, variables) => {
+      const { peerUserId, trace } = normalizeCreateDirectChatVariables(variables);
       const conversationId = extractCreatedDirectConversationId(chat);
       if (!conversationId) {
         setNotice(t("messages.startConversation.directMissingId"));
@@ -51,7 +70,7 @@ export function useMessageStartConversationController({
       if (preview) {
         upsertImConversationListItem(queryClient, session, preview);
       }
-      setActiveConversation(conversationId);
+      setActiveConversation(conversationId, trace);
       void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
     },
     onError: (error) =>
@@ -59,15 +78,18 @@ export function useMessageStartConversationController({
   });
 
   const createGroupChatMutation = useMutation({
-    mutationFn: async (payload: CreateGroupChatPayload) => {
+    mutationFn: async (variables: CreateGroupChatVariables) => {
       if (!groupCreateAccess.canCreateGroup) {
         throw new Error(groupCreateAccess.reason ?? t("messages.startConversation.noGroupPermission"));
       }
       return requireApiClient(session).createGroupChat(
-        normalizeCreateGroupChatPayload(payload),
+        normalizeCreateGroupChatPayload(
+          normalizeCreateGroupChatVariables(variables).payload,
+        ),
       );
     },
-    onSuccess: (group) => {
+    onSuccess: (group, variables) => {
+      const { trace } = normalizeCreateGroupChatVariables(variables);
       const conversationId = extractCreatedGroupConversationId(group);
       if (!conversationId) {
         setNotice(t("messages.startConversation.groupMissingId"));
@@ -78,7 +100,7 @@ export function useMessageStartConversationController({
       if (preview) {
         upsertImConversationListItem(queryClient, session, preview);
       }
-      setActiveConversation(conversationId);
+      setActiveConversation(conversationId, trace);
       void queryClient.invalidateQueries({ queryKey: ["pc-im-conversations"] });
     },
     onError: (error) =>
@@ -100,4 +122,18 @@ export function useMessageStartConversationController({
     createInviteQrMutation,
     groupCreateAccess,
   };
+}
+
+function normalizeCreateDirectChatVariables(
+  variables: CreateDirectChatVariables,
+) {
+  return typeof variables === "string"
+    ? { peerUserId: variables }
+    : variables;
+}
+
+function normalizeCreateGroupChatVariables(
+  variables: CreateGroupChatVariables,
+) {
+  return "payload" in variables ? variables : { payload: variables };
 }

@@ -49,4 +49,20 @@ describe("customer service history model", () => {
       staffUserId: "staff-2",
     });
   });
+
+  it("uses last_message_at as the history thread last-message time", () => {
+    const item = {
+      acceptedAt: "2026-06-18T13:03:17.000Z",
+      closedAt: "2026-06-18T13:13:20.000Z",
+      conversationId: "conversation-visit-time",
+      last_message_at: "2026-06-18T13:03:19.000Z",
+      status: "closed",
+      threadId: "thread-visit-time",
+      threadType: "temp_session",
+    } as StaffServiceHistoryItem & Record<string, unknown>;
+
+    const thread = staffServiceHistoryItemToThread(item);
+
+    expect(thread.lastMessageAt).toBe("2026-06-18T13:03:19.000Z");
+  });
 });

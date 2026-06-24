@@ -6,7 +6,7 @@ import {
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   isTerminalCustomerServiceThreadStatus,
@@ -61,6 +61,7 @@ import {
 import { formatBadgeCount, formatChatTime } from "../lib/format";
 import { ChannelBadge } from "./ChannelBadge";
 import { PcAvatar } from "./PcAvatar";
+import { startServiceThreadSelectionTrace } from "../customer-service/diagnostics/service-selection-performance";
 
 type ThreadMode = ServiceThreadListMode;
 type ThreadListEmptyAction = "clearSearch" | "viewAll" | "viewQueued";
@@ -338,6 +339,33 @@ export function ThreadList() {
   const canLoadMoreHistory = mode === "history" && Boolean(historyQuery.hasNextPage);
   const listLoading = threadsQuery.isLoading || historyQuery.isLoading;
   const listError = threadsQuery.error || historyQuery.error;
+  const openThreadFromUserClick = useCallback(
+    (thread: CustomerServiceThread, trigger: "click" | "keyboard") => {
+      startServiceThreadSelectionTrace(thread, {
+        dataUpdatedAt: threadsQuery.dataUpdatedAt,
+        fetchStatus: threadsQuery.fetchStatus,
+        filter,
+        mode,
+        queryStatus: threadsQuery.status,
+        renderedThreadCount: threadRenderWindow.renderedThreads.length,
+        selectedThreadId,
+        trigger,
+        visibleThreadCount: visibleThreads.length,
+      });
+      openCustomerServiceThread(thread.threadId, "user");
+    },
+    [
+      filter,
+      mode,
+      openCustomerServiceThread,
+      selectedThreadId,
+      threadRenderWindow.renderedThreads.length,
+      threadsQuery.dataUpdatedAt,
+      threadsQuery.fetchStatus,
+      threadsQuery.status,
+      visibleThreads.length,
+    ],
+  );
   const emptyState = useMemo(
     () =>
       createThreadListEmptyStateView({
@@ -488,11 +516,11 @@ export function ThreadList() {
                   selectedThreadId === thread.threadId ? "active" : ""
                 } ${risky ? "sla-risk" : ""}`}
                 key={`${thread.threadType}-${thread.threadId}`}
-                onClick={() => openCustomerServiceThread(thread.threadId, "user")}
+                onClick={() => openThreadFromUserClick(thread, "click")}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
-                  openCustomerServiceThread(thread.threadId, "user");
+                  openThreadFromUserClick(thread, "keyboard");
                 }}
                 role="button"
                 tabIndex={0}

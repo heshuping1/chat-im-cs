@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { ConversationListItem, MessageItemDto } from "../../data/api-client";
@@ -74,6 +74,25 @@ export function useImReadCommandExecutor({
   upsertImReadState: (state: ConversationReadState) => void;
 }) {
   const activeModule = useActiveModule();
+  const readUiContextRef = useRef({
+    activeConversationId,
+    activeConversationSource,
+    activeConversationVisibility,
+    activeModule,
+  });
+  useEffect(() => {
+    readUiContextRef.current = {
+      activeConversationId,
+      activeConversationSource,
+      activeConversationVisibility,
+      activeModule,
+    };
+  }, [
+    activeConversationId,
+    activeConversationSource,
+    activeConversationVisibility,
+    activeModule,
+  ]);
   const executeImCoreCommands = useCallback(
     (commands: ImCoreCommand[], reason: string) => {
       commands.forEach((command) => {
@@ -88,16 +107,17 @@ export function useImReadCommandExecutor({
 
         const nextReadSeq = Math.max(0, Math.floor(command.readSeq));
         if (nextReadSeq <= 0) return;
+        const readUiContext = readUiContextRef.current;
         recordMessageReminderDiagnostic({
           event: "im.ui.read.command",
           source: "use-im-read-command-executor",
           phase: "execute",
           route: command.type,
           classification: {
-            activeConversationId,
-            activeConversationSource,
-            activeConversationVisibility,
-            activeModule,
+            activeConversationId: readUiContext.activeConversationId,
+            activeConversationSource: readUiContext.activeConversationSource,
+            activeConversationVisibility: readUiContext.activeConversationVisibility,
+            activeModule: readUiContext.activeModule,
             commandReason: reason,
             conversationId: command.conversationId,
             conversationType: command.conversationType,
@@ -152,10 +172,6 @@ export function useImReadCommandExecutor({
       });
     },
     [
-      activeConversationId,
-      activeConversationSource,
-      activeConversationVisibility,
-      activeModule,
       clearPendingImRead,
       dismissRealtimeRemindersForTarget,
       markConversationReadLocally,
@@ -302,6 +318,7 @@ export function useImReadCommandExecutor({
     if (conversationItems.length === 0) return;
     const ownershipScopeKey = customerServiceIndexScopeKey(session);
     let stateByConversation = getImReadSnapshot().imReadStateByConversation;
+    const readUiContext = readUiContextRef.current;
     for (const conversation of conversationItems) {
       if (!isVisibleImConversationInScope(conversation, ownershipScopeKey)) continue;
       const conversationType = getImConversationType(conversation);
@@ -330,10 +347,10 @@ export function useImReadCommandExecutor({
         phase: "reconcile",
         route: "conversation-list-snapshot",
         classification: {
-          activeConversationId,
-          activeConversationSource,
-          activeConversationVisibility,
-          activeModule,
+          activeConversationId: readUiContext.activeConversationId,
+          activeConversationSource: readUiContext.activeConversationSource,
+          activeConversationVisibility: readUiContext.activeConversationVisibility,
+          activeModule: readUiContext.activeModule,
           commands: result.commands.map((command) => command.type),
           conversationId: conversation.conversationId,
           conversationType,
@@ -368,10 +385,6 @@ export function useImReadCommandExecutor({
   }, [
     conversationItems,
     executeImCoreCommands,
-    activeConversationId,
-    activeConversationSource,
-    activeConversationVisibility,
-    activeModule,
     queryClient,
     session,
     unreadIdentity,

@@ -1,5 +1,6 @@
 ﻿import { createContext, useMemo, useState, type ReactNode } from 'react';
 import {
+  createBrandTranslationParams,
   formatMessage,
   messages,
   resolveMessage,
@@ -21,19 +22,25 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>(readInitialLocale);
 
   const value = useMemo<I18nContextValue>(
-    () => ({
-      locale,
-      setLocale(nextLocale) {
-        setLocaleState(nextLocale);
-        persistLocale(nextLocale);
-      },
-      t(key, params) {
-        return formatMessage(
-          resolveMessage(messages[locale], messages[defaultLocale], key),
-          params,
-        );
-      },
-    }),
+    () => {
+      const brandParams = createBrandTranslationParams(
+        messages[locale],
+        messages[defaultLocale],
+      );
+      return {
+        locale,
+        setLocale(nextLocale) {
+          setLocaleState(nextLocale);
+          persistLocale(nextLocale);
+        },
+        t(key, params) {
+          return formatMessage(
+            resolveMessage(messages[locale], messages[defaultLocale], key),
+            { ...brandParams, ...params },
+          );
+        },
+      };
+    },
     [locale],
   );
 

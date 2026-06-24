@@ -1,3 +1,8 @@
+import {
+  isMessageReminderDiagnosticsEnabled,
+  recordMessageReminderDiagnostic,
+} from "../data/diagnostics/message-reminder-diagnostics";
+
 const chatScrollTraceFlag = "chatScrollTrace";
 const legacyChatScrollTraceFlag = "lpp.chatScrollTrace";
 const maxChatScrollTraceRecords = 400;
@@ -57,7 +62,8 @@ export function logChatScrollTrace({
   stack?: boolean;
   stage?: HTMLElement | null;
 }) {
-  if (!isChatScrollTraceEnabled()) return undefined;
+  const traceEnabled = isChatScrollTraceEnabled();
+  if (!traceEnabled && !isMessageReminderDiagnosticsEnabled()) return undefined;
   const target = typeof window === "undefined" ? null : window;
   if (!target) return undefined;
   const record: ChatScrollTraceRecord = {
@@ -67,8 +73,23 @@ export function logChatScrollTrace({
     stack: stack ? new Error().stack : undefined,
     timestamp: Math.round(performance.now() * 100) / 100,
   };
-  const current = target.__lppChatScrollTrace ?? [];
-  target.__lppChatScrollTrace = [...current, record].slice(-maxChatScrollTraceRecords);
-  console.debug("[lpp:chat-scroll]", record);
+  if (traceEnabled) {
+    const current = target.__lppChatScrollTrace ?? [];
+    target.__lppChatScrollTrace = [...current, record].slice(-maxChatScrollTraceRecords);
+    console.debug("[lpp:chat-scroll]", record);
+  }
+  recordMessageReminderDiagnostic({
+    event: "im.chat-scroll.trace",
+    source: "chat-scroll-trace",
+    phase: "trace",
+    route: event,
+    classification: {
+      context: record.context,
+      event: record.event,
+      metrics: record.metrics,
+      timestamp: record.timestamp,
+    },
+    summary: record.stack ? { stack: record.stack } : undefined,
+  });
   return record;
 }

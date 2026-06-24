@@ -24,11 +24,11 @@
   position: relative;
   display: inline-grid;
   width: var(--media-preview-width, 178px);
-  height: auto;
+  height: var(--media-preview-height, 178px);
   aspect-ratio: var(--media-preview-aspect-ratio, 1 / 1);
   max-width: 100%;
   min-width: 0;
-  min-height: 0;
+  min-height: var(--media-preview-height, 178px);
   place-items: center;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -428,16 +428,6 @@ button.message-image-frame {
   color: #e05252;
 }
 
-.message-file-error {
-  max-width: min(318px, 72vw);
-  overflow: hidden;
-  color: #e05252;
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .message-file-card.paused em,
 .message-file-card.canceled em {
   color: #8a96a7;
@@ -655,9 +645,10 @@ button.message-image-frame {
 .message-audio-card {
   display: inline-flex;
   width: var(--voice-card-width, 82px);
+  height: var(--media-preview-voice-height, 36px);
   min-width: 82px;
   max-width: min(178px, 46vw);
-  min-height: 36px;
+  min-height: var(--media-preview-voice-height, 36px);
   align-items: center;
   justify-content: flex-start;
   gap: 7px;
@@ -1381,11 +1372,15 @@ button.message-image-frame {
 }
 
 .message-contact-card {
+  --media-preview-contact-height: 86px;
+  box-sizing: border-box;
   width: 100%;
+  height: var(--media-preview-contact-height, 86px);
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 11px;
   min-width: 236px;
+  min-height: var(--media-preview-contact-height, 86px);
   max-width: 320px;
   padding: 10px 11px;
   border: 1px solid var(--pc-border, #dbe3ee);

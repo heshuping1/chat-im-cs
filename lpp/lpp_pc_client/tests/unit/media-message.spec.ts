@@ -514,7 +514,10 @@ describe("message media upload presentation", () => {
     expect(fileMessageContent).toContain("onUploadAction?.(uploadState.taskId, fileCardState.controlAction);");
     expect(fileMessageContent).toContain("controlState={fileCardState.controlState}");
     expect(fileMessageContent).toContain("onControlClick={fileCardState.controlAction ? handleFileControlClick : undefined}");
-    expect(fileMessageContent).toContain("metaText={displayStatusText || formatSize(media?.sizeBytes, t)}");
+    expect(fileMessageContent).toContain("const displayMetaText = openError || displayStatusText || formatSize(media?.sizeBytes, t);");
+    expect(fileMessageContent).toContain("metaText={displayMetaText}");
+    expect(fileMessageContent).not.toContain('{openError && <span className="message-file-error">');
+    expect(mediaCss).not.toContain(".message-file-error");
     expect(fileMessageCard).toContain("message-file-icon-action");
     expect(fileMessageCard).toContain("message-file-source");
     expect(fileMessageCard).not.toContain("message-file-type-layer");
@@ -794,8 +797,8 @@ describe("message media upload presentation", () => {
     expect(mediaParts).toContain("if (failed && hasNextImageSource) advanceToNextImageSource();");
     expect(mediaParts).toContain("sourceAvailable={Boolean(visibleImageSrc)}");
     expect(mediaParts).toContain("imagePreviewPresentation");
-    expect(imageFrame).toContain("imagePreviewBoxFromSize");
-    expect(imageFrame).toContain("naturalPreviewBox");
+    expect(imageFrame).not.toContain("imagePreviewBoxFromSize");
+    expect(imageFrame).not.toContain("naturalPreviewBox");
     expect(imageFrame).toContain("handleInlineImageLoad");
     expect(imageFrame).toContain("presentation");
     expect(imageFrame).toContain("--media-preview-width");
@@ -824,9 +827,12 @@ describe("message media upload presentation", () => {
     );
 
     expect(imageFrame).toContain("mediaPreviewFrameStyle");
-    expect(imageFrame).toContain("setNaturalPreviewBox");
+    expect(imageFrame).not.toContain("setNaturalPreviewBox");
+    expect(imageFrame).toContain("const effectivePreviewBox = presentation?.previewBox;");
     expect(imageFrame).toContain("--media-preview-aspect-ratio");
     expect(mediaCss).toContain("width: var(--media-preview-width");
+    expect(mediaCss).toContain("height: var(--media-preview-height");
+    expect(mediaCss).toContain("min-height: var(--media-preview-height");
     expect(mediaCss).toContain("aspect-ratio: var(--media-preview-aspect-ratio");
     expect(mediaCss).toContain("object-fit: fill");
     expect(mediaCss).toMatch(
@@ -834,11 +840,21 @@ describe("message media upload presentation", () => {
     );
     expect(mediaCss).not.toContain(".message-image-frame.loaded {\n  min-width: 0;\n  min-height: 0;");
     expect(messageCenterCss).toContain("aspect-ratio: var(--media-preview-aspect-ratio");
-    expect(messageCenterCss).not.toContain("height: var(--media-preview-height");
+    expect(messageCenterCss).toContain("height: var(--media-preview-height");
+    expect(messageCenterCss).toContain("min-height: var(--media-preview-height");
     expect(messageCenterCss).not.toContain(".pc-chat-bubble .message-image-frame.loaded {\n  min-width: 0;");
     expect(messageMediaParts).toContain("videoPreviewPresentation");
     expect(messageMediaParts).not.toContain("setVideoSize({ width: videoWidth, height: videoHeight });");
     expect(mediaCss).toContain("height: var(--media-preview-file-height");
     expect(messageCenterCss).toContain("height: var(--media-preview-file-height");
+    expect(mediaCss).toContain("height: var(--media-preview-voice-height");
+    expect(mediaCss).toContain("min-height: var(--media-preview-voice-height");
+    expect(messageCenterCss).toContain("height: var(--media-preview-voice-height");
+    expect(messageCenterCss).toContain("min-height: var(--media-preview-voice-height");
+    expect(mediaCss).toContain("--media-preview-contact-height: 86px");
+    expect(mediaCss).toContain("height: var(--media-preview-contact-height");
+    expect(mediaCss).toContain("min-height: var(--media-preview-contact-height");
+    expect(mediaCss).toContain("height: var(--media-preview-video-height");
+    expect(messageCenterCss).toContain("height: var(--media-preview-video-height");
   });
 });

@@ -295,7 +295,7 @@ export interface DesktopApi {
   cacheMediaFile(payload: CacheMediaFilePayload): Promise<CachedMediaFileResult>;
   cacheLocalMediaFile(payload: CacheMediaFilePayload, file: unknown): Promise<CachedMediaFileResult>;
   getCachedMediaStatus(payload: CacheMediaFilePayload): Promise<CachedMediaStatus>;
-  readMediaFileAsDataUrl(payload: CacheMediaFilePayload): Promise<string>;
+  readMediaFileAsDataUrl(payload: CacheMediaFilePayload): Promise<string | undefined>;
   cacheMediaPoster(payload: CacheMediaPosterPayload): Promise<CachedMediaFileResult>;
   openVideoPlayer(payload: VideoPlayerPayload): Promise<string>;
   openDownloadedFile(payload: Omit<CacheMediaFilePayload, 'kind'>): Promise<string>;

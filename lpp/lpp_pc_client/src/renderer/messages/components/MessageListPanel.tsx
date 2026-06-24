@@ -11,6 +11,7 @@ import { PanelState } from "../../components/PanelState";
 import type { ConversationListItem, GroupMemberDto, MessageItemDto } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
 import {
+  activeGroupReadReceiptAutoSyncDelayMs,
   activeGroupReadReceiptAutoSyncIntervalMs,
   activeGroupReadReceiptAutoSyncMaxTargets,
   activeGroupReadReceiptAutoSyncStaleMs,
@@ -28,9 +29,14 @@ import { chatMessageRenderKey } from "../models/messageRenderKey";
 import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
 import {
   createMessageRenderWindow,
+  effectiveMessageRenderWindowExpandedOlderCount,
+  expandMessageRenderWindowOlder,
   messageRenderWindowExpandStep,
+  messageRenderWindowResetKey,
+  resetMessageRenderWindowExpansion,
 } from "../models/messageListWindowing";
 import { logMessageCenterDiagnostic } from "../diagnostics/message-center-diagnostics";
+import { recordConversationSelectionStep } from "../diagnostics/message-selection-performance";
 import { logChatScrollTrace } from "../../lib/chatScrollTrace";
 import { GroupReadReceiptPopover } from "./GroupReadReceiptPopover";
 import {
@@ -132,7 +138,17 @@ export function MessageListPanel({
 }: MessageListPanelProps) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [expandedOlderCount, setExpandedOlderCount] = useState(0);
+  const renderWindowResetKey = messageRenderWindowResetKey({
+    conversationId: conversation.conversationId,
+    messageCount: messages.length,
+  });
+  const [expandedOlderState, setExpandedOlderState] = useState(() =>
+    resetMessageRenderWindowExpansion(renderWindowResetKey),
+  );
+  const expandedOlderCount = effectiveMessageRenderWindowExpandedOlderCount(
+    expandedOlderState,
+    renderWindowResetKey,
+  );
   const [activeGroupReadReceipt, setActiveGroupReadReceipt] = useState<{
     anchorRect: DOMRect;
     groupId: string;
@@ -140,7 +156,7 @@ export function MessageListPanel({
     messageSeq: number;
   } | null>(null);
   const lastWindowDiagnosticKeyRef = useRef("");
-  const windowingEnabled = !unreadJump;
+  const windowingEnabled = true;
   const messageRenderWindow = useMemo(
     () =>
       createMessageRenderWindow({
@@ -151,9 +167,31 @@ export function MessageListPanel({
     [expandedOlderCount, messages, windowingEnabled],
   );
   useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
     const firstRendered = messageRenderWindow.renderedMessages[0];
     const lastRendered =
       messageRenderWindow.renderedMessages[messageRenderWindow.renderedMessages.length - 1];
+    const unreadJumpActive = unreadJump?.conversationId === conversation.conversationId;
+    recordConversationSelectionStep(
+      conversation.conversationId,
+      "message-list.render-window",
+      {
+        firstRenderedKey: firstRendered ? chatMessageRenderKey(firstRendered) : undefined,
+        lastRenderedKey: lastRendered ? chatMessageRenderKey(lastRendered) : undefined,
+        messageCount: messages.length,
+        renderedCount: messageRenderWindow.renderedMessages.length,
+        windowed: messageRenderWindow.windowed,
+      },
+      {
+        repeatKey: [
+          messages.length,
+          messageRenderWindow.renderedMessages.length,
+          messageRenderWindow.windowed,
+          firstRendered ? chatMessageRenderKey(firstRendered) : "",
+          lastRendered ? chatMessageRenderKey(lastRendered) : "",
+        ].join("|"),
+      },
+    );
     logChatScrollTrace({
       context: {
         conversationId: conversation.conversationId,
@@ -161,11 +199,16 @@ export function MessageListPanel({
         firstRenderedId: firstRendered?.messageId,
         firstRenderedKey: firstRendered ? chatMessageRenderKey(firstRendered) : undefined,
         hiddenBeforeCount: messageRenderWindow.hiddenBeforeCount,
+        lastMessageId: lastMessage?.messageId,
+        lastMessageMine: lastMessage ? isMineMessage(lastMessage) : undefined,
         lastRenderedId: lastRendered?.messageId,
         lastRenderedKey: lastRendered ? chatMessageRenderKey(lastRendered) : undefined,
+        lastRenderedMine: lastRendered ? isMineMessage(lastRendered) : undefined,
         messageCount: messages.length,
         renderedCount: messageRenderWindow.renderedMessages.length,
         totalCount: messageRenderWindow.totalCount,
+        unreadJumpActive,
+        unreadJumpCount: unreadJumpActive ? unreadJump?.count : undefined,
         windowed: messageRenderWindow.windowed,
         windowingEnabled,
       },
@@ -178,8 +221,11 @@ export function MessageListPanel({
     messageRenderWindow.renderedMessages,
     messageRenderWindow.totalCount,
     messageRenderWindow.windowed,
-    messages.length,
+    messages,
+    unreadJump?.conversationId,
+    unreadJump?.count,
     windowingEnabled,
+    isMineMessage,
   ]);
   const groupReadReceiptTotal =
     conversation.conversationType === "group"
@@ -189,9 +235,19 @@ export function MessageListPanel({
           groupMemberMap,
         })
       : undefined;
+  const [groupReadReceiptAutoSyncReady, setGroupReadReceiptAutoSyncReady] = useState(false);
+  useEffect(() => {
+    setGroupReadReceiptAutoSyncReady(false);
+    if (conversation.conversationType !== "group") return undefined;
+    const timeoutId = window.setTimeout(
+      () => setGroupReadReceiptAutoSyncReady(true),
+      activeGroupReadReceiptAutoSyncDelayMs(),
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [conversation.conversationId, conversation.conversationType]);
   const groupReadReceiptAutoSyncTargets = useMemo(
     () =>
-      conversation.conversationType === "group"
+      conversation.conversationType === "group" && groupReadReceiptAutoSyncReady
         ? pendingGroupReadReceiptSnapshotTargets({
             identity: authSession ?? null,
             maxTargets: activeGroupReadReceiptAutoSyncMaxTargets(),
@@ -202,6 +258,7 @@ export function MessageListPanel({
     [
       authSession,
       conversation.conversationType,
+      groupReadReceiptAutoSyncReady,
       groupReadReceiptTotal,
       messageRenderWindow.renderedMessages,
     ],
@@ -217,9 +274,13 @@ export function MessageListPanel({
       },
       event: "message-list.reset-expanded-older",
     });
-    setExpandedOlderCount(0);
+    setExpandedOlderState((current) =>
+      current.resetKey === renderWindowResetKey && current.expandedOlderCount === 0
+        ? current
+        : resetMessageRenderWindowExpansion(renderWindowResetKey),
+    );
     setActiveGroupReadReceipt(null);
-  }, [conversation.conversationId, messages.length]);
+  }, [conversation.conversationId, messages.length, renderWindowResetKey]);
 
   useEffect(() => {
     if (!activeGroupReadReceipt) return;
@@ -237,12 +298,13 @@ export function MessageListPanel({
         messageSeq: target.messageSeq,
         tenantToken: authSession?.tenantToken,
       }),
-      queryFn: async () => {
+      queryFn: async ({ signal }) => {
         if (!authSession) throw new Error("No active group read receipt target");
         return requireApiClient(authSession).getGroupReadReceipts(
           conversation.conversationId,
           target.messageId,
           target.messageSeq,
+          { signal },
         );
       },
       refetchInterval: activeGroupReadReceiptAutoSyncIntervalMs(),
@@ -291,7 +353,7 @@ export function MessageListPanel({
           tenantToken: authSession?.tenantToken,
         })
       : ["pc-group-read-receipts", "idle"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!authSession || !activeGroupReadReceipt) {
         throw new Error("No active group read receipt target");
       }
@@ -299,6 +361,7 @@ export function MessageListPanel({
         activeGroupReadReceipt.groupId,
         activeGroupReadReceipt.messageId,
         activeGroupReadReceipt.messageSeq,
+        { signal },
       );
     },
     retry: false,
@@ -366,6 +429,12 @@ export function MessageListPanel({
       context: {
         conversationId: conversation.conversationId,
         hiddenBeforeCount: messageRenderWindow.hiddenBeforeCount,
+        unreadJumpActive: unreadJump?.conversationId === conversation.conversationId,
+        unreadJumpCount:
+          unreadJump?.conversationId === conversation.conversationId
+            ? unreadJump.count
+            : undefined,
+        windowingEnabled,
         renderedCount: messageRenderWindow.renderedMessages.length,
         totalCount: messageRenderWindow.totalCount,
       },
@@ -376,6 +445,9 @@ export function MessageListPanel({
     messageRenderWindow.renderedMessages.length,
     messageRenderWindow.totalCount,
     messageRenderWindow.windowed,
+    unreadJump?.conversationId,
+    unreadJump?.count,
+    windowingEnabled,
   ]);
 
   return (
@@ -404,7 +476,13 @@ export function MessageListPanel({
           className="pc-chat-load-earlier"
           type="button"
           onClick={() =>
-            setExpandedOlderCount((current) => current + messageRenderWindowExpandStep)
+            setExpandedOlderState((current) =>
+              expandMessageRenderWindowOlder({
+                resetKey: renderWindowResetKey,
+                state: current,
+                step: messageRenderWindowExpandStep,
+              }),
+            )
           }
         >
           {t("messages.listPanel.loadEarlier", {
@@ -441,6 +519,10 @@ export function MessageListPanel({
                 selectedMessageIds.has(message.messageId) ? "selected" : ""
               }`}
               data-message-render-key={renderKey}
+              data-message-id={message.messageId}
+              data-message-mine={mine ? "true" : "false"}
+              data-message-seq={message.conversationSeq ?? ""}
+              data-message-type={message.messageType}
               key={renderKey}
               ref={(element) => onMessageElementRef(message.messageId, element)}
             >

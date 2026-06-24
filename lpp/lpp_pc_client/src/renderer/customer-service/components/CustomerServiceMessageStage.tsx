@@ -18,6 +18,7 @@ import { useI18n } from "../../i18n/useI18n";
 import { formatFullDateTime } from "../../lib/format";
 import { chatMessageRenderKey } from "../../messages/models/messageRenderKey";
 import { chatBackgroundStyleVariables } from "../../settings/models/chatBackgroundModel";
+import { recordServiceThreadSelectionStep } from "../diagnostics/service-selection-performance";
 import {
   ServiceMessageContextMenu,
   type ServiceMessageContextAction,
@@ -92,6 +93,38 @@ export function CustomerServiceMessageStage({
     messages,
     transferRemarks,
   });
+  useEffect(() => {
+    const firstMessage = messages[0];
+    const lastMessage = messages[messages.length - 1];
+    recordServiceThreadSelectionStep(
+      selectedThread.threadId,
+      "message-stage.rendered",
+      {
+        firstMessageKey: firstMessage ? chatMessageRenderKey(firstMessage) : "",
+        lastMessageKey: lastMessage ? chatMessageRenderKey(lastMessage) : "",
+        messageCount: messages.length,
+        messageStageKind: messageStageState?.kind,
+        timelineItemCount: timelineItems.length,
+        transferRemarkCount: transferRemarks.length,
+      },
+      {
+        repeatKey: [
+          messages.length,
+          firstMessage ? chatMessageRenderKey(firstMessage) : "",
+          lastMessage ? chatMessageRenderKey(lastMessage) : "",
+          messageStageState?.kind ?? "",
+          timelineItems.length,
+          transferRemarks.length,
+        ].join("|"),
+      },
+    );
+  }, [
+    messageStageState?.kind,
+    messages,
+    selectedThread.threadId,
+    timelineItems.length,
+    transferRemarks.length,
+  ]);
   useEffect(() => {
     const duplicateMessageIds = countMessageValues(messages, (message) => message.messageId);
     const duplicateClientIds = countMessageValues(messages, customerServiceClientMessageId);

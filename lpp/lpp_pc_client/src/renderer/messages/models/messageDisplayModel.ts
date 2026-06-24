@@ -7,6 +7,7 @@ import type {
   UserProfileDto,
 } from "../../data/api-client";
 import type { AuthSession } from "../../data/auth/auth-session";
+import { PUBLIC_ID_LABEL } from "../../brand/public-brand";
 import {
   type CurrentUserIdentity,
   isSelfSender,
@@ -120,7 +121,7 @@ export function buildAvatarProfilePopover({
       avatarUrl: session?.avatarUrl,
       rows: compactProfileRows([
         ["昵称", title],
-        ["星络号", session?.lppId],
+        [PUBLIC_ID_LABEL, session?.lppId],
       ], { keepEmpty: true }),
     };
   }
@@ -214,12 +215,12 @@ export function buildAvatarProfilePopover({
       isGroup
         ? [
             ["昵称", displayName],
-            ["星络号", lppId],
+            [PUBLIC_ID_LABEL, lppId],
           ]
         : [
             ["昵称", displayName],
             ["备注", remark],
-            ["星络号", lppId],
+            [PUBLIC_ID_LABEL, lppId],
             ["渠道应用", applicationName],
             ["来源渠道", source],
           ],
@@ -272,7 +273,7 @@ export function buildContactCardProfilePopover({
     rows: compactProfileRows([
       ["个性签名", signature],
       ["昵称", title],
-      ["星络号", lppId],
+      [PUBLIC_ID_LABEL, lppId],
       ["来源", source],
     ], { keepEmpty: true }),
   };

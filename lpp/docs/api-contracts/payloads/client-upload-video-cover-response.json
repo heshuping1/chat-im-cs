@@ -1,17 +1,17 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNM0Q9OQ641S",
+  "requestId": "0HNMCAQPOOLUU",
   "data": {
-    "mediaId": "019e8989-389a-7384-9778-1d344891c512",
+    "mediaId": "019ed503-ba88-7cca-88e3-c835d207dcd7",
     "mediaKind": "image",
-    "url": "/media/019e8989-389a-7384-9778-1d344891c512",
-    "relativePath": "11111111111111111111111111111111/2026/06/02/image/019e8989389a738497781d344891c512.png",
+    "url": "/media/019ed503-ba88-7cca-88e3-c835d207dcd7",
+    "relativePath": "11111111111111111111111111111111/2026/06/17/image/019ed503ba887cca88e3c835d207dcd7.png",
     "fileName": "walkthrough-cover.png",
     "mimeType": "image/png",
     "sizeBytes": 12,
     "thumbnailUrl": null,
-    "signedUrl": "/media/019e8989-389a-7384-9778-1d344891c512?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427532\u0026sig=fLekPkS1cCQnYBoaCeXnFGgHW0yejSb6YrgP-iENikY",
-    "downloadUrl": "/media/019e8989-389a-7384-9778-1d344891c512?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427532\u0026sig=fLekPkS1cCQnYBoaCeXnFGgHW0yejSb6YrgP-iENikY\u0026download=1"
+    "signedUrl": "/media/019ed503-ba88-7cca-88e3-c835d207dcd7?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693851\u0026sig=g77HkIpLGOTOOGr-SnbJaRoevCTka9MU12U8_ljWdgw",
+    "downloadUrl": "/media/019ed503-ba88-7cca-88e3-c835d207dcd7?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693851\u0026sig=g77HkIpLGOTOOGr-SnbJaRoevCTka9MU12U8_ljWdgw\u0026download=1"
   }
 }

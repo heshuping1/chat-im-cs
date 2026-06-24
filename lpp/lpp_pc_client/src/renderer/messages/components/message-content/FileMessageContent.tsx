@@ -55,6 +55,7 @@ export function FileMessageContent({
   const fileCardState = fileMessageCardState(uploadState);
   const translatedStatusText = uploadStatusText(uploadState, t);
   const displayStatusText = translatedStatusText || statusText || "";
+  const displayMetaText = openError || displayStatusText || formatSize(media?.sizeBytes, t);
   const uploadBlocked = Boolean(displayStatusText);
 
   useEffect(() => {
@@ -130,11 +131,10 @@ export function FileMessageContent({
         controlProgress={fileCardState.controlProgress}
         controlState={fileCardState.controlState}
         fileName={fileName}
-        metaText={displayStatusText || formatSize(media?.sizeBytes, t)}
+        metaText={displayMetaText}
         onControlClick={fileCardState.controlAction ? handleFileControlClick : undefined}
         sourceLabel={appProductName}
       />
-      {openError && <span className="message-file-error">{openError}</span>}
     </span>
   );
 }

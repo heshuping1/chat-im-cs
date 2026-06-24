@@ -1,22 +1,22 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNLVOL2JTIK5",
+  "requestId": "0HNMCAQPOOLQ1",
   "data": {
-    "sessionId": "019e82a5-14a7-7d07-9da6-24439713fb38",
-    "conversationId": "019e82a5-14a7-706a-b6e5-eb0fdd8ba5d9",
+    "sessionId": "019ed503-4f60-70a7-b0e1-8ea43ea4ce4e",
+    "conversationId": "019ed503-4f60-7d33-9ea7-39273ef94f1f",
     "status": "active",
     "locale": "zh-CN",
     "queuePosition": null,
     "estimatedWaitSeconds": null,
-    "visitorId": "019e82a5-14a7-7a20-9ff7-1b360865340c",
-    "visitorUserId": "019e82a5-14a6-7f19-8d51-c289cd428e58",
-    "currentOwnerStaffUserId": "019e82a5-141f-7352-bc77-54640b1ea83b",
+    "visitorId": "019ed503-4f60-767a-b5eb-52741d72d005",
+    "visitorUserId": "019ed503-4f5f-7683-824a-26b3b0e0c3c2",
+    "currentOwnerStaffUserId": "019ed503-4ebe-7657-b21f-a7e319b1a621",
     "currentOwnerStaffDisplayName": "Temp Staff",
     "currentResponderType": "staff",
     "currentResponderDisplayName": "Temp Staff",
     "ai": null,
-    "createdAt": "2026-06-01T10:05:17.3507032\u002B00:00",
-    "lastMessageAt": "2026-06-01T10:05:17.3725907\u002B00:00"
+    "createdAt": "2026-06-17T09:57:04.4797409\u002B00:00",
+    "lastMessageAt": "2026-06-17T09:57:04.5185756\u002B00:00"
   }
 }

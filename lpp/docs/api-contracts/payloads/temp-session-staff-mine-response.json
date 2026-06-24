@@ -1,19 +1,19 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNLVOL2JTIKD",
+  "requestId": "0HNMCAQPOOLQC",
   "data": [
     {
-      "sessionId": "019e82a5-14a7-7d07-9da6-24439713fb38",
-      "conversationId": "019e82a5-14a7-706a-b6e5-eb0fdd8ba5d9",
+      "sessionId": "019ed503-4f60-70a7-b0e1-8ea43ea4ce4e",
+      "conversationId": "019ed503-4f60-7d33-9ea7-39273ef94f1f",
       "status": "active",
-      "visitorId": "019e82a5-14a7-7a20-9ff7-1b360865340c",
+      "visitorId": "019ed503-4f60-767a-b5eb-52741d72d005",
       "visitorName": "Widget Visitor",
       "customerId": null,
       "locale": "zh-CN",
       "category": "\u552E\u524D\u54A8\u8BE2",
       "sourceChannel": "website",
-      "currentOwnerStaffUserId": "019e82a5-141f-7352-bc77-54640b1ea83b",
+      "currentOwnerStaffUserId": "019ed503-4ebe-7657-b21f-a7e319b1a621",
       "currentOwnerStaffDisplayName": "Temp Staff",
       "currentResponderType": "staff",
       "currentResponderDisplayName": "Temp Staff",
@@ -28,7 +28,7 @@
         "lastResponseAt": null,
         "messageCount": 0,
         "humanRequestedAt": null,
-        "humanHandoffAt": "2026-06-01T10:05:17.3507032\u002B00:00",
+        "humanHandoffAt": "2026-06-17T09:57:04.4797409\u002B00:00",
         "handoffReasonCode": null,
         "handoffReasonText": null,
         "handoffSummary": null,
@@ -51,10 +51,25 @@
       "priority": "normal",
       "visitorMessageCount": 2,
       "staffMessageCount": 0,
-      "createdAt": "2026-06-01T10:05:17.3507032\u002B00:00",
-      "lastMessageAt": "2026-06-01T10:05:18.3465133\u002B00:00",
+      "createdAt": "2026-06-17T09:57:04.4797409\u002B00:00",
+      "lastMessageAt": "2026-06-17T09:57:06.1318848\u002B00:00",
       "visitorIpAddress": null,
-      "visitorUserAgent": ""
+      "visitorUserAgent": "",
+      "acquisition": {
+        "applicationId": null,
+        "sourcePlatform": null,
+        "chatTool": null,
+        "deviceType": null,
+        "os": null,
+        "osVersion": null,
+        "utmSource": null,
+        "utmMedium": null,
+        "utmCampaign": null,
+        "appVersion": null,
+        "country": null,
+        "region": null,
+        "timezone": null
+      }
     }
   ]
 }

@@ -1,11 +1,11 @@
 {
   "event": "space.notice",
-  "traceId": "019e71c0a71e7c1ab4d23112a55895be",
-  "sentAt": "2026-05-29T03:21:51.6469098\u002B00:00",
+  "traceId": "019ed5031e3a70659175ce40acee7e1e",
+  "sentAt": "2026-06-17T09:56:51.898465\u002B00:00",
   "data": {
     "noticeType": "message",
     "spaceType": 2,
-    "tenantId": "019e71c0-a54a-7d55-82a4-5fcbe827e070",
+    "tenantId": "019ed503-1c2c-7a58-b0ad-a69733e3bede",
     "requiresSwitch": true,
     "targetUnreadConversationCount": 1,
     "targetUnreadMessageCount": 1,

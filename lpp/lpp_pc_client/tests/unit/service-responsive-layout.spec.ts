@@ -35,7 +35,7 @@ describe("online service responsive layout", () => {
   it("keeps the online service thread pool scrollbar from changing list width", () => {
     expect(scrollbarBridgeCss).toContain(".app-shell .h-thread-list");
     expect(scrollbarBridgeCss).toMatch(
-      /\.app-shell \.e-message-stage,\s*\.app-shell \.h-message-stage,\s*\.app-shell \.h-thread-list,\s*\.app-shell \.customer-info-panel[\s\S]*overflow-y: scroll !important;[\s\S]*scrollbar-gutter: stable !important;[\s\S]*scrollbar-color: transparent transparent !important;/,
+      /\.app-shell \.e-message-stage,\s*\.app-shell \.h-message-stage,\s*\.app-shell \.h-thread-list,\s*\.app-shell \.e-conversation-list,\s*\.app-shell \.customer-info-panel[\s\S]*overflow-y: scroll !important;[\s\S]*scrollbar-gutter: stable !important;[\s\S]*scrollbar-color: transparent transparent !important;/,
     );
     expect(scrollbarBridgeCss).toContain(".app-shell .h-thread-list.is-scrolling");
     expect(scrollbarBridgeCss).toContain(".app-shell .h-thread-list.is-scrolling::-webkit-scrollbar-thumb");

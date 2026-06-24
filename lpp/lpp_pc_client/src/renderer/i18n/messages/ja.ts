@@ -12,6 +12,10 @@ import {
 } from './workbench-fallback';
 
 export const ja: MessageDictionary = {
+  brand: {
+    publicName: 'StartLink',
+    publicIdLabel: '{publicName} ID',
+  },
   app: {
     errorMessage: '画面の描画でエラーが発生しました。まず画面を再試行し、失敗する場合はクライアントを再読み込みしてください。',
     errorReference: 'エラー番号：{referenceCode}',
@@ -27,7 +31,7 @@ export const ja: MessageDictionary = {
     forceUpdateInstalling: 'Installing',
     forceUpdateMessage: 'This version is below the minimum version allowed by the server. Update before continuing.',
     forceUpdateTitle: 'Client update required',
-    title: 'StartLink',
+    title: '{publicName}',
   },
   aiDraft: {
     adoptFailed: '採用に失敗しました：{error}',
@@ -89,12 +93,12 @@ export const ja: MessageDictionary = {
       'cartoon-pink': 'カートゥーン ピーチアバター',
       'cartoon-lemon': 'カートゥーン レモンアバター',
       'cartoon-gray': 'カートゥーン グレーアバター',
-      'bubble-service': 'StartLink サービスアバター',
-      'bubble-headset': 'StartLink ヘッドセットアバター',
-      'bubble-chat': 'StartLink チャットアバター',
-      'bubble-cute': 'StartLink フレンドリーアバター',
-      'bubble-online': 'StartLink オンラインアバター',
-      'bubble-brand': 'StartLink ブランドアバター',
+      'bubble-service': '{publicName} サービスアバター',
+      'bubble-headset': '{publicName} ヘッドセットアバター',
+      'bubble-chat': '{publicName} チャットアバター',
+      'bubble-cute': '{publicName} フレンドリーアバター',
+      'bubble-online': '{publicName} オンラインアバター',
+      'bubble-brand': '{publicName} ブランドアバター',
     },
     validation: {
       displayNameRequired: 'Enter a nickname',
@@ -157,8 +161,8 @@ export const ja: MessageDictionary = {
     enter: '入る',
     entering: '入っています...',
     enterpriseSpace: 'Enterprise space',
-    identifier: 'StartLink ID / メール / 携帯番号',
-    identifierPlaceholder: 'StartLink ID / メール / 携帯番号を入力',
+    identifier: '{publicIdLabel} / メール / 携帯番号',
+    identifierPlaceholder: '{publicIdLabel} / メール / 携帯番号を入力',
     invitationHelp: '既存アカウントはサインイン後に招待企業へ参加できます。参加済み企業のロールは変更されません。',
     invitation: {
       enterpriseInvitation: 'Enterprise invitation',
@@ -631,7 +635,7 @@ export const ja: MessageDictionary = {
       remindersSuffix: '、リマインダー {count} 件',
     },
     brand: {
-      about: 'StartLink について',
+      about: '{publicName} について',
       helpAboutUpdate: 'ヘルプ / About / 更新確認',
     },
     collapse: 'サイドバーを折りたたむ',
@@ -1609,12 +1613,12 @@ export const ja: MessageDictionary = {
         terms: {
           title: 'Terms of Service',
           parts: [
-            'StartLink Terms of Service',
+            '{publicName} Terms of Service',
             'Updated: June 5, 2026',
             'Effective: June 5, 2026',
-            'Welcome to StartLink. Please read and understand these terms before using this client and related services. Continued use means you agree to these terms.',
+            'Welcome to {publicName}. Please read and understand these terms before using this client and related services. Continued use means you agree to these terms.',
             '1. Services',
-            'StartLink provides instant messaging, customer service collaboration, file transfer, notifications, and related operation tools. We may adjust, interrupt, or terminate parts of the service for maintenance, upgrades, or security.',
+            '{publicName} provides instant messaging, customer service collaboration, file transfer, notifications, and related operation tools. We may adjust, interrupt, or terminate parts of the service for maintenance, upgrades, or security.',
             '2. Account registration and use',
             'You must provide true, accurate, and complete registration information, keep your account and password secure, and must not sell, rent, transfer, or authorize others to use your account.',
             '3. User conduct',
@@ -1625,13 +1629,13 @@ export const ja: MessageDictionary = {
             'For service interruption, data anomalies, or losses caused by force majeure, third parties, or causes outside our control, liability is limited to the extent permitted by law. You are responsible for content you publish through the service.',
             '6. Changes and contact',
             'We may update these terms for business or legal reasons. Material changes will be announced in the client or by other reasonable methods. Contact support@lpp.com with questions.',
-            '© 2026 StartLink Technology Co., Ltd. All rights reserved',
+            '© 2026 {publicName} Technology Co., Ltd. All rights reserved',
           ],
         },
         privacy: {
           title: 'Privacy Policy',
           parts: [
-            'StartLink Privacy Policy',
+            '{publicName} Privacy Policy',
             'Updated: June 5, 2026',
             'Effective: June 5, 2026',
             'We value personal information protection and take reasonable security measures under applicable laws and regulations.',
@@ -1647,7 +1651,7 @@ export const ja: MessageDictionary = {
             'You may access, correct, delete personal information, close your account, withdraw authorization, or request explanations of personal information processing rules as permitted by law.',
             '6. Minors and policy updates',
             'This service is not intended for minors under 14. When this policy changes, we will notify you in the client or through other reasonable channels.',
-            '© 2026 StartLink Technology Co., Ltd. All rights reserved',
+            '© 2026 {publicName} Technology Co., Ltd. All rights reserved',
           ],
         },
       },

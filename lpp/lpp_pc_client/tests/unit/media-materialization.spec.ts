@@ -320,6 +320,28 @@ describe("media materialization", () => {
     expect(getMaterializedMediaDisplayUrl("video-poster:expired-media")).toBeUndefined();
   });
 
+  it("throttles empty desktop display materialization results without retrying immediately", async () => {
+    vi.mocked(window.desktopApi?.readMediaFileAsDataUrl).mockResolvedValueOnce(undefined);
+
+    const payload = {
+      accountId: "staff-1",
+      authToken: "tenant-token",
+      cacheIdentity: "video-poster:missing-media",
+      cacheKey: "video-poster:missing-media",
+      conversationId: "direct-1",
+      fileName: "missing-poster.jpg",
+      fileUrl: "https://cdn.example.test/media/missing-poster.jpg?sig=expired",
+      kind: "image" as const,
+      preferDesktopRead: true,
+    };
+
+    await expect(ensureMaterializedMediaDisplayUrl(payload)).resolves.toBeUndefined();
+    await expect(ensureMaterializedMediaDisplayUrl(payload)).resolves.toBeUndefined();
+
+    expect(window.desktopApi?.readMediaFileAsDataUrl).toHaveBeenCalledTimes(1);
+    expect(getMaterializedMediaDisplayUrl("video-poster:missing-media")).toBeUndefined();
+  });
+
   it("materializes received video and file messages before UI render", async () => {
     await materializeReceivedMediaMessage({
       accountId: "staff-1",

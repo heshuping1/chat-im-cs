@@ -25,15 +25,19 @@ export interface GroupReadReceiptIdentity {
 }
 
 export function activeGroupReadReceiptAutoSyncIntervalMs() {
-  return 2_000;
+  return 5_000;
 }
 
 export function activeGroupReadReceiptAutoSyncMaxTargets() {
-  return 20;
+  return 4;
+}
+
+export function activeGroupReadReceiptAutoSyncDelayMs() {
+  return 500;
 }
 
 export function activeGroupReadReceiptAutoSyncStaleMs() {
-  return 1_000;
+  return 10_000;
 }
 
 export function parseGroupReadReceiptsPayload(

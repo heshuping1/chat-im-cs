@@ -12,6 +12,10 @@ import {
 } from './workbench-fallback';
 
 export const vi: MessageDictionary = {
+  brand: {
+    publicName: 'StartLink',
+    publicIdLabel: '{publicName} ID',
+  },
   app: {
     errorMessage: 'Giao diện gặp lỗi khi hiển thị. Hãy thử tải lại giao diện trước, nếu vẫn lỗi thì tải lại ứng dụng khách.',
     errorReference: 'Mã lỗi: {referenceCode}',
@@ -27,7 +31,7 @@ export const vi: MessageDictionary = {
     forceUpdateInstalling: 'Installing',
     forceUpdateMessage: 'This version is below the minimum version allowed by the server. Update before continuing.',
     forceUpdateTitle: 'Client update required',
-    title: 'StartLink',
+    title: '{publicName}',
   },
   aiDraft: {
     adoptFailed: 'Áp dụng thất bại: {error}',
@@ -89,12 +93,12 @@ export const vi: MessageDictionary = {
       'cartoon-pink': 'Ảnh đại diện hoạt hình đào hồng',
       'cartoon-lemon': 'Ảnh đại diện hoạt hình chanh',
       'cartoon-gray': 'Ảnh đại diện hoạt hình xám',
-      'bubble-service': 'Ảnh đại diện CS StartLink',
-      'bubble-headset': 'Ảnh đại diện tai nghe StartLink',
-      'bubble-chat': 'Ảnh đại diện trò chuyện StartLink',
-      'bubble-cute': 'Ảnh đại diện thân thiện StartLink',
-      'bubble-online': 'Ảnh đại diện trực tuyến StartLink',
-      'bubble-brand': 'Ảnh đại diện thương hiệu StartLink',
+      'bubble-service': 'Ảnh đại diện CS {publicName}',
+      'bubble-headset': 'Ảnh đại diện tai nghe {publicName}',
+      'bubble-chat': 'Ảnh đại diện trò chuyện {publicName}',
+      'bubble-cute': 'Ảnh đại diện thân thiện {publicName}',
+      'bubble-online': 'Ảnh đại diện trực tuyến {publicName}',
+      'bubble-brand': 'Ảnh đại diện thương hiệu {publicName}',
     },
     validation: {
       displayNameRequired: 'Enter a nickname',
@@ -157,8 +161,8 @@ export const vi: MessageDictionary = {
     enter: 'Vào',
     entering: 'Đang vào...',
     enterpriseSpace: 'Enterprise space',
-    identifier: 'StartLink ID / Email / Di động',
-    identifierPlaceholder: 'Nhập StartLink ID / email / di động',
+    identifier: '{publicIdLabel} / Email / Di động',
+    identifierPlaceholder: 'Nhập {publicIdLabel} / email / di động',
     invitationHelp: 'Tài khoản hiện có có thể đăng nhập rồi tham gia doanh nghiệp được mời, không thay đổi vai trò trong doanh nghiệp đã tham gia.',
     invitation: {
       enterpriseInvitation: 'Enterprise invitation',
@@ -631,7 +635,7 @@ export const vi: MessageDictionary = {
       remindersSuffix: ', {count} nhắc nhở',
     },
     brand: {
-      about: 'Giới thiệu StartLink',
+      about: 'Giới thiệu {publicName}',
       helpAboutUpdate: 'Trợ giúp / Giới thiệu / Kiểm tra cập nhật',
     },
     collapse: 'Thu gọn thanh bên',
@@ -1609,12 +1613,12 @@ export const vi: MessageDictionary = {
         terms: {
           title: 'Terms of Service',
           parts: [
-            'StartLink Terms of Service',
+            '{publicName} Terms of Service',
             'Updated: June 5, 2026',
             'Effective: June 5, 2026',
-            'Welcome to StartLink. Please read and understand these terms before using this client and related services. Continued use means you agree to these terms.',
+            'Welcome to {publicName}. Please read and understand these terms before using this client and related services. Continued use means you agree to these terms.',
             '1. Services',
-            'StartLink provides instant messaging, customer service collaboration, file transfer, notifications, and related operation tools. We may adjust, interrupt, or terminate parts of the service for maintenance, upgrades, or security.',
+            '{publicName} provides instant messaging, customer service collaboration, file transfer, notifications, and related operation tools. We may adjust, interrupt, or terminate parts of the service for maintenance, upgrades, or security.',
             '2. Account registration and use',
             'You must provide true, accurate, and complete registration information, keep your account and password secure, and must not sell, rent, transfer, or authorize others to use your account.',
             '3. User conduct',
@@ -1625,13 +1629,13 @@ export const vi: MessageDictionary = {
             'For service interruption, data anomalies, or losses caused by force majeure, third parties, or causes outside our control, liability is limited to the extent permitted by law. You are responsible for content you publish through the service.',
             '6. Changes and contact',
             'We may update these terms for business or legal reasons. Material changes will be announced in the client or by other reasonable methods. Contact support@lpp.com with questions.',
-            '© 2026 StartLink Technology Co., Ltd. All rights reserved',
+            '© 2026 {publicName} Technology Co., Ltd. All rights reserved',
           ],
         },
         privacy: {
           title: 'Privacy Policy',
           parts: [
-            'StartLink Privacy Policy',
+            '{publicName} Privacy Policy',
             'Updated: June 5, 2026',
             'Effective: June 5, 2026',
             'We value personal information protection and take reasonable security measures under applicable laws and regulations.',
@@ -1647,7 +1651,7 @@ export const vi: MessageDictionary = {
             'You may access, correct, delete personal information, close your account, withdraw authorization, or request explanations of personal information processing rules as permitted by law.',
             '6. Minors and policy updates',
             'This service is not intended for minors under 14. When this policy changes, we will notify you in the client or through other reasonable channels.',
-            '© 2026 StartLink Technology Co., Ltd. All rights reserved',
+            '© 2026 {publicName} Technology Co., Ltd. All rights reserved',
           ],
         },
       },

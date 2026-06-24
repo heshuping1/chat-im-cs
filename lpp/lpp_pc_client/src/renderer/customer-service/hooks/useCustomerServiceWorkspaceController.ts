@@ -51,6 +51,7 @@ import {
 } from "../../data/customer-service/cs-typing-preview";
 import { formatError } from "../../lib/format";
 import { useMessageDetailSync } from "../../lib/useMessageDetailSync";
+import { recordServiceThreadSelectionStep } from "../diagnostics/service-selection-performance";
 
 const staffServiceHistoryPageSize = 50;
 
@@ -103,6 +104,44 @@ export function useCustomerServiceWorkspaceController({
       threads: threadsQuery.data,
     });
   }, [historyItems, selectedThreadId, threadsQuery.data]);
+  useEffect(() => {
+    if (!selectedThreadId) return;
+    recordServiceThreadSelectionStep(
+      selectedThreadId,
+      "workspace.selected-thread.resolved",
+      {
+        activeThreadId: selectedThreadId,
+        historyItems: historyItems.length,
+        queryDataUpdatedAt: threadsQuery.dataUpdatedAt,
+        queryFetchStatus: threadsQuery.fetchStatus,
+        queryStatus: threadsQuery.status,
+        resolved: Boolean(selectedThread),
+        selectedThreadStatus: selectedThread?.status,
+        selectableActiveItems: threadsQuery.data?.activeItems?.length ?? 0,
+        selectableQueueItems: threadsQuery.data?.queueItems?.length ?? 0,
+        threadType: selectedThread?.threadType,
+      },
+      {
+        repeatKey: [
+          selectedThread?.threadId ?? "",
+          selectedThread?.status ?? "",
+          threadsQuery.status,
+          threadsQuery.fetchStatus,
+          threadsQuery.dataUpdatedAt,
+          historyItems.length,
+        ].join("|"),
+      },
+    );
+  }, [
+    historyItems.length,
+    selectedThread,
+    selectedThreadId,
+    threadsQuery.data?.activeItems?.length,
+    threadsQuery.data?.queueItems?.length,
+    threadsQuery.dataUpdatedAt,
+    threadsQuery.fetchStatus,
+    threadsQuery.status,
+  ]);
   const selectableThreads = useMemo(
     () =>
       listCustomerServiceSelectableThreads({
@@ -242,6 +281,52 @@ export function useCustomerServiceWorkspaceController({
     () => mergeCustomerServiceThreadDetailReadStatus(detailQuery.data, readStatusQuery.data),
     [detailQuery.data, readStatusQuery.data],
   );
+  useEffect(() => {
+    if (!threadId) return;
+    recordServiceThreadSelectionStep(
+      threadId,
+      "workspace.detail-query.state",
+      {
+        detailDataUpdatedAt: detailQuery.dataUpdatedAt,
+        detailFetchStatus: detailQuery.fetchStatus,
+        detailIsFetched: detailQuery.isFetched,
+        detailIsFetching: detailQuery.isFetching,
+        detailIsLoading: detailQuery.isLoading,
+        detailMessageCount: detailQuery.data?.messages?.length ?? 0,
+        detailStatus: detailQuery.status,
+        readStatusDataUpdatedAt: readStatusQuery.dataUpdatedAt,
+        readStatusFetchStatus: readStatusQuery.fetchStatus,
+        readStatusStatus: readStatusQuery.status,
+        selectedThreadStatus: selectedThread?.status,
+        threadType,
+      },
+      {
+        repeatKey: [
+          detailQuery.status,
+          detailQuery.fetchStatus,
+          detailQuery.dataUpdatedAt,
+          detailQuery.data?.messages?.length ?? 0,
+          readStatusQuery.status,
+          readStatusQuery.fetchStatus,
+          readStatusQuery.dataUpdatedAt,
+        ].join("|"),
+      },
+    );
+  }, [
+    detailQuery.data?.messages?.length,
+    detailQuery.dataUpdatedAt,
+    detailQuery.fetchStatus,
+    detailQuery.isFetched,
+    detailQuery.isFetching,
+    detailQuery.isLoading,
+    detailQuery.status,
+    readStatusQuery.dataUpdatedAt,
+    readStatusQuery.fetchStatus,
+    readStatusQuery.status,
+    selectedThread?.status,
+    threadId,
+    threadType,
+  ]);
   const localSelectedThread = localThreadsQuery.data?.find(
     (thread) =>
       thread.threadId === selectedThread?.threadId &&

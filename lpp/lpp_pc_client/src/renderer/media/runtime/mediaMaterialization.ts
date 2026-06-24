@@ -175,7 +175,10 @@ export function ensureMaterializedMediaDisplayUrl({
       url: fileUrl,
     })
     .then((displayUrl) => {
-      if (!displayUrl?.startsWith("data:")) return undefined;
+      if (!displayUrl?.startsWith("data:")) {
+        failedMediaDisplayUrls.set(cacheKey, { failedAt: Date.now(), url: fileUrl });
+        return undefined;
+      }
       registerMaterializedMediaDisplayUrl(cacheKey, displayUrl);
       return displayUrl;
     })

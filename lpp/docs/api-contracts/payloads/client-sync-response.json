@@ -1,15 +1,15 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNM0Q9OQ642I",
+  "requestId": "0HNMCAQPOOLVR",
   "data": {
     "conversations": [
       {
-        "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
+        "conversationId": "019ed503-ba16-7f2a-a088-0c984755f400",
         "messages": [
           {
-            "messageId": "019e8989-3879-7d40-bceb-9bbf2dd5b249",
-            "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
+            "messageId": "019ed503-ba3a-7539-bf8c-3e78ed8a632f",
+            "conversationId": "019ed503-ba16-7f2a-a088-0c984755f400",
             "conversationSeq": 1,
             "senderUserId": "00000000-0000-0000-0000-000000000000",
             "messageType": "event",
@@ -24,9 +24,9 @@
               "location": null,
               "event": {
                 "eventType": "members_added",
-                "operatorUserId": "019e8989-3696-7cbf-b712-eb42c41b37a0",
+                "operatorUserId": "019ed503-b7f7-7223-896f-b44dbe7ac18e",
                 "addedUserIds": [
-                  "019e8989-36dd-74d9-9671-0a85080d1405"
+                  "019ed503-b857-7473-8944-33723b1e21d7"
                 ],
                 "removedUserId": null,
                 "userId": null,
@@ -36,18 +36,18 @@
               "kind": null
             },
             "isRecalled": false,
-            "sentAt": "2026-06-02T18:12:12.0248358\u002B00:00",
+            "sentAt": "2026-06-17T09:57:31.8337982\u002B00:00",
             "replyToMessageId": null,
             "forwardFromMessageId": null,
             "mentions": null,
-            "clientMsgId": "sys_019e898938797d40bceb9bbf2dd5b249",
+            "clientMsgId": "sys_019ed503ba3a7539bf8c3e78ed8a632f",
             "appId": null
           },
           {
-            "messageId": "019e8989-3953-7073-90f2-0de2d77cffe5",
-            "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
+            "messageId": "019ed503-ba96-761f-926f-789a0f3b3e5d",
+            "conversationId": "019ed503-ba16-7f2a-a088-0c984755f400",
             "conversationSeq": 2,
-            "senderUserId": "019e8989-3696-7cbf-b712-eb42c41b37a0",
+            "senderUserId": "019ed503-b7f7-7223-896f-b44dbe7ac18e",
             "messageType": "text",
             "body": {
               "text": "[\u6D88\u606F\u5DF2\u64A4\u56DE]",
@@ -62,7 +62,7 @@
               "kind": null
             },
             "isRecalled": true,
-            "sentAt": "2026-06-02T18:12:12.2438715\u002B00:00",
+            "sentAt": "2026-06-17T09:57:31.9264681\u002B00:00",
             "replyToMessageId": null,
             "forwardFromMessageId": null,
             "mentions": null,
@@ -70,10 +70,10 @@
             "appId": null
           },
           {
-            "messageId": "019e8989-3a54-7af0-80a5-e25dd61088ed",
-            "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
+            "messageId": "019ed503-bc0f-7f9f-ac86-a3b6dec7e648",
+            "conversationId": "019ed503-ba16-7f2a-a088-0c984755f400",
             "conversationSeq": 3,
-            "senderUserId": "019e8989-3696-7cbf-b712-eb42c41b37a0",
+            "senderUserId": "019ed503-b7f7-7223-896f-b44dbe7ac18e",
             "messageType": "text",
             "body": {
               "text": "@Bob \u6536\u5230\uFF0C\u7EE7\u7EED\u8054\u8C03",
@@ -88,12 +88,12 @@
               "kind": null
             },
             "isRecalled": false,
-            "sentAt": "2026-06-02T18:12:12.5007982\u002B00:00",
-            "replyToMessageId": "019e8989-3953-7073-90f2-0de2d77cffe5",
+            "sentAt": "2026-06-17T09:57:32.3030203\u002B00:00",
+            "replyToMessageId": "019ed503-ba96-761f-926f-789a0f3b3e5d",
             "forwardFromMessageId": null,
             "mentions": [
               {
-                "userId": "019e8989-36dd-74d9-9671-0a85080d1405",
+                "userId": "019ed503-b857-7473-8944-33723b1e21d7",
                 "offset": 0,
                 "length": 4
               }
@@ -102,15 +102,15 @@
             "appId": null
           },
           {
-            "messageId": "019e8989-3b4a-7031-9969-c931382b77ea",
-            "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
+            "messageId": "019ed503-bcf6-73eb-8a58-59e4cdefcee9",
+            "conversationId": "019ed503-ba16-7f2a-a088-0c984755f400",
             "conversationSeq": 4,
-            "senderUserId": "019e8989-3696-7cbf-b712-eb42c41b37a0",
+            "senderUserId": "019ed503-b7f7-7223-896f-b44dbe7ac18e",
             "messageType": "image",
             "body": {
               "text": null,
               "image": {
-                "url": "/media/019e8989-388e-7040-b054-04fa2014b0bf",
+                "url": "/media/019ed503-ba6b-78bc-a271-b1fdcfa5b246",
                 "fileName": "diagram.png",
                 "mimeType": "image/png",
                 "sizeBytes": 12,
@@ -118,8 +118,8 @@
                 "height": null,
                 "durationSeconds": null,
                 "thumbnailUrl": null,
-                "signedUrl": "/media/019e8989-388e-7040-b054-04fa2014b0bf?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427533\u0026sig=umR0nXu-qDbA7xMGkjCaP8yHWIp7E6TLv5oxoCEfHig",
-                "downloadUrl": "/media/019e8989-388e-7040-b054-04fa2014b0bf?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427533\u0026sig=umR0nXu-qDbA7xMGkjCaP8yHWIp7E6TLv5oxoCEfHig\u0026download=1"
+                "signedUrl": "/media/019ed503-ba6b-78bc-a271-b1fdcfa5b246?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693852\u0026sig=zRWLqdUkeC6gAP38Biixh9u9yHK4bhKm3GNLcB5mayI",
+                "downloadUrl": "/media/019ed503-ba6b-78bc-a271-b1fdcfa5b246?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693852\u0026sig=zRWLqdUkeC6gAP38Biixh9u9yHK4bhKm3GNLcB5mayI\u0026download=1"
               },
               "video": null,
               "voice": null,
@@ -131,7 +131,7 @@
               "kind": null
             },
             "isRecalled": false,
-            "sentAt": "2026-06-02T18:12:12.7462894\u002B00:00",
+            "sentAt": "2026-06-17T09:57:32.5348527\u002B00:00",
             "replyToMessageId": null,
             "forwardFromMessageId": null,
             "mentions": null,
@@ -139,25 +139,25 @@
             "appId": null
           },
           {
-            "messageId": "019e8989-3b58-7c67-811f-7b0d8cd5d37d",
-            "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
+            "messageId": "019ed503-bd04-7025-991d-4ea15269c697",
+            "conversationId": "019ed503-ba16-7f2a-a088-0c984755f400",
             "conversationSeq": 5,
-            "senderUserId": "019e8989-3696-7cbf-b712-eb42c41b37a0",
+            "senderUserId": "019ed503-b7f7-7223-896f-b44dbe7ac18e",
             "messageType": "video",
             "body": {
               "text": null,
               "image": null,
               "video": {
-                "url": "/media/019e8989-3895-7e7a-93ae-2bd8fb1ae0b7",
+                "url": "/media/019ed503-ba76-797c-8cd7-dd032c162386",
                 "fileName": "walkthrough.mp4",
                 "mimeType": "video/mp4",
                 "sizeBytes": 16,
                 "width": null,
                 "height": null,
                 "durationSeconds": 12,
-                "thumbnailUrl": "/media/019e8989-389a-7384-9778-1d344891c512?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427533\u0026sig=Qm3R_HFE8LiYBlqmJ3pLzwK-KX-7fnOU6KFzLFfG3yU",
-                "signedUrl": "/media/019e8989-3895-7e7a-93ae-2bd8fb1ae0b7?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427533\u0026sig=B8Q9dH9hwkFKXpEpb9R2VskcN9SN_WK674dMlJfMD4I",
-                "downloadUrl": "/media/019e8989-3895-7e7a-93ae-2bd8fb1ae0b7?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427533\u0026sig=B8Q9dH9hwkFKXpEpb9R2VskcN9SN_WK674dMlJfMD4I\u0026download=1"
+                "thumbnailUrl": "/media/019ed503-ba88-7cca-88e3-c835d207dcd7?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693852\u0026sig=DTDqlCTVXnAQSvzyd-2pnffxucVc4ioq1-yW-xE8qNc",
+                "signedUrl": "/media/019ed503-ba76-797c-8cd7-dd032c162386?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693852\u0026sig=gtIKkAJukNy-Vy9VE38PYyhNbpDTw9yPSzzpmtNtJjQ",
+                "downloadUrl": "/media/019ed503-ba76-797c-8cd7-dd032c162386?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693852\u0026sig=gtIKkAJukNy-Vy9VE38PYyhNbpDTw9yPSzzpmtNtJjQ\u0026download=1"
               },
               "voice": null,
               "file": null,
@@ -168,7 +168,7 @@
               "kind": null
             },
             "isRecalled": false,
-            "sentAt": "2026-06-02T18:12:12.7600736\u002B00:00",
+            "sentAt": "2026-06-17T09:57:32.5489231\u002B00:00",
             "replyToMessageId": null,
             "forwardFromMessageId": null,
             "mentions": null,

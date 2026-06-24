@@ -188,6 +188,23 @@ function persistServiceLayoutPatch(patch: StoredServiceLayout) {
   }
 }
 
+function workspaceActionCallerStack() {
+  const stack = new Error().stack;
+  if (!stack) return [];
+  return stack
+    .split('\n')
+    .slice(2, 10)
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^at\s+/, '')
+        .replace(/file:\/\/\/[A-Z]:\/.*?\/dist\/renderer\/assets\//i, 'dist/renderer/assets/')
+        .replace(/https?:\/\/[^/]+\//i, '')
+        .slice(0, 180),
+    )
+    .filter(Boolean);
+}
+
 function readStoredAuth(): AuthSession | null {
   return readStoredAuthSession();
 }
@@ -375,13 +392,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => {
       const noOp = state.activeImConversationId === id && state.activeModule === 'messages';
       rememberContactMessageOpenTrace(id, trace);
+      const callerStack = workspaceActionCallerStack();
       recordMessageReminderDiagnostic({
         event: 'workspace.im.set-active',
         source: 'workspace-store-core',
         phase: noOp ? 'no-op' : 'state-change',
         route: 'messages',
         classification: {
+          callerStack,
           elapsedMs: elapsedMsFromTrace(trace),
+          hasTrace: Boolean(trace),
           nextActiveConversationId: id,
           nextActiveModule: 'messages',
           previousActiveConversationId: state.activeImConversationId,

@@ -556,6 +556,38 @@ describe("CustomerServiceApiClient", () => {
     ]);
   });
 
+  it("updates a temp-session visitor customer remark through the client token API", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      response: {
+        sessionId: "session-1",
+        remark: "VIP old customer",
+      },
+    });
+
+    await expect(
+      client.updateTempSessionVisitorRemark("session-1", "  VIP old customer  "),
+    ).resolves.toEqual({
+      sessionId: "session-1",
+      remark: "VIP old customer",
+    });
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        body: { remark: "VIP old customer" },
+        path: "/api/client/v1/customer-service/temp-sessions/session-1/visitor-remark",
+      },
+    ]);
+  });
+
+  it("rejects temp-session visitor customer remarks longer than 1000 characters before posting", () => {
+    const client = new RecordingCustomerServiceApiClient();
+
+    expect(() =>
+      client.updateTempSessionVisitorRemark("session-1", "x".repeat(1001)),
+    ).toThrow("1000");
+    expect(client.requests).toEqual([]);
+  });
+
   it("loads live monitor threads from the admin service center", async () => {
     const client = new RecordingCustomerServiceApiClient({
       membershipRole: 4,
@@ -1222,6 +1254,57 @@ describe("CustomerServiceApiClient", () => {
           conversationId: "temp-conversation-1",
           threadId: "temp-thread-1",
           threadType: "temp_session",
+        },
+      ],
+    });
+  });
+
+  it("keeps server history last-message time for visit exit time", async () => {
+    rememberCustomerServiceConversationIndex({
+      conversationId: "temp-conversation-visit-exit",
+      lastMessageAt: "2026-06-18T13:10:00.000Z",
+      lastMessagePreview: "local newer message",
+      overlayUnreadCount: 2,
+      scopeKey: testScopeKey,
+      threadId: "temp-thread-visit-exit",
+      threadType: "temp_session",
+    });
+    class HistoryClient extends CustomerServiceApiClient {
+      constructor() {
+        super({
+          baseUrl: "https://api.example.test",
+          tenantToken: "tenant-token",
+          traceId: "test-trace",
+        });
+      }
+
+      override async request<T>() {
+        return {
+          items: [
+            {
+              conversationId: "temp-conversation-visit-exit",
+              createdAt: "2026-06-18T13:03:17.000Z",
+              durationSeconds: 603,
+              last_message_at: "2026-06-18T13:03:19.000Z",
+              status: "closed_by_staff",
+              threadId: "temp-thread-visit-exit",
+              threadType: "temp_session",
+              title: "Visitor",
+              unreadCount: 0,
+            },
+          ],
+        } as T;
+      }
+    }
+
+    await expect(new HistoryClient().getStaffServiceHistory()).resolves.toMatchObject({
+      items: [
+        {
+          createdAt: "2026-06-18T13:03:17.000Z",
+          durationSeconds: 603,
+          lastMessageAt: "2026-06-18T13:03:19.000Z",
+          threadId: "temp-thread-visit-exit",
+          unreadCount: 0,
         },
       ],
     });

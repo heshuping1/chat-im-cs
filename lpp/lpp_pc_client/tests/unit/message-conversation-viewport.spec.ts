@@ -17,6 +17,7 @@ describe("message conversation viewport model", () => {
       atBottom: false,
       pendingNewMessageCount: 2,
       scrollTop: 420,
+      userControlled: true,
     });
 
     expect(restoreConversationViewport(registry, "c1")).toEqual({
@@ -25,7 +26,30 @@ describe("message conversation viewport model", () => {
         atBottom: false,
         pendingNewMessageCount: 2,
         scrollTop: 420,
+        userControlled: true,
       },
+    });
+  });
+
+  it("ignores transient non-user viewport states captured during hydration", () => {
+    const registry = createConversationViewportRegistry();
+    registry.remember("c1", {
+      atBottom: false,
+      pendingNewMessageCount: 0,
+      scrollTop: 420,
+    });
+    registry.remember("c2", {
+      atBottom: false,
+      pendingNewMessageCount: 0,
+      scrollTop: 520,
+      userControlled: false,
+    });
+
+    expect(restoreConversationViewport(registry, "c1")).toEqual({
+      kind: "initial-bottom",
+    });
+    expect(restoreConversationViewport(registry, "c2")).toEqual({
+      kind: "initial-bottom",
     });
   });
 
@@ -51,7 +75,7 @@ describe("message conversation viewport model", () => {
     expect(hookSource).toContain("restoreConversationViewport");
     expect(hookSource).toContain("conversationBottomScrollTop");
     expect(hookSource).toContain('restore.kind === "restore"');
-    expect(hookSource).toContain("rememberConversationViewport(previousConversationKey)");
+    expect(hookSource).toContain("rememberConversationViewportSnapshot(previousConversationKey, previousSnapshot)");
     expect(hookSource).toContain("stage.scrollTo({ top: restore.state.scrollTop");
   });
 
@@ -138,6 +162,9 @@ describe("message conversation viewport model", () => {
 
     expect(stageSource).toContain("const renderKey = chatMessageRenderKey(message)");
     expect(stageSource).toContain("data-message-render-key={renderKey}");
+    expect(stageSource).toContain("data-message-id={message.messageId}");
+    expect(stageSource).toContain("data-message-seq={message.conversationSeq ?? \"\"}");
+    expect(stageSource).toContain("data-message-type={message.messageType}");
     expect(stageSource).toContain("key={renderKey}");
   });
 
@@ -154,10 +181,34 @@ describe("message conversation viewport model", () => {
     expect(hookSource).toContain("markProgrammaticScroll(stage)");
     expect(hookSource).toContain("hasSuppressedLayoutBottomFollow");
     expect(hookSource).toContain("hasRecentOwnAppend");
+    expect(hookSource).toContain("bottomPinnedConversationKeysRef");
+    expect(hookSource).toContain("userControlledConversationKeysRef");
+    expect(hookSource).toContain("!programmatic && hasRecentUserScrollIntent()");
+    expect(hookSource).toContain("rememberConversationViewportSnapshot");
+    expect(hookSource).toContain("markConversationBottomPinned(conversationKey)");
+    expect(hookSource).toContain("clearConversationBottomPinned(conversationKey)");
     expect(hookSource).toContain("stabilizeViewportFromSnapshot(viewportSnapshotRef.current)");
+    expect(hookSource).toContain("shouldKeepBottomPinnedAfterLayout");
+    expect(hookSource).toContain("bottom-follow.stabilize.pin-bottom.before");
     expect(hookSource).toContain('stage.dataset.programmaticScroll = "true"');
     expect(appSource).toContain("target.dataset.programmaticScroll === 'true'");
     expect(appSource).toContain("target.classList.remove('is-scrolling')");
+  });
+
+  it("keeps the message conversation list scrollbar from changing content width", () => {
+    const scrollbarBridgeCss = readFileSync(
+      resolve(process.cwd(), "src/renderer/styles/shared/scrollbar-theme-bridge.css"),
+      "utf8",
+    );
+
+    expect(scrollbarBridgeCss).toContain(".app-shell .e-conversation-list");
+    expect(scrollbarBridgeCss).toMatch(
+      /\.app-shell \.e-message-stage,\s*\.app-shell \.h-message-stage,\s*\.app-shell \.h-thread-list,\s*\.app-shell \.e-conversation-list[\s\S]*overflow-y: scroll !important;[\s\S]*scrollbar-gutter: stable !important;[\s\S]*scrollbar-color: transparent transparent !important;/,
+    );
+    expect(scrollbarBridgeCss).toContain(".app-shell .e-conversation-list.is-scrolling");
+    expect(scrollbarBridgeCss).toContain(
+      ".app-shell .e-conversation-list.is-scrolling::-webkit-scrollbar-thumb",
+    );
   });
 
   it("keeps automatic bottom alignment single-pass and anchor-compensated", () => {
@@ -169,7 +220,7 @@ describe("message conversation viewport model", () => {
     expect(hookSource).not.toContain("scheduledScrollFrameRef");
     expect(hookSource).not.toContain("requestAnimationFrame(restoreScroll)");
     expect(hookSource).not.toContain("followBottomIfNeeded");
-    expect(hookSource).not.toContain("shouldKeepBottomPinnedAfterLayout");
+    expect(hookSource).toContain("recentUserScroll: hasRecentUserScrollIntent()");
     expect(hookSource).toContain("Math.abs(stage.scrollTop - nextTop) > 1");
     expect(hookSource).toContain("stage.scrollTop = nextTop");
     expect(hookSource).toContain("captureViewportSnapshot");
@@ -177,8 +228,42 @@ describe("message conversation viewport model", () => {
     expect(hookSource).toContain("viewportSnapshotRef");
     expect(hookSource).toContain("addedMessages.length === 0");
     expect(hookSource).toContain("recentOwnAppendUntilRef.current = Date.now() + recentOwnAppendSuppressMs");
-    expect(hookSource).toContain("if (hasRecentOwnAppend())");
+    expect(hookSource).toContain("hasRecentOwnAppend() ||");
     expect(hookSource).toContain("stabilizeViewportFromSnapshot(previousSnapshot)");
+    const noAddedSource = hookSource.slice(
+      hookSource.indexOf("if (addedMessages.length === 0)"),
+      hookSource.indexOf("const addedIncomingCount"),
+    );
+    expect(noAddedSource.indexOf('event: "bottom-follow.commit.no-added.suppressed"')).toBeLessThan(
+      noAddedSource.indexOf('event: "bottom-follow.commit.no-added.pin-bottom"'),
+    );
+  });
+
+  it("keeps default-latest conversation entries bottom-pinned through hydration", () => {
+    const hookSource = readFileSync(
+      resolve(process.cwd(), "src/renderer/lib/useWechatBottomFollow.ts"),
+      "utf8",
+    );
+
+    expect(hookSource).toContain("shouldForceBottomPinned(conversationKey)");
+    expect(hookSource).toContain('event: "bottom-follow.commit.no-added.pin-bottom"');
+    expect(hookSource).toContain('event: "bottom-follow.observer.pin-bottom"');
+    expect(hookSource).toContain('event: "bottom-follow.observer.resize-entries"');
+    const observedLayoutSource = hookSource.slice(
+      hookSource.indexOf("const stabilizeObservedLayout = () =>"),
+      hookSource.indexOf("const scheduleLayoutStabilization = () =>"),
+    );
+    expect(observedLayoutSource.indexOf("hasSuppressedLayoutBottomFollow()")).toBeLessThan(
+      observedLayoutSource.indexOf("shouldForceBottomPinned(conversationKey)"),
+    );
+    expect(hookSource).toContain("messageElement?.dataset.messageRenderKey");
+    expect(hookSource).toContain("messageElement?.dataset.messageId");
+    expect(hookSource).toContain("totalChangedEntries");
+    expect(hookSource).toContain("const forceBottomPinned = shouldForceBottomPinned(key)");
+    expect(hookSource).toContain("const atBottom = forceBottomPinned || snapshot.atBottom");
+    expect(hookSource).toContain("if (restore.state.atBottom)");
+    expect(hookSource).toContain("markConversationBottomPinned(conversationKey)");
+    expect(hookSource).toContain("clearConversationBottomPinned(conversationKey)");
   });
 
   it("leaves IM send bottom-follow scrolling to the viewport hook", () => {

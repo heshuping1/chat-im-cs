@@ -185,7 +185,10 @@ describe("message lookup UI", () => {
     expect(messageListModel).toContain("createMessageLookupScope");
     expect(messageCenter).toContain("messagesHydrationSource");
     expect(listPanel).toContain("emptyText");
-    expect(listPanel).toContain("const windowingEnabled = !unreadJump");
+    expect(listPanel).toContain("const windowingEnabled = true");
+    expect(listPanel).not.toContain("const windowingEnabled = !unreadJump");
+    expect(listPanel).toContain("unreadJumpActive");
+    expect(listPanel).toContain("lastMessageMine");
     expect(listPanel).not.toContain("const lookupOpen = messageSearchOpen || historyOpen");
     expect(listPanel).not.toContain("chat-lookup-panel");
     expect(listPanel).not.toContain("chat-inline-panel");
@@ -377,8 +380,8 @@ describe("message lookup UI", () => {
     expect(contactProfileController).not.toContain("pcQueryKeys.customerServiceThreadProfile");
     expect(contactProfileController).toContain("pcQueryKeys.friendProfileExtra");
     expect(contactProfileController).toContain("activeFriend");
-    expect(contactProfileController).toContain("enabled: false");
-    expect(contactProfileController).not.toContain("getFriendProfileExtra(activeFriendUserId)");
+    expect(contactProfileController).toContain('activeConversationType === "direct"');
+    expect(contactProfileController).toContain("getFriendProfileExtra(activeFriendUserId)");
     expect(contactProfileController).toContain("updateFriendProfileMutation");
     expect(contactProfileController).toContain('queryClient.invalidateQueries({ queryKey: ["pc-friends"] })');
     expect(contactProfileController).toContain("pcQueryKeys.imConversations(session?.apiBaseUrl, session?.tenantToken)");
@@ -390,7 +393,7 @@ describe("message lookup UI", () => {
     expect(messageCenter).toContain("useMessageInteractionHandlers({");
     expect(messageCenter).toContain("profile: contactProfileController.profileQuery.data");
     expect(messageCenter).toContain("profileExtra: contactProfileController.profileExtraQuery.data");
-    expect(contactProfileController).not.toContain("getFriendProfileExtra(activeFriendUserId)");
+    expect(contactProfileController).toContain("getFriendProfileExtra(activeFriendUserId)");
     expect(stage).toContain("handleAvatarClick");
   });
 
@@ -523,6 +526,8 @@ describe("message lookup UI", () => {
     expect(listPanel).toContain("pendingGroupReadReceiptSnapshotTargets");
     expect(listPanel).toContain("messages: messageRenderWindow.renderedMessages");
     expect(listPanel).toContain("groupReadReceiptAutoSyncTargets");
+    expect(listPanel).toContain("groupReadReceiptAutoSyncReady");
+    expect(listPanel).toContain("activeGroupReadReceiptAutoSyncDelayMs");
     expect(listPanel).toContain("useQueries");
     expect(listPanel).toContain("activeGroupReadReceiptAutoSyncIntervalMs");
     expect(listPanel).toContain("groupReadReceiptQuery");

@@ -21,6 +21,22 @@ describe("customer-service message avatars", () => {
     ),
     "utf8",
   );
+  const chatMessageBubbleSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/ChatMessageBubble.tsx"),
+    "utf8",
+  );
+  const messageBodyViewSource = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/MessageBodyView.tsx"),
+    "utf8",
+  );
+  const customerServiceCss = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/customer-service/customer-service.css"),
+    "utf8",
+  );
+  const mediaCss = readFileSync(
+    resolve(process.cwd(), "src/renderer/styles/messages/message-media-content.css"),
+    "utf8",
+  );
 
   it("passes domain-resolved avatars into online-service customer-service bubbles", () => {
     expect(chatWorkspaceSource).toContain("mineAvatarUrl={session?.avatarUrl}");
@@ -68,5 +84,30 @@ describe("customer-service message avatars", () => {
     expect(serviceMessageBubbleSource).not.toContain("messageReadStatusText");
     expect(serviceMessageBubbleSource).not.toContain("customerMessageReadText");
     expect(serviceMessageBubbleSource).not.toContain("customerReadReceiptText");
+  });
+
+  it("keeps online-service media messages on the shared stable chat bubble path", () => {
+    expect(serviceMessageBubbleSource).toContain('import { ChatMessageBubble } from "../../components/ChatMessageBubble";');
+    expect(serviceMessageBubbleSource).toContain("<ChatMessageBubble");
+    expect(serviceMessageBubbleSource).toContain("mediaCacheContext={mediaCacheContext}");
+    expect(serviceMessageBubbleSource).toContain("onUploadAction={onUploadAction}");
+    expect(serviceMessageBubbleSource).not.toContain("<img");
+    expect(serviceMessageBubbleSource).not.toContain("<video");
+    expect(serviceMessageBubbleSource).not.toContain("ImagePart");
+    expect(serviceMessageBubbleSource).not.toContain("VideoPart");
+    expect(serviceMessageBubbleSource).not.toContain("FileMessageContent");
+    expect(messageStageSource).toContain("<ServiceMessageBubble");
+    expect(chatMessageBubbleSource).toContain("<MessageBodyView");
+    expect(chatMessageBubbleSource).toContain("mediaCacheContext={mediaCacheContext}");
+    expect(messageBodyViewSource).toContain("normalizeMediaPart({ assetBaseUrl, fallback, part })");
+    expect(messageBodyViewSource).toContain("<ImagePart");
+    expect(messageBodyViewSource).toContain("<VideoPart");
+    expect(messageBodyViewSource).toContain("<FileMessageContent");
+    expect(mediaCss).toContain("height: var(--media-preview-height");
+    expect(mediaCss).toContain("height: var(--media-preview-video-height");
+    expect(mediaCss).toContain("height: var(--media-preview-file-height");
+    expect(customerServiceCss).not.toContain("message-image-frame");
+    expect(customerServiceCss).not.toContain("message-video-card");
+    expect(customerServiceCss).not.toContain("message-file-card");
   });
 });

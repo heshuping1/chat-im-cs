@@ -8,6 +8,7 @@ import {
   reuseStableMessageItems,
 } from "../../src/renderer/data/message/message-domain";
 import type { MessageItemDto } from "../../src/renderer/data/api/types";
+import { chatMessageRenderKey } from "../../src/renderer/messages/models/messageRenderKey";
 
 describe("message domain", () => {
   it("maps IM message dto to shared entity", () => {
@@ -203,6 +204,56 @@ describe("message domain", () => {
     const result = reuseStableMessageItems([previous], [next]);
 
     expect(result?.[0]).toBe(next);
+  });
+
+  it("preserves client identity when a server refresh updates the same message", () => {
+    const previous = message({
+      clientMsgId: "pc-local-text-1",
+      conversationSeq: 12,
+      messageId: "server-1",
+      readCount: 0,
+      status: "sent",
+    });
+    const next = message({
+      conversationSeq: 12,
+      messageId: "server-1",
+      readCount: 2,
+      status: "read",
+    });
+
+    const result = mergeStableMessagePage([previous], [next]);
+
+    expect(result?.[0]).not.toBe(previous);
+    expect(result?.[0]).toMatchObject({
+      clientMsgId: "pc-local-text-1",
+      messageId: "server-1",
+      readCount: 2,
+      status: "read",
+    });
+    expect(chatMessageRenderKey(result![0])).toBe(chatMessageRenderKey(previous));
+  });
+
+  it("does not override client identity returned by the refreshed server message", () => {
+    const previous = message({
+      clientMsgId: "pc-local-old",
+      conversationSeq: 12,
+      messageId: "server-1",
+      readCount: 0,
+    });
+    const next = message({
+      clientMsgId: "pc-local-current",
+      conversationSeq: 12,
+      messageId: "server-1",
+      readCount: 1,
+    });
+
+    const result = mergeStableMessagePage([previous], [next]);
+
+    expect(result?.[0]).toMatchObject({
+      clientMsgId: "pc-local-current",
+      messageId: "server-1",
+      readCount: 1,
+    });
   });
 
   it("keeps previously loaded older messages when the latest server page shifts", () => {

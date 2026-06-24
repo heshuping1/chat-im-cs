@@ -4,6 +4,7 @@ import {
   createConversationViewportRegistry,
   decideConversationViewportAfterAppend,
   restoreConversationViewport,
+  shouldKeepBottomPinnedAfterLayout,
 } from "../messages/models/messageConversationViewportModel";
 import { logChatScrollTrace } from "./chatScrollTrace";
 
@@ -40,11 +41,14 @@ export function useWechatBottomFollow<TMessage>({
   const previousConversationKeyRef = useRef<string | undefined>(undefined);
   const previousMessageKeysRef = useRef<Set<string>>(new Set());
   const viewportRegistryRef = useRef(createConversationViewportRegistry());
+  const bottomPinnedConversationKeysRef = useRef(new Set<string>());
+  const userControlledConversationKeysRef = useRef(new Set<string>());
   const pendingNewMessageCountRef = useRef(0);
   const layoutBottomFollowSuppressedUntilRef = useRef(0);
   const recentOwnAppendUntilRef = useRef(0);
   const programmaticScrollTimerRef = useRef<number | null>(null);
   const viewportSnapshotRef = useRef<ViewportAnchorSnapshot | null>(null);
+  const observedLayoutHeightsRef = useRef(new WeakMap<Element, number>());
   const [pendingNewMessageCount, setPendingNewMessageCount] = useState(0);
 
   const updatePendingNewMessageCount = useCallback(
@@ -79,17 +83,61 @@ export function useWechatBottomFollow<TMessage>({
     [],
   );
 
+  const markConversationBottomPinned = useCallback((key: string | undefined) => {
+    if (!key) return;
+    bottomPinnedConversationKeysRef.current.add(key);
+    userControlledConversationKeysRef.current.delete(key);
+  }, []);
+
+  const clearConversationBottomPinned = useCallback((key: string | undefined) => {
+    if (!key) return;
+    bottomPinnedConversationKeysRef.current.delete(key);
+  }, []);
+
+  const shouldForceBottomPinned = useCallback(
+    (key: string | undefined) =>
+      Boolean(
+        key &&
+          bottomPinnedConversationKeysRef.current.has(key) &&
+          !hasRecentUserScrollIntent(),
+      ),
+    [hasRecentUserScrollIntent],
+  );
+
   const rememberConversationViewport = useCallback(
     (key: string | undefined) => {
       const stage = stageRef.current;
       if (!key || !stage) return;
+      const forceBottomPinned = shouldForceBottomPinned(key);
+      const atBottom = forceBottomPinned || rawIsNearBottom();
+      const userControlled =
+        !atBottom && userControlledConversationKeysRef.current.has(key);
       viewportRegistryRef.current.remember(key, {
-        atBottom: rawIsNearBottom(),
+        atBottom,
         pendingNewMessageCount: pendingNewMessageCountRef.current,
         scrollTop: stage.scrollTop,
+        userControlled,
       });
     },
-    [rawIsNearBottom],
+    [rawIsNearBottom, shouldForceBottomPinned],
+  );
+
+  const rememberConversationViewportSnapshot = useCallback(
+    (key: string | undefined, snapshot: ViewportAnchorSnapshot | null) => {
+      if (!key || !snapshot) return;
+      const forceBottomPinned = shouldForceBottomPinned(key);
+      const atBottom = forceBottomPinned || snapshot.atBottom;
+      if (atBottom) userControlledConversationKeysRef.current.delete(key);
+      const userControlled =
+        !atBottom && userControlledConversationKeysRef.current.has(key);
+      viewportRegistryRef.current.remember(key, {
+        atBottom,
+        pendingNewMessageCount: pendingNewMessageCountRef.current,
+        scrollTop: snapshot.scrollTop,
+        userControlled,
+      });
+    },
+    [shouldForceBottomPinned],
   );
 
   const isNearBottom = useCallback(
@@ -177,6 +225,46 @@ export function useWechatBottomFollow<TMessage>({
 
   const stabilizeViewportFromSnapshot = useCallback(
     (snapshot: ViewportAnchorSnapshot | null) => {
+      if (
+        shouldKeepBottomPinnedAfterLayout({
+          atBottom: Boolean(snapshot?.atBottom),
+          recentUserScroll: hasRecentUserScrollIntent(),
+        })
+      ) {
+        const stage = stageRef.current;
+        if (stage) {
+          const nextTop = conversationBottomScrollTop({
+            clientHeight: stage.clientHeight,
+            scrollHeight: stage.scrollHeight,
+          });
+          logChatScrollTrace({
+            context: {
+              nextTop,
+              reason: "snapshot_was_at_bottom",
+            },
+            event: "bottom-follow.stabilize.pin-bottom.before",
+            stack: true,
+            stage,
+          });
+          markProgrammaticScroll(stage);
+          if (Math.abs(stage.scrollTop - nextTop) > 1) {
+            stage.scrollTop = nextTop;
+          }
+          isAtBottomRef.current = true;
+          const nextSnapshot = captureViewportSnapshot();
+          if (nextSnapshot) nextSnapshot.atBottom = true;
+          viewportSnapshotRef.current = nextSnapshot;
+          logChatScrollTrace({
+            context: {
+              nextTop,
+              reason: "snapshot_was_at_bottom",
+            },
+            event: "bottom-follow.stabilize.pin-bottom.after",
+            stage,
+          });
+          return;
+        }
+      }
       restoreAnchorPosition(snapshot);
       const nextSnapshot = captureViewportSnapshot();
       if (nextSnapshot && snapshot?.atBottom) {
@@ -185,7 +273,12 @@ export function useWechatBottomFollow<TMessage>({
       }
       viewportSnapshotRef.current = nextSnapshot;
     },
-    [captureViewportSnapshot, restoreAnchorPosition],
+    [
+      captureViewportSnapshot,
+      hasRecentUserScrollIntent,
+      markProgrammaticScroll,
+      restoreAnchorPosition,
+    ],
   );
 
   const alignBottom = useCallback(
@@ -201,6 +294,7 @@ export function useWechatBottomFollow<TMessage>({
       });
       logChatScrollTrace({
         context: {
+          conversationKey,
           behavior,
           nextTop,
           reason: "align_bottom",
@@ -217,10 +311,12 @@ export function useWechatBottomFollow<TMessage>({
         }
       }
       isAtBottomRef.current = true;
+      markConversationBottomPinned(conversationKey);
       updatePendingNewMessageCount(0);
       storeViewportSnapshot();
       logChatScrollTrace({
         context: {
+          conversationKey,
           behavior,
           nextTop,
           reason: "align_bottom",
@@ -229,7 +325,13 @@ export function useWechatBottomFollow<TMessage>({
         stage,
       });
     },
-    [markProgrammaticScroll, storeViewportSnapshot, updatePendingNewMessageCount],
+    [
+      conversationKey,
+      markConversationBottomPinned,
+      markProgrammaticScroll,
+      storeViewportSnapshot,
+      updatePendingNewMessageCount,
+    ],
   );
 
   const scrollToBottom = useCallback(
@@ -241,11 +343,23 @@ export function useWechatBottomFollow<TMessage>({
 
   const handleScroll = useCallback(() => {
     const atBottom = rawIsNearBottom();
+    const programmatic = stageRef.current?.dataset.programmaticScroll === "true";
+    if (conversationKey) {
+      if (atBottom) {
+        markConversationBottomPinned(conversationKey);
+      } else if (!programmatic && hasRecentUserScrollIntent()) {
+        userControlledConversationKeysRef.current.add(conversationKey);
+        clearConversationBottomPinned(conversationKey);
+      }
+    }
     logChatScrollTrace({
       context: {
         atBottom,
         conversationKey,
-        programmatic: stageRef.current?.dataset.programmaticScroll === "true",
+        programmatic,
+        userControlled: conversationKey
+          ? userControlledConversationKeysRef.current.has(conversationKey)
+          : false,
       },
       event: "bottom-follow.scroll-event",
       stage: stageRef.current,
@@ -256,6 +370,9 @@ export function useWechatBottomFollow<TMessage>({
     storeViewportSnapshot();
   }, [
     conversationKey,
+    clearConversationBottomPinned,
+    hasRecentUserScrollIntent,
+    markConversationBottomPinned,
     rawIsNearBottom,
     rememberConversationViewport,
     storeViewportSnapshot,
@@ -271,10 +388,12 @@ export function useWechatBottomFollow<TMessage>({
     const previousConversationKey = previousConversationKeyRef.current;
     const previousKeys = previousMessageKeysRef.current;
     const conversationChanged = previousConversationKey !== conversationKey;
-    if (conversationChanged) rememberConversationViewport(previousConversationKey);
+    const previousSnapshot = viewportSnapshotRef.current;
+    if (conversationChanged) {
+      rememberConversationViewportSnapshot(previousConversationKey, previousSnapshot);
+    }
     previousConversationKeyRef.current = conversationKey;
     previousMessageKeysRef.current = currentKeys;
-    const previousSnapshot = viewportSnapshotRef.current;
     logChatScrollTrace({
       context: {
         conversationChanged,
@@ -300,6 +419,12 @@ export function useWechatBottomFollow<TMessage>({
       if (restore.kind === "restore") {
         isAtBottomRef.current = restore.state.atBottom;
         updatePendingNewMessageCount(restore.state.pendingNewMessageCount);
+        if (restore.state.atBottom) {
+          markConversationBottomPinned(conversationKey);
+        } else {
+          userControlledConversationKeysRef.current.add(conversationKey);
+          clearConversationBottomPinned(conversationKey);
+        }
         const restoreScroll = () => {
           const stage = stageRef.current;
           if (!stage) return;
@@ -322,6 +447,7 @@ export function useWechatBottomFollow<TMessage>({
         return;
       }
       isAtBottomRef.current = true;
+      markConversationBottomPinned(conversationKey);
       updatePendingNewMessageCount(0);
       scrollToBottom("auto");
       return;
@@ -329,16 +455,34 @@ export function useWechatBottomFollow<TMessage>({
 
     const addedMessages = messages.filter((message) => !previousKeys.has(messageKey(message)));
     if (addedMessages.length === 0) {
-      if (hasRecentOwnAppend()) {
+      if (
+        hasSuppressedLayoutBottomFollow() ||
+        hasRecentOwnAppend() ||
+        hasRecentUserScrollIntent()
+      ) {
         logChatScrollTrace({
           context: {
             conversationKey,
-            reason: "no_added_messages_recent_own_append",
+            recentOwnAppend: hasRecentOwnAppend(),
+            recentUserScrollIntent: hasRecentUserScrollIntent(),
+            suppressedLayoutBottomFollow: hasSuppressedLayoutBottomFollow(),
           },
           event: "bottom-follow.commit.no-added.suppressed",
           stage: stageRef.current,
         });
         storeViewportSnapshot();
+        return;
+      }
+      if (shouldForceBottomPinned(conversationKey)) {
+        logChatScrollTrace({
+          context: {
+            conversationKey,
+            reason: "bottom_pinned_no_added_messages",
+          },
+          event: "bottom-follow.commit.no-added.pin-bottom",
+          stage: stageRef.current,
+        });
+        scrollToBottom("auto");
         return;
       }
       logChatScrollTrace({
@@ -372,6 +516,10 @@ export function useWechatBottomFollow<TMessage>({
       event: "bottom-follow.commit.added",
       stage: stageRef.current,
     });
+    if (shouldForceBottomPinned(conversationKey)) {
+      scrollToBottom("auto");
+      return;
+    }
     if (decision.kind === "follow-bottom") {
       if (addedMineCount > 0) {
         recentOwnAppendUntilRef.current = Date.now() + recentOwnAppendSuppressMs;
@@ -389,7 +537,13 @@ export function useWechatBottomFollow<TMessage>({
     messageKey,
     messages,
     rememberConversationViewport,
+    rememberConversationViewportSnapshot,
+    hasRecentUserScrollIntent,
     hasRecentOwnAppend,
+    hasSuppressedLayoutBottomFollow,
+    markConversationBottomPinned,
+    clearConversationBottomPinned,
+    shouldForceBottomPinned,
     scrollToBottom,
     stabilizeViewportFromSnapshot,
     storeViewportSnapshot,
@@ -425,6 +579,44 @@ export function useWechatBottomFollow<TMessage>({
     const stage = stageRef.current;
     if (!stage || typeof ResizeObserver === "undefined") return undefined;
     let resizeFrame: number | null = null;
+    const layoutHeightByElement = observedLayoutHeightsRef.current;
+    const collectResizeChanges = (entries: ResizeObserverEntry[]) => {
+      const changes = entries
+        .map((entry) => {
+          const target = entry.target;
+          const previousHeight = layoutHeightByElement.get(target);
+          const nextHeight = Math.round(entry.contentRect.height * 100) / 100;
+          layoutHeightByElement.set(target, nextHeight);
+          if (previousHeight === undefined) return undefined;
+          const delta = Math.round((nextHeight - previousHeight) * 100) / 100;
+          if (Math.abs(delta) <= 1) return undefined;
+          const element = target instanceof HTMLElement ? target : null;
+          const messageElement = element?.closest<HTMLElement>(messageAnchorSelector);
+          return {
+            delta,
+            messageId: messageElement?.dataset.messageId,
+            messageMine: messageElement?.dataset.messageMine,
+            messageRenderKey: messageElement?.dataset.messageRenderKey,
+            messageSeq: messageElement?.dataset.messageSeq,
+            messageType: messageElement?.dataset.messageType,
+            nextHeight,
+            previousHeight,
+            targetClassName: element?.className,
+            targetTagName: element?.tagName.toLowerCase(),
+          };
+        })
+        .filter((change): change is NonNullable<typeof change> => Boolean(change));
+      if (changes.length === 0) return;
+      logChatScrollTrace({
+        context: {
+          changes: changes.slice(0, 12),
+          conversationKey,
+          totalChangedEntries: changes.length,
+        },
+        event: "bottom-follow.observer.resize-entries",
+        stage,
+      });
+    };
     const stabilizeObservedLayout = () => {
       if (
         hasSuppressedLayoutBottomFollow() ||
@@ -444,6 +636,18 @@ export function useWechatBottomFollow<TMessage>({
         storeViewportSnapshot();
         return;
       }
+      if (shouldForceBottomPinned(conversationKey)) {
+        logChatScrollTrace({
+          context: {
+            conversationKey,
+            reason: "bottom_pinned_observed_layout_change",
+          },
+          event: "bottom-follow.observer.pin-bottom",
+          stage,
+        });
+        scrollToBottom("auto");
+        return;
+      }
       logChatScrollTrace({
         context: {
           conversationKey,
@@ -461,7 +665,10 @@ export function useWechatBottomFollow<TMessage>({
         stabilizeObservedLayout();
       });
     };
-    const resizeObserver = new ResizeObserver(scheduleLayoutStabilization);
+    const resizeObserver = new ResizeObserver((entries) => {
+      collectResizeChanges(entries);
+      scheduleLayoutStabilization();
+    });
     const observeCurrentLayout = () => {
       resizeObserver.observe(stage);
       Array.from(stage.children).forEach((child) => resizeObserver.observe(child));
@@ -483,6 +690,8 @@ export function useWechatBottomFollow<TMessage>({
     hasRecentOwnAppend,
     hasSuppressedLayoutBottomFollow,
     messages.length,
+    scrollToBottom,
+    shouldForceBottomPinned,
     stabilizeViewportFromSnapshot,
     storeViewportSnapshot,
   ]);

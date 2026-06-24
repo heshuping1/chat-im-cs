@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeGroupReadReceiptAutoSyncDelayMs,
   activeGroupReadReceiptAutoSyncIntervalMs,
   activeGroupReadReceiptAutoSyncMaxTargets,
   activeGroupReadReceiptAutoSyncStaleMs,
@@ -165,9 +166,10 @@ describe("group read receipts model", () => {
     ]);
   });
 
-  it("uses a short active-conversation auto sync policy for group read receipts", () => {
-    expect(activeGroupReadReceiptAutoSyncIntervalMs()).toBe(2_000);
-    expect(activeGroupReadReceiptAutoSyncMaxTargets()).toBe(20);
-    expect(activeGroupReadReceiptAutoSyncStaleMs()).toBe(1_000);
+  it("keeps active-conversation read receipt auto sync out of the first frame", () => {
+    expect(activeGroupReadReceiptAutoSyncDelayMs()).toBe(500);
+    expect(activeGroupReadReceiptAutoSyncIntervalMs()).toBe(5_000);
+    expect(activeGroupReadReceiptAutoSyncMaxTargets()).toBe(4);
+    expect(activeGroupReadReceiptAutoSyncStaleMs()).toBe(10_000);
   });
 });

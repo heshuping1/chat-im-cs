@@ -14,6 +14,7 @@ import { MessagePlusMenu, type MessagePlusAction } from "./MessageStartDialogs";
 import type { GroupCreateAccess } from "../models/groupCreateModel";
 import type { GroupConversationAvatar } from "../models/groupAvatarTypes";
 import { conversationListIdentityView } from "../models/conversationListIdentityModel";
+import { startConversationSelectionTrace } from "../diagnostics/message-selection-performance";
 import { ConversationRow } from "./ConversationListParts";
 
 export type MessageConversationFilterKey = "all" | "unread" | "friends" | "groups";
@@ -97,9 +98,15 @@ export function MessageConversationListPanel({
     (event: MouseEvent<HTMLDivElement>) => {
       const conversation = conversationFromListEvent(event, conversationsById);
       if (!conversation) return;
+      startConversationSelectionTrace(conversation, {
+        activeConversationId,
+        conversationCount: conversationsById.size,
+        eventDetail: event.detail,
+        eventTimeStamp: event.timeStamp,
+      });
       onConversationClick(conversation);
     },
-    [conversationsById, onConversationClick],
+    [activeConversationId, conversationsById, onConversationClick],
   );
   const handleConversationListContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {

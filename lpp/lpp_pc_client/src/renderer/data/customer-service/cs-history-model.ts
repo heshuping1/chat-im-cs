@@ -78,7 +78,11 @@ export function staffServiceHistoryItemToThread(
       "staff_user_id",
     ], ["staffUserId", "userId", "id"]),
     lastMessagePreview: item.lastMessagePreview,
-    lastMessageAt: item.lastMessageAt ?? item.closedAt ?? item.acceptedAt ?? item.startedAt,
+    lastMessageAt:
+      readHistoryLastMessageAt(record) ??
+      item.closedAt ??
+      item.acceptedAt ??
+      item.startedAt,
     unreadCount: item.unreadCount ?? 0,
     historyItem: item as StaffServiceHistoryItem & Record<string, unknown>,
   };
@@ -112,6 +116,28 @@ function readStringField(source: unknown, key: string) {
   if (!source || typeof source !== "object") return undefined;
   const value = (source as Record<string, unknown>)[key];
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function readHistoryLastMessageAt(source: Record<string, unknown>) {
+  const nestedMessage =
+    readRecordField(source, "lastMessage") ||
+    readRecordField(source, "last_message") ||
+    readRecordField(source, "latestMessage") ||
+    readRecordField(source, "latest_message");
+  return readFirstStringField(source, ["lastMessageAt", "last_message_at"]) ||
+    readFirstStringField(nestedMessage ?? {}, [
+      "sentAt",
+      "sent_at",
+      "createdAt",
+      "created_at",
+    ]);
+}
+
+function readRecordField(source: Record<string, unknown>, key: string) {
+  const value = source[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function readHistoryStaffField(

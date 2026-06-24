@@ -2441,8 +2441,9 @@
 
 .pc-chat-bubble .message-image-frame {
   width: var(--media-preview-width, 178px);
+  height: var(--media-preview-height, 178px);
   min-width: 0;
-  min-height: 0;
+  min-height: var(--media-preview-height, 178px);
   max-width: 100%;
   aspect-ratio: var(--media-preview-aspect-ratio, 1 / 1);
   border-radius: 8px;
@@ -2553,7 +2554,9 @@
 
 .pc-chat-bubble .message-audio-card {
   width: var(--voice-card-width, 82px);
+  height: var(--media-preview-voice-height, 36px);
   min-width: 82px;
+  min-height: var(--media-preview-voice-height, 36px);
   max-width: min(178px, 46vw);
   padding: 0 12px 0 11px;
   border: 0;

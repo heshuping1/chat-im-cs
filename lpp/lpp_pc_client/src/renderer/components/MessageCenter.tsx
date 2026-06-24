@@ -14,7 +14,9 @@ import { pcQueryKeys } from "../data/query-keys";
 import { recordMessageReminderDiagnostic } from "../data/diagnostics/message-reminder-diagnostics";
 import {
   contactMessageOpenTraceForConversation,
+  elapsedMsFromTrace,
   recordContactMessageOpenDiagnostic,
+  type ContactMessageOpenTrace,
 } from "../data/diagnostics/contact-message-open-diagnostics";
 import { workspaceScopeFromSession, workspaceScopeDiagnostic } from "../data/workspace-scope";
 import { requireApiClient } from "../data/runtime";
@@ -88,6 +90,7 @@ import { useMessageContactPickerData } from "../messages/hooks/useMessageContact
 import { useImConversationsQuery } from "../messages/hooks/useImConversationsQuery";
 import { useMessageContactProfileController } from "../messages/hooks/useMessageContactProfileController";
 import { useMessageConversationActions } from "../messages/hooks/useMessageConversationActions";
+import { startConversationTargetActionTrace } from "../messages/diagnostics/message-selection-performance";
 import { useAutoTranslateConversationPreference } from "../translation/hooks/useAutoTranslateConversationPreference";
 import { useAutoTranslateMessages } from "../translation/hooks/useAutoTranslateMessages";
 import { autoTranslateTargetLanguage } from "../translation/models/autoTranslateModel";
@@ -138,6 +141,7 @@ import {
 } from "../messages/hooks/useMessageResponsiveLayout";
 import { useSerialTaskQueue } from "../messages/hooks/useSerialTaskQueue";
 import { useWindowDismiss } from "../messages/hooks/useWindowDismiss";
+import { recordConversationSelectionStep } from "../messages/diagnostics/message-selection-performance";
 import {
   messageDangerConfirmationDescriptor,
   requestMessageDangerConfirmation,
@@ -204,12 +208,64 @@ function readMessageContextOrder(): MessageContextPaneOrder[] {
   return ["assistant", "profile"];
 }
 
+function recordMessageCenterSetActiveRequest(
+  route:
+    | "conversation-action"
+    | "start-conversation-controller"
+    | "unread-jump-controller",
+  classification: Record<string, unknown>,
+  trace?: ContactMessageOpenTrace,
+) {
+  recordMessageReminderDiagnostic({
+    event: "im.ui.set-active.request",
+    source: "message-center",
+    phase: "request",
+    route,
+    classification: {
+      ...classification,
+      elapsedMs: elapsedMsFromTrace(trace),
+      hasTrace: Boolean(trace),
+      traceId: trace?.traceId,
+    },
+  });
+}
+
 export function MessageCenter() {
   const session = useAuthSession();
   const { t } = useI18n();
   const activeModule = useActiveModule();
   const activeConversationId = useActiveImConversationId();
   const setActiveConversation = useSetActiveImConversation();
+  const setActiveConversationFromStartController = useCallback(
+    (conversationId: string, trace?: ContactMessageOpenTrace) => {
+      recordMessageCenterSetActiveRequest("start-conversation-controller", {
+        activeConversationId,
+        conversationId,
+      }, trace);
+      setActiveConversation(conversationId, trace);
+    },
+    [activeConversationId, setActiveConversation],
+  );
+  const setActiveConversationFromConversationAction = useCallback(
+    (conversationId: string, trace?: ContactMessageOpenTrace) => {
+      recordMessageCenterSetActiveRequest("conversation-action", {
+        activeConversationId,
+        conversationId,
+      }, trace);
+      setActiveConversation(conversationId, trace);
+    },
+    [activeConversationId, setActiveConversation],
+  );
+  const setActiveConversationFromUnreadController = useCallback(
+    (conversationId: string, trace?: ContactMessageOpenTrace) => {
+      recordMessageCenterSetActiveRequest("unread-jump-controller", {
+        activeConversationId,
+        conversationId,
+      }, trace);
+      setActiveConversation(conversationId, trace);
+    },
+    [activeConversationId, setActiveConversation],
+  );
   const locallyReadConversationReads = useLocalImConversationReads();
   const imPeerReadReceipts = useImPeerReadReceipts();
   const imReadStateByConversation = useImReadStateByConversation();
@@ -366,6 +422,19 @@ export function MessageCenter() {
     messageFilter,
     session,
   });
+  useEffect(() => {
+    if (!activeConversation) return;
+    recordConversationSelectionStep(activeConversation.conversationId, "active-conversation.resolved", {
+      activeConversationId,
+      activeConversationType,
+      visibleConversationCount: visibleConversations.length,
+    });
+  }, [
+    activeConversation,
+    activeConversationId,
+    activeConversationType,
+    visibleConversations.length,
+  ]);
   useMessageCenterPageEffects({
     activeConversation,
     activeConversationType,
@@ -399,6 +468,42 @@ export function MessageCenter() {
     activeConversationType,
     session,
   });
+  useEffect(() => {
+    if (!activeConversation) return;
+    recordConversationSelectionStep(
+      activeConversation.conversationId,
+      "messages.query-state",
+      {
+        dataUpdatedAt: messagesQuery.dataUpdatedAt,
+        fetching: messagesQuery.isFetching,
+        hydrationSource: messagesHydrationSource,
+        messageCount: hotServerMessages.length,
+        messagesLoaded,
+        messagesLoading,
+        queryLoading: messagesQuery.isLoading,
+      },
+      {
+        repeatKey: [
+          messagesHydrationSource,
+          hotServerMessages.length,
+          messagesLoaded,
+          messagesLoading,
+          messagesQuery.isFetching,
+          messagesQuery.isLoading,
+          messagesQuery.dataUpdatedAt,
+        ].join("|"),
+      },
+    );
+  }, [
+    activeConversation,
+    hotServerMessages.length,
+    messagesHydrationSource,
+    messagesLoaded,
+    messagesLoading,
+    messagesQuery.dataUpdatedAt,
+    messagesQuery.isFetching,
+    messagesQuery.isLoading,
+  ]);
   useMessageDetailSync({
     enabled: Boolean(session && activeConversation && activeConversationType),
     isFetching: messagesQuery.isFetching,
@@ -543,7 +648,7 @@ export function MessageCenter() {
   } = useMessageStartConversationController({
     queryClient,
     session,
-    setActiveConversation,
+    setActiveConversation: setActiveConversationFromStartController,
     setComposerDialog,
     setNotice,
   });
@@ -551,7 +656,7 @@ export function MessageCenter() {
     activeConversationId,
     queryClient,
     session,
-    setActiveConversation,
+    setActiveConversation: setActiveConversationFromConversationAction,
     setLocalHiddenConversationIds,
     setLocalMutedConversationOverrides,
     setLocalPinnedConversationOverrides,
@@ -663,7 +768,7 @@ export function MessageCenter() {
     messageSearchOpen,
     messages,
     session,
-    setActiveConversation,
+    setActiveConversation: setActiveConversationFromUnreadController,
     setConversationDrawerOpen,
     setMessageSearchKeyword,
     setMessageSearchOpen,
@@ -1448,8 +1553,28 @@ export function MessageCenter() {
         }}
         onCloseForward={() => setForwardTargetMessages([])}
         onCloseResend={() => setResendConfirmMessage(null)}
-        onCreateDirectChat={(userId) => createDirectChatMutation.mutate(userId)}
-        onCreateGroupChat={(payload) => createGroupChatMutation.mutate(payload)}
+        onCreateDirectChat={(userId) =>
+          createDirectChatMutation.mutate({
+            peerUserId: userId,
+            trace: startConversationTargetActionTrace({
+              action: "start-direct.target-click",
+              activeConversationId,
+              targetId: userId,
+              targetKind: "direct-contact",
+            }),
+          })
+        }
+        onCreateGroupChat={(payload) =>
+          createGroupChatMutation.mutate({
+            payload,
+            trace: startConversationTargetActionTrace({
+              action: "start-group.submit",
+              activeConversationId,
+              targetId: payload.memberUserIds.join(","),
+              targetKind: "group-contact",
+            }),
+          })
+        }
         onCreateInviteQr={() => createInviteQrMutation.mutate()}
         onOpenCreateGroup={openCreateGroupFromActiveConversation}
         onOpenChatBackgroundSettings={() => setConversationBackgroundDialogOpen(true)}
@@ -1479,12 +1604,18 @@ export function MessageCenter() {
           }
         }}
         onFailedMessageClick={setResendConfirmMessage}
-        onForwardToConversation={(targetConversationId) =>
+        onForwardToConversation={(targetConversationId) => {
+          startConversationTargetActionTrace({
+            action: "forward.target-click",
+            activeConversationId,
+            targetId: targetConversationId,
+            targetKind: "forward-conversation",
+          });
           forwardMutation.mutate({
             messages: forwardTargetMessages,
             targetConversationId,
-          })
-        }
+          });
+        }}
         onResendMessage={handleConfirmResendMessage}
         onMessageElementRef={messageListScrollRegistry.registerMessageElement}
         onAiDraft={() => openAiDraftDrawer()}

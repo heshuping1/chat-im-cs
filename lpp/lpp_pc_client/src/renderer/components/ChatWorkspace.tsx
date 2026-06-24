@@ -119,6 +119,7 @@ import { isRiskyCustomerServiceThread } from "../customer-service/models/service
 import type { MessageComposerHandle } from "./MessageComposer";
 import { clampComposerHeight } from "../messages/models/messageComposerLayoutModel";
 import { createCustomerServiceTransferRecordViewModels } from "../data/customer-service/cs-transfer-records";
+import { recordServiceThreadSelectionStep } from "../customer-service/diagnostics/service-selection-performance";
 
 const defaultCustomerServiceComposerHeight = 220;
 
@@ -348,6 +349,50 @@ export function ChatWorkspace({
     messageKey: chatMessageRenderKey,
     messages: displayMessages,
   });
+  useEffect(() => {
+    if (!selectedThreadId) return;
+    recordServiceThreadSelectionStep(
+      selectedThreadId,
+      "chat-workspace.render-state",
+      {
+        activeModule,
+        activeThreadOpenSource,
+        canReply,
+        detailLoaded: Boolean(detail),
+        detailLoading,
+        displayMessageCount: displayMessages.length,
+        messageStageKind: messageStageState?.kind,
+        readOnly,
+        resolvedThreadId: selectedThread?.threadId,
+        status,
+        threadState: threadState.kind,
+      },
+      {
+        repeatKey: [
+          selectedThread?.threadId ?? "",
+          Boolean(detail),
+          detailLoading,
+          displayMessages.length,
+          messageStageState?.kind ?? "",
+          status,
+          threadState.kind,
+        ].join("|"),
+      },
+    );
+  }, [
+    activeModule,
+    activeThreadOpenSource,
+    canReply,
+    detail,
+    detailLoading,
+    displayMessages.length,
+    messageStageState?.kind,
+    readOnly,
+    selectedThread?.threadId,
+    selectedThreadId,
+    status,
+    threadState.kind,
+  ]);
   const lookupCounts = useMemo(() => getHistoryFilterCounts(displayMessages), [displayMessages]);
   const lookupMessages = useMemo(
     () =>

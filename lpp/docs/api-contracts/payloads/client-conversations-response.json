@@ -1,19 +1,19 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNM0Q9OQ642C",
+  "requestId": "0HNMCAQPOOLVL",
   "data": {
     "items": [
       {
-        "conversationId": "019e8989-386c-7c3b-98f5-85dc80fc0ea3",
+        "conversationId": "019ed503-ba16-7f2a-a088-0c984755f400",
         "conversationType": "group",
         "title": "\u9879\u76EE\u8054\u8C03\u7FA4",
         "avatarUrl": null,
         "lastMessage": {
-          "messageId": "019e8989-3b58-7c67-811f-7b0d8cd5d37d",
+          "messageId": "019ed503-bd04-7025-991d-4ea15269c697",
           "messageType": "video",
           "preview": "[\u89C6\u9891]",
-          "sentAt": "2026-06-02T18:12:12.7600736\u002B00:00"
+          "sentAt": "2026-06-17T09:57:32.5489231\u002B00:00"
         },
         "draft": null,
         "unreadCount": 5,
@@ -23,11 +23,11 @@
         "isMuted": false,
         "peerUserId": null,
         "memberCount": 3,
-        "ownerUserId": "019e8989-3297-7e8e-99e4-6fe9abb974d9",
+        "ownerUserId": "019ed503-ae62-778c-95ee-60fcb5ae9178",
         "peerUserType": null,
         "tempSession": null
       }
     ],
-    "nextCursor": "2026-06-02T18:12:12.7600736\u002B00:00"
+    "nextCursor": "2026-06-17T09:57:32.5489231\u002B00:00"
   }
 }

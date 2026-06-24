@@ -103,6 +103,31 @@ describe("desktop file handlers", () => {
     ).rejects.toThrow("media asset is not accessible");
   });
 
+  it("returns no data url for display media cache misses without rejecting IPC", async () => {
+    ensureLocalMediaFile.mockRejectedValueOnce(new Error("MEDIA_SIGNATURE_EXPIRED"));
+    const { registerDesktopFileHandlers } = await import("../../src/main/desktop-file-handlers");
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+
+    registerDesktopFileHandlers({
+      appIconPath: "/app/icon.ico",
+      preloadPath: "/app/preload.cjs",
+      register: (method, handler) => {
+        handlers.set(method, handler as (...args: unknown[]) => unknown);
+      },
+    });
+
+    await expect(
+      handlers.get("readMediaFileAsDataUrl")?.(
+        {},
+        {
+          fileName: "clip-poster.jpg",
+          kind: "image",
+          url: "https://cdn.example.test/clip-poster.jpg?sig=expired",
+        },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it("passes the preload-derived source path through the local media cache handler", async () => {
     const { registerDesktopFileHandlers } = await import("../../src/main/desktop-file-handlers");
     const handlers = new Map<string, (...args: unknown[]) => unknown>();

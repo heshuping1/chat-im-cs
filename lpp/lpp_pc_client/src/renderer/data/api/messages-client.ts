@@ -391,13 +391,14 @@ export class MessagesApiClient extends ContactsApiClient {
     groupId: string,
     messageId: string,
     messageSeq: number,
+    options: { signal?: AbortSignal } = {},
   ) {
     const search = new URLSearchParams({ messageId });
     const path = `${endpointPlan.groupReadReceipts.replace(
       "{conversationId}",
       encodeURIComponent(groupId),
     )}?${search.toString()}`;
-    return this.request<unknown>(path).then((payload) =>
+    return this.request<unknown>(path, { signal: options.signal }).then((payload) =>
       parseGroupReadReceiptsPayload(readEnvelopeData(payload), {
         currentUser: {
           displayName: this.options.displayName,

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, RefreshCw } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
-import { DayPicker, type DateRange } from "react-day-picker";
+import type { DateRange } from "react-day-picker";
 
 import type {
   ExportTaskDto,
@@ -14,6 +14,7 @@ import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
 import { resolveServicePerformanceStaff } from "../customer-service/models/servicePerformanceModel";
 import { formatError } from "../lib/format";
+import { CustomerServiceDateRangeFilter } from "./CustomerServiceDateRangeFilter";
 import { CustomerServiceExportTaskDialog } from "./CustomerServiceExportTaskDialog";
 import { PanelState } from "./PanelState";
 import type {
@@ -738,17 +739,7 @@ function DistributionPieChart({ items }: { items: TempDistributionPointDto[] }) 
   );
 }
 
-function StatsDateRangeFilter({
-  fromTime,
-  onPickerOpenChange,
-  onPresetChange,
-  onRangeChange,
-  onTimeChange,
-  pickerOpen,
-  preset,
-  range,
-  toTime,
-}: {
+function StatsDateRangeFilter(props: {
   fromTime: string;
   onPickerOpenChange: (open: boolean) => void;
   onPresetChange: (preset: ExportPreset) => void;
@@ -760,73 +751,12 @@ function StatsDateRangeFilter({
   toTime: string;
 }) {
   return (
-    <div className="cs-history-date-filter cs-stats-date-filter">
-      <div className="cs-history-filter-options">
-        {exportPresets.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={preset === option.value ? "active" : undefined}
-            onClick={() => onPresetChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      {preset === "custom" && (
-        <div className="cs-history-date-custom">
-          <button
-            type="button"
-            className="cs-history-date-trigger"
-            onClick={() => onPickerOpenChange(true)}
-          >
-            {statsDateRangeLabel(range, fromTime, toTime)}
-          </button>
-          {pickerOpen && (
-            <div className="cs-history-date-popover">
-              <DayPicker
-                captionLayout="dropdown"
-                mode="range"
-                numberOfMonths={1}
-                selected={range}
-                weekStartsOn={1}
-                onSelect={onRangeChange}
-              />
-              <div className="cs-history-time-grid">
-                <label>
-                  <input
-                    aria-label="开始时间"
-                    type="time"
-                    step={1}
-                    value={fromTime}
-                    disabled={!range.from}
-                    onChange={(event) => onTimeChange("from", event.target.value)}
-                  />
-                </label>
-                <label>
-                  <input
-                    aria-label="结束时间"
-                    type="time"
-                    step={1}
-                    value={toTime}
-                    disabled={!range.to}
-                    onChange={(event) => onTimeChange("to", event.target.value)}
-                  />
-                </label>
-              </div>
-              <footer>
-                <button type="button" onClick={() => onRangeChange(undefined)}>
-                  清空
-                </button>
-                <button type="button" className="primary" onClick={() => onPickerOpenChange(false)}>
-                  完成
-                </button>
-              </footer>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <CustomerServiceDateRangeFilter
+      {...props}
+      className="cs-stats-date-filter"
+      presetOptions={exportPresets}
+      rangeLabel={statsDateRangeLabel}
+    />
   );
 }
 

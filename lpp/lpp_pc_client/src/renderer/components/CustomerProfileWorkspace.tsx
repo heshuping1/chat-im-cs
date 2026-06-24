@@ -388,7 +388,6 @@ function ServiceActionPanel({
   t: Translate;
 }) {
   const ticketCount = model.tickets.length;
-  const editable = isKnown(model.friendUserId);
   const [editingRemark, setEditingRemark] = useState(false);
   const [remarkDraft, setRemarkDraft] = useState("");
   const [editingTags, setEditingTags] = useState(false);
@@ -403,7 +402,7 @@ function ServiceActionPanel({
   }, [editingTags, model.tags]);
 
   const saveRemark = async () => {
-    if (!editable || !onUpdateRemark) {
+    if (!onUpdateRemark) {
       onPendingAction(t("customerProfile.notice.missingFriendForRemark"));
       return;
     }
@@ -421,7 +420,7 @@ function ServiceActionPanel({
   };
 
   const saveTags = async () => {
-    if (!editable || !onUpdateTags) {
+    if (!onUpdateTags) {
       onPendingAction(t("customerProfile.notice.missingFriendForTags"));
       return;
     }
@@ -520,15 +519,21 @@ function ServiceActionPanel({
           />
         ) : (
           <CompactActionRow
-            actionLabel={t("customerProfile.actions.edit")}
+            actionLabel={
+              onUpdateRemark ? t("customerProfile.actions.edit") : undefined
+            }
             actionKey="remark"
             icon={<PencilLine size={15} />}
             label={t("customerProfile.fields.remark")}
-            onAction={() => {
-              setRemarkDraft(isKnown(model.remark) ? model.remark : "");
-              setEditingRemark(true);
-              onPendingAction("");
-            }}
+            onAction={
+              onUpdateRemark
+                ? () => {
+                    setRemarkDraft(isKnown(model.remark) ? model.remark : "");
+                    setEditingRemark(true);
+                    onPendingAction("");
+                  }
+                : undefined
+            }
             value={isKnown(model.remark) ? model.remark : t("customerProfile.empty.remark")}
           />
         )}
@@ -550,11 +555,11 @@ function CompactActionRow({
   onAction,
   value,
 }: {
-  actionLabel: string;
+  actionLabel?: string;
   actionKey: string;
   icon: ReactNode;
   label: string;
-  onAction: () => void;
+  onAction?: () => void;
   value: string;
 }) {
   return (
@@ -564,9 +569,11 @@ function CompactActionRow({
         {label}
       </span>
       <strong className="customer-360-action-value">{value}</strong>
-      <button className="customer-360-action-control" type="button" onClick={onAction}>
-        {actionLabel}
-      </button>
+      {onAction && actionLabel && (
+        <button className="customer-360-action-control" type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }

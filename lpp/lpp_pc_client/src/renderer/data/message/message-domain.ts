@@ -192,10 +192,13 @@ export function reuseStableMessageItems(
   const stableNext = next.map((message, index) => {
     const key = stableMessageKey(message);
     const previousMessage = key ? previousByKey.get(key) : undefined;
+    const messageWithStableIdentity = previousMessage
+      ? preservePreviousClientIdentity(previousMessage, message)
+      : message;
     const shouldReuse =
       Boolean(previousMessage) &&
-      previousFingerprintByKey.get(key) === stableMessageFingerprint(message);
-    const resolved = shouldReuse ? previousMessage! : message;
+      previousFingerprintByKey.get(key) === stableMessageFingerprint(messageWithStableIdentity);
+    const resolved = shouldReuse ? previousMessage! : messageWithStableIdentity;
     if (resolved !== previous[index]) reusedEveryItem = false;
     return resolved;
   });
@@ -288,6 +291,32 @@ function stableMessageKey(message: MessageItemDto) {
   return "";
 }
 
+function preservePreviousClientIdentity(
+  previous: MessageItemDto,
+  next: MessageItemDto,
+): MessageItemDto {
+  const nextRecord = next as unknown as Record<string, unknown>;
+  if (
+    hasNonEmptyString(nextRecord.clientMsgId) ||
+    hasNonEmptyString(nextRecord.clientMessageId) ||
+    hasNonEmptyString(nextRecord.localTaskId)
+  ) {
+    return next;
+  }
+
+  const previousRecord = previous as unknown as Record<string, unknown>;
+  const clientMsgId = stringRecordValue(previousRecord.clientMsgId);
+  const clientMessageId = stringRecordValue(previousRecord.clientMessageId);
+  const localTaskId = stringRecordValue(previousRecord.localTaskId);
+  if (!clientMsgId && !clientMessageId && !localTaskId) return next;
+  return {
+    ...next,
+    ...(clientMsgId ? { clientMsgId } : {}),
+    ...(clientMessageId ? { clientMessageId } : {}),
+    ...(localTaskId ? { localTaskId } : {}),
+  };
+}
+
 function messageIdentityKeys(message: MessageItemDto) {
   const keys = new Set<string>();
   const record = message as unknown as Record<string, unknown>;
@@ -302,6 +331,14 @@ function messageIdentityKeys(message: MessageItemDto) {
     keys.add(`seq:${message.conversationId}:${message.conversationSeq}`);
   }
   return [...keys];
+}
+
+function hasNonEmptyString(value: unknown) {
+  return typeof value === "string" && Boolean(value.trim());
+}
+
+function stringRecordValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
 function latestPageBoundary(messages: MessageItemDto[]) {

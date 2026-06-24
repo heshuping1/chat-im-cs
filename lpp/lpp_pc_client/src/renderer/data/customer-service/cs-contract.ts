@@ -75,6 +75,10 @@ export interface CustomerProfileEntity {
   entryChannel?: string;
   platform?: string;
   provider?: string;
+  visitorRemark?: string | null;
+  customerRemark?: string | null;
+  remark?: string | null;
+  note?: string | null;
   tags: string[];
   tabCounts?: Record<string, number>;
   tradingSummary?: Record<string, unknown>;
@@ -324,6 +328,10 @@ export function normalizeCustomerProfileDto(
       entryChannel: stringField(record, "entryChannel", "entry_channel"),
       platform: stringField(record, "platform"),
       provider: stringField(record, "provider"),
+      visitorRemark: nullableStringField(record, "visitorRemark", "visitor_remark"),
+      customerRemark: nullableStringField(record, "customerRemark", "customer_remark"),
+      remark: nullableStringField(record, "remark"),
+      note: nullableStringField(record, "note"),
       tags: stringArrayField(record, "tags"),
       tabCounts: asNumberRecord(record.tabCounts ?? record.tab_counts),
       tradingSummary: asRecordOrUndefined(record.tradingSummary ?? record.trading_summary),
@@ -372,6 +380,10 @@ export function customerProfileEntityToDto(
     entryChannel: entity.entryChannel,
     platform: entity.platform,
     provider: entity.provider,
+    visitorRemark: entity.visitorRemark,
+    customerRemark: entity.customerRemark,
+    remark: entity.remark,
+    note: entity.note,
     tags: entity.tags,
     tabCounts: entity.tabCounts,
     tradingSummary: entity.tradingSummary,

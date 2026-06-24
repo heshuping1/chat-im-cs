@@ -1,17 +1,17 @@
 {
   "code": "OK",
   "message": "success",
-  "requestId": "0HNM0Q9OQ641R",
+  "requestId": "0HNMCAQPOOLUT",
   "data": {
-    "mediaId": "019e8989-3895-7e7a-93ae-2bd8fb1ae0b7",
+    "mediaId": "019ed503-ba76-797c-8cd7-dd032c162386",
     "mediaKind": "video",
-    "url": "/media/019e8989-3895-7e7a-93ae-2bd8fb1ae0b7",
-    "relativePath": "11111111111111111111111111111111/2026/06/02/video/019e898938957e7a93ae2bd8fb1ae0b7.mp4",
+    "url": "/media/019ed503-ba76-797c-8cd7-dd032c162386",
+    "relativePath": "11111111111111111111111111111111/2026/06/17/video/019ed503ba76797c8cd7dd032c162386.mp4",
     "fileName": "walkthrough.mp4",
     "mimeType": "video/mp4",
     "sizeBytes": 16,
     "thumbnailUrl": null,
-    "signedUrl": "/media/019e8989-3895-7e7a-93ae-2bd8fb1ae0b7?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427532\u0026sig=LaRSIVusBB7vsO3CalZJCrUSSo8FZR2JyEyVwriEKt0",
-    "downloadUrl": "/media/019e8989-3895-7e7a-93ae-2bd8fb1ae0b7?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1780427532\u0026sig=LaRSIVusBB7vsO3CalZJCrUSSo8FZR2JyEyVwriEKt0\u0026download=1"
+    "signedUrl": "/media/019ed503-ba76-797c-8cd7-dd032c162386?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693851\u0026sig=m_kEQ9DEuuX9Qv1DJQ4pZS0ffvatGdIxywQqE5C-QzA",
+    "downloadUrl": "/media/019ed503-ba76-797c-8cd7-dd032c162386?tenantId=11111111-1111-1111-1111-111111111111\u0026exp=1781693851\u0026sig=m_kEQ9DEuuX9Qv1DJQ4pZS0ffvatGdIxywQqE5C-QzA\u0026download=1"
   }
 }

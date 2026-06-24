@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   createMessageRenderWindow,
   defaultMessageRenderWindowSize,
+  effectiveMessageRenderWindowExpandedOlderCount,
+  expandMessageRenderWindowOlder,
   messageRenderWindowExpandStep,
+  messageRenderWindowResetKey,
+  resetMessageRenderWindowExpansion,
 } from "../../src/renderer/messages/models/messageListWindowing";
 
 describe("message list windowing", () => {
@@ -38,5 +42,35 @@ describe("message list windowing", () => {
 
     expect(window.hiddenBeforeCount).toBe(120);
     expect(window.renderedMessages[0]).toBe(120);
+  });
+
+  it("ignores stale expanded windows before a new conversation paints", () => {
+    const firstKey = messageRenderWindowResetKey({
+      conversationId: "conversation-a",
+      messageCount: 600,
+    });
+    const secondKey = messageRenderWindowResetKey({
+      conversationId: "conversation-b",
+      messageCount: 600,
+    });
+    const expanded = expandMessageRenderWindowOlder({
+      resetKey: firstKey,
+      state: resetMessageRenderWindowExpansion(firstKey),
+    });
+
+    expect(effectiveMessageRenderWindowExpandedOlderCount(expanded, firstKey)).toBe(
+      messageRenderWindowExpandStep,
+    );
+    expect(effectiveMessageRenderWindowExpandedOlderCount(expanded, secondKey)).toBe(0);
+    expect(
+      createMessageRenderWindow({
+        enabled: true,
+        expandedOlderCount: effectiveMessageRenderWindowExpandedOlderCount(
+          expanded,
+          secondKey,
+        ),
+        messages: Array.from({ length: 600 }, (_, index) => index),
+      }).renderedMessages[0],
+    ).toBe(600 - defaultMessageRenderWindowSize);
   });
 });

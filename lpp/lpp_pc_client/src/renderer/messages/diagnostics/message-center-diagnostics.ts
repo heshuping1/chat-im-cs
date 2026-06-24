@@ -1,3 +1,5 @@
+import { recordMessageReminderDiagnostic } from "../../data/diagnostics/message-reminder-diagnostics";
+
 export type MessageCenterDiagnosticEvent =
   | "conversation.selected"
   | "command.invoked"
@@ -62,6 +64,23 @@ export function logMessageCenterDiagnostic(input: MessageCenterDiagnosticInput) 
     const printer = record.result === "failed" ? console.warn : console.debug;
     printer("[lpp:message-center]", record);
   }
+  recordMessageReminderDiagnostic({
+    at: new Date(record.timestamp).toISOString(),
+    event: `im.message-center.${record.event}`,
+    source: "message-center",
+    phase: record.phase,
+    route: record.event,
+    classification: {
+      context: record.context,
+      event: record.event,
+      result: record.result,
+      traceId: record.traceId,
+    },
+    summary: {
+      reason: record.reason,
+      taskId: record.taskId,
+    },
+  });
   return record;
 }
 

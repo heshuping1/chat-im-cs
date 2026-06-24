@@ -1092,7 +1092,9 @@ export interface StaffServiceHistoryItem {
   startedAt?: string | null;
   acceptedAt?: string | null;
   queueEnteredAt?: string | null;
+  accessSeconds?: number | null;
   firstResponseSeconds?: number | null;
+  totalResponseSeconds?: number | null;
   durationSeconds?: number | null;
   transferCount?: number | null;
   rating?: number | null;
@@ -1105,8 +1107,12 @@ export interface StaffServiceHistoryItem {
   sourcePlatform?: string | null;
   country?: string | null;
   region?: string | null;
+  ipMasked?: string | null;
   locale?: string | null;
   category?: string | null;
+  conversationCategory?: string | null;
+  customerRemark?: string | null;
+  isValid?: boolean | null;
   firstResponseAt?: string | null;
   closedAt?: string | null;
   lastMessageAt?: string | null;
@@ -1194,6 +1200,10 @@ export interface CustomerProfileCard {
   entryChannel?: string;
   platform?: string;
   provider?: string;
+  visitorRemark?: string | null;
+  customerRemark?: string | null;
+  remark?: string | null;
+  note?: string | null;
   tags?: string[];
   phoneMasked?: string;
   mobileMasked?: string;

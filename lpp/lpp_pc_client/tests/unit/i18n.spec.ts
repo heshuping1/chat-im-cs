@@ -1,5 +1,10 @@
 ﻿import { describe, expect, it } from 'vitest';
-import { formatMessage, messages, resolveMessage } from '../../src/renderer/i18n/dictionary';
+import {
+  createBrandTranslationParams,
+  formatMessage,
+  messages,
+  resolveMessage,
+} from '../../src/renderer/i18n/dictionary';
 import { defaultLocale, normalizeLocale, supportedLocales } from '../../src/renderer/i18n/locales';
 
 describe('i18n foundation', () => {
@@ -31,6 +36,14 @@ describe('i18n foundation', () => {
     expect(formatMessage('{count} unread from {name}', { count: 3 })).toBe(
       '3 unread from {name}',
     );
+  });
+
+  it('derives public identity labels from the shared brand name', () => {
+    const zhBrand = createBrandTranslationParams(messages['zh-CN'], messages[defaultLocale]);
+    const enBrand = createBrandTranslationParams(messages.en, messages[defaultLocale]);
+
+    expect(zhBrand).toMatchObject({ publicName: '星络', publicIdLabel: '星络号' });
+    expect(enBrand).toMatchObject({ publicName: 'StartLink', publicIdLabel: 'StartLink ID' });
   });
 
   it('keeps dictionary keys aligned across all supported locales', () => {

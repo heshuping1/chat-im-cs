@@ -66,6 +66,12 @@ describe("customer profile workspace copy", () => {
     expect(bitsSource).not.toContain("+ 添加");
   });
 
+  it("does not render the remark edit command when the scene has no update permission", () => {
+    expect(workspaceSource).toContain("actionLabel={");
+    expect(workspaceSource).toContain('onUpdateRemark ? t("customerProfile.actions.edit") : undefined');
+    expect(workspaceSource).toContain("{onAction && actionLabel && (");
+  });
+
   it("keeps the ticket quick row wired to the existing ticket tab", () => {
     expect(workspaceSource).toContain('onOpenTickets={() =>');
     expect(workspaceSource).toContain('setActiveTab("tickets")');
