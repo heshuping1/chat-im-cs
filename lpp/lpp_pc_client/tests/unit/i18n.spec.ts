@@ -42,7 +42,7 @@ describe('i18n foundation', () => {
     const zhBrand = createBrandTranslationParams(messages['zh-CN'], messages[defaultLocale]);
     const enBrand = createBrandTranslationParams(messages.en, messages[defaultLocale]);
 
-    expect(zhBrand).toMatchObject({ publicName: '星络', publicIdLabel: '星络号' });
+    expect(zhBrand).toMatchObject({ publicName: '微界', publicIdLabel: '微界号' });
     expect(enBrand).toMatchObject({ publicName: 'StartLink', publicIdLabel: 'StartLink ID' });
   });
 

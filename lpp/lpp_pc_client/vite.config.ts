@@ -11,6 +11,7 @@ const packageJson = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'u
   };
 };
 const buildProductName = packageJson.build?.productName?.trim() || 'StartLink';
+const devServerPort = Number(process.env.VITE_PORT || 5173);
 
 export default defineConfig({
   plugins: [react()],
@@ -20,7 +21,7 @@ export default defineConfig({
     __LPP_PC_PRODUCT_NAME__: JSON.stringify(buildProductName),
   },
   server: {
-    port: 5173,
+    port: Number.isFinite(devServerPort) ? devServerPort : 5173,
     strictPort: true,
   },
   build: {

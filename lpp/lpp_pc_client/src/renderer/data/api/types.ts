@@ -33,11 +33,17 @@ export interface PlatformLoginResult {
   userType?: number | null;
   platformToken?: string;
   platformRefreshToken?: string;
+  platformRefreshTokenExpiresAt?: string | null;
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
   tenantId?: string;
   userId?: string;
+  deviceSession?: {
+    deviceSessionToken: string;
+    issuedAt?: string | null;
+    inactiveExpiresAt?: string | null;
+  };
   tenants?: PlatformTenant[];
   spaceContext?: {
     spaceType: number;
@@ -98,6 +104,25 @@ export interface TenantAuthResult {
     tenantId?: string | null;
   };
 }
+
+export interface TenantTokenRefreshResult {
+  userId?: string;
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn?: number;
+}
+
+export interface PlatformTokenRefreshResult {
+  platformUserId?: string;
+  lppId?: string;
+  displayName?: string;
+  userType?: number | null;
+  platformToken: string;
+  platformRefreshToken?: string;
+  platformRefreshTokenExpiresAt?: string | null;
+}
+
+export type DeviceSessionExchangeResult = PlatformTokenRefreshResult;
 
 export interface UserProfileDto {
   userId: string;

@@ -16,6 +16,7 @@ import { quitApp } from './data/app-instance/app-instance';
 import {
   getAuthSessionSnapshot,
   getClearAuthSessionAction,
+  getRecoverAuthSessionAction,
   useAuthSession,
   useRestoreDesktopAuthSession,
   useSetAuthSession,
@@ -160,7 +161,22 @@ function handleUnauthorizedError(error: unknown) {
   const authSession = getAuthSessionSnapshot();
   if (!authSession) return;
   queryClient.clear();
-  getClearAuthSessionAction()();
+  const recoverAuthSession = getRecoverAuthSessionAction();
+  if (!recoverAuthSession) {
+    getClearAuthSessionAction()();
+    return;
+  }
+  void recoverAuthSession()
+    .then((recovered) => {
+      if (!recovered && getAuthSessionSnapshot() === authSession) {
+        getClearAuthSessionAction()();
+      }
+    })
+    .catch(() => {
+      if (getAuthSessionSnapshot() === authSession) {
+        getClearAuthSessionAction()();
+      }
+    });
 }
 
 export default function App() {

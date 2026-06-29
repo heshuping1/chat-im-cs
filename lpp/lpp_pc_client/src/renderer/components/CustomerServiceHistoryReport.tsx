@@ -23,6 +23,8 @@ import { useAuthSession } from "../data/auth/auth-store";
 import { PUBLIC_ID_LABEL } from "../brand/public-brand";
 import { pcQueryKeys } from "../data/query-keys";
 import { createApiClient } from "../data/runtime";
+import type { PcSettings } from "../data/settings/pc-settings";
+import { usePcSettings } from "../data/settings/settings-store";
 import type { PcDataCenterView } from "../data/workspace-access";
 import { formatError } from "../lib/format";
 import { MessageHistoryLookupDialog } from "../messages/components/MessageHistoryLookupDialog";
@@ -36,18 +38,18 @@ import { channelLabel } from "./ChannelBadge";
 import { CustomerServiceDateRangeFilter } from "./CustomerServiceDateRangeFilter";
 import { CustomerServiceExportTaskDialog } from "./CustomerServiceExportTaskDialog";
 import type { DataCenterReportDefinition } from "./data-center/dataCenterReportTypes";
+import {
+  formatHistoryDateTime,
+  historyDatePresetRange,
+  historyDateRangeLabel,
+  historyQueryDateTimeToUtc,
+  historyTimePart,
+  normalizeHistoryTime,
+  parseHistoryDate,
+  type HistoryDatePreset,
+} from "./historyDateRange";
 import { PanelState } from "./PanelState";
 import { PcAvatar } from "./PcAvatar";
-
-type HistoryDatePreset =
-  | "all"
-  | "today"
-  | "yesterday"
-  | "last7"
-  | "last30"
-  | "thisWeek"
-  | "thisMonth"
-  | "custom";
 
 type HistoryFilters = {
   assignedStaffUserId: string;
@@ -156,6 +158,7 @@ export function CustomerServiceHistoryReport({
   const [exportCustomDatePickerOpen, setExportCustomDatePickerOpen] = useState(false);
   const [exportNotice, setExportNotice] = useState("");
   const queryClient = useQueryClient();
+  const pcSettings = usePcSettings();
   const client = useMemo(() => (session ? createApiClient(session) : null), [session]);
   const historyExportTypeValue = useMemo(() => historyExportType(report), [report]);
   const exportTasksKey = useMemo(
@@ -170,14 +173,17 @@ export function CustomerServiceHistoryReport({
     [historyExportTypeValue, session?.apiBaseUrl, session?.tenantToken],
   );
   const historyParams = useMemo(
-    () => historyQueryParams(filters, historyPageSize),
-    [filters, historyPageSize],
+    () => historyQueryParams(filters, historyPageSize, pcSettings.timezone),
+    [filters, historyPageSize, pcSettings.timezone],
   );
   const exportPreviewParams = useMemo(
-    () => historyQueryParams(exportFilters, 1),
-    [exportFilters],
+    () => historyQueryParams(exportFilters, 1, pcSettings.timezone),
+    [exportFilters, pcSettings.timezone],
   );
-  const currentHistoryExportFilters = useMemo(() => historyExportFilters(exportFilters), [exportFilters]);
+  const currentHistoryExportFilters = useMemo(
+    () => historyExportFilters(exportFilters, pcSettings.timezone),
+    [exportFilters, pcSettings.timezone],
+  );
   const lookupScope = useMemo(() => createMessageLookupScope("server"), []);
 
   useEffect(() => {
@@ -385,7 +391,7 @@ export function CustomerServiceHistoryReport({
       setCustomDatePickerOpen(true);
       return;
     }
-    const range = historyDatePresetRange(preset);
+    const range = historyDatePresetRange(preset, pcSettings.timezone);
     setCustomDatePickerOpen(false);
     setFilters((current) => ({
       ...current,
@@ -421,7 +427,7 @@ export function CustomerServiceHistoryReport({
       setExportCustomDatePickerOpen(true);
       return;
     }
-    const range = historyDatePresetRange(preset);
+    const range = historyDatePresetRange(preset, pcSettings.timezone);
     setExportCustomDatePickerOpen(false);
     setExportFilters((current) => ({
       ...current,
@@ -2485,97 +2491,6 @@ function HistoryDateRangeFilter(props: {
   );
 }
 
-function historyDatePresetRange(preset: HistoryDatePreset) {
-  const today = startOfHistoryDay(new Date());
-  if (preset === "all" || preset === "custom") return { from: "", to: "" };
-  if (preset === "today") {
-    return { from: formatHistoryDateTime(today, "00:00:00"), to: formatHistoryDateTime(today, "23:59:59") };
-  }
-  if (preset === "yesterday") {
-    const value = addHistoryDays(today, -1);
-    return { from: formatHistoryDateTime(value, "00:00:00"), to: formatHistoryDateTime(value, "23:59:59") };
-  }
-  if (preset === "last7") {
-    return { from: formatHistoryDateTime(addHistoryDays(today, -6), "00:00:00"), to: formatHistoryDateTime(today, "23:59:59") };
-  }
-  if (preset === "last30") {
-    return { from: formatHistoryDateTime(addHistoryDays(today, -29), "00:00:00"), to: formatHistoryDateTime(today, "23:59:59") };
-  }
-  if (preset === "thisWeek") {
-    const day = today.getDay() || 7;
-    return { from: formatHistoryDateTime(addHistoryDays(today, 1 - day), "00:00:00"), to: formatHistoryDateTime(today, "23:59:59") };
-  }
-  if (preset === "thisMonth") {
-    return {
-      from: formatHistoryDateTime(new Date(today.getFullYear(), today.getMonth(), 1), "00:00:00"),
-      to: formatHistoryDateTime(today, "23:59:59"),
-    };
-  }
-  return { from: "", to: "" };
-}
-
-function historyDateRangeLabel(range: DateRange, fromTime: string, toTime: string) {
-  const from = formatHistoryDateTime(range.from, fromTime).replace("T", " ");
-  const to = formatHistoryDateTime(range.to, toTime).replace("T", " ");
-  if (from && to) return `${from} ~ ${to}`;
-  if (from) return `${from} ~ 结束时间`;
-  return "选择日期范围";
-}
-
-function parseHistoryDate(value: string) {
-  if (!value) return undefined;
-  const datePart = value.trim().split(/[ T]/)[0] ?? "";
-  const [yearText, monthText, dayText] = datePart.split("-");
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return undefined;
-  return new Date(year, month - 1, day);
-}
-
-function formatHistoryDate(date?: Date) {
-  if (!date) return "";
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatHistoryDateTime(date: Date | undefined, time: string) {
-  const dateText = formatHistoryDate(date);
-  if (!dateText) return "";
-  return `${dateText}T${normalizeHistoryTime(time, "00:00:00")}`;
-}
-
-function historyTimePart(value: string, fallback: string) {
-  const time = value.trim().split(/[ T]/)[1] ?? "";
-  return normalizeHistoryTime(time, fallback);
-}
-
-function normalizeHistoryTime(value: string, fallback: string) {
-  const [hour = "", minute = "", second = ""] = value.split(":");
-  const h = normalizeHistoryTimeUnit(hour, 23);
-  const m = normalizeHistoryTimeUnit(minute, 59);
-  const s = normalizeHistoryTimeUnit(second, 59);
-  if (!h || !m || !s) return fallback;
-  return `${h}:${m}:${s}`;
-}
-
-function normalizeHistoryTimeUnit(value: string, max: number) {
-  if (!/^\d{1,2}$/.test(value)) return "";
-  const number = Number(value);
-  if (!Number.isInteger(number) || number < 0 || number > max) return "";
-  return String(number).padStart(2, "0");
-}
-
-function startOfHistoryDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function addHistoryDays(date: Date, days: number) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-}
-
 function createHistoryStaffPickerMembers(members: TenantMemberDto[]) {
   return members
     .filter((member) => member.userId && isSelectableHistoryStaffMember(member))
@@ -2636,14 +2551,20 @@ function shortHistoryIdentity(value: string) {
   return value.length > 12 ? `${value.slice(0, 8)}...` : value;
 }
 
-function historyQueryParams(filters: HistoryFilters, limit: number) {
+function historyQueryParams(
+  filters: HistoryFilters,
+  limit: number,
+  timezone: PcSettings["timezone"],
+) {
   const rating = filters.rating.trim();
   const ratingRange = ratingSegmentRange(filters.ratingSegment);
   const minRiskLevel = filters.slaRisk.trim();
+  const from = historyQueryDateTimeToUtc(filters.from, timezone);
+  const to = historyQueryDateTimeToUtc(filters.to, timezone);
   return {
     ...(filters.threadType !== "all" ? { threadType: filters.threadType } : {}),
-    ...(filters.from ? { from: filters.from } : {}),
-    ...(filters.to ? { to: filters.to } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
     ...(filters.conversationId ? { conversationId: filters.conversationId } : {}),
     ...(filters.customerId ? { customerId: filters.customerId } : {}),
     ...(filters.customerUserId ? { customerUserId: filters.customerUserId } : {}),
@@ -2673,14 +2594,16 @@ function historyEmptyText(isLoading: boolean, keyword: string) {
   return "没有找到符合条件的历史对话";
 }
 
-function historyExportFilters(filters: HistoryFilters) {
+function historyExportFilters(filters: HistoryFilters, timezone: PcSettings["timezone"]) {
   const rating = filters.rating.trim();
   const ratingRange = ratingSegmentRange(filters.ratingSegment);
   const minRiskLevel = filters.slaRisk.trim();
+  const from = historyQueryDateTimeToUtc(filters.from, timezone);
+  const to = historyQueryDateTimeToUtc(filters.to, timezone);
   return {
     ...(filters.threadType !== "all" ? { threadType: filters.threadType } : {}),
-    ...(filters.from ? { from: filters.from } : {}),
-    ...(filters.to ? { to: filters.to } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
     ...(filters.conversationId ? { conversationId: filters.conversationId } : {}),
     ...(filters.customerId ? { customerId: filters.customerId } : {}),
     ...(filters.customerUserId ? { customerUserId: filters.customerUserId } : {}),

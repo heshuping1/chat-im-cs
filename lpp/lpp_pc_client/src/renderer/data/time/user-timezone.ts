@@ -1,4 +1,4 @@
-const systemTimezone = "系统默认";
+export const systemTimezone = "系统默认";
 
 const fixedUtcTimezoneOptions = [
   "UTC-12:00",
@@ -175,6 +175,14 @@ export function getUserDateParts(date: Date, timezone: unknown): DateParts {
     hour: zoned.getUTCHours(),
     minute: zoned.getUTCMinutes(),
   };
+}
+
+export function getPcTimezoneOffsetMinutes(timezone: unknown, at: Date = new Date()) {
+  const normalized = normalizePcUserTimezone(timezone);
+  if (normalized === systemTimezone) {
+    return -at.getTimezoneOffset();
+  }
+  return utcOffsetMinutes(normalized);
 }
 
 function utcOffsetMinutes(timezone: PcSelectableUserTimezone) {

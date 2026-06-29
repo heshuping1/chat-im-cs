@@ -1,6 +1,6 @@
 export const zhCN = {
   brand: {
-    publicName: '星络',
+    publicName: '微界',
     publicIdLabel: '{publicName}号',
   },
   app: {

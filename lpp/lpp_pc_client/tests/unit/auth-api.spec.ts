@@ -54,6 +54,13 @@ describe("auth api client", () => {
     expect(endpointPlan.platformRegister).toBe("/api/platform/v1/auth/register");
     expect(endpointPlan.platformInvitation).toBe("/api/platform/v1/invitations/{code}");
     expect(endpointPlan.platformInvitationAccept).toBe("/api/platform/v1/invitations/{code}/accept");
+    expect(endpointPlan.refreshPlatformTokenByRefreshToken).toBe(
+      "/api/platform/v1/auth/refresh-platform-token-by-refresh-token",
+    );
+    expect(endpointPlan.deviceSessionExchange).toBe(
+      "/api/platform/v1/auth/device-session/exchange",
+    );
+    expect(endpointPlan.tenantTokenRefresh).toBe("/api/client/v1/auth/refresh");
   });
 
   it("registers platform accounts with trimmed public fields and no local-only fields", async () => {
@@ -105,8 +112,34 @@ describe("auth api client", () => {
         captchaToken: null,
         captchaAnswer: null,
         issueRefreshToken: true,
+        trustDevice: true,
         devicePlatform: "pc",
       },
+    });
+  });
+
+  it("refreshes platform and tenant credentials through dedicated auth endpoints", async () => {
+    await apiClient().refreshPlatformTokenByRefreshToken("prt_token");
+    await apiClient().deviceSessionExchange({
+      deviceSessionToken: "ds_token",
+      issueRefreshToken: true,
+    });
+    await apiClient().refreshTenantToken("tenant-refresh-token");
+
+    expect(requests[0]).toEqual({
+      body: { platformRefreshToken: "prt_token" },
+      method: "POST",
+      url: "https://api.example/api/platform/v1/auth/refresh-platform-token-by-refresh-token",
+    });
+    expect(requests[1]).toEqual({
+      body: { deviceSessionToken: "ds_token", issueRefreshToken: true },
+      method: "POST",
+      url: "https://api.example/api/platform/v1/auth/device-session/exchange",
+    });
+    expect(requests[2]).toEqual({
+      body: { refreshToken: "tenant-refresh-token" },
+      method: "POST",
+      url: "https://api.example/api/client/v1/auth/refresh",
     });
   });
 

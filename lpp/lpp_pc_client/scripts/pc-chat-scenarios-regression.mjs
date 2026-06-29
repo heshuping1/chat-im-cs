@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { _electron as electron } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -12,7 +13,8 @@ const reportDir = join(
   new Date().toISOString().replace(/[:.]/g, '-'),
 );
 const electronPath = join(root, 'node_modules', 'electron', 'dist', 'electron.exe');
-const viteUrl = 'http://127.0.0.1:5173';
+const vitePort = process.env.LPP_PC_ELECTRON_VITE_PORT || String(34300 + (process.pid % 1000));
+const viteUrl = process.env.VITE_DEV_SERVER_URL || `http://127.0.0.1:${vitePort}`;
 const apiBaseUrl = 'https://chat.hearteasechat.com';
 const electronSandboxRoot = join(root, 'tmp', 'electron-sandbox');
 const electronSandboxAppData = join(electronSandboxRoot, 'appdata');
@@ -26,10 +28,12 @@ const accounts = {
 
 const results = [];
 const apps = [];
+let viteProcess = null;
 
 await mkdir(reportDir, { recursive: true });
 
 try {
+  viteProcess = await startViteServer();
   const staff = await launchClient(`chat-staff-${Date.now()}`);
   const customer = await launchClient(`chat-customer-${Date.now()}`);
 
@@ -53,6 +57,7 @@ try {
   );
   console.log(JSON.stringify({ reportDir, results }, null, 2));
   if (results.some((item) => item.status === 'failed')) process.exitCode = 1;
+  process.exit(process.exitCode || 0);
 }
 
 async function launchClient(profileId) {
@@ -63,6 +68,8 @@ async function launchClient(profileId) {
     env: {
       ...process.env,
       VITE_DEV_SERVER_URL: viteUrl,
+      VITE_PORT: vitePort,
+      LPP_PC_ELECTRON_VITE_PORT: vitePort,
       LPP_PC_INSTANCE_PROFILE: profileId,
       APPDATA: electronSandboxAppData,
       LOCALAPPDATA: electronSandboxLocalAppData,
@@ -495,7 +502,14 @@ async function step(name, fn) {
 
 async function closeAll() {
   for (const app of apps.splice(0).reverse()) {
-    await app.close().catch(() => undefined);
+    await Promise.race([
+      app.close().catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 5_000)),
+    ]);
+  }
+  if (viteProcess) {
+    await killProcessTree(viteProcess).catch(() => undefined);
+    viteProcess = null;
   }
 }
 
@@ -510,4 +524,74 @@ function shortError(error) {
 
 function push(name, status, detail = {}) {
   results.push({ name, status, ...detail });
+}
+
+async function startViteServer() {
+  const child = spawnNpm(['run', 'dev:browser'], {
+    cwd: root,
+    env: {
+      ...process.env,
+      VITE_PORT: vitePort,
+      VITE_DEV_SERVER_URL: viteUrl,
+      LPP_PC_ELECTRON_VITE_PORT: vitePort,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  captureProcessOutput(join(reportDir, 'vite.log'), child);
+  try {
+    await waitForUrl(viteUrl, 60_000);
+  } catch (error) {
+    await killProcessTree(child).catch(() => undefined);
+    throw error;
+  }
+  return child;
+}
+
+function spawnNpm(args, options) {
+  if (process.platform === 'win32') {
+    return spawn('cmd.exe', ['/c', 'npm.cmd', ...args], { ...options, shell: false });
+  }
+  return spawn('npm', args, { ...options, shell: false });
+}
+
+function captureProcessOutput(logPath, child) {
+  const chunks = [];
+  const collect = (chunk) => chunks.push(String(chunk));
+  child.stdout?.on('data', collect);
+  child.stderr?.on('data', collect);
+  child.on('exit', () => {
+    void writeFile(logPath, chunks.join(''), 'utf8').catch(() => undefined);
+  });
+}
+
+async function waitForUrl(url, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch {
+      // Retry until the dev server is ready.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Timed out waiting for ${url}.`);
+}
+
+async function killProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    await new Promise((resolve) => {
+      const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      killer.on('error', () => resolve());
+      killer.on('close', () => resolve());
+    });
+    return;
+  }
+  child.kill('SIGTERM');
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+  if (child.exitCode === null) child.kill('SIGKILL');
 }

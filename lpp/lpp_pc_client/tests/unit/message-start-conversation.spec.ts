@@ -140,11 +140,13 @@ describe("message start UI closure", () => {
       resolve(process.cwd(), "src/renderer/messages/hooks/useMessageStartConversationController.ts"),
       "utf8",
     );
-    const directSuccess = controllerSource.slice(
-      controllerSource.indexOf("onSuccess: (chat, peerUserId)"),
-      controllerSource.indexOf("onError: (error)", controllerSource.indexOf("onSuccess: (chat, peerUserId)")),
+    const directSuccessMatch = controllerSource.match(
+      /onSuccess:\s*\(chat,\s*variables\)\s*=>\s*{([\s\S]*?)}\s*,\s*onError:\s*\(error\)/,
     );
-    const setActiveIndex = directSuccess.indexOf("setActiveConversation(conversationId)");
+    expect(directSuccessMatch).not.toBeNull();
+    const directSuccess = directSuccessMatch?.[1] ?? "";
+    const setActiveMatch = directSuccess.match(/setActiveConversation\(conversationId(?:,\s*trace)?\)/);
+    const setActiveIndex = setActiveMatch ? directSuccess.indexOf(setActiveMatch[0]) : -1;
     const invalidateIndex = directSuccess.indexOf("invalidateQueries");
 
     expect(setActiveIndex).toBeGreaterThan(-1);

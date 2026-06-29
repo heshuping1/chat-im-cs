@@ -81,8 +81,8 @@ test("IM full read/unread UI scenarios across two simulated PC clients", async (
   await owner.page.getByRole("button", { name: /mouse客服1/ }).click();
   const ownerMessage = owner.page.locator("article", { hasText: "from owner to agent" });
   await expect(ownerMessage).toBeVisible();
-  await expect(ownerMessage.locator("time")).toContainText("已读");
-  await expect(ownerMessage.locator("time")).not.toContainText("已发送");
+  await expect(ownerMessage.getByLabel("已读")).toBeVisible();
+  await expect(ownerMessage).not.toContainText("已发送");
 
   await agent.context.close();
   await owner.context.close();
@@ -268,7 +268,7 @@ async function openClient(
 }
 
 async function seedAuth(page: Page, userKey: UserKey) {
-  const apiBaseUrl = "http://127.0.0.1:5173";
+  const apiBaseUrl = testApiBaseUrl();
   const session = {
     apiBaseUrl,
     tenantToken: `${userKey}-token`,
@@ -279,6 +279,9 @@ async function seedAuth(page: Page, userKey: UserKey) {
     platformUserId: users[userKey].platformUserId,
     lppId: users[userKey].lppId,
     displayName: users[userKey].displayName,
+    userType: 2,
+    membershipRole: userKey === "owner" ? 4 : 2,
+    spaceType: 2,
     roleLabel: "Tester",
   };
   const readStateKey = [
@@ -314,6 +317,12 @@ async function installMockRoutes(
 ) {
   await page.route("**/api/client/v1/conversations?**", async (route) => {
     await ok(route, { items: server.conversationsFor(userKey) });
+  });
+  await page.route("**/api/client/v1/friends/requests", async (route) => {
+    await ok(route, []);
+  });
+  await page.route("**/api/client/v1/friends", async (route) => {
+    await ok(route, []);
   });
   const handleDirectMessages = async (route: Parameters<Parameters<Page["route"]>[1]>[0]) => {
     const conversationId = route.request().url().match(/direct-chats\/([^/]+)\/messages/)?.[1] ?? "";
@@ -355,6 +364,40 @@ async function installMockRoutes(
       queueItems: [],
       activeItems: [],
     });
+  });
+  await page.route("**/api/client/v1/customer-service/reception/status", async (route) => {
+    await ok(route, {
+      serviceStatus: "busy",
+      queueAcceptEnabled: true,
+      maxConcurrentSessions: 3,
+    });
+  });
+  await page.route("**/api/client/v1/profile/me", async (route) => {
+    await ok(route, {
+      userId: users[userKey].userId,
+      loginName: `${userKey}@example.test`,
+      displayName: users[userKey].displayName,
+      lppId: users[userKey].lppId,
+      mobile: "13800000000",
+      email: `${userKey}@example.test`,
+      createdAt: "2026-05-28T00:00:00.000Z",
+    });
+  });
+  await page.route("**/api/client/v1/tenant/info", async (route) => {
+    await ok(route, {
+      tenantId: "test-tenant",
+      tenantCode: "TEST",
+      tenantName: "IM 全场景测试",
+    });
+  });
+  await page.route("**/api/client/v1/tenant/members", async (route) => {
+    await ok(route, []);
+  });
+  await page.route("**/api/client/v1/departments/", async (route) => {
+    await ok(route, []);
+  });
+  await page.route("**/api/client/v1/friends/invite-qr", async (route) => {
+    await ok(route, []);
   });
   await page.route("**/ws/client/**", async (route) => {
     await route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
@@ -414,4 +457,9 @@ async function expectNoUnreadBadge(page: Page, title: string) {
 async function expectChatMeta(page: Page, pattern: RegExp) {
   void pattern;
   await expect(page.getByLabel("消息内容")).toBeVisible();
+}
+
+function testApiBaseUrl() {
+  const port = process.env.PLAYWRIGHT_WEB_SERVER_PORT?.trim() || "34073";
+  return `http://127.0.0.1:${port}`;
 }

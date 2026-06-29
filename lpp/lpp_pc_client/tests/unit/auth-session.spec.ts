@@ -32,8 +32,8 @@ describe("auth session service shell", () => {
     expect(session).toEqual({
       apiBaseUrl: "https://api.example.com",
       tenantToken: "tenant-token",
-      displayName: "当前账号",
-      roleLabel: "已配置 Token",
+      displayName: "褰撳墠璐﹀彿",
+      roleLabel: "宸查厤缃?Token",
     });
   });
 

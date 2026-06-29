@@ -7,6 +7,7 @@ export interface AuthStoreCompatibleState {
   authSession: AuthSession | null;
   setAuthSession: (session: AuthSession) => void;
   restoreDesktopAuthSession?: () => Promise<void>;
+  recoverAuthSession?: () => Promise<boolean>;
   clearAuthSession: () => void;
 }
 
@@ -26,6 +27,10 @@ export function selectRestoreDesktopAuthSession(state: AuthStoreCompatibleState)
   return state.restoreDesktopAuthSession;
 }
 
+export function selectRecoverAuthSession(state: AuthStoreCompatibleState) {
+  return state.recoverAuthSession;
+}
+
 export function useAuthSession() {
   return useWorkspaceStore(selectAuthSession);
 }
@@ -42,10 +47,18 @@ export function useRestoreDesktopAuthSession() {
   return useWorkspaceStore(selectRestoreDesktopAuthSession);
 }
 
+export function useRecoverAuthSession() {
+  return useWorkspaceStore(selectRecoverAuthSession);
+}
+
 export function getAuthSessionSnapshot() {
   return selectAuthSession(useWorkspaceStore.getState());
 }
 
 export function getClearAuthSessionAction() {
   return selectClearAuthSession(useWorkspaceStore.getState());
+}
+
+export function getRecoverAuthSessionAction() {
+  return selectRecoverAuthSession(useWorkspaceStore.getState());
 }

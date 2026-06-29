@@ -291,9 +291,25 @@ export function validateDesktopAuthSessionPayload(value: unknown): DesktopAuthSe
     adminBaseUrl: optionalString(record.adminBaseUrl, 'authSession.adminBaseUrl'),
     apiBaseUrl: safeString(record.apiBaseUrl, 'authSession.apiBaseUrl'),
     avatarUrl: optionalNullableString(record.avatarUrl, 'authSession.avatarUrl'),
+    deviceSessionInactiveExpiresAt: optionalNullableString(
+      record.deviceSessionInactiveExpiresAt,
+      'authSession.deviceSessionInactiveExpiresAt',
+    ),
+    deviceSessionIssuedAt: optionalNullableString(
+      record.deviceSessionIssuedAt,
+      'authSession.deviceSessionIssuedAt',
+    ),
+    deviceSessionToken: optionalString(
+      record.deviceSessionToken,
+      'authSession.deviceSessionToken',
+    ),
     displayName: safeString(record.displayName, 'authSession.displayName'),
     lppId: optionalString(record.lppId, 'authSession.lppId'),
     membershipRole: optionalPositiveNumber(record.membershipRole, 'authSession.membershipRole'),
+    platformRefreshTokenExpiresAt: optionalNullableString(
+      record.platformRefreshTokenExpiresAt,
+      'authSession.platformRefreshTokenExpiresAt',
+    ),
     platformRefreshToken: optionalString(
       record.platformRefreshToken,
       'authSession.platformRefreshToken',
@@ -657,7 +673,7 @@ function optionalNullableString(value: unknown, label: string, maxLength = maxSh
   return safeString(value, label, maxLength);
 }
 
-function optionalJsonRecord(value: unknown, label: string) {
+function _optionalJsonRecord(value: unknown, label: string) {
   if (value === undefined || value === null) return {};
   return objectValue(value, label);
 }
@@ -692,7 +708,7 @@ function boundedInteger(value: unknown, label: string, min: number, max: number)
   return numberValue;
 }
 
-function optionalBoundedInteger(value: unknown, label: string, min: number, max: number) {
+function _optionalBoundedInteger(value: unknown, label: string, min: number, max: number) {
   if (value === undefined || value === null) return undefined;
   return boundedInteger(value, label, min, max);
 }

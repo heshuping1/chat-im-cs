@@ -10,7 +10,7 @@ describe("register avatar options", () => {
     expect(registerAvatarOptions.filter((item) => item.category === "green_bubble")).toHaveLength(6);
     expect(registerAvatarOptions.some((item) => item.label.includes("AI"))).toBe(true);
     expect(registerAvatarOptions.some((item) => item.label.includes("卡通"))).toBe(true);
-    expect(registerAvatarOptions.some((item) => item.label.includes("星络"))).toBe(true);
+    expect(registerAvatarOptions.some((item) => item.label.includes("微界"))).toBe(true);
   });
 
   it("keeps every preset as a local unique svg data url", () => {

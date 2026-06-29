@@ -1,10 +1,12 @@
+import { spawn } from 'node:child_process';
 import { _electron as electron } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const root = process.cwd();
 export const electronPath = join(root, 'node_modules', 'electron', 'dist', 'electron.exe');
-export const viteUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
+const electronVitePort = process.env.LPP_PC_ELECTRON_VITE_PORT || String(34100 + (process.pid % 1000));
+export const viteUrl = process.env.VITE_DEV_SERVER_URL || `http://127.0.0.1:${electronVitePort}`;
 export const apiBaseUrl = process.env.LPP_PC_API_BASE_URL || 'https://chat.hearteasechat.com';
 const electronSandboxRoot = join(root, 'tmp', 'electron-sandbox');
 const electronSandboxAppData = join(electronSandboxRoot, 'appdata');
@@ -31,6 +33,8 @@ export function createElectronTestRunner({ suiteName, catalog = null }) {
   const fixtures = [];
   const cleanupFailures = [];
   const apps = [];
+  let viteServerProcess = null;
+  let viteServerReady = null;
 
   function push(name, status, detail = {}) {
     results.push({
@@ -75,7 +79,15 @@ export function createElectronTestRunner({ suiteName, catalog = null }) {
 
   async function closeAll() {
     for (const app of apps.splice(0).reverse()) {
-      await app.close().catch(() => undefined);
+      await Promise.race([
+        app.close().catch(() => undefined),
+        new Promise((resolve) => setTimeout(resolve, 5_000)),
+      ]);
+    }
+    if (viteServerProcess) {
+      await killProcessTree(viteServerProcess).catch(() => undefined);
+      viteServerProcess = null;
+      viteServerReady = null;
     }
   }
 
@@ -107,6 +119,7 @@ export function createElectronTestRunner({ suiteName, catalog = null }) {
 
   async function launchClient(profileId) {
     await mkdir(reportDir, { recursive: true });
+    await ensureViteServer();
     const app = await electron.launch({
       executablePath: electronPath,
       args: ['.', `--profile=${profileId}`],
@@ -138,6 +151,35 @@ export function createElectronTestRunner({ suiteName, catalog = null }) {
     finalize,
     launchClient,
   };
+
+  async function ensureViteServer() {
+    if (viteServerReady) {
+      await viteServerReady;
+      return;
+    }
+    viteServerReady = (async () => {
+      const child = spawnNpm(['run', 'dev:browser'], {
+        cwd: root,
+        env: {
+          ...process.env,
+          VITE_PORT: electronVitePort,
+          VITE_DEV_SERVER_URL: viteUrl,
+          LPP_PC_ELECTRON_VITE_PORT: electronVitePort,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      viteServerProcess = child;
+      captureProcessOutput(join(reportDir, 'vite.log'), child);
+      try {
+        await waitForUrl(viteUrl, 60_000);
+      } catch (error) {
+        await killProcessTree(child).catch(() => undefined);
+        viteServerProcess = null;
+        throw error;
+      }
+    })();
+    await viteServerReady;
+  }
 }
 
 export async function loginClient(runner, client, account) {
@@ -166,6 +208,8 @@ export function electronTestEnv(profileId) {
   return {
     ...process.env,
     VITE_DEV_SERVER_URL: viteUrl,
+    VITE_PORT: electronVitePort,
+    LPP_PC_ELECTRON_VITE_PORT: electronVitePort,
     LPP_PC_INSTANCE_PROFILE: profileId,
     APPDATA: electronSandboxAppData,
     LOCALAPPDATA: electronSandboxLocalAppData,
@@ -583,4 +627,53 @@ export function shortError(error) {
     .filter(Boolean)
     .slice(0, 3)
     .join(' | ');
+}
+
+function spawnNpm(args, options) {
+  if (process.platform === 'win32') {
+    return spawn('cmd.exe', ['/c', 'npm.cmd', ...args], { ...options, shell: false });
+  }
+  return spawn('npm', args, { ...options, shell: false });
+}
+
+function captureProcessOutput(logPath, child) {
+  const chunks = [];
+  const collect = (chunk) => chunks.push(String(chunk));
+  child.stdout?.on('data', collect);
+  child.stderr?.on('data', collect);
+  child.on('exit', () => {
+    void writeFile(logPath, chunks.join(''), 'utf8').catch(() => undefined);
+  });
+}
+
+async function waitForUrl(url, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+    } catch {
+      // Retry until the dev server is ready.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Timed out waiting for ${url}.`);
+}
+
+async function killProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    await new Promise((resolve) => {
+      const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      killer.on('error', () => resolve());
+      killer.on('close', () => resolve());
+    });
+    return;
+  }
+  child.kill('SIGTERM');
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+  if (child.exitCode === null) child.kill('SIGKILL');
 }

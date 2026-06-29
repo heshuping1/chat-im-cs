@@ -19,6 +19,10 @@ describe("customer-service history and lookup surfaces", () => {
     resolve(process.cwd(), "src/renderer/components/CustomerServiceDateRangeFilter.tsx"),
     "utf8",
   );
+  const historyDateRange = readFileSync(
+    resolve(process.cwd(), "src/renderer/components/historyDateRange.ts"),
+    "utf8",
+  );
   const customerServiceExportTaskDialog = readFileSync(
     resolve(process.cwd(), "src/renderer/components/CustomerServiceExportTaskDialog.tsx"),
     "utf8",
@@ -160,7 +164,8 @@ describe("customer-service history and lookup surfaces", () => {
     expect(customerServiceHistoryReport).toContain("当前接口仅支持单个参与客服筛选");
     expect(customerServiceHistoryReport).toContain("搜索员工姓名 / ${PUBLIC_ID_LABEL}");
     expect(customerServiceHistoryReport).toContain("setFilters((current) => ({ ...current, staffUserId }))");
-    expect(customerServiceHistoryReport).toContain("`${dateText}T${normalizeHistoryTime");
+    expect(historyDateRange).toContain("`${dateText}T${normalizeHistoryTime");
+    expect(historyDateRange).toContain("historyQueryDateTimeToUtc");
     expect(customerServiceHistoryReport).not.toContain('HistoryInput label="参与客服 ID"');
     expect(customerServiceClient).not.toContain("if (!staffUserId && !hasCustomerFilter) return null");
     expect(customerServiceClient).not.toContain("getAdminTempSessionHistory");

@@ -11,7 +11,8 @@ const pcRoot = resolve(dirname(__filename), '..');
 const lppRoot = resolve(pcRoot, '..');
 const repoRoot = resolve(lppRoot, '..');
 const defaultApiBaseUrl = 'https://chat.hearteasechat.com';
-const viteUrl = 'http://127.0.0.1:5173';
+const electronVitePort = process.env.LPP_PC_ELECTRON_VITE_PORT || String(34200 + (process.pid % 1000));
+const viteUrl = process.env.VITE_DEV_SERVER_URL || `http://127.0.0.1:${electronVitePort}`;
 const reportRoot = join(lppRoot, 'reports', 'pc', 'electron-regression');
 const localRoot = join(lppRoot, '.local', 'pc-regression');
 const electronSandboxRoot = join(pcRoot, 'tmp', 'electron-sandbox');
@@ -642,7 +643,12 @@ function selectTenantId(tenants, tenantCode) {
 async function startViteServer() {
   const child = spawnNpm(['run', 'dev:browser'], {
     cwd: pcRoot,
-    env: { ...process.env },
+    env: {
+      ...process.env,
+      VITE_PORT: electronVitePort,
+      VITE_DEV_SERVER_URL: viteUrl,
+      LPP_PC_ELECTRON_VITE_PORT: electronVitePort,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   captureProcessOutput('vite', child);
@@ -1028,6 +1034,8 @@ function electronTestEnv(profileId) {
   return {
     ...process.env,
     VITE_DEV_SERVER_URL: viteUrl,
+    VITE_PORT: electronVitePort,
+    LPP_PC_ELECTRON_VITE_PORT: electronVitePort,
     LPP_PC_INSTANCE_PROFILE: profileId,
     APPDATA: electronSandboxAppData,
     LOCALAPPDATA: electronSandboxLocalAppData,

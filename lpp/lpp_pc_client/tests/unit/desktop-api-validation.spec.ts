@@ -649,13 +649,23 @@ describe("desktop api validation", () => {
     expect(
       validateDesktopAuthSessionPayload({
         apiBaseUrl: "https://api.example.com",
+        deviceSessionInactiveExpiresAt: "2026-09-01T00:00:00.000Z",
+        deviceSessionIssuedAt: "2026-06-01T00:00:00.000Z",
+        deviceSessionToken: "ds-token",
         displayName: "Tester",
+        platformRefreshToken: "prt-token",
+        platformRefreshTokenExpiresAt: "2026-08-01T00:00:00.000Z",
         platformToken: "platform-token",
         tenantToken: "tenant-token",
       }),
     ).toMatchObject({
       apiBaseUrl: "https://api.example.com",
+      deviceSessionInactiveExpiresAt: "2026-09-01T00:00:00.000Z",
+      deviceSessionIssuedAt: "2026-06-01T00:00:00.000Z",
+      deviceSessionToken: "ds-token",
       displayName: "Tester",
+      platformRefreshToken: "prt-token",
+      platformRefreshTokenExpiresAt: "2026-08-01T00:00:00.000Z",
       platformToken: "platform-token",
       tenantToken: "tenant-token",
     });

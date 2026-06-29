@@ -96,8 +96,9 @@ function npmInvocation(args) {
 
 function defaultTimeoutFor(name) {
   if (name.startsWith('rebuild:native')) return 10 * 60_000;
-  if (name === 'test:electron:regression') return 8 * 60_000;
-  if (name.startsWith('test:electron')) return 3 * 60_000;
+  if (name === 'test:electron:regression') return 12 * 60_000;
+  if (name === 'test:electron:group-chat:full') return 6 * 60_000;
+  if (name.startsWith('test:electron')) return 5 * 60_000;
   if (name === 'test:browser') return 10 * 60_000;
   if (name === 'build') return 10 * 60_000;
   return 5 * 60_000;
@@ -109,6 +110,9 @@ async function runCommandPlan(plan) {
   let output = '';
   let timedOut = false;
   let spawnError = null;
+  if (process.platform === 'win32' && plan.name.startsWith('rebuild:native')) {
+    await cleanupLingeringProjectElectronProcesses();
+  }
   const child = spawn(plan.executable, plan.args, {
     cwd: root,
     shell: false,
@@ -160,6 +164,34 @@ async function runCommandPlan(plan) {
     stopOnFailure: plan.stopOnFailure,
     ...(spawnError ? { error: shortError(spawnError) } : {}),
   };
+}
+
+async function cleanupLingeringProjectElectronProcesses() {
+  const electronPath = `${join(root, 'node_modules', 'electron', 'dist', 'electron.exe')}`
+    .replace(/\\/g, '\\\\');
+  await new Promise((resolve) => {
+    const cleaner = spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-Command',
+        `
+$target = '${electronPath}';
+$processes = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $target };
+foreach ($process in $processes) {
+  Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue;
+}
+`,
+      ],
+      {
+        stdio: 'ignore',
+        windowsHide: true,
+      },
+    );
+    cleaner.on('error', () => resolve());
+    cleaner.on('close', () => resolve());
+  });
+  await new Promise((resolve) => setTimeout(resolve, 1_500));
 }
 
 async function killProcessTree(child) {

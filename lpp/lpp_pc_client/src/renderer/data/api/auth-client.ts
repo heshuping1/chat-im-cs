@@ -4,10 +4,13 @@ import { endpointPlan } from "./endpoints";
 import { getAppInstanceProfile } from "../app-instance/app-instance";
 import type {
   CaptchaChallenge,
+  DeviceSessionExchangeResult,
   PlatformInvitationPreviewDto,
   PlatformLoginResult,
+  PlatformTokenRefreshResult,
   PlatformRegisterRequest,
   PlatformRegisterResult,
+  TenantTokenRefreshResult,
   TenantAuthResult,
 } from "./types";
 
@@ -28,6 +31,7 @@ export class AuthApiClient extends ApiBaseClient {
         captchaToken: body.captchaToken ?? null,
         captchaAnswer: body.captchaAnswer ?? null,
         issueRefreshToken: true,
+        trustDevice: true,
         deviceId: instance.deviceId,
         devicePlatform: "pc",
         deviceName: `StartLink PC Client (${instance.profileName})`,
@@ -159,6 +163,39 @@ export class AuthApiClient extends ApiBaseClient {
         body: JSON.stringify({}),
       },
     );
+  }
+
+  refreshPlatformTokenByRefreshToken(platformRefreshToken: string) {
+    return this.platformRequest<PlatformTokenRefreshResult>(
+      endpointPlan.refreshPlatformTokenByRefreshToken,
+      {
+        method: "POST",
+        body: JSON.stringify({ platformRefreshToken }),
+      },
+    );
+  }
+
+  deviceSessionExchange(body: {
+    deviceSessionToken: string;
+    issueRefreshToken?: boolean;
+  }) {
+    return this.platformRequest<DeviceSessionExchangeResult>(
+      endpointPlan.deviceSessionExchange,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          deviceSessionToken: body.deviceSessionToken,
+          issueRefreshToken: body.issueRefreshToken ?? true,
+        }),
+      },
+    );
+  }
+
+  refreshTenantToken(refreshToken: string) {
+    return this.request<TenantTokenRefreshResult>(endpointPlan.tenantTokenRefresh, {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    });
   }
 }
 

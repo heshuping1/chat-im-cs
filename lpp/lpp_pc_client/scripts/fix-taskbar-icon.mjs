@@ -95,7 +95,7 @@ function updateShortcuts(targetExes, preferredTargetExe, shortcutIcon) {
     "Get-ChildItem $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue |",
     "ForEach-Object {",
     "$shortcut = $shell.CreateShortcut($_.FullName);",
-    "if ($targets -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink|LPP|lpp' -or $_.Name -match '星络|StartLink|startlink|LPP|客服|lpp') {",
+    "if ($targets -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink|LPP|lpp' -or $_.Name -match '星络|微界|StartLink|startlink|LPP|客服|lpp') {",
     "$shortcut.TargetPath = $target;",
     "$shortcut.WorkingDirectory = Split-Path $target;",
     "$shortcut.IconLocation = $icon;",

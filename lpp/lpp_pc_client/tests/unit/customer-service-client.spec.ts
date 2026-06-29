@@ -981,6 +981,7 @@ describe("CustomerServiceApiClient", () => {
         conversationId: "conversation-1",
         customerId: "customer-1",
         customerUserId: "customer-user-1",
+        from: "2026-06-29 00:00:00",
         keyword: "refund",
         limit: 50,
         rating: 5,
@@ -989,6 +990,7 @@ describe("CustomerServiceApiClient", () => {
         staffUserId: "staff-1",
         status: "closed",
         threadType: "im_direct",
+        to: "2026-06-29 23:59:59",
         visitorUserId: "visitor-1",
       }),
     ).resolves.toMatchObject({
@@ -1003,7 +1005,34 @@ describe("CustomerServiceApiClient", () => {
     expect(client.requests).toEqual([
       {
         admin: true,
-        path: "/api/admin/v1/customer-service/center/history-sessions?threadType=im_direct&status=closed&limit=50&customerId=customer-1&customerUserId=customer-user-1&visitorUserId=visitor-1&keyword=refund&assignedStaffUserId=staff-assigned&conversationId=conversation-1&senderUserId=sender-1&staffUserId=staff-1&rating=5&slaRisk=true",
+        path: "/api/admin/v1/customer-service/center/history-sessions?threadType=im_direct&status=closed&limit=50&from=2026-06-29+00%3A00%3A00&to=2026-06-29+23%3A59%3A59&customerId=customer-1&customerUserId=customer-user-1&visitorUserId=visitor-1&keyword=refund&assignedStaffUserId=staff-assigned&conversationId=conversation-1&senderUserId=sender-1&staffUserId=staff-1&rating=5&slaRisk=true",
+      },
+    ]);
+  });
+
+  it("keeps self-service history on the staff service-history route even when from/to are provided", async () => {
+    const client = new RecordingCustomerServiceApiClient({
+      membershipRole: 2,
+      response: {
+        items: [],
+      },
+    });
+
+    await expect(
+      client.getCustomerServiceHistoryThreads({
+        from: "2026-06-29 00:00:00",
+        limit: 20,
+        threadType: "temp_session",
+        to: "2026-06-29 23:59:59",
+      }),
+    ).resolves.toMatchObject({
+      items: [],
+    });
+
+    expect(client.requests).toEqual([
+      {
+        admin: false,
+        path: "/api/client/v1/customer-service/staff/service-history?threadType=temp_session&limit=20&from=2026-06-29+00%3A00%3A00&to=2026-06-29+23%3A59%3A59",
       },
     ]);
   });

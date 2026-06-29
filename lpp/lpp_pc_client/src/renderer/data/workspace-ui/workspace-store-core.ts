@@ -3,6 +3,7 @@ import type { TrayStatus } from '../../../shared/desktop-api';
 import {
   clearStoredAuthSession,
   persistAuthSession,
+  recoverAuthSession as recoverPersistedAuthSession,
   readDesktopStoredAuthSession,
   readStoredAuthSession,
   type AuthSession,
@@ -288,11 +289,13 @@ interface WorkspaceState {
   dismissRealtimeRemindersForTarget: (targetModule: ModuleKey, targetId?: string) => void;
   setAuthSession: (session: AuthSession) => void;
   restoreDesktopAuthSession: () => Promise<void>;
+  recoverAuthSession: () => Promise<boolean>;
   clearAuthSession: () => void;
 }
 
 const initialAuthSession = readStoredAuth();
 const initialServiceLayout = readStoredServiceLayout();
+let authSessionRecoveryPromise: Promise<boolean> | null = null;
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   authSession: initialAuthSession,
@@ -775,6 +778,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (get().authSession) return;
     const authSession = await readDesktopStoredAuthSession();
     if (!authSession || get().authSession) return;
+    persistAuthSession(authSession);
     recordMessageReminderDiagnostic({
       event: 'workspace.scope.changed',
       source: 'workspace-store-core',
@@ -796,6 +800,33 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       readPeerReads: readStoredLocalImPeerReadReceipts,
       readReadState: readStoredImReadState,
     }));
+  },
+  recoverAuthSession: async () => {
+    if (authSessionRecoveryPromise) return authSessionRecoveryPromise;
+    const currentSession = get().authSession;
+    if (!currentSession) return false;
+    authSessionRecoveryPromise = (async () => {
+      const recoveredSession = await recoverPersistedAuthSession(currentSession);
+      const latestSession = get().authSession;
+      if (!recoveredSession || latestSession !== currentSession) return false;
+      persistAuthSession(recoveredSession);
+      const sameScope =
+        workspaceScopeFromSession(currentSession).key ===
+        workspaceScopeFromSession(recoveredSession).key;
+      set(
+        sameScope
+          ? { authSession: recoveredSession }
+          : createAuthSessionAppliedState(recoveredSession, {
+              readLocalReads: readStoredLocalImConversationReads,
+              readPeerReads: readStoredLocalImPeerReadReceipts,
+              readReadState: readStoredImReadState,
+            }),
+      );
+      return true;
+    })().finally(() => {
+      authSessionRecoveryPromise = null;
+    });
+    return authSessionRecoveryPromise;
   },
   clearAuthSession: () => {
     clearStoredAuthSession();

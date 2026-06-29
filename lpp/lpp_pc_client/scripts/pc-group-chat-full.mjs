@@ -33,6 +33,7 @@ try {
 } finally {
   await runner.closeAll();
   await runner.finalize({ primaryFixture: fixture });
+  process.exit(process.exitCode || 0);
 }
 
 async function prepareGroupFixture(page) {

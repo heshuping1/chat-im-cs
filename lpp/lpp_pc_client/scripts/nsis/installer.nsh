@@ -8,10 +8,10 @@
     ReadRegStr $R3 HKCU "${UNINSTALL_REGISTRY_KEY}" DisplayVersion
 
     ${If} $R0 != ""
-      MessageBox MB_YESNO|MB_ICONQUESTION "检测到已安装的 星络 $R0。$\r$\n继续安装会覆盖升级到 startlink ${VERSION}，并保留本地数据。$\r$\n$\r$\n是否继续？" IDYES +2
+      MessageBox MB_YESNO|MB_ICONQUESTION "检测到已安装的 微界 $R0。$\r$\n继续安装会覆盖升级到 startlink ${VERSION}，并保留本地数据。$\r$\n$\r$\n是否继续？" IDYES +2
       Quit
     ${ElseIf} $R1 != ""
-      MessageBox MB_YESNO|MB_ICONQUESTION "检测到已安装的 星络 $R1。$\r$\n继续安装会覆盖升级到 startlink ${VERSION}，并保留本地数据。$\r$\n$\r$\n是否继续？" IDYES +2
+      MessageBox MB_YESNO|MB_ICONQUESTION "检测到已安装的 微界 $R1。$\r$\n继续安装会覆盖升级到 startlink ${VERSION}，并保留本地数据。$\r$\n$\r$\n是否继续？" IDYES +2
       Quit
     ${ElseIf} $R2 != ""
       MessageBox MB_YESNO|MB_ICONQUESTION "检测到已安装的 startlink $R2。$\r$\n继续安装会覆盖升级到 startlink ${VERSION}，并保留本地数据。$\r$\n$\r$\n是否继续？" IDYES +2

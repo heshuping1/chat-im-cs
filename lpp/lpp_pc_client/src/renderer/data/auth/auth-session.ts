@@ -1,6 +1,7 @@
 import type { PlatformTenant } from "../api/types";
 import type { DesktopAuthSessionPayload } from "../../../shared/desktop-api";
 import { logAuthDiagnostic } from "./auth-diagnostics";
+import { recoverAuthSession as recoverPersistedAuthSession } from "./auth-session-recovery";
 
 export interface AuthSession {
   apiBaseUrl: string;
@@ -8,7 +9,11 @@ export interface AuthSession {
   tenantToken: string;
   platformToken?: string;
   platformRefreshToken?: string;
+  platformRefreshTokenExpiresAt?: string | null;
   refreshToken?: string;
+  deviceSessionToken?: string;
+  deviceSessionIssuedAt?: string | null;
+  deviceSessionInactiveExpiresAt?: string | null;
   tenantId?: string;
   tenantCode?: string;
   tenantName?: string;
@@ -49,8 +54,8 @@ export function createConfiguredAuthSession(env: AuthSessionEnv): AuthSession | 
   return {
     apiBaseUrl: env.apiBaseUrl || defaultAuthApiBaseUrl,
     tenantToken: env.tenantToken,
-    displayName: "当前账号",
-    roleLabel: "已配置 Token",
+    displayName: "褰撳墠璐﹀彿",
+    roleLabel: "宸查厤缃?Token",
   };
 }
 
@@ -157,6 +162,7 @@ export function persistAuthSession(
       reason: "secure_storage_scheduled",
       context: {
         apiBaseUrl: session.apiBaseUrl,
+        hasDeviceSessionToken: Boolean(session.deviceSessionToken),
         hasTenantToken: Boolean(session.tenantToken),
         hasPlatformToken: Boolean(session.platformToken),
         tenantId: session.tenantId,
@@ -183,6 +189,7 @@ export function persistAuthSession(
       reason: "stored_session",
       context: {
         apiBaseUrl: session.apiBaseUrl,
+        hasDeviceSessionToken: Boolean(session.deviceSessionToken),
         hasTenantToken: Boolean(session.tenantToken),
         hasPlatformToken: Boolean(session.platformToken),
         tenantId: session.tenantId,
@@ -245,44 +252,64 @@ export function clearStoredAuthSession(
 }
 
 export async function readDesktopStoredAuthSession(): Promise<AuthSession | null> {
-  const desktopApi = safeDesktopApi();
-  if (!desktopApi?.readAuthSession) return null;
-  try {
-    const payload = await desktopApi.readAuthSession();
-    if (!payload?.tenantToken) {
-      logAuthDiagnostic({
-        event: "auth.session.restore",
-        phase: "restore",
-        result: "skipped",
-        reason: "secure_storage_empty",
-      });
-      return null;
-    }
-    const session = fromDesktopAuthSessionPayload(payload);
-    logAuthDiagnostic({
-      event: "auth.session.restore",
-      phase: "restore",
-      result: "success",
-      reason: "secure_storage",
-      context: {
-        apiBaseUrl: session.apiBaseUrl,
-        hasTenantToken: Boolean(session.tenantToken),
-        hasPlatformToken: Boolean(session.platformToken),
-        tenantId: session.tenantId,
-        userId: session.userId,
-      },
-    });
-    return session;
-  } catch (error) {
+  const storedSession = await readRawDesktopStoredAuthSession();
+  if (!storedSession) return null;
+  const recoveredSession = await recoverPersistedAuthSession(storedSession, {
+    fallbackToStoredSessionOnError: true,
+  });
+  const session = recoveredSession ?? storedSession;
+  logAuthDiagnostic({
+    event: "auth.session.restore",
+    phase: "restore",
+    result: "success",
+    reason:
+      recoveredSession && recoveredSession !== storedSession
+        ? "secure_storage_recovered"
+        : "secure_storage",
+    context: {
+      apiBaseUrl: session.apiBaseUrl,
+      hasDeviceSessionToken: Boolean(session.deviceSessionToken),
+      hasTenantToken: Boolean(session.tenantToken),
+      hasPlatformToken: Boolean(session.platformToken),
+      tenantId: session.tenantId,
+      userId: session.userId,
+    },
+  });
+  return session;
+}
+
+export async function recoverAuthSession(session: AuthSession) {
+  const recoveredSession = await recoverPersistedAuthSession(session);
+  if (!recoveredSession) {
     logAuthDiagnostic({
       event: "auth.session.restore",
       phase: "restore",
       result: "failed",
-      reason: "secure_storage_read_failed",
-      error,
+      reason: "session_recovery_failed",
+      context: {
+        hasDeviceSessionToken: Boolean(session.deviceSessionToken),
+        hasPlatformRefreshToken: Boolean(session.platformRefreshToken),
+        hasTenantRefreshToken: Boolean(session.refreshToken),
+        tenantId: session.tenantId,
+        userId: session.userId,
+      },
     });
     return null;
   }
+  logAuthDiagnostic({
+    event: "auth.session.restore",
+    phase: "restore",
+    result: "success",
+    reason: "session_recovered",
+    context: {
+      hasDeviceSessionToken: Boolean(recoveredSession.deviceSessionToken),
+      hasTenantToken: Boolean(recoveredSession.tenantToken),
+      hasPlatformToken: Boolean(recoveredSession.platformToken),
+      tenantId: recoveredSession.tenantId,
+      userId: recoveredSession.userId,
+    },
+  });
+  return recoveredSession;
 }
 
 function currentAuthSessionEnv(): AuthSessionEnv {
@@ -321,7 +348,34 @@ function toDesktopAuthSessionPayload(session: AuthSession): DesktopAuthSessionPa
 function fromDesktopAuthSessionPayload(payload: DesktopAuthSessionPayload): AuthSession {
   return {
     ...payload,
-    displayName: payload.displayName || "当前账号",
+    displayName: payload.displayName || "褰撳墠璐﹀彿",
     tenants: Array.isArray(payload.tenants) ? (payload.tenants as PlatformTenant[]) : undefined,
   };
+}
+
+async function readRawDesktopStoredAuthSession(): Promise<AuthSession | null> {
+  const desktopApi = safeDesktopApi();
+  if (!desktopApi?.readAuthSession) return null;
+  try {
+    const payload = await desktopApi.readAuthSession();
+    if (!payload?.tenantToken) {
+      logAuthDiagnostic({
+        event: "auth.session.restore",
+        phase: "restore",
+        result: "skipped",
+        reason: "secure_storage_empty",
+      });
+      return null;
+    }
+    return fromDesktopAuthSessionPayload(payload);
+  } catch (error) {
+    logAuthDiagnostic({
+      event: "auth.session.restore",
+      phase: "restore",
+      result: "failed",
+      reason: "secure_storage_read_failed",
+      error,
+    });
+    return null;
+  }
 }

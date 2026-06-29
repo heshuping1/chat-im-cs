@@ -3,10 +3,10 @@ import { expect, test } from "@playwright/test";
 test("renders the local login shell", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "StartLink" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^(StartLink|微界)$/ })).toBeVisible();
   await expect(page.locator(".auth-advanced summary")).toBeVisible();
   await expect(page.locator(".auth-advanced input").first()).toBeHidden();
-  await expect(page.getByText("星络号 / 邮箱 / 手机号")).toBeVisible();
+  await expect(page.getByText("微界号 / 邮箱 / 手机号")).toBeVisible();
   await expect(page.getByText("密码")).toBeVisible();
 });
 
@@ -47,8 +47,8 @@ test("IM outgoing bubble does not regress from read to sent after refresh", asyn
 
   const outgoingMessage = page.locator("article", { hasText: "latest outgoing" });
   await expect(outgoingMessage).toBeVisible();
-  await expect(outgoingMessage.locator("time")).toContainText("已读");
-  await expect(outgoingMessage.locator("time")).not.toContainText("已发送");
+  await expect(outgoingMessage.getByLabel("已读")).toBeVisible();
+  await expect(outgoingMessage).not.toContainText("已发送");
 });
 
 test("settings left navigation does not jump between bottom sections", async ({ page }) => {
@@ -93,7 +93,7 @@ async function seedLoggedInImWorkspace(
     storedReadState?: Record<string, unknown>;
   } = {},
 ) {
-  const apiBaseUrl = "http://127.0.0.1:5173";
+  const apiBaseUrl = testApiBaseUrl();
   const session = {
     apiBaseUrl,
     tenantToken: "test-token",
@@ -104,6 +104,9 @@ async function seedLoggedInImWorkspace(
     platformUserId: "me-platform",
     lppId: "me-lpp",
     displayName: "Me",
+    userType: 2,
+    membershipRole: 2,
+    spaceType: 2,
     roleLabel: "Tester",
   };
   const readStateKey = [
@@ -230,6 +233,55 @@ async function seedLoggedInImWorkspace(
     });
   });
 
+  await page.route("**/api/client/v1/friends/requests", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ code: "OK", data: [] }),
+    });
+  });
+
+  await page.route("**/api/client/v1/friends", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ code: "OK", data: [] }),
+    });
+  });
+
+  await page.route("**/api/client/v1/tenant/info", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "OK",
+        data: {
+          tenantId: session.tenantId,
+          tenantCode: session.tenantCode,
+          tenantName: session.tenantName,
+        },
+      }),
+    });
+  });
+
+  await page.route("**/api/client/v1/tenant/members", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ code: "OK", data: [] }),
+    });
+  });
+
+  await page.route("**/api/client/v1/departments/", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ code: "OK", data: [] }),
+    });
+  });
+
+  await page.route("**/api/client/v1/friends/invite-qr", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ code: "OK", data: [] }),
+    });
+  });
+
   await page.route(/\/api\/client\/v1\/direct-chats\/task-7-chat\/read-status(?:[?#].*)?$/, async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -261,4 +313,23 @@ async function seedLoggedInImWorkspace(
       body: JSON.stringify({ code: "NOT_FOUND", data: null }),
     });
   });
+
+  await page.route("**/api/client/v1/customer-service/reception/status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "OK",
+        data: {
+          serviceStatus: "busy",
+          queueAcceptEnabled: true,
+          maxConcurrentSessions: 3,
+        },
+      }),
+    });
+  });
+}
+
+function testApiBaseUrl() {
+  const port = process.env.PLAYWRIGHT_WEB_SERVER_PORT?.trim() || "34073";
+  return `http://127.0.0.1:${port}`;
 }

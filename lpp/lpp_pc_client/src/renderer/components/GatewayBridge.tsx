@@ -9,6 +9,7 @@ import { useEffect, useMemo } from "react";
 import {
   useAuthSession,
   useClearAuthSession,
+  useRecoverAuthSession,
 } from "../data/auth/auth-store";
 import {
   useSetCustomerServiceStatus,
@@ -30,6 +31,7 @@ import { recordGatewayPushReceived } from "../data/gateway/message-delivery-serv
 export function GatewayBridge() {
   const session = useAuthSession();
   const clearAuthSession = useClearAuthSession();
+  const recoverAuthSession = useRecoverAuthSession();
   const setCustomerServiceStatus = useSetCustomerServiceStatus();
   const setGatewayRealtimeStatus = useSetGatewayRealtimeStatus();
   const queryClient = useQueryClient();
@@ -222,6 +224,11 @@ export function GatewayBridge() {
         });
       },
       onStartFailed: ({ attempt, elapsedMs, error }) => {
+        if (isGatewayUnauthorizedError(error) && recoverAuthSession) {
+          void recoverAuthSession().then((recovered) => {
+            if (!recovered) clearAuthSession();
+          });
+        }
         setGatewayRealtimeStatus("retrying");
         recordGatewayHealthDiagnostic({
           apiHost: safeUrlHost(session.apiBaseUrl),
@@ -253,6 +260,7 @@ export function GatewayBridge() {
   }, [
     clearAuthSession,
     queryClient,
+    recoverAuthSession,
     scopeKey,
     session,
     sessionKey,
@@ -277,4 +285,14 @@ async function heartbeat(connection: HubConnection) {
   } catch {
     // Older gateway builds may not require explicit heartbeat.
   }
+}
+
+function isGatewayUnauthorizedError(error: unknown) {
+  const message = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("401") ||
+    normalized.includes("unauthorized") ||
+    (normalized.includes("token") && normalized.includes("expired"))
+  );
 }

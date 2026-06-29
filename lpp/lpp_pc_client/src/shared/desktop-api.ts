@@ -147,7 +147,11 @@ export interface DesktopAuthSessionPayload {
   tenantToken: string;
   platformToken?: string;
   platformRefreshToken?: string;
+  platformRefreshTokenExpiresAt?: string | null;
   refreshToken?: string;
+  deviceSessionToken?: string;
+  deviceSessionIssuedAt?: string | null;
+  deviceSessionInactiveExpiresAt?: string | null;
   tenantId?: string;
   tenantCode?: string;
   tenantName?: string;

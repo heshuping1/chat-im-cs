@@ -32,7 +32,7 @@ $roots = @(
 foreach ($root in $roots) {
   Get-ChildItem -LiteralPath $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {
     $shortcut = $shell.CreateShortcut($_.FullName)
-    if ($targetCandidates -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink' -or $_.Name -match '星络|StartLink|startlink') {
+    if ($targetCandidates -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink' -or $_.Name -match '星络|微界|StartLink|startlink') {
       $shortcut.TargetPath = $target
       $shortcut.WorkingDirectory = Split-Path $target
       $shortcut.IconLocation = $iconLocation

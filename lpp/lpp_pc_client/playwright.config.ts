@@ -2,6 +2,9 @@ import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 const chromeChannel = process.env.PLAYWRIGHT_CHROME_CHANNEL || detectWindowsChromeChannel();
+const derivedPlaywrightPort = 34000 + (process.pid % 1000);
+const playwrightPort = Number(process.env.PLAYWRIGHT_WEB_SERVER_PORT || derivedPlaywrightPort);
+const baseURL = `http://127.0.0.1:${Number.isFinite(playwrightPort) ? playwrightPort : 4173}`;
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -12,15 +15,15 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     viewport: { width: 1440, height: 920 },
   },
   webServer: {
-    command: 'npm run dev:browser',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
+    command: `cmd /c cross-env VITE_PORT=${Number.isFinite(playwrightPort) ? playwrightPort : 4173} npm run dev:browser`,
+    url: baseURL,
+    reuseExistingServer: false,
     timeout: 60_000,
   },
   projects: [

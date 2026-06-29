@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   selectAuthSession,
   selectClearAuthSession,
+  selectRecoverAuthSession,
   selectSetAuthSession,
 } from "../../src/renderer/data/auth/auth-store";
 
@@ -23,5 +24,6 @@ describe("auth store selectors", () => {
     expect(selectAuthSession(state)).toBe(session);
     expect(selectSetAuthSession(state)).toBe(setAuthSession);
     expect(selectClearAuthSession(state)).toBe(clearAuthSession);
+    expect(selectRecoverAuthSession(state)).toBeUndefined();
   });
 });
