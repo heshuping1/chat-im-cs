@@ -34,6 +34,7 @@ class TenantSelectPage extends ConsumerWidget {
     });
 
     final tenants = authState.valueOrNull?.availableTenants ?? [];
+    final canSelectPersonalSpace = authState.valueOrNull?.platformToken != null;
     final isLoading = authState.isLoading;
 
     return Scaffold(
@@ -50,7 +51,7 @@ class TenantSelectPage extends ConsumerWidget {
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             )
-          : tenants.isEmpty
+          : tenants.isEmpty && !canSelectPersonalSpace
               ? _buildEmpty()
               : _buildTenantList(context, ref, tenants),
     );
@@ -166,9 +167,8 @@ class _TenantListItem extends StatelessWidget {
   }
 
   Widget _defaultAvatar() {
-    final initial = tenant.tenantName.isNotEmpty
-        ? tenant.tenantName[0].toUpperCase()
-        : '?';
+    final initial =
+        tenant.tenantName.isNotEmpty ? tenant.tenantName[0].toUpperCase() : '?';
     return Container(
       width: 44,
       height: 44,
@@ -179,7 +179,7 @@ class _TenantListItem extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 18,
           fontWeight: FontWeight.w600,
@@ -207,11 +207,12 @@ class _PersonalSpaceItem extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.12),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
-              child: const Icon(Icons.person_outline, color: AppColors.primary, size: 24),
+              child: const Icon(Icons.person_outline,
+                  color: AppColors.primary, size: 24),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -224,7 +225,8 @@ class _PersonalSpaceItem extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
+            const Icon(Icons.chevron_right,
+                color: AppColors.textSecondary, size: 20),
           ],
         ),
       ),

@@ -3,8 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/network/connectivity_provider.dart';
 import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
-import 'package:lpp_mobile/features/chat/data/datasources/gateway_service.dart';
-import 'package:lpp_mobile/features/chat/presentation/providers/gateway_provider.dart';
+
+enum NetworkStatusBannerKind { offline }
+
+@visibleForTesting
+NetworkStatusBannerKind? resolveNetworkStatusBannerKind({
+  required AppConnectivityStatus connectivity,
+}) {
+  if (connectivity == AppConnectivityStatus.offline) {
+    return NetworkStatusBannerKind.offline;
+  }
+  return null;
+}
 
 class NetworkStatusBanner extends ConsumerWidget {
   const NetworkStatusBanner({super.key});
@@ -18,28 +28,19 @@ class NetworkStatusBanner extends ConsumerWidget {
 
     final connectivity = ref.watch(connectivityStatusProvider).valueOrNull ??
         AppConnectivityStatus.online;
-    final gatewayStatus =
-        ref.watch(gatewayConnectionStatusProvider).valueOrNull ??
-            GatewayConnectionStatus.disconnected;
 
-    final _BannerState? state;
-    if (connectivity == AppConnectivityStatus.offline) {
-      state = const _BannerState(
-        text: '网络不可用，请检查网络设置',
-        icon: Icons.wifi_off_rounded,
-        background: Color(0xFFFFF4E5),
-        foreground: Color(0xFF8A4B00),
-      );
-    } else if (gatewayStatus == GatewayConnectionStatus.connected) {
-      state = null;
-    } else {
-      state = const _BannerState(
-        text: '连接中...',
-        icon: Icons.sync_rounded,
-        background: Color(0xFFEFF4FF),
-        foreground: Color(0xFF1D4ED8),
-      );
-    }
+    final bannerKind = resolveNetworkStatusBannerKind(
+      connectivity: connectivity,
+    );
+    final state = switch (bannerKind) {
+      NetworkStatusBannerKind.offline => const _BannerState(
+          text: '网络不可用，请检查网络设置',
+          icon: Icons.wifi_off_rounded,
+          background: Color(0xFFFFF4E5),
+          foreground: Color(0xFF8A4B00),
+        ),
+      null => null,
+    };
 
     final top = MediaQuery.of(context).padding.top;
     return Positioned(

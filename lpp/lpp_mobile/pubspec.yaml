@@ -95,3 +95,4 @@ flutter:
     - assets/brand/app_icon.png
     - assets/brand/brand_logo_icon.png
     - assets/brand/startlink_loading.png
+    - assets/auth/

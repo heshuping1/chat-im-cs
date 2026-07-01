@@ -41,7 +41,7 @@
     <uses-permission android:name="com.huawei.android.launcher.permission.WRITE_SETTINGS"/>
 
     <application
-        android:label="星络"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">

@@ -193,7 +193,7 @@ class NoticeDetailPage extends ConsumerWidget {
             // Footer
             Center(
               child: Text(
-                '本服务由星络提供安全加密技术支持',
+                '本服务由微界提供安全加密技术支持',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[400],

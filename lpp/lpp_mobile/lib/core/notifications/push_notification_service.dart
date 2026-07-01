@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lpp_mobile/core/notifications/mobile_push_token_provider.dart';
@@ -163,6 +163,7 @@ class PushNotificationService {
     await _ensureLocalNotificationsInitialized(null);
     final scenario = _scenario(data);
     final isCall = scenario == 'call';
+    if (!isCall && _isAppForegroundForLocalNotification()) return;
     final title = _stringValue(data, const ['title', 'notificationTitle']) ??
         (isCall ? '来电' : '新消息');
     final rawBody = _stringValue(data, const ['body', 'alert', 'preview']) ??
@@ -207,6 +208,17 @@ class PushNotificationService {
       notificationDetails: details,
       payload: jsonEncode(data),
     );
+  }
+
+  static bool _isAppForegroundForLocalNotification() {
+    return switch (WidgetsBinding.instance.lifecycleState) {
+      AppLifecycleState.resumed || AppLifecycleState.inactive => true,
+      AppLifecycleState.hidden ||
+      AppLifecycleState.paused ||
+      AppLifecycleState.detached ||
+      null =>
+        false,
+    };
   }
 
   static Future<void> _ensureLocalNotificationsInitialized(

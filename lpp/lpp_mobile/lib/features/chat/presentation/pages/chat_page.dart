@@ -39,6 +39,7 @@ import 'package:lpp_mobile/features/chat/presentation/controllers/outgoing_media
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_draft_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
+import 'package:lpp_mobile/features/chat/presentation/providers/active_chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/group_detail_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/group_settings_page.dart'
     show groupMembersProvider;
@@ -252,6 +253,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     super.initState();
     _resolvedIsGroup = widget.isGroup;
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _markActiveChatForNotifications();
+    });
     // 进入聊天页时立即本地清零未读数
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _spaceId.isEmpty) return;
@@ -306,6 +311,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         );
       }
     });
+  }
+
+  void _markActiveChatForNotifications() {
+    ref.read(activeChatConversationProvider.notifier).state =
+        _activeConversationId;
   }
 
   void _captureInitialMentionReadSeq() {
@@ -798,6 +808,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   void dispose() {
+    final active = ref.read(activeChatConversationProvider);
+    if (active == _activeConversationId || active == widget.conversationId) {
+      ref.read(activeChatConversationProvider.notifier).state = null;
+    }
     _refreshTimer?.cancel();
     _groupDetailRefreshTimer?.cancel();
     _customerServiceThreadsSub?.close();
@@ -1723,6 +1737,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } else {
       _createdConversationId = chatId;
     }
+    _markActiveChatForNotifications();
     if (_spaceId.isNotEmpty) {
       ref.invalidate(conversationsProvider(_spaceId));
     }

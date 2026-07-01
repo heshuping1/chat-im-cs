@@ -10,6 +10,7 @@ import 'package:lpp_mobile/core/branding/startlink_brand_logo.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/utils/validators.dart';
+import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/settings/presentation/pages/privacy_page.dart';
 import 'package:lpp_mobile/features/settings/presentation/pages/terms_page.dart';
@@ -44,6 +45,7 @@ const _quickLoginAccounts = [
     email: 'lpp_owner_1776587541@test.com',
     mobile: null,
     lppId: 'lpp_aej69f2o',
+    avatarAssetPath: 'assets/auth/quick_login_owner.png',
   ),
   _QuickLoginAccount(
     label: '管理员(3)',
@@ -63,6 +65,7 @@ const _quickLoginAccounts = [
     tab: _LoginTab.email,
     description: '邮箱登录',
     email: 'lpp_cs2_1776587541@test.com',
+    avatarAssetPath: 'assets/auth/quick_login_service.png',
   ),
   _QuickLoginAccount(
     label: '技术支持(1) 邮箱',
@@ -83,24 +86,26 @@ const _quickLoginAccounts = [
     email: 'lpp_member2_1776587541@test.com',
   ),
   _QuickLoginAccount(
-    label: '客户归属客服 星络号',
+    label: '客户归属客服 微界号',
     name: '文档用户',
     identifier: 'lpp_hlty0ap2',
     password: '123123123',
     tab: _LoginTab.loginName,
-    description: '星络号登录',
+    description: '微界号登录',
     lppId: 'lpp_hlty0ap2',
     enterprise: 'Mouse 测试企业',
     assignedServiceStaff: 'StartLink客服',
+    avatarAssetPath: 'assets/auth/quick_login_doc_user.png',
   ),
   _QuickLoginAccount(
-    label: '客服无归属 星络号',
+    label: '客服无归属 微界号',
     name: 'mouse客服',
     identifier: 'lpp_gs9fn2c7',
     password: '123123123',
     tab: _LoginTab.loginName,
-    description: '星络号登录',
+    description: '微界号登录',
     lppId: 'lpp_gs9fn2c7',
+    avatarAssetPath: 'assets/auth/quick_login_service.png',
   ),
   _QuickLoginAccount(
     label: 'StartLink客户1 邮箱',
@@ -254,6 +259,7 @@ class _QuickLoginAccount {
   final String? loginName;
   final String? enterprise;
   final String? assignedServiceStaff;
+  final String? avatarAssetPath;
 
   const _QuickLoginAccount({
     required this.label,
@@ -268,6 +274,7 @@ class _QuickLoginAccount {
     this.loginName,
     this.enterprise,
     this.assignedServiceStaff,
+    this.avatarAssetPath,
   });
 }
 
@@ -1087,7 +1094,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  // 星络号表单：星络号 + 密码。登录不需要企业码；企业选择由平台登录结果决定。
+  // 微界号表单：微界号 + 密码。登录不需要企业码；企业选择由平台登录结果决定。
   Widget _buildLoginNameForm() {
     final l10n = AppLocalizations.of(context);
     return Column(
@@ -1859,6 +1866,8 @@ class _QuickLoginAccountButton extends StatelessWidget {
           ),
           child: Row(
             children: [
+              _QuickLoginAvatar(account: account),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1905,7 +1914,7 @@ class _QuickLoginAccountButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '星络号：${account.lppId ?? '-'}',
+                      '微界号：${account.lppId ?? '-'}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -1960,6 +1969,41 @@ class _QuickLoginAccountButton extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickLoginAvatar extends StatelessWidget {
+  final _QuickLoginAccount account;
+
+  const _QuickLoginAvatar({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 52.0;
+    const borderRadius = 14.0;
+    final assetPath = account.avatarAssetPath;
+    if (assetPath == null || assetPath.isEmpty) {
+      return UserAvatar(
+        name: account.name,
+        size: size,
+        borderRadius: borderRadius,
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: Image.asset(
+        assetPath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => UserAvatar(
+          name: account.name,
+          size: size,
+          borderRadius: borderRadius,
         ),
       ),
     );

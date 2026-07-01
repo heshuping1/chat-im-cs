@@ -1345,7 +1345,7 @@ class _ConversationListState extends ConsumerState<_ConversationList> {
                   ),
                 ),
 
-              // 电脑星络已登录提示条（暂无对应接口，隐藏）
+              // 电脑微界已登录提示条（暂无对应接口，隐藏）
               // SliverToBoxAdapter(
               //   child: Padding(
               //     padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -1361,7 +1361,7 @@ class _ConversationListState extends ConsumerState<_ConversationList> {
               //           children: [
               //             Icon(Icons.monitor, size: 16, color: Color(0xFF6B7280)),
               //             SizedBox(width: 8),
-              //             Text('电脑星络已登录',
+              //             Text('电脑微界已登录',
               //                 style: TextStyle(fontSize: 14, color: Color(0xFF4B5563))),
               //           ],
               //         ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lpp_mobile/core/diagnostics/app_diagnostics.dart';
@@ -23,6 +24,8 @@ import 'package:lpp_mobile/features/chat/data/repositories/chat_repository_impl.
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
+import 'package:lpp_mobile/features/chat/domain/services/message_notification_policy.dart';
+import 'package:lpp_mobile/features/chat/presentation/providers/active_chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/media_prefetch_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
@@ -188,6 +191,7 @@ void _handleEvent(
           unawaited(_showGatewayMessageNotificationIfAllowed(
             spaceId: spaceId,
             conversationId: conversationId,
+            activeConversationId: ref.read(activeChatConversationProvider),
             fallbackType: fallbackType,
             message: message,
             data: event.data,
@@ -928,12 +932,23 @@ String? _gatewayNotificationTitle(Map<String, dynamic> data) {
 Future<void> _showGatewayMessageNotificationIfAllowed({
   required String spaceId,
   required String conversationId,
+  required String? activeConversationId,
   required ConversationType fallbackType,
   required Message message,
   required Map<String, dynamic> data,
   required String? currentUserId,
 }) async {
-  if (await _isGatewayConversationMuted(spaceId, conversationId)) return;
+  final isMuted = await _isGatewayConversationMuted(spaceId, conversationId);
+  final visibility = _currentChatAppVisibility();
+  if (!shouldShowSystemMessageNotification(
+    visibility: visibility,
+    incomingConversationId: conversationId,
+    activeConversationId: activeConversationId,
+    isMuted: isMuted,
+    isSelf: false,
+  )) {
+    return;
+  }
   final mentionKind = mentionReminderKindForMessage(
     mentions: message.mentions,
     currentUserId: currentUserId,
@@ -956,6 +971,19 @@ Future<void> _showGatewayMessageNotificationIfAllowed({
     senderDisplayName: _gatewayString(data['senderDisplayName']) ??
         _gatewayString(data['senderName']),
   );
+}
+
+ChatAppVisibility _currentChatAppVisibility() {
+  return switch (WidgetsBinding.instance.lifecycleState) {
+    AppLifecycleState.resumed ||
+    AppLifecycleState.inactive =>
+      ChatAppVisibility.foreground,
+    AppLifecycleState.hidden ||
+    AppLifecycleState.paused ||
+    AppLifecycleState.detached ||
+    null =>
+      ChatAppVisibility.background,
+  };
 }
 
 Future<bool> _isGatewayConversationMuted(

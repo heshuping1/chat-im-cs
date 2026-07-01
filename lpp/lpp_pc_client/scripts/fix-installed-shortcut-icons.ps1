@@ -22,6 +22,7 @@ if (-not (Test-Path -LiteralPath $iconPath)) {
 }
 
 $shell = New-Object -ComObject WScript.Shell
+$shortcutName = '微界.lnk'
 $roots = @(
   [Environment]::GetFolderPath('CommonDesktopDirectory'),
   [Environment]::GetFolderPath('DesktopDirectory'),
@@ -32,12 +33,18 @@ $roots = @(
 foreach ($root in $roots) {
   Get-ChildItem -LiteralPath $root -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {
     $shortcut = $shell.CreateShortcut($_.FullName)
-    if ($targetCandidates -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink' -or $_.Name -match '星络|微界|StartLink|startlink') {
+    if ($targetCandidates -contains $shortcut.TargetPath -or $shortcut.TargetPath -match 'StartLink|startlink' -or $_.Name -match '\u661f\u7edc|微界|StartLink|startlink') {
       $shortcut.TargetPath = $target
       $shortcut.WorkingDirectory = Split-Path $target
       $shortcut.IconLocation = $iconLocation
       $shortcut.Save()
-      Write-Output "[StartLink] shortcut icon updated: $($_.FullName)"
+      if ($_.Name -ne $shortcutName) {
+        $renamedPath = Join-Path $_.DirectoryName $shortcutName
+        Move-Item -Force -LiteralPath $_.FullName -Destination $renamedPath
+        Write-Output "[StartLink] shortcut renamed and icon updated: $renamedPath"
+      } else {
+        Write-Output "[StartLink] shortcut icon updated: $($_.FullName)"
+      }
     }
   }
 }

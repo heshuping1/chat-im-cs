@@ -144,7 +144,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navMe => '我';
 
   @override
-  String get authLoginTitle => '登录星络';
+  String get authLoginTitle => '登录微界';
 
   @override
   String get authTabMobile => '手机号';
@@ -153,7 +153,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authTabEmail => '邮箱';
 
   @override
-  String get authTabLoginName => '星络号';
+  String get authTabLoginName => '微界号';
 
   @override
   String get authHintMobile => '请输入手机号';
@@ -168,7 +168,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authHintCode => '请输入验证码';
 
   @override
-  String get authHintLoginName => '请输入星络号（lpp_xxxxxxxx）';
+  String get authHintLoginName => '请输入微界号（lpp_xxxxxxxx）';
 
   @override
   String get authLoginButton => '登录 / 注册';
@@ -215,7 +215,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get authErrorEmptyPassword => '请输入密码';
 
   @override
-  String get authErrorEmptyLoginName => '请输入星络号';
+  String get authErrorEmptyLoginName => '请输入微界号';
 
   @override
   String get authErrorWrongCredentials => '账号或密码错误';
@@ -780,11 +780,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get myLeaveEnterpriseFailed => '退出失败，请重试';
 
   @override
-  String get myLppIdCopied => '星络号已复制';
+  String get myLppIdCopied => '微界号已复制';
 
   @override
   String myLppIdLabel(String lppId) {
-    return '星络号：$lppId';
+    return '微界号：$lppId';
   }
 
   @override
@@ -847,7 +847,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get profileBasicSection => '基本信息';
 
   @override
-  String get profileLppId => '星络号';
+  String get profileLppId => '微界号';
 
   @override
   String get profileLppIdNotSet => '未设置';
@@ -886,13 +886,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get profileSaveFailed => '保存失败，请重试';
 
   @override
-  String get profileLppIdTitle => '星络号';
+  String get profileLppIdTitle => '微界号';
 
   @override
-  String get profileLppIdSetOnce => '星络号设置后只能修改一次，请谨慎填写';
+  String get profileLppIdSetOnce => '微界号设置后只能修改一次，请谨慎填写';
 
   @override
-  String get profileLppIdChangeFailed => '修改失败（星络号只能修改一次）';
+  String get profileLppIdChangeFailed => '修改失败（微界号只能修改一次）';
 
   @override
   String get profileChangePasswordOld => '旧密码';
@@ -955,7 +955,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsChatHistory => '聊天记录管理';
 
   @override
-  String get settingsAbout => '关于星络';
+  String get settingsAbout => '关于微界';
 
   @override
   String get settingsLanguage => '系统语言';
@@ -1203,7 +1203,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get friendAddTitle => '添加朋友';
 
   @override
-  String get friendSearchHint => '手机号 / 邮箱 / 星络号';
+  String get friendSearchHint => '手机号 / 邮箱 / 微界号';
 
   @override
   String get friendRequestSent => '已发送好友申请';
@@ -1251,7 +1251,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get friendSendMessage => '发消息';
 
   @override
-  String get friendMatchTypeLppId => '星络号匹配';
+  String get friendMatchTypeLppId => '微界号匹配';
 
   @override
   String get friendMatchTypeMobile => '手机号匹配';
@@ -1305,7 +1305,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get profilePageFriendsOnly => '该用户仅对好友展示资料';
 
   @override
-  String get profilePageLppId => '星络号';
+  String get profilePageLppId => '微界号';
 
   @override
   String get profilePageRemarkName => '备注';
@@ -1323,7 +1323,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchTitle => '搜索';
 
   @override
-  String get searchHint => '输入完整手机号、邮箱或星络号搜索';
+  String get searchHint => '输入完整手机号、邮箱或微界号搜索';
 
   @override
   String get searchNoResults => '未找到相关结果';
@@ -1536,7 +1536,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get spaceEnterEnterprise => '进入企业空间';
 
   @override
-  String get aboutTitle => '关于星络';
+  String get aboutTitle => '关于微界';
 
   @override
   String get aboutVersion => '版本';
@@ -1761,7 +1761,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacySearchableByMobile => '允许通过手机号搜索';
 
   @override
-  String get privacySearchableByLppId => '允许通过星络号搜索';
+  String get privacySearchableByLppId => '允许通过微界号搜索';
 
   @override
   String get privacyAllowFriendRequest => '加我为好友';
@@ -1977,11 +1977,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addFriendTitle => '添加朋友';
 
   @override
-  String get addFriendSearchHint => '手机号 / 邮箱 / 星络号';
+  String get addFriendSearchHint => '手机号 / 邮箱 / 微界号';
 
   @override
   String addFriendLppIdLabel(String lppId) {
-    return '星络号：$lppId';
+    return '微界号：$lppId';
   }
 
   @override
@@ -2325,7 +2325,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get navMe => '我';
 
   @override
-  String get authLoginTitle => '登入星絡';
+  String get authLoginTitle => '登入微界';
 
   @override
   String get authTabMobile => '手機號';
@@ -2334,7 +2334,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get authTabEmail => '電子郵件';
 
   @override
-  String get authTabLoginName => '星絡號';
+  String get authTabLoginName => '微界號';
 
   @override
   String get authHintMobile => '請輸入手機號';
@@ -2349,7 +2349,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get authHintCode => '請輸入驗證碼';
 
   @override
-  String get authHintLoginName => '請輸入星絡號（lpp_xxxxxxxx）';
+  String get authHintLoginName => '請輸入微界號（lpp_xxxxxxxx）';
 
   @override
   String get authLoginButton => '登入 / 註冊';
@@ -2396,7 +2396,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get authErrorEmptyPassword => '請輸入密碼';
 
   @override
-  String get authErrorEmptyLoginName => '請輸入星絡號';
+  String get authErrorEmptyLoginName => '請輸入微界號';
 
   @override
   String get authErrorWrongCredentials => '帳號或密碼錯誤';
@@ -2961,11 +2961,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get myLeaveEnterpriseFailed => '退出失敗，請重試';
 
   @override
-  String get myLppIdCopied => '星絡號已複製';
+  String get myLppIdCopied => '微界號已複製';
 
   @override
   String myLppIdLabel(String lppId) {
-    return '星絡號：$lppId';
+    return '微界號：$lppId';
   }
 
   @override
@@ -3028,7 +3028,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get profileBasicSection => '基本資訊';
 
   @override
-  String get profileLppId => '星絡號';
+  String get profileLppId => '微界號';
 
   @override
   String get profileLppIdNotSet => '未設定';
@@ -3067,13 +3067,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get profileSaveFailed => '儲存失敗，請重試';
 
   @override
-  String get profileLppIdTitle => '星絡號';
+  String get profileLppIdTitle => '微界號';
 
   @override
-  String get profileLppIdSetOnce => '星絡號設定後只能修改一次，請謹慎填寫';
+  String get profileLppIdSetOnce => '微界號設定後只能修改一次，請謹慎填寫';
 
   @override
-  String get profileLppIdChangeFailed => '修改失敗（星絡號只能修改一次）';
+  String get profileLppIdChangeFailed => '修改失敗（微界號只能修改一次）';
 
   @override
   String get profileChangePasswordOld => '舊密碼';
@@ -3136,7 +3136,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsChatHistory => '聊天記錄管理';
 
   @override
-  String get settingsAbout => '關於星絡';
+  String get settingsAbout => '關於微界';
 
   @override
   String get settingsLanguage => '系統語言';
@@ -3384,7 +3384,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get friendAddTitle => '新增朋友';
 
   @override
-  String get friendSearchHint => '手機號 / 電子郵件 / 星絡號';
+  String get friendSearchHint => '手機號 / 電子郵件 / 微界號';
 
   @override
   String get friendRequestSent => '已傳送好友申請';
@@ -3432,7 +3432,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get friendSendMessage => '傳送訊息';
 
   @override
-  String get friendMatchTypeLppId => '星絡號匹配';
+  String get friendMatchTypeLppId => '微界號匹配';
 
   @override
   String get friendMatchTypeMobile => '手機號匹配';
@@ -3486,7 +3486,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get profilePageFriendsOnly => '該使用者僅對好友展示資料';
 
   @override
-  String get profilePageLppId => '星絡號';
+  String get profilePageLppId => '微界號';
 
   @override
   String get profilePageRemarkName => '備註';
@@ -3504,7 +3504,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get searchTitle => '搜尋';
 
   @override
-  String get searchHint => '輸入完整手機號、電子郵件或星絡號搜尋';
+  String get searchHint => '輸入完整手機號、電子郵件或微界號搜尋';
 
   @override
   String get searchNoResults => '未找到相關結果';
@@ -3717,7 +3717,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get spaceEnterEnterprise => '進入企業空間';
 
   @override
-  String get aboutTitle => '關於星絡';
+  String get aboutTitle => '關於微界';
 
   @override
   String get aboutVersion => '版本';
@@ -3942,7 +3942,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get privacySearchableByMobile => '允許透過手機號搜尋';
 
   @override
-  String get privacySearchableByLppId => '允許透過星絡號搜尋';
+  String get privacySearchableByLppId => '允許透過微界號搜尋';
 
   @override
   String get privacyAllowFriendRequest => '加我為好友';
@@ -4158,11 +4158,11 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get addFriendTitle => '新增朋友';
 
   @override
-  String get addFriendSearchHint => '手機號 / 電子郵件 / 星絡號';
+  String get addFriendSearchHint => '手機號 / 電子郵件 / 微界號';
 
   @override
   String addFriendLppIdLabel(String lppId) {
-    return '星絡號：$lppId';
+    return '微界號：$lppId';
   }
 
   @override

@@ -23,7 +23,7 @@ abstract class AuthRepository {
   /// 刷新 Token
   Future<TenantAuthResult> refreshToken(String refreshToken);
 
-  /// 租户内登录（星络号+密码，走 /api/client/v1/auth/login）
+  /// 租户内登录（微界号+密码，走 /api/client/v1/auth/login）
   Future<TenantAuthResult> tenantLogin(LoginRequest request);
 
   /// 退出登录

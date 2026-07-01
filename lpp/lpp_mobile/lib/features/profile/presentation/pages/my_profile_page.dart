@@ -1085,7 +1085,7 @@ class _EditPageState extends State<_EditPage> {
 }
 
 // ---------------------------------------------------------------------------
-// 星络号编辑页
+// 微界号编辑页
 // ---------------------------------------------------------------------------
 class _ZtIdEditPage extends StatefulWidget {
   final String initialValue;

@@ -114,6 +114,14 @@ describe("app brand assets", () => {
     expect(fixInstalledShortcutSource).toContain("IconLocation");
   });
 
+  it("renames legacy Windows shortcuts to the public Chinese app name", () => {
+    expect(packageJson.build?.nsis?.shortcutName).toBe("微界");
+    expect(fixTaskbarSource).toContain("$shortcutName = '微界.lnk'");
+    expect(fixTaskbarSource).toContain("Move-Item -Force");
+    expect(fixInstalledShortcutSource).toContain("$shortcutName = '微界.lnk'");
+    expect(fixInstalledShortcutSource).toContain("Move-Item -Force");
+  });
+
   it("uses the high fidelity app icon asset in PC brand slots", { timeout: 15_000 }, () => {
     expect(appMetadataSource).toContain("import.meta.env.BASE_URL");
     expect(appMetadataSource).toContain("app-icon-startlink.png");

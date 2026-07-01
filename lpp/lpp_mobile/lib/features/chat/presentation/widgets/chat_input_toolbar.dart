@@ -250,6 +250,7 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     _mentionDraft = const MentionComposerDraft.empty();
     _wasClearedBySend = true;
     _draftTimer?.cancel();
+    _keepTextInputFocusedAfterSend();
     try {
       final sent = scheduledAt == null
           ? await Future.sync(
@@ -271,8 +272,15 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     } finally {
       if (mounted) {
         setState(() => _sendingText = false);
+        _keepTextInputFocusedAfterSend();
       }
     }
+  }
+
+  void _keepTextInputFocusedAfterSend() {
+    if (_isMutedForUser || _mode != _InputMode.text) return;
+    _focusNode.requestFocus();
+    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.show'));
   }
 
   Future<void> _openSchedulePicker() async {

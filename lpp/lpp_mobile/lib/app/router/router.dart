@@ -137,8 +137,8 @@ class AppRouter {
 
       // 仍在加载中，不重定向
       final isAuthenticated = authStatus == AuthStatus.authenticated;
-      final hasPendingTenants = (authValue?.availableTenants.length ?? 0) > 1 &&
-          authStatus == AuthStatus.unauthenticated;
+      final hasPendingSpaceSelection =
+          authValue != null && authStateNeedsSpaceSelection(authValue);
 
       final location = state.matchedLocation;
       final isStartupRoute = location == AppRoutes.startup;
@@ -155,11 +155,19 @@ class AppRouter {
       _hasCompletedInitialAuthResolution = true;
 
       if (!isAuthenticated &&
+          hasPendingSpaceSelection &&
+          !isTenantSelectRoute &&
+          !isStartupRoute &&
+          !isLoginRoute) {
+        return AppRoutes.tenantSelect;
+      }
+
+      if (!isAuthenticated &&
           !isLoginRoute &&
           !isStartupRoute &&
           !isTenantSelectRoute &&
           !isRegisterRoute) {
-        if (hasPendingTenants) return AppRoutes.tenantSelect;
+        if (hasPendingSpaceSelection) return AppRoutes.tenantSelect;
         return AppRoutes.login;
       }
       if (!isAuthenticated && isStartupRoute) {
@@ -168,7 +176,8 @@ class AppRouter {
       if (isAuthenticated && isStartupRoute) {
         return null;
       }
-      if (isAuthenticated && (isLoginRoute || isTenantSelectRoute)) {
+      if (isAuthenticated &&
+          (isLoginRoute || isTenantSelectRoute || isRegisterRoute)) {
         return AppRoutes.home;
       }
       return null;

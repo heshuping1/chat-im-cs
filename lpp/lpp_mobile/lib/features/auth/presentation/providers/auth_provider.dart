@@ -72,6 +72,12 @@ class AuthState {
   }
 }
 
+bool authStateNeedsSpaceSelection(AuthState state) {
+  return state.status == AuthStatus.unauthenticated &&
+      state.platformToken != null &&
+      state.currentSpace == null;
+}
+
 // ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
@@ -464,14 +470,14 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   // ---------------------------------------------------------------------------
 
   /// 模式A：平台注册（多租户通用 APP）
-  /// 模式A：平台注册（多租户通用 APP）
-  /// 注册成功后自动用 platformToken 进入个人空间
+  /// 注册成功后保留 platformToken，等待用户显式选择个人空间或企业空间。
   /// 支持两种响应变体：
-  ///   - platform-result：返回 platformToken，进入个人空间
+  ///   - platform-result：返回 platformToken，进入空间选择
   ///   - tenant-result：企业绑定模式+自动审批，直接返回 accessToken
   Future<void> registerPlatform({
     required String displayName,
     required String password,
+    required String loginType,
     String? loginName,
     String? mobile,
     String? email,
@@ -487,6 +493,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         data: {
           'displayName': displayName,
           'password': password,
+          'loginType': loginType,
           if (loginName != null && loginName.isNotEmpty) 'loginName': loginName,
           if (mobile != null) 'mobile': mobile,
           if (email != null) 'email': email,
@@ -520,25 +527,51 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // platform-result：有 platformToken
       final platformToken = data['platformToken'] as String?;
       if (platformToken == null) throw Exception('注册失败：未返回 platformToken');
+      await _storage.write(
+          SecureStorageService.platformTokenKey, platformToken);
 
-      // pendingApproval=true：企业绑定模式+人工审批，进入个人空间等待审批
-      final pendingApproval = data['pendingApproval'] as bool? ?? false;
-      if (pendingApproval) {
-        // 进入个人空间，UI 层会根据 state 提示用户等待审批
-        final spaceResult = await _repo.selectPersonalSpace(platformToken);
-        await _applyTenantAuth(
-            spaceResult, AuthState(platformToken: platformToken));
-        return;
-      }
-
-      // 标准注册：进入个人空间
-      final spaceResult = await _repo.selectPersonalSpace(platformToken);
-      await _applyTenantAuth(
-          spaceResult, AuthState(platformToken: platformToken));
+      final tenants = await _resolveRegistrationTenants(data, platformToken);
+      state = AsyncData(AuthState(
+        status: AuthStatus.unauthenticated,
+        availableTenants: tenants,
+        platformToken: platformToken,
+      ));
+    } on DioException catch (e, st) {
+      final error = ErrorHandler.fromDioException(e);
+      state = AsyncError(error, st);
+      throw error;
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
     }
+  }
+
+  Future<List<TenantSummary>> _resolveRegistrationTenants(
+      Map<String, dynamic> data, String platformToken) async {
+    final responseTenants = data['tenants'];
+    if (responseTenants is List) {
+      return responseTenants
+          .whereType<Map<String, dynamic>>()
+          .map(_tenantSummaryFromJson)
+          .toList();
+    }
+    try {
+      return await _repo.getMyTenants(platformToken);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  TenantSummary _tenantSummaryFromJson(Map<String, dynamic> json) {
+    return TenantSummary(
+      tenantId: json['tenantId'] as String,
+      tenantName: json['tenantName'] as String,
+      tenantCode: json['tenantCode'] as String?,
+      logoUrl: (json['logoUrl'] as String?)?.isNotEmpty == true
+          ? json['logoUrl'] as String
+          : null,
+      membershipRole: json['membershipRole'] as int? ?? 0,
+    );
   }
 
   /// 模式B：企业专属注册
@@ -548,6 +581,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     required String tenantIdOrCode,
     required String password,
     required String displayName,
+    required String loginType,
     String? loginName,
     String? email,
     String? mobile,
@@ -567,6 +601,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           if (loginName != null && loginName.isNotEmpty) 'loginName': loginName,
           'password': password,
           'displayName': displayName,
+          'loginType': loginType,
           if (email != null) 'email': email,
           if (mobile != null) 'mobile': mobile,
           if (verificationCode != null) 'verificationCode': verificationCode,
@@ -578,23 +613,23 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // Step2: 注册成功后自动登录
       // 优先用邮箱/手机号登录（平台账号），否则用 loginName
       final String loginIdentifier;
-      final String loginType;
+      final String resolvedLoginType;
       if (email != null && email.isNotEmpty) {
         loginIdentifier = email;
-        loginType = 'email';
+        resolvedLoginType = 'email';
       } else if (mobile != null && mobile.isNotEmpty) {
         loginIdentifier = mobile;
-        loginType = 'mobile';
+        resolvedLoginType = 'mobile';
       } else {
         loginIdentifier = loginName ?? '';
-        loginType = 'login_name';
+        resolvedLoginType = 'login_name';
       }
 
       // X-Tenant-Id 接受 GUID 或 tenantCode，统一传给 tenantCode 字段
       final request = LoginRequest(
         identifier: loginIdentifier,
         password: password,
-        loginType: loginType,
+        loginType: resolvedLoginType,
         isCodeLogin: false,
         tenantCode: tenantIdOrCode,
       );
@@ -607,6 +642,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
         expiresIn: result.expiresIn,
       );
       await _applyTenantAuth(tenantResult, const AuthState());
+    } on DioException catch (e, st) {
+      final error = ErrorHandler.fromDioException(e);
+      state = AsyncError(error, st);
+      throw error;
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;

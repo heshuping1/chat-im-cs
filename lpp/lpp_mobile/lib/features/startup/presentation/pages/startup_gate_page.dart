@@ -31,9 +31,10 @@ final _startupDestinationProvider = FutureProvider<String>((ref) async {
     final storage = ref.read(secureStorageProvider);
     final authState = await ref.watch(authProvider.future);
     if (authState.status != AuthStatus.authenticated) {
-      final hasPendingTenants = authState.availableTenants.length > 1;
       await storage.write(SecureStorageService.startupGateCompletedKey, 'true');
-      return hasPendingTenants ? AppRoutes.tenantSelect : AppRoutes.login;
+      return authStateNeedsSpaceSelection(authState)
+          ? AppRoutes.tenantSelect
+          : AppRoutes.login;
     }
 
     final space = ref.watch(currentSpaceProvider) ?? authState.currentSpace;
@@ -100,7 +101,6 @@ void _scheduleStartupUiReleaseAfterDestinationFrame(
   VoidCallback releaseNetworkBanner,
 ) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    WidgetsBinding.instance.allowFirstFrame();
     unawaited(configureAppSystemUi());
     releaseNetworkBanner();
   });
@@ -171,6 +171,7 @@ class StartupGatePage extends ConsumerStatefulWidget {
 
 class _StartupGatePageState extends ConsumerState<StartupGatePage> {
   var _hasNavigated = false;
+  var _hasAllowedStartupLoadingFrame = false;
   var _hasScheduledStartupUiRelease = false;
 
   @override
@@ -180,15 +181,26 @@ class _StartupGatePageState extends ConsumerState<StartupGatePage> {
       SystemUiMode.manual,
       overlays: const [],
     ));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _allowStartupLoadingFirstFrame();
+    });
   }
 
   @override
   void dispose() {
+    if (!_hasAllowedStartupLoadingFrame) {
+      _allowStartupLoadingFirstFrame();
+    }
     if (!_hasScheduledStartupUiRelease) {
-      WidgetsBinding.instance.allowFirstFrame();
       unawaited(configureAppSystemUi());
     }
     super.dispose();
+  }
+
+  void _allowStartupLoadingFirstFrame() {
+    if (_hasAllowedStartupLoadingFrame) return;
+    _hasAllowedStartupLoadingFrame = true;
+    WidgetsBinding.instance.allowFirstFrame();
   }
 
   void _scheduleStartupUiRelease() {

@@ -105,6 +105,38 @@ void main() {
     expect(tester.testTextInput.isVisible, isTrue);
   });
 
+  testWidgets('keeps text input focused while send is in flight', (
+    tester,
+  ) async {
+    final sendCompleter = Completer<bool>();
+
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'chat-1',
+          isGroup: false,
+          onSendText: (_) => sendCompleter.future,
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+        ),
+      ),
+    );
+
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump();
+
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    sendCompleter.complete(true);
+    await tester.pumpAndSettle();
+
+    expect(tester.testTextInput.isVisible, isTrue);
+  });
+
   testWidgets('hydrates draft when local draft arrives after first build', (
     tester,
   ) async {

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lpp_mobile/app/router/router.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/utils/validators.dart';
@@ -321,6 +323,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           tenantIdOrCode: tenantIdOrCode,
           password: password,
           displayName: displayName,
+          loginType: _currentLoginType(),
           loginName:
               _idMode == _IdMode.loginName ? _loginNameCtrl.text.trim() : null,
           email: _idMode == _IdMode.email ? identifier : null,
@@ -335,6 +338,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         await notifier.registerPlatform(
           displayName: displayName,
           password: password,
+          loginType: _currentLoginType(),
           loginName:
               _idMode == _IdMode.loginName ? _loginNameCtrl.text.trim() : null,
           mobile: _idMode == _IdMode.mobile ? identifier : null,
@@ -384,10 +388,63 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  bool _isCaptchaError(Object e) {
+    if (e is ServerError) {
+      final code = e.code.toUpperCase();
+      final message = e.message.toLowerCase();
+      return code == 'AUTH_CAPTCHA_REQUIRED' ||
+          code == 'AUTH_CAPTCHA_INVALID' ||
+          message.contains('captcha') ||
+          message.contains('图形验证码') ||
+          message.contains('安全验证');
+    }
+    final text = e.toString().toLowerCase();
+    return text.contains('auth_captcha_required') ||
+        text.contains('auth_captcha_invalid') ||
+        text.contains('captcha verification is required') ||
+        text.contains('captcha') ||
+        text.contains('图形验证码') ||
+        text.contains('安全验证');
+  }
+
+  String _currentLoginType() {
+    return switch (_idMode) {
+      _IdMode.mobile => 'mobile',
+      _IdMode.email => 'email',
+      _IdMode.loginName => 'lpp_id',
+    };
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<AuthState>>(authProvider, (_, next) {
+      next.whenOrNull(
+        data: (s) {
+          if (s.status == AuthStatus.authenticated) {
+            context.go(AppRoutes.home);
+            return;
+          }
+          if (authStateNeedsSpaceSelection(s)) {
+            context.go(AppRoutes.tenantSelect);
+          }
+        },
+        error: (e, _) {
+          if (_isCaptchaError(e)) return;
+          if (e is ServerError) {
+            _showError(e.message);
+          } else if (e is AuthError) {
+            _showError('账号或密码错误');
+          } else if (e is NetworkError) {
+            _showError(e.message);
+          } else {
+            _showError(e.toString());
+          }
+        },
+      );
+    });
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(

@@ -378,7 +378,7 @@ abstract class AppLocalizations {
   /// Login page title
   ///
   /// In zh, this message translates to:
-  /// **'登录星络'**
+  /// **'登录微界'**
   String get authLoginTitle;
 
   /// Login tab: mobile
@@ -396,7 +396,7 @@ abstract class AppLocalizations {
   /// Login tab: lpp id
   ///
   /// In zh, this message translates to:
-  /// **'星络号'**
+  /// **'微界号'**
   String get authTabLoginName;
 
   /// Mobile hint
@@ -426,7 +426,7 @@ abstract class AppLocalizations {
   /// Login name hint
   ///
   /// In zh, this message translates to:
-  /// **'请输入星络号（lpp_xxxxxxxx）'**
+  /// **'请输入微界号（lpp_xxxxxxxx）'**
   String get authHintLoginName;
 
   /// Login button
@@ -516,7 +516,7 @@ abstract class AppLocalizations {
   /// Empty login name error
   ///
   /// In zh, this message translates to:
-  /// **'请输入星络号'**
+  /// **'请输入微界号'**
   String get authErrorEmptyLoginName;
 
   /// Wrong credentials
@@ -1596,13 +1596,13 @@ abstract class AppLocalizations {
   /// StartLink ID copied
   ///
   /// In zh, this message translates to:
-  /// **'星络号已复制'**
+  /// **'微界号已复制'**
   String get myLppIdCopied;
 
   /// StartLink ID label
   ///
   /// In zh, this message translates to:
-  /// **'星络号：{lppId}'**
+  /// **'微界号：{lppId}'**
   String myLppIdLabel(String lppId);
 
   /// Friend count
@@ -1722,7 +1722,7 @@ abstract class AppLocalizations {
   /// StartLink ID field
   ///
   /// In zh, this message translates to:
-  /// **'星络号'**
+  /// **'微界号'**
   String get profileLppId;
 
   /// StartLink ID not set
@@ -1800,19 +1800,19 @@ abstract class AppLocalizations {
   /// StartLink ID page title
   ///
   /// In zh, this message translates to:
-  /// **'星络号'**
+  /// **'微界号'**
   String get profileLppIdTitle;
 
   /// StartLink ID set once warning
   ///
   /// In zh, this message translates to:
-  /// **'星络号设置后只能修改一次，请谨慎填写'**
+  /// **'微界号设置后只能修改一次，请谨慎填写'**
   String get profileLppIdSetOnce;
 
   /// StartLink ID change failed
   ///
   /// In zh, this message translates to:
-  /// **'修改失败（星络号只能修改一次）'**
+  /// **'修改失败（微界号只能修改一次）'**
   String get profileLppIdChangeFailed;
 
   /// Old password
@@ -1938,7 +1938,7 @@ abstract class AppLocalizations {
   /// About
   ///
   /// In zh, this message translates to:
-  /// **'关于星络'**
+  /// **'关于微界'**
   String get settingsAbout;
 
   /// Language
@@ -2418,7 +2418,7 @@ abstract class AppLocalizations {
   /// Friend search hint
   ///
   /// In zh, this message translates to:
-  /// **'手机号 / 邮箱 / 星络号'**
+  /// **'手机号 / 邮箱 / 微界号'**
   String get friendSearchHint;
 
   /// Friend request sent
@@ -2514,7 +2514,7 @@ abstract class AppLocalizations {
   /// Match by lpp id
   ///
   /// In zh, this message translates to:
-  /// **'星络号匹配'**
+  /// **'微界号匹配'**
   String get friendMatchTypeLppId;
 
   /// Match by mobile
@@ -2622,7 +2622,7 @@ abstract class AppLocalizations {
   /// StartLink ID
   ///
   /// In zh, this message translates to:
-  /// **'星络号'**
+  /// **'微界号'**
   String get profilePageLppId;
 
   /// Remark name
@@ -2658,7 +2658,7 @@ abstract class AppLocalizations {
   /// Search hint
   ///
   /// In zh, this message translates to:
-  /// **'输入完整手机号、邮箱或星络号搜索'**
+  /// **'输入完整手机号、邮箱或微界号搜索'**
   String get searchHint;
 
   /// No search results
@@ -3084,7 +3084,7 @@ abstract class AppLocalizations {
   /// About title
   ///
   /// In zh, this message translates to:
-  /// **'关于星络'**
+  /// **'关于微界'**
   String get aboutTitle;
 
   /// Version
@@ -3534,7 +3534,7 @@ abstract class AppLocalizations {
   /// Searchable by lpp id
   ///
   /// In zh, this message translates to:
-  /// **'允许通过星络号搜索'**
+  /// **'允许通过微界号搜索'**
   String get privacySearchableByLppId;
 
   /// Allow friend request
@@ -3966,13 +3966,13 @@ abstract class AppLocalizations {
   /// Add friend search hint
   ///
   /// In zh, this message translates to:
-  /// **'手机号 / 邮箱 / 星络号'**
+  /// **'手机号 / 邮箱 / 微界号'**
   String get addFriendSearchHint;
 
   /// StartLink ID label in search result
   ///
   /// In zh, this message translates to:
-  /// **'星络号：{lppId}'**
+  /// **'微界号：{lppId}'**
   String addFriendLppIdLabel(String lppId);
 
   /// Add friend button

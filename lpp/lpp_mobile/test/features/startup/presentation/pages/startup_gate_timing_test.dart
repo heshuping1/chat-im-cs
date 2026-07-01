@@ -63,7 +63,7 @@ void main() {
     );
   });
 
-  test('startup gate navigates without flashing an extra loading overlay', () {
+  test('startup gate shows the brand loading frame before navigation', () {
     final source =
         File('lib/features/startup/presentation/pages/startup_gate_page.dart')
             .readAsStringSync();
@@ -76,6 +76,7 @@ void main() {
     expect(source, contains('SystemUiMode.manual'));
     expect(source, contains('overlays: const []'));
     expect(source, contains('allowFirstFrame()'));
+    expect(source, contains('_allowStartupLoadingFirstFrame()'));
     expect(source, contains('configureAppSystemUi()'));
     expect(source, isNot(contains('startupHandoffOverlayProvider')));
     expect(source, contains('startupNetworkBannerSuppressedProvider'));
@@ -89,6 +90,10 @@ void main() {
       source.indexOf('SystemUiMode.manual'),
       lessThan(source.indexOf('return const StartupBrandLoadingView()')),
     );
+    expect(
+      source.indexOf('_allowStartupLoadingFirstFrame();'),
+      lessThan(source.indexOf('context.go(destination)')),
+    );
     final navigationIndex = source.indexOf('context.go(destination)');
     final deferredReleaseIndex = source.indexOf(
       '_scheduleStartupUiRelease()',
@@ -100,6 +105,12 @@ void main() {
     expect(routerSource, contains('path: AppRoutes.startup'));
     expect(routerSource, contains('path: AppRoutes.login'));
     expect(routerSource, contains('path: AppRoutes.tenantSelect'));
+    expect(
+      RegExp(
+        r'isAuthenticated\s*&&\s*\(\s*isLoginRoute\s*\|\|\s*isTenantSelectRoute\s*\|\|\s*isRegisterRoute\s*\)',
+      ).hasMatch(routerSource),
+      isTrue,
+    );
     expect(
       RegExp(r'path: AppRoutes\.startup,[\s\S]*?NoTransitionPage')
           .hasMatch(routerSource),
@@ -116,4 +127,15 @@ void main() {
       isTrue,
     );
   });
+
+  test('register page redirects pending platform registration to space select',
+      () {
+    final registerSource =
+        File('lib/features/auth/presentation/pages/register_page.dart')
+            .readAsStringSync();
+
+    expect(registerSource, contains('authStateNeedsSpaceSelection(s)'));
+    expect(registerSource, contains('context.go(AppRoutes.tenantSelect)'));
+  });
+
 }

@@ -2,7 +2,7 @@ import type { MessageDictionary } from './zh-CN';
 
 export const zhTW: MessageDictionary = {
   brand: {
-    publicName: '星絡',
+    publicName: '微界',
     publicIdLabel: '{publicName}號',
   },
   app: {

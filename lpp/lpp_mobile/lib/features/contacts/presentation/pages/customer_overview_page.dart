@@ -1206,7 +1206,7 @@ class _AssignCustomerSheet extends StatelessWidget {
                     return _AssignRow(
                       title: staff.displayName,
                       subtitle: staff.lppId?.isNotEmpty == true
-                          ? '星络号：${staff.lppId}'
+                          ? '微界号：${staff.lppId}'
                           : staff.loginName,
                       selected: customer.assignedStaffUserId == staff.userId,
                       onTap: () => onAssign(staff.userId),

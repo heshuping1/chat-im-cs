@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/app/router/router.dart';
 import 'package:lpp_mobile/core/diagnostics/app_error_reporter.dart';
+import 'package:lpp_mobile/core/branding/app_brand.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/providers/font_size_provider.dart';
 import 'package:lpp_mobile/app/theme/theme.dart';
@@ -190,7 +191,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       ref.watch(gatewayProvider);
     }
     return MaterialApp.router(
-      title: '星络',
+      title: AppBrand.publicName,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,

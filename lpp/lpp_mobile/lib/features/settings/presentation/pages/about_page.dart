@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lpp_mobile/core/branding/app_brand_assets.dart';
+import 'package:lpp_mobile/core/branding/startlink_brand_logo.dart';
 import 'package:lpp_mobile/core/widgets/setting_tile.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
 
@@ -21,17 +21,9 @@ class AboutPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 48),
             child: Column(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    AppBrandAssets.appIcon,
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
-                  ),
-                ),
+                const StartlinkBrandLogo(dimension: 80),
                 const SizedBox(height: 16),
-                const Text('星络',
+                const Text('微界',
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -79,7 +71,7 @@ class AboutPage extends StatelessWidget {
           const Center(
             child: Column(
               children: [
-                Text('© 2026 星络科技有限公司',
+                Text('© 2026 微界科技有限公司',
                     style: TextStyle(fontSize: 12, color: Color(0xFFAEAEB2))),
                 SizedBox(height: 4),
                 Text('保留所有权利',

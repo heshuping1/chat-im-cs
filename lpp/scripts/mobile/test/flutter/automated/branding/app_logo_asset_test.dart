@@ -19,7 +19,7 @@ void main() {
       expect(_sha256(mobileLogo), _sha256(pcLogo));
     });
 
-    test('pubspec and branded screens use the shared logo asset', () {
+    test('pubspec and branded screens use the final brand logo asset', () {
       final mobileRoot = Directory.current;
       final pubspec = File(
         '${mobileRoot.path}/pubspec.yaml',
@@ -27,15 +27,21 @@ void main() {
       final loginPage = File(
         '${mobileRoot.path}/lib/features/auth/presentation/pages/login_page.dart',
       ).readAsStringSync();
+      final brandLogo = File(
+        '${mobileRoot.path}/lib/core/branding/startlink_brand_logo.dart',
+      ).readAsStringSync();
       final aboutPage = File(
         '${mobileRoot.path}/lib/features/settings/presentation/pages/about_page.dart',
       ).readAsStringSync();
 
       expect(pubspec, contains('assets/brand/app_icon.png'));
-      expect(loginPage, contains('Image.asset'));
-      expect(loginPage, contains('AppBrandAssets.appIcon'));
-      expect(aboutPage, contains('Image.asset'));
-      expect(aboutPage, contains('AppBrandAssets.appIcon'));
+      expect(pubspec, contains('assets/brand/brand_logo_icon.png'));
+      expect(loginPage, contains('StartlinkBrandLogo'));
+      expect(brandLogo, contains('Image.asset'));
+      expect(brandLogo, contains('AppBrandAssets.brandLogoIcon'));
+      expect(aboutPage, contains('StartlinkBrandLogo'));
+      expect(aboutPage, contains("dimension: 80"));
+      expect(aboutPage, isNot(contains('AppBrandAssets.appIcon')));
     });
 
     test('android launcher icon uses adaptive resources for vendor launchers', () async {
@@ -73,6 +79,58 @@ void main() {
         _hasTransparentPixels(legacyRoundIcon),
         completion(isFalse),
       );
+    });
+
+    test('native launcher labels use the public Chinese app name', () {
+      final mobileRoot = Directory.current;
+      final manifest = File(
+        '${mobileRoot.path}/android/app/src/main/AndroidManifest.xml',
+      ).readAsStringSync();
+      final androidStrings = File(
+        '${mobileRoot.path}/android/app/src/main/res/values/strings.xml',
+      ).readAsStringSync();
+      final iosInfoPlist = File(
+        '${mobileRoot.path}/ios/Runner/Info.plist',
+      ).readAsStringSync();
+      final appSource = File(
+        '${mobileRoot.path}/lib/app/app.dart',
+      ).readAsStringSync();
+      final appBrandSource = File(
+        '${mobileRoot.path}/lib/core/branding/app_brand.dart',
+      ).readAsStringSync();
+
+      expect(manifest, contains('android:label="@string/app_name"'));
+      expect(androidStrings, contains('<string name="app_name">微界</string>'));
+      expect(iosInfoPlist, contains('<key>CFBundleDisplayName</key>'));
+      expect(iosInfoPlist, contains('<string>微界</string>'));
+      expect(appBrandSource, contains("publicName = '微界'"));
+      expect(appSource, contains('title: AppBrand.publicName'));
+    });
+
+    test('mobile runtime copy does not expose the legacy Chinese brand', () {
+      final mobileRoot = Directory.current;
+      final legacyChineseBrands = [
+        String.fromCharCodes([0x661f, 0x7edc]),
+        String.fromCharCodes([0x661f, 0x7d61]),
+      ];
+      final runtimeRoots = [Directory('${mobileRoot.path}/lib')];
+      final offenders = <String>[];
+
+      for (final root in runtimeRoots) {
+        for (final entity in root.listSync(recursive: true)) {
+          if (entity is! File ||
+              (!entity.path.endsWith('.dart') &&
+                  !entity.path.endsWith('.arb'))) {
+            continue;
+          }
+          final source = entity.readAsStringSync();
+          if (legacyChineseBrands.any(source.contains)) {
+            offenders.add(entity.path.replaceFirst('${mobileRoot.path}/', ''));
+          }
+        }
+      }
+
+      expect(offenders, isEmpty);
     });
   });
 }

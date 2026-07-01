@@ -8,7 +8,7 @@ abstract final class Validators {
   static bool isEmail(String value) =>
       RegExp(r'^[\w.+\-]+@[\w\-]+\.[a-zA-Z]{2,}$').hasMatch(value.trim());
 
-  /// 星络号：字母开头，6-20 位，仅字母/数字/下划线
+  /// 微界号：字母开头，6-20 位，仅字母/数字/下划线
   static bool isZtId(String value) =>
       RegExp(r'^[a-zA-Z][a-zA-Z0-9_]{5,19}$').hasMatch(value.trim());
 

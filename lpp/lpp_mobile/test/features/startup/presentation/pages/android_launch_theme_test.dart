@@ -32,7 +32,7 @@ void main() {
     expect(mainSource, isNot(contains('startActivity(')));
   });
 
-  test('Android 12 system splash is neutral before native loading takes over',
+  test('Android 12 system splash shows a visible brand icon before loading',
       () {
     final styleFiles = [
       File('android/app/src/main/res/values-v31/styles.xml'),
@@ -46,8 +46,8 @@ void main() {
       expect(source, contains('android:windowSplashScreenBackground'));
       expect(source, contains('@color/launch_background'));
       expect(source, contains('android:windowSplashScreenAnimatedIcon'));
-      expect(source, contains('@drawable/splash_transparent_icon'));
-      expect(source, isNot(contains('@drawable/ic_launcher_foreground')));
+      expect(source, contains('@drawable/ic_launcher_foreground'));
+      expect(source, isNot(contains('@drawable/splash_transparent_icon')));
       expect(source, contains('android:windowDisablePreview'));
       expect(source, contains('@drawable/launch_background'));
       expect(source, isNot(contains('postSplashScreenTheme')));
@@ -69,6 +69,25 @@ void main() {
       final launchTheme = _styleBlock(source, 'LaunchTheme');
       expect(launchTheme, contains('android:windowDisablePreview'));
       expect(launchTheme, contains('true'));
+    }
+  });
+
+  test('Android normal theme keeps the native loading artwork before Flutter',
+      () {
+    final styleFiles = [
+      File('android/app/src/main/res/values/styles.xml'),
+      File('android/app/src/main/res/values-night/styles.xml'),
+      File('android/app/src/main/res/values-v31/styles.xml'),
+      File('android/app/src/main/res/values-night-v31/styles.xml'),
+    ];
+
+    for (final styles in styleFiles) {
+      expect(styles.existsSync(), isTrue);
+
+      final source = styles.readAsStringSync();
+      final normalTheme = _styleBlock(source, 'NormalTheme');
+      expect(normalTheme, contains('@drawable/launch_background'));
+      expect(normalTheme, isNot(contains('?android:colorBackground')));
     }
   });
 

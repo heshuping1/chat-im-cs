@@ -180,7 +180,7 @@
   "@navMe": {
     "description": "Bottom nav: Me"
   },
-  "authLoginTitle": "登录星络",
+  "authLoginTitle": "登录微界",
   "@authLoginTitle": {
     "description": "Login page title"
   },
@@ -192,7 +192,7 @@
   "@authTabEmail": {
     "description": "Login tab: email"
   },
-  "authTabLoginName": "星络号",
+  "authTabLoginName": "微界号",
   "@authTabLoginName": {
     "description": "Login tab: lpp id"
   },
@@ -212,7 +212,7 @@
   "@authHintCode": {
     "description": "Code hint"
   },
-  "authHintLoginName": "请输入星络号（lpp_xxxxxxxx）",
+  "authHintLoginName": "请输入微界号（lpp_xxxxxxxx）",
   "@authHintLoginName": {
     "description": "Login name hint"
   },
@@ -277,7 +277,7 @@
   "@authErrorEmptyPassword": {
     "description": "Empty password error"
   },
-  "authErrorEmptyLoginName": "请输入星络号",
+  "authErrorEmptyLoginName": "请输入微界号",
   "@authErrorEmptyLoginName": {
     "description": "Empty login name error"
   },
@@ -1057,11 +1057,11 @@
   "@myLeaveEnterpriseFailed": {
     "description": "Leave enterprise failed"
   },
-  "myLppIdCopied": "星络号已复制",
+  "myLppIdCopied": "微界号已复制",
   "@myLppIdCopied": {
     "description": "StartLink ID copied"
   },
-  "myLppIdLabel": "星络号：{lppId}",
+  "myLppIdLabel": "微界号：{lppId}",
   "@myLppIdLabel": {
     "description": "StartLink ID label",
     "placeholders": {
@@ -1151,7 +1151,7 @@
   "@profileBasicSection": {
     "description": "Basic info section"
   },
-  "profileLppId": "星络号",
+  "profileLppId": "微界号",
   "@profileLppId": {
     "description": "StartLink ID field"
   },
@@ -1203,15 +1203,15 @@
   "@profileSaveFailed": {
     "description": "Save failed"
   },
-  "profileLppIdTitle": "星络号",
+  "profileLppIdTitle": "微界号",
   "@profileLppIdTitle": {
     "description": "StartLink ID page title"
   },
-  "profileLppIdSetOnce": "星络号设置后只能修改一次，请谨慎填写",
+  "profileLppIdSetOnce": "微界号设置后只能修改一次，请谨慎填写",
   "@profileLppIdSetOnce": {
     "description": "StartLink ID set once warning"
   },
-  "profileLppIdChangeFailed": "修改失败（星络号只能修改一次）",
+  "profileLppIdChangeFailed": "修改失败（微界号只能修改一次）",
   "@profileLppIdChangeFailed": {
     "description": "StartLink ID change failed"
   },
@@ -1295,7 +1295,7 @@
   "@settingsChatHistory": {
     "description": "Chat history"
   },
-  "settingsAbout": "关于星络",
+  "settingsAbout": "关于微界",
   "@settingsAbout": {
     "description": "About"
   },
@@ -1635,7 +1635,7 @@
   "@friendAddTitle": {
     "description": "Add friend title"
   },
-  "friendSearchHint": "手机号 / 邮箱 / 星络号",
+  "friendSearchHint": "手机号 / 邮箱 / 微界号",
   "@friendSearchHint": {
     "description": "Friend search hint"
   },
@@ -1699,7 +1699,7 @@
   "@friendSendMessage": {
     "description": "Send message"
   },
-  "friendMatchTypeLppId": "星络号匹配",
+  "friendMatchTypeLppId": "微界号匹配",
   "@friendMatchTypeLppId": {
     "description": "Match by lpp id"
   },
@@ -1771,7 +1771,7 @@
   "@profilePageFriendsOnly": {
     "description": "Profile friends only"
   },
-  "profilePageLppId": "星络号",
+  "profilePageLppId": "微界号",
   "@profilePageLppId": {
     "description": "StartLink ID"
   },
@@ -1795,7 +1795,7 @@
   "@searchTitle": {
     "description": "Search title"
   },
-  "searchHint": "输入完整手机号、邮箱或星络号搜索",
+  "searchHint": "输入完整手机号、邮箱或微界号搜索",
   "@searchHint": {
     "description": "Search hint"
   },
@@ -2079,7 +2079,7 @@
   "@spaceEnterEnterprise": {
     "description": "Enter enterprise space"
   },
-  "aboutTitle": "关于星络",
+  "aboutTitle": "关于微界",
   "@aboutTitle": {
     "description": "About title"
   },
@@ -2379,7 +2379,7 @@
   "@privacySearchableByMobile": {
     "description": "Searchable by mobile"
   },
-  "privacySearchableByLppId": "允许通过星络号搜索",
+  "privacySearchableByLppId": "允许通过微界号搜索",
   "@privacySearchableByLppId": {
     "description": "Searchable by lpp id"
   },
@@ -2667,11 +2667,11 @@
   "@addFriendTitle": {
     "description": "Add friend page title"
   },
-  "addFriendSearchHint": "手机号 / 邮箱 / 星络号",
+  "addFriendSearchHint": "手机号 / 邮箱 / 微界号",
   "@addFriendSearchHint": {
     "description": "Add friend search hint"
   },
-  "addFriendLppIdLabel": "星络号：{lppId}",
+  "addFriendLppIdLabel": "微界号：{lppId}",
   "@addFriendLppIdLabel": {
     "description": "StartLink ID label in search result",
     "placeholders": {

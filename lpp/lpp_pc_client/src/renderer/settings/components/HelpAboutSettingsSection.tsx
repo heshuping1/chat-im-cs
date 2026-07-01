@@ -34,50 +34,16 @@ interface LegalPart {
   key: string;
 }
 
-const legalContent: Record<Exclude<LegalPanel, null>, { titleKey: string; parts: LegalPart[] }> = {
+const legacyLegalPartCount = 17;
+
+const legalContent: Record<Exclude<LegalPanel, null>, { titleKey: string; zhCNPartCount: number }> = {
   terms: {
     titleKey: "settings.helpAbout.legal.terms.title",
-    parts: [
-      { kind: "title", key: "settings.helpAbout.legal.terms.parts.0" },
-      { kind: "meta", key: "settings.helpAbout.legal.terms.parts.1" },
-      { kind: "meta", key: "settings.helpAbout.legal.terms.parts.2" },
-      { kind: "body", key: "settings.helpAbout.legal.terms.parts.3" },
-      { kind: "section", key: "settings.helpAbout.legal.terms.parts.4" },
-      { kind: "body", key: "settings.helpAbout.legal.terms.parts.5" },
-      { kind: "section", key: "settings.helpAbout.legal.terms.parts.6" },
-      { kind: "body", key: "settings.helpAbout.legal.terms.parts.7" },
-      { kind: "section", key: "settings.helpAbout.legal.terms.parts.8" },
-      { kind: "body", key: "settings.helpAbout.legal.terms.parts.9" },
-      { kind: "section", key: "settings.helpAbout.legal.terms.parts.10" },
-      { kind: "body", key: "settings.helpAbout.legal.terms.parts.11" },
-      { kind: "section", key: "settings.helpAbout.legal.terms.parts.12" },
-      { kind: "body", key: "settings.helpAbout.legal.terms.parts.13" },
-      { kind: "section", key: "settings.helpAbout.legal.terms.parts.14" },
-      { kind: "body", key: "settings.helpAbout.legal.terms.parts.15" },
-      { kind: "footer", key: "settings.helpAbout.legal.terms.parts.16" },
-    ],
+    zhCNPartCount: 49,
   },
   privacy: {
     titleKey: "settings.helpAbout.legal.privacy.title",
-    parts: [
-      { kind: "title", key: "settings.helpAbout.legal.privacy.parts.0" },
-      { kind: "meta", key: "settings.helpAbout.legal.privacy.parts.1" },
-      { kind: "meta", key: "settings.helpAbout.legal.privacy.parts.2" },
-      { kind: "body", key: "settings.helpAbout.legal.privacy.parts.3" },
-      { kind: "section", key: "settings.helpAbout.legal.privacy.parts.4" },
-      { kind: "body", key: "settings.helpAbout.legal.privacy.parts.5" },
-      { kind: "section", key: "settings.helpAbout.legal.privacy.parts.6" },
-      { kind: "body", key: "settings.helpAbout.legal.privacy.parts.7" },
-      { kind: "section", key: "settings.helpAbout.legal.privacy.parts.8" },
-      { kind: "body", key: "settings.helpAbout.legal.privacy.parts.9" },
-      { kind: "section", key: "settings.helpAbout.legal.privacy.parts.10" },
-      { kind: "body", key: "settings.helpAbout.legal.privacy.parts.11" },
-      { kind: "section", key: "settings.helpAbout.legal.privacy.parts.12" },
-      { kind: "body", key: "settings.helpAbout.legal.privacy.parts.13" },
-      { kind: "section", key: "settings.helpAbout.legal.privacy.parts.14" },
-      { kind: "body", key: "settings.helpAbout.legal.privacy.parts.15" },
-      { kind: "footer", key: "settings.helpAbout.legal.privacy.parts.16" },
-    ],
+    zhCNPartCount: 82,
   },
 };
 
@@ -88,7 +54,7 @@ export function HelpAboutSettingsSection({
   authSession: AuthSession | null;
   setNotice: (notice: string) => void;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [version, setVersion] = useState("0.1.0");
   const [legalPanel, setLegalPanel] = useState<LegalPanel>(null);
   const [feedbackType, setFeedbackType] = useState("bug");
@@ -205,6 +171,7 @@ export function HelpAboutSettingsSection({
 
   if (currentLegal) {
     const currentLegalTitle = t(currentLegal.titleKey);
+    const partCount = locale === "zh-CN" ? currentLegal.zhCNPartCount : legacyLegalPartCount;
     return (
       <section className="settings-about-layout settings-about-legal-view" aria-label={currentLegalTitle}>
         <header className="settings-about-legal-head">
@@ -215,9 +182,11 @@ export function HelpAboutSettingsSection({
           <strong>{currentLegalTitle}</strong>
         </header>
         <div className="settings-legal-copy">
-          {currentLegal.parts.map((part, index) => (
-            <LegalCopyPart key={`${part.kind}-${index}`} part={part} t={t} />
-          ))}
+          {Array.from({ length: partCount }, (_, index) => {
+            const key = `settings.helpAbout.legal.${legalPanel}.parts.${index}`;
+            const text = t(key);
+            return <LegalCopyPart key={key} part={{ kind: resolveLegalPartKind(index, text), key }} t={t} />;
+          })}
         </div>
       </section>
     );
@@ -358,6 +327,14 @@ function LegalCopyPart({ part, t }: { part: LegalPart; t: Translate }) {
   if (part.kind === "meta") return <em>{text}</em>;
   if (part.kind === "footer") return <small>{text}</small>;
   return <p>{text}</p>;
+}
+
+function resolveLegalPartKind(index: number, text: string): LegalPartKind {
+  if (index === 0) return "title";
+  if (/^(更新日期|最近更新日期|生效日期|协议生效日期)：/.test(text)) return "meta";
+  if (/^[一二三四五六七八九十]+、/.test(text)) return "section";
+  if (/^©\s?\d{4}/.test(text)) return "footer";
+  return "body";
 }
 
 export async function checkClientUpdate() {
