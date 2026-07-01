@@ -286,6 +286,15 @@ class _FakePendingRepository implements ChatRepository {
   }
 
   @override
+  Future<ScheduledMessage> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<void> markRead(
     String conversationId,
     bool isGroup,

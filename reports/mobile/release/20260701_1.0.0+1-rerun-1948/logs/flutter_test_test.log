@@ -1,0 +1,183 @@
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 67.0.0 (104.0.0 available)
+  analyzer 6.4.1 (14.0.0 available)
+  analyzer_plugin 0.11.3 (0.14.13 available)
+  audio_session 0.1.25 (0.2.4 available)
+  audioplayers 6.6.0 (6.8.1 available)
+  audioplayers_android 5.2.1 (5.3.0 available)
+  audioplayers_darwin 6.4.0 (6.5.0 available)
+  audioplayers_linux 4.2.1 (4.3.0 available)
+  audioplayers_platform_interface 7.1.1 (7.2.0 available)
+  audioplayers_web 5.2.0 (5.3.0 available)
+  audioplayers_windows 4.3.0 (4.4.1 available)
+  build 2.4.1 (4.0.6 available)
+  build_config 1.1.2 (1.3.0 available)
+  build_resolvers 2.4.2 (3.0.4 available)
+  build_runner 2.4.13 (2.15.0 available)
+  build_runner_core 7.3.2 (9.3.2 available)
+  camera_android_camerax 0.7.2 (0.7.2+1 available)
+  camera_web 0.3.5+3 (0.3.5+4 available)
+  code_assets 1.1.0 (1.2.1 available)
+  connectivity_plus 6.1.5 (7.2.0 available)
+  cross_file 0.3.5+2 (0.3.5+3 available)
+  custom_lint_core 0.6.3 (0.8.2 available)
+  dart_style 2.3.6 (3.1.9 available)
+  dbus 0.7.12 (0.7.14 available)
+  dio 5.9.2 (5.10.0 available)
+  dio_web_adapter 2.1.2 (2.2.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_local_notifications 21.0.0 (22.0.1 available)
+  flutter_local_notifications_linux 8.0.0 (8.0.1 available)
+  flutter_local_notifications_platform_interface 11.0.0 (12.0.0 available)
+  flutter_local_notifications_windows 3.0.0 (3.1.1 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  flutter_riverpod 2.6.1 (3.3.2 available)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 1.4.1 (1.5.2 available)
+  freezed 2.5.2 (3.2.5 available)
+  freezed_annotation 2.4.4 (3.1.0 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_android 5.0.2 (5.0.3 available)
+  geolocator_apple 2.3.13 (2.3.14 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  geolocator_platform_interface 4.2.6 (4.2.8 available)
+  geolocator_web 4.1.3 (4.1.4 available)
+  go_router 13.2.5 (17.3.0 available)
+  hooks 2.0.0 (2.0.2 available)
+  image_picker_android 0.8.13+17 (0.8.13+19 available)
+  intl 0.20.2 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  json_annotation 4.9.0 (4.12.0 available)
+  json_serializable 6.8.0 (6.14.0 available)
+  just_audio 0.9.46 (0.10.6 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.17.0 (1.18.3 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.0 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  protobuf 3.1.0 (6.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record 5.2.1 (7.1.1 available)
+  record_android 1.5.1 (2.1.2 available)
+! record_linux 1.3.0 (overridden) (2.1.0 available)
+  record_platform_interface 1.5.0 (2.1.0 available)
+  record_web 1.3.0 (2.1.1 available)
+  record_windows 1.0.7 (2.2.0 available)
+  retrofit_generator 8.2.1 (10.2.7 available)
+  riverpod 2.6.1 (3.3.2 available)
+  riverpod_analyzer_utils 0.5.1 (0.5.10 available)
+  riverpod_annotation 2.6.1 (4.0.3 available)
+  riverpod_generator 2.4.0 (4.0.4 available)
+  shelf_web_socket 2.0.1 (3.0.0 available)
+  source_gen 1.5.0 (4.2.3 available)
+  source_helper 1.3.5 (1.3.12 available)
+  sqflite 2.4.2+1 (2.4.3 available)
+  sqflite_android 2.4.2+3 (2.4.3 available)
+  sqflite_common 2.5.8 (2.5.11 available)
+  sqflite_darwin 2.4.2 (2.4.3+1 available)
+  sqflite_platform_interface 2.4.0 (2.4.1 available)
+  sse_channel 0.1.1 (0.2.2 available)
+  synchronized 3.4.0+1 (3.4.1 available)
+  test_api 0.7.10 (0.7.13 available)
+  timezone 0.11.0 (0.11.1 available)
+  url_launcher_android 6.3.30 (6.3.32 available)
+  vector_graphics_compiler 1.2.3 (1.2.6 available)
+  vector_math 2.2.0 (2.4.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+97 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/push_notification_service_test.dart
+00:00 +0: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/android_launcher_badge_bridge_test.dart: Android launcher badge bridge supports Oplus com.android.launcher
+00:00 +1: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/push_notification_service_test.dart: PushNotificationService gateway local notifications allows process-alive message notifications on Android
+00:00 +2: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/push_notification_service_test.dart: PushNotificationService gateway local notifications allows process-alive message notifications on desktop
+00:00 +3: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/push_notification_service_test.dart: PushNotificationService mobile registration does not register when native push token is unavailable
+[PushNotification] skip remote push device registration: mobile native push adapter is disabled or unavailable
+00:00 +4: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/push_notification_service_test.dart: PushNotificationService mobile registration registers OPPO token with a stable device id
+00:00 +5: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/mobile_push_token_provider_test.dart: disabled provider does not request a native push token
+00:00 +6: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/mobile_push_token_provider_test.dart: returns JPush token from native channel when enabled
+00:00 +7: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/mobile_push_token_provider_test.dart: returns OPPO token from native channel when enabled
+00:00 +8: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/app_icon_badge_service_test.dart: AppIconBadgeService normalizes launcher badge counts for platform limits
+00:00 +9: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/widgets/network_status_banner_test.dart: network status banner does not show a floating gateway status banner while online
+00:00 +10: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/widgets/network_status_banner_test.dart: network status banner keeps offline network warning as a global banner
+00:00 +11: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/app_icon_badge_service_test.dart: AppIconBadgeService sets positive unread count and clears zero count
+00:00 +12: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/app_icon_badge_service_test.dart: AppIconBadgeService does nothing when launcher badge is unsupported
+00:00 +13: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/core/notifications/app_icon_badge_service_test.dart: AndroidLauncherBadgeFallback updates Android launcher badge through platform channel
+00:00 +14: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service role capabilities keeps staff on reception APIs and admins on readonly management
+00:01 +15: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service role capabilities does not grant customer or unknown roles service capabilities
+00:01 +16: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service role capabilities prefers numeric membership role over stale role labels
+00:01 +17: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service role capabilities falls back to role label when membership role is unavailable
+00:01 +18: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service action permissions requires claim before staff can reply to queued threads
+00:01 +19: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service action permissions requires takeover before staff can reply to AI threads
+00:01 +20: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service action permissions allows staff to reply transfer close and silent recall only when open
+00:01 +21: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service action permissions keeps admin monitor readonly even when a thread is open
+00:01 +22: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_role_capabilities_test.dart: customer service action permissions hides active staff actions for readonly threads
+00:01 +23: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_realtime_models_test.dart: silent recall removes messages while normal recall marks recalled
+00:01 +24: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_realtime_models_test.dart: typing preview ignores staff drafts and expires after ttl
+00:01 +25: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_realtime_models_test.dart: transfer targets exclude current staff and non-service members
+00:01 +26: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_monitor_wall_test.dart: monitor layout capacity trims and deduplicates watched threads
+00:01 +27: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_monitor_wall_test.dart: monitor layout capacity trims and deduplicates watched threads
+00:01 +28: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_monitor_wall_test.dart: monitor layout capacity trims and deduplicates watched threads
+00:01 +29: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_monitor_wall_test.dart: select watched thread replaces focused slot when wall is full
+00:01 +30: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/customer_service/domain/customer_service_monitor_wall_test.dart: filter monitor threads by staff status and thread type
+00:01 +31: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/domain/services/message_read_receipt_service_test.dart: marks only own direct server messages up to peer read seq
+00:01 +32: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/domain/services/message_read_receipt_service_test.dart: marks only own direct server messages up to peer read seq
+00:01 +33: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/domain/services/message_read_receipt_service_test.dart: allows group receipt entry only for own usable group messages
+00:01 +34: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/domain/services/message_read_receipt_service_test.dart: detects pending direct read receipts for sent own messages only
+00:01 +35: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/presentation/pages/customer_service_ended_notice_test.dart: customer service ended notice reserves bottom safe area
+00:01 +36: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/presentation/pages/customer_service_ended_notice_test.dart: customer service ended notice explains history retention and refreshes
+00:01 +37: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/presentation/pages/home_title_status_test.dart: home title gateway status shows message label without count when connected and count is zero
+00:01 +38: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/presentation/pages/home_title_status_test.dart: home title gateway status shows message label with count when connected and count is positive
+00:01 +39: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/presentation/pages/home_title_status_test.dart: home title gateway status shows connecting title while initial gateway connection is starting
+00:01 +40: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/presentation/pages/home_title_status_test.dart: home title gateway status shows connecting title while gateway is reconnecting
+00:01 +41: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/chat/presentation/pages/home_title_status_test.dart: home title gateway status keeps message count title while gateway is disconnected
+00:02 +42: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: defaults to email registration with optional join entry
+00:02 +43: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: defaults to email registration with optional join entry
+00:02 +44: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: defaults to email registration with optional join entry
+00:02 +45: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: defaults to email registration with optional join entry
+00:02 +46: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: defaults to email registration with optional join entry
+00:02 +47: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: defaults to email registration with optional join entry
+00:02 +48: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: defaults to email registration with optional join entry
+00:02 +49: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +50: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +51: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +52: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +53: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +54: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +55: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +56: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id login option from login page
+00:03 +57: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/register_page_test.dart: previews invitation code from optional join section
+00:03 +58: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +59: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +60: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +61: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +62: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +63: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +64: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +65: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +66: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +67: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: hides weijie id quick login accounts
+00:03 +68: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/ios_launch_screen_test.dart: iOS launch fallback artwork stays aligned with the primary artwork
+00:03 +69: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/auth/presentation/pages/login_page_test.dart: register entry has a comfortable tap target
+00:03 +70: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: startup loading view presents the public brand loading artwork
+00:04 +71: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: startup loading view presents the public brand loading artwork
+00:04 +72: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: startup loading view presents the public brand loading artwork
+00:04 +73: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: startup loading view presents the public brand loading artwork
+00:04 +74: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: startup loading view presents the public brand loading artwork
+00:04 +75: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: startup loading view presents the public brand loading artwork
+00:04 +76: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: startup loading artwork is no longer the legacy StarLink bitmap
+00:04 +77: /Users/treesoft/Downloads/lpp-flutte/lpp/lpp_mobile/test/features/startup/presentation/pages/startup_gate_page_test.dart: Android native launch artwork matches the Flutter loading artwork
+00:04 +78: All tests passed!

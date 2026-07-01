@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-const SystemUiOverlayStyle appEdgeToEdgeOverlayStyle = SystemUiOverlayStyle(
+const SystemUiOverlayStyle appSystemUiOverlayStyle = SystemUiOverlayStyle(
   statusBarColor: Colors.transparent,
   statusBarIconBrightness: Brightness.dark,
   statusBarBrightness: Brightness.light,
-  systemNavigationBarColor: Colors.transparent,
+  systemNavigationBarColor: Color(0xFFF7F8FA),
   systemNavigationBarIconBrightness: Brightness.dark,
-  systemNavigationBarContrastEnforced: false,
+  systemNavigationBarContrastEnforced: true,
 );
 
 const SystemUiOverlayStyle startupFullScreenOverlayStyle = SystemUiOverlayStyle(
@@ -28,6 +28,12 @@ Future<void> configureStartupSystemUi() async {
 }
 
 Future<void> configureAppSystemUi() async {
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(appEdgeToEdgeOverlayStyle);
+  await SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.manual,
+    overlays: const [
+      SystemUiOverlay.top,
+      SystemUiOverlay.bottom,
+    ],
+  );
+  SystemChrome.setSystemUIOverlayStyle(appSystemUiOverlayStyle);
 }

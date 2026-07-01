@@ -25,23 +25,24 @@ void main() {
     expect(_directReadReceiptMark(), findsNothing);
   });
 
-  testWidgets('direct self messages use PC-style read receipt after peer reads', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        MessageBubble(
-          message: _message(isReadByPeer: true),
-          isSelf: true,
-          showTimestamp: false,
+  testWidgets(
+    'direct self messages use PC-style read receipt after peer reads',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MessageBubble(
+            message: _message(isReadByPeer: true),
+            isSelf: true,
+            showTimestamp: false,
+          ),
         ),
-      ),
-    );
+      );
 
-    expect(find.byIcon(Icons.done), findsNothing);
-    expect(find.byIcon(Icons.done_all), findsNothing);
-    expect(_directReadReceiptMark(), findsOneWidget);
-  });
+      expect(find.byIcon(Icons.done), findsNothing);
+      expect(find.byIcon(Icons.done_all), findsNothing);
+      expect(_directReadReceiptMark(), findsOneWidget);
+    },
+  );
 
   testWidgets('group self messages show PC-style pie receipt entry', (
     tester,
@@ -63,6 +64,7 @@ void main() {
     expect(find.byIcon(Icons.done), findsNothing);
     expect(find.byIcon(Icons.done_all), findsNothing);
     expect(_groupReadReceiptMark(), findsOneWidget);
+    expect(_groupReadReceiptRatio(), greaterThan(0));
     expect(find.textContaining('已读'), findsNothing);
     expect(find.textContaining('未读'), findsNothing);
 
@@ -74,7 +76,7 @@ void main() {
     expect(tapped, isTrue);
   });
 
-  testWidgets('group self messages show pie receipt entry when count is zero', (
+  testWidgets('group self messages hide pie receipt entry when count is zero', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -89,82 +91,88 @@ void main() {
       ),
     );
 
-    expect(_groupReadReceiptMark(), findsOneWidget);
-    expect(find.text('未读'), findsNothing);
-    expect(find.textContaining('已读'), findsNothing);
-  });
-
-  testWidgets('group read receipt entry is hidden when message seq is unknown', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        MessageBubble(
-          message: _message(readCount: 3, conversationSeq: 0),
-          isSelf: true,
-          groupId: 'group-1',
-          showTimestamp: false,
-          onGroupReadReceiptTap: () {},
-        ),
-      ),
-    );
-
     expect(_groupReadReceiptMark(), findsNothing);
     expect(
       find.byKey(const ValueKey('message-group-read-receipt-entry')),
       findsNothing,
     );
-  });
-
-  testWidgets('group read receipt entry is hidden for peer and unsent messages', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(
-        Column(
-          children: [
-            MessageBubble(
-              message: _message(readCount: 3),
-              isSelf: false,
-              groupId: 'group-1',
-              showTimestamp: false,
-              onGroupReadReceiptTap: () {},
-            ),
-            MessageBubble(
-              message: _message(status: MessageStatus.sending, readCount: 3),
-              isSelf: true,
-              groupId: 'group-1',
-              showTimestamp: false,
-              onGroupReadReceiptTap: () {},
-            ),
-            MessageBubble(
-              message: _message(status: MessageStatus.failed, readCount: 3),
-              isSelf: true,
-              groupId: 'group-1',
-              showTimestamp: false,
-              onGroupReadReceiptTap: () {},
-            ),
-            MessageBubble(
-              message: _message(readCount: 3),
-              isSelf: true,
-              showTimestamp: false,
-              onGroupReadReceiptTap: () {},
-            ),
-            MessageBubble(
-              message: _message(readCount: 3, isRecalled: true),
-              isSelf: true,
-              groupId: 'group-1',
-              showTimestamp: false,
-              onGroupReadReceiptTap: () {},
-            ),
-          ],
-        ),
-      ),
-    );
-
-    expect(find.textContaining('已读'), findsNothing);
     expect(find.text('未读'), findsNothing);
+    expect(find.textContaining('已读'), findsNothing);
   });
+
+  testWidgets(
+    'group read receipt entry is hidden when message seq is unknown',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MessageBubble(
+            message: _message(readCount: 3, conversationSeq: 0),
+            isSelf: true,
+            groupId: 'group-1',
+            showTimestamp: false,
+            onGroupReadReceiptTap: () {},
+          ),
+        ),
+      );
+
+      expect(_groupReadReceiptMark(), findsNothing);
+      expect(
+        find.byKey(const ValueKey('message-group-read-receipt-entry')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'group read receipt entry is hidden for peer and unsent messages',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          Column(
+            children: [
+              MessageBubble(
+                message: _message(readCount: 3),
+                isSelf: false,
+                groupId: 'group-1',
+                showTimestamp: false,
+                onGroupReadReceiptTap: () {},
+              ),
+              MessageBubble(
+                message: _message(status: MessageStatus.sending, readCount: 3),
+                isSelf: true,
+                groupId: 'group-1',
+                showTimestamp: false,
+                onGroupReadReceiptTap: () {},
+              ),
+              MessageBubble(
+                message: _message(status: MessageStatus.failed, readCount: 3),
+                isSelf: true,
+                groupId: 'group-1',
+                showTimestamp: false,
+                onGroupReadReceiptTap: () {},
+              ),
+              MessageBubble(
+                message: _message(readCount: 3),
+                isSelf: true,
+                showTimestamp: false,
+                onGroupReadReceiptTap: () {},
+              ),
+              MessageBubble(
+                message: _message(readCount: 3, isRecalled: true),
+                isSelf: true,
+                groupId: 'group-1',
+                showTimestamp: false,
+                onGroupReadReceiptTap: () {},
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.textContaining('已读'), findsNothing);
+      expect(find.text('未读'), findsNothing);
+    },
+  );
 
   testWidgets('local media sending avoids immediate progress spinner', (
     tester,
@@ -676,8 +684,8 @@ Finder _directReadReceiptMark() {
     (widget) =>
         widget is CustomPaint &&
         widget.painter.runtimeType.toString().contains(
-              'DirectReadReceiptPainter',
-            ),
+          'DirectReadReceiptPainter',
+        ),
   );
 }
 
@@ -686,9 +694,15 @@ Finder _groupReadReceiptMark() {
     (widget) =>
         widget is CustomPaint &&
         widget.painter.runtimeType.toString().contains(
-              'GroupReadReceiptPainter',
-            ),
+          'GroupReadReceiptPainter',
+        ),
   );
+}
+
+double _groupReadReceiptRatio() {
+  final widget =
+      _groupReadReceiptMark().evaluate().single.widget as CustomPaint;
+  return (widget.painter as dynamic).ratio as double;
 }
 
 Widget _wrap(Widget child) {

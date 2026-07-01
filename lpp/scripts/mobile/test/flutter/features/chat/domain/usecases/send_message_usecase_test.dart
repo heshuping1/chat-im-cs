@@ -239,7 +239,7 @@ void main() {
   });
 
   test(
-    'defers local video optimistic insert until send is confirmed',
+    'keeps local video visible with upload progress until send is confirmed',
     () async {
       repository.uploadProgressEvents = const [
         MediaUploadProgressEvent(loaded: 512, total: 1024),
@@ -266,13 +266,17 @@ void main() {
       expect(sent.status, MessageStatus.sent);
       expect(sent.localUploadState, isNull);
       expect(optimisticMessages, hasLength(1));
-      expect(optimisticMessages.single.status, MessageStatus.sent);
+      expect(optimisticMessages.single.status, MessageStatus.sending);
+      expect(optimisticMessages.single.body.video?.url, '/tmp/local-video.mp4');
       expect(optimisticMessages.single.localUploadState, isNull);
       expect(
-        updates
-            .map((message) => message.localUploadState)
-            .whereType<MessageLocalUploadState>(),
-        isEmpty,
+        updates.map((message) => message.localUploadState?.status).toList(),
+        containsAllInOrder([
+          MessageLocalUploadStatus.uploading,
+          MessageLocalUploadStatus.uploading,
+          MessageLocalUploadStatus.sending,
+          null,
+        ]),
       );
     },
   );
@@ -315,6 +319,7 @@ class _FakeChatRepository implements ChatRepository {
   @override
   Future<MediaResource> uploadMedia(
     String filePath, {
+    String? mediaKind,
     MediaUploadProgressCallback? onProgress,
   }) async {
     for (final event in uploadProgressEvents) {
@@ -378,4 +383,13 @@ class _FakeChatRepository implements ChatRepository {
 
   @override
   Future<void> cancelScheduledMessage(String scheduledMessageId) async {}
+
+  @override
+  Future<ScheduledMessage> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  }) {
+    throw UnimplementedError('Scheduled messages are not used in this fake.');
+  }
 }

@@ -55,6 +55,29 @@ void main() {
     expect(token?.region, 'CN');
   });
 
+  test('ignores a native token returned for a different provider', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'isAvailable') return true;
+      if (call.method == 'requestToken') {
+        return {
+          'provider': 'oppo',
+          'token': 'wrong-provider-token',
+          'region': 'CN',
+        };
+      }
+      return null;
+    });
+    const provider = MethodChannelMobilePushTokenProvider(
+      enabled: true,
+      provider: MobilePushProvider.jpush,
+      channel: channel,
+    );
+
+    expect(await provider.requestToken(), isNull);
+  });
+
   test('returns OPPO token from native channel when enabled', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     final calls = <String>[];

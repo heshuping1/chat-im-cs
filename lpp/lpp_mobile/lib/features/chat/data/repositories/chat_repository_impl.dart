@@ -1,3 +1,5 @@
+import 'package:lpp_mobile/core/diagnostics/app_diagnostics.dart';
+import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
@@ -7,6 +9,8 @@ import 'package:lpp_mobile/features/chat/domain/entities/read_receipt.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 import 'package:lpp_mobile/features/chat/domain/repositories/chat_repository.dart';
 import 'package:lpp_mobile/features/chat/domain/usecases/filter_conversations.dart';
+
+const _initialConversationRetryDelay = Duration(milliseconds: 250);
 
 class ChatRepositoryImpl implements ChatRepository, DirectReadStatusReader {
   final ChatRemoteDataSource _remote;
@@ -30,28 +34,89 @@ class ChatRepositoryImpl implements ChatRepository, DirectReadStatusReader {
     int limit = 50,
   }) async {
     try {
-      final page = await _remote.getConversations(cursor: cursor, limit: limit);
-      final visibleItems = await _homeConversations(
-        await _preserveLocalSelfReadState(page.items),
+      return await _fetchRemoteConversationSnapshot(
+        cursor: cursor,
+        limit: limit,
       );
-      if (cursor == null) {
-        await _local.cacheConversations(spaceId, visibleItems);
-      }
-      return ConversationsPage(
-          items: visibleItems, nextCursor: page.nextCursor);
-    } catch (_) {
+    } catch (firstError, firstStack) {
       final cached = await _local.getCachedConversations(spaceId);
       if (cached != null) {
         return ConversationsPage(items: await _homeConversations(cached));
       }
-      rethrow;
+      if (cursor == null &&
+          _shouldRetryInitialConversationSnapshot(firstError)) {
+        try {
+          await Future<void>.delayed(_initialConversationRetryDelay);
+          return await _fetchRemoteConversationSnapshot(limit: limit);
+        } catch (_) {
+          // Keep the original error: it is the first visible failure for the
+          // user flow and usually carries the clearest network cause.
+        }
+      }
+      Error.throwWithStackTrace(firstError, firstStack);
     }
+  }
+
+  Future<ConversationsPage> _fetchRemoteConversationSnapshot({
+    String? cursor,
+    int limit = 50,
+  }) async {
+    final page = await _remote.getConversations(cursor: cursor, limit: limit);
+    final visibleItems = await _homeConversations(
+      await _preserveLocalSelfReadState(page.items),
+    );
+    if (cursor == null) {
+      await _cacheFirstPageConversationsBestEffort(visibleItems);
+    }
+    return ConversationsPage(items: visibleItems, nextCursor: page.nextCursor);
+  }
+
+  Future<void> _cacheFirstPageConversationsBestEffort(
+    List<Conversation> conversations,
+  ) async {
+    if (conversations.isEmpty) return;
+    try {
+      await _local.cacheConversations(spaceId, conversations);
+    } catch (error) {
+      AppDiagnostics.instance.warning(
+        'chat.conversations.cache',
+        'conversation cache write failed after remote snapshot',
+        context: {
+          'spaceId': spaceId,
+          'conversationCount': conversations.length,
+          'error': error.toString(),
+        },
+      );
+    }
+  }
+
+  bool _shouldRetryInitialConversationSnapshot(Object error) {
+    if (error is NetworkError) return true;
+    if (error is ServerError) {
+      final statusCode = error.statusCode;
+      return statusCode == 408 ||
+          statusCode == 429 ||
+          (statusCode != null && statusCode >= 500);
+    }
+    return false;
   }
 
   /// 读取本地缓存（立即返回，不阻塞）
   Future<List<Conversation>?> getCachedConversations() async {
-    final cached = await _local.getConversations(spaceId);
-    return _homeConversations(cached);
+    try {
+      final cached = await _local.getConversations(spaceId);
+      return _homeConversations(cached);
+    } catch (error) {
+      AppDiagnostics.instance.warning(
+        'chat.conversations.cache',
+        'conversation cache read failed before remote snapshot',
+        context: {
+          'spaceId': spaceId,
+          'error': error.toString(),
+        },
+      );
+      return null;
+    }
   }
 
   /// 后台静默同步：拉取最新数据并 upsert 缓存，返回最新列表
@@ -384,6 +449,20 @@ class ChatRepositoryImpl implements ChatRepository, DirectReadStatusReader {
   @override
   Future<void> cancelScheduledMessage(String scheduledMessageId) =>
       _remote.cancelScheduledMessage(scheduledMessageId);
+
+  @override
+  Future<ScheduledMessage> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  }) async {
+    final dto = await _remote.updateScheduledMessage(
+      scheduledMessageId: scheduledMessageId,
+      body: body,
+      scheduledAt: scheduledAt,
+    );
+    return dto.toDomain();
+  }
 
   @override
   Future<MediaResource> uploadMedia(

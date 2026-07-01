@@ -124,8 +124,8 @@ class MessageBubble extends ConsumerWidget {
       showGroupReadReceipt: showGroupReadReceipt,
       onTap: onGroupReadReceiptTap,
     );
-    final showStatusSlot =
-        showGroupReceipt || _shouldShowExternalStatusIndicator(message, groupId);
+    final showStatusSlot = showGroupReceipt ||
+        _shouldShowExternalStatusIndicator(message, groupId);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -199,6 +199,7 @@ class MessageBubble extends ConsumerWidget {
                     if (isSelf && showStatusSlot) ...[
                       if (showGroupReceipt)
                         _GroupReadReceiptEntry(
+                          readCount: message.readCount,
                           onTap: onGroupReadReceiptTap!,
                         )
                       else
@@ -420,6 +421,7 @@ bool _shouldShowGroupReadReceipt(
 }) {
   return showGroupReadReceipt &&
       onTap != null &&
+      message.readCount > 0 &&
       const MessageReadReceiptService().canShowGroupReadReceipt(
         message,
         isSelf: isSelf,
@@ -428,9 +430,11 @@ bool _shouldShowGroupReadReceipt(
 }
 
 class _GroupReadReceiptEntry extends StatelessWidget {
+  final int readCount;
   final VoidCallback onTap;
 
   const _GroupReadReceiptEntry({
+    required this.readCount,
     required this.onTap,
   });
 
@@ -447,7 +451,7 @@ class _GroupReadReceiptEntry extends StatelessWidget {
           width: 16,
           height: 16,
           alignment: Alignment.center,
-          child: const _GroupReadReceiptMark(),
+          child: _GroupReadReceiptMark(readCount: readCount),
         ),
       ),
     );
@@ -468,15 +472,18 @@ class _DirectReadReceiptMark extends StatelessWidget {
 }
 
 class _GroupReadReceiptMark extends StatelessWidget {
-  const _GroupReadReceiptMark();
+  final int readCount;
+
+  const _GroupReadReceiptMark({required this.readCount});
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    final ratio = readCount > 0 ? 0.42 : 0.0;
+    return SizedBox(
       width: 14,
       height: 14,
       child: CustomPaint(
-        painter: _GroupReadReceiptPainter(ratio: 0.42),
+        painter: _GroupReadReceiptPainter(ratio: ratio),
       ),
     );
   }

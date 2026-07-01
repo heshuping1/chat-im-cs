@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:lpp_mobile/core/database/app_database.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_search_index.dart';
 import 'package:lpp_mobile/features/chat/data/models/message_model.dart';
@@ -858,9 +859,14 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     final columns = await db.rawQuery('PRAGMA table_info($tableName)');
     final exists = columns.any((row) => row['name'] == columnName);
     if (!exists) {
-      await db.execute(
-        'ALTER TABLE $tableName ADD COLUMN $columnName $definition',
-      );
+      try {
+        await db.execute(
+          'ALTER TABLE $tableName ADD COLUMN $columnName $definition',
+        );
+      } catch (error) {
+        if (isDuplicateColumnSqliteError(error, columnName)) return;
+        rethrow;
+      }
     }
   }
 
@@ -874,4 +880,12 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
     await _ensureColumn(db, 'conversations', 'last_message_direction', 'TEXT');
     await _ensureColumn(db, 'conversations', 'last_message_mentions', 'TEXT');
   }
+}
+
+@visibleForTesting
+bool isDuplicateColumnSqliteError(Object error, String columnName) {
+  final message = error.toString().toLowerCase();
+  final normalizedColumn = columnName.toLowerCase();
+  return message.contains('duplicate column name') &&
+      message.contains(normalizedColumn);
 }

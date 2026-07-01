@@ -272,8 +272,7 @@ void _handleEvent(
   } else if (event is SpaceNoticeEvent) {
     // 跨空间未读通知：刷新空间列表；如果是当前空间，同时刷新消息会话，
     // 保证空间切换页和消息页用同一套普通 IM 未读口径校正。
-    ref.invalidate(spaceUnreadSummaryProvider);
-    ref.invalidate(spacesProvider);
+    requestSpaceUnreadSummaryRefresh(ref);
     final currentSpace = ref.read(currentSpaceProvider);
     if (currentSpace != null &&
         _spaceNoticeTargetsCurrentSpace(event, currentSpace.spaceId)) {

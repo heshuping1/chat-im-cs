@@ -55,7 +55,7 @@ void main() {
       expect(await storage.readAccessToken('personal'), isNull);
     });
 
-    test('platform registration rejects lpp id identifiers', () async {
+    test('platform registration accepts weijie id identifiers', () async {
       final storage = _MemorySecureStorage();
       final adapter = _LppIdPlatformLoginAdapter();
       final dio = Dio(BaseOptions(baseUrl: 'https://test.local'))
@@ -72,30 +72,26 @@ void main() {
         container.dispose();
       });
 
-      await expectLater(
-        container
-            .read(authProvider.notifier)
-            .registerPlatform(
-              displayName: '微界号用户',
-              password: '123123123',
-              loginType: 'lpp_id',
-              loginName: 'wj0701163730',
-            ),
-        throwsA(
-          isA<ServerError>()
-              .having(
-                (error) => error.code,
-                'code',
-                'AUTH_REGISTER_IDENTIFIER_UNSUPPORTED',
-              )
-              .having(
-                (error) => error.message,
-                'message',
-                '注册暂不支持微界号，请使用邮箱或手机号注册',
-              ),
-        ),
+      await container
+          .read(authProvider.notifier)
+          .registerPlatform(
+            displayName: '微界号用户',
+            password: '123123123',
+            loginType: 'login_name',
+            loginName: 'wj0701163730',
+          );
+
+      expect(adapter.paths, ['/api/platform/v1/auth/register']);
+      expect(adapter.platformRegisterBody['loginType'], 'login_name');
+      expect(adapter.platformRegisterBody['loginName'], 'wj0701163730');
+      expect(
+        container.read(authProvider).valueOrNull?.status,
+        AuthStatus.unauthenticated,
       );
-      expect(adapter.paths, isEmpty);
+      expect(
+        await storage.read(SecureStorageService.platformTokenKey),
+        'platform-token',
+      );
     });
 
     test(

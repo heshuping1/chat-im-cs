@@ -606,4 +606,13 @@ class _FakeChatRepository implements ChatRepository {
 
   @override
   Future<void> cancelScheduledMessage(String scheduledMessageId) async {}
+
+  @override
+  Future<ScheduledMessage> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  }) {
+    throw UnimplementedError('Scheduled messages are not used in this fake.');
+  }
 }

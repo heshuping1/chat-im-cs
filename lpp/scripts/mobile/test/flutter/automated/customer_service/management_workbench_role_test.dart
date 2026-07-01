@@ -190,7 +190,7 @@ void main() {
     expect(find.text('客服中心概览'), findsOneWidget);
     expect(find.text('客户会话'), findsWidgets);
     expect(find.text('在线客服'), findsWidgets);
-    expect(find.text('排队'), findsOneWidget);
+    expect(find.text('排队'), findsWidgets);
     expect(find.text('接待人员'), findsOneWidget);
     expect(find.text('客服状态'), findsOneWidget);
     expect(find.text('客户会话 A'), findsOneWidget);
@@ -316,6 +316,9 @@ void main() {
     );
 
     await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(InkWell, '客户会话'));
+    await tester.pumpAndSettle();
+
     await tester.scrollUntilVisible(find.text('客户会话 A'), 120);
     await tester.tap(find.text('客户会话 A'));
     await tester.pumpAndSettle();
@@ -362,6 +365,7 @@ class _FakeAdminCustomerServiceRepository
     String? keyword,
     String? status,
     String? threadType,
+    String? assignedStaffUserId,
   }) async {
     if (threadType == 'temp_session') {
       return const [

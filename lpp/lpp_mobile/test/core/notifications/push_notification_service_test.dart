@@ -53,7 +53,7 @@ void main() {
       expect(registrar.registrations, isEmpty);
     });
 
-    test('registers OPPO token with a stable device id', () async {
+    test('registers JPush token with a stable device id', () async {
       final registrar = _FakePushDeviceRegistrar();
       final storage = _MemorySecureStorage();
       final service = PushNotificationService(
@@ -61,8 +61,8 @@ void main() {
         storage: storage,
         mobilePushTokenProvider: const _StaticMobilePushTokenProvider(
           MobilePushToken(
-            channel: PushChannel.oppo,
-            token: 'oppo-token',
+            channel: PushChannel.jpush,
+            token: 'jpush-registration-id',
             region: 'CN',
           ),
         ),
@@ -74,8 +74,8 @@ void main() {
       final registration = registrar.registrations.single;
       expect(registration.deviceId, isNotEmpty);
       expect(registration.platform, PushPlatform.android);
-      expect(registration.channel, PushChannel.oppo);
-      expect(registration.token, 'oppo-token');
+      expect(registration.channel, PushChannel.jpush);
+      expect(registration.token, 'jpush-registration-id');
       expect(registration.region, 'CN');
       expect(await storage.read('push_device_id'), registration.deviceId);
     });

@@ -12,9 +12,11 @@ import 'package:lpp_mobile/core/widgets/app_toast.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/asr_service.dart';
 import 'package:lpp_mobile/features/chat/domain/services/chat_draft_hydration_policy.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_composer.dart';
+import 'package:lpp_mobile/features/chat/domain/services/scheduled_message_time_policy.dart';
 import 'package:lpp_mobile/features/chat/presentation/pages/chat_camera_capture_page.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/emoji_picker_panel.dart';
@@ -49,6 +51,12 @@ class ChatTextSendRequest {
   });
 }
 
+typedef ScheduledTextUpdateCallback = FutureOr<bool> Function({
+  required String scheduledMessageId,
+  required String text,
+  required DateTime scheduledAt,
+});
+
 class ChatInputToolbar extends ConsumerStatefulWidget {
   final String conversationId;
   final bool isGroup;
@@ -67,6 +75,11 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
   final FutureOr<bool> Function(ChatTextSendRequest request)? onSendTextRequest;
   final FutureOr<bool> Function(String text, DateTime scheduledAt)?
       onScheduleText;
+  final DateTime? scheduledSendAt;
+  final ValueChanged<DateTime?>? onScheduledSendAtChanged;
+  final ScheduledMessage? scheduledMessageForEdit;
+  final ScheduledTextUpdateCallback? onUpdateScheduledText;
+  final VoidCallback? onCancelScheduledEdit;
   final Function(String filePath, int duration) onSendVoice;
   final FutureOr<void> Function(List<ChatPickedMedia> media) onSendMedia;
   final FutureOr<void> Function(
@@ -98,6 +111,11 @@ class ChatInputToolbar extends ConsumerStatefulWidget {
     required this.onSendText,
     this.onSendTextRequest,
     this.onScheduleText,
+    this.scheduledSendAt,
+    this.onScheduledSendAtChanged,
+    this.scheduledMessageForEdit,
+    this.onUpdateScheduledText,
+    this.onCancelScheduledEdit,
     required this.onSendVoice,
     required this.onSendMedia,
     this.onSendFile,
@@ -138,13 +156,22 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
 
   bool get _isMutedForUser => widget.isMuted && !widget.canSpeak;
 
+  bool get _isEditingScheduledMessage => widget.scheduledMessageForEdit != null;
+
   @override
   void initState() {
     super.initState();
     _galleryPicker = widget.galleryPicker ?? ImagePickerChatGalleryPicker();
     // 恢复草稿
-    if (widget.initialDraft != null && widget.initialDraft!.isNotEmpty) {
+    final editMessage = widget.scheduledMessageForEdit;
+    if (editMessage != null) {
+      _hydrateDraft(editMessage.body.text?.trim() ?? '');
+      _scheduledSendAt = editMessage.scheduledAt.toLocal();
+      _hasLocalInputInteraction = true;
+    } else if (widget.initialDraft != null && widget.initialDraft!.isNotEmpty) {
       _hydrateDraft(widget.initialDraft!);
+    } else if (widget.scheduledSendAt != null) {
+      _scheduledSendAt = widget.scheduledSendAt;
     }
   }
 
@@ -157,9 +184,37 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
       _draftTimer?.cancel();
       _textController.clear();
       _mentionDraft = const MentionComposerDraft.empty();
+      _setScheduledSendAt(null, notify: true, rebuild: false);
       _hasLocalInputInteraction = false;
       _wasClearedBySend = false;
       _lastMentionPromptTextLength = null;
+    }
+
+    final editMessage = widget.scheduledMessageForEdit;
+    final oldEditMessage = oldWidget.scheduledMessageForEdit;
+    if (editMessage?.scheduledMessageId != oldEditMessage?.scheduledMessageId) {
+      if (editMessage != null) {
+        _hydrateDraft(editMessage.body.text?.trim() ?? '');
+        _scheduledSendAt = editMessage.scheduledAt.toLocal();
+        _hasLocalInputInteraction = true;
+        _wasClearedBySend = false;
+        _mode = _InputMode.text;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _focusNode.requestFocus();
+          unawaited(
+            SystemChannels.textInput.invokeMethod<void>('TextInput.show'),
+          );
+        });
+      } else if (oldEditMessage != null) {
+        _setScheduledSendAt(null, notify: false, rebuild: false);
+      }
+    }
+
+    if (editMessage == null &&
+        widget.scheduledSendAt != oldWidget.scheduledSendAt &&
+        widget.scheduledSendAt != _scheduledSendAt) {
+      _setScheduledSendAt(widget.scheduledSendAt, notify: false, rebuild: false);
     }
 
     final nextDraft = widget.initialDraft;
@@ -252,18 +307,32 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
     _draftTimer?.cancel();
     _keepTextInputFocusedAfterSend();
     try {
+      final editingMessage = widget.scheduledMessageForEdit;
       final sent = scheduledAt == null
           ? await Future.sync(
               () =>
                   widget.onSendTextRequest?.call(request) ??
                   widget.onSendText(text),
             ).then((value) => value).catchError((_) => false)
-          : await Future.sync(
-              () => widget.onScheduleText?.call(text, scheduledAt) ?? false,
-            ).then((value) => value).catchError((_) => false);
+          : editingMessage != null
+              ? await Future.sync(
+                  () =>
+                      widget.onUpdateScheduledText?.call(
+                        scheduledMessageId: editingMessage.scheduledMessageId,
+                        text: text,
+                        scheduledAt: scheduledAt,
+                      ) ??
+                      false,
+                ).then((value) => value).catchError((_) => false)
+              : await Future.sync(
+                  () => widget.onScheduleText?.call(text, scheduledAt) ?? false,
+                ).then((value) => value).catchError((_) => false);
       if (sent) {
         if (scheduledAt != null && mounted) {
-          setState(() => _scheduledSendAt = null);
+          _setScheduledSendAt(null);
+        }
+        if (editingMessage != null) {
+          widget.onCancelScheduledEdit?.call();
         }
         await _saveDraft('');
       } else {
@@ -296,13 +365,25 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
       builder: (_) => const _ScheduledMessageTimeSheet(),
     );
     if (selected == null || !mounted) return;
-    setState(() => _scheduledSendAt = selected);
+    _setScheduledSendAt(selected);
     _setMode(_InputMode.text);
     _focusNode.requestFocus();
   }
 
-  void _clearScheduledSendAt() {
-    setState(() => _scheduledSendAt = null);
+  void _setScheduledSendAt(
+    DateTime? value, {
+    bool notify = true,
+    bool rebuild = true,
+  }) {
+    if (_scheduledSendAt == value) return;
+    if (rebuild && mounted) {
+      setState(() => _scheduledSendAt = value);
+    } else {
+      _scheduledSendAt = value;
+    }
+    if (notify && !_isEditingScheduledMessage) {
+      widget.onScheduledSendAtChanged?.call(value);
+    }
   }
 
   bool _isPlainEnter(KeyEvent event) {
@@ -676,14 +757,6 @@ class _ChatInputToolbarState extends ConsumerState<ChatInputToolbar> {
               ],
             ),
           ),
-          if (_scheduledSendAt != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-              child: _ScheduledSendBanner(
-                scheduledAt: _scheduledSendAt!,
-                onClear: _clearScheduledSendAt,
-              ),
-            ),
           AnimatedSize(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeInOut,
@@ -1027,60 +1100,6 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
-class _ScheduledSendBanner extends StatelessWidget {
-  final DateTime scheduledAt;
-  final VoidCallback onClear;
-
-  const _ScheduledSendBanner({
-    required this.scheduledAt,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.only(left: 12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Text(
-            '发送时间：',
-            style: TextStyle(
-              fontSize: 14,
-              color: colorScheme.onSurface.withValues(alpha: 0.62),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              _formatScheduledSendAt(scheduledAt),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF2F6FED),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            onPressed: onClear,
-            icon: Icon(
-              Icons.close_rounded,
-              color: colorScheme.onSurface.withValues(alpha: 0.42),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ScheduledMessageTimeSheet extends StatefulWidget {
   const _ScheduledMessageTimeSheet();
 
@@ -1091,6 +1110,7 @@ class _ScheduledMessageTimeSheet extends StatefulWidget {
 
 class _ScheduledMessageTimeSheetState
     extends State<_ScheduledMessageTimeSheet> {
+  static const _timePolicy = ScheduledMessageTimePolicy();
   late final List<DateTime> _dates;
   late int _selectedDateIndex;
   late int _selectedHour;
@@ -1100,9 +1120,7 @@ class _ScheduledMessageTimeSheetState
   void initState() {
     super.initState();
     final now = DateTime.now();
-    final nextHour = now.add(const Duration(hours: 1));
-    final defaultTime =
-        DateTime(nextHour.year, nextHour.month, nextHour.day, nextHour.hour);
+    final defaultTime = _timePolicy.defaultScheduledAt(now);
     _dates = List.generate(
       14,
       (index) =>
@@ -1124,9 +1142,7 @@ class _ScheduledMessageTimeSheetState
     );
   }
 
-  bool get _isValid => _selectedAt.isAfter(
-        DateTime.now().add(const Duration(minutes: 1)),
-      );
+  bool get _isValid => _timePolicy.canScheduleAt(_selectedAt, DateTime.now());
 
   @override
   Widget build(BuildContext context) {
@@ -1275,12 +1291,6 @@ class _ScheduledMessageTimeSheetState
       ),
     );
   }
-}
-
-String _formatScheduledSendAt(DateTime dateTime) {
-  final minute = dateTime.minute.toString().padLeft(2, '0');
-  return '${dateTime.month}月${dateTime.day}日（${_weekdayText(dateTime)}） '
-      '${dateTime.hour.toString().padLeft(2, '0')}:$minute';
 }
 
 String _formatSchedulePickerDate(DateTime date) {

@@ -21,4 +21,27 @@ class ScheduledMessage {
     this.status = 0,
     this.failureReason,
   });
+
+  bool get canEdit => status == ScheduledMessageStatus.pending.code;
+
+  bool get canCancel => status == ScheduledMessageStatus.pending.code;
+}
+
+enum ScheduledMessageStatus {
+  pending(0),
+  sent(1),
+  canceled(2),
+  failed(3),
+  delivering(4);
+
+  final int code;
+
+  const ScheduledMessageStatus(this.code);
+
+  static ScheduledMessageStatus? fromCode(int code) {
+    for (final status in ScheduledMessageStatus.values) {
+      if (status.code == code) return status;
+    }
+    return null;
+  }
 }

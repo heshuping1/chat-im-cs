@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/asr_service.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/chat_picked_media.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
@@ -403,6 +405,7 @@ void main() {
   ) async {
     String? scheduledText;
     DateTime? scheduledAt;
+    DateTime? selectedScheduledAt;
 
     await tester.pumpWidget(
       _wrap(
@@ -414,6 +417,9 @@ void main() {
             scheduledText = text;
             scheduledAt = time;
             return true;
+          },
+          onScheduledSendAtChanged: (time) {
+            selectedScheduledAt = time;
           },
           onSendVoice: (_, __) {},
           onSendMedia: (_) {},
@@ -431,7 +437,9 @@ void main() {
 
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('发送时间：'), findsOneWidget);
+    expect(selectedScheduledAt, isNotNull);
+    expect(find.textContaining('发送时间：'), findsNothing);
+    expect(find.textContaining('将定时发送'), findsNothing);
 
     await tester.showKeyboard(find.byType(TextField));
     await tester.enterText(find.byType(TextField), '  明天提醒  ');
@@ -446,6 +454,116 @@ void main() {
     expect(scheduledAt, isNotNull);
     expect(scheduledAt!.isAfter(DateTime.now()), isTrue);
   });
+
+  testWidgets('scheduled send time clears after creating a scheduled task', (
+    tester,
+  ) async {
+    final scheduledTexts = <String>[];
+    final scheduledTimes = <DateTime>[];
+    final normalTexts = <String>[];
+    DateTime? selectedScheduledAt;
+
+    await tester.pumpWidget(
+      _wrap(
+        ChatInputToolbar(
+          conversationId: 'chat-1',
+          isGroup: false,
+          onSendText: (text) async {
+            normalTexts.add(text);
+            return true;
+          },
+          onScheduleText: (text, time) async {
+            scheduledTexts.add(text);
+            scheduledTimes.add(time);
+            return true;
+          },
+          onScheduledSendAtChanged: (time) {
+            selectedScheduledAt = time;
+          },
+          onSendVoice: (_, __) {},
+          onSendMedia: (_) {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.byIcon(Icons.add_circle_outline_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('定时消息'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(selectedScheduledAt, isNotNull);
+    expect(find.textContaining('发送时间：'), findsNothing);
+
+    await tester.showKeyboard(find.byType(TextField));
+    await tester.enterText(find.byType(TextField), '第一条');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(selectedScheduledAt, isNull);
+    expect(find.textContaining('发送时间：'), findsNothing);
+    expect(scheduledTexts, ['第一条']);
+    expect(scheduledTimes, hasLength(1));
+    expect(normalTexts, isEmpty);
+  });
+
+  testWidgets(
+    'editing scheduled message hydrates input and updates existing task',
+    (tester) async {
+      String? updatedText;
+      DateTime? updatedAt;
+      var createCalls = 0;
+
+      final scheduledAt = DateTime.now().add(const Duration(hours: 2));
+
+      await tester.pumpWidget(
+        _wrap(
+          ChatInputToolbar(
+            conversationId: 'chat-1',
+            isGroup: false,
+            scheduledMessageForEdit: ScheduledMessage(
+              scheduledMessageId: 'scheduled-1',
+              conversationId: 'chat-1',
+              isGroup: false,
+              type: MessageType.text,
+              body: const MessageBody(text: '原来的定时内容'),
+              scheduledAt: scheduledAt,
+            ),
+            onSendText: (_) async => true,
+            onScheduleText: (_, __) async {
+              createCalls++;
+              return true;
+            },
+            onUpdateScheduledText:
+                ({
+                  required scheduledMessageId,
+                  required text,
+                  required scheduledAt,
+                }) async {
+                  updatedText = text;
+                  updatedAt = scheduledAt;
+                  return true;
+                },
+            onCancelScheduledEdit: () {},
+            onSendVoice: (_, __) {},
+            onSendMedia: (_) {},
+          ),
+        ),
+      );
+
+      expect(find.text('原来的定时内容'), findsOneWidget);
+      expect(find.textContaining('正在编辑定时消息'), findsNothing);
+
+      await tester.showKeyboard(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), '改后的内容');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+
+      expect(updatedText, '改后的内容');
+      expect(updatedAt, scheduledAt);
+      expect(createCalls, 0);
+    },
+  );
 
   testWidgets(
     'group mention picker opens again after deleting and retyping @',

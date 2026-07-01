@@ -121,7 +121,7 @@ class _HomePageState extends ConsumerState<HomePage>
     ref.watch(gatewayProvider);
 
     return AnnotatedRegion(
-      value: appEdgeToEdgeOverlayStyle,
+      value: appSystemUiOverlayStyle,
       child: Scaffold(
         backgroundColor: _homeBackground(context),
         body: Stack(

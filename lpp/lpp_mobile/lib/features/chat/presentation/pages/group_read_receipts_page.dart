@@ -1,30 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
-import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/chat/data/mappers/group_read_receipts_mapper.dart';
+import 'package:lpp_mobile/features/chat/presentation/providers/chat_provider.dart';
 
 // ---------------------------------------------------------------------------
 // 群聊已读回执页
 // GET /api/client/v1/groups/{groupId}/read-receipts
 // ---------------------------------------------------------------------------
 
-final _readReceiptsProvider = FutureProvider.autoDispose
-    .family<GroupReadReceipts,
-        (String groupId, String messageId, int messageSeq)>(
+final _readReceiptsProvider = FutureProvider.autoDispose.family<
+    GroupReadReceipts, (String groupId, String messageId, int messageSeq)>(
   (ref, args) async {
     final dio = ref.read(dioProvider);
-    final currentUserId = ref.watch(currentSpaceProvider)?.userId;
+    final currentSpace = ref.watch(currentSpaceProvider);
+    var currentProfile = ref.watch(currentUserProfileProvider);
+    if (currentProfile == null && currentSpace?.userId.isNotEmpty == true) {
+      await ref.read(profileProvider.notifier).loadProfile();
+      currentProfile = ref.read(currentUserProfileProvider);
+    }
     final resp = await dio.get<Map<String, dynamic>>(
       '/api/client/v1/groups/${args.$1}/read-receipts',
       queryParameters: {'messageId': args.$2},
     );
-    return parseGroupReadReceiptsPayload(
+    final receipts = parseGroupReadReceiptsPayload(
       resp.data?['data'],
-      currentUser: GroupReadReceiptIdentity(userId: currentUserId),
+      currentUser: GroupReadReceiptIdentity(
+        userId: currentProfile?.userId ?? currentSpace?.userId,
+        platformUserId: currentProfile?.platformUserId,
+        lppId: currentProfile?.lppId,
+        displayName: currentProfile?.displayName,
+      ),
       messageSeq: args.$3,
     );
+    final spaceId = currentSpace?.spaceId;
+    if (spaceId != null && spaceId.isNotEmpty) {
+      ref
+          .read(chatProvider((spaceId, args.$1, true)).notifier)
+          .syncGroupReadReceiptSnapshot(
+            messageId: args.$2,
+            messageSeq: args.$3,
+            readCount: receipts.readCount,
+          );
+    }
+    return receipts;
   },
 );
 

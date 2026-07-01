@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/space/space_context.dart';
-import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/pending_message_queue.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
@@ -275,6 +274,39 @@ class ChatNotifier
     });
   }
 
+  void syncGroupReadReceiptSnapshot({
+    required String messageId,
+    required int messageSeq,
+    required int readCount,
+  }) {
+    final (spaceId, conversationId, _) = arg;
+    Message? updatedMessage;
+    state = state.whenData((list) {
+      var changed = false;
+      final next = list.map((message) {
+        final matchesMessageId =
+            messageId.isNotEmpty && message.messageId == messageId;
+        final matchesSeq =
+            messageSeq > 0 && message.conversationSeq == messageSeq;
+        if (!matchesMessageId && !matchesSeq) return message;
+        if (!message.status.isServerUsable || message.conversationSeq <= 0) {
+          return message;
+        }
+        final normalizedReadCount = readCount < 0 ? 0 : readCount;
+        if (message.readCount == normalizedReadCount) return message;
+        changed = true;
+        updatedMessage = message.copyWith(readCount: normalizedReadCount);
+        return updatedMessage!;
+      }).toList(growable: false);
+      return changed ? next : list;
+    });
+
+    final messageToPersist = updatedMessage;
+    if (messageToPersist != null) {
+      _persistMessage(spaceId, conversationId, messageToPersist);
+    }
+  }
+
   /// 追加新消息（WebSocket 收到时调用）
   void appendMessage(Message message) {
     final (spaceId, conversationId, _) = arg;
@@ -363,7 +395,7 @@ class ChatNotifier
   }
 
   /// 对端已读回执：将 seq <= readSeq 且自己发送的消息标记为已读
-  void updatePeerReadSeq(String _peerUserId, int readSeq) {
+  void updatePeerReadSeq(String peerUserId, int readSeq) {
     final myUserId = ref.read(currentSpaceProvider)?.userId ?? '';
     const receiptService = MessageReadReceiptService();
     state = state.whenData(

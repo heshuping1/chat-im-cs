@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:lpp_mobile/app/system_ui.dart';
 import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/platform/local_file.dart';
 import 'package:lpp_mobile/core/widgets/app_network_image.dart';
@@ -67,7 +68,7 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
   @override
   void dispose() {
     _pageController.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    configureAppSystemUi();
     super.dispose();
   }
 

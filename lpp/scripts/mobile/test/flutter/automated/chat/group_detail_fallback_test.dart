@@ -31,5 +31,38 @@ void main() {
         expect(detail.isMuted, isTrue);
       },
     );
+
+    test(
+      'refreshes members when detail count is newer than loaded member list',
+      () {
+        expect(
+          shouldRefreshGroupMembers(
+            canViewMembers: true,
+            isLoading: false,
+            detailMemberCount: 3,
+            loadedMemberCount: 2,
+          ),
+          isTrue,
+        );
+        expect(
+          shouldRefreshGroupMembers(
+            canViewMembers: true,
+            isLoading: false,
+            detailMemberCount: 3,
+            loadedMemberCount: 3,
+          ),
+          isFalse,
+        );
+        expect(
+          shouldRefreshGroupMembers(
+            canViewMembers: false,
+            isLoading: false,
+            detailMemberCount: 3,
+            loadedMemberCount: 2,
+          ),
+          isFalse,
+        );
+      },
+    );
   });
 }

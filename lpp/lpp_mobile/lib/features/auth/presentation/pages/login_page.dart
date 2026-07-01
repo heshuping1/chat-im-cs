@@ -11,6 +11,7 @@ import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/utils/validators.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
+import 'package:lpp_mobile/features/auth/application/login_identifier_cache.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
 import 'package:lpp_mobile/features/settings/presentation/pages/privacy_page.dart';
 import 'package:lpp_mobile/features/settings/presentation/pages/terms_page.dart';
@@ -26,11 +27,11 @@ enum _LoginTab {
   loginName;
 }
 
-const _lastLoginTypeKey = 'auth_last_login_type';
-const _lastLoginIdentifierKey = 'auth_last_login_identifier';
-const _lastLoginIdentifierMobileKey = 'auth_last_login_identifier_mobile';
-const _lastLoginIdentifierEmailKey = 'auth_last_login_identifier_email';
-const _lastLoginIdentifierLppIdKey = 'auth_last_login_identifier_lpp_id';
+const _visibleLoginTabs = <_LoginTab>[
+  _LoginTab.mobile,
+  _LoginTab.email,
+];
+
 const _enableQuickLogin =
     !kReleaseMode || bool.fromEnvironment('ENABLE_QUICK_LOGIN');
 
@@ -367,10 +368,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Future<void> _restoreLastLoginAccount() async {
     try {
       final storage = ref.read(secureStorageProvider);
-      final type = await storage.read(_lastLoginTypeKey);
-      final mobile = await storage.read(_lastLoginIdentifierMobileKey);
-      final email = await storage.read(_lastLoginIdentifierEmailKey);
-      final legacyIdentifier = await storage.read(_lastLoginIdentifierKey);
+      final type = await storage.read(LoginIdentifierCache.lastLoginTypeKey);
+      final mobile =
+          await storage.read(LoginIdentifierCache.lastLoginIdentifierMobileKey);
+      final email =
+          await storage.read(LoginIdentifierCache.lastLoginIdentifierEmailKey);
+      final legacyIdentifier =
+          await storage.read(LoginIdentifierCache.lastLoginIdentifierKey);
       if (!mounted) return;
 
       _rememberedIdentifiers
@@ -406,8 +410,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final storage = ref.read(secureStorageProvider);
       _rememberedIdentifiers[tab] = id;
       _identifierDrafts[tab] = id;
-      await storage.write(_lastLoginTypeKey, _loginTypeForTab(tab));
-      await storage.write(_lastLoginIdentifierKey, id);
+      await storage.write(
+        LoginIdentifierCache.lastLoginTypeKey,
+        _loginTypeForTab(tab),
+      );
+      await storage.write(LoginIdentifierCache.lastLoginIdentifierKey, id);
       await storage.write(_identifierStorageKeyForTab(tab), id);
     } catch (_) {}
   }
@@ -415,11 +422,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   String _identifierStorageKeyForTab(_LoginTab tab) {
     switch (tab) {
       case _LoginTab.mobile:
-        return _lastLoginIdentifierMobileKey;
+        return LoginIdentifierCache.lastLoginIdentifierMobileKey;
       case _LoginTab.email:
-        return _lastLoginIdentifierEmailKey;
+        return LoginIdentifierCache.lastLoginIdentifierEmailKey;
       case _LoginTab.loginName:
-        return _lastLoginIdentifierLppIdKey;
+        return LoginIdentifierCache.lastLoginIdentifierLppIdKey;
     }
   }
 
@@ -443,7 +450,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   void _switchLoginTab(_LoginTab tab) {
-    if (tab == _tab) return;
+    if (tab == _tab || !_visibleLoginTabs.contains(tab)) return;
     _identifierDrafts[_tab] = _identifierCtrl.text;
     setState(() {
       _tab = tab;
@@ -477,7 +484,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return _LoginTab.email;
       case 'lpp_id':
       case 'login_name':
-        return _LoginTab.loginName;
+        return null;
       default:
         return null;
     }
@@ -803,8 +810,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   Future<void> _quickLogin(_QuickLoginAccount account) async {
-    if (!_enableQuickLogin) return;
-    final tab = _loginTabForQuickAccount(account.identifier);
+    if (!_enableQuickLogin || !_visibleLoginTabs.contains(account.tab)) return;
+    final tab = account.tab;
     FocusScope.of(context).unfocus();
     setState(() {
       _tab = tab;
@@ -819,17 +826,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     await _login();
   }
 
-  _LoginTab _loginTabForQuickAccount(String identifier) {
-    return identifier.contains('@') ? _LoginTab.email : _LoginTab.loginName;
-  }
-
   void _openQuickLoginPage() {
     if (!_enableQuickLogin) return;
+    final visibleAccounts = _quickLoginAccounts
+        .where((account) => _visibleLoginTabs.contains(account.tab))
+        .toList(growable: false);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
         builder: (_) => _QuickLoginPage(
-          accounts: _quickLoginAccounts,
+          accounts: visibleAccounts,
           onLogin: _quickLogin,
         ),
       ),
@@ -957,11 +963,21 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text('没有账号？', style: AppTextStyles.caption),
-                      GestureDetector(
-                        onTap: () => context.push('/register'),
-                        child: Text('立即注册',
-                            style: AppTextStyles.caption
-                                .copyWith(color: AppColors.primary)),
+                      TextButton(
+                        onPressed: () => context.push('/register'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          minimumSize: const Size(64, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          '立即注册',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -996,12 +1012,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Tab 栏（3 个）
+  // Tab 栏
   // ---------------------------------------------------------------------------
 
   Widget _buildTabBar() {
     return Row(
-      children: _LoginTab.values.map((tab) {
+      children: _visibleLoginTabs.map((tab) {
         final selected = tab == _tab;
         return Expanded(
           child: GestureDetector(

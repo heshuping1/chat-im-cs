@@ -1,10 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider.dart';
 
 void main() {
   group('space unread summary', () {
-    test('counts only numeric unread bubble conversations', () {
+    test('counts visible IM direct and group unread bubble conversations', () {
       final summary = computeImUnreadSummaryForSpaceBadges(const [
         Conversation(
           conversationId: 'direct-1',
@@ -39,8 +40,8 @@ void main() {
         ),
       ]);
 
-      expect(summary.unreadConversationCount, 1);
-      expect(summary.unreadMessageCount, 2);
+      expect(summary.unreadConversationCount, 2);
+      expect(summary.unreadMessageCount, 5);
     });
 
     test('normalizes negative unread counts to zero', () {
@@ -55,6 +56,28 @@ void main() {
 
       expect(summary.unreadConversationCount, 0);
       expect(summary.unreadMessageCount, 0);
+    });
+
+    test('coalesces repeated gateway refresh requests', () {
+      fakeAsync((async) {
+        var refreshCount = 0;
+        final scheduler = SpaceUnreadSummaryRefreshScheduler(
+          refreshWindow: const Duration(seconds: 2),
+          onRefresh: () => refreshCount += 1,
+        );
+        addTearDown(scheduler.dispose);
+
+        scheduler.requestRefresh();
+        scheduler.requestRefresh();
+        scheduler.requestRefresh();
+        async.elapse(const Duration(milliseconds: 1999));
+
+        expect(refreshCount, 0);
+
+        async.elapse(const Duration(milliseconds: 1));
+
+        expect(refreshCount, 1);
+      });
     });
   });
 }

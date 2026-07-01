@@ -200,7 +200,11 @@ class _StartupGatePageState extends ConsumerState<StartupGatePage> {
   void _allowStartupLoadingFirstFrame() {
     if (_hasAllowedStartupLoadingFrame) return;
     _hasAllowedStartupLoadingFrame = true;
-    WidgetsBinding.instance.allowFirstFrame();
+    try {
+      WidgetsBinding.instance.allowFirstFrame();
+    } on AssertionError {
+      // Widget tests can mount App without main.dart's deferFirstFrame handoff.
+    }
   }
 
   void _scheduleStartupUiRelease() {

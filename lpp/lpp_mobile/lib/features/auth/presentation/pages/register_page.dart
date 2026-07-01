@@ -36,6 +36,8 @@ enum _IdMode { mobile, email }
 
 enum _JoinCredentialKind { tenantCode, invitationCode }
 
+enum _RegisterField { displayName, identifier, password, confirm, code, join }
+
 class _RegisterPageState extends ConsumerState<RegisterPage> {
   _IdMode _idMode = _IdMode.email;
 
@@ -45,6 +47,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _confirmCtrl = TextEditingController();
   final _codeCtrl = TextEditingController(); // 短信/邮件验证码
   final _enterpriseCtrl = TextEditingController(); // 企业码（可选）
+  final _displayNameFocusNode = FocusNode();
+  final _identifierFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _confirmFocusNode = FocusNode();
+  final _codeFocusNode = FocusNode();
   final _enterpriseFocusNode = FocusNode(); // 企业码输入框焦点
 
   bool _showEnterpriseField = false; // 是否展开企业字段
@@ -56,6 +63,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  bool _errorDialogVisible = false;
 
   // 验证码设置
   bool _smsEnabled = true;
@@ -70,6 +78,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   // 发送倒计时
   int _countdown = 0;
   Timer? _countdownTimer;
+  final Map<_RegisterField, String> _fieldErrors = {};
 
   @override
   void initState() {
@@ -85,6 +94,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     _confirmCtrl.dispose();
     _codeCtrl.dispose();
     _enterpriseCtrl.dispose();
+    _displayNameFocusNode.dispose();
+    _identifierFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _confirmFocusNode.dispose();
+    _codeFocusNode.dispose();
     _enterpriseFocusNode.dispose();
     _captchaAnswerCtrl.dispose();
     _countdownTimer?.cancel();
@@ -121,9 +135,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   void _refreshVerificationRequired() {
     if (_settingsData == null) return;
-    final required = _idMode == _IdMode.mobile
-        ? _settingsData!['smsRequired'] as bool? ?? false
-        : _settingsData!['emailRequired'] as bool? ?? false;
+    final required = switch (_idMode) {
+      _IdMode.mobile => _settingsData!['smsRequired'] as bool? ?? false,
+      _IdMode.email => _settingsData!['emailRequired'] as bool? ?? false,
+    };
     setState(() => _verificationRequired = required);
   }
 
@@ -134,13 +149,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (_idMode == _IdMode.mobile) {
       final err = Validators.validateMobile(identifier);
       if (err != null) {
-        _showError(err);
+        _showFieldError(_RegisterField.identifier, err, _identifierFocusNode);
         return;
       }
     } else {
       final err = Validators.validateEmail(identifier);
       if (err != null) {
-        _showError(err);
+        _showFieldError(_RegisterField.identifier, err, _identifierFocusNode);
         return;
       }
     }
@@ -251,6 +266,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   Future<void> _register() async {
     if (!_agreedToTerms || _isLoading) return;
+    _clearAllFieldErrors();
 
     final displayName = _displayNameCtrl.text.trim();
     final identifier = _identifierCtrl.text.trim();
@@ -261,37 +277,59 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     // 基础校验
     if (displayName.isEmpty) {
-      _showError('请输入昵称');
+      _showFieldError(
+        _RegisterField.displayName,
+        '请输入昵称',
+        _displayNameFocusNode,
+      );
       return;
     }
 
     if (identifier.isEmpty) {
-      _showError(_idMode == _IdMode.mobile ? '请输入手机号' : '请输入邮箱');
+      _showFieldError(
+        _RegisterField.identifier,
+        switch (_idMode) {
+          _IdMode.mobile => '请输入手机号',
+          _IdMode.email => '请输入邮箱',
+        },
+        _identifierFocusNode,
+      );
       return;
     }
-    if (_idMode == _IdMode.mobile) {
-      final err = Validators.validateMobile(identifier);
-      if (err != null) {
-        _showError(err);
-        return;
-      }
-    } else {
-      final err = Validators.validateEmail(identifier);
-      if (err != null) {
-        _showError(err);
-        return;
-      }
+    final identifierError = switch (_idMode) {
+      _IdMode.mobile => Validators.validateMobile(identifier),
+      _IdMode.email => Validators.validateEmail(identifier),
+    };
+    if (identifierError != null) {
+      _showFieldError(
+        _RegisterField.identifier,
+        identifierError,
+        _identifierFocusNode,
+      );
+      return;
     }
     if (password.length < 6) {
-      _showError('密码至少6位');
+      _showFieldError(
+        _RegisterField.password,
+        '密码至少6位',
+        _passwordFocusNode,
+      );
       return;
     }
     if (password != confirm) {
-      _showError('两次密码不一致');
+      _showFieldError(
+        _RegisterField.confirm,
+        '两次密码不一致',
+        _confirmFocusNode,
+      );
       return;
     }
     if (_verificationRequired && _codeCtrl.text.trim().isEmpty) {
-      _showError('请先获取并填写验证码');
+      _showFieldError(
+        _RegisterField.code,
+        '请先获取并填写验证码',
+        _codeFocusNode,
+      );
       return;
     }
 
@@ -351,7 +389,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           }
           if (err.code == 'AUTH_VERIFICATION_REQUIRED') {
             setState(() => _verificationRequired = true);
-            msg = '请先获取并填写验证码';
+            _showFieldError(
+              _RegisterField.code,
+              '请先获取并填写验证码',
+              _codeFocusNode,
+            );
+            return;
           } else {
             msg = err.message;
           }
@@ -372,7 +415,50 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (!mounted || _errorDialogVisible) return;
+    _errorDialogVisible = true;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '注册失败',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          msg,
+          style: const TextStyle(fontSize: 15, color: _txtMain, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('知道了', style: TextStyle(color: _primary)),
+          ),
+        ],
+      ),
+    ).whenComplete(() => _errorDialogVisible = false);
+  }
+
+  void _showFieldError(
+    _RegisterField field,
+    String message,
+    FocusNode focusNode,
+  ) {
+    setState(() => _fieldErrors[field] = message);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) focusNode.requestFocus();
+    });
+  }
+
+  void _clearFieldError(_RegisterField field) {
+    if (!_fieldErrors.containsKey(field)) return;
+    setState(() => _fieldErrors.remove(field));
+  }
+
+  void _clearAllFieldErrors() {
+    if (_fieldErrors.isEmpty) return;
+    setState(_fieldErrors.clear);
   }
 
   bool _isInvitationCode(String value) {
@@ -425,7 +511,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           if (e is ServerError) {
             _showError(e.message);
           } else if (e is AuthError) {
-            _showError('微界号或密码错误');
+            _showError('注册失败，请重试');
           } else if (e is NetworkError) {
             _showError(e.message);
           } else {
@@ -457,7 +543,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               const SizedBox(height: 8),
               // 昵称
               _buildLabel('昵称'),
-              _buildInput(controller: _displayNameCtrl, hint: '设置昵称'),
+              _buildInput(
+                controller: _displayNameCtrl,
+                focusNode: _displayNameFocusNode,
+                hint: '设置昵称',
+                errorText: _fieldErrors[_RegisterField.displayName],
+                onChanged: (_) => _clearFieldError(_RegisterField.displayName),
+              ),
               const SizedBox(height: 16),
 
               // 手机/邮箱切换（始终显示）
@@ -472,8 +564,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 _buildLabel('邮箱'),
                 _buildInput(
                   controller: _identifierCtrl,
+                  focusNode: _identifierFocusNode,
                   hint: '请输入邮箱',
                   keyboardType: TextInputType.emailAddress,
+                  errorText: _fieldErrors[_RegisterField.identifier],
+                  onChanged: (_) => _clearFieldError(_RegisterField.identifier),
                 ),
               ],
               const SizedBox(height: 16),
@@ -489,8 +584,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               _buildLabel('密码'),
               _buildInput(
                 controller: _passwordCtrl,
+                focusNode: _passwordFocusNode,
                 hint: '设置密码（至少6位）',
                 obscure: _obscurePassword,
+                errorText: _fieldErrors[_RegisterField.password],
+                onChanged: (_) => _clearFieldError(_RegisterField.password),
                 suffix: _eyeBtn(_obscurePassword,
                     () => setState(() => _obscurePassword = !_obscurePassword)),
               ),
@@ -498,8 +596,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               _buildLabel('确认密码'),
               _buildInput(
                 controller: _confirmCtrl,
+                focusNode: _confirmFocusNode,
                 hint: '再次输入密码',
                 obscure: _obscureConfirm,
+                errorText: _fieldErrors[_RegisterField.confirm],
+                onChanged: (_) => _clearFieldError(_RegisterField.confirm),
                 suffix: _eyeBtn(_obscureConfirm,
                     () => setState(() => _obscureConfirm = !_obscureConfirm)),
               ),
@@ -565,7 +666,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: const Text.rich(TextSpan(
-                    text: '已有微界号？',
+                    text: '已有账户？',
                     style: TextStyle(fontSize: 14, color: _txtGray),
                     children: [
                       TextSpan(
@@ -608,6 +709,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           _idMode = mode;
           _identifierCtrl.clear();
           _codeCtrl.clear();
+          _fieldErrors.remove(_RegisterField.identifier);
+          _fieldErrors.remove(_RegisterField.code);
           _countdown = 0;
           _countdownTimer?.cancel();
         });
@@ -633,37 +736,48 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   // ── 手机号输入（带区号） ───────────────────────────────────────────────────
 
   Widget _buildPhoneInput() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _divider),
-      ),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: const BoxDecoration(
-              border: Border(right: BorderSide(color: _divider))),
-          child: const Text('+86',
-              style: TextStyle(
-                  color: _primary, fontSize: 15, fontWeight: FontWeight.w500)),
-        ),
-        Expanded(
-          child: TextField(
-            controller: _identifierCtrl,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              hintText: '请输入手机号',
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-            ),
+    final errorText = _fieldErrors[_RegisterField.identifier];
+    final hasError = errorText != null && errorText.isNotEmpty;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: hasError ? const Color(0xFFEF4444) : _divider,
           ),
         ),
-      ]),
-    );
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: const BoxDecoration(
+                border: Border(right: BorderSide(color: _divider))),
+            child: const Text('+86',
+                style: TextStyle(
+                    color: _primary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500)),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _identifierCtrl,
+              focusNode: _identifierFocusNode,
+              keyboardType: TextInputType.phone,
+              onChanged: (_) => _clearFieldError(_RegisterField.identifier),
+              decoration: const InputDecoration(
+                hintText: '请输入手机号',
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              ),
+            ),
+          ),
+        ]),
+      ),
+      if (hasError) _buildFieldError(errorText),
+    ]);
   }
 
   // ── 验证码行 ───────────────────────────────────────────────────────────────
@@ -673,8 +787,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       Expanded(
         child: _buildInput(
           controller: _codeCtrl,
+          focusNode: _codeFocusNode,
           hint: '请输入验证码',
           keyboardType: TextInputType.number,
+          errorText: _fieldErrors[_RegisterField.code],
+          onChanged: (_) => _clearFieldError(_RegisterField.code),
         ),
       ),
       const SizedBox(width: 8),
@@ -706,7 +823,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Future<void> _searchEnterprise() async {
     final code = _enterpriseCtrl.text.trim();
     if (code.isEmpty) {
-      _showError('请输入企业码或邀请码');
+      _showFieldError(
+        _RegisterField.join,
+        '请输入企业码或邀请码',
+        _enterpriseFocusNode,
+      );
       return;
     }
     if (_isInvitationCode(code)) {
@@ -875,7 +996,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               controller: _enterpriseCtrl,
               focusNode: _enterpriseFocusNode,
               hint: '请输入企业码或邀请码',
-              onChanged: (_) => _clearJoinLookup(),
+              errorText: _fieldErrors[_RegisterField.join],
+              onChanged: (_) {
+                _clearFieldError(_RegisterField.join);
+                _clearJoinLookup();
+              },
               suffix: _foundJoinKind != null
                   ? const Icon(Icons.check_circle, color: _primary, size: 20)
                   : null,
@@ -960,6 +1085,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     Widget? suffix,
     FocusNode? focusNode,
     ValueChanged<String>? onChanged,
+    String? errorText,
   }) {
     return TextField(
       controller: controller,
@@ -970,6 +1096,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: Color(0xFFBBBBBB), fontSize: 15),
+        errorText: errorText,
+        errorMaxLines: 2,
+        errorStyle: const TextStyle(fontSize: 12, color: Color(0xFFEF4444)),
         suffixIcon: suffix,
         filled: true,
         fillColor: _card,
@@ -984,6 +1113,22 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: const BorderSide(color: _primary, width: 1.5)),
+        errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFEF4444))),
+        focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+      ),
+    );
+  }
+
+  Widget _buildFieldError(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 4),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444)),
       ),
     );
   }

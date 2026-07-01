@@ -41,6 +41,12 @@ abstract class ChatRepository {
 
   Future<void> cancelScheduledMessage(String scheduledMessageId);
 
+  Future<ScheduledMessage> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  });
+
   /// 上传媒体文件
   Future<MediaResource> uploadMedia(
     String filePath, {

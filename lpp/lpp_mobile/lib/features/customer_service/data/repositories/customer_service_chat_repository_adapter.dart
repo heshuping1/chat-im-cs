@@ -116,6 +116,17 @@ class CustomerServiceChatRepositoryAdapter implements ChatRepository {
   }
 
   @override
+  Future<ScheduledMessage> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  }) {
+    throw UnsupportedError(
+      'Customer service adapter does not update scheduled messages.',
+    );
+  }
+
+  @override
   Future<void> recallMessage(String messageId) {
     throw UnsupportedError(
         'Customer service adapter does not recall messages.');

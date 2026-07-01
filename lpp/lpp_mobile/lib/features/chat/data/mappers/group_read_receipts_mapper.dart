@@ -134,11 +134,22 @@ GroupReadReceipts _receiptsFromMembers(
   final readableFallbackUnreadCount = selfMember != null && !selfMember.hasRead
       ? _decrementCount(fallbackUnreadCount)
       : fallbackUnreadCount ?? 0;
-  final readCount =
-      receiptMembers.isEmpty ? readableFallbackReadCount : readMembers.length;
-  final unreadCount = receiptMembers.isEmpty
-      ? readableFallbackUnreadCount
-      : receiptMembers.length - readCount;
+  final membersLookComplete =
+      readableTotal <= 0 || receiptMembers.length >= readableTotal;
+  final shouldUseFallbackCounts = !membersLookComplete &&
+      (fallbackReadCount != null || fallbackUnreadCount != null);
+  final readCount = shouldUseFallbackCounts
+      ? readableFallbackReadCount
+      : receiptMembers.isEmpty
+          ? readableFallbackReadCount
+          : readMembers.length;
+  final unreadCount = shouldUseFallbackCounts
+      ? fallbackUnreadCount != null
+          ? readableFallbackUnreadCount
+          : _clampCount(readableTotal - readCount)
+      : receiptMembers.isEmpty
+          ? readableFallbackUnreadCount
+          : receiptMembers.length - readCount;
   return GroupReadReceipts(
     members: receiptMembers,
     totalMembers: readableTotal,
@@ -263,8 +274,7 @@ bool _isCurrentReceiptMember(
     member.platformUserId,
     member.lppId,
   ]);
-  if (currentIds.isNotEmpty &&
-      memberIds.any((id) => currentIds.contains(id))) {
+  if (currentIds.isNotEmpty && memberIds.any((id) => currentIds.contains(id))) {
     return true;
   }
   final currentName = _normalizeText(currentUser?.displayName);
@@ -281,6 +291,9 @@ String _normalizeText(String? value) {
 }
 
 int _decrementCount(int? value) {
-  final count = value ?? 0;
-  return count > 0 ? count - 1 : 0;
+  return _clampCount((value ?? 0) - 1);
+}
+
+int _clampCount(int value) {
+  return value > 0 ? value : 0;
 }

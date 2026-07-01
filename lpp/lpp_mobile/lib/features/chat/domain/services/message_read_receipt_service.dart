@@ -71,6 +71,25 @@ class MessageReadReceiptService {
         !message.isRecalled;
   }
 
+  List<Message> groupReadReceiptSnapshotTargets(
+    List<Message> messages, {
+    required String currentUserId,
+    int maxTargets = 4,
+  }) {
+    if (maxTargets <= 0) return const [];
+    final targets = <Message>[];
+    for (final message in messages.reversed) {
+      final isSelf =
+          message.isSelf || _sameIdentity(message.senderUserId, currentUserId);
+      if (!canShowGroupReadReceipt(message, isSelf: isSelf, isGroup: true)) {
+        continue;
+      }
+      targets.add(message);
+      if (targets.length >= maxTargets) break;
+    }
+    return targets;
+  }
+
   bool _sameIdentity(String? left, String? right) {
     final a = left?.trim().toLowerCase();
     final b = right?.trim().toLowerCase();

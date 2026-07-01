@@ -145,6 +145,13 @@ abstract class ChatRemoteDataSource {
   /// DELETE /api/client/v1/scheduled-messages/{scheduledMessageId}
   Future<void> cancelScheduledMessage(String scheduledMessageId);
 
+  /// PUT /api/client/v1/scheduled-messages/{scheduledMessageId}
+  Future<ScheduledMessageDto> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  });
+
   /// POST /api/client/v1/media/upload
   Future<MediaResource> uploadMedia(
     String filePath, {
@@ -463,6 +470,31 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
       await _dio.delete<Map<String, dynamic>>(
         '/api/client/v1/scheduled-messages/$scheduledMessageId',
       );
+    } on DioException catch (e) {
+      throw ErrorHandler.fromDioException(e);
+    }
+  }
+
+  @override
+  Future<ScheduledMessageDto> updateScheduledMessage({
+    required String scheduledMessageId,
+    MessageBody? body,
+    DateTime? scheduledAt,
+  }) async {
+    try {
+      final response = await _dio.put<Map<String, dynamic>>(
+        '/api/client/v1/scheduled-messages/$scheduledMessageId',
+        data: {
+          if (body != null) 'body': _messageBodyToRequestJson(body),
+          if (scheduledAt != null)
+            'scheduledAt': scheduledAt.toUtc().toIso8601String(),
+        },
+      );
+      final apiResponse = ApiResponse.fromJson(
+        response.data!,
+        (json) => ScheduledMessageDto.fromJson(json as Map<String, dynamic>),
+      );
+      return apiResponse.getDataOrThrow();
     } on DioException catch (e) {
       throw ErrorHandler.fromDioException(e);
     }

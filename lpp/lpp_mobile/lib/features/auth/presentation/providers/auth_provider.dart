@@ -12,6 +12,7 @@ import 'package:lpp_mobile/core/space/space_context.dart';
 import 'package:lpp_mobile/core/storage/secure_storage.dart';
 import 'package:lpp_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:lpp_mobile/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:lpp_mobile/features/auth/application/login_identifier_cache.dart';
 import 'package:lpp_mobile/features/auth/domain/entities/auth_entities.dart';
 import 'package:lpp_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
@@ -501,7 +502,6 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   }) async {
     state = const AsyncLoading();
     try {
-      _ensureRegistrationIdentifierSupported(loginType, loginName);
       final dio = ref.read(dioProvider);
       final regResp = await dio.post<Map<String, dynamic>>(
         '/api/platform/v1/auth/register',
@@ -648,7 +648,6 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   }) async {
     state = const AsyncLoading();
     try {
-      _ensureRegistrationIdentifierSupported(loginType, loginName);
       final dio = ref.read(dioProvider);
 
       // Step1: 企业注册（X-Tenant-Id 传 tenantId 或 tenantCode 均可，服务端按优先级处理）
@@ -707,20 +706,6 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
-    }
-  }
-
-  void _ensureRegistrationIdentifierSupported(
-    String loginType,
-    String? loginName,
-  ) {
-    final type = loginType.trim().toLowerCase();
-    final hasLoginName = loginName != null && loginName.trim().isNotEmpty;
-    if (type == 'lpp_id' || type == 'login_name' || hasLoginName) {
-      throw const ServerError(
-        code: 'AUTH_REGISTER_IDENTIFIER_UNSUPPORTED',
-        message: '注册暂不支持微界号，请使用邮箱或手机号注册',
-      );
     }
   }
 
@@ -916,30 +901,25 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   // ---------------------------------------------------------------------------
 
   Future<void> logout() async {
+    final stopwatch = Stopwatch()..start();
+
     // 停止定时刷新
     TokenRefreshService.instance.stop();
 
-    await ref.read(pushNotificationServiceProvider).unregisterCurrentDevice();
+    final pushNotificationService = ref.read(pushNotificationServiceProvider);
+    unawaited(pushNotificationService.unregisterCurrentDevice());
 
-    try {
-      await _repo.logout();
-    } catch (_) {}
+    unawaited(_repo.logout().catchError((_) {}));
 
     // 退出前保存当前空间 ID，下次登录时恢复
     final spaceId = await _storage.read(SecureStorageService.activeSpaceIdKey);
     if (spaceId != null) {
       await _storage.write(SecureStorageService.lastActiveSpaceIdKey, spaceId);
       await _storage.clearTokens(spaceId);
-      await _storage.clearAdminTokens(spaceId);
-      // 退出登录时删除该空间的 SQLite 数据库文件
-      await AppDatabase.delete(spaceId);
-    }
-    final knownTenantIds = await _storage.readKnownTenantIds();
-    for (final tenantId in knownTenantIds) {
-      await _storage.clearAdminTokens(tenantId);
     }
     await _storage.delete(SecureStorageService.platformTokenKey);
     await _storage.delete(SecureStorageService.activeSpaceIdKey);
+    await LoginIdentifierCache.clear(_storage);
 
     ref.read(currentSpaceProvider.notifier).clearSpace();
 
@@ -952,6 +932,48 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     state = const AsyncData(
       AuthState(status: AuthStatus.unauthenticated),
     );
+
+    if (kDebugMode) {
+      debugPrint(
+        '[AuthLogout] foreground logout completed in '
+        '${stopwatch.elapsedMilliseconds}ms',
+      );
+    }
+
+    _runPostLogoutCleanup(spaceId);
+  }
+
+  void _runPostLogoutCleanup(String? spaceId) {
+    final storage = _storage;
+
+    unawaited(Future<void>(() async {
+      final stopwatch = Stopwatch()..start();
+      try {
+        if (spaceId != null) {
+          await storage.clearAdminTokens(spaceId);
+          await AppDatabase.delete(spaceId);
+        }
+
+        final knownTenantIds = await storage.readKnownTenantIds();
+        for (final tenantId in knownTenantIds) {
+          if (tenantId == spaceId) continue;
+          await storage.clearAdminTokens(tenantId);
+        }
+
+        if (kDebugMode) {
+          debugPrint(
+            '[AuthLogout] background cleanup completed in '
+            '${stopwatch.elapsedMilliseconds}ms',
+          );
+        }
+      } catch (error, stackTrace) {
+        if (kDebugMode) {
+          debugPrint(
+            '[AuthLogout] background cleanup failed: $error\n$stackTrace',
+          );
+        }
+      }
+    }));
   }
 
   // ---------------------------------------------------------------------------

@@ -84,21 +84,53 @@ void main() {
 
       expect(violations, isEmpty);
     });
+
+    test('keeps platform space unread summary behind its provider owner', () {
+      final source = File(
+        'lib/features/space/presentation/providers/spaces_provider.dart',
+      ).readAsStringSync();
+      final loadSpacesBody = RegExp(
+        r'Future<List<Space>> _loadSpaces\([^)]*\) async \{([\s\S]*?)\n  \}',
+      ).firstMatch(source)?.group(1);
+
+      expect(loadSpacesBody, isNotNull);
+      expect(loadSpacesBody, isNot(contains('_fetchSpaceUnreadSummaries')));
+    });
+
+    test('coalesces gateway space unread refresh requests', () {
+      final source = File(
+        'lib/features/chat/presentation/providers/gateway_provider.dart',
+      ).readAsStringSync();
+
+      expect(
+        source,
+        isNot(contains('ref.invalidate(spaceUnreadSummaryProvider)')),
+      );
+      expect(source, contains('requestSpaceUnreadSummaryRefresh(ref)'));
+    });
   });
 }
 
 const _knownDomainApplicationBoundaryDebt = {
   'lib/features/call/domain/services/webrtc_service.dart',
   'lib/features/chat/domain/services/audio_player_service.dart',
+  'lib/features/chat/domain/services/chat_startup_recovery.dart',
+  'lib/features/chat/domain/services/chat_storage_manager.dart',
   'lib/features/chat/domain/services/message_send_lifecycle.dart',
+  'lib/features/customer_service/domain/customer_service_monitor_wall.dart',
 };
 
 const _knownPresentationBoundaryDebt = {
+  'lib/features/app_update/presentation/app_update_provider.dart',
   'lib/features/auth/presentation/pages/login_page.dart',
   'lib/features/auth/presentation/pages/register_page.dart',
   'lib/features/auth/presentation/providers/auth_provider.dart',
   'lib/features/call/presentation/providers/call_provider.dart',
   'lib/features/chat/presentation/controllers/conversation_actions_controller.dart',
+  'lib/features/chat/presentation/controllers/customer_service_chat_controller.dart',
+  'lib/features/chat/presentation/controllers/direct_chat_entry_controller.dart',
+  'lib/features/chat/presentation/controllers/media_open_controller.dart',
+  'lib/features/chat/presentation/controllers/message_translation_controller.dart',
   'lib/features/chat/presentation/pages/add_friend_page.dart',
   'lib/features/chat/presentation/pages/bulk_send_page.dart',
   'lib/features/chat/presentation/pages/chat_page.dart',
@@ -112,10 +144,12 @@ const _knownPresentationBoundaryDebt = {
   'lib/features/chat/presentation/pages/group_member_mute_page.dart',
   'lib/features/chat/presentation/pages/group_read_receipts_page.dart',
   'lib/features/chat/presentation/pages/group_settings_page.dart',
+  'lib/features/chat/presentation/pages/home_page.dart',
   'lib/features/chat/presentation/pages/scan_page.dart',
   'lib/features/chat/presentation/pages/search_page.dart',
   'lib/features/chat/presentation/pages/select_group_member_page.dart',
   'lib/features/chat/presentation/pages/transfer_owner_page.dart',
+  'lib/features/chat/presentation/providers/chat_draft_provider.dart',
   'lib/features/chat/presentation/providers/chat_provider.dart',
   'lib/features/chat/presentation/providers/conversations_provider.dart',
   'lib/features/chat/presentation/providers/gateway_provider.dart',
@@ -124,6 +158,7 @@ const _knownPresentationBoundaryDebt = {
   'lib/features/chat/presentation/providers/group_join_requests_provider.dart',
   'lib/features/chat/presentation/providers/presence_provider.dart',
   'lib/features/chat/presentation/widgets/chat_input_toolbar.dart',
+  'lib/features/chat/presentation/widgets/conversation_row.dart',
   'lib/features/chat/presentation/widgets/message_bubble.dart',
   'lib/features/contacts/presentation/pages/contacts_page.dart',
   'lib/features/contacts/presentation/pages/customer_overview_page.dart',
@@ -160,6 +195,7 @@ const _knownPresentationBoundaryDebt = {
 const _knownCoreSharedBoundaryDebt = {
   'lib/core/database/hive_to_sqlite_migration.dart',
   'lib/core/di/injector.dart',
+  'lib/core/platform/media_file_runtime.dart',
   'lib/core/widgets/network_status_banner.dart',
 };
 

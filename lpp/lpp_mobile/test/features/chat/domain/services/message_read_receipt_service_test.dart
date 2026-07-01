@@ -132,4 +132,22 @@ void main() {
       isFalse,
     );
   });
+
+  test('selects latest own group messages for read receipt snapshot sync only',
+      () {
+    final targets = service.groupReadReceiptSnapshotTargets(
+      [
+        message(id: 'peer', seq: 1, senderUserId: 'peer'),
+        message(id: 'failed', seq: 2, senderUserId: 'me', isSelf: true)
+            .copyWith(status: MessageStatus.failed),
+        message(id: 'unknown-seq', seq: 0, senderUserId: 'me', isSelf: true),
+        message(id: 'mine-old', seq: 3, senderUserId: 'me', isSelf: true),
+        message(id: 'mine-new', seq: 4, senderUserId: 'me', isSelf: true),
+      ],
+      currentUserId: 'me',
+      maxTargets: 1,
+    );
+
+    expect(targets.map((message) => message.messageId), ['mine-new']);
+  });
 }

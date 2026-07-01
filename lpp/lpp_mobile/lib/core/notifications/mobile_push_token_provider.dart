@@ -78,6 +78,12 @@ class MethodChannelMobilePushTokenProvider implements MobilePushTokenProvider {
         {'provider': provider.name},
       );
       if (raw == null) return null;
+      final rawProvider = (raw['provider'] as String?)?.trim();
+      if (rawProvider != null &&
+          rawProvider.isNotEmpty &&
+          MobilePushProvider.parse(rawProvider) != provider) {
+        return null;
+      }
       final token = (raw['token'] as String?)?.trim();
       if (token == null || token.isEmpty) return null;
       return MobilePushToken(

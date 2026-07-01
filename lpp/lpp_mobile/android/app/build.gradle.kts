@@ -33,9 +33,17 @@ fun dartDefineValue(key: String): String? {
         ?.substringAfter("=")
 }
 
+fun configValue(key: String, defaultValue: String = ""): String {
+    return providers.gradleProperty(key)
+        .orElse(providers.environmentVariable(key))
+        .orElse(providers.provider { dartDefineValue(key) ?: defaultValue })
+        .orElse(defaultValue)
+        .get()
+}
+
 val jpushAppKey = providers.gradleProperty("JPUSH_APP_KEY")
     .orElse(providers.environmentVariable("JPUSH_APP_KEY"))
-    .orElse(providers.provider { dartDefineValue("JPUSH_APP_KEY") ?: "" })
+    .orElse(providers.provider { dartDefineValue("JPUSH_APP_KEY") ?: "baeb8407ae27f7b251c8e907" })
     .orElse("")
     .get()
 val jpushChannel = providers.gradleProperty("JPUSH_CHANNEL")
@@ -70,6 +78,17 @@ android {
         manifestPlaceholders["JPUSH_PKGNAME"] = "com.startlink.lite"
         manifestPlaceholders["JPUSH_APPKEY"] = jpushAppKey
         manifestPlaceholders["JPUSH_CHANNEL"] = jpushChannel
+        manifestPlaceholders["MEIZU_APPKEY"] = configValue("MEIZU_APPKEY")
+        manifestPlaceholders["MEIZU_APPID"] = configValue("MEIZU_APPID")
+        manifestPlaceholders["XIAOMI_APPID"] = configValue("XIAOMI_APPID")
+        manifestPlaceholders["XIAOMI_APPKEY"] = configValue("XIAOMI_APPKEY")
+        manifestPlaceholders["OPPO_APPKEY"] = configValue("OPPO_APPKEY")
+        manifestPlaceholders["OPPO_APPID"] = configValue("OPPO_APPID")
+        manifestPlaceholders["OPPO_APPSECRET"] = configValue("OPPO_APPSECRET")
+        manifestPlaceholders["VIVO_APPKEY"] = configValue("VIVO_APPKEY")
+        manifestPlaceholders["VIVO_APPID"] = configValue("VIVO_APPID")
+        manifestPlaceholders["HONOR_APPID"] = configValue("HONOR_APPID")
+        manifestPlaceholders["NIO_APPID"] = configValue("NIO_APPID")
     }
 
     signingConfigs {
@@ -98,4 +117,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
 }

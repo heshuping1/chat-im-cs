@@ -555,6 +555,7 @@ class GroupSettingsPage extends ConsumerStatefulWidget {
 class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   bool _removeMode = false;
   final Set<String> _selectedForRemoval = {};
+  int? _lastMemberRefreshTargetCount;
 
   // 从 groupDetail 初始化后的本地状态
   bool? _isPinned;
@@ -875,6 +876,12 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               muteReason: member.muteReason,
             ))
         .toList();
+    _refreshMembersWhenCountIsStale(
+      canViewMembers: canViewMembers,
+      isLoading: membersAsync.isLoading,
+      detailMemberCount: detail.memberCount,
+      loadedMemberCount: rawMembers.length,
+    );
     bool canRemoveMember(GroupMember member) {
       if (!canRemoveMembers || member.userId == currentUserId) {
         return false;
@@ -1084,6 +1091,31 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     );
   }
 
+  void _refreshMembersWhenCountIsStale({
+    required bool canViewMembers,
+    required bool isLoading,
+    required int detailMemberCount,
+    required int loadedMemberCount,
+  }) {
+    if (!shouldRefreshGroupMembers(
+      canViewMembers: canViewMembers,
+      isLoading: isLoading,
+      detailMemberCount: detailMemberCount,
+      loadedMemberCount: loadedMemberCount,
+    )) {
+      if (loadedMemberCount >= detailMemberCount) {
+        _lastMemberRefreshTargetCount = null;
+      }
+      return;
+    }
+    if (_lastMemberRefreshTargetCount == detailMemberCount) return;
+    _lastMemberRefreshTargetCount = detailMemberCount;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(groupMembersProvider(widget.groupId).notifier).refresh();
+    });
+  }
+
   void _showClearSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1179,6 +1211,18 @@ class _GroupDetailErrorState extends StatelessWidget {
       ),
     );
   }
+}
+
+@visibleForTesting
+bool shouldRefreshGroupMembers({
+  required bool canViewMembers,
+  required bool isLoading,
+  required int detailMemberCount,
+  required int loadedMemberCount,
+}) {
+  if (!canViewMembers || isLoading) return false;
+  if (detailMemberCount <= 0) return false;
+  return loadedMemberCount < detailMemberCount;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,21 +69,21 @@ class SpacesNotifier extends AsyncNotifier<List<Space>> {
     if (currentSpace != null) {
       ref.watch(conversationsProvider(currentSpace.spaceId));
     }
-    return _loadSpaces();
+    final unreadSummaries =
+        ref.watch(spaceUnreadSummaryProvider).valueOrNull ?? const [];
+    return _loadSpaces(unreadSummaries: unreadSummaries);
   }
 
-  Future<List<Space>> _loadSpaces() async {
+  Future<List<Space>> _loadSpaces({
+    required List<SpaceUnreadSummary> unreadSummaries,
+  }) async {
     var spaces = await _repo.getSpaces();
-    List<SpaceUnreadSummary> unreadSummaries = const [];
 
     // 平台未读汇总只作为跨空间普通 IM 红点来源；当前空间会用消息页
     // conversationsProvider 再校正一次，避免把在线客服/工作台提醒算进消息未读。
-    try {
-      unreadSummaries = await _fetchSpaceUnreadSummaries(ref);
-      if (unreadSummaries.isNotEmpty) {
-        spaces = _mergeUnreadSummaries(spaces, unreadSummaries);
-      }
-    } catch (_) {}
+    if (unreadSummaries.isNotEmpty) {
+      spaces = _mergeUnreadSummaries(spaces, unreadSummaries);
+    }
 
     final currentSpace = ref.read(currentSpaceProvider);
     final currentImUnread = _currentSpaceImUnreadSummary(ref);
@@ -137,7 +139,12 @@ class SpacesNotifier extends AsyncNotifier<List<Space>> {
     try {
       await _repo.switchSpace(spaceId);
       invalidateContactScopedProviders(ref);
-      state = AsyncData(await _loadSpaces());
+      state = AsyncData(
+        await _loadSpaces(
+          unreadSummaries:
+              ref.read(spaceUnreadSummaryProvider).valueOrNull ?? const [],
+        ),
+      );
     } catch (e, st) {
       if (previous != null) {
         state = AsyncData(previous);
@@ -150,7 +157,12 @@ class SpacesNotifier extends AsyncNotifier<List<Space>> {
 
   /// 刷新空间列表（例如收到新消息后更新未读数）
   Future<void> refresh() async {
-    state = AsyncData(await _loadSpaces());
+    ref.invalidate(spaceUnreadSummaryProvider);
+    state = AsyncData(
+      await _loadSpaces(
+        unreadSummaries: await ref.read(spaceUnreadSummaryProvider.future),
+      ),
+    );
   }
 }
 
@@ -199,6 +211,43 @@ final spaceUnreadSummaryProvider =
   ref.watch(authProvider);
   return _fetchSpaceUnreadSummaries(ref);
 });
+
+const _spaceUnreadSummaryRefreshWindow = Duration(seconds: 2);
+
+final _spaceUnreadSummaryRefreshSchedulerProvider =
+    Provider<SpaceUnreadSummaryRefreshScheduler>((ref) {
+  final scheduler = SpaceUnreadSummaryRefreshScheduler(
+    refreshWindow: _spaceUnreadSummaryRefreshWindow,
+    onRefresh: () => ref.invalidate(spaceUnreadSummaryProvider),
+  );
+  ref.onDispose(scheduler.dispose);
+  return scheduler;
+});
+
+void requestSpaceUnreadSummaryRefresh(Ref ref) {
+  ref.read(_spaceUnreadSummaryRefreshSchedulerProvider).requestRefresh();
+}
+
+@visibleForTesting
+class SpaceUnreadSummaryRefreshScheduler {
+  final Duration refreshWindow;
+  final VoidCallback onRefresh;
+  Timer? _timer;
+
+  SpaceUnreadSummaryRefreshScheduler({
+    required this.refreshWindow,
+    required this.onRefresh,
+  });
+
+  void requestRefresh() {
+    if (_timer?.isActive == true) return;
+    _timer = Timer(refreshWindow, onRefresh);
+  }
+
+  void dispose() {
+    _timer?.cancel();
+  }
+}
 
 Future<List<SpaceUnreadSummary>> _fetchSpaceUnreadSummaries(Ref ref) async {
   final authState = ref.read(authProvider).valueOrNull;
@@ -275,11 +324,16 @@ List<Space> _overrideCurrentSpaceUnread(
 SpaceImUnreadSummary computeImUnreadSummaryForSpaceBadges(
   List<Conversation> conversations,
 ) {
+  final badgeConversations = conversations
+      .where((conversation) =>
+          conversation.type == ConversationType.direct ||
+          conversation.type == ConversationType.group)
+      .toList(growable: false);
   return SpaceImUnreadSummary(
     unreadConversationCount: calculateNumericUnreadConversationCount(
-      conversations,
+      badgeConversations,
     ),
-    unreadMessageCount: calculateMessageBadgeCount(conversations),
+    unreadMessageCount: calculateMessageBadgeCount(badgeConversations),
   );
 }
 

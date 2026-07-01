@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_remote_datasource.dart';
 import 'package:lpp_mobile/features/chat/data/repositories/chat_repository_impl.dart';
@@ -8,6 +9,67 @@ import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
 
 void main() {
   group('ChatRepositoryImpl unread normalization', () {
+    test(
+      'retries initial conversation snapshot once when cache is empty and first request is transient',
+      () async {
+        final local = _FakeLocalDataSource(cached: const []);
+        final remote = _FakeRemoteDataSource([
+          _conversation(),
+        ], firstConversationError: const NetworkError('temporary unavailable'));
+        final repo = ChatRepositoryImpl(
+          remote: remote,
+          local: local,
+          spaceId: 'space-1',
+        );
+
+        final page = await repo.getConversations();
+
+        expect(remote.conversationRequests, 2);
+        expect(page.items.single.title, '同事');
+        expect(local.cachedConversations.single.title, '同事');
+      },
+    );
+
+    test(
+      'returns remote first screen when local conversation cache write fails',
+      () async {
+        final local = _FakeLocalDataSource(
+          cached: const [],
+          failCacheConversations: true,
+        );
+        final remote = _FakeRemoteDataSource([_conversation()]);
+        final repo = ChatRepositoryImpl(
+          remote: remote,
+          local: local,
+          spaceId: 'space-1',
+        );
+
+        final page = await repo.getConversations();
+
+        expect(page.items.single.title, '同事');
+        expect(remote.conversationRequests, 1);
+      },
+    );
+
+    test(
+      'treats local conversation cache read failure as cache miss',
+      () async {
+        final local = _FakeLocalDataSource(
+          cached: const [],
+          failReadConversations: true,
+        );
+        final repo = ChatRepositoryImpl(
+          remote: _FakeRemoteDataSource([_conversation()]),
+          local: local,
+          spaceId: 'space-1',
+        );
+
+        final cached = await repo.getCachedConversations();
+
+        expect(cached, isNull);
+      },
+    );
+
     test(
       'keeps local self last-message state when remote summary omits sender',
       () async {
@@ -213,13 +275,16 @@ class _FakeRemoteDataSource implements ChatRemoteDataSource {
   final List<Conversation> conversations;
   final List<Message> directMessages;
   final List<Message> groupMessages;
+  final Object? firstConversationError;
   final directMessageRequests = <String>[];
   final groupMessageRequests = <String>[];
+  int conversationRequests = 0;
 
   _FakeRemoteDataSource(
     this.conversations, {
     this.directMessages = const [],
     this.groupMessages = const [],
+    this.firstConversationError,
   });
 
   @override
@@ -227,6 +292,10 @@ class _FakeRemoteDataSource implements ChatRemoteDataSource {
     String? cursor,
     int limit = 50,
   }) async {
+    conversationRequests++;
+    if (conversationRequests == 1 && firstConversationError != null) {
+      throw firstConversationError!;
+    }
     return ConversationsPage(items: conversations);
   }
 
@@ -256,18 +325,29 @@ class _FakeRemoteDataSource implements ChatRemoteDataSource {
 
 class _FakeLocalDataSource implements ChatLocalDataSource {
   final List<Conversation> cached;
+  final bool failCacheConversations;
+  final bool failReadConversations;
   List<Conversation> cachedConversations = const [];
   List<Message> cachedMessages = const [];
   List<Message> upsertedMessages = const [];
 
-  _FakeLocalDataSource({required this.cached});
+  _FakeLocalDataSource({
+    required this.cached,
+    this.failCacheConversations = false,
+    this.failReadConversations = false,
+  });
 
   @override
-  Future<List<Conversation>> getConversations(String spaceId) async => cached;
+  Future<List<Conversation>> getConversations(String spaceId) async {
+    if (failReadConversations) {
+      throw StateError('duplicate column name: last_message_is_self');
+    }
+    return cached;
+  }
 
   @override
   Future<List<Conversation>?> getCachedConversations(String spaceId) async =>
-      cached;
+      cached.isEmpty ? null : cached;
 
   @override
   Future<List<Message>?> getCachedMessages(
@@ -288,6 +368,9 @@ class _FakeLocalDataSource implements ChatLocalDataSource {
     String spaceId,
     List<Conversation> conversations,
   ) async {
+    if (failCacheConversations) {
+      throw StateError('sqlite is warming up');
+    }
     cachedConversations = conversations;
   }
 

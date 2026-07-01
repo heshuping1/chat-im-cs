@@ -24,12 +24,16 @@ import 'package:lpp_mobile/core/widgets/identity_badge.dart';
 import 'package:lpp_mobile/core/widgets/user_avatar.dart';
 import 'package:lpp_mobile/features/call/domain/entities/call_entities.dart';
 import 'package:lpp_mobile/features/chat/data/datasources/chat_local_datasource.dart';
+import 'package:lpp_mobile/features/chat/data/mappers/group_read_receipts_mapper.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/media_local_file.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/message.dart';
+import 'package:lpp_mobile/features/chat/domain/entities/scheduled_message.dart';
 import 'package:lpp_mobile/features/chat/domain/services/mention_reminder.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_read_receipt_service.dart';
 import 'package:lpp_mobile/features/chat/domain/services/message_send_failure.dart';
+import 'package:lpp_mobile/features/chat/domain/services/scheduled_message_input_panel_policy.dart';
+import 'package:lpp_mobile/features/chat/domain/services/scheduled_message_time_policy.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/conversation_actions_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/customer_service_chat_controller.dart';
 import 'package:lpp_mobile/features/chat/presentation/controllers/direct_chat_entry_controller.dart';
@@ -50,11 +54,14 @@ import 'package:lpp_mobile/features/chat/presentation/models/chat_call_launch_mo
 import 'package:lpp_mobile/features/chat/presentation/models/chat_send_interaction_policy.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/customer_service_chat_state_model.dart';
 import 'package:lpp_mobile/features/chat/presentation/models/message_context_action_model.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/scheduled_message_cancel_failure_policy.dart';
+import 'package:lpp_mobile/features/chat/presentation/models/scheduled_message_input_status.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/chat_input_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/conversation_avatar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/customer_service_ended_notice.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/marketing_toolbar.dart';
 import 'package:lpp_mobile/features/chat/presentation/widgets/message_bubble.dart';
+import 'package:lpp_mobile/features/chat/presentation/widgets/scheduled_message_input_status_bar.dart';
 import 'package:lpp_mobile/features/contacts/presentation/pages/profile_page.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
 import 'package:lpp_mobile/features/customer_service/data/models/customer_service_models.dart';
@@ -114,13 +121,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   static bool get _locationSendingEnabled => false;
   static const PlatformMediaSaver _mediaSaver = PlatformMediaSaver();
+  static const ScheduledMessageCancelFailurePolicy
+      _scheduledCancelFailurePolicy = ScheduledMessageCancelFailurePolicy();
 
   final _scrollController = ScrollController();
   bool _isSending = false;
   String _spaceId = '';
   Timer? _refreshTimer;
   Timer? _groupDetailRefreshTimer;
+  Timer? _groupReadReceiptAutoSyncTimer;
+  Timer? _scheduledMessagesDueRefreshTimer;
   ProviderSubscription<AsyncValue<CsThreadsData>>? _customerServiceThreadsSub;
+  final Set<String> _groupReadReceiptAutoSyncingMessageIds = {};
+  final Set<String> _groupReadReceiptAutoSyncedKeys = {};
+  String? _lastImmediateScheduledMessageProbeKey;
   bool _requestedScrollTarget = false;
   // 退出时上报已读的 seq（微信做法：进入立即本地清零，退出时才上报服务器）
   int? _pendingReadSeq;
@@ -141,6 +155,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   // 回复引用
   ({String id, String text, String sender})? _replyingTo;
+  List<ScheduledMessage> _scheduledMessages = const [];
+  bool _scheduledMessagesLoading = false;
+  String? _cancelingScheduledMessageId;
+  ScheduledMessage? _editingScheduledMessage;
+  DateTime? _localScheduledSendAt;
   bool _resolvedIsGroup = false;
   String? _createdConversationId;
   String? _externalInsertText;
@@ -177,6 +196,31 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       return false;
     }
     return _customerServiceChatState.requiresManualEntry;
+  }
+
+  ScheduledMessage? get _visibleScheduledMessage {
+    const policy = ScheduledMessageInputPanelPolicy();
+    return policy.visibleTask(_scheduledMessages);
+  }
+
+  ScheduledMessageInputStatus get _scheduledInputStatus {
+    final editing = _editingScheduledMessage;
+    if (editing != null) {
+      return ScheduledMessageInputStatus.editingTask(editing);
+    }
+    final visibleTask = _visibleScheduledMessage;
+    if (visibleTask != null) {
+      return ScheduledMessageInputStatus.pendingTask(
+        visibleTask,
+        canceling:
+            _cancelingScheduledMessageId == visibleTask.scheduledMessageId,
+      );
+    }
+    final localScheduledAt = _localScheduledSendAt;
+    if (localScheduledAt != null) {
+      return ScheduledMessageInputStatus.localDraft(localScheduledAt);
+    }
+    return const ScheduledMessageInputStatus.none();
   }
 
   String get _activeConversationId =>
@@ -284,6 +328,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ref
                   .read(conversationsProvider(_spaceId).notifier)
                   .markRead(_activeConversationId, _effectiveIsGroup, maxSeq);
+              if (_effectiveIsGroup) {
+                _scheduleGroupReadReceiptAutoSync(msgs);
+              }
             }
           });
         },
@@ -333,7 +380,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final space = ref.read(currentSpaceProvider);
-    _spaceId = space?.spaceId ?? '';
+    final nextSpaceId = space?.spaceId ?? '';
+    final spaceChanged = nextSpaceId != _spaceId;
+    _spaceId = nextSpaceId;
+    if (spaceChanged && _spaceId.isNotEmpty) {
+      unawaited(_refreshScheduledMessages());
+    }
     if (_isCustomerServiceThread && !_customerServiceDetailLoaded) {
       _customerServiceDetailLoaded = true;
       unawaited(_syncCustomerServiceThread(showError: false));
@@ -806,6 +858,82 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         .mergeConversationFromGateway(partial, isSelf: true);
   }
 
+  void _scheduleGroupReadReceiptAutoSync(List<Message> messages) {
+    if (!_effectiveIsGroup || _spaceId.isEmpty || messages.isEmpty) return;
+    _groupReadReceiptAutoSyncTimer?.cancel();
+    _groupReadReceiptAutoSyncTimer =
+        Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      unawaited(_syncGroupReadReceiptSnapshots(messages));
+    });
+  }
+
+  Future<void> _syncGroupReadReceiptSnapshots(List<Message> messages) async {
+    if (!_effectiveIsGroup || _spaceId.isEmpty || messages.isEmpty) return;
+    final currentSpace = ref.read(currentSpaceProvider);
+    final currentUserId = currentSpace?.userId ?? '';
+    final targets = const MessageReadReceiptService()
+        .groupReadReceiptSnapshotTargets(
+          messages,
+          currentUserId: currentUserId,
+        )
+        .where((message) => !_groupReadReceiptAutoSyncedKeys.contains(
+              _groupReadReceiptAutoSyncKey(message, message.readCount),
+            ))
+        .toList(growable: false);
+    if (targets.isEmpty) return;
+
+    var currentProfile = ref.read(currentUserProfileProvider);
+    if (currentProfile == null && currentUserId.isNotEmpty) {
+      await ref.read(profileProvider.notifier).loadProfile();
+      if (!mounted) return;
+      currentProfile = ref.read(currentUserProfileProvider);
+    }
+
+    final dio = ref.read(dioProvider);
+    final notifier = ref.read(
+      chatProvider((_spaceId, _activeConversationId, true)).notifier,
+    );
+    for (final message in targets) {
+      if (_groupReadReceiptAutoSyncingMessageIds.contains(message.messageId)) {
+        continue;
+      }
+      _groupReadReceiptAutoSyncingMessageIds.add(message.messageId);
+      try {
+        final resp = await dio.get<Map<String, dynamic>>(
+          '/api/client/v1/groups/$_activeConversationId/read-receipts',
+          queryParameters: {'messageId': message.messageId},
+        );
+        final receipts = parseGroupReadReceiptsPayload(
+          resp.data?['data'],
+          currentUser: GroupReadReceiptIdentity(
+            userId: currentProfile?.userId ?? currentUserId,
+            platformUserId: currentProfile?.platformUserId,
+            lppId: currentProfile?.lppId,
+            displayName: currentProfile?.displayName,
+          ),
+          messageSeq: message.conversationSeq,
+        );
+        notifier.syncGroupReadReceiptSnapshot(
+          messageId: message.messageId,
+          messageSeq: message.conversationSeq,
+          readCount: receipts.readCount,
+        );
+        _groupReadReceiptAutoSyncedKeys
+          ..add(_groupReadReceiptAutoSyncKey(message, message.readCount))
+          ..add(_groupReadReceiptAutoSyncKey(message, receipts.readCount));
+      } catch (_) {
+        // 回执快照只是首屏修正，失败时保留本地消息并允许下次消息变更再同步。
+      } finally {
+        _groupReadReceiptAutoSyncingMessageIds.remove(message.messageId);
+      }
+    }
+  }
+
+  String _groupReadReceiptAutoSyncKey(Message message, int readCount) {
+    return '${message.messageId}:${message.conversationSeq}:$readCount';
+  }
+
   @override
   void dispose() {
     final active = ref.read(activeChatConversationProvider);
@@ -814,6 +942,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
     _refreshTimer?.cancel();
     _groupDetailRefreshTimer?.cancel();
+    _groupReadReceiptAutoSyncTimer?.cancel();
+    _scheduledMessagesDueRefreshTimer?.cancel();
     _customerServiceThreadsSub?.close();
     _scrollController.dispose();
     // 退出时上报已读（微信做法：退出才调服务器接口）
@@ -1677,14 +1807,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<bool> _scheduleTextMessage(String text, DateTime scheduledAt) async {
+    const timePolicy = ScheduledMessageTimePolicy();
     final now = DateTime.now();
-    if (!scheduledAt.isAfter(now.add(const Duration(minutes: 1)))) {
+    if (timePolicy.isBeforeMinLeadTime(scheduledAt, now)) {
       AppToast.error(context, '请选择至少 1 分钟后的时间');
       return false;
     }
-    if (scheduledAt.isAfter(now.add(const Duration(days: 14)))) {
+    if (timePolicy.exceedsMaxLeadTime(scheduledAt, now)) {
       AppToast.error(context, '定时发送最多支持 14 天内');
       return false;
+    }
+    final visibleTask = _visibleScheduledMessage;
+    if (visibleTask != null) {
+      return _updateScheduledTextMessage(
+        scheduledMessageId: visibleTask.scheduledMessageId,
+        text: text,
+        scheduledAt: scheduledAt,
+      );
     }
     try {
       await ref
@@ -1698,10 +1837,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             replyToMessageId: _replyingTo?.id,
           );
       if (!mounted) return true;
-      AppToast.success(
-        context,
-        '已设置定时发送：${_formatScheduledMessageTime(scheduledAt)}',
-      );
+      if (_replyingTo != null || _localScheduledSendAt != null) {
+        setState(() {
+          _replyingTo = null;
+          _localScheduledSendAt = null;
+        });
+      }
+      unawaited(_refreshScheduledMessages());
       return true;
     } catch (error) {
       if (!mounted) return false;
@@ -1710,19 +1852,198 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
+  Future<bool> _updateScheduledTextMessage({
+    required String scheduledMessageId,
+    required String text,
+    required DateTime scheduledAt,
+  }) async {
+    const timePolicy = ScheduledMessageTimePolicy();
+    final now = DateTime.now();
+    if (timePolicy.isBeforeMinLeadTime(scheduledAt, now)) {
+      AppToast.error(context, '请选择至少 1 分钟后的时间');
+      return false;
+    }
+    if (timePolicy.exceedsMaxLeadTime(scheduledAt, now)) {
+      AppToast.error(context, '定时发送最多支持 14 天内');
+      return false;
+    }
+    try {
+      await ref
+          .read(scheduledMessageRepositoryProvider(_spaceId))
+          .updateScheduledMessage(
+            scheduledMessageId: scheduledMessageId,
+            body: MessageBody(text: text),
+            scheduledAt: scheduledAt,
+          );
+      if (!mounted) return true;
+      setState(() {
+        _editingScheduledMessage = null;
+        _localScheduledSendAt = null;
+      });
+      unawaited(_refreshScheduledMessages());
+      return true;
+    } catch (error) {
+      if (!mounted) return false;
+      AppToast.error(context, _friendlyErrorMessage(error));
+      return false;
+    }
+  }
+
+  Future<void> _refreshScheduledMessages() async {
+    if (_spaceId.isEmpty || _isPendingDirectChat || _isReadOnlyConversation) {
+      _scheduledMessagesDueRefreshTimer?.cancel();
+      if (mounted && _scheduledMessages.isNotEmpty) {
+        setState(() => _scheduledMessages = const []);
+      }
+      return;
+    }
+    final conversationId = _activeConversationId;
+    if (_scheduledMessagesLoading) return;
+    if (mounted) {
+      setState(() => _scheduledMessagesLoading = true);
+    }
+    try {
+      final items = await ref
+          .read(scheduledMessageRepositoryProvider(_spaceId))
+          .getScheduledMessages(conversationId);
+      if (!mounted || conversationId != _activeConversationId) return;
+      final pending = items.where((item) => item.canEdit).toList()
+        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+      setState(() {
+        _scheduledMessages = pending;
+        final editing = _editingScheduledMessage;
+        if (editing != null &&
+            !pending.any(
+              (item) => item.scheduledMessageId == editing.scheduledMessageId,
+            )) {
+          _editingScheduledMessage = null;
+        }
+      });
+      _scheduleScheduledMessagesDueRefresh(pending);
+    } catch (_) {
+      _scheduledMessagesDueRefreshTimer?.cancel();
+      if (mounted) {
+        setState(() => _scheduledMessages = const []);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _scheduledMessagesLoading = false);
+      }
+    }
+  }
+
+  void _scheduleScheduledMessagesDueRefresh(List<ScheduledMessage> messages) {
+    _scheduledMessagesDueRefreshTimer?.cancel();
+    const policy = ScheduledMessageInputPanelPolicy();
+    final visibleTask = policy.visibleTask(messages);
+    final delay = policy.refreshDelayForVisibleTask(
+      visibleTask: visibleTask,
+      now: DateTime.now(),
+    );
+    if (visibleTask == null || delay == null) {
+      _lastImmediateScheduledMessageProbeKey = null;
+      return;
+    }
+    final probeKey =
+        '${visibleTask.scheduledMessageId}:${visibleTask.status}:${visibleTask.scheduledAt.toUtc().toIso8601String()}';
+    final effectiveDelay = delay == Duration.zero &&
+            _lastImmediateScheduledMessageProbeKey == probeKey
+        ? const Duration(seconds: 15)
+        : delay;
+    _scheduledMessagesDueRefreshTimer = Timer(effectiveDelay, () {
+      if (!mounted) return;
+      if (delay == Duration.zero) {
+        _lastImmediateScheduledMessageProbeKey = probeKey;
+      }
+      unawaited(_handleScheduledMessageDueRefresh());
+    });
+  }
+
+  Future<void> _handleScheduledMessageDueRefresh() async {
+    if (_spaceId.isEmpty) return;
+    await _refreshScheduledMessages();
+    if (!mounted || _spaceId.isEmpty) return;
+    ref.invalidate(
+        chatProvider((_spaceId, _activeConversationId, _effectiveIsGroup)));
+    ref.invalidate(conversationsProvider(_spaceId));
+    if (_effectiveIsGroup) {
+      ref.invalidate(groupDetailProvider(_activeConversationId));
+    }
+  }
+
+  void _startEditingScheduledMessage(ScheduledMessage message) {
+    if (message.type != MessageType.text || !message.canEdit) return;
+    setState(() {
+      _replyingTo = null;
+      _editingScheduledMessage = message;
+      _localScheduledSendAt = null;
+    });
+  }
+
+  void _handleLocalScheduledSendAtChanged(DateTime? scheduledAt) {
+    if (_localScheduledSendAt == scheduledAt) return;
+    setState(() => _localScheduledSendAt = scheduledAt);
+  }
+
+  void _clearLocalScheduledSendAt() {
+    if (_localScheduledSendAt == null) return;
+    setState(() => _localScheduledSendAt = null);
+  }
+
+  void _cancelScheduledMessageEdit() {
+    if (_editingScheduledMessage == null) return;
+    setState(() => _editingScheduledMessage = null);
+  }
+
+  Future<void> _cancelScheduledMessageFromInput(
+      ScheduledMessage message) async {
+    if (!message.canCancel || _cancelingScheduledMessageId != null) return;
+    final previousMessages = _scheduledMessages;
+    setState(() {
+      _cancelingScheduledMessageId = message.scheduledMessageId;
+      _scheduledMessages = _scheduledMessages
+          .where(
+              (item) => item.scheduledMessageId != message.scheduledMessageId)
+          .toList(growable: false);
+      if (_editingScheduledMessage?.scheduledMessageId ==
+          message.scheduledMessageId) {
+        _editingScheduledMessage = null;
+      }
+    });
+    try {
+      await ref
+          .read(scheduledMessageRepositoryProvider(_spaceId))
+          .cancelScheduledMessage(message.scheduledMessageId)
+          .timeout(const Duration(seconds: 8));
+      if (!mounted) return;
+      AppToast.success(context, '已删除定时消息');
+      unawaited(_refreshScheduledMessages());
+    } catch (error) {
+      if (mounted) {
+        if (_scheduledCancelFailurePolicy.shouldRestoreAfterCancelFailure(
+          error,
+        )) {
+          setState(() => _scheduledMessages = previousMessages);
+        } else {
+          unawaited(_refreshScheduledMessages());
+        }
+        AppToast.error(
+          context,
+          _scheduledCancelFailurePolicy.messageForCancelFailure(error),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _cancelingScheduledMessageId = null);
+      }
+    }
+  }
+
   String _friendlyErrorMessage(Object error) {
     if (error is ServerError) return error.message;
     if (error is NetworkError) return error.message;
     if (error is AuthError) return '登录状态已失效，请重新登录';
     return '定时发送设置失败';
-  }
-
-  String _formatScheduledMessageTime(DateTime dateTime) {
-    const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    final weekday = weekdays[dateTime.weekday - 1];
-    final hour = dateTime.hour.toString().padLeft(2, '0');
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    return '${dateTime.month}月${dateTime.day}日（$weekday）$hour:$minute';
   }
 
   Future<String> _ensureDirectConversationForSend() async {
@@ -2628,6 +2949,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 _CustomerTypingPreviewBar(
                   previewText: customerTypingPreview.previewText,
                 ),
+              if (!_isReadOnlyConversation &&
+                  !_customerServiceThreadEnded &&
+                  !_customerServiceRequiresManualEntry &&
+                  !_notFriend)
+                ScheduledMessageInputStatusBar(
+                  status: _scheduledInputStatus,
+                  onEditTask: _startEditingScheduledMessage,
+                  onCancelTask: _cancelScheduledMessageFromInput,
+                  onClearLocalDraft: _clearLocalScheduledSendAt,
+                  onCancelEditing: _cancelScheduledMessageEdit,
+                ),
               // 非好友提示 or 输入框。群全员禁言时仍展示工具栏，但统一置灰不可操作。
               if (_isReadOnlyConversation)
                 _isCustomerServiceThread
@@ -2655,6 +2987,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     canSpeak: !groupMutedForMe,
                     muteReason: groupPermissions?.muteReason,
                     initialDraft: initialDraft,
+                    scheduledSendAt: _localScheduledSendAt,
+                    onScheduledSendAtChanged:
+                        _handleLocalScheduledSendAtChanged,
+                    scheduledMessageForEdit: _editingScheduledMessage,
                     onSendText: (text) async {
                       return _sendTextMessage(
                         text: text,
@@ -2671,6 +3007,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       );
                     },
                     onScheduleText: _scheduleTextMessage,
+                    onUpdateScheduledText: _updateScheduledTextMessage,
+                    onCancelScheduledEdit: () {
+                      if (_editingScheduledMessage != null && mounted) {
+                        _cancelScheduledMessageEdit();
+                      }
+                    },
                     onSendVoice: (filePath, duration) async {
                       final notifier = ref.read(chatProvider((
                         _spaceId,

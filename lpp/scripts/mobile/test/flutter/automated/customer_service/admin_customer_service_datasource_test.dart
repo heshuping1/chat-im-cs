@@ -45,10 +45,10 @@ void main() {
 
       expect(
         adapter.requests.single.path,
-        '/api/admin/v1/conversation-management/conversations',
+        '/api/admin/v1/customer-service/center/threads',
       );
       expect(
-        adapter.requests.single.queryParameters.containsKey('type'),
+        adapter.requests.single.queryParameters.containsKey('threadType'),
         isFalse,
       );
       expect(items, hasLength(2));
@@ -68,9 +68,12 @@ void main() {
 
         expect(
           adapter.requests.single.path,
-          '/api/admin/v1/conversation-management/conversations',
+          '/api/admin/v1/customer-service/center/threads',
         );
-        expect(adapter.requests.single.queryParameters['type'], 'temp_session');
+        expect(
+          adapter.requests.single.queryParameters['threadType'],
+          'temp_session',
+        );
         expect(items.single.threadType, 'temp_session');
       },
     );
@@ -89,9 +92,12 @@ void main() {
 
         expect(
           adapter.requests.single.path,
-          '/api/admin/v1/conversation-management/conversations',
+          '/api/admin/v1/customer-service/center/threads',
         );
-        expect(adapter.requests.single.queryParameters['type'], 'direct');
+        expect(
+          adapter.requests.single.queryParameters['threadType'],
+          'im_direct',
+        );
         expect(items.single.threadType, 'direct_customer');
       },
     );
@@ -586,7 +592,8 @@ class _AdminApiAdapter implements HttpClientAdapter {
         },
       });
     }
-    if (options.path == '/api/admin/v1/conversation-management/conversations') {
+    if (options.path == '/api/admin/v1/customer-service/center/threads' ||
+        options.path == '/api/admin/v1/conversation-management/conversations') {
       final allItems = [
         {
           'threadType': 'temp_session',
@@ -609,7 +616,10 @@ class _AdminApiAdapter implements HttpClientAdapter {
           'unreadCount': 3,
         },
       ];
-      final type = options.queryParameters['type'] as String?;
+      final type =
+          (options.queryParameters['threadType'] ??
+                  options.queryParameters['type'])
+              as String?;
       final items = type == null
           ? allItems
           : allItems
