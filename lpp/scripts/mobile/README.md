@@ -40,6 +40,8 @@ Useful options:
 ../scripts/mobile/package/build_debug_apk.sh --clean
 ../scripts/mobile/package/build_release_apk.sh --split-per-abi
 ../scripts/mobile/package/build_release_apk.sh --dart-define=JPUSH_APP_KEY=your_key
+../scripts/mobile/dev/install_all_ios_devices.sh --device=00008110-000858580E9A801E
+../scripts/mobile/dev/install_all_ios_devices.sh --no-build --device=Tangming
 ../scripts/mobile/package/create_android_signing_keys.sh --config=android-signing.local.env
 ```
 

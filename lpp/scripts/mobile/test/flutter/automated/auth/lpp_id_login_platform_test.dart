@@ -83,10 +83,16 @@ void main() {
             ),
         throwsA(
           isA<ServerError>()
-              .having((error) => error.code, 'code',
-                  'AUTH_REGISTER_IDENTIFIER_UNSUPPORTED')
-              .having((error) => error.message, 'message',
-                  '注册暂不支持微界号，请使用邮箱或手机号注册'),
+              .having(
+                (error) => error.code,
+                'code',
+                'AUTH_REGISTER_IDENTIFIER_UNSUPPORTED',
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                '注册暂不支持微界号，请使用邮箱或手机号注册',
+              ),
         ),
       );
       expect(adapter.paths, isEmpty);
