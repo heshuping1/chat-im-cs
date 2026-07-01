@@ -6,6 +6,8 @@ class PrivacyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const LegalDocumentScaffold(document: privacyLegalDocumentZh);
+    return LegalDocumentScaffold(
+      document: privacyLegalDocumentForLocale(Localizations.localeOf(context)),
+    );
   }
 }

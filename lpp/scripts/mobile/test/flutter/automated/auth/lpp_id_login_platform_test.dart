@@ -55,7 +55,7 @@ void main() {
       expect(await storage.readAccessToken('personal'), isNull);
     });
 
-    test('platform lpp id registration sends explicit login type', () async {
+    test('platform registration rejects lpp id identifiers', () async {
       final storage = _MemorySecureStorage();
       final adapter = _LppIdPlatformLoginAdapter();
       final dio = Dio(BaseOptions(baseUrl: 'https://test.local'))
@@ -72,17 +72,73 @@ void main() {
         container.dispose();
       });
 
-      await container.read(authProvider.notifier).registerPlatform(
-            displayName: '微界号用户',
-            password: '123123123',
-            loginType: 'lpp_id',
-            loginName: 'wj0701163730',
-          );
-
-      expect(adapter.paths, ['/api/platform/v1/auth/register']);
-      expect(adapter.platformRegisterBody['loginName'], 'wj0701163730');
-      expect(adapter.platformRegisterBody['loginType'], 'lpp_id');
+      await expectLater(
+        container
+            .read(authProvider.notifier)
+            .registerPlatform(
+              displayName: '微界号用户',
+              password: '123123123',
+              loginType: 'lpp_id',
+              loginName: 'wj0701163730',
+            ),
+        throwsA(
+          isA<ServerError>()
+              .having((error) => error.code, 'code',
+                  'AUTH_REGISTER_IDENTIFIER_UNSUPPORTED')
+              .having((error) => error.message, 'message',
+                  '注册暂不支持微界号，请使用邮箱或手机号注册'),
+        ),
+      );
+      expect(adapter.paths, isEmpty);
     });
+
+    test(
+      'platform registration accepts invitation and enters tenant',
+      () async {
+        final storage = _MemorySecureStorage();
+        final adapter = _LppIdPlatformLoginAdapter();
+        final dio = Dio(BaseOptions(baseUrl: 'https://test.local'))
+          ..httpClientAdapter = adapter;
+
+        final container = ProviderContainer(
+          overrides: [
+            secureStorageProvider.overrideWithValue(storage),
+            dioProvider.overrideWithValue(dio),
+          ],
+        );
+        addTearDown(() {
+          TokenRefreshService.instance.stop();
+          container.dispose();
+        });
+
+        await container
+            .read(authProvider.notifier)
+            .registerPlatform(
+              displayName: '邀请用户',
+              password: '123123123',
+              loginType: 'email',
+              email: 'invited@example.com',
+              invitationCode: 'DD11D7976EDE33BB',
+            );
+
+        expect(adapter.paths, [
+          '/api/platform/v1/auth/register',
+          '/api/platform/v1/invitations/DD11D7976EDE33BB',
+          '/api/platform/v1/invitations/DD11D7976EDE33BB/accept',
+        ]);
+        expect(adapter.invitationAcceptAuthHeader, 'Bearer platform-token');
+        expect(container.read(currentSpaceProvider)?.spaceId, 'tenant-1');
+        expect(container.read(currentSpaceProvider)?.membershipRole, 2);
+        expect(
+          await storage.readAccessToken('tenant-1'),
+          'invitation-tenant-access',
+        );
+        expect(
+          await storage.read(SecureStorageService.activeSpaceIdKey),
+          'tenant-1',
+        );
+      },
+    );
 
     test('pending platform token requires explicit space selection', () {
       const state = AuthState(
@@ -279,6 +335,7 @@ class _LppIdPlatformLoginAdapter implements HttpClientAdapter {
   Map<String, dynamic> platformLoginBody = {};
   Map<String, dynamic> platformRegisterBody = {};
   bool tenantLoginCalled = false;
+  String? invitationAcceptAuthHeader;
 
   @override
   Future<ResponseBody> fetch(
@@ -367,6 +424,44 @@ class _LppIdPlatformLoginAdapter implements HttpClientAdapter {
           'accessToken': 'tenant-access',
           'refreshToken': 'tenant-refresh',
           'expiresIn': 3600,
+          'spaceContext': {'spaceType': 2, 'tenantId': 'tenant-1'},
+        },
+      });
+    }
+
+    if (options.path == '/api/platform/v1/invitations/DD11D7976EDE33BB') {
+      return _json({
+        'code': 'OK',
+        'message': 'success',
+        'requestId': 'test-invitation-preview-1',
+        'data': {
+          'tenantId': 'tenant-1',
+          'tenantCode': 'mouse-corp',
+          'tenantName': 'Mouse 测试企业',
+          'targetMembershipRole': 2,
+          'alreadyMember': false,
+        },
+      });
+    }
+
+    if (options.path ==
+        '/api/platform/v1/invitations/DD11D7976EDE33BB/accept') {
+      invitationAcceptAuthHeader = options.headers['Authorization'] as String?;
+      return _json({
+        'code': 'OK',
+        'message': 'success',
+        'requestId': 'test-invitation-accept-1',
+        'data': {
+          'tenantId': 'tenant-1',
+          'userId': 'invited-user-1',
+          'platformUserId': 'platform-new-1',
+          'lppId': 'lpp_newuser1',
+          'displayName': '邀请用户',
+          'userType': 1,
+          'accessToken': 'invitation-tenant-access',
+          'refreshToken': 'invitation-tenant-refresh',
+          'expiresIn': 3600,
+          'membershipRole': 2,
           'spaceContext': {'spaceType': 2, 'tenantId': 'tenant-1'},
         },
       });

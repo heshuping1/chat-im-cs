@@ -1,15 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lpp_mobile/core/branding/startlink_brand_logo.dart';
 import 'package:lpp_mobile/core/widgets/setting_tile.dart';
+import 'package:lpp_mobile/features/app_update/domain/app_release_update.dart';
+import 'package:lpp_mobile/features/app_update/presentation/app_update_provider.dart';
 import 'package:lpp_mobile/l10n/app_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
-class AboutPage extends StatelessWidget {
+class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
+
+  @override
+  ConsumerState<AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends ConsumerState<AboutPage> {
+  late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+
+  Future<void> _checkUpdate(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final latestVersionText = AppLocalizations.of(context).aboutLatestVersion;
+    try {
+      final update = await ref
+          .read(appUpdateControllerProvider.notifier)
+          .checkForUpdates();
+      if (!mounted || update == null) return;
+      if (update.status == AppUpdateStatus.none) {
+        messenger.showSnackBar(SnackBar(content: Text(latestVersionText)));
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+            content: Text(
+                '发现新版本 ${update.latestVersion ?? update.latestVersionCode ?? ''}')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('检查更新失败：$error')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final updateState = ref.watch(appUpdateControllerProvider);
     return Scaffold(
       backgroundColor: null,
       appBar: buildSettingsAppBar(context, l10n.aboutTitle),
@@ -29,9 +64,15 @@ class AboutPage extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1D2129))),
                 const SizedBox(height: 4),
-                Text('${l10n.aboutVersion} 1.0.0',
-                    style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF8E8E93))),
+                FutureBuilder<PackageInfo>(
+                  future: _packageInfo,
+                  builder: (context, snapshot) {
+                    final version = snapshot.data?.version ?? '1.0.0';
+                    return Text('${l10n.aboutVersion} $version',
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF8E8E93)));
+                  },
+                ),
               ],
             ),
           ),
@@ -40,8 +81,9 @@ class AboutPage extends StatelessWidget {
             children: [
               SettingTile(
                 label: l10n.aboutCheckUpdate,
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(l10n.aboutLatestVersion))),
+                value: updateState.isChecking ? '检查中' : null,
+                onTap:
+                    updateState.isChecking ? null : () => _checkUpdate(context),
               ),
             ],
           ),

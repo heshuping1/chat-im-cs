@@ -9,6 +9,7 @@ import 'package:lpp_mobile/core/di/injector.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
 import 'package:lpp_mobile/core/utils/validators.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:lpp_mobile/features/space/data/datasources/platform_tenant_datasource.dart';
 
 // ---------------------------------------------------------------------------
 // 颜色常量
@@ -31,14 +32,15 @@ class RegisterPage extends ConsumerStatefulWidget {
   ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-enum _IdMode { mobile, email, loginName }
+enum _IdMode { mobile, email }
+
+enum _JoinCredentialKind { tenantCode, invitationCode }
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
   _IdMode _idMode = _IdMode.email;
 
   final _displayNameCtrl = TextEditingController();
   final _identifierCtrl = TextEditingController(); // 手机号或邮箱
-  final _loginNameCtrl = TextEditingController(); // 账号模式的 loginName
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _codeCtrl = TextEditingController(); // 短信/邮件验证码
@@ -49,6 +51,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _searchingEnterprise = false; // 搜索中
   String? _foundEnterpriseName; // 搜索到的企业名
   String? _foundTenantId; // 搜索到的 tenantId
+  _JoinCredentialKind? _foundJoinKind;
   bool _agreedToTerms = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
@@ -78,7 +81,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   void dispose() {
     _displayNameCtrl.dispose();
     _identifierCtrl.dispose();
-    _loginNameCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     _codeCtrl.dispose();
@@ -119,11 +121,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   void _refreshVerificationRequired() {
     if (_settingsData == null) return;
-    // 账号模式不需要验证码
-    if (_idMode == _IdMode.loginName) {
-      setState(() => _verificationRequired = false);
-      return;
-    }
     final required = _idMode == _IdMode.mobile
         ? _settingsData!['smsRequired'] as bool? ?? false
         : _settingsData!['emailRequired'] as bool? ?? false;
@@ -259,7 +256,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     final identifier = _identifierCtrl.text.trim();
     final password = _passwordCtrl.text;
     final confirm = _confirmCtrl.text;
-    final enterprise = _enterpriseCtrl.text.trim(); // 企业ID或邀请码
+    final joinCredential = _enterpriseCtrl.text.trim(); // 企业码或邀请码
+    final isInvitationCode = _isInvitationCode(joinCredential);
 
     // 基础校验
     if (displayName.isEmpty) {
@@ -267,29 +265,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       return;
     }
 
-    if (_idMode == _IdMode.loginName) {
-      // 账号模式：校验 loginName
-      if (_loginNameCtrl.text.trim().isEmpty) {
-        _showError('请输入账号');
+    if (identifier.isEmpty) {
+      _showError(_idMode == _IdMode.mobile ? '请输入手机号' : '请输入邮箱');
+      return;
+    }
+    if (_idMode == _IdMode.mobile) {
+      final err = Validators.validateMobile(identifier);
+      if (err != null) {
+        _showError(err);
         return;
       }
     } else {
-      if (identifier.isEmpty) {
-        _showError(_idMode == _IdMode.mobile ? '请输入手机号' : '请输入邮箱');
+      final err = Validators.validateEmail(identifier);
+      if (err != null) {
+        _showError(err);
         return;
-      }
-      if (_idMode == _IdMode.mobile) {
-        final err = Validators.validateMobile(identifier);
-        if (err != null) {
-          _showError(err);
-          return;
-        }
-      } else {
-        final err = Validators.validateEmail(identifier);
-        if (err != null) {
-          _showError(err);
-          return;
-        }
       }
     }
     if (password.length < 6) {
@@ -316,16 +306,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       final captchaAnswer = _captchaAnswerCtrl.text.trim();
       final notifier = ref.read(authProvider.notifier);
 
-      if (enterprise.isNotEmpty) {
+      if (joinCredential.isNotEmpty && !isInvitationCode) {
         // 企业注册：填了企业码，用搜索到的 tenantId（或直接用输入值）
-        final tenantIdOrCode = _foundTenantId ?? enterprise;
+        final tenantIdOrCode = _foundTenantId ?? joinCredential;
         await notifier.registerEnterprise(
           tenantIdOrCode: tenantIdOrCode,
           password: password,
           displayName: displayName,
           loginType: _currentLoginType(),
-          loginName:
-              _idMode == _IdMode.loginName ? _loginNameCtrl.text.trim() : null,
           email: _idMode == _IdMode.email ? identifier : null,
           mobile: _idMode == _IdMode.mobile ? identifier : null,
           verificationCode:
@@ -334,19 +322,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           captchaAnswer: captchaAnswer.isNotEmpty ? captchaAnswer : null,
         );
       } else {
-        // 平台注册：未填企业ID
+        // 平台注册：未填企业码，或填的是邀请码。
         await notifier.registerPlatform(
           displayName: displayName,
           password: password,
           loginType: _currentLoginType(),
-          loginName:
-              _idMode == _IdMode.loginName ? _loginNameCtrl.text.trim() : null,
           mobile: _idMode == _IdMode.mobile ? identifier : null,
           email: _idMode == _IdMode.email ? identifier : null,
           verificationCode:
               _verificationRequired ? _codeCtrl.text.trim() : null,
           captchaToken: _captchaToken,
           captchaAnswer: captchaAnswer.isNotEmpty ? captchaAnswer : null,
+          invitationCode: isInvitationCode ? joinCredential : null,
         );
       }
       // 注册+登录成功，router 自动跳转
@@ -388,6 +375,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  bool _isInvitationCode(String value) {
+    return RegExp(r'^[0-9A-Fa-f]{12,}$').hasMatch(value.trim());
+  }
+
   bool _isCaptchaError(Object e) {
     if (e is ServerError) {
       final code = e.code.toUpperCase();
@@ -411,7 +402,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     return switch (_idMode) {
       _IdMode.mobile => 'mobile',
       _IdMode.email => 'email',
-      _IdMode.loginName => 'lpp_id',
     };
   }
 
@@ -435,7 +425,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           if (e is ServerError) {
             _showError(e.message);
           } else if (e is AuthError) {
-            _showError('账号或密码错误');
+            _showError('微界号或密码错误');
           } else if (e is NetworkError) {
             _showError(e.message);
           } else {
@@ -470,26 +460,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               _buildInput(controller: _displayNameCtrl, hint: '设置昵称'),
               const SizedBox(height: 16),
 
-              // 手机/邮箱/账号切换（始终显示）
+              // 手机/邮箱切换（始终显示）
               _buildIdModeTabs(),
               const SizedBox(height: 8),
 
-              // 手机号、邮箱或账号输入
+              // 手机号或邮箱输入
               if (_idMode == _IdMode.mobile) ...[
                 _buildLabel('手机号'),
                 _buildPhoneInput(),
-              ] else if (_idMode == _IdMode.email) ...[
+              ] else ...[
                 _buildLabel('邮箱'),
                 _buildInput(
                   controller: _identifierCtrl,
                   hint: '请输入邮箱',
                   keyboardType: TextInputType.emailAddress,
-                ),
-              ] else ...[
-                _buildLabel('账号'),
-                _buildInput(
-                  controller: _loginNameCtrl,
-                  hint: '设置账号（字母开头，字母数字下划线）',
                 ),
               ],
               const SizedBox(height: 16),
@@ -581,7 +565,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 child: GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: const Text.rich(TextSpan(
-                    text: '已有账号？',
+                    text: '已有微界号？',
                     style: TextStyle(fontSize: 14, color: _txtGray),
                     children: [
                       TextSpan(
@@ -600,7 +584,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     );
   }
 
-  // ── 手机/邮箱/账号切换 Tab ──────────────────────────────────────────────────
+  // ── 手机/邮箱切换 Tab ─────────────────────────────────────────────────────
 
   Widget _buildIdModeTabs() {
     return Row(children: [
@@ -612,7 +596,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         _idTab('手机号', _IdMode.mobile),
         const SizedBox(width: 16),
       ],
-      _idTab('账号', _IdMode.loginName),
     ]);
   }
 
@@ -624,7 +607,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         setState(() {
           _idMode = mode;
           _identifierCtrl.clear();
-          _loginNameCtrl.clear();
           _codeCtrl.clear();
           _countdown = 0;
           _countdownTimer?.cancel();
@@ -724,13 +706,18 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Future<void> _searchEnterprise() async {
     final code = _enterpriseCtrl.text.trim();
     if (code.isEmpty) {
-      _showError('请输入企业码');
+      _showError('请输入企业码或邀请码');
+      return;
+    }
+    if (_isInvitationCode(code)) {
+      await _previewInvitation(code);
       return;
     }
     setState(() {
       _searchingEnterprise = true;
       _foundEnterpriseName = null;
       _foundTenantId = null;
+      _foundJoinKind = null;
     });
     try {
       final dio = ref.read(dioProvider);
@@ -749,6 +736,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         setState(() {
           _foundEnterpriseName = m['tenantName'] as String?;
           _foundTenantId = m['tenantId'] as String?;
+          _foundJoinKind = _JoinCredentialKind.tenantCode;
         });
       } else {
         setState(() => _foundEnterpriseName = '');
@@ -766,6 +754,39 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     } finally {
       if (mounted) setState(() => _searchingEnterprise = false);
     }
+  }
+
+  Future<void> _previewInvitation(String code) async {
+    setState(() {
+      _searchingEnterprise = true;
+      _foundEnterpriseName = null;
+      _foundTenantId = null;
+      _foundJoinKind = null;
+    });
+    try {
+      final preview = await PlatformTenantDataSource(ref.read(dioProvider))
+          .previewInvitation(code: code);
+      setState(() {
+        _foundEnterpriseName = preview.tenantName;
+        _foundTenantId = null;
+        _foundJoinKind = _JoinCredentialKind.invitationCode;
+      });
+    } on DioException catch (e) {
+      final err = ErrorHandler.fromDioException(e);
+      _showError(_joinPreviewErrorMessage(err));
+      setState(() => _foundEnterpriseName = '');
+    } catch (_) {
+      _showError('邀请码无效，请确认后重试');
+      setState(() => _foundEnterpriseName = '');
+    } finally {
+      if (mounted) setState(() => _searchingEnterprise = false);
+    }
+  }
+
+  String _joinPreviewErrorMessage(AppError error) {
+    if (error is ServerError) return error.message;
+    if (error is NetworkError) return error.message;
+    return '邀请码无效，请确认后重试';
   }
 
   /// 降级：用需要 platformToken 的 /tenants/search 接口搜索
@@ -787,6 +808,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         setState(() {
           _foundEnterpriseName = m['tenantName'] as String?;
           _foundTenantId = m['tenantId'] as String?;
+          _foundJoinKind = _JoinCredentialKind.tenantCode;
         });
       } else {
         setState(() => _foundEnterpriseName = '');
@@ -800,6 +822,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         setState(() {
           _foundEnterpriseName = code;
           _foundTenantId = null; // 用 tenantCode 注册
+          _foundJoinKind = _JoinCredentialKind.tenantCode;
         });
       } else {
         _showError('搜索失败，请重试');
@@ -819,6 +842,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               _enterpriseCtrl.clear();
               _foundEnterpriseName = null;
               _foundTenantId = null;
+              _foundJoinKind = null;
             }
           });
           // 展开时自动聚焦企业码输入框
@@ -838,7 +862,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ),
           const SizedBox(width: 4),
           Text(
-            _showEnterpriseField ? '收起企业信息' : '加入企业？输入企业码（可选）',
+            _showEnterpriseField ? '收起加入信息' : '加入企业？输入企业码/邀请码（可选）',
             style: const TextStyle(fontSize: 13, color: _txtGray),
           ),
         ]),
@@ -850,8 +874,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             child: _buildInput(
               controller: _enterpriseCtrl,
               focusNode: _enterpriseFocusNode,
-              hint: '请输入企业码（如 mouse-corp）',
-              suffix: _foundTenantId != null
+              hint: '请输入企业码或邀请码',
+              onChanged: (_) => _clearJoinLookup(),
+              suffix: _foundJoinKind != null
                   ? const Icon(Icons.check_circle, color: _primary, size: 20)
                   : null,
             ),
@@ -884,20 +909,36 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           Row(children: [
             const Icon(Icons.business_outlined, size: 14, color: _primary),
             const SizedBox(width: 4),
-            Text('找到企业：$_foundEnterpriseName',
+            Text(
+                _foundJoinKind == _JoinCredentialKind.invitationCode
+                    ? '邀请码有效：$_foundEnterpriseName'
+                    : '找到企业：$_foundEnterpriseName',
                 style: const TextStyle(fontSize: 12, color: _primary)),
           ]),
         ] else if (_foundEnterpriseName == '') ...[
           const SizedBox(height: 6),
-          const Text('未找到该企业',
+          const Text('未找到该企业或邀请码无效',
               style: TextStyle(fontSize: 12, color: Color(0xFFEF4444))),
         ] else ...[
           const SizedBox(height: 4),
-          const Text('填写企业码后点击搜索验证，注册后将自动加入该企业',
+          const Text('填写企业码或邀请码后点击搜索验证，注册后将自动加入该企业',
               style: TextStyle(fontSize: 12, color: _txtGray)),
         ],
       ],
     ]);
+  }
+
+  void _clearJoinLookup() {
+    if (_foundEnterpriseName == null &&
+        _foundTenantId == null &&
+        _foundJoinKind == null) {
+      return;
+    }
+    setState(() {
+      _foundEnterpriseName = null;
+      _foundTenantId = null;
+      _foundJoinKind = null;
+    });
   }
 
   // ── 通用输入框 ─────────────────────────────────────────────────────────────
@@ -918,12 +959,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     TextInputType? keyboardType,
     Widget? suffix,
     FocusNode? focusNode,
+    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
       focusNode: focusNode,
       obscureText: obscure,
       keyboardType: keyboardType,
+      onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: Color(0xFFBBBBBB), fontSize: 15),

@@ -263,10 +263,12 @@ export interface ClientUpdatePackageInfo {
   updateKind: ClientUpdateKind;
   version: string;
   force: boolean;
+  latestVersionCode?: number;
   releaseNotes?: string;
   packageUrl?: string;
   latestYmlUrl?: string;
   sha512?: string;
+  fileHashSha256?: string;
   sizeBytes?: number;
   fallbackFullPackageUrl?: string;
   fallbackSha512?: string;

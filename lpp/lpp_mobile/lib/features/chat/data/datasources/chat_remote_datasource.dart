@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:lpp_mobile/core/network/api_response.dart';
 import 'package:lpp_mobile/core/network/error_handler.dart';
+import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/features/chat/data/models/conversation_model.dart';
 import 'package:lpp_mobile/features/chat/data/models/message_model.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation_page.dart';
@@ -166,8 +167,13 @@ abstract class ChatRemoteDataSource {
 
 class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   final Dio _dio;
+  final String? Function()? _accessTokenGetter;
 
-  ChatRemoteDataSourceImpl(this._dio);
+  ChatRemoteDataSourceImpl(
+    this._dio, {
+    String? Function()? accessTokenGetter,
+  }) : _accessTokenGetter =
+            accessTokenGetter ?? (() => GlobalTokenHolder.instance.accessToken);
 
   @override
   Future<ConversationsPage> getConversations({
@@ -181,6 +187,7 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
           if (cursor != null) 'cursor': cursor,
           'limit': limit,
         },
+        options: _tenantAuthOptions(),
       );
       final apiResponse = ApiResponse.fromJson(
         response.data!,
@@ -201,6 +208,12 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     } on DioException catch (e) {
       throw ErrorHandler.fromDioException(e);
     }
+  }
+
+  Options? _tenantAuthOptions() {
+    final token = _accessTokenGetter?.call()?.trim();
+    if (token == null || token.isEmpty) return null;
+    return Options(headers: {'Authorization': 'Bearer $token'});
   }
 
   @override

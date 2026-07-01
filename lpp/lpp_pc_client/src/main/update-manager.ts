@@ -1,7 +1,12 @@
 import type { App, BrowserWindow } from 'electron';
+import { shell } from 'electron';
 import electronUpdater from 'electron-updater';
-import { dirname, join } from 'node:path';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
+import { dirname, basename, join } from 'node:path';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type {
   AppInstanceProfilePayload,
   ClientUpdatePackageInfo,
@@ -12,6 +17,10 @@ import type {
   DesktopApiMethod,
 } from '../shared/desktop-api.js';
 import { desktopUpdateStateChangedChannel } from '../shared/desktop-api.js';
+import {
+  normalizeAppReleaseUpdateResponse,
+  resolveDesktopVersionCode,
+} from './app-release-update-contract.js';
 
 const { autoUpdater } = electronUpdater;
 
@@ -28,20 +37,8 @@ interface UpdateManagerOptions {
   appInstanceIdentity: Promise<AppInstanceProfilePayload>;
 }
 
-interface ClientUpdateLatestResponse {
-  hasUpdate?: boolean;
-  version?: unknown;
-  force?: unknown;
-  releaseNotes?: unknown;
-  updateKind?: unknown;
-  packageUrl?: unknown;
-  latestYmlUrl?: unknown;
-  sha512?: unknown;
-  sizeBytes?: unknown;
-  fallbackFullPackageUrl?: unknown;
-  fallbackSha512?: unknown;
-  publishedAt?: unknown;
-}
+const defaultUpdateApiBaseUrl = 'https://chat.hearteasechat.com';
+const desktopAppUpdateKey = 'staff';
 
 const defaultUpdatePreferences: ClientUpdatePreferences = {
   autoCheck: false,
@@ -58,6 +55,8 @@ export function registerUpdateManager({
 }: UpdateManagerOptions) {
   const preferencesPath = join(app.getPath('userData'), 'updates', 'preferences.json');
   let preferencesPromise: Promise<ClientUpdatePreferences> | null = null;
+  let downloadedInstallerPath: string | null = null;
+  let buildVersionCodePromise: Promise<number> | null = null;
   let state: ClientUpdateState = {
     currentVersion: app.getVersion(),
     preferences: defaultUpdatePreferences,
@@ -99,6 +98,12 @@ export function registerUpdateManager({
   register('downloadUpdate', async () => downloadUpdate());
   register('installUpdate', async () => {
     updateState({ phase: 'installing' });
+    if (downloadedInstallerPath) {
+      const result = await shell.openPath(downloadedInstallerPath);
+      if (result) throw new Error(result);
+      app.quit();
+      return;
+    }
     autoUpdater.quitAndInstall(false, true);
   });
 
@@ -126,8 +131,9 @@ export function registerUpdateManager({
       preferences,
       progress: undefined,
     });
-    const response = await fetchLatestUpdate(preferences);
-    if (!response.hasUpdate) {
+    const available = await fetchLatestUpdate(preferences);
+    downloadedInstallerPath = null;
+    if (!available) {
       updateState({
         available: undefined,
         checkedAt: new Date().toISOString(),
@@ -137,7 +143,6 @@ export function registerUpdateManager({
       });
       return state;
     }
-    const available = normalizeLatestResponse(response);
     updateState({
       available,
       checkedAt: new Date().toISOString(),
@@ -178,6 +183,10 @@ export function registerUpdateManager({
   }
 
   async function downloadWithPackage(updatePackage: ClientUpdatePackageInfo) {
+    if (!updatePackage.latestYmlUrl) {
+      await downloadDirectPackage(updatePackage);
+      return state;
+    }
     configureFeed(updatePackage);
     updateState({
       available: updatePackage,
@@ -207,32 +216,89 @@ export function registerUpdateManager({
 
   async function fetchLatestUpdate(
     preferences: ClientUpdatePreferences,
-  ): Promise<ClientUpdateLatestResponse> {
+  ): Promise<ClientUpdatePackageInfo | undefined> {
     const [authSession, identity] = await Promise.all([
       readAuthSession(),
       appInstanceIdentity,
     ]);
     const apiBaseUrl = normalizedBaseUrl(
-      process.env.LPP_UPDATE_API_BASE_URL || authSession?.apiBaseUrl,
+      process.env.LPP_UPDATE_API_BASE_URL || authSession?.apiBaseUrl || defaultUpdateApiBaseUrl,
     );
     if (!apiBaseUrl) throw new Error('缺少更新服务地址，请先登录或配置 LPP_UPDATE_API_BASE_URL');
-    const url = new URL('/api/client-updates/latest', apiBaseUrl);
-    url.searchParams.set('appId', 'startlink');
+    const versionCode = await readDesktopBuildVersionCode();
+    const url = new URL('/api/client/v1/app-releases/latest', apiBaseUrl);
+    url.searchParams.set('appKey', process.env.LPP_UPDATE_APP_KEY || desktopAppUpdateKey);
     url.searchParams.set('platform', 'windows');
-    url.searchParams.set('arch', process.arch === 'ia32' ? 'ia32' : 'x64');
-    url.searchParams.set('currentVersion', app.getVersion());
+    url.searchParams.set('versionCode', String(versionCode));
     url.searchParams.set('channel', preferences.channel);
+    url.searchParams.set('arch', process.arch === 'ia32' ? 'ia32' : 'x64');
     if (authSession?.tenantId) url.searchParams.set('tenantId', authSession.tenantId);
     if (identity.deviceId) url.searchParams.set('deviceId', identity.deviceId);
-    const response = await fetch(url, {
-      headers: authSession?.tenantToken
-        ? { Authorization: `Bearer ${authSession.tenantToken}` }
-        : undefined,
-    });
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`更新检查失败：HTTP ${response.status}`);
     }
-    return response.json() as Promise<ClientUpdateLatestResponse>;
+    return normalizeAppReleaseUpdateResponse(
+      await response.json() as Record<string, unknown>,
+      apiBaseUrl,
+    );
+  }
+
+  async function readDesktopBuildVersionCode() {
+    if (buildVersionCodePromise) return buildVersionCodePromise;
+    buildVersionCodePromise = readFile(join(app.getAppPath(), 'package.json'), 'utf8')
+      .then((content) => {
+        const parsed = JSON.parse(content) as { buildVersionCode?: unknown };
+        return resolveDesktopVersionCode(app.getVersion(), parsed.buildVersionCode);
+      })
+      .catch(() => resolveDesktopVersionCode(app.getVersion(), undefined));
+    return buildVersionCodePromise;
+  }
+
+  async function downloadDirectPackage(updatePackage: ClientUpdatePackageInfo) {
+    const packageUrl = updatePackage.packageUrl;
+    if (!packageUrl) throw new Error('服务端未返回安装包下载地址');
+    const response = await fetch(packageUrl);
+    if (!response.ok || !response.body) {
+      throw new Error(`更新包下载失败：HTTP ${response.status}`);
+    }
+
+    const downloadsDir = join(app.getPath('userData'), 'updates', 'downloads');
+    await mkdir(downloadsDir, { recursive: true });
+    const installerPath = join(downloadsDir, updateInstallerFileName(packageUrl, updatePackage.version));
+    const hash = createHash('sha256');
+    const startedAt = Date.now();
+    const responseSize = Number.parseInt(response.headers.get('content-length') ?? '', 10);
+    const total = Number.isFinite(responseSize) && responseSize > 0
+      ? responseSize
+      : updatePackage.sizeBytes ?? 0;
+    let transferred = 0;
+    const stream = Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]);
+    stream.on('data', (chunk: Buffer) => {
+      transferred += chunk.byteLength;
+      hash.update(chunk);
+      const elapsedSeconds = Math.max(1, (Date.now() - startedAt) / 1000);
+      updateState({
+        phase: 'downloading',
+        progress: {
+          bytesPerSecond: transferred / elapsedSeconds,
+          percent: total > 0 ? (transferred / total) * 100 : 0,
+          total,
+          transferred,
+        },
+      });
+    });
+    await pipeline(stream, createWriteStream(installerPath));
+    const expectedHash = updatePackage.fileHashSha256?.trim().toLowerCase();
+    if (expectedHash) {
+      const actualHash = hash.digest('hex');
+      if (actualHash !== expectedHash) {
+        await rm(installerPath, { force: true });
+        throw new Error('更新包 SHA-256 校验失败');
+      }
+    }
+    downloadedInstallerPath = installerPath;
+    updateState({ phase: 'downloaded', progress: undefined });
   }
 
   async function loadPreferences() {
@@ -257,27 +323,6 @@ export function registerUpdateManager({
     };
     getMainWindow()?.webContents.send(desktopUpdateStateChangedChannel, state);
   }
-}
-
-function normalizeLatestResponse(response: ClientUpdateLatestResponse): ClientUpdatePackageInfo {
-  const version = stringValue(response.version, 'version');
-  const updateKind = stringValue(response.updateKind, 'updateKind');
-  if (updateKind !== 'delta' && updateKind !== 'full') {
-    throw new Error(`Invalid updateKind: ${updateKind}`);
-  }
-  return {
-    fallbackFullPackageUrl: optionalStringValue(response.fallbackFullPackageUrl),
-    fallbackSha512: optionalStringValue(response.fallbackSha512),
-    force: Boolean(response.force),
-    latestYmlUrl: optionalStringValue(response.latestYmlUrl),
-    packageUrl: optionalStringValue(response.packageUrl),
-    publishedAt: optionalStringValue(response.publishedAt),
-    releaseNotes: optionalStringValue(response.releaseNotes),
-    sha512: optionalStringValue(response.sha512),
-    sizeBytes: optionalNumberValue(response.sizeBytes),
-    updateKind,
-    version,
-  };
 }
 
 function normalizePreferences(value: unknown): ClientUpdatePreferences {
@@ -307,21 +352,6 @@ function finiteNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-function optionalStringValue(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function stringValue(value: unknown, label: string) {
-  const text = optionalStringValue(value);
-  if (!text) throw new Error(`更新服务返回缺少 ${label}`);
-  return text;
-}
-
-function optionalNumberValue(value: unknown) {
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) && numberValue >= 0 ? numberValue : undefined;
-}
-
 function normalizedBaseUrl(value: string | undefined) {
   if (!value?.trim()) return undefined;
   try {
@@ -338,6 +368,16 @@ function parentUrl(value: string | undefined) {
   } catch {
     return undefined;
   }
+}
+
+function updateInstallerFileName(packageUrl: string, version: string) {
+  try {
+    const urlName = basename(new URL(packageUrl).pathname);
+    if (/\.(exe|msi|dmg|pkg|zip)$/i.test(urlName)) return urlName;
+  } catch {
+    // Fall through to deterministic fallback.
+  }
+  return `startlink-${version}-setup.exe`;
 }
 
 function formatUpdateError(error: unknown) {

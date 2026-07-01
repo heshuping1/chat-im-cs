@@ -16,6 +16,7 @@ import 'package:lpp_mobile/features/auth/domain/entities/auth_entities.dart';
 import 'package:lpp_mobile/features/auth/domain/repositories/auth_repository.dart';
 import 'package:lpp_mobile/features/chat/presentation/providers/conversations_provider.dart';
 import 'package:lpp_mobile/features/contacts/presentation/providers/contacts_provider.dart';
+import 'package:lpp_mobile/features/space/data/datasources/platform_tenant_datasource.dart';
 import 'package:lpp_mobile/features/space/presentation/providers/spaces_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -297,6 +298,18 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           state = AsyncData(current.copyWith(currentSpace: updatedSpace));
         }
       }
+    } on DioException catch (e) {
+      if (e.response?.statusCode != 401 && e.response?.statusCode != 403) {
+        return;
+      }
+      await _refreshCurrentTenantToken();
+      final refreshedToken = await _storage.readAccessToken(spaceId);
+      if (refreshedToken == null ||
+          refreshedToken.isEmpty ||
+          refreshedToken == accessToken) {
+        return;
+      }
+      await _restoreUserId(spaceId, refreshedToken);
     } catch (_) {}
   }
 
@@ -484,9 +497,11 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     String? verificationCode,
     String? captchaToken,
     String? captchaAnswer,
+    String? invitationCode,
   }) async {
     state = const AsyncLoading();
     try {
+      _ensureRegistrationIdentifierSupported(loginType, loginName);
       final dio = ref.read(dioProvider);
       final regResp = await dio.post<Map<String, dynamic>>(
         '/api/platform/v1/auth/register',
@@ -530,6 +545,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       await _storage.write(
           SecureStorageService.platformTokenKey, platformToken);
 
+      if (await _acceptRegistrationInvitation(
+        invitationCode: invitationCode,
+        platformToken: platformToken,
+      )) {
+        return;
+      }
+
       final tenants = await _resolveRegistrationTenants(data, platformToken);
       state = AsyncData(AuthState(
         status: AuthStatus.unauthenticated,
@@ -544,6 +566,41 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       state = AsyncError(e, st);
       rethrow;
     }
+  }
+
+  Future<bool> _acceptRegistrationInvitation({
+    required String? invitationCode,
+    required String platformToken,
+  }) async {
+    final code = invitationCode?.trim();
+    if (code == null || code.isEmpty) return false;
+
+    final dataSource = PlatformTenantDataSource(ref.read(dioProvider));
+    final preview = await dataSource.previewInvitation(
+      platformToken: platformToken,
+      code: code,
+    );
+    final joinResult = await dataSource.acceptInvitation(
+      platformToken: platformToken,
+      code: code,
+    );
+    if (!joinResult.isJoined || joinResult.tenantAuth == null) {
+      state = AsyncData(AuthState(
+        status: AuthStatus.unauthenticated,
+        platformToken: platformToken,
+      ));
+      return true;
+    }
+
+    await _applyTenantAuth(
+      joinResult.tenantAuth!,
+      AuthState(
+        status: AuthStatus.unauthenticated,
+        platformToken: platformToken,
+        availableTenants: [preview.toTenantSummary()],
+      ),
+    );
+    return true;
   }
 
   Future<List<TenantSummary>> _resolveRegistrationTenants(
@@ -591,6 +648,7 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   }) async {
     state = const AsyncLoading();
     try {
+      _ensureRegistrationIdentifierSupported(loginType, loginName);
       final dio = ref.read(dioProvider);
 
       // Step1: 企业注册（X-Tenant-Id 传 tenantId 或 tenantCode 均可，服务端按优先级处理）
@@ -649,6 +707,20 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
+    }
+  }
+
+  void _ensureRegistrationIdentifierSupported(
+    String loginType,
+    String? loginName,
+  ) {
+    final type = loginType.trim().toLowerCase();
+    final hasLoginName = loginName != null && loginName.trim().isNotEmpty;
+    if (type == 'lpp_id' || type == 'login_name' || hasLoginName) {
+      throw const ServerError(
+        code: 'AUTH_REGISTER_IDENTIFIER_UNSUPPORTED',
+        message: '注册暂不支持微界号，请使用邮箱或手机号注册',
+      );
     }
   }
 

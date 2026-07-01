@@ -138,4 +138,33 @@ void main() {
     expect(registerSource, contains('context.go(AppRoutes.tenantSelect)'));
   });
 
+  test('register page routes invitation code through platform registration',
+      () {
+    final registerSource =
+        File('lib/features/auth/presentation/pages/register_page.dart')
+            .readAsStringSync();
+
+    expect(registerSource, contains('enum _JoinCredentialKind'));
+    expect(registerSource, contains('invitationCode: isInvitationCode'));
+    expect(registerSource, contains('_previewInvitation(code)'));
+    expect(
+      registerSource.indexOf('!isInvitationCode'),
+      lessThan(registerSource.indexOf('registerEnterprise(')),
+    );
+    expect(
+      registerSource.indexOf('registerPlatform('),
+      lessThan(registerSource.indexOf('invitationCode: isInvitationCode')),
+    );
+  });
+
+  test('register page labels lpp id registration as weijie id', () {
+    final registerSource =
+        File('lib/features/auth/presentation/pages/register_page.dart')
+            .readAsStringSync();
+
+    expect(registerSource, contains("_idTab('微界号', _IdMode.loginName)"));
+    expect(registerSource, contains("_buildLabel('微界号')"));
+    expect(registerSource, contains("hint: '设置微界号"));
+    expect(registerSource, isNot(contains("_idTab('账号', _IdMode.loginName)")));
+  });
 }

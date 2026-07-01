@@ -1,9 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { ClientUpdatePreferences, ClientUpdateState } from "../../../shared/desktop-api";
+import type {
+  ClientUpdatePreferences,
+  ClientUpdateState,
+} from "../../../shared/desktop-api";
 import type { AuthSession } from "../../data/auth/auth-session";
 import { requireApiClient } from "../../data/runtime";
+import type { AppLocale } from "../../i18n/locales";
 import { useI18n } from "../../i18n/useI18n";
 import { formatError } from "../../lib/format";
 import {
@@ -23,11 +27,20 @@ import {
   setClientUpdatePreferences,
   subscribeClientUpdateState,
 } from "../runtime/clientUpdateRuntime";
-import { ActionRow, InfoRow, InlineSettingsState, SelectRow, SwitchRow } from "./SettingsRows";
+import {
+  ActionRow,
+  InfoRow,
+  InlineSettingsState,
+  SelectRow,
+  SwitchRow,
+} from "./SettingsRows";
 
 type LegalPanel = "terms" | "privacy" | null;
 type LegalPartKind = "title" | "meta" | "section" | "body" | "footer";
-type Translate = (key: string, params?: Record<string, string | number>) => string;
+type Translate = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string;
 
 interface LegalPart {
   kind: LegalPartKind;
@@ -36,15 +49,20 @@ interface LegalPart {
 
 const legacyLegalPartCount = 17;
 
-const legalContent: Record<Exclude<LegalPanel, null>, { titleKey: string; zhCNPartCount: number }> = {
-  terms: {
-    titleKey: "settings.helpAbout.legal.terms.title",
-    zhCNPartCount: 49,
-  },
-  privacy: {
-    titleKey: "settings.helpAbout.legal.privacy.title",
-    zhCNPartCount: 82,
-  },
+type LegalPartCounts = Record<Exclude<LegalPanel, null>, number>;
+
+const legalPartCountsByLocale: Record<AppLocale, LegalPartCounts> = {
+  "zh-CN": { terms: 53, privacy: 91 },
+  "zh-TW": { terms: 47, privacy: 85 },
+  en: { terms: 47, privacy: 85 },
+  ja: { terms: 43, privacy: 65 },
+  vi: { terms: 40, privacy: 60 },
+  th: { terms: 47, privacy: 85 },
+};
+
+const legalContent: Record<Exclude<LegalPanel, null>, { titleKey: string }> = {
+  terms: { titleKey: "settings.helpAbout.legal.terms.title" },
+  privacy: { titleKey: "settings.helpAbout.legal.privacy.title" },
 };
 
 export function HelpAboutSettingsSection({
@@ -72,7 +90,10 @@ export function HelpAboutSettingsSection({
   });
 
   useEffect(() => {
-    void window.desktopApi?.getAppVersion?.().then(setVersion).catch(() => setVersion("0.1.0"));
+    void window.desktopApi
+      ?.getAppVersion?.()
+      .then(setVersion)
+      .catch(() => setVersion("0.1.0"));
   }, []);
 
   useEffect(() => {
@@ -92,8 +113,10 @@ export function HelpAboutSettingsSection({
 
   const submitFeedback = useMutation({
     mutationFn: async () => {
-      if (!feedbackTitle.trim()) throw new Error(t("settings.helpAbout.feedback.validation.title"));
-      if (!feedbackContent.trim()) throw new Error(t("settings.helpAbout.feedback.validation.content"));
+      if (!feedbackTitle.trim())
+        throw new Error(t("settings.helpAbout.feedback.validation.title"));
+      if (!feedbackContent.trim())
+        throw new Error(t("settings.helpAbout.feedback.validation.content"));
       return requireApiClient(authSession).submitFeedback({
         type: feedbackType,
         title: feedbackTitle,
@@ -103,7 +126,9 @@ export function HelpAboutSettingsSection({
         clientContext: {
           app: "lpp_pc_client",
           version,
-          apiEnvironment: authSession?.apiBaseUrl ? "configured" : "default-test",
+          apiEnvironment: authSession?.apiBaseUrl
+            ? "configured"
+            : "default-test",
           tenantId: authSession?.tenantId,
           tenantCode: authSession?.tenantCode || "mouse-corp",
         },
@@ -115,11 +140,18 @@ export function HelpAboutSettingsSection({
       setFeedbackContact("");
       setNotice(
         result.feedbackId
-          ? t("settings.helpAbout.feedback.submittedWithId", { id: result.feedbackId })
+          ? t("settings.helpAbout.feedback.submittedWithId", {
+              id: result.feedbackId,
+            })
           : t("settings.helpAbout.feedback.submitted"),
       );
     },
-    onError: (error) => setNotice(t("settings.helpAbout.feedback.submitFailed", { error: formatError(error) })),
+    onError: (error) =>
+      setNotice(
+        t("settings.helpAbout.feedback.submitFailed", {
+          error: formatError(error),
+        }),
+      ),
   });
 
   const checkUpdate = useMutation({
@@ -128,25 +160,37 @@ export function HelpAboutSettingsSection({
       setUpdateState(state);
       setNotice(
         state.phase === "available"
-          ? t("settings.helpAbout.update.available", { version: state.available?.version ?? "" })
+          ? t("settings.helpAbout.update.available", {
+              version: state.available?.version ?? "",
+            })
           : t("settings.helpAbout.update.latest"),
       );
     },
-    onError: (error) => setNotice(t("settings.helpAbout.update.failed", { error: formatError(error) })),
+    onError: (error) =>
+      setNotice(
+        t("settings.helpAbout.update.failed", { error: formatError(error) }),
+      ),
   });
 
   const downloadUpdate = useMutation({
     mutationFn: downloadClientUpdate,
     onSuccess: (state) => {
       setUpdateState(state);
-      if (state.phase === "downloaded") setNotice(t("settings.helpAbout.update.downloaded"));
+      if (state.phase === "downloaded")
+        setNotice(t("settings.helpAbout.update.downloaded"));
     },
-    onError: (error) => setNotice(t("settings.helpAbout.update.failed", { error: formatError(error) })),
+    onError: (error) =>
+      setNotice(
+        t("settings.helpAbout.update.failed", { error: formatError(error) }),
+      ),
   });
 
   const installUpdate = useMutation({
     mutationFn: installClientUpdate,
-    onError: (error) => setNotice(t("settings.helpAbout.update.failed", { error: formatError(error) })),
+    onError: (error) =>
+      setNotice(
+        t("settings.helpAbout.update.failed", { error: formatError(error) }),
+      ),
   });
 
   const updatePreferences = useMutation({
@@ -154,7 +198,10 @@ export function HelpAboutSettingsSection({
     onSuccess: (preferences) => {
       setUpdateState((state) => ({ ...state, preferences }));
     },
-    onError: (error) => setNotice(t("settings.helpAbout.update.failed", { error: formatError(error) })),
+    onError: (error) =>
+      setNotice(
+        t("settings.helpAbout.update.failed", { error: formatError(error) }),
+      ),
   });
 
   const setUpdatePreference = (patch: Partial<ClientUpdatePreferences>) => {
@@ -167,13 +214,19 @@ export function HelpAboutSettingsSection({
     updatePreferences.mutate(nextPreferences);
   };
 
-  const currentLegal = legalPanel ? legalContent[legalPanel] : null;
+  const activeLegalPanel = legalPanel;
+  const currentLegal = activeLegalPanel ? legalContent[activeLegalPanel] : null;
 
-  if (currentLegal) {
+  if (activeLegalPanel && currentLegal) {
     const currentLegalTitle = t(currentLegal.titleKey);
-    const partCount = locale === "zh-CN" ? currentLegal.zhCNPartCount : legacyLegalPartCount;
+    const partCount =
+      legalPartCountsByLocale[locale]?.[activeLegalPanel] ??
+      legacyLegalPartCount;
     return (
-      <section className="settings-about-layout settings-about-legal-view" aria-label={currentLegalTitle}>
+      <section
+        className="settings-about-layout settings-about-legal-view"
+        aria-label={currentLegalTitle}
+      >
         <header className="settings-about-legal-head">
           <button type="button" onClick={() => setLegalPanel(null)}>
             <ArrowLeft size={16} />
@@ -185,7 +238,13 @@ export function HelpAboutSettingsSection({
           {Array.from({ length: partCount }, (_, index) => {
             const key = `settings.helpAbout.legal.${legalPanel}.parts.${index}`;
             const text = t(key);
-            return <LegalCopyPart key={key} part={{ kind: resolveLegalPartKind(index, text), key }} t={t} />;
+            return (
+              <LegalCopyPart
+                key={key}
+                part={{ kind: resolveLegalPartKind(index, text), key }}
+                t={t}
+              />
+            );
           })}
         </div>
       </section>
@@ -193,22 +252,32 @@ export function HelpAboutSettingsSection({
   }
 
   return (
-    <section className="settings-about-layout" aria-label={t("settings.helpAbout.aria")}>
+    <section
+      className="settings-about-layout"
+      aria-label={t("settings.helpAbout.aria")}
+    >
       <div className="settings-sub-card">
         <header>
           <strong>{t("settings.helpAbout.version.title")}</strong>
           <span>{version}</span>
         </header>
-        <InfoRow {...settingRowProps("aboutClient")} desc={`StartLink ${version}`} />
+        <InfoRow
+          {...settingRowProps("aboutClient")}
+          desc={`StartLink ${version}`}
+        />
         <SwitchRow
           {...settingRowProps("autoCheckUpdates")}
           checked={updateState.preferences.autoCheck}
-          enabled={isClientUpdateRuntimeAvailable() && !updatePreferences.isPending}
+          enabled={
+            isClientUpdateRuntimeAvailable() && !updatePreferences.isPending
+          }
           onChange={(autoCheck) => setUpdatePreference({ autoCheck })}
         />
         <SelectRow
           {...settingRowProps("updateChannel")}
-          enabled={isClientUpdateRuntimeAvailable() && !updatePreferences.isPending}
+          enabled={
+            isClientUpdateRuntimeAvailable() && !updatePreferences.isPending
+          }
           value={updateState.preferences.channel}
           options={["stable", "beta"]}
           optionLabels={{
@@ -229,7 +298,11 @@ export function HelpAboutSettingsSection({
       </div>
       <ActionRow
         {...settingRowProps("checkUpdate")}
-        action={checkUpdate.isPending ? t("settings.helpAbout.update.checking") : t("settings.helpAbout.update.check")}
+        action={
+          checkUpdate.isPending
+            ? t("settings.helpAbout.update.checking")
+            : t("settings.helpAbout.update.check")
+        }
         enabled={isClientUpdateRuntimeAvailable() && !checkUpdate.isPending}
         onClick={() => checkUpdate.mutate()}
       />
@@ -243,7 +316,9 @@ export function HelpAboutSettingsSection({
             <InlineSettingsState text={updateState.available.releaseNotes} />
           )}
           {updateState.progress && (
-            <InlineSettingsState text={updateProgressText(updateState.progress)} />
+            <InlineSettingsState
+              text={updateProgressText(updateState.progress)}
+            />
           )}
           <ActionRow
             label={t("settings.helpAbout.update.download")}
@@ -264,7 +339,9 @@ export function HelpAboutSettingsSection({
             label={t("settings.helpAbout.update.install")}
             desc={t("settings.helpAbout.update.installDesc")}
             action={t("settings.helpAbout.update.install")}
-            enabled={updateStateCanInstall(updateState) && !installUpdate.isPending}
+            enabled={
+              updateStateCanInstall(updateState) && !installUpdate.isPending
+            }
             onClick={() => installUpdate.mutate()}
           />
         </div>
@@ -280,10 +357,18 @@ export function HelpAboutSettingsSection({
             value={feedbackType}
             onChange={(event) => setFeedbackType(event.target.value)}
           >
-            <option value="bug">{t("settings.helpAbout.feedback.types.bug")}</option>
-            <option value="suggestion">{t("settings.helpAbout.feedback.types.suggestion")}</option>
-            <option value="complaint">{t("settings.helpAbout.feedback.types.complaint")}</option>
-            <option value="experience">{t("settings.helpAbout.feedback.types.experience")}</option>
+            <option value="bug">
+              {t("settings.helpAbout.feedback.types.bug")}
+            </option>
+            <option value="suggestion">
+              {t("settings.helpAbout.feedback.types.suggestion")}
+            </option>
+            <option value="complaint">
+              {t("settings.helpAbout.feedback.types.complaint")}
+            </option>
+            <option value="experience">
+              {t("settings.helpAbout.feedback.types.experience")}
+            </option>
           </select>
           <input
             value={feedbackTitle}
@@ -300,11 +385,19 @@ export function HelpAboutSettingsSection({
             placeholder={t("settings.helpAbout.feedback.contactPlaceholder")}
             onChange={(event) => setFeedbackContact(event.target.value)}
           />
-          <button type="button" disabled={submitFeedback.isPending} onClick={() => submitFeedback.mutate()}>
-            {submitFeedback.isPending ? t("settings.helpAbout.feedback.submitting") : t("settings.helpAbout.feedback.submit")}
+          <button
+            type="button"
+            disabled={submitFeedback.isPending}
+            onClick={() => submitFeedback.mutate()}
+          >
+            {submitFeedback.isPending
+              ? t("settings.helpAbout.feedback.submitting")
+              : t("settings.helpAbout.feedback.submit")}
           </button>
         </div>
-        <InlineSettingsState text={t("settings.helpAbout.feedback.privacyNote")} />
+        <InlineSettingsState
+          text={t("settings.helpAbout.feedback.privacyNote")}
+        />
       </div>
       <ActionRow
         {...settingRowProps("terms")}
@@ -331,8 +424,14 @@ function LegalCopyPart({ part, t }: { part: LegalPart; t: Translate }) {
 
 function resolveLegalPartKind(index: number, text: string): LegalPartKind {
   if (index === 0) return "title";
-  if (/^(更新日期|最近更新日期|生效日期|协议生效日期)：/.test(text)) return "meta";
-  if (/^[一二三四五六七八九十]+、/.test(text)) return "section";
+  if (
+    /^(更新日期|最近更新日期|生效日期|协议生效日期|Last updated|Updated|Effective|Effective date|最終更新日|発効日|Cập nhật|Ngày có hiệu lực|ปรับปรุงล่าสุด|วันที่มีผลใช้บังคับ)[:：]/.test(
+      text,
+    )
+  )
+    return "meta";
+  if (/^[一二三四五六七八九十]+、/.test(text) || /^\d+[.．]\s/.test(text))
+    return "section";
   if (/^©\s?\d{4}/.test(text)) return "footer";
   return "body";
 }
@@ -345,8 +444,13 @@ function updateStatusDescription(
   state: ClientUpdateState,
   t: (key: string, params?: Record<string, string | number>) => string,
 ) {
-  if (state.phase === "available" && state.available) return updatePackageSummary(state.available);
-  if (state.phase === "downloading") return updateProgressText(state.progress) || t("settings.helpAbout.update.downloading");
+  if (state.phase === "available" && state.available)
+    return updatePackageSummary(state.available);
+  if (state.phase === "downloading")
+    return (
+      updateProgressText(state.progress) ||
+      t("settings.helpAbout.update.downloading")
+    );
   if (state.phase === "error" && state.error) return state.error;
   return t(`settings.helpAbout.update.desc.${state.phase}`);
 }

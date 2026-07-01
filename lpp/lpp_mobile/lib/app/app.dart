@@ -17,6 +17,7 @@ import 'package:lpp_mobile/core/space/space_manager.dart';
 import 'package:lpp_mobile/core/storage/secure_storage.dart';
 import 'package:lpp_mobile/core/widgets/network_status_banner.dart';
 import 'package:lpp_mobile/features/auth/presentation/providers/auth_provider.dart';
+import 'package:lpp_mobile/features/app_update/presentation/app_update_gate.dart';
 import 'package:lpp_mobile/features/call/presentation/widgets/incoming_call_overlay.dart';
 import 'package:lpp_mobile/features/chat/domain/entities/conversation.dart';
 import 'package:lpp_mobile/features/chat/domain/services/chat_startup_recovery.dart';
@@ -209,6 +210,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
             ),
             IncomingCallOverlay(router: _appRouter.router),
             ActiveCallMiniOverlay(router: _appRouter.router),
+            const AppUpdateGate(),
             if (!suppressStartupNetworkBanner) const NetworkStatusBanner(),
           ],
         );

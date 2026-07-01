@@ -24,8 +24,16 @@ import 'package:lpp_mobile/features/customer_service/presentation/providers/cust
 final _chatRepositoryProvider =
     Provider.family<ChatRepository, String>((ref, spaceId) {
   final dio = ref.watch(dioProvider);
+  ref.watch(currentSpaceProvider)?.spaceId;
   return ChatRepositoryImpl(
-    remote: ChatRemoteDataSourceImpl(dio),
+    remote: ChatRemoteDataSourceImpl(
+      dio,
+      accessTokenGetter: () {
+        final space = ref.read(currentSpaceProvider);
+        if (space?.spaceId != spaceId) return null;
+        return space?.accessToken;
+      },
+    ),
     local: ChatLocalDataSourceImpl(),
     spaceId: spaceId,
   );

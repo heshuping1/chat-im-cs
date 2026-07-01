@@ -28,13 +28,13 @@ class PlatformTenantDataSource {
   }
 
   Future<InvitationPreview> previewInvitation({
-    required String platformToken,
+    String? platformToken,
     required String code,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/platform/v1/invitations/$code',
-        options: _platformOptions(platformToken),
+        options: _optionalPlatformOptions(platformToken),
       );
       return InvitationPreview.fromJson(
         _data(response) as Map<String, dynamic>? ?? const {},
@@ -130,6 +130,12 @@ class PlatformTenantDataSource {
 
   Options _platformOptions(String platformToken) {
     return Options(headers: {'Authorization': 'Bearer $platformToken'});
+  }
+
+  Options? _optionalPlatformOptions(String? platformToken) {
+    final token = platformToken?.trim();
+    if (token == null || token.isEmpty) return null;
+    return _platformOptions(token);
   }
 
   Object? _data(Response<Map<String, dynamic>> response) {

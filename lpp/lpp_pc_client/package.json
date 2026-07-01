@@ -1,6 +1,7 @@
 {
   "name": "startlink",
   "version": "1.0.4",
+  "buildVersionCode": 104,
   "private": true,
   "description": "StartLink Windows customer service desktop client",
   "main": "dist/main/main.js",

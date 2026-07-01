@@ -6,6 +6,8 @@ class TermsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const LegalDocumentScaffold(document: termsLegalDocumentZh);
+    return LegalDocumentScaffold(
+      document: termsLegalDocumentForLocale(Localizations.localeOf(context)),
+    );
   }
 }
