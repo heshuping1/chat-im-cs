@@ -1092,7 +1092,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           controller: _identifierCtrl,
           hint: l10n.authHintEmail,
           keyboardType: TextInputType.emailAddress,
-          autofillHints: const [AutofillHints.email],
           focusNode: _identifierFocusNode,
         ),
         const SizedBox(height: 8),
